@@ -20,7 +20,8 @@ export function middleware(request: NextRequest) {
   }
 
   // --- Rate Limiting ---
-  const ip = request.ip || request.headers.get('x-forwarded-for') || 'unknown';
+  // Next.js Edge API does not provide request.ip; use x-forwarded-for or fallback to hostname
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || request.nextUrl.hostname || 'unknown';
   const now = Date.now();
   const entry = rateLimitMap.get(ip) || { count: 0, last: now };
   if (now - entry.last > 60_000) {
