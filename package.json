@@ -9,12 +9,13 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.744.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@mui/icons-material": "^7.3.7",
     "@mui/material": "^7.3.7",
-    "@aws-sdk/client-s3": "^3.744.0",
     "axios": "^1.13.2",
+    "firebase-admin": "^13.6.0",
     "form-data": "^4.0.5",
     "googleapis": "^170.0.0",
     "lucide-react": "^0.562.0",
@@ -27,7 +28,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@types/node": "^20.19.29",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

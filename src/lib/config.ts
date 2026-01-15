@@ -28,7 +28,11 @@ export interface Product {
 export interface ShopConfig {
   isOpen: boolean;
   closeDate: string;
-  products: Product[];
+    products: Product[];
+    /**
+     * Firestore/Storage key for products (optional, for large data)
+     */
+    productsKey?: string;
   sheetId?: string;
   sheetUrl?: string;
   announcement?: {

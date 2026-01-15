@@ -41,13 +41,13 @@ export default function Footer() {
         <div>
           <h4 className="font-bold text-white mb-4">ติดต่อเรา</h4>
           <div className="flex gap-4 mb-4">
-            <a href="https://facebook.com" className="hover:text-indigo-500 transition" title="Facebook">
+            <a href="https://facebook.com/psuscc" className="hover:text-indigo-500 transition" title="Facebook">
               <Facebook size={20} />
             </a>
-            <a href="https://instagram.com" className="hover:text-pink-500 transition" title="Instagram">
+            <a href="https://instagram.com/psuscc" className="hover:text-pink-500 transition" title="Instagram">
               <Instagram size={20} />
             </a>
-            <a href="mailto:contact@cs-shop.com" className="hover:text-emerald-500 transition" title="Email">
+            <a href="psuscc@psusci.club" className="hover:text-emerald-500 transition" title="Email">
               <Mail size={20} />
             </a>
           </div>
