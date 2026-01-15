@@ -205,16 +205,10 @@ class APIClient {
         );
       }
 
-
       // Check content-type before parsing
       const contentType = response.headers.get('content-type') || '';
-      const text = await response.text();
-
-      if (this.debug) {
-        console.log('📄 Raw response:', text.substring(0, 300));
-      }
-
       if (!contentType.includes('application/json')) {
+        const text = await response.text();
         throw new AppError(
           500,
           'INVALID_CONTENT_TYPE',
@@ -223,20 +217,12 @@ class APIClient {
         );
       }
 
-      // Check for HTML response (error page)
-      if (text.includes('<!DOCTYPE') || text.includes('<html')) {
-        throw new AppError(
-          500,
-          'INVALID_RESPONSE',
-          'Server returned HTML instead of JSON. Check GAS deployment.',
-          { responseText: text.substring(0, 200) }
-        );
-      }
-
+      // Parse JSON safely
       let data: APIResponse<T>;
       try {
-        data = JSON.parse(text);
+        data = await response.json();
       } catch (parseError) {
+        const text = await response.text();
         throw new AppError(
           500,
           'PARSE_ERROR',
@@ -405,8 +391,17 @@ async function fetchJson<T = any>(path: string, opts?: FetchOptions): Promise<AP
   };
 
   const res = await fetch(path, init);
-  const data = await res.json();
-  return data;
+  const contentType = res.headers.get('content-type') || '';
+  if (!res.ok) {
+    // Try to get error message from text
+    const text = await res.text();
+    throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
+  }
+  if (!contentType.includes('application/json')) {
+    const text = await res.text();
+    throw new Error('Server did not return JSON: ' + text.slice(0, 200));
+  }
+  return await res.json();
 }
 
 // ============== SPECIFIC API FUNCTIONS ==============
