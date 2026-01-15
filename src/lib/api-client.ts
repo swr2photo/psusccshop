@@ -205,11 +205,22 @@ class APIClient {
         );
       }
 
-      // Parse response - first get text then parse
+
+      // Check content-type before parsing
+      const contentType = response.headers.get('content-type') || '';
       const text = await response.text();
-      
+
       if (this.debug) {
         console.log('📄 Raw response:', text.substring(0, 300));
+      }
+
+      if (!contentType.includes('application/json')) {
+        throw new AppError(
+          500,
+          'INVALID_CONTENT_TYPE',
+          'เซิร์ฟเวอร์ส่งข้อมูลผิดรูปแบบ (Content-Type ไม่ใช่ application/json)',
+          { contentType, responseText: text.substring(0, 200) }
+        );
       }
 
       // Check for HTML response (error page)
