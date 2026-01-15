@@ -57,12 +57,12 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error(`❌ [GAS-API] GET Error:`, error.message);
-    
+    console.error(`❌ [GAS-API] GET Error:`, error?.message || error);
     return NextResponse.json(
       {
         status: 'error',
-        message: error.message || 'Internal server error',
+        message: error?.message || 'Internal server error',
+        error: typeof error === 'object' ? error : { detail: String(error) },
       },
       { status: 500 }
     );
@@ -120,12 +120,12 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error(`❌ [GAS-API] POST Error:`, error.message);
-    
+    console.error(`❌ [GAS-API] POST Error:`, error?.message || error);
     return NextResponse.json(
       {
         status: 'error',
-        message: error.message || 'Internal server error',
+        message: error?.message || 'Internal server error',
+        error: typeof error === 'object' ? error : { detail: String(error) },
       },
       { status: 500 }
     );
