@@ -5,6 +5,7 @@ import type { NextRequest } from 'next/server';
 // --- CORS config ---
 const allowedOrigins = [
   'https://psusccshop.psusci.club',
+
   // Add more allowed domains here
 ];
 

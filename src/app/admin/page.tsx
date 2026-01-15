@@ -340,22 +340,46 @@ export default function AdminPage(): JSX.Element {
     setConfig(newConfig);
     setLastSavedTime(new Date());
     saveAdminCache({ config: newConfig, orders, logs });
-    // Fire-and-forget remote save
-    saveShopConfig({ ...newConfig, products: newConfig.products || [] }, session?.user?.email || '')
-      .then((res) => {
-        if (res.status !== 'success') {
-          throw new Error(res.message || 'บันทึกไม่สำเร็จ');
+
+    // --- Chunking logic ---
+    const products = newConfig.products || [];
+    const CHUNK_SIZE = 100;
+    const chunkArray = <T,>(arr: T[], size: number): T[][] => {
+      const res: T[][] = [];
+      for (let i = 0; i < arr.length; i += size) {
+        res.push(arr.slice(i, i + size));
+      }
+      return res;
+    };
+    const productChunks = chunkArray(products, CHUNK_SIZE);
+
+    // Helper to merge config except products
+    const baseConfig = { ...newConfig, products: undefined };
+
+    // Async function to send all chunks sequentially
+    const saveChunks = async () => {
+      for (let i = 0; i < productChunks.length; i++) {
+        const chunk = productChunks[i];
+        const isLast = i === productChunks.length - 1;
+        try {
+          const res = await saveShopConfig(
+            { ...baseConfig, products: chunk, chunkIndex: i, chunkTotal: productChunks.length, isLastChunk: isLast },
+            session?.user?.email || ''
+          );
+          if (res.status !== 'success') {
+            throw new Error((res as any).message || 'บันทึกไม่สำเร็จ');
+          }
+        } catch (error: any) {
+          console.error('❌ Save error:', error);
+          showToast('error', error?.message || 'บันทึกไม่สำเร็จ (chunk ' + (i + 1) + ')');
+          break;
         }
-        // Optionally update config with server response if needed
-        // setConfig(res.data as ShopConfig);
-      })
-      .catch((error) => {
-        console.error('❌ Save error:', error);
-        showToast('error', error?.message || 'บันทึกไม่สำเร็จ');
-      })
-      .finally(() => {
-        setSaving(false);
-      });
+      }
+    };
+
+    saveChunks().finally(() => {
+      setSaving(false);
+    });
   }, [orders, logs, showToast, session?.user?.email]);
 
   // Update Order Status
