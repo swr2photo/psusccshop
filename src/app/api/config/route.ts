@@ -1,3 +1,8 @@
+// TypeScript: Extend globalThis for chunked cache
+declare global {
+  // eslint-disable-next-line no-var
+  var _chunkedProductsCache: Record<number, any[]> | undefined;
+}
 import { NextRequest, NextResponse } from 'next/server';
 import { getJson, putJson } from '@/lib/filebase';
 import { ShopConfig } from '@/lib/config';
