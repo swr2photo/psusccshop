@@ -20,6 +20,10 @@ export async function POST(req: NextRequest) {
     await putJson(profileKey(email), data);
     return NextResponse.json({ status: 'success', data: { profile: data } });
   } catch (error: any) {
-    return NextResponse.json({ status: 'error', message: error?.message || 'save failed' }, { status: 500 });
+    return NextResponse.json({
+      status: 'error',
+      message: error?.message || 'save failed',
+      error: typeof error === 'object' ? error : { detail: String(error) },
+    }, { status: 500 });
   }
 }
