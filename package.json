@@ -9,6 +9,11 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^7.3.7",
+    "@mui/material": "^7.3.7",
+    "@aws-sdk/client-s3": "^3.744.0",
     "axios": "^1.13.2",
     "form-data": "^4.0.5",
     "googleapis": "^170.0.0",
