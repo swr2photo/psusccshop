@@ -8,10 +8,10 @@ const findOrderKey = async (ref: string): Promise<string | null> => {
 };
 
 export async function GET(req: NextRequest) {
-  const ref = req.nextUrl.searchParams.get('ref');
-  if (!ref) return NextResponse.json({ status: 'error', message: 'missing ref' }, { status: 400 });
-
   try {
+    const ref = req.nextUrl.searchParams.get('ref');
+    if (!ref) return NextResponse.json({ status: 'error', message: 'missing ref' }, { status: 400 });
+
     const key = await findOrderKey(ref);
     if (!key) return NextResponse.json({ status: 'error', message: 'order not found' }, { status: 404 });
 
@@ -42,6 +42,10 @@ export async function GET(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('[payment-info] error', error);
-    return NextResponse.json({ status: 'error', message: error?.message || 'load failed' }, { status: 500 });
+    return NextResponse.json({
+      status: 'error',
+      message: error?.message || 'load failed',
+      error: typeof error === 'object' ? error : { detail: String(error) },
+    }, { status: 500 });
   }
 }

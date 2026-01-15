@@ -104,6 +104,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ status: 'success', data: { ref, expectedAmount } });
   } catch (error: any) {
     console.error('[payment-verify] error', error);
-    return NextResponse.json({ status: 'error', message: error.message || 'verify failed' }, { status: 500 });
+    return NextResponse.json({
+      status: 'error',
+      message: error?.message || 'verify failed',
+      error: typeof error === 'object' ? error : { detail: String(error) },
+    }, { status: 500 });
   }
 }
