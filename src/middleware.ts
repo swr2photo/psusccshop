@@ -16,7 +16,7 @@ export function middleware(request: NextRequest) {
   // --- CORS ---
   const origin = request.headers.get('origin');
   if (origin && !allowedOrigins.includes(origin)) {
-    return new NextResponse('CORS policy: This origin is not allowed', { status: 403 });
+    return NextResponse.json({ status: 'error', message: 'CORS policy: This origin is not allowed' }, { status: 403 });
   }
 
   // --- Rate Limiting ---
@@ -31,7 +31,7 @@ export function middleware(request: NextRequest) {
   entry.count++;
   rateLimitMap.set(ip, entry);
   if (entry.count > RATE_LIMIT) {
-    return new NextResponse('Too many requests', { status: 429 });
+    return NextResponse.json({ status: 'error', message: 'Too many requests' }, { status: 429 });
   }
 
   // --- CSP Header ---
