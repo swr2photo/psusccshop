@@ -142,10 +142,26 @@ const saveAdminCache = (payload: { config: ShopConfig; orders?: AdminOrder[]; lo
   if (typeof window === 'undefined' || ADMIN_CACHE_DISABLED) return;
   try {
     const cached = loadAdminCache();
+    
+    // Strip base64 images from products before caching to avoid quota issues
+    const stripBase64FromProducts = (products: any[]) => {
+      return (products || []).map(p => ({
+        ...p,
+        // Keep URL images, remove base64 data URLs
+        coverImage: p.coverImage?.startsWith('data:') ? '' : p.coverImage,
+        images: (p.images || []).filter((img: string) => !img?.startsWith('data:')),
+      }));
+    };
+    
+    const configToCache = {
+      ...payload.config,
+      products: stripBase64FromProducts(payload.config?.products || []),
+    };
+    
     const next = {
-      config: payload.config || cached?.config || DEFAULT_CONFIG,
+      config: configToCache || cached?.config || DEFAULT_CONFIG,
       orders: payload.orders ?? cached?.orders ?? [],
-      logs: payload.logs ?? cached?.logs ?? [],
+      logs: (payload.logs ?? cached?.logs ?? []).slice(0, 50), // Limit logs
     };
     const save = (data: any) => window.localStorage.setItem(ADMIN_CACHE_KEY, JSON.stringify(data));
 
@@ -155,8 +171,8 @@ const saveAdminCache = (payload: { config: ShopConfig; orders?: AdminOrder[]; lo
       if (err?.name !== 'QuotaExceededError') throw err;
       // Fallback: store smaller snapshot to avoid quota blowups in dev tools
       const compact = {
-        config: next.config,
-        orders: (next.orders || []).slice(0, 30).map(o => ({ ref: o.ref, status: o.status })),
+        config: { ...next.config, products: [] }, // Remove products entirely
+        orders: (next.orders || []).slice(0, 20).map(o => ({ ref: o.ref, status: o.status })),
         logs: [],
       };
       try {
@@ -400,54 +416,112 @@ export default function AdminPage(): JSX.Element {
     }
   }, [session?.user?.email, showToast]);
 
-  // 💾 Save Config
-  const saveFullConfig = useCallback((newConfig: ShopConfig) => {
-    setSaving(true);
-    // Save to local state/cache immediately for instant UI feedback
-    setConfig(newConfig);
-    setLastSavedTime(new Date());
-    saveAdminCache({ config: newConfig, orders, logs });
-
-    // --- Chunking logic ---
-    const products = newConfig.products || [];
-    const CHUNK_SIZE = 100;
-    const chunkArray = <T,>(arr: T[], size: number): T[][] => {
-      const res: T[][] = [];
-      for (let i = 0; i < arr.length; i += size) {
-        res.push(arr.slice(i, i + size));
+  // �️ Upload images to Filebase before saving
+  const uploadImagesToStorage = async (products: any[]): Promise<any[]> => {
+    const isBase64 = (str: string) => str && str.startsWith('data:image');
+    
+    // Collect all base64 images
+    const imagesToUpload: { productIndex: number; field: 'coverImage' | 'images'; imageIndex?: number; base64: string }[] = [];
+    
+    products.forEach((product, productIndex) => {
+      if (product.coverImage && isBase64(product.coverImage)) {
+        imagesToUpload.push({ productIndex, field: 'coverImage', base64: product.coverImage });
       }
-      return res;
-    };
-    const productChunks = chunkArray(products, CHUNK_SIZE);
-
-    // Helper to merge config except products
-    const baseConfig = { ...newConfig, products: undefined };
-
-    // Async function to send all chunks sequentially
-    const saveChunks = async () => {
-      for (let i = 0; i < productChunks.length; i++) {
-        const chunk = productChunks[i];
-        const isLast = i === productChunks.length - 1;
-        try {
-          const res = await saveShopConfig(
-            { ...baseConfig, products: chunk, chunkIndex: i, chunkTotal: productChunks.length, isLastChunk: isLast },
-            session?.user?.email || ''
-          );
-          if (res.status !== 'success') {
-            throw new Error((res as any).message || 'บันทึกไม่สำเร็จ');
+      if (Array.isArray(product.images)) {
+        product.images.forEach((img: string, imageIndex: number) => {
+          if (isBase64(img)) {
+            imagesToUpload.push({ productIndex, field: 'images', imageIndex, base64: img });
           }
-        } catch (error: any) {
-          console.error('❌ Save error:', error);
-          showToast('error', error?.message || 'บันทึกไม่สำเร็จ (chunk ' + (i + 1) + ')');
-          break;
-        }
+        });
       }
-    };
-
-    saveChunks().finally(() => {
-      setSaving(false);
     });
-  }, [orders, logs, showToast, session?.user?.email]);
+
+    if (imagesToUpload.length === 0) return products;
+
+    console.log(`📤 Uploading ${imagesToUpload.length} images to storage...`);
+
+    // Upload in batches
+    const BATCH_SIZE = 5;
+    const updatedProducts = [...products];
+    
+    for (let i = 0; i < imagesToUpload.length; i += BATCH_SIZE) {
+      const batch = imagesToUpload.slice(i, i + BATCH_SIZE);
+      const uploadPromises = batch.map(async (item) => {
+        try {
+          const res = await fetch('/api/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              base64: item.base64,
+              filename: `product_${item.productIndex}_${Date.now()}.png`,
+              mime: 'image/png',
+            }),
+          });
+          const data = await res.json();
+          if (data.status === 'success' && data.data?.url) {
+            return { ...item, url: data.data.url };
+          }
+          return { ...item, url: null, error: data.message };
+        } catch (err: any) {
+          console.error('Upload error:', err);
+          return { ...item, url: null, error: err?.message };
+        }
+      });
+
+      const results = await Promise.all(uploadPromises);
+      
+      // Update products with uploaded URLs
+      results.forEach((result) => {
+        if (result.url) {
+          if (result.field === 'coverImage') {
+            updatedProducts[result.productIndex] = {
+              ...updatedProducts[result.productIndex],
+              coverImage: result.url,
+            };
+          } else if (result.field === 'images' && typeof result.imageIndex === 'number') {
+            const images = [...(updatedProducts[result.productIndex].images || [])];
+            images[result.imageIndex] = result.url;
+            updatedProducts[result.productIndex] = {
+              ...updatedProducts[result.productIndex],
+              images,
+            };
+          }
+        }
+      });
+    }
+
+    console.log(`✅ Image upload complete`);
+    return updatedProducts;
+  };
+
+  // 💾 Save Config
+  const saveFullConfig = useCallback(async (newConfig: ShopConfig) => {
+    setSaving(true);
+    
+    try {
+      // Upload images first if any are base64
+      const productsWithUrls = await uploadImagesToStorage(newConfig.products || []);
+      const configWithUrls = { ...newConfig, products: productsWithUrls };
+      
+      // Save to local state/cache immediately for instant UI feedback
+      setConfig(configWithUrls);
+      setLastSavedTime(new Date());
+      saveAdminCache({ config: configWithUrls, orders, logs });
+
+      // Save to server
+      const res = await saveShopConfig(configWithUrls, session?.user?.email || '');
+      if (res.status !== 'success') {
+        throw new Error((res as any).message || 'บันทึกไม่สำเร็จ');
+      }
+      
+      addLog('SAVE_CONFIG', 'บันทึกการตั้งค่า', { config: configWithUrls });
+    } catch (error: any) {
+      console.error('❌ Save error:', error);
+      showToast('error', error?.message || 'บันทึกไม่สำเร็จ');
+    } finally {
+      setSaving(false);
+    }
+  }, [orders, logs, showToast, session?.user?.email, addLog]);
 
   // Update Order Status
   const updateOrderStatus = async (ref: string, newStatus: string) => {
