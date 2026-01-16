@@ -218,7 +218,7 @@ type OrderHistory = {
 
 type Interval = ReturnType<typeof setInterval>;
 
-type LeanProduct = Pick<Product, 'id' | 'name' | 'description' | 'type' | 'images' | 'basePrice' | 'sizePricing' | 'isActive'>;
+type LeanProduct = Pick<Product, 'id' | 'name' | 'description' | 'type' | 'images' | 'basePrice' | 'sizePricing' | 'isActive' | 'startDate' | 'endDate'>;
 type LeanConfig = {
   isOpen: boolean;
   announcement?: ShopConfig['announcement'];
@@ -227,6 +227,19 @@ type LeanConfig = {
 
 const clampQty = (value: number) => Math.min(99, Math.max(1, value));
 const normalizeStatus = (status: string) => (status || '').trim().toUpperCase();
+
+// Check if product is currently open based on startDate/endDate
+const isProductCurrentlyOpen = (product: { isActive?: boolean; startDate?: string; endDate?: string }): boolean => {
+  if (!product.isActive) return false;
+  const now = new Date();
+  const start = product.startDate ? new Date(product.startDate) : null;
+  const end = product.endDate ? new Date(product.endDate) : null;
+  // Not yet started
+  if (start && now < start) return false;
+  // Already ended
+  if (end && now > end) return false;
+  return true;
+};
 const normalizeEngName = (value: string) => value.replace(/[^a-zA-Z\s]/g, '').toUpperCase().slice(0, 7).trim();
 const normalizeDigits99 = (value: string) => {
   const digits = value.replace(/\D/g, '');
@@ -604,6 +617,8 @@ export default function HomePage() {
       basePrice: p.basePrice,
       sizePricing: p.sizePricing,
       isActive: p.isActive,
+      startDate: p.startDate,
+      endDate: p.endDate,
     })),
   });
 
@@ -1698,7 +1713,7 @@ export default function HomePage() {
   }, [displaySizes, selectedProduct]);
 
   const groupedProducts = useMemo(() => {
-    const items = (config?.products || []).filter((p) => p.isActive);
+    const items = (config?.products || []).filter((p) => isProductCurrentlyOpen(p));
     const map: Record<string, Product[]> = {};
     items.forEach((p) => {
       const key = p.type || 'OTHER';

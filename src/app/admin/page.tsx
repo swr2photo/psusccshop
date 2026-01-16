@@ -331,6 +331,9 @@ export default function AdminPage(): JSX.Element {
   const [lastSavedTime, setLastSavedTime] = useState<Date | null>(null);
   const [sheetSyncing, setSheetSyncing] = useState(false);
   const [orderProcessingRef, setOrderProcessingRef] = useState<string | null>(null);
+  // Settings state (moved from SettingsView to prevent re-render issues)
+  const [settingsLocalConfig, setSettingsLocalConfig] = useState<ShopConfig>(DEFAULT_CONFIG);
+  const [settingsHasChanges, setSettingsHasChanges] = useState(false);
   const [orderEditor, setOrderEditor] = useState({
     open: false,
     ref: '',
@@ -694,6 +697,13 @@ export default function AdminPage(): JSX.Element {
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
   }, [status, fetchData]);
+
+  // Sync settings local config with main config (only when no unsaved changes)
+  useEffect(() => {
+    if (!settingsHasChanges) {
+      setSettingsLocalConfig(config);
+    }
+  }, [config, settingsHasChanges]);
 
   // ✅ View Components
   const DashboardView = (): JSX.Element => {
@@ -1638,27 +1648,23 @@ export default function AdminPage(): JSX.Element {
   };
 
   const SettingsView = (): JSX.Element => {
-    const [localConfig, setLocalConfig] = useState(config);
-    const [hasChanges, setHasChanges] = useState(false);
-
-    useEffect(() => {
-      setLocalConfig(config);
-      setHasChanges(false);
-    }, [config]);
+    // Use parent-level state to prevent re-mount losing focus
+    const localConfig = settingsLocalConfig;
+    const hasChanges = settingsHasChanges;
 
     const handleChange = (newVal: ShopConfig) => {
-      setLocalConfig(newVal);
-      setHasChanges(true);
+      setSettingsLocalConfig(newVal);
+      setSettingsHasChanges(true);
     };
 
     const handleSave = () => {
       saveFullConfig(localConfig);
-      setHasChanges(false);
+      setSettingsHasChanges(false);
     };
 
     const handleReset = () => {
-      setLocalConfig(config);
-      setHasChanges(false);
+      setSettingsLocalConfig(config);
+      setSettingsHasChanges(false);
     };
 
     // Section wrapper component
@@ -3095,7 +3101,50 @@ const StatusChip = ({ status }: { status: string }): JSX.Element => {
   return <Chip label={label} size="small" color={colors[normalized] || 'default'} variant="outlined" />;
 };
 
+// Check if product is currently open based on startDate/endDate
+const isProductOpen = (product: any): { isOpen: boolean; status: 'upcoming' | 'active' | 'ended' | 'always' } => {
+  const now = new Date();
+  const start = product.startDate ? new Date(product.startDate) : null;
+  const end = product.endDate ? new Date(product.endDate) : null;
+  
+  // No dates set = always open (if isActive)
+  if (!start && !end) return { isOpen: product.isActive, status: 'always' };
+  
+  // Has start date but not reached yet
+  if (start && now < start) return { isOpen: false, status: 'upcoming' };
+  
+  // Has end date and already passed
+  if (end && now > end) return { isOpen: false, status: 'ended' };
+  
+  // Within date range (or no constraints violated)
+  return { isOpen: product.isActive, status: 'active' };
+};
+
+// Format date/time for display
+const formatDateTime = (dateStr: string | undefined): string => {
+  if (!dateStr) return '-';
+  const date = new Date(dateStr);
+  return date.toLocaleString('th-TH', { 
+    day: '2-digit', 
+    month: 'short', 
+    year: 'numeric',
+    hour: '2-digit', 
+    minute: '2-digit' 
+  });
+};
+
 const ProductCardItem = ({ product, onEdit, onDelete }: any): JSX.Element => {
+  const { isOpen, status } = isProductOpen(product);
+  
+  const statusConfig = {
+    upcoming: { label: '⏰ รอเปิด', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)' },
+    active: { label: '🟢 กำลังขาย', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' },
+    ended: { label: '🔴 หมดเวลา', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' },
+    always: { label: product.isActive ? '✓ เปิดขาย' : '✗ ปิดขาย', color: product.isActive ? '#10b981' : '#64748b', bg: product.isActive ? 'rgba(16, 185, 129, 0.15)' : 'rgba(100, 116, 139, 0.15)' },
+  };
+  
+  const currentStatus = statusConfig[status];
+  
   return (
     <Card sx={{ ...glassCardSx, height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Box
@@ -3113,18 +3162,58 @@ const ProductCardItem = ({ product, onEdit, onDelete }: any): JSX.Element => {
           borderBottom: `1px solid ${ADMIN_THEME.border}`
         }}
       >
-        {!product.isActive && (
+        {/* Status Badge */}
+        <Box sx={{
+          position: 'absolute',
+          top: 8,
+          left: 8,
+          px: 1.5,
+          py: 0.5,
+          borderRadius: '8px',
+          bgcolor: currentStatus.bg,
+          border: `1px solid ${currentStatus.color}40`,
+          backdropFilter: 'blur(8px)',
+        }}>
+          <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: currentStatus.color }}>
+            {currentStatus.label}
+          </Typography>
+        </Box>
+        
+        {/* Date Range Badge */}
+        {(product.startDate || product.endDate) && (
+          <Box sx={{
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            px: 1,
+            py: 0.5,
+            borderRadius: '6px',
+            bgcolor: 'rgba(0,0,0,0.6)',
+            backdropFilter: 'blur(8px)',
+          }}>
+            <Typography sx={{ fontSize: '0.65rem', color: '#e2e8f0' }}>
+              📅 {product.startDate ? formatDateTime(product.startDate).split(' ')[0] : '...'} - {product.endDate ? formatDateTime(product.endDate).split(' ')[0] : '...'}
+            </Typography>
+          </Box>
+        )}
+        
+        {!isOpen && (
           <Box sx={{
             position: 'absolute',
             inset: 0,
-            bgcolor: 'rgba(0,0,0,0.6)',
+            bgcolor: 'rgba(0,0,0,0.5)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: '#ff6b6b',
-            fontWeight: 'bold'
           }}>
-            INACTIVE
+            <Typography sx={{ 
+              color: status === 'upcoming' ? '#f59e0b' : '#ff6b6b', 
+              fontWeight: 'bold',
+              fontSize: '0.9rem',
+              textTransform: 'uppercase',
+            }}>
+              {status === 'upcoming' ? 'Coming Soon' : status === 'ended' ? 'Ended' : 'Inactive'}
+            </Typography>
           </Box>
         )}
       </Box>
@@ -3542,25 +3631,114 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any
           </Box>
         </Box>
 
-        <TextField
-          label="Start Date"
-          type="date"
-          value={product.startDate}
-          onChange={(e) => onChange({...product, startDate: e.target.value})}
-          fullWidth
-          InputLabelProps={{ shrink: true }}
-          sx={inputSx}
-        />
+        {/* Schedule Section */}
+        <Box sx={{ bgcolor: ADMIN_THEME.glassSoft, p: 2, borderRadius: 1, border: `1px solid ${ADMIN_THEME.border}`, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{
+              width: 36,
+              height: 36,
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              <DateRange sx={{ fontSize: 20, color: '#fff' }} />
+            </Box>
+            <Box>
+              <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: ADMIN_THEME.text }}>กำหนดเวลาขาย</Typography>
+              <Typography sx={{ fontSize: '0.75rem', color: ADMIN_THEME.muted }}>ตั้งเวลาเปิด-ปิดขายอัตโนมัติ</Typography>
+            </Box>
+          </Box>
 
-        <TextField
-          label="End Date"
-          type="date"
-          value={product.endDate}
-          onChange={(e) => onChange({...product, endDate: e.target.value})}
-          fullWidth
-          InputLabelProps={{ shrink: true }}
-          sx={inputSx}
-        />
+          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+            <Box>
+              <Typography sx={{ fontSize: '0.8rem', color: '#64748b', mb: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                🟢 เปิดขายเมื่อ
+              </Typography>
+              <TextField
+                type="datetime-local"
+                value={product.startDate || ''}
+                onChange={(e) => onChange({...product, startDate: e.target.value})}
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+                sx={{
+                  ...inputSx,
+                  '& .MuiOutlinedInput-root': {
+                    ...inputSx['& .MuiOutlinedInput-root'],
+                    borderRadius: '10px',
+                  },
+                }}
+              />
+              {product.startDate && (
+                <Button 
+                  size="small" 
+                  onClick={() => onChange({...product, startDate: ''})}
+                  sx={{ mt: 0.5, color: '#64748b', textTransform: 'none', fontSize: '0.7rem' }}
+                >
+                  ✕ ล้างวันเริ่ม
+                </Button>
+              )}
+            </Box>
+            <Box>
+              <Typography sx={{ fontSize: '0.8rem', color: '#64748b', mb: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                🔴 ปิดขายเมื่อ
+              </Typography>
+              <TextField
+                type="datetime-local"
+                value={product.endDate || ''}
+                onChange={(e) => onChange({...product, endDate: e.target.value})}
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+                sx={{
+                  ...inputSx,
+                  '& .MuiOutlinedInput-root': {
+                    ...inputSx['& .MuiOutlinedInput-root'],
+                    borderRadius: '10px',
+                  },
+                }}
+              />
+              {product.endDate && (
+                <Button 
+                  size="small" 
+                  onClick={() => onChange({...product, endDate: ''})}
+                  sx={{ mt: 0.5, color: '#64748b', textTransform: 'none', fontSize: '0.7rem' }}
+                >
+                  ✕ ล้างวันสิ้นสุด
+                </Button>
+              )}
+            </Box>
+          </Box>
+
+          {/* Status Preview */}
+          {(() => {
+            const { status } = isProductOpen(product);
+            const statusInfo = {
+              upcoming: { icon: '⏰', text: 'สินค้าจะเปิดขายเมื่อถึงเวลาที่กำหนด', color: '#f59e0b' },
+              active: { icon: '🟢', text: 'สินค้ากำลังเปิดขายอยู่', color: '#10b981' },
+              ended: { icon: '🔴', text: 'หมดเวลาขายแล้ว', color: '#ef4444' },
+              always: { icon: '∞', text: 'ไม่มีกำหนดเวลา (เปิดตลอด)', color: '#64748b' },
+            };
+            const info = statusInfo[status];
+            return (
+              <Box sx={{
+                mt: 1,
+                p: 1.5,
+                borderRadius: '10px',
+                bgcolor: `${info.color}15`,
+                border: `1px solid ${info.color}30`,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+              }}>
+                <Typography sx={{ fontSize: '1.2rem' }}>{info.icon}</Typography>
+                <Typography sx={{ fontSize: '0.85rem', color: info.color, fontWeight: 500 }}>
+                  {info.text}
+                </Typography>
+              </Box>
+            );
+          })()}
+        </Box>
 
         <Box sx={{ bgcolor: ADMIN_THEME.glassSoft, p: 2, borderRadius: 1, border: `1px solid ${ADMIN_THEME.border}`, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
