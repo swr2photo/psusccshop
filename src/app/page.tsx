@@ -1006,7 +1006,7 @@ export default function HomePage() {
             </Box>
           )}
 
-          {/* Size Selection */}
+          {/* Size Chart & Selection - Combined Modern Design */}
           <Box sx={{
             p: { xs: 2, sm: 2.5 },
             mb: 2,
@@ -1014,43 +1014,111 @@ export default function HomePage() {
             bgcolor: 'rgba(30,41,59,0.5)',
             border: '1px solid rgba(255,255,255,0.08)',
           }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <Box sx={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: '10px',
-                  bgcolor: 'rgba(99,102,241,0.15)',
-                  display: 'grid',
-                  placeItems: 'center',
-                }}>
-                  <Ruler size={18} color="#a5b4fc" />
-                </Box>
-                <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: '#e2e8f0' }}>
-                  เลือกขนาด
+            {/* Size Chart Table - Now at Top */}
+            <Box sx={{ 
+              mb: 2.5, 
+              p: 1.5, 
+              borderRadius: '14px', 
+              bgcolor: 'rgba(15,23,42,0.6)',
+              border: '1px solid rgba(99,102,241,0.2)',
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                <Ruler size={16} color="#a5b4fc" />
+                <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#a5b4fc' }}>
+                  ตารางไซส์ (นิ้ว)
                 </Typography>
               </Box>
-              <Button 
-                size="small" 
-                onClick={() => setShowSizeChart(true)} 
-                sx={{ 
-                  color: '#a5b4fc', 
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  textTransform: 'none',
-                  '&:hover': { bgcolor: 'rgba(99,102,241,0.1)' },
-                }}
-              >
-                ดูตารางไซส์
-              </Button>
+              <Box sx={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'auto 1fr',
+                gap: 0,
+                fontSize: '0.72rem',
+                '& > div': { 
+                  p: 0.8, 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  borderBottom: '1px solid rgba(255,255,255,0.06)',
+                },
+              }}>
+                {/* Header Row */}
+                <Box sx={{ bgcolor: 'rgba(99,102,241,0.15)', fontWeight: 700, color: '#a5b4fc', borderRadius: '6px 0 0 0' }}>ขนาด</Box>
+                <Box sx={{ display: 'grid !important', gridTemplateColumns: `repeat(${displaySizes.length}, 1fr)`, bgcolor: 'rgba(99,102,241,0.08)' }}>
+                  {displaySizes.map((size, idx) => (
+                    <Box key={size} sx={{ 
+                      fontWeight: 700, 
+                      color: productOptions.size === size ? '#818cf8' : '#94a3b8',
+                      borderRight: idx < displaySizes.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                      bgcolor: productOptions.size === size ? 'rgba(99,102,241,0.2)' : 'transparent',
+                    }}>
+                      {size}
+                    </Box>
+                  ))}
+                </Box>
+                {/* Chest Row */}
+                <Box sx={{ bgcolor: 'rgba(255,255,255,0.03)', color: '#94a3b8', fontWeight: 600 }}>รอบอก</Box>
+                <Box sx={{ display: 'grid !important', gridTemplateColumns: `repeat(${displaySizes.length}, 1fr)` }}>
+                  {displaySizes.map((size, idx) => {
+                    const sizeKey = size as keyof typeof SIZE_MEASUREMENTS;
+                    const measurement = SIZE_MEASUREMENTS[sizeKey];
+                    return (
+                      <Box key={size} sx={{ 
+                        color: productOptions.size === size ? '#e2e8f0' : '#64748b',
+                        borderRight: idx < displaySizes.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                        bgcolor: productOptions.size === size ? 'rgba(99,102,241,0.1)' : 'transparent',
+                      }}>
+                        {measurement?.chest || '-'}
+                      </Box>
+                    );
+                  })}
+                </Box>
+                {/* Length Row */}
+                <Box sx={{ bgcolor: 'rgba(255,255,255,0.03)', color: '#94a3b8', fontWeight: 600, borderRadius: '0 0 0 6px', borderBottom: 'none !important' }}>ความยาว</Box>
+                <Box sx={{ display: 'grid !important', gridTemplateColumns: `repeat(${displaySizes.length}, 1fr)`, borderBottom: 'none !important' }}>
+                  {displaySizes.map((size, idx) => {
+                    const sizeKey = size as keyof typeof SIZE_MEASUREMENTS;
+                    const measurement = SIZE_MEASUREMENTS[sizeKey];
+                    return (
+                      <Box key={size} sx={{ 
+                        color: productOptions.size === size ? '#e2e8f0' : '#64748b',
+                        borderRight: idx < displaySizes.length - 1 ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                        bgcolor: productOptions.size === size ? 'rgba(99,102,241,0.1)' : 'transparent',
+                        borderBottom: 'none !important',
+                      }}>
+                        {measurement?.length || '-'}
+                      </Box>
+                    );
+                  })}
+                </Box>
+              </Box>
             </Box>
 
+            {/* Size Selection Header */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+              <Box sx={{
+                width: 36,
+                height: 36,
+                borderRadius: '10px',
+                bgcolor: 'rgba(99,102,241,0.15)',
+                display: 'grid',
+                placeItems: 'center',
+              }}>
+                <Tag size={18} color="#a5b4fc" />
+              </Box>
+              <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: '#e2e8f0' }}>
+                เลือกขนาด
+              </Typography>
+            </Box>
+
+            {/* Size Selection Cards */}
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
               {displaySizes.map((size) => {
                 const basePrice = selectedProduct?.sizePricing?.[size] ?? selectedProduct?.basePrice ?? 0;
                 const longSleeveFee = selectedProduct.options?.hasLongSleeve && productOptions.isLongSleeve ? 50 : 0;
                 const price = basePrice + longSleeveFee;
                 const active = productOptions.size === size;
+                const sizeKey = size as keyof typeof SIZE_MEASUREMENTS;
+                const measurement = SIZE_MEASUREMENTS[sizeKey];
                 return (
                   <Box
                     key={size}
@@ -1066,7 +1134,8 @@ export default function HomePage() {
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
-                      minWidth: 70,
+                      minWidth: 75,
+                      position: 'relative',
                       '&:hover': { 
                         borderColor: active ? '#6366f1' : 'rgba(99,102,241,0.5)',
                         bgcolor: active ? 'rgba(99,102,241,0.2)' : 'rgba(99,102,241,0.08)',
@@ -1076,9 +1145,14 @@ export default function HomePage() {
                     <Typography sx={{ fontSize: '1rem', fontWeight: 800, color: active ? '#a5b4fc' : '#e2e8f0' }}>
                       {size}
                     </Typography>
-                    <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: active ? '#818cf8' : '#64748b' }}>
+                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: active ? '#818cf8' : '#64748b', mb: 0.3 }}>
                       ฿{price.toLocaleString()}
                     </Typography>
+                    {measurement && (
+                      <Typography sx={{ fontSize: '0.6rem', color: active ? '#6ee7b7' : '#475569' }}>
+                        {measurement.chest}" × {measurement.length}"
+                      </Typography>
+                    )}
                   </Box>
                 );
               })}

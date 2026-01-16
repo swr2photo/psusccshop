@@ -5,18 +5,36 @@ import type { NextRequest } from 'next/server';
 // --- CORS config ---
 const allowedOrigins = [
   'https://psusccshop.psusci.club',
-  // Add more allowed domains here
+  'https://www.psusccshop.psusci.club',
 ];
+
+// Check if origin is allowed
+function isAllowedOrigin(origin: string | null): boolean {
+  // No origin header = same-origin request (allowed)
+  if (!origin) return true;
+  
+  // Exact match for production domains
+  if (allowedOrigins.includes(origin)) return true;
+  
+  // Allow subdomains of psusci.club
+  if (origin.endsWith('.psusci.club')) return true;
+  
+  return false;
+}
 
 // --- Simple in-memory rate limiter (per IP, per minute) ---
 const rateLimitMap = new Map<string, { count: number; last: number }>();
 const RATE_LIMIT = 60; // max requests per minute per IP
 
 export function middleware(request: NextRequest) {
-  // --- CORS ---
   const origin = request.headers.get('origin');
-  if (origin && !allowedOrigins.includes(origin)) {
-    return NextResponse.json({ status: 'error', message: 'CORS policy: This origin is not allowed' }, { status: 403 });
+  
+  // --- CORS ---
+  if (!isAllowedOrigin(origin)) {
+    return NextResponse.json(
+      { status: 'error', message: 'CORS policy: This origin is not allowed' }, 
+      { status: 403 }
+    );
   }
 
   // --- Rate Limiting ---

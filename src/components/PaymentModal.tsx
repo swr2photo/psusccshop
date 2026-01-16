@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import type { JSX } from 'react';
-import { X, Upload, Check, Loader2, AlertCircle, CheckCircle2, Image, Clock3, Download, CreditCard, QrCode } from 'lucide-react';
+import { X, Upload, Check, Loader2, AlertCircle, CheckCircle2, Image, Clock3, Download, CreditCard, QrCode, Copy, Smartphone, ArrowRight, Sparkles } from 'lucide-react';
 import { Drawer, Box, Typography, Button, IconButton, Skeleton, useMediaQuery, LinearProgress } from '@mui/material';
 
 interface PaymentModalProps {
@@ -89,6 +89,11 @@ function PaymentToastContainer({
             maxWidth: 400,
             width: '100%',
             pointerEvents: 'auto',
+            animation: 'slideIn 0.3s ease',
+            '@keyframes slideIn': {
+              from: { transform: 'translateY(-20px)', opacity: 0 },
+              to: { transform: 'translateY(0)', opacity: 1 },
+            },
           }}
         >
           <Box sx={{ flexShrink: 0 }}>{icons[toast.type]}</Box>
@@ -122,12 +127,20 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
 
+  // Step tracking: 0 = QR, 1 = Upload, 2 = Confirm
+  const [activeStep, setActiveStep] = useState(0);
+
   const hasSlip = Boolean(selectedFile);
   const discountValue = Math.abs(discount);
 
   useEffect(() => {
     fetchPaymentInfo();
   }, [orderRef]);
+
+  useEffect(() => {
+    if (hasSlip) setActiveStep(2);
+    else if (!loading) setActiveStep(0);
+  }, [hasSlip, loading]);
 
   const fetchPaymentInfo = async () => {
     setLoading(true);
@@ -257,6 +270,13 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
     }
   };
 
+  const copyAmount = () => {
+    navigator.clipboard.writeText(amount.toString());
+    addToast('success', 'คัดลอกยอดเงินแล้ว');
+  };
+
+  const steps = ['สแกน QR', 'แนบสลิป', 'ยืนยัน'];
+
   return (
     <Drawer
       anchor="bottom"
@@ -266,8 +286,8 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
         sx: {
           height: { xs: '95vh', sm: '90vh' },
           maxHeight: '95vh',
-          borderTopLeftRadius: { xs: 20, sm: 24 },
-          borderTopRightRadius: { xs: 20, sm: 24 },
+          borderTopLeftRadius: { xs: 24, sm: 28 },
+          borderTopRightRadius: { xs: 24, sm: 28 },
           bgcolor: '#0a0f1a',
           overflow: 'hidden',
         },
@@ -278,7 +298,8 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
       {/* Header */}
       <Box sx={{
         px: { xs: 2, sm: 3 },
-        py: { xs: 1.5, sm: 2 },
+        pt: 1.5,
+        pb: 2,
         borderBottom: '1px solid rgba(255,255,255,0.06)',
         background: 'linear-gradient(180deg, rgba(15,23,42,0.98) 0%, rgba(10,15,26,0.98) 100%)',
         position: 'sticky',
@@ -286,279 +307,473 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
         zIndex: 10,
       }}>
         {/* Drag Handle */}
-        <Box sx={{ width: 36, height: 4, bgcolor: 'rgba(255,255,255,0.2)', borderRadius: 2, mx: 'auto', mb: 2 }} />
+        <Box sx={{ width: 40, height: 5, bgcolor: 'rgba(255,255,255,0.15)', borderRadius: 3, mx: 'auto', mb: 2 }} />
         
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <Box sx={{
-              width: 44,
-              height: 44,
-              borderRadius: '14px',
+              width: 48,
+              height: 48,
+              borderRadius: '16px',
               background: 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)',
               display: 'grid',
               placeItems: 'center',
-              boxShadow: '0 4px 14px rgba(16,185,129,0.3)',
+              boxShadow: '0 8px 24px rgba(16,185,129,0.3)',
             }}>
-              <CreditCard size={22} color="white" />
+              <CreditCard size={24} color="white" />
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '1.15rem', fontWeight: 800, color: '#f1f5f9' }}>
+              <Typography sx={{ fontSize: '1.2rem', fontWeight: 800, color: '#f1f5f9' }}>
                 ชำระเงิน
               </Typography>
-              <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>
+              <Typography sx={{ fontSize: '0.8rem', color: '#64748b', fontFamily: 'monospace' }}>
                 #{orderRef}
               </Typography>
             </Box>
           </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Box sx={{
-              px: 1.5,
-              py: 0.5,
-              borderRadius: '20px',
-              bgcolor: verifying ? 'rgba(6,182,212,0.15)' : hasSlip ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)',
-              border: `1px solid ${verifying ? 'rgba(6,182,212,0.4)' : hasSlip ? 'rgba(16,185,129,0.4)' : 'rgba(245,158,11,0.4)'}`,
-            }}>
-              <Typography sx={{ 
-                fontSize: '0.7rem', 
-                fontWeight: 600, 
-                color: verifying ? '#67e8f9' : hasSlip ? '#6ee7b7' : '#fbbf24' 
+          <IconButton 
+            onClick={onClose} 
+            sx={{ 
+              color: '#94a3b8', 
+              bgcolor: 'rgba(255,255,255,0.05)', 
+              width: 40,
+              height: 40,
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } 
+            }}
+          >
+            <X size={20} />
+          </IconButton>
+        </Box>
+
+        {/* Progress Steps - Simplified */}
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          gap: 1,
+        }}>
+          {steps.map((step, index) => (
+            <Box key={step} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.8,
+                px: 1.5,
+                py: 0.6,
+                borderRadius: '20px',
+                bgcolor: activeStep >= index 
+                  ? index === 2 && hasSlip ? 'rgba(16, 185, 129, 0.15)' : 'rgba(6, 182, 212, 0.15)'
+                  : 'rgba(255,255,255,0.03)',
+                border: `1px solid ${activeStep >= index 
+                  ? index === 2 && hasSlip ? 'rgba(16, 185, 129, 0.3)' : 'rgba(6, 182, 212, 0.3)'
+                  : 'transparent'}`,
+                transition: 'all 0.3s ease',
               }}>
-                {verifying ? 'กำลังตรวจสอบ' : hasSlip ? 'พร้อมยืนยัน' : 'รอแนบสลิป'}
-              </Typography>
+                <Box sx={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: '50%',
+                  bgcolor: activeStep >= index 
+                    ? index === 2 && hasSlip ? '#10b981' : '#06b6d4'
+                    : 'rgba(255,255,255,0.1)',
+                  display: 'grid',
+                  placeItems: 'center',
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  color: activeStep >= index ? 'white' : '#64748b',
+                }}>
+                  {activeStep > index ? <Check size={12} /> : index + 1}
+                </Box>
+                <Typography sx={{ 
+                  fontSize: '0.75rem', 
+                  fontWeight: 600, 
+                  color: activeStep >= index 
+                    ? index === 2 && hasSlip ? '#6ee7b7' : '#67e8f9'
+                    : '#64748b',
+                }}>
+                  {step}
+                </Typography>
+              </Box>
+              {index < steps.length - 1 && (
+                <ArrowRight size={14} style={{ color: '#475569' }} />
+              )}
             </Box>
-            <IconButton onClick={onClose} sx={{ color: '#94a3b8', bgcolor: 'rgba(255,255,255,0.05)', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
-              <X size={20} />
-            </IconButton>
-          </Box>
+          ))}
         </Box>
       </Box>
 
       {/* Content */}
-      <Box sx={{ flex: 1, overflow: 'auto', WebkitOverflowScrolling: 'touch', px: { xs: 2, sm: 3 }, py: 2 }}>
+      <Box sx={{ flex: 1, overflow: 'auto', WebkitOverflowScrolling: 'touch', px: { xs: 2, sm: 3 }, py: 2.5 }}>
         {loading ? (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Skeleton variant="rectangular" height={260} sx={{ bgcolor: 'rgba(30,41,59,0.5)', borderRadius: '16px' }} />
-            <Skeleton variant="rectangular" height={140} sx={{ bgcolor: 'rgba(30,41,59,0.5)', borderRadius: '16px' }} />
-            <Skeleton variant="rectangular" height={200} sx={{ bgcolor: 'rgba(30,41,59,0.5)', borderRadius: '16px' }} />
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, maxWidth: 500, mx: 'auto' }}>
+            <Skeleton variant="rectangular" height={120} sx={{ bgcolor: 'rgba(30,41,59,0.5)', borderRadius: '20px' }} />
+            <Skeleton variant="rectangular" height={300} sx={{ bgcolor: 'rgba(30,41,59,0.5)', borderRadius: '20px' }} />
+            <Skeleton variant="rectangular" height={180} sx={{ bgcolor: 'rgba(30,41,59,0.5)', borderRadius: '20px' }} />
           </Box>
         ) : (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, maxWidth: 600, mx: 'auto' }}>
-            {/* Amount Summary */}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, maxWidth: 500, mx: 'auto' }}>
+            
+            {/* Amount Card - Hero Style */}
             <Box sx={{
-              p: 2.5,
-              borderRadius: '16px',
-              background: 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)',
+              p: 3,
+              borderRadius: '24px',
+              background: 'linear-gradient(135deg, #10b981 0%, #0891b2 100%)',
               color: 'white',
               textAlign: 'center',
+              position: 'relative',
+              overflow: 'hidden',
             }}>
-              <Typography sx={{ fontSize: '0.8rem', opacity: 0.9, mb: 0.5 }}>ยอดที่ต้องชำระ</Typography>
-              <Typography sx={{ fontSize: '2.5rem', fontWeight: 900 }}>฿{amount.toLocaleString()}</Typography>
-              {discountValue > 0 && (
-                <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 1, fontSize: '0.8rem' }}>
-                  <Typography sx={{ opacity: 0.8 }}>ค่าสินค้า ฿{baseAmount.toLocaleString()}</Typography>
-                  <Typography sx={{ color: '#a7f3d0' }}>ส่วนลด -฿{discountValue.toLocaleString()}</Typography>
-                </Box>
-              )}
-            </Box>
-
-            {/* QR Code Section */}
-            <Box sx={{
-              p: 2,
-              borderRadius: '16px',
-              bgcolor: 'rgba(30,41,59,0.5)',
-              border: '1px solid rgba(255,255,255,0.06)',
-            }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-                <Box sx={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: '10px',
-                  bgcolor: 'rgba(16,185,129,0.15)',
-                  display: 'grid',
-                  placeItems: 'center',
-                }}>
-                  <QrCode size={18} style={{ color: '#6ee7b7' }} />
-                </Box>
-                <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: '#e2e8f0' }}>
-                  QR Code สำหรับโอนเงิน
-                </Typography>
-              </Box>
+              {/* Decorative circles */}
+              <Box sx={{
+                position: 'absolute',
+                top: -30,
+                right: -30,
+                width: 100,
+                height: 100,
+                borderRadius: '50%',
+                bgcolor: 'rgba(255,255,255,0.1)',
+              }} />
+              <Box sx={{
+                position: 'absolute',
+                bottom: -20,
+                left: -20,
+                width: 60,
+                height: 60,
+                borderRadius: '50%',
+                bgcolor: 'rgba(255,255,255,0.08)',
+              }} />
               
-              {qrUrl ? (
-                <Box sx={{ 
-                  bgcolor: 'white', 
-                  borderRadius: '12px', 
-                  p: 2, 
-                  display: 'flex', 
-                  justifyContent: 'center',
-                  mb: 2,
-                }}>
-                  <Box
-                    component="img"
-                    src={qrUrl}
-                    alt="QR Code"
-                    sx={{ maxWidth: '100%', maxHeight: 280, objectFit: 'contain' }}
-                  />
-                </Box>
-              ) : (
-                <Box sx={{ 
-                  bgcolor: 'rgba(100,116,139,0.1)', 
-                  borderRadius: '12px', 
-                  p: 4, 
-                  textAlign: 'center',
-                  mb: 2,
-                }}>
-                  <Typography sx={{ color: '#64748b' }}>กำลังสร้าง QR...</Typography>
-                </Box>
-              )}
-
-              <Button
-                fullWidth
-                startIcon={downloading ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
-                onClick={handleSaveQr}
-                disabled={!qrUrl || downloading}
-                sx={{
-                  py: 1.2,
-                  borderRadius: '10px',
-                  bgcolor: 'rgba(16,185,129,0.1)',
-                  border: '1px solid rgba(16,185,129,0.3)',
-                  color: '#6ee7b7',
-                  fontWeight: 600,
-                  textTransform: 'none',
-                  '&:hover': { bgcolor: 'rgba(16,185,129,0.2)' },
-                  '&:disabled': { opacity: 0.5 },
-                }}
-              >
-                {downloading ? `บันทึก... ${downloadProgress}%` : 'บันทึก QR Code'}
-              </Button>
-              {downloading && (
-                <LinearProgress 
-                  variant="determinate" 
-                  value={downloadProgress} 
+              <Typography sx={{ fontSize: '0.85rem', opacity: 0.9, mb: 1, fontWeight: 500 }}>
+                💳 ยอดที่ต้องชำระ
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5 }}>
+                <Typography sx={{ fontSize: '3rem', fontWeight: 900, letterSpacing: '-2px' }}>
+                  ฿{amount.toLocaleString()}
+                </Typography>
+                <IconButton 
+                  onClick={copyAmount} 
                   sx={{ 
-                    mt: 1, 
-                    borderRadius: 1, 
-                    bgcolor: 'rgba(255,255,255,0.1)',
-                    '& .MuiLinearProgress-bar': { bgcolor: '#10b981' }
-                  }} 
-                />
+                    color: 'rgba(255,255,255,0.8)', 
+                    bgcolor: 'rgba(255,255,255,0.15)',
+                    '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' },
+                  }}
+                >
+                  <Copy size={16} />
+                </IconButton>
+              </Box>
+              {discountValue > 0 && (
+                <Box sx={{ 
+                  display: 'inline-flex', 
+                  alignItems: 'center',
+                  gap: 1.5, 
+                  mt: 1.5, 
+                  px: 2,
+                  py: 0.5,
+                  borderRadius: '20px',
+                  bgcolor: 'rgba(255,255,255,0.15)',
+                  fontSize: '0.8rem',
+                }}>
+                  <Typography sx={{ opacity: 0.9, textDecoration: 'line-through' }}>฿{baseAmount.toLocaleString()}</Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Sparkles size={12} />
+                    <Typography sx={{ color: '#a7f3d0', fontWeight: 600 }}>ลด ฿{discountValue.toLocaleString()}</Typography>
+                  </Box>
+                </Box>
               )}
             </Box>
 
-            {/* Slip Upload Section */}
+            {/* QR Code Card */}
             <Box sx={{
-              p: 2,
-              borderRadius: '16px',
-              bgcolor: 'rgba(30,41,59,0.5)',
+              borderRadius: '24px',
+              bgcolor: 'rgba(30,41,59,0.4)',
               border: '1px solid rgba(255,255,255,0.06)',
+              overflow: 'hidden',
             }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+              {/* Card Header */}
+              <Box sx={{ 
+                px: 2.5, 
+                py: 2, 
+                borderBottom: '1px solid rgba(255,255,255,0.06)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                   <Box sx={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: '10px',
-                    bgcolor: 'rgba(6,182,212,0.15)',
+                    width: 40,
+                    height: 40,
+                    borderRadius: '12px',
+                    background: 'linear-gradient(135deg, rgba(16,185,129,0.2) 0%, rgba(6,182,212,0.2) 100%)',
                     display: 'grid',
                     placeItems: 'center',
                   }}>
-                    <Image size={18} style={{ color: '#67e8f9' }} />
+                    <QrCode size={20} style={{ color: '#6ee7b7' }} />
                   </Box>
                   <Box>
-                    <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: '#e2e8f0' }}>
-                      แนบสลิปโอนเงิน
+                    <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#e2e8f0' }}>
+                      สแกนเพื่อโอนเงิน
                     </Typography>
-                    <Typography sx={{ fontSize: '0.7rem', color: '#64748b' }}>
-                      รองรับ PNG, JPG สูงสุด 5MB
+                    <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>
+                      PromptPay / Mobile Banking
                     </Typography>
                   </Box>
                 </Box>
-                {hasSlip && (
-                  <Button
-                    size="small"
-                    onClick={() => { setPreviewUrl(null); setSelectedFile(null); }}
-                    sx={{ 
-                      color: '#fbbf24', 
-                      fontSize: '0.75rem',
-                      textTransform: 'none',
-                    }}
-                  >
-                    ลบ
-                  </Button>
-                )}
-              </Box>
-
-              {!previewUrl ? (
-                <Box
-                  onClick={() => fileInputRef.current?.click()}
-                  onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
-                  onDragLeave={() => setDragActive(false)}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setDragActive(false);
-                    const droppedFile = e.dataTransfer.files?.[0];
-                    if (droppedFile) processFile(droppedFile);
-                  }}
-                  sx={{
-                    border: '2px dashed',
-                    borderColor: dragActive ? '#06b6d4' : 'rgba(255,255,255,0.15)',
-                    borderRadius: '12px',
-                    p: 4,
-                    textAlign: 'center',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    bgcolor: dragActive ? 'rgba(6,182,212,0.1)' : 'transparent',
-                    '&:hover': { borderColor: '#06b6d4', bgcolor: 'rgba(6,182,212,0.05)' },
-                  }}
-                >
-                  <Upload size={32} style={{ color: '#64748b', margin: '0 auto 8px' }} />
-                  <Typography sx={{ color: '#94a3b8', fontWeight: 600, mb: 0.5 }}>
-                    ลากไฟล์หรือคลิกเพื่อเลือก
-                  </Typography>
-                  <Typography sx={{ color: '#64748b', fontSize: '0.8rem' }}>
-                    ควรเป็นสลิปที่คมชัด เห็นยอดและเวลา
+                <Box sx={{
+                  px: 1.5,
+                  py: 0.5,
+                  borderRadius: '20px',
+                  bgcolor: 'rgba(16,185,129,0.1)',
+                  border: '1px solid rgba(16,185,129,0.2)',
+                }}>
+                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#6ee7b7' }}>
+                    ขั้นตอนที่ 1
                   </Typography>
                 </Box>
-              ) : (
-                <Box>
+              </Box>
+              
+              {/* QR Image */}
+              <Box sx={{ p: 3, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                {qrUrl ? (
                   <Box sx={{ 
-                    position: 'relative', 
-                    borderRadius: '12px', 
-                    overflow: 'hidden',
-                    border: '1px solid rgba(16,185,129,0.3)',
-                    mb: 1.5,
+                    bgcolor: 'white', 
+                    borderRadius: '20px', 
+                    p: 2.5,
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+                    mb: 2,
                   }}>
                     <Box
                       component="img"
-                      src={previewUrl}
-                      alt="Preview"
-                      sx={{ width: '100%', maxHeight: 300, objectFit: 'contain', bgcolor: 'rgba(0,0,0,0.2)' }}
+                      src={qrUrl}
+                      alt="QR Code"
+                      sx={{ 
+                        width: 220,
+                        height: 220,
+                        objectFit: 'contain',
+                        display: 'block',
+                      }}
                     />
-                    <Box sx={{
-                      position: 'absolute',
-                      bottom: 8,
-                      right: 8,
-                      bgcolor: 'rgba(16,185,129,0.9)',
-                      borderRadius: '50%',
-                      p: 0.5,
-                    }}>
-                      <CheckCircle2 size={20} color="white" />
-                    </Box>
                   </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Typography sx={{ fontSize: '0.8rem', color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>
-                      {selectedFile?.name}
+                ) : (
+                  <Box sx={{ 
+                    width: 220,
+                    height: 220,
+                    bgcolor: 'rgba(100,116,139,0.1)', 
+                    borderRadius: '20px',
+                    display: 'grid',
+                    placeItems: 'center',
+                    mb: 2,
+                  }}>
+                    <Loader2 size={32} style={{ color: '#64748b' }} className="animate-spin" />
+                  </Box>
+                )}
+
+                <Button
+                  fullWidth
+                  startIcon={downloading ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+                  onClick={handleSaveQr}
+                  disabled={!qrUrl || downloading}
+                  sx={{
+                    py: 1.3,
+                    borderRadius: '12px',
+                    bgcolor: 'rgba(16,185,129,0.1)',
+                    border: '1px solid rgba(16,185,129,0.3)',
+                    color: '#6ee7b7',
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    '&:hover': { bgcolor: 'rgba(16,185,129,0.2)' },
+                    '&:disabled': { opacity: 0.5 },
+                  }}
+                >
+                  {downloading ? `บันทึก... ${downloadProgress}%` : 'บันทึก QR ลงเครื่อง'}
+                </Button>
+                {downloading && (
+                  <LinearProgress 
+                    variant="determinate" 
+                    value={downloadProgress} 
+                    sx={{ 
+                      mt: 1.5, 
+                      width: '100%',
+                      borderRadius: 1, 
+                      bgcolor: 'rgba(255,255,255,0.1)',
+                      '& .MuiLinearProgress-bar': { bgcolor: '#10b981' }
+                    }} 
+                  />
+                )}
+              </Box>
+            </Box>
+
+            {/* Slip Upload Card */}
+            <Box sx={{
+              borderRadius: '24px',
+              bgcolor: 'rgba(30,41,59,0.4)',
+              border: hasSlip ? '2px solid rgba(16,185,129,0.4)' : '1px solid rgba(255,255,255,0.06)',
+              overflow: 'hidden',
+              transition: 'all 0.3s ease',
+            }}>
+              {/* Card Header */}
+              <Box sx={{ 
+                px: 2.5, 
+                py: 2, 
+                borderBottom: '1px solid rgba(255,255,255,0.06)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <Box sx={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: '12px',
+                    background: hasSlip 
+                      ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                      : 'linear-gradient(135deg, rgba(6,182,212,0.2) 0%, rgba(59,130,246,0.2) 100%)',
+                    display: 'grid',
+                    placeItems: 'center',
+                  }}>
+                    {hasSlip ? <Check size={20} style={{ color: 'white' }} /> : <Image size={20} style={{ color: '#67e8f9' }} />}
+                  </Box>
+                  <Box>
+                    <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#e2e8f0' }}>
+                      {hasSlip ? 'แนบสลิปแล้ว' : 'แนบสลิปโอนเงิน'}
                     </Typography>
-                    <Button
-                      size="small"
-                      onClick={() => fileInputRef.current?.click()}
-                      sx={{ color: '#67e8f9', fontSize: '0.75rem', textTransform: 'none' }}
-                    >
-                      เปลี่ยนรูป
-                    </Button>
+                    <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>
+                      {hasSlip ? 'พร้อมยืนยันการชำระ' : 'อัปโหลดหลักฐานการโอน'}
+                    </Typography>
                   </Box>
                 </Box>
-              )}
+                <Box sx={{
+                  px: 1.5,
+                  py: 0.5,
+                  borderRadius: '20px',
+                  bgcolor: hasSlip ? 'rgba(16,185,129,0.15)' : 'rgba(6,182,212,0.1)',
+                  border: `1px solid ${hasSlip ? 'rgba(16,185,129,0.3)' : 'rgba(6,182,212,0.2)'}`,
+                }}>
+                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: hasSlip ? '#6ee7b7' : '#67e8f9' }}>
+                    ขั้นตอนที่ 2
+                  </Typography>
+                </Box>
+              </Box>
+              
+              <Box sx={{ p: 2.5 }}>
+                {!previewUrl ? (
+                  <Box
+                    onClick={() => fileInputRef.current?.click()}
+                    onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+                    onDragLeave={() => setDragActive(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDragActive(false);
+                      const droppedFile = e.dataTransfer.files?.[0];
+                      if (droppedFile) processFile(droppedFile);
+                    }}
+                    sx={{
+                      border: '2px dashed',
+                      borderColor: dragActive ? '#06b6d4' : 'rgba(255,255,255,0.15)',
+                      borderRadius: '16px',
+                      p: 4,
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      bgcolor: dragActive ? 'rgba(6,182,212,0.1)' : 'rgba(255,255,255,0.02)',
+                      '&:hover': { 
+                        borderColor: '#06b6d4', 
+                        bgcolor: 'rgba(6,182,212,0.05)',
+                        transform: 'scale(1.01)',
+                      },
+                    }}
+                  >
+                    <Box sx={{
+                      width: 64,
+                      height: 64,
+                      borderRadius: '20px',
+                      bgcolor: 'rgba(6,182,212,0.1)',
+                      display: 'grid',
+                      placeItems: 'center',
+                      mx: 'auto',
+                      mb: 2,
+                    }}>
+                      <Upload size={28} style={{ color: '#67e8f9' }} />
+                    </Box>
+                    <Typography sx={{ color: '#e2e8f0', fontWeight: 600, mb: 0.5, fontSize: '1rem' }}>
+                      คลิกหรือลากไฟล์มาวาง
+                    </Typography>
+                    <Typography sx={{ color: '#64748b', fontSize: '0.8rem' }}>
+                      รูปสลิปที่คมชัด เห็นยอดและเวลา
+                    </Typography>
+                    <Box sx={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      gap: 0.5, 
+                      mt: 1.5,
+                      color: '#475569',
+                      fontSize: '0.75rem',
+                    }}>
+                      <Smartphone size={14} />
+                      <Typography sx={{ fontSize: 'inherit' }}>PNG, JPG ไม่เกิน 5MB</Typography>
+                    </Box>
+                  </Box>
+                ) : (
+                  <Box sx={{ position: 'relative' }}>
+                    <Box sx={{
+                      borderRadius: '16px',
+                      overflow: 'hidden',
+                      bgcolor: '#000',
+                      position: 'relative',
+                    }}>
+                      <Box
+                        component="img"
+                        src={previewUrl}
+                        alt="Slip Preview"
+                        sx={{
+                          width: '100%',
+                          maxHeight: 280,
+                          objectFit: 'contain',
+                          display: 'block',
+                        }}
+                      />
+                      {/* Success Overlay */}
+                      <Box sx={{
+                        position: 'absolute',
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        py: 1.5,
+                        px: 2,
+                        background: 'linear-gradient(transparent, rgba(16,185,129,0.9))',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 1,
+                      }}>
+                        <CheckCircle2 size={18} />
+                        <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'white' }}>
+                          พร้อมส่งตรวจสอบ
+                        </Typography>
+                      </Box>
+                    </Box>
+                    <Button
+                      fullWidth
+                      onClick={() => {
+                        setSelectedFile(null);
+                        setPreviewUrl(null);
+                      }}
+                      sx={{
+                        mt: 1.5,
+                        py: 1,
+                        borderRadius: '10px',
+                        bgcolor: 'rgba(245,158,11,0.1)',
+                        color: '#fbbf24',
+                        fontWeight: 600,
+                        textTransform: 'none',
+                        '&:hover': { bgcolor: 'rgba(245,158,11,0.2)' },
+                      }}
+                    >
+                      เปลี่ยนสลิป
+                    </Button>
+                  </Box>
+                )}
+              </Box>
 
               <input
                 type="file"
@@ -569,23 +784,20 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
               />
             </Box>
 
-            {/* Tips */}
+            {/* Tips - Compact */}
             <Box sx={{
-              p: 2,
-              borderRadius: '12px',
-              bgcolor: 'rgba(245,158,11,0.08)',
-              border: '1px solid rgba(245,158,11,0.2)',
+              px: 2,
+              py: 1.5,
+              borderRadius: '14px',
+              bgcolor: 'rgba(245,158,11,0.06)',
+              border: '1px solid rgba(245,158,11,0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5,
             }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                <Clock3 size={16} style={{ color: '#fbbf24' }} />
-                <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: '#fbbf24' }}>
-                  คำแนะนำ
-                </Typography>
-              </Box>
-              <Typography sx={{ fontSize: '0.8rem', color: '#94a3b8', lineHeight: 1.6 }}>
-                • อัปโหลดสลิปภายใน 15 นาทีหลังสั่งซื้อ<br/>
-                • ระบบจะตรวจสอบอัตโนมัติทันที<br/>
-                • หากสลิปถูกปฏิเสธ สามารถแนบใหม่ได้
+              <Clock3 size={18} style={{ color: '#fbbf24', flexShrink: 0 }} />
+              <Typography sx={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                อัปโหลดสลิปภายใน 15 นาที • ระบบตรวจอัตโนมัติ
               </Typography>
             </Box>
           </Box>
@@ -601,39 +813,44 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
         backdropFilter: 'blur(20px)',
         paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
       }}>
-        <Box sx={{ maxWidth: 600, mx: 'auto' }}>
+        <Box sx={{ maxWidth: 500, mx: 'auto' }}>
           <Button
             fullWidth
             onClick={handleConfirmPayment}
             disabled={verifying || loading || !selectedFile}
-            startIcon={verifying ? <Loader2 size={20} className="animate-spin" /> : hasSlip ? <Check size={20} /> : <AlertCircle size={20} />}
+            startIcon={verifying ? <Loader2 size={22} className="animate-spin" /> : hasSlip ? <Check size={22} /> : <Upload size={22} />}
             sx={{
-              py: 1.8,
-              borderRadius: '14px',
+              py: 2,
+              borderRadius: '16px',
               background: hasSlip && !verifying
                 ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                : 'rgba(100,116,139,0.2)',
+                : 'rgba(100,116,139,0.15)',
               color: hasSlip && !verifying ? 'white' : '#64748b',
-              fontSize: '1rem',
+              fontSize: '1.05rem',
               fontWeight: 700,
               textTransform: 'none',
-              boxShadow: hasSlip && !verifying ? '0 4px 20px rgba(16,185,129,0.3)' : 'none',
+              boxShadow: hasSlip && !verifying ? '0 8px 32px rgba(16,185,129,0.35)' : 'none',
+              transition: 'all 0.3s ease',
               '&:hover': {
                 background: hasSlip && !verifying
                   ? 'linear-gradient(135deg, #059669 0%, #047857 100%)'
-                  : 'rgba(100,116,139,0.3)',
+                  : 'rgba(100,116,139,0.2)',
+                transform: hasSlip && !verifying ? 'translateY(-2px)' : 'none',
+                boxShadow: hasSlip && !verifying ? '0 12px 40px rgba(16,185,129,0.4)' : 'none',
               },
               '&:disabled': {
-                background: verifying ? 'linear-gradient(135deg, #0891b2 0%, #06b6d4 100%)' : 'rgba(100,116,139,0.2)',
+                background: verifying ? 'linear-gradient(135deg, #0891b2 0%, #06b6d4 100%)' : 'rgba(100,116,139,0.15)',
                 color: verifying ? 'white' : '#64748b',
               },
             }}
           >
-            {verifying ? 'กำลังตรวจสอบ...' : hasSlip ? 'ยืนยันการโอนเงิน' : 'กรุณาแนบสลิป'}
+            {verifying ? 'กำลังตรวจสอบสลิป...' : hasSlip ? '✓ ยืนยันการชำระเงิน' : 'แนบสลิปเพื่อชำระเงิน'}
           </Button>
-          <Typography sx={{ textAlign: 'center', fontSize: '0.75rem', color: '#64748b', mt: 1.5 }}>
-            ระบบตรวจสอบอัตโนมัติ โปรดรออยู่ในหน้านี้
-          </Typography>
+          {!hasSlip && (
+            <Typography sx={{ textAlign: 'center', fontSize: '0.75rem', color: '#475569', mt: 1.5 }}>
+              กรุณาแนบสลิปก่อนกดยืนยัน
+            </Typography>
+          )}
         </Box>
       </Box>
     </Drawer>

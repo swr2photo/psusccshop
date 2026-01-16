@@ -69,6 +69,7 @@ import {
   LocalShipping,
   Save,
   Edit as EditIconMUI,
+  Check,
 } from '@mui/icons-material';
 
 import { isAdmin, Product, ShopConfig, SIZES } from '@/lib/config';
@@ -180,43 +181,108 @@ const saveAdminCache = (payload: { config: ShopConfig; orders?: AdminOrder[]; lo
 const ORDER_STATUSES = ['WAITING_PAYMENT', 'PENDING', 'PAID', 'READY', 'SHIPPED', 'COMPLETED', 'CANCELLED'];
 const PRODUCT_TYPES = ['JERSEY', 'CREW', 'OTHER'];
 
+// ============== NEW MODERN THEME ==============
 const ADMIN_THEME = {
-  bg: '#0f172a',
-  text: '#e2e8f0',
-  muted: '#cbd5e1',
-  border: 'rgba(255,255,255,0.14)',
-  glass: 'rgba(255,255,255,0.06)',
-  glassSoft: 'rgba(255,255,255,0.04)',
-  gradient: 'linear-gradient(135deg, #6366f1 0%, #06b6d4 100%)',
-  gradientAlt: 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)',
+  // Base colors
+  bg: '#0a0f1a',
+  bgCard: 'rgba(15,23,42,0.7)',
+  bgSidebar: 'rgba(10,15,26,0.95)',
+  bgHeader: 'rgba(15,23,42,0.85)',
+  
+  // Text colors
+  text: '#f1f5f9',
+  textSecondary: '#94a3b8',
+  muted: '#64748b',
+  
+  // Borders
+  border: 'rgba(255,255,255,0.08)',
+  borderActive: 'rgba(99,102,241,0.5)',
+  
+  // Glass effects
+  glass: 'rgba(30,41,59,0.6)',
+  glassSoft: 'rgba(30,41,59,0.4)',
+  glassHover: 'rgba(30,41,59,0.8)',
+  
+  // Gradients
+  gradient: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+  gradientAlt: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+  gradientWarm: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)',
+  gradientCool: 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%)',
+  
+  // Accent colors
+  primary: '#6366f1',
+  primaryLight: '#a5b4fc',
+  success: '#10b981',
+  warning: '#f59e0b',
+  error: '#ef4444',
+  info: '#06b6d4',
+};
+
+// Status color mapping
+const STATUS_THEME: Record<string, { bg: string; text: string; border: string }> = {
+  WAITING_PAYMENT: { bg: 'rgba(245,158,11,0.15)', text: '#fbbf24', border: 'rgba(245,158,11,0.4)' },
+  PENDING: { bg: 'rgba(245,158,11,0.15)', text: '#fbbf24', border: 'rgba(245,158,11,0.4)' },
+  PAID: { bg: 'rgba(59,130,246,0.15)', text: '#60a5fa', border: 'rgba(59,130,246,0.4)' },
+  READY: { bg: 'rgba(16,185,129,0.15)', text: '#34d399', border: 'rgba(16,185,129,0.4)' },
+  SHIPPED: { bg: 'rgba(6,182,212,0.15)', text: '#22d3ee', border: 'rgba(6,182,212,0.4)' },
+  COMPLETED: { bg: 'rgba(34,197,94,0.15)', text: '#4ade80', border: 'rgba(34,197,94,0.4)' },
+  CANCELLED: { bg: 'rgba(239,68,68,0.15)', text: '#f87171', border: 'rgba(239,68,68,0.4)' },
 };
 
 const glassCardSx = {
   background: ADMIN_THEME.glass,
   border: `1px solid ${ADMIN_THEME.border}`,
-  boxShadow: '0 18px 44px rgba(0,0,0,0.35)',
-  backdropFilter: 'blur(18px)',
+  borderRadius: '20px',
+  boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
+  backdropFilter: 'blur(20px)',
   color: ADMIN_THEME.text,
+  overflow: 'hidden',
 };
 
 const inputSx = {
   '& .MuiOutlinedInput-root': {
     backgroundColor: ADMIN_THEME.glassSoft,
+    borderRadius: '12px',
     color: ADMIN_THEME.text,
     '& fieldset': { borderColor: ADMIN_THEME.border },
-    '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.28)' },
-    '&.Mui-focused fieldset': { borderColor: '#6366f1', boxShadow: '0 0 0 1px rgba(99,102,241,0.35)' },
+    '&:hover fieldset': { borderColor: 'rgba(99,102,241,0.4)' },
+    '&.Mui-focused fieldset': { borderColor: '#6366f1', boxShadow: '0 0 0 3px rgba(99,102,241,0.15)' },
   },
-  '& .MuiInputLabel-root': { color: ADMIN_THEME.muted },
+  '& .MuiInputLabel-root': { color: ADMIN_THEME.textSecondary },
   '& .MuiFormHelperText-root': { color: ADMIN_THEME.muted },
-  '& .MuiSelect-icon': { color: ADMIN_THEME.text },
+  '& .MuiSelect-icon': { color: ADMIN_THEME.textSecondary },
 };
 
 const gradientButtonSx = {
   background: ADMIN_THEME.gradient,
-  color: '#f8fafc',
-  boxShadow: '0 12px 30px rgba(99,102,241,0.35)',
-  '&:hover': { background: 'linear-gradient(135deg, #5458e9 0%, #05a2c2 100%)', boxShadow: '0 14px 34px rgba(99,102,241,0.45)' },
+  color: '#fff',
+  borderRadius: '12px',
+  fontWeight: 700,
+  textTransform: 'none',
+  px: 3,
+  py: 1.2,
+  boxShadow: '0 4px 14px rgba(99,102,241,0.35)',
+  '&:hover': { 
+    background: 'linear-gradient(135deg, #5458e9 0%, #7c3aed 100%)', 
+    boxShadow: '0 6px 20px rgba(99,102,241,0.45)',
+    transform: 'translateY(-1px)',
+  },
+  transition: 'all 0.2s ease',
+};
+
+const secondaryButtonSx = {
+  bgcolor: 'rgba(255,255,255,0.05)',
+  color: ADMIN_THEME.textSecondary,
+  borderRadius: '12px',
+  border: `1px solid ${ADMIN_THEME.border}`,
+  fontWeight: 600,
+  textTransform: 'none',
+  px: 2.5,
+  py: 1,
+  '&:hover': { 
+    bgcolor: 'rgba(255,255,255,0.1)',
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
 };
 
 const tableSx = {
@@ -261,7 +327,8 @@ export default function AdminPage(): JSX.Element {
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
   const isAuthorized = isAdmin(session?.user?.email ?? null);
-  const isLoading = status === 'loading' || loading;
+  const isSessionLoading = status === 'loading';
+  const isDataLoading = loading && !hasInitialData;
 
   const showToast = useCallback((_type: 'success' | 'error' | 'info' | 'warning', _message: string) => {
     // Notifications disabled per request
@@ -522,15 +589,13 @@ export default function AdminPage(): JSX.Element {
   useEffect(() => {
     if (status === 'loading') return;
 
-    if (status === 'unauthenticated') {
-      signIn('google');
-    } else if (status === 'authenticated') {
+    if (status === 'authenticated') {
       if (!session?.user?.email || !isAdmin(session.user.email)) {
         Swal.fire({
           icon: 'error',
-          title: 'Access Denied',
-          text: 'You do not have permission to access this page',
-          confirmButtonText: 'Go Back',
+          title: 'ไม่มีสิทธิ์เข้าถึง',
+          text: 'บัญชีของคุณไม่มีสิทธิ์เข้าถึงหน้านี้',
+          confirmButtonText: 'กลับหน้าหลัก',
           didClose: () => router.push('/')
         });
         return;
@@ -561,86 +626,317 @@ export default function AdminPage(): JSX.Element {
     const paidOrders = orders.filter(o => o.status === 'PAID').length;
     const readyOrders = orders.filter(o => ['READY', 'SHIPPED'].includes(o.status)).length;
     const completedOrders = orders.filter(o => o.status === 'COMPLETED').length;
+    const cancelledOrders = orders.filter(o => o.status === 'CANCELLED').length;
+
+    const statsData = [
+      { 
+        label: 'ยอดขายรวม', 
+        value: `฿${totalSales.toLocaleString()}`, 
+        subtitle: `${validOrders.length} ออเดอร์`,
+        gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+        iconBg: 'rgba(16,185,129,0.2)',
+        icon: <AttachMoney sx={{ fontSize: 28, color: '#34d399' }} />,
+      },
+      { 
+        label: 'รอชำระเงิน', 
+        value: `${pendingOrders}`, 
+        subtitle: 'รายการ',
+        gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+        iconBg: 'rgba(245,158,11,0.2)',
+        icon: <DateRange sx={{ fontSize: 28, color: '#fbbf24' }} />,
+      },
+      { 
+        label: 'ชำระแล้ว', 
+        value: `${paidOrders}`, 
+        subtitle: 'พร้อมจัดส่ง',
+        gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+        iconBg: 'rgba(59,130,246,0.2)',
+        icon: <CheckCircle sx={{ fontSize: 28, color: '#60a5fa' }} />,
+      },
+      { 
+        label: 'จัดส่งแล้ว', 
+        value: `${readyOrders + completedOrders}`, 
+        subtitle: 'เสร็จสมบูรณ์',
+        gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+        iconBg: 'rgba(139,92,246,0.2)',
+        icon: <LocalShipping sx={{ fontSize: 28, color: '#a78bfa' }} />,
+      },
+    ];
 
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-        {/* Stats Grid */}
-        <Box sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: 'repeat(4, 1fr)' },
-          gap: 2
+        {/* Welcome Header */}
+        <Box sx={{ 
+          p: 3, 
+          borderRadius: '20px', 
+          background: 'linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(139,92,246,0.1) 100%)',
+          border: '1px solid rgba(99,102,241,0.2)',
         }}>
-          <StatCard
-            label="Total Sales"
-            value={`฿${totalSales.toLocaleString()}`}
-            trend="+12.5% from last month"
-            icon={<AttachMoney sx={{ fontSize: 32, color: '#10b981' }} />}
-          />
-          <StatCard
-            label="Pending Orders"
-            value={`${pendingOrders}`}
-            trend="waiting for verification"
-            icon={<DateRange sx={{ fontSize: 32, color: '#f59e0b' }} />}
-          />
-          <StatCard
-            label="Paid Orders"
-            value={`${paidOrders}`}
-            trend="ready to pack"
-            icon={<CheckCircle sx={{ fontSize: 32, color: '#3b82f6' }} />}
-          />
-          <StatCard
-            label="Completed"
-            value={`${completedOrders + readyOrders}`}
-            trend="this month"
-            icon={<LocalShipping sx={{ fontSize: 32, color: '#10b981' }} />}
-          />
+          <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: '#f1f5f9', mb: 0.5 }}>
+            👋 ยินดีต้อนรับ, {session?.user?.name?.split(' ')[0] || 'Admin'}
+          </Typography>
+          <Typography sx={{ fontSize: '0.9rem', color: '#94a3b8' }}>
+            จัดการร้านค้าและออเดอร์ของคุณได้ที่นี่ • อัพเดทล่าสุด: {lastSavedTime?.toLocaleTimeString('th-TH') || 'กำลังโหลด...'}
+          </Typography>
         </Box>
 
-        {/* Recent Orders Table */}
-        <Card sx={glassCardSx}>
-          <CardHeader
-            title="Recent Orders"
-            avatar={<LocalShipping />}
-            titleTypographyProps={{ sx: { fontWeight: 'bold', color: ADMIN_THEME.text } }}
-            sx={{ color: ADMIN_THEME.text }}
-          />
-          <CardContent>
-            <TableContainer component={Box} sx={{ background: 'transparent' }}>
-              <Table sx={tableSx}>
-                <TableHead>
-                  <TableRow>
-                    <TableCell><strong>Ref</strong></TableCell>
-                    <TableCell><strong>Customer</strong></TableCell>
-                    <TableCell align="right"><strong>Amount</strong></TableCell>
-                    <TableCell><strong>Status</strong></TableCell>
-                    <TableCell><strong>Date</strong></TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {orders.slice(0, 5).map((order) => (
-                    <TableRow key={order.ref} hover>
-                      <TableCell>
-                        <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
-                          {order.ref}
+        {/* Stats Grid - Modern Cards */}
+        <Box sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
+          gap: 2,
+        }}>
+          {statsData.map((stat, idx) => (
+            <Box
+              key={idx}
+              sx={{
+                p: 2.5,
+                borderRadius: '18px',
+                bgcolor: ADMIN_THEME.glass,
+                border: `1px solid ${ADMIN_THEME.border}`,
+                backdropFilter: 'blur(20px)',
+                position: 'relative',
+                overflow: 'hidden',
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
+                },
+              }}
+            >
+              {/* Background Glow */}
+              <Box sx={{
+                position: 'absolute',
+                top: -20,
+                right: -20,
+                width: 80,
+                height: 80,
+                borderRadius: '50%',
+                background: stat.gradient,
+                opacity: 0.15,
+                filter: 'blur(20px)',
+              }} />
+              
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2, position: 'relative' }}>
+                <Box sx={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: '14px',
+                  bgcolor: stat.iconBg,
+                  display: 'grid',
+                  placeItems: 'center',
+                }}>
+                  {stat.icon}
+                </Box>
+              </Box>
+              
+              <Typography sx={{ fontSize: '1.75rem', fontWeight: 900, color: '#f1f5f9', lineHeight: 1, mb: 0.5 }}>
+                {stat.value}
+              </Typography>
+              <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: '#94a3b8' }}>
+                {stat.label}
+              </Typography>
+              <Typography sx={{ fontSize: '0.7rem', color: '#64748b', mt: 0.5 }}>
+                {stat.subtitle}
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+
+        {/* Quick Status Overview */}
+        <Box sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+          gap: 2,
+        }}>
+          {/* Order Status Breakdown */}
+          <Box sx={{ ...glassCardSx, p: 3 }}>
+            <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#f1f5f9', mb: 2.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Receipt sx={{ fontSize: 20, color: '#a5b4fc' }} />
+              สถานะออเดอร์
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              {[
+                { status: 'WAITING_PAYMENT', count: pendingOrders },
+                { status: 'PAID', count: paidOrders },
+                { status: 'READY', count: readyOrders },
+                { status: 'COMPLETED', count: completedOrders },
+                { status: 'CANCELLED', count: cancelledOrders },
+              ].map((item) => {
+                const theme = STATUS_THEME[item.status] || STATUS_THEME.PENDING;
+                const total = orders.length || 1;
+                const percent = Math.round((item.count / total) * 100);
+                return (
+                  <Box key={item.status} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Box sx={{ 
+                      width: 100, 
+                      flexShrink: 0,
+                      px: 1.5, 
+                      py: 0.5, 
+                      borderRadius: '8px', 
+                      bgcolor: theme.bg, 
+                      border: `1px solid ${theme.border}`,
+                      textAlign: 'center',
+                    }}>
+                      <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: theme.text }}>
+                        {item.status.replace('_', ' ')}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ flex: 1, height: 8, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
+                      <Box sx={{ 
+                        width: `${percent}%`, 
+                        height: '100%', 
+                        bgcolor: theme.text.replace('1)', '0.8)'),
+                        borderRadius: '4px',
+                        transition: 'width 0.5s ease',
+                      }} />
+                    </Box>
+                    <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: theme.text, minWidth: 30, textAlign: 'right' }}>
+                      {item.count}
+                    </Typography>
+                  </Box>
+                );
+              })}
+            </Box>
+          </Box>
+
+          {/* Quick Actions */}
+          <Box sx={{ ...glassCardSx, p: 3 }}>
+            <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#f1f5f9', mb: 2.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Bolt sx={{ fontSize: 20, color: '#fbbf24' }} />
+              Quick Actions
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              <Button
+                fullWidth
+                onClick={() => setActiveTab(1)}
+                sx={{
+                  ...secondaryButtonSx,
+                  justifyContent: 'flex-start',
+                  gap: 1.5,
+                }}
+              >
+                <ShoppingCart sx={{ fontSize: 20 }} />
+                จัดการสินค้า ({config.products?.length || 0} รายการ)
+              </Button>
+              <Button
+                fullWidth
+                onClick={() => setActiveTab(2)}
+                sx={{
+                  ...secondaryButtonSx,
+                  justifyContent: 'flex-start',
+                  gap: 1.5,
+                }}
+              >
+                <Receipt sx={{ fontSize: 20 }} />
+                ดูออเดอร์ทั้งหมด ({orders.length} รายการ)
+              </Button>
+              <Button
+                fullWidth
+                onClick={() => triggerSheetSync(config.sheetId ? 'sync' : 'create')}
+                disabled={sheetSyncing}
+                sx={{
+                  ...gradientButtonSx,
+                  justifyContent: 'flex-start',
+                  gap: 1.5,
+                }}
+              >
+                <Bolt sx={{ fontSize: 20 }} />
+                {sheetSyncing ? 'กำลังซิงก์...' : 'ซิงก์ Google Sheet'}
+              </Button>
+            </Box>
+          </Box>
+        </Box>
+
+        {/* Recent Orders - Modern Table */}
+        <Box sx={{ ...glassCardSx, p: 0 }}>
+          <Box sx={{ 
+            px: 3, 
+            py: 2.5, 
+            borderBottom: `1px solid ${ADMIN_THEME.border}`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}>
+            <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#f1f5f9', display: 'flex', alignItems: 'center', gap: 1 }}>
+              <LocalShipping sx={{ fontSize: 20, color: '#22d3ee' }} />
+              ออเดอร์ล่าสุด
+            </Typography>
+            <Button
+              size="small"
+              onClick={() => setActiveTab(2)}
+              sx={{ color: '#a5b4fc', fontSize: '0.8rem', textTransform: 'none' }}
+            >
+              ดูทั้งหมด →
+            </Button>
+          </Box>
+          <Box sx={{ overflowX: 'auto' }}>
+            <Table sx={{ minWidth: 600 }}>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ color: '#64748b', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>REF</TableCell>
+                  <TableCell sx={{ color: '#64748b', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>ลูกค้า</TableCell>
+                  <TableCell align="right" sx={{ color: '#64748b', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>ยอด</TableCell>
+                  <TableCell sx={{ color: '#64748b', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>สถานะ</TableCell>
+                  <TableCell sx={{ color: '#64748b', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>วันที่</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {orders.slice(0, 5).map((order) => {
+                  const theme = STATUS_THEME[order.status] || STATUS_THEME.PENDING;
+                  return (
+                    <TableRow 
+                      key={order.ref} 
+                      sx={{ 
+                        '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' },
+                        cursor: 'pointer',
+                      }}
+                      onClick={() => { setActiveTab(2); setSearchTerm(order.ref); }}
+                    >
+                      <TableCell sx={{ borderColor: ADMIN_THEME.border }}>
+                        <Typography sx={{ fontSize: '0.8rem', fontFamily: 'monospace', color: '#a5b4fc', fontWeight: 600 }}>
+                          {order.ref.slice(-8)}
                         </Typography>
                       </TableCell>
-                      <TableCell>{order.name}</TableCell>
-                      <TableCell align="right" sx={{ color: '#10b981', fontWeight: 'bold' }}>
-                        ฿{Number(order.amount).toLocaleString()}
+                      <TableCell sx={{ borderColor: ADMIN_THEME.border }}>
+                        <Typography sx={{ fontSize: '0.85rem', color: '#f1f5f9', fontWeight: 600 }}>
+                          {order.name || '—'}
+                        </Typography>
+                        <Typography sx={{ fontSize: '0.7rem', color: '#64748b' }}>
+                          {order.email?.slice(0, 20) || ''}
+                        </Typography>
                       </TableCell>
-                      <TableCell>
-                        <StatusChip status={order.status} />
+                      <TableCell align="right" sx={{ borderColor: ADMIN_THEME.border }}>
+                        <Typography sx={{ fontSize: '0.9rem', color: '#10b981', fontWeight: 700 }}>
+                          ฿{Number(order.amount).toLocaleString()}
+                        </Typography>
                       </TableCell>
-                      <TableCell>
-                        {order.date ? new Date(order.date).toLocaleDateString() : '-'}
+                      <TableCell sx={{ borderColor: ADMIN_THEME.border }}>
+                        <Box sx={{
+                          display: 'inline-flex',
+                          px: 1.5,
+                          py: 0.5,
+                          borderRadius: '8px',
+                          bgcolor: theme.bg,
+                          border: `1px solid ${theme.border}`,
+                        }}>
+                          <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: theme.text }}>
+                            {order.status.replace('_', ' ')}
+                          </Typography>
+                        </Box>
+                      </TableCell>
+                      <TableCell sx={{ borderColor: ADMIN_THEME.border }}>
+                        <Typography sx={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                          {order.date ? new Date(order.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }) : '-'}
+                        </Typography>
                       </TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </CardContent>
-        </Card>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </Box>
+        </Box>
       </Box>
     );
   };
@@ -665,224 +961,598 @@ export default function AdminPage(): JSX.Element {
 
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-          <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
-            Orders ({filteredOrders.length}/{orders.length})
-          </Typography>
-          <Stack direction="row" spacing={1} flexWrap="wrap" justifyContent="flex-end">
+        {/* Header */}
+        <Box sx={{ 
+          display: 'flex', 
+          flexDirection: { xs: 'column', md: 'row' },
+          justifyContent: 'space-between', 
+          alignItems: { xs: 'stretch', md: 'center' }, 
+          gap: 2 
+        }}>
+          <Box>
+            <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: '#f1f5f9' }}>
+              📦 จัดการออเดอร์
+            </Typography>
+            <Typography sx={{ fontSize: '0.85rem', color: '#64748b' }}>
+              แสดง {filteredOrders.length} จาก {orders.length} รายการ
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
             {config.sheetUrl && (
               <Button
-                variant="text"
                 component="a"
                 href={config.sheetUrl}
                 target="_blank"
                 rel="noreferrer"
-                startIcon={<Bolt />}
-                sx={{ color: '#a5b4fc' }}
+                sx={{
+                  ...secondaryButtonSx,
+                  gap: 1,
+                }}
               >
-                เปิด Google Sheet
+                <Bolt sx={{ fontSize: 18 }} />
+                Google Sheet
               </Button>
             )}
             <Button
-              variant="contained"
-              startIcon={<Bolt />}
               onClick={() => triggerSheetSync(config.sheetId ? 'sync' : 'create')}
               disabled={sheetSyncing}
               sx={gradientButtonSx}
             >
+              <Bolt sx={{ fontSize: 18, mr: 1 }} />
               {sheetSyncing ? 'กำลังซิงก์...' : config.sheetId ? 'ซิงก์ Sheet' : 'สร้าง Sheet' }
             </Button>
             <Button 
-              variant="outlined" 
-              startIcon={<Refresh />}
               onClick={() => fetchData()}
+              sx={secondaryButtonSx}
             >
-              Refresh
+              <Refresh sx={{ fontSize: 18 }} />
             </Button>
-          </Stack>
+          </Box>
         </Box>
 
-        {/* Search & Filter */}
-        <Box sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr', md: '2fr 1fr' },
-          gap: 2
+        {/* Status Filters - Pill Style */}
+        <Box sx={{ 
+          display: 'flex', 
+          gap: 1, 
+          overflowX: 'auto', 
+          pb: 1,
+          '&::-webkit-scrollbar': { display: 'none' },
         }}>
-          <TextField
-            placeholder="Search by Ref, Name, or Email..."
-            variant="outlined"
-            fullWidth
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            sx={inputSx}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search />
-                </InputAdornment>
-              ),
-            }}
-          />
-          <Select
-            fullWidth
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            sx={inputSx}
-          >
-            <MenuItem value="ALL">All Status</MenuItem>
-            {ORDER_STATUSES.map(status => (
-              <MenuItem key={status} value={status}>{status}</MenuItem>
-            ))}
-          </Select>
+          {['ALL', ...ORDER_STATUSES].map((status) => {
+            const isActive = filterStatus === status;
+            const count = status === 'ALL' ? orders.length : orders.filter(o => o.status === status).length;
+            const theme = STATUS_THEME[status] || { bg: 'rgba(255,255,255,0.05)', text: '#94a3b8', border: ADMIN_THEME.border };
+            return (
+              <Box
+                key={status}
+                onClick={() => setFilterStatus(status)}
+                sx={{
+                  px: 2,
+                  py: 0.8,
+                  borderRadius: '20px',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.2s ease',
+                  bgcolor: isActive ? theme.bg : 'rgba(255,255,255,0.03)',
+                  border: `1px solid ${isActive ? theme.border : ADMIN_THEME.border}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  '&:hover': { bgcolor: theme.bg },
+                }}
+              >
+                <Typography sx={{ 
+                  fontSize: '0.8rem', 
+                  fontWeight: 600, 
+                  color: isActive ? theme.text : '#64748b' 
+                }}>
+                  {status === 'ALL' ? 'ทั้งหมด' : status.replace('_', ' ')}
+                </Typography>
+                <Box sx={{
+                  px: 0.8,
+                  py: 0.2,
+                  borderRadius: '8px',
+                  bgcolor: isActive ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.05)',
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  color: isActive ? theme.text : '#64748b',
+                }}>
+                  {count}
+                </Box>
+              </Box>
+            );
+          })}
         </Box>
 
-        {/* Orders Table */}
-        <Card sx={glassCardSx}>
-          <CardContent>
-            <TableContainer component={Box} sx={{ background: 'transparent' }}>
-              <Table sx={tableSx}>
-                <TableHead>
-                  <TableRow>
-                    <TableCell><strong>Ref</strong></TableCell>
-                    <TableCell><strong>Customer</strong></TableCell>
-                    <TableCell><strong>Email</strong></TableCell>
-                    <TableCell align="right"><strong>Amount</strong></TableCell>
-                    <TableCell><strong>Status</strong></TableCell>
-                    <TableCell><strong>Date</strong></TableCell>
-                    <TableCell><strong>Action</strong></TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {filteredOrders.map(order => (
-                    <TableRow key={order.ref} hover>
-                      <TableCell>
-                        <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
-                          {order.ref}
+        {/* Search */}
+        <TextField
+          placeholder="🔍 ค้นหา Ref, ชื่อ, หรืออีเมล..."
+          variant="outlined"
+          fullWidth
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          sx={{
+            ...inputSx,
+            '& .MuiOutlinedInput-root': {
+              ...inputSx['& .MuiOutlinedInput-root'],
+              borderRadius: '14px',
+            },
+          }}
+        />
+
+        {/* Orders List - Modern Cards */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {filteredOrders.map(order => {
+            const statusTheme = STATUS_THEME[normalizeStatusKey(order.status)] || STATUS_THEME.PENDING_PAYMENT;
+            const isProcessing = orderProcessingRef === order.ref;
+            return (
+              <Box
+                key={order.ref}
+                sx={{
+                  ...glassCardSx,
+                  p: 0,
+                  overflow: 'hidden',
+                  transition: 'all 0.3s ease',
+                  opacity: isProcessing ? 0.6 : 1,
+                  '&:hover': {
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+                  },
+                }}
+              >
+                {/* Status Bar */}
+                <Box sx={{
+                  height: '4px',
+                  background: `linear-gradient(90deg, ${statusTheme.text}, ${statusTheme.border})`,
+                }} />
+                
+                <Box sx={{ p: 2.5 }}>
+                  {/* Top Row: Ref, Status, Amount */}
+                  <Box sx={{ 
+                    display: 'flex', 
+                    flexWrap: 'wrap',
+                    justifyContent: 'space-between', 
+                    alignItems: 'flex-start',
+                    gap: 2,
+                    mb: 2,
+                  }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Box sx={{
+                        fontFamily: 'monospace',
+                        fontSize: '0.85rem',
+                        fontWeight: 700,
+                        color: '#f1f5f9',
+                        bgcolor: 'rgba(255,255,255,0.05)',
+                        px: 1.5,
+                        py: 0.5,
+                        borderRadius: '8px',
+                      }}>
+                        #{order.ref}
+                      </Box>
+                      <Box sx={{
+                        px: 1.5,
+                        py: 0.4,
+                        borderRadius: '12px',
+                        bgcolor: statusTheme.bg,
+                        border: `1px solid ${statusTheme.border}`,
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        color: statusTheme.text,
+                      }}>
+                        {order.status}
+                      </Box>
+                    </Box>
+                    <Typography sx={{ 
+                      fontSize: '1.3rem', 
+                      fontWeight: 800, 
+                      color: '#10b981',
+                    }}>
+                      ฿{Number(order.amount).toLocaleString()}
+                    </Typography>
+                  </Box>
+
+                  {/* Customer Info */}
+                  <Box sx={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                    gap: 1.5,
+                    mb: 2,
+                  }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box sx={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: '8px',
+                        bgcolor: 'rgba(139, 92, 246, 0.2)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}>
+                        <Typography sx={{ fontSize: '0.8rem' }}>👤</Typography>
+                      </Box>
+                      <Box>
+                        <Typography sx={{ fontSize: '0.7rem', color: '#64748b' }}>ลูกค้า</Typography>
+                        <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: '#f1f5f9' }}>
+                          {order.name}
                         </Typography>
-                      </TableCell>
-                      <TableCell>{order.name}</TableCell>
-                      <TableCell>
-                        <Typography variant="caption">{order.email}</Typography>
-                      </TableCell>
-                      <TableCell align="right" sx={{ color: '#10b981', fontWeight: 'bold' }}>
-                        ฿{Number(order.amount).toLocaleString()}
-                      </TableCell>
-                      <TableCell>
-                        <StatusChip status={order.status} />
-                      </TableCell>
-                      <TableCell>
-                        {order.date ? new Date(order.date).toLocaleDateString() : '-'}
-                      </TableCell>
-                      <TableCell>
-                        <Stack direction="row" spacing={1} alignItems="center">
-                          <Select
-                            value={order.status}
-                            onChange={(e) => updateOrderStatus(order.ref, e.target.value)}
-                            size="small"
-                            sx={{ ...inputSx, minWidth: 140 }}
-                          >
-                            {ORDER_STATUSES.map(status => (
-                              <MenuItem key={status} value={status}>{status}</MenuItem>
-                            ))}
-                          </Select>
-                          <IconButton
-                            size="small"
-                            onClick={() => openOrderEditor(order)}
-                            sx={{ color: '#e2e8f0' }}
-                            disabled={orderProcessingRef === order.ref}
-                          >
-                            <EditIconMUI fontSize="small" />
-                          </IconButton>
-                          <IconButton
-                            size="small"
-                            onClick={() => deleteOrder(order, false)}
-                            sx={{ color: '#f59e0b' }}
-                            disabled={orderProcessingRef === order.ref}
-                          >
-                            <Close fontSize="small" />
-                          </IconButton>
-                          <IconButton
-                            size="small"
-                            onClick={() => deleteOrder(order, true)}
-                            sx={{ color: '#ef4444' }}
-                            disabled={orderProcessingRef === order.ref}
-                          >
-                            <Delete fontSize="small" />
-                          </IconButton>
-                        </Stack>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                      </Box>
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box sx={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: '8px',
+                        bgcolor: 'rgba(59, 130, 246, 0.2)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}>
+                        <Typography sx={{ fontSize: '0.8rem' }}>📧</Typography>
+                      </Box>
+                      <Box sx={{ overflow: 'hidden' }}>
+                        <Typography sx={{ fontSize: '0.7rem', color: '#64748b' }}>อีเมล</Typography>
+                        <Typography sx={{ 
+                          fontSize: '0.85rem', 
+                          color: '#94a3b8',
+                          textOverflow: 'ellipsis',
+                          overflow: 'hidden',
+                          whiteSpace: 'nowrap',
+                        }}>
+                          {order.email || '-'}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Box>
 
-            {filteredOrders.length === 0 && (
-              <Box sx={{ textAlign: 'center', py: 4 }}>
-                <Receipt sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
-                <Typography sx={{ color: ADMIN_THEME.muted }}>No orders found</Typography>
+                  {/* Date and Actions */}
+                  <Box sx={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: 2,
+                    pt: 2,
+                    borderTop: `1px solid ${ADMIN_THEME.border}`,
+                  }}>
+                    <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>
+                      📅 {order.date ? new Date(order.date).toLocaleDateString('th-TH', { 
+                        day: 'numeric', 
+                        month: 'short', 
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      }) : '-'}
+                    </Typography>
+                    
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                      {/* Quick Status Change */}
+                      <Select
+                        value={order.status}
+                        onChange={(e) => updateOrderStatus(order.ref, e.target.value)}
+                        size="small"
+                        disabled={isProcessing}
+                        sx={{ 
+                          minWidth: 130,
+                          fontSize: '0.8rem',
+                          bgcolor: 'rgba(255,255,255,0.03)',
+                          borderRadius: '10px',
+                          '& .MuiOutlinedInput-notchedOutline': {
+                            borderColor: ADMIN_THEME.border,
+                          },
+                          '&:hover .MuiOutlinedInput-notchedOutline': {
+                            borderColor: 'rgba(255,255,255,0.2)',
+                          },
+                          '& .MuiSelect-select': {
+                            py: 0.8,
+                            color: '#e2e8f0',
+                          },
+                        }}
+                      >
+                        {ORDER_STATUSES.map(status => (
+                          <MenuItem key={status} value={status}>{status}</MenuItem>
+                        ))}
+                      </Select>
+
+                      {/* Action Buttons */}
+                      <Box sx={{
+                        display: 'flex',
+                        bgcolor: 'rgba(255,255,255,0.03)',
+                        borderRadius: '10px',
+                        border: `1px solid ${ADMIN_THEME.border}`,
+                        overflow: 'hidden',
+                      }}>
+                        <IconButton
+                          size="small"
+                          onClick={() => openOrderEditor(order)}
+                          disabled={isProcessing}
+                          sx={{ 
+                            color: '#60a5fa',
+                            borderRadius: 0,
+                            px: 1.2,
+                            '&:hover': { bgcolor: 'rgba(96, 165, 250, 0.1)' },
+                          }}
+                        >
+                          <EditIconMUI sx={{ fontSize: 18 }} />
+                        </IconButton>
+                        <Box sx={{ width: '1px', bgcolor: ADMIN_THEME.border }} />
+                        <IconButton
+                          size="small"
+                          onClick={() => deleteOrder(order, false)}
+                          disabled={isProcessing}
+                          sx={{ 
+                            color: '#f59e0b',
+                            borderRadius: 0,
+                            px: 1.2,
+                            '&:hover': { bgcolor: 'rgba(245, 158, 11, 0.1)' },
+                          }}
+                          title="ยกเลิกออเดอร์"
+                        >
+                          <Close sx={{ fontSize: 18 }} />
+                        </IconButton>
+                        <Box sx={{ width: '1px', bgcolor: ADMIN_THEME.border }} />
+                        <IconButton
+                          size="small"
+                          onClick={() => deleteOrder(order, true)}
+                          disabled={isProcessing}
+                          sx={{ 
+                            color: '#ef4444',
+                            borderRadius: 0,
+                            px: 1.2,
+                            '&:hover': { bgcolor: 'rgba(239, 68, 68, 0.1)' },
+                          }}
+                          title="ลบถาวร"
+                        >
+                          <Delete sx={{ fontSize: 18 }} />
+                        </IconButton>
+                      </Box>
+                    </Box>
+                  </Box>
+                </Box>
               </Box>
-            )}
-          </CardContent>
-        </Card>
+            );
+          })}
 
-        <Dialog open={orderEditor.open} onClose={resetOrderEditor} fullWidth maxWidth="sm">
-          <DialogTitle>
-            แก้ไขออเดอร์ {orderEditor.ref && <Typography component="span" variant="caption">#{orderEditor.ref}</Typography>}
-          </DialogTitle>
-          <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <TextField
-              label="ชื่อลูกค้า"
-              value={orderEditor.name}
-              onChange={(e) => setOrderEditor(prev => ({ ...prev, name: e.target.value }))}
-              fullWidth
-              sx={inputSx}
-            />
-            <TextField
-              label="อีเมล"
-              value={orderEditor.email}
-              onChange={(e) => setOrderEditor(prev => ({ ...prev, email: e.target.value }))}
-              fullWidth
-              sx={inputSx}
-            />
-            <TextField
-              label="ยอดชำระ (บาท)"
-              type="number"
-              value={orderEditor.amount}
-              onChange={(e) => setOrderEditor(prev => ({ ...prev, amount: Number(e.target.value) }))}
-              fullWidth
-              sx={inputSx}
-            />
-            <TextField
-              label="วันที่"
-              type="datetime-local"
-              value={orderEditor.date}
-              onChange={(e) => setOrderEditor(prev => ({ ...prev, date: e.target.value }))}
-              InputLabelProps={{ shrink: true }}
-              fullWidth
-              sx={inputSx}
-            />
-            <Select
-              value={orderEditor.status}
-              onChange={(e) => setOrderEditor(prev => ({ ...prev, status: e.target.value }))}
-              fullWidth
-              sx={inputSx}
-            >
-              {ORDER_STATUSES.map(status => (
-                <MenuItem key={status} value={status}>{status}</MenuItem>
-              ))}
-            </Select>
+          {filteredOrders.length === 0 && (
+            <Box sx={{ 
+              ...glassCardSx,
+              textAlign: 'center', 
+              py: 6,
+            }}>
+              <Receipt sx={{ fontSize: 56, color: '#475569', mb: 2 }} />
+              <Typography sx={{ fontSize: '1.1rem', fontWeight: 600, color: '#64748b', mb: 0.5 }}>
+                ไม่พบออเดอร์
+              </Typography>
+              <Typography sx={{ fontSize: '0.85rem', color: '#475569' }}>
+                ลองเปลี่ยนตัวกรองหรือคำค้นหา
+              </Typography>
+            </Box>
+          )}
+        </Box>
+
+        {/* Order Editor Dialog - Modern Design */}
+        <Dialog 
+          open={orderEditor.open} 
+          onClose={resetOrderEditor} 
+          fullWidth 
+          maxWidth="sm"
+          PaperProps={{
+            sx: {
+              bgcolor: '#0f172a',
+              backgroundImage: 'linear-gradient(135deg, rgba(139, 92, 246, 0.03) 0%, rgba(16, 185, 129, 0.03) 100%)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: '20px',
+              overflow: 'hidden',
+            }
+          }}
+        >
+          {/* Header */}
+          <Box sx={{
+            p: 3,
+            pb: 2,
+            background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%)',
+            borderBottom: '1px solid rgba(255,255,255,0.06)',
+          }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Box sx={{
+                width: 48,
+                height: 48,
+                borderRadius: '14px',
+                background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <EditIconMUI sx={{ color: '#fff', fontSize: 24 }} />
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: '1.2rem', fontWeight: 700, color: '#f1f5f9' }}>
+                  แก้ไขออเดอร์
+                </Typography>
+                {orderEditor.ref && (
+                  <Typography sx={{ 
+                    fontSize: '0.85rem', 
+                    color: '#64748b',
+                    fontFamily: 'monospace',
+                  }}>
+                    #{orderEditor.ref}
+                  </Typography>
+                )}
+              </Box>
+            </Box>
+          </Box>
+
+          <DialogContent sx={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: 2.5,
+            p: 3,
+          }}>
+            {/* Customer Info Section */}
+            <Box>
+              <Typography sx={{ 
+                fontSize: '0.75rem', 
+                fontWeight: 600, 
+                color: '#64748b', 
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                mb: 1.5,
+              }}>
+                ข้อมูลลูกค้า
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <TextField
+                  label="ชื่อลูกค้า"
+                  placeholder="กรอกชื่อ-นามสกุล"
+                  value={orderEditor.name}
+                  onChange={(e) => setOrderEditor(prev => ({ ...prev, name: e.target.value }))}
+                  fullWidth
+                  sx={{
+                    ...inputSx,
+                    '& .MuiOutlinedInput-root': {
+                      ...inputSx['& .MuiOutlinedInput-root'],
+                      borderRadius: '12px',
+                    },
+                  }}
+                />
+                <TextField
+                  label="อีเมล"
+                  placeholder="example@email.com"
+                  type="email"
+                  value={orderEditor.email}
+                  onChange={(e) => setOrderEditor(prev => ({ ...prev, email: e.target.value }))}
+                  fullWidth
+                  sx={{
+                    ...inputSx,
+                    '& .MuiOutlinedInput-root': {
+                      ...inputSx['& .MuiOutlinedInput-root'],
+                      borderRadius: '12px',
+                    },
+                  }}
+                />
+              </Box>
+            </Box>
+
+            {/* Order Details Section */}
+            <Box>
+              <Typography sx={{ 
+                fontSize: '0.75rem', 
+                fontWeight: 600, 
+                color: '#64748b', 
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                mb: 1.5,
+              }}>
+                รายละเอียดออเดอร์
+              </Typography>
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                <TextField
+                  label="ยอดชำระ (บาท)"
+                  type="number"
+                  value={orderEditor.amount}
+                  onChange={(e) => setOrderEditor(prev => ({ ...prev, amount: Number(e.target.value) }))}
+                  fullWidth
+                  InputProps={{
+                    startAdornment: <Typography sx={{ color: '#10b981', mr: 1, fontWeight: 600 }}>฿</Typography>,
+                  }}
+                  sx={{
+                    ...inputSx,
+                    '& .MuiOutlinedInput-root': {
+                      ...inputSx['& .MuiOutlinedInput-root'],
+                      borderRadius: '12px',
+                    },
+                  }}
+                />
+                <TextField
+                  label="วันที่"
+                  type="datetime-local"
+                  value={orderEditor.date}
+                  onChange={(e) => setOrderEditor(prev => ({ ...prev, date: e.target.value }))}
+                  InputLabelProps={{ shrink: true }}
+                  fullWidth
+                  sx={{
+                    ...inputSx,
+                    '& .MuiOutlinedInput-root': {
+                      ...inputSx['& .MuiOutlinedInput-root'],
+                      borderRadius: '12px',
+                    },
+                  }}
+                />
+              </Box>
+            </Box>
+
+            {/* Status Section */}
+            <Box>
+              <Typography sx={{ 
+                fontSize: '0.75rem', 
+                fontWeight: 600, 
+                color: '#64748b', 
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                mb: 1.5,
+              }}>
+                สถานะ
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                {ORDER_STATUSES.map(status => {
+                  const theme = STATUS_THEME[status] || STATUS_THEME.PENDING_PAYMENT;
+                  const isSelected = orderEditor.status === status;
+                  return (
+                    <Box
+                      key={status}
+                      onClick={() => setOrderEditor(prev => ({ ...prev, status }))}
+                      sx={{
+                        px: 2,
+                        py: 1,
+                        borderRadius: '10px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        bgcolor: isSelected ? theme.bg : 'rgba(255,255,255,0.03)',
+                        border: `2px solid ${isSelected ? theme.border : 'transparent'}`,
+                        '&:hover': { 
+                          bgcolor: theme.bg,
+                          transform: 'translateY(-1px)',
+                        },
+                      }}
+                    >
+                      <Typography sx={{ 
+                        fontSize: '0.8rem', 
+                        fontWeight: 600, 
+                        color: isSelected ? theme.text : '#64748b',
+                      }}>
+                        {status}
+                      </Typography>
+                    </Box>
+                  );
+                })}
+              </Box>
+            </Box>
           </DialogContent>
-          <DialogActions>
-            <Button onClick={resetOrderEditor}>ปิด</Button>
+
+          <DialogActions sx={{ 
+            p: 3, 
+            pt: 0,
+            gap: 1.5,
+          }}>
+            <Button 
+              onClick={resetOrderEditor}
+              sx={{
+                ...secondaryButtonSx,
+                flex: 1,
+              }}
+            >
+              ยกเลิก
+            </Button>
             <Button
               onClick={saveOrderEdits}
-              variant="contained"
-              startIcon={<Save />}
               disabled={orderProcessingRef === orderEditor.ref}
-              sx={gradientButtonSx}
+              sx={{
+                ...gradientButtonSx,
+                flex: 2,
+                gap: 1,
+              }}
             >
-              บันทึก
+              <Save sx={{ fontSize: 18 }} />
+              {orderProcessingRef === orderEditor.ref ? 'กำลังบันทึก...' : 'บันทึกการเปลี่ยนแปลง'}
             </Button>
           </DialogActions>
         </Dialog>
@@ -918,203 +1588,313 @@ export default function AdminPage(): JSX.Element {
       return () => clearTimeout(timer);
     }, [hasChanges, localConfig, saveFullConfig]);
 
+    // Section wrapper component
+    const SettingSection = ({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) => (
+      <Box sx={{
+        ...glassCardSx,
+        overflow: 'hidden',
+      }}>
+        <Box sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 2,
+          p: 2.5,
+          borderBottom: `1px solid ${ADMIN_THEME.border}`,
+          background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(59, 130, 246, 0.05) 100%)',
+        }}>
+          <Box sx={{
+            width: 40,
+            height: 40,
+            borderRadius: '12px',
+            background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#fff',
+          }}>
+            {icon}
+          </Box>
+          <Typography sx={{ fontSize: '1.1rem', fontWeight: 700, color: '#f1f5f9' }}>
+            {title}
+          </Typography>
+        </Box>
+        <Box sx={{ p: 2.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {children}
+        </Box>
+      </Box>
+    );
+
+    // Toggle row component
+    const ToggleRow = ({ label, description, checked, onChange }: { label: string; description?: string; checked: boolean; onChange: (checked: boolean) => void }) => (
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        py: 0.5,
+      }}>
+        <Box>
+          <Typography sx={{ fontSize: '0.95rem', fontWeight: 500, color: '#e2e8f0' }}>{label}</Typography>
+          {description && (
+            <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>{description}</Typography>
+          )}
+        </Box>
+        <Switch
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+          sx={{
+            '& .MuiSwitch-switchBase.Mui-checked': {
+              color: '#10b981',
+            },
+            '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+              backgroundColor: '#10b981',
+            },
+          }}
+        />
+      </Box>
+    );
+
     return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, maxWidth: 800 }}>
-        <Typography variant="h5" sx={{ fontWeight: 'bold' }}>Shop Settings</Typography>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, maxWidth: 700 }}>
+        {/* Header */}
+        <Box sx={{ mb: 1 }}>
+          <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: '#f1f5f9' }}>
+            ⚙️ ตั้งค่าร้านค้า
+          </Typography>
+          <Typography sx={{ fontSize: '0.85rem', color: '#64748b' }}>
+            จัดการการตั้งค่าทั้งหมดของร้าน
+          </Typography>
+        </Box>
 
         {/* Shop Status */}
-        <Card sx={glassCardSx}>
-          <CardHeader
-            title="Shop Status"
-            avatar={<Store />}
-            titleTypographyProps={{ sx: { fontWeight: 'bold', color: ADMIN_THEME.text } }}
-            sx={{ color: ADMIN_THEME.text }}
+        <SettingSection icon={<Store sx={{ fontSize: 20 }} />} title="สถานะร้านค้า">
+          <ToggleRow
+            label="เปิดรับออเดอร์"
+            description={localConfig.isOpen ? 'ร้านเปิดให้บริการอยู่' : 'ปิดรับออเดอร์ชั่วคราว'}
+            checked={localConfig.isOpen}
+            onChange={(checked) => handleChange({...localConfig, isOpen: checked})}
           />
-          <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography>Shop Is Open</Typography>
-              <Switch
-                checked={localConfig.isOpen}
-                onChange={(e) => handleChange({...localConfig, isOpen: e.target.checked})}
-              />
-            </Box>
-
-            {!localConfig.isOpen && (
+          {!localConfig.isOpen && (
+            <Box sx={{ 
+              mt: 1, 
+              p: 2, 
+              borderRadius: '12px', 
+              bgcolor: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid rgba(239, 68, 68, 0.2)',
+            }}>
+              <Typography sx={{ fontSize: '0.85rem', color: '#f87171', mb: 1.5 }}>
+                📅 กำหนดวันเปิดร้าน
+              </Typography>
               <TextField
                 type="date"
-                label="Close Until"
                 value={localConfig.closeDate}
                 onChange={(e) => handleChange({...localConfig, closeDate: e.target.value})}
                 fullWidth
-                InputLabelProps={{ shrink: true }}
-                sx={inputSx}
+                sx={{
+                  ...inputSx,
+                  '& .MuiOutlinedInput-root': {
+                    ...inputSx['& .MuiOutlinedInput-root'],
+                    borderRadius: '10px',
+                  },
+                }}
               />
-            )}
-          </CardContent>
-        </Card>
+            </Box>
+          )}
+        </SettingSection>
 
         {/* Announcement */}
-        <Card sx={glassCardSx}>
-          <CardHeader
-            title="Announcement"
-            avatar={<Notifications />}
-            titleTypographyProps={{ sx: { fontWeight: 'bold', color: ADMIN_THEME.text } }}
-            sx={{ color: ADMIN_THEME.text }}
+        <SettingSection icon={<Notifications sx={{ fontSize: 20 }} />} title="ประกาศ">
+          <ToggleRow
+            label="แสดงประกาศ"
+            description="แสดงแถบประกาศบนหน้าร้าน"
+            checked={localConfig.announcement?.enabled ?? false}
+            onChange={(checked) => handleChange({
+              ...localConfig,
+              announcement: {...(localConfig.announcement ?? { enabled: false, message: '', color: 'blue' }), enabled: checked}
+            })}
           />
-          <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={localConfig.announcement?.enabled ?? false}
-                  onChange={(e) => handleChange({
-                    ...localConfig,
-                    announcement: {...(localConfig.announcement ?? { enabled: false, message: '', color: 'blue' }), enabled: e.target.checked}
-                  })}
-                />
-              }
-              label="Enable Announcement"
-            />
 
-            {(localConfig.announcement?.enabled) && (
-              <>
-                <TextField
-                  label="Message"
-                  multiline
-                  rows={3}
-                  value={localConfig.announcement?.message ?? ''}
-                  onChange={(e) => handleChange({
-                    ...localConfig,
-                    announcement: {...(localConfig.announcement ?? { enabled: false, message: '', color: 'blue' }), message: e.target.value}
-                  })}
-                  fullWidth
-                  inputProps={{ maxLength: 200 }}
-                  helperText={`${(localConfig.announcement?.message ?? '').length}/200`}
-                  sx={inputSx}
-                />
+          {(localConfig.announcement?.enabled) && (
+            <Box sx={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: 2,
+              mt: 1,
+              p: 2,
+              borderRadius: '12px',
+              bgcolor: 'rgba(139, 92, 246, 0.05)',
+              border: `1px solid ${ADMIN_THEME.border}`,
+            }}>
+              <TextField
+                label="ข้อความประกาศ"
+                multiline
+                rows={2}
+                value={localConfig.announcement?.message ?? ''}
+                onChange={(e) => handleChange({
+                  ...localConfig,
+                  announcement: {...(localConfig.announcement ?? { enabled: false, message: '', color: 'blue' }), message: e.target.value}
+                })}
+                fullWidth
+                inputProps={{ maxLength: 200 }}
+                helperText={`${(localConfig.announcement?.message ?? '').length}/200 ตัวอักษร`}
+                sx={{
+                  ...inputSx,
+                  '& .MuiOutlinedInput-root': {
+                    ...inputSx['& .MuiOutlinedInput-root'],
+                    borderRadius: '10px',
+                  },
+                }}
+              />
 
-                <Select
-                  value={localConfig.announcement?.color ?? 'blue'}
-                  onChange={(e) => handleChange({
-                    ...localConfig,
-                    announcement: {...(localConfig.announcement ?? { enabled: false, message: '', color: 'blue' }), color: e.target.value as any}
-                  })}
-                  fullWidth
-                  sx={inputSx}
-                >
-                  <MenuItem value="blue">Blue</MenuItem>
-                  <MenuItem value="red">Red</MenuItem>
-                  <MenuItem value="emerald">Emerald</MenuItem>
-                  <MenuItem value="orange">Orange</MenuItem>
-                </Select>
-              </>
-            )}
-          </CardContent>
-        </Card>
+              <Box>
+                <Typography sx={{ fontSize: '0.8rem', color: '#64748b', mb: 1 }}>สีพื้นหลัง</Typography>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  {[
+                    { value: 'blue', color: '#3b82f6', label: 'น้ำเงิน' },
+                    { value: 'red', color: '#ef4444', label: 'แดง' },
+                    { value: 'emerald', color: '#10b981', label: 'เขียว' },
+                    { value: 'orange', color: '#f59e0b', label: 'ส้ม' },
+                  ].map(option => (
+                    <Box
+                      key={option.value}
+                      onClick={() => handleChange({
+                        ...localConfig,
+                        announcement: {...(localConfig.announcement ?? { enabled: false, message: '', color: 'blue' }), color: option.value as any}
+                      })}
+                      sx={{
+                        flex: 1,
+                        py: 1,
+                        borderRadius: '10px',
+                        cursor: 'pointer',
+                        textAlign: 'center',
+                        bgcolor: localConfig.announcement?.color === option.value ? option.color : 'rgba(255,255,255,0.05)',
+                        border: `2px solid ${localConfig.announcement?.color === option.value ? option.color : 'transparent'}`,
+                        transition: 'all 0.2s ease',
+                        '&:hover': { transform: 'translateY(-1px)' },
+                      }}
+                    >
+                      <Typography sx={{ 
+                        fontSize: '0.75rem', 
+                        fontWeight: 600,
+                        color: localConfig.announcement?.color === option.value ? '#fff' : '#94a3b8',
+                      }}>
+                        {option.label}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+            </Box>
+          )}
+        </SettingSection>
 
-        <Card sx={glassCardSx}>
-          <CardHeader
-            title="Google Sheet"
-            avatar={<Bolt />}
-            titleTypographyProps={{ sx: { fontWeight: 'bold', color: ADMIN_THEME.text } }}
-            sx={{ color: ADMIN_THEME.text }}
-          />
-          <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {/* Google Sheet */}
+        <SettingSection icon={<Bolt sx={{ fontSize: 20 }} />} title="Google Sheet">
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <TextField
               label="Sheet ID"
+              placeholder="1abc123..."
               value={localConfig.sheetId || ''}
               onChange={(e) => handleChange({ ...localConfig, sheetId: e.target.value, sheetUrl: e.target.value ? `https://docs.google.com/spreadsheets/d/${e.target.value}` : '' })}
               fullWidth
-              sx={inputSx}
-              helperText="ใส่ ID จากลิงก์ Sheet หรือปล่อยว่างแล้วกด 'สร้างและเชื่อม Sheet'"
+              sx={{
+                ...inputSx,
+                '& .MuiOutlinedInput-root': {
+                  ...inputSx['& .MuiOutlinedInput-root'],
+                  borderRadius: '10px',
+                },
+              }}
+              helperText="ใส่ ID จาก URL ของ Google Sheet"
             />
-            <TextField
-              label="Sheet URL"
-              value={localConfig.sheetUrl || ''}
-              onChange={(e) => handleChange({ ...localConfig, sheetUrl: e.target.value })}
-              fullWidth
-              sx={inputSx}
-              helperText="เปิดดู/แก้ไขได้ที่ลิงก์นี้"
-            />
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+            
+            {localConfig.sheetUrl && (
+              <Box sx={{
+                p: 2,
+                borderRadius: '12px',
+                bgcolor: 'rgba(16, 185, 129, 0.1)',
+                border: '1px solid rgba(16, 185, 129, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 2,
+              }}>
+                <Box sx={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: '10px',
+                  bgcolor: '#10b981',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <Check sx={{ color: '#fff', fontSize: 20 }} />
+                </Box>
+                <Box sx={{ flex: 1 }}>
+                  <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: '#10b981' }}>
+                    เชื่อมต่อแล้ว
+                  </Typography>
+                  <Typography 
+                    component="a"
+                    href={localConfig.sheetUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    sx={{ 
+                      fontSize: '0.8rem', 
+                      color: '#64748b',
+                      textDecoration: 'underline',
+                      '&:hover': { color: '#94a3b8' },
+                    }}
+                  >
+                    เปิด Google Sheet
+                  </Typography>
+                </Box>
+              </Box>
+            )}
+
+            <Box sx={{ display: 'flex', gap: 1.5 }}>
               <Button
-                variant="contained"
-                startIcon={<Bolt />}
                 onClick={() => triggerSheetSync(localConfig.sheetId ? 'sync' : 'create')}
                 disabled={sheetSyncing}
-                sx={{ ...gradientButtonSx, flex: 1 }}
+                sx={{ ...gradientButtonSx, flex: 1, gap: 1 }}
               >
-                {sheetSyncing ? 'กำลังซิงก์...' : localConfig.sheetId ? 'ซิงก์ทันที' : 'สร้างและเชื่อม Sheet'}
+                <Bolt sx={{ fontSize: 18 }} />
+                {sheetSyncing ? 'กำลังซิงก์...' : localConfig.sheetId ? 'ซิงก์ทันที' : 'สร้าง Sheet ใหม่'}
               </Button>
-              {localConfig.sheetUrl && (
-                <Button
-                  variant="outlined"
-                  component="a"
-                  href={localConfig.sheetUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  fullWidth
-                  sx={{ minWidth: 160 }}
-                >
-                  เปิด Sheet
-                </Button>
-              )}
-            </Stack>
-          </CardContent>
-        </Card>
+            </Box>
+          </Box>
+        </SettingSection>
 
-        {/* Save Button */}
-        {hasChanges && (
-          <Stack direction="row" spacing={2}>
-            <Button
-              variant="contained"
-              fullWidth
-              onClick={handleSave}
-              disabled={loading}
-              startIcon={<Save />}
-              sx={{ ...gradientButtonSx, background: ADMIN_THEME.gradientAlt, '&:hover': { background: 'linear-gradient(135deg, #0ea472 0%, #0591b5 100%)', boxShadow: '0 14px 34px rgba(16,185,129,0.45)' } }}
-            >
-              {loading ? 'Saving...' : 'Save Changes'}
-            </Button>
-            <Button
-              variant="outlined"
-              fullWidth
-              onClick={() => {
-                setLocalConfig(config);
-                setHasChanges(false);
-              }}
-            >
-              Cancel
-            </Button>
-          </Stack>
-        )}
-
-        {!hasChanges && (
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
-            <Button
-              variant="contained"
-              startIcon={<Save />}
-              onClick={() => handleSave()}
-              disabled={loading}
-              sx={{ ...gradientButtonSx, flex: 1 }}
-            >
-              บันทึกตอนนี้
-            </Button>
-            <Button
-              variant="outlined"
-              onClick={() => triggerSheetSync(localConfig.sheetId ? 'sync' : 'create')}
-              disabled={sheetSyncing}
-              sx={{ flex: 1, borderColor: 'rgba(255,255,255,0.25)' }}
-            >
-              {sheetSyncing ? 'กำลังซิงก์...' : 'ซิงก์ Sheet เร็วๆ'}
-            </Button>
-          </Stack>
-        )}
-
-        {lastSavedTime && (
-          <Typography variant="caption" sx={{ color: ADMIN_THEME.muted }}>
-            Last saved: {lastSavedTime.toLocaleString()}
-          </Typography>
-        )}
+        {/* Save Status */}
+        <Box sx={{ 
+          ...glassCardSx,
+          p: 2,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{
+              width: 10,
+              height: 10,
+              borderRadius: '50%',
+              bgcolor: hasChanges ? '#f59e0b' : '#10b981',
+              boxShadow: `0 0 12px ${hasChanges ? '#f59e0b' : '#10b981'}`,
+            }} />
+            <Typography sx={{ fontSize: '0.85rem', color: '#94a3b8' }}>
+              {hasChanges ? 'มีการเปลี่ยนแปลงที่ยังไม่บันทึก' : 'บันทึกล่าสุด: ' + (lastSavedTime ? lastSavedTime.toLocaleString('th-TH') : '-')}
+            </Typography>
+          </Box>
+          <Button
+            onClick={handleSave}
+            disabled={!hasChanges || loading}
+            sx={{
+              ...gradientButtonSx,
+              minWidth: 120,
+              opacity: hasChanges ? 1 : 0.5,
+            }}
+          >
+            <Save sx={{ fontSize: 18, mr: 1 }} />
+            บันทึก
+          </Button>
+        </Box>
       </Box>
     );
   };
@@ -1126,65 +1906,186 @@ export default function AdminPage(): JSX.Element {
       ? logs
       : logs.filter(log => log[2] === logFilter);
 
+    const getActionTheme = (action: string) => {
+      switch (action) {
+        case 'UPDATE_CONFIG': return { icon: '⚙️', color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.15)' };
+        case 'UPDATE_STATUS': return { icon: '🔄', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' };
+        case 'SEND_EMAIL': return { icon: '📧', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' };
+        case 'SUBMIT_ORDER': return { icon: '🛒', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)' };
+        default: return { icon: '📋', color: '#64748b', bg: 'rgba(100, 116, 139, 0.15)' };
+      }
+    };
+
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-        <Typography variant="h5" sx={{ fontWeight: 'bold' }}>System Logs</Typography>
+        {/* Header */}
+        <Box>
+          <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: '#f1f5f9' }}>
+            📜 ประวัติระบบ
+          </Typography>
+          <Typography sx={{ fontSize: '0.85rem', color: '#64748b' }}>
+            แสดง {filteredLogs.length} จาก {logs.length} รายการ
+          </Typography>
+        </Box>
 
-        {/* Filter */}
-        <Select
-          value={logFilter}
-          onChange={(e) => setLogFilter(e.target.value)}
-          sx={{ maxWidth: 300, ...inputSx }}
-        >
-          <MenuItem value="ALL">All Actions</MenuItem>
-          <MenuItem value="UPDATE_CONFIG">Config Updates</MenuItem>
-          <MenuItem value="UPDATE_STATUS">Status Changes</MenuItem>
-          <MenuItem value="SEND_EMAIL">Emails</MenuItem>
-          <MenuItem value="SUBMIT_ORDER">New Orders</MenuItem>
-        </Select>
-
-        {/* Logs Table */}
-        <Card sx={glassCardSx}>
-          <CardContent>
-            <TableContainer component={Box} sx={{ background: 'transparent' }}>
-              <Table sx={tableSx}>
-                <TableHead>
-                  <TableRow>
-                    <TableCell><strong>Timestamp</strong></TableCell>
-                    <TableCell><strong>Admin</strong></TableCell>
-                    <TableCell><strong>Action</strong></TableCell>
-                    <TableCell><strong>Detail</strong></TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {filteredLogs.map((log, idx) => (
-                    <TableRow key={idx} hover>
-                      <TableCell>
-                        <Typography variant="caption">
-                          {log[0] ? new Date(log[0]).toLocaleString() : '-'}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>{log[1] || '-'}</TableCell>
-                      <TableCell>
-                        <Chip label={log[2] || '-'} size="small" />
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="caption">{log[3] || '-'}</Typography>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-
-            {filteredLogs.length === 0 && (
-              <Box sx={{ textAlign: 'center', py: 4 }}>
-                <History sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
-                <Typography sx={{ color: ADMIN_THEME.muted }}>No logs found</Typography>
+        {/* Filter Tabs */}
+        <Box sx={{ 
+          display: 'flex', 
+          gap: 1, 
+          overflowX: 'auto',
+          pb: 1,
+          '&::-webkit-scrollbar': { display: 'none' },
+        }}>
+          {[
+            { value: 'ALL', label: 'ทั้งหมด', icon: '📋' },
+            { value: 'UPDATE_CONFIG', label: 'ตั้งค่า', icon: '⚙️' },
+            { value: 'UPDATE_STATUS', label: 'สถานะ', icon: '🔄' },
+            { value: 'SEND_EMAIL', label: 'อีเมล', icon: '📧' },
+            { value: 'SUBMIT_ORDER', label: 'ออเดอร์ใหม่', icon: '🛒' },
+          ].map(filter => {
+            const isActive = logFilter === filter.value;
+            const count = filter.value === 'ALL' ? logs.length : logs.filter(l => l[2] === filter.value).length;
+            return (
+              <Box
+                key={filter.value}
+                onClick={() => setLogFilter(filter.value)}
+                sx={{
+                  px: 2,
+                  py: 0.8,
+                  borderRadius: '20px',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.2s ease',
+                  bgcolor: isActive ? 'rgba(139, 92, 246, 0.2)' : 'rgba(255,255,255,0.03)',
+                  border: `1px solid ${isActive ? 'rgba(139, 92, 246, 0.4)' : ADMIN_THEME.border}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  '&:hover': { bgcolor: 'rgba(139, 92, 246, 0.1)' },
+                }}
+              >
+                <Typography sx={{ fontSize: '0.9rem' }}>{filter.icon}</Typography>
+                <Typography sx={{ 
+                  fontSize: '0.8rem', 
+                  fontWeight: 600, 
+                  color: isActive ? '#a78bfa' : '#64748b' 
+                }}>
+                  {filter.label}
+                </Typography>
+                <Box sx={{
+                  px: 0.8,
+                  py: 0.2,
+                  borderRadius: '8px',
+                  bgcolor: isActive ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.05)',
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  color: isActive ? '#a78bfa' : '#64748b',
+                }}>
+                  {count}
+                </Box>
               </Box>
-            )}
-          </CardContent>
-        </Card>
+            );
+          })}
+        </Box>
+
+        {/* Log Entries */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          {filteredLogs.map((log, idx) => {
+            const actionTheme = getActionTheme(log[2] || '');
+            return (
+              <Box
+                key={idx}
+                sx={{
+                  ...glassCardSx,
+                  p: 2,
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 2,
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    bgcolor: 'rgba(255,255,255,0.03)',
+                  },
+                }}
+              >
+                {/* Action Icon */}
+                <Box sx={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: '12px',
+                  bgcolor: actionTheme.bg,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}>
+                  <Typography sx={{ fontSize: '1.1rem' }}>{actionTheme.icon}</Typography>
+                </Box>
+
+                {/* Content */}
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, alignItems: 'center', mb: 0.5 }}>
+                    <Box sx={{
+                      px: 1.5,
+                      py: 0.3,
+                      borderRadius: '8px',
+                      bgcolor: actionTheme.bg,
+                      border: `1px solid ${actionTheme.color}30`,
+                    }}>
+                      <Typography sx={{ 
+                        fontSize: '0.75rem', 
+                        fontWeight: 600, 
+                        color: actionTheme.color,
+                      }}>
+                        {log[2] || 'UNKNOWN'}
+                      </Typography>
+                    </Box>
+                    <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>
+                      โดย <strong style={{ color: '#94a3b8' }}>{log[1] || 'ระบบ'}</strong>
+                    </Typography>
+                  </Box>
+                  <Typography sx={{ 
+                    fontSize: '0.9rem', 
+                    color: '#e2e8f0',
+                    wordBreak: 'break-word',
+                  }}>
+                    {log[3] || '-'}
+                  </Typography>
+                </Box>
+
+                {/* Timestamp */}
+                <Typography sx={{ 
+                  fontSize: '0.75rem', 
+                  color: '#475569',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                }}>
+                  {log[0] ? new Date(log[0]).toLocaleString('th-TH', {
+                    day: 'numeric',
+                    month: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  }) : '-'}
+                </Typography>
+              </Box>
+            );
+          })}
+
+          {filteredLogs.length === 0 && (
+            <Box sx={{ 
+              ...glassCardSx,
+              textAlign: 'center', 
+              py: 6,
+            }}>
+              <History sx={{ fontSize: 56, color: '#475569', mb: 2 }} />
+              <Typography sx={{ fontSize: '1.1rem', fontWeight: 600, color: '#64748b', mb: 0.5 }}>
+                ไม่พบประวัติ
+              </Typography>
+              <Typography sx={{ fontSize: '0.85rem', color: '#475569' }}>
+                ยังไม่มีกิจกรรมในระบบ
+              </Typography>
+            </Box>
+          )}
+        </Box>
       </Box>
     );
   };
@@ -1195,32 +2096,390 @@ export default function AdminPage(): JSX.Element {
   // Main Render
   const pendingCount = orders.filter((o) => ['WAITING_PAYMENT', 'PENDING'].includes(o.status)).length;
 
-  if (!isAuthorized) {
+  // 🔐 Login Component - Show when not authenticated
+  if (status === 'unauthenticated') {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)' }}>
-        <Card sx={{ ...glassCardSx, maxWidth: 420, textAlign: 'center', p: 4 }}>
-          <Lock sx={{ fontSize: 64, color: '#ef4444', mb: 2 }} />
-          <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 2 }}>Access Denied</Typography>
-          <Typography sx={{ mb: 3, color: ADMIN_THEME.muted }}>
-            You don't have permission to access this page
-          </Typography>
-          <Button
-            variant="contained"
-            onClick={() => router.push('/')}
-            fullWidth
-            sx={gradientButtonSx}
+      <Box
+        sx={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: `radial-gradient(ellipse at top, rgba(99,102,241,0.15) 0%, transparent 50%),
+                       radial-gradient(ellipse at bottom right, rgba(139,92,246,0.1) 0%, transparent 50%),
+                       linear-gradient(180deg, #0a0f1a 0%, #0f172a 50%, #0a0f1a 100%)`,
+          p: 2,
+        }}
+      >
+        {/* Animated Background Elements */}
+        <Box
+          sx={{
+            position: 'absolute',
+            top: '20%',
+            left: '10%',
+            width: 300,
+            height: 300,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(139,92,246,0.15) 0%, transparent 70%)',
+            filter: 'blur(40px)',
+            animation: 'pulse 4s ease-in-out infinite',
+            '@keyframes pulse': {
+              '0%, 100%': { transform: 'scale(1)', opacity: 0.5 },
+              '50%': { transform: 'scale(1.1)', opacity: 0.8 },
+            },
+          }}
+        />
+        <Box
+          sx={{
+            position: 'absolute',
+            bottom: '15%',
+            right: '15%',
+            width: 250,
+            height: 250,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%)',
+            filter: 'blur(40px)',
+            animation: 'pulse2 5s ease-in-out infinite',
+            '@keyframes pulse2': {
+              '0%, 100%': { transform: 'scale(1.1)', opacity: 0.6 },
+              '50%': { transform: 'scale(1)', opacity: 0.4 },
+            },
+          }}
+        />
+
+        {/* Login Card */}
+        <Box
+          sx={{
+            position: 'relative',
+            zIndex: 1,
+            width: '100%',
+            maxWidth: 440,
+          }}
+        >
+          <Box
+            sx={{
+              ...glassCardSx,
+              p: 0,
+              overflow: 'hidden',
+            }}
           >
-            Go Home
-          </Button>
-        </Card>
+            {/* Header Gradient */}
+            <Box
+              sx={{
+                background: 'linear-gradient(135deg, rgba(139,92,246,0.2) 0%, rgba(59,130,246,0.2) 100%)',
+                p: 4,
+                pb: 5,
+                textAlign: 'center',
+                position: 'relative',
+              }}
+            >
+              {/* Logo */}
+              <Box
+                sx={{
+                  width: 80,
+                  height: 80,
+                  borderRadius: '24px',
+                  background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 50%, #3b82f6 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  mx: 'auto',
+                  mb: 2.5,
+                  boxShadow: '0 20px 40px rgba(139,92,246,0.3)',
+                }}
+              >
+                <Store sx={{ fontSize: 40, color: '#fff' }} />
+              </Box>
+              <Typography
+                sx={{
+                  fontSize: '1.6rem',
+                  fontWeight: 800,
+                  color: '#f1f5f9',
+                  mb: 0.5,
+                }}
+              >
+                PSUSCC Admin
+              </Typography>
+              <Typography
+                sx={{
+                  fontSize: '0.9rem',
+                  color: '#94a3b8',
+                }}
+              >
+                ระบบจัดการร้านค้า
+              </Typography>
+            </Box>
+
+            {/* Login Form */}
+            <Box sx={{ p: 4, pt: 3 }}>
+              <Typography
+                sx={{
+                  fontSize: '0.85rem',
+                  color: '#64748b',
+                  textAlign: 'center',
+                  mb: 3,
+                }}
+              >
+                เข้าสู่ระบบด้วยบัญชี Google ที่ได้รับอนุญาต
+              </Typography>
+
+              {/* Google Sign In Button */}
+              <Button
+                onClick={() => signIn('google')}
+                fullWidth
+                sx={{
+                  py: 1.8,
+                  borderRadius: '14px',
+                  background: '#fff',
+                  color: '#1f2937',
+                  fontWeight: 600,
+                  fontSize: '1rem',
+                  textTransform: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 2,
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    background: '#f8fafc',
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 8px 30px rgba(0,0,0,0.2)',
+                  },
+                }}
+              >
+                {/* Google Icon */}
+                <Box
+                  component="svg"
+                  viewBox="0 0 24 24"
+                  sx={{ width: 24, height: 24 }}
+                >
+                  <path
+                    fill="#4285F4"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                  />
+                </Box>
+                เข้าสู่ระบบด้วย Google
+              </Button>
+
+              {/* Divider */}
+              <Box sx={{ display: 'flex', alignItems: 'center', my: 3 }}>
+                <Box sx={{ flex: 1, height: 1, bgcolor: 'rgba(255,255,255,0.08)' }} />
+                <Typography sx={{ px: 2, fontSize: '0.75rem', color: '#475569' }}>หรือ</Typography>
+                <Box sx={{ flex: 1, height: 1, bgcolor: 'rgba(255,255,255,0.08)' }} />
+              </Box>
+
+              {/* Back to Shop */}
+              <Button
+                onClick={() => router.push('/')}
+                fullWidth
+                sx={{
+                  ...secondaryButtonSx,
+                  py: 1.5,
+                }}
+              >
+                กลับไปหน้าร้าน
+              </Button>
+            </Box>
+
+            {/* Footer */}
+            <Box
+              sx={{
+                px: 4,
+                py: 2,
+                borderTop: `1px solid ${ADMIN_THEME.border}`,
+                background: 'rgba(0,0,0,0.2)',
+              }}
+            >
+              <Typography
+                sx={{
+                  fontSize: '0.75rem',
+                  color: '#475569',
+                  textAlign: 'center',
+                }}
+              >
+                🔒 เฉพาะผู้ดูแลระบบที่ได้รับอนุญาตเท่านั้น
+              </Typography>
+            </Box>
+          </Box>
+
+          {/* Version Badge */}
+          <Typography
+            sx={{
+              textAlign: 'center',
+              mt: 3,
+              fontSize: '0.7rem',
+              color: '#475569',
+            }}
+          >
+            PSUSCC Shop Admin v2.0
+          </Typography>
+        </Box>
       </Box>
     );
   }
 
-  if (isLoading) {
+  // Access Denied - logged in but not admin
+  if (!isAuthorized) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)' }}>
-        <Typography sx={{ color: ADMIN_THEME.muted }}>Loading…</Typography>
+      <Box
+        sx={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: `radial-gradient(ellipse at top, rgba(239,68,68,0.1) 0%, transparent 50%),
+                       linear-gradient(180deg, #0a0f1a 0%, #0f172a 50%, #0a0f1a 100%)`,
+          p: 2,
+        }}
+      >
+        <Box
+          sx={{
+            ...glassCardSx,
+            maxWidth: 440,
+            textAlign: 'center',
+            p: 0,
+            overflow: 'hidden',
+          }}
+        >
+          {/* Error Header */}
+          <Box
+            sx={{
+              background: 'linear-gradient(135deg, rgba(239,68,68,0.2) 0%, rgba(248,113,113,0.1) 100%)',
+              p: 4,
+            }}
+          >
+            <Box
+              sx={{
+                width: 80,
+                height: 80,
+                borderRadius: '24px',
+                background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                mx: 'auto',
+                mb: 2,
+                boxShadow: '0 20px 40px rgba(239,68,68,0.3)',
+              }}
+            >
+              <Lock sx={{ fontSize: 40, color: '#fff' }} />
+            </Box>
+            <Typography sx={{ fontSize: '1.4rem', fontWeight: 800, color: '#f1f5f9' }}>
+              ไม่มีสิทธิ์เข้าถึง
+            </Typography>
+          </Box>
+
+          {/* Content */}
+          <Box sx={{ p: 4 }}>
+            <Typography sx={{ fontSize: '0.9rem', color: '#94a3b8', mb: 1 }}>
+              บัญชี {session?.user?.email || 'ของคุณ'}
+            </Typography>
+            <Typography sx={{ fontSize: '0.85rem', color: '#64748b', mb: 3 }}>
+              ไม่ได้รับอนุญาตให้เข้าถึงหน้านี้
+            </Typography>
+
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              <Button
+                onClick={() => signOut()}
+                sx={{
+                  ...secondaryButtonSx,
+                  py: 1.5,
+                }}
+              >
+                ออกจากระบบ
+              </Button>
+              <Button
+                onClick={() => router.push('/')}
+                fullWidth
+                sx={{
+                  ...gradientButtonSx,
+                  py: 1.5,
+                }}
+              >
+                กลับหน้าหลัก
+              </Button>
+            </Box>
+          </Box>
+        </Box>
+      </Box>
+    );
+  }
+
+  // Only show loading for initial session check
+  if (isSessionLoading) {
+    return (
+      <Box
+        sx={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexDirection: 'column',
+          gap: 3,
+          background: `radial-gradient(ellipse at top, rgba(99,102,241,0.1) 0%, transparent 50%),
+                       linear-gradient(180deg, #0a0f1a 0%, #0f172a 50%, #0a0f1a 100%)`,
+        }}
+      >
+        {/* Animated Logo */}
+        <Box
+          sx={{
+            width: 80,
+            height: 80,
+            borderRadius: '24px',
+            background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 50%, #3b82f6 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 20px 40px rgba(139,92,246,0.3)',
+            animation: 'pulse-logo 2s ease-in-out infinite',
+            '@keyframes pulse-logo': {
+              '0%, 100%': { transform: 'scale(1)', boxShadow: '0 20px 40px rgba(139,92,246,0.3)' },
+              '50%': { transform: 'scale(1.05)', boxShadow: '0 25px 50px rgba(139,92,246,0.4)' },
+            },
+          }}
+        >
+          <Store sx={{ fontSize: 40, color: '#fff' }} />
+        </Box>
+        
+        {/* Loading Spinner */}
+        <Box sx={{ position: 'relative' }}>
+          <CircularProgress
+            size={48}
+            thickness={2}
+            sx={{
+              color: 'rgba(139,92,246,0.3)',
+              position: 'absolute',
+            }}
+          />
+          <CircularProgress
+            size={48}
+            thickness={2}
+            sx={{
+              color: '#8b5cf6',
+              animation: 'spin 1s linear infinite',
+              '@keyframes spin': {
+                '0%': { transform: 'rotate(0deg)' },
+                '100%': { transform: 'rotate(360deg)' },
+              },
+            }}
+          />
+        </Box>
+        
+        <Typography sx={{ color: '#64748b', fontSize: '0.9rem' }}>
+          กำลังตรวจสอบสิทธิ์...
+        </Typography>
       </Box>
     );
   }
@@ -1231,58 +2490,163 @@ export default function AdminPage(): JSX.Element {
         display: 'flex',
         flexDirection: 'column',
         minHeight: '100vh',
-        background: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%)',
+        background: `radial-gradient(ellipse at top, rgba(99,102,241,0.08) 0%, transparent 50%),
+                     radial-gradient(ellipse at bottom right, rgba(6,182,212,0.06) 0%, transparent 50%),
+                     linear-gradient(180deg, #0a0f1a 0%, #0f172a 50%, #0a0f1a 100%)`,
         color: ADMIN_THEME.text,
+        position: 'relative',
       }}
     >
-      {/* Header */}
-      <AppBar
-        position="sticky"
-        elevation={0}
+      {/* Data Loading Overlay - non-blocking */}
+      {isDataLoading && (
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 9999,
+            height: 3,
+            background: 'rgba(0,0,0,0.2)',
+            overflow: 'hidden',
+          }}
+        >
+          <Box
+            sx={{
+              height: '100%',
+              width: '40%',
+              background: 'linear-gradient(90deg, transparent, #8b5cf6, #3b82f6, transparent)',
+              animation: 'loading-bar 1.5s ease-in-out infinite',
+              '@keyframes loading-bar': {
+                '0%': { transform: 'translateX(-100%)' },
+                '100%': { transform: 'translateX(350%)' },
+              },
+            }}
+          />
+        </Box>
+      )}
+
+      {/* Modern Header */}
+      <Box
         sx={{
-          bgcolor: 'rgba(15,23,42,0.78)',
-          backdropFilter: 'blur(16px)',
-          borderBottom: '1px solid rgba(255,255,255,0.12)',
-          boxShadow: '0 18px 44px rgba(0,0,0,0.45)',
-          color: ADMIN_THEME.text,
+          position: 'sticky',
+          top: 0,
+          zIndex: 1200,
+          px: { xs: 2, md: 3 },
+          py: 1.5,
+          bgcolor: ADMIN_THEME.bgHeader,
+          backdropFilter: 'blur(20px)',
+          borderBottom: `1px solid ${ADMIN_THEME.border}`,
         }}
       >
-        <Toolbar>
-          <IconButton
-            edge="start"
-            color="inherit"
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            sx={{ mr: 2, display: { xs: 'block', md: 'none' } }}
-          >
-            <Dashboard />
-          </IconButton>
-          <Bolt sx={{ mr: 1 }} />
-          <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 'bold' }}>
-            PSUSCCSHOP Admin
-          </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          {/* Left: Logo & Menu Toggle */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            {saving ? (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: ADMIN_THEME.muted }}>
-                <CircularProgress size={14} thickness={6} color="inherit" />
-                <Typography variant="caption">กำลังบันทึก…</Typography>
+            <IconButton
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              sx={{ 
+                display: { xs: 'flex', md: 'none' },
+                color: ADMIN_THEME.textSecondary,
+                bgcolor: 'rgba(255,255,255,0.05)',
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' },
+              }}
+            >
+              <Dashboard />
+            </IconButton>
+            
+            {/* Brand */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box sx={{
+                width: 40,
+                height: 40,
+                borderRadius: '12px',
+                background: ADMIN_THEME.gradient,
+                display: 'grid',
+                placeItems: 'center',
+                boxShadow: '0 4px 14px rgba(99,102,241,0.3)',
+              }}>
+                <Bolt sx={{ color: '#fff', fontSize: 22 }} />
               </Box>
-            ) : (
-              <Typography variant="caption" sx={{ color: ADMIN_THEME.muted }}>
-                {lastSavedTime ? `บันทึกล่าสุด ${lastSavedTime.toLocaleTimeString()}` : 'ยังไม่บันทึก'}
-              </Typography>
-            )}
-            <Typography variant="caption" sx={{ color: ADMIN_THEME.muted }}>{session?.user?.name || 'Admin'}</Typography>
-            <Avatar src={session?.user?.image || ''} />
-            <Button color="inherit" onClick={() => signOut()}>
-              <Logout />
-            </Button>
+              <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
+                <Typography sx={{ fontSize: '1.1rem', fontWeight: 800, color: '#f1f5f9', lineHeight: 1.2 }}>
+                  Admin Panel
+                </Typography>
+                <Typography sx={{ fontSize: '0.7rem', color: '#64748b' }}>
+                  PSUSCCSHOP
+                </Typography>
+              </Box>
+            </Box>
           </Box>
-        </Toolbar>
-      </AppBar>
+
+          {/* Right: Status & User */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            {/* Sync Status */}
+            <Box sx={{ 
+              display: { xs: 'none', sm: 'flex' },
+              alignItems: 'center', 
+              gap: 1,
+              px: 1.5,
+              py: 0.6,
+              borderRadius: '10px',
+              bgcolor: saving ? 'rgba(245,158,11,0.15)' : 'rgba(16,185,129,0.15)',
+              border: `1px solid ${saving ? 'rgba(245,158,11,0.3)' : 'rgba(16,185,129,0.3)'}`,
+            }}>
+              {saving ? (
+                <>
+                  <CircularProgress size={12} thickness={6} sx={{ color: '#fbbf24' }} />
+                  <Typography sx={{ fontSize: '0.7rem', color: '#fbbf24', fontWeight: 600 }}>กำลังบันทึก...</Typography>
+                </>
+              ) : (
+                <>
+                  <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#10b981' }} />
+                  <Typography sx={{ fontSize: '0.7rem', color: '#34d399', fontWeight: 600 }}>
+                    {lastSavedTime ? lastSavedTime.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : 'พร้อม'}
+                  </Typography>
+                </>
+              )}
+            </Box>
+
+            {/* User Menu */}
+            <Box sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 1.5,
+              pl: 2,
+              borderLeft: `1px solid ${ADMIN_THEME.border}`,
+            }}>
+              <Avatar 
+                src={session?.user?.image || ''} 
+                sx={{ 
+                  width: 36, 
+                  height: 36,
+                  border: '2px solid rgba(99,102,241,0.3)',
+                }} 
+              />
+              <Box sx={{ display: { xs: 'none', md: 'block' } }}>
+                <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: '#f1f5f9', lineHeight: 1.2 }}>
+                  {session?.user?.name?.split(' ')[0] || 'Admin'}
+                </Typography>
+                <Typography sx={{ fontSize: '0.65rem', color: '#64748b' }}>
+                  Administrator
+                </Typography>
+              </Box>
+              <IconButton 
+                onClick={() => signOut()}
+                sx={{ 
+                  color: '#94a3b8',
+                  '&:hover': { color: '#f87171', bgcolor: 'rgba(239,68,68,0.1)' },
+                }}
+              >
+                <Logout sx={{ fontSize: 20 }} />
+              </IconButton>
+            </Box>
+          </Box>
+        </Box>
+      </Box>
 
       {/* Sidebar & Content */}
       <Box sx={{ display: 'flex', flex: 1 }}>
-        {/* Sidebar */}
+        {/* Modern Sidebar */}
         <Drawer
           open={isDesktop ? true : sidebarOpen}
           onClose={() => setSidebarOpen(false)}
@@ -1291,61 +2655,120 @@ export default function AdminPage(): JSX.Element {
             flexShrink: 0,
             '& .MuiDrawer-paper': {
               width: 260,
-              background: 'rgba(15,23,42,0.92)',
+              background: ADMIN_THEME.bgSidebar,
               color: ADMIN_THEME.text,
-              borderRight: '1px solid rgba(255,255,255,0.12)',
+              borderRight: `1px solid ${ADMIN_THEME.border}`,
               boxSizing: 'border-box',
               position: { xs: 'fixed', md: 'relative' },
               height: { xs: 'auto', md: '100%' },
               backdropFilter: 'blur(20px)',
-              boxShadow: '0 18px 44px rgba(0,0,0,0.45)',
+              pt: { xs: 2, md: 0 },
             }
           }}
           variant={isDesktop ? 'permanent' : 'temporary'}
           ModalProps={{ keepMounted: true }}
           anchor="left"
         >
-          <List sx={{ p: 2 }}>
+          {/* Sidebar Content */}
+          <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {/* Navigation Items */}
             {[
-              { icon: <Dashboard />, label: 'Dashboard', idx: 0 },
-              { icon: <ShoppingCart />, label: 'Products', idx: 1 },
-              { icon: <Receipt />, label: 'Orders', idx: 2 },
-              { icon: <Settings />, label: 'Settings', idx: 3 },
-              { icon: <History />, label: 'Logs', idx: 4 },
-            ].map((item) => (
-              <ListItem
-                key={item.idx}
-                onClick={() => {
-                  setActiveTab(item.idx);
-                  setSidebarOpen(false);
-                }}
-                sx={{
-                  borderRadius: 1,
-                  mb: 1,
-                  bgcolor: activeTab === item.idx ? 'rgba(99,102,241,0.16)' : 'transparent',
-                  border: activeTab === item.idx ? '1px solid rgba(99,102,241,0.45)' : '1px solid transparent',
-                  '&:hover': { bgcolor: 'rgba(255,255,255,0.06)' },
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  color: activeTab === item.idx ? ADMIN_THEME.text : ADMIN_THEME.muted,
-                  fontWeight: activeTab === item.idx ? 'bold' : 'normal',
-                }}
-              >
-                <ListItemIcon sx={{ color: 'inherit', minWidth: 40 }}>
-                  {item.icon}
-                </ListItemIcon>
-                <ListItemText primary={item.label} />
-                {item.idx === 2 && pendingCount > 0 && (
-                  <Badge badgeContent={pendingCount} color="error" />
-                )}
-              </ListItem>
-            ))}
-          </List>
+              { icon: <Dashboard sx={{ fontSize: 20 }} />, label: 'แดชบอร์ด', idx: 0, color: '#a5b4fc' },
+              { icon: <ShoppingCart sx={{ fontSize: 20 }} />, label: 'จัดการสินค้า', idx: 1, color: '#fbbf24' },
+              { icon: <Receipt sx={{ fontSize: 20 }} />, label: 'ออเดอร์', idx: 2, color: '#34d399', badge: pendingCount },
+              { icon: <Settings sx={{ fontSize: 20 }} />, label: 'ตั้งค่าร้าน', idx: 3, color: '#60a5fa' },
+              { icon: <History sx={{ fontSize: 20 }} />, label: 'ประวัติการใช้งาน', idx: 4, color: '#f472b6' },
+            ].map((item) => {
+              const isActive = activeTab === item.idx;
+              return (
+                <Box
+                  key={item.idx}
+                  onClick={() => {
+                    setActiveTab(item.idx);
+                    setSidebarOpen(false);
+                  }}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1.5,
+                    px: 2,
+                    py: 1.5,
+                    borderRadius: '14px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    bgcolor: isActive ? 'rgba(99,102,241,0.15)' : 'transparent',
+                    border: isActive ? '1px solid rgba(99,102,241,0.3)' : '1px solid transparent',
+                    '&:hover': { 
+                      bgcolor: isActive ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.05)',
+                    },
+                  }}
+                >
+                  <Box sx={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: '10px',
+                    bgcolor: isActive ? `${item.color}20` : 'rgba(255,255,255,0.05)',
+                    display: 'grid',
+                    placeItems: 'center',
+                    color: isActive ? item.color : '#64748b',
+                    transition: 'all 0.2s ease',
+                  }}>
+                    {item.icon}
+                  </Box>
+                  <Typography sx={{ 
+                    flex: 1,
+                    fontSize: '0.9rem', 
+                    fontWeight: isActive ? 700 : 500, 
+                    color: isActive ? '#f1f5f9' : '#94a3b8',
+                  }}>
+                    {item.label}
+                  </Typography>
+                  {item.badge && item.badge > 0 && (
+                    <Box sx={{
+                      px: 1,
+                      py: 0.3,
+                      borderRadius: '8px',
+                      bgcolor: 'rgba(239,68,68,0.2)',
+                      border: '1px solid rgba(239,68,68,0.4)',
+                    }}>
+                      <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: '#f87171' }}>
+                        {item.badge}
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+              );
+            })}
+          </Box>
+
+          {/* Sidebar Footer */}
+          <Box sx={{ mt: 'auto', p: 2, borderTop: `1px solid ${ADMIN_THEME.border}` }}>
+            <Box sx={{
+              p: 2,
+              borderRadius: '14px',
+              bgcolor: 'rgba(16,185,129,0.1)',
+              border: '1px solid rgba(16,185,129,0.2)',
+            }}>
+              <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#34d399', mb: 0.5 }}>
+                ร้านค้า: {config.isOpen ? '🟢 เปิดขาย' : '🔴 ปิดชั่วคราว'}
+              </Typography>
+              <Typography sx={{ fontSize: '0.65rem', color: '#64748b' }}>
+                สินค้า {config.products?.length || 0} รายการ
+              </Typography>
+            </Box>
+          </Box>
         </Drawer>
 
         {/* Main Content */}
-        <Box sx={{ flex: 1, p: { xs: 2, md: 3 }, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <Box sx={{ 
+          flex: 1, 
+          p: { xs: 2, md: 3 }, 
+          overflow: 'auto', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: 3,
+          minHeight: 0,
+        }}>
           {activeTab === 0 && <DashboardView />}
           {activeTab === 1 && (
             <ProductsView
@@ -1363,8 +2786,6 @@ export default function AdminPage(): JSX.Element {
           {activeTab === 4 && <LogsView />}
         </Box>
       </Box>
-
-      {/* Toast intentionally disabled */}
     </Box>
   );
 }
