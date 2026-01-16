@@ -443,8 +443,8 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                 bgcolor: 'rgba(255,255,255,0.08)',
               }} />
               
-              <Typography sx={{ fontSize: '0.85rem', opacity: 0.9, mb: 1, fontWeight: 500 }}>
-                💳 ยอดที่ต้องชำระ
+              <Typography sx={{ fontSize: '0.85rem', opacity: 0.9, mb: 1, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'center' }}>
+                <CreditCard size={16} /> ยอดที่ต้องชำระ
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5 }}>
                 <Typography sx={{ fontSize: '3rem', fontWeight: 900, letterSpacing: '-2px' }}>

@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { listKeys, getJson, putJson } from '@/lib/filebase';
 import { calculateOrderTotal } from '@/lib/payment-utils';
+import { requireAuth, isResourceOwner, isAdminEmail } from '@/lib/auth';
 
 const checkSlipWithSlipOK = async (base64: string, expectedAmount: number) => {
   const branchId = process.env.SLIPOK_BRANCH_ID;
@@ -37,7 +38,15 @@ const findOrderKey = async (ref: string): Promise<string | null> => {
   return keys.find((k) => k.endsWith(`${ref}.json`)) || null;
 };
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  // ต้องเข้าสู่ระบบก่อน
+  const authResult = await requireAuth();
+  if (authResult instanceof NextResponse) {
+    return authResult;
+  }
+  const currentUserEmail = authResult.email;
+  const isAdmin = isAdminEmail(currentUserEmail);
+
   try {
     const { ref, base64, mime, name } = await req.json();
     if (!ref || !base64) return NextResponse.json({ status: 'error', message: 'missing ref/base64' }, { status: 400 });
@@ -47,6 +56,12 @@ export async function POST(req: Request) {
 
     const order = await getJson<any>(key);
     if (!order) return NextResponse.json({ status: 'error', message: 'order data missing' }, { status: 404 });
+
+    // ตรวจสอบว่าเป็นเจ้าของ order หรือเป็น admin
+    const orderEmail = order.customerEmail || order.email;
+    if (!isResourceOwner(orderEmail, currentUserEmail) && !isAdmin) {
+      return NextResponse.json({ status: 'error', message: 'ไม่มีสิทธิ์อัพโหลดสลิปสำหรับ order นี้' }, { status: 403 });
+    }
 
     const expectedAmount = Number(order.totalAmount ?? order.amount ?? calculateOrderTotal(order.cart || [])) || 0;
 

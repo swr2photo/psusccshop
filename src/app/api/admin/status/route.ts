@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getJson, putJson, listKeys } from '@/lib/filebase';
+import { requireAdmin } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
+  // ตรวจสอบสิทธิ์ Admin
+  const authResult = await requireAdmin();
+  if (authResult instanceof NextResponse) {
+    return authResult;
+  }
+
   try {
     const body = await req.json();
     const ref = body?.ref as string | undefined;

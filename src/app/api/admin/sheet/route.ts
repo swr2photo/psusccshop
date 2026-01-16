@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSheets } from '@/lib/google';
 import { getJson, listKeys } from '@/lib/filebase';
+import { requireAdmin } from '@/lib/auth';
 
 const ORDERS_SHEET_TITLE = 'Orders';
 
@@ -19,10 +20,16 @@ const summarizeItems = (items: any[]): string => {
   }).join('; ');
 };
 
-const buildRows = (orders: any[]) => {
+const buildRows = (orders: any[], baseUrl: string) => {
   return orders.map((o) => {
     const items = o?.items || o?.cart || o?.raw?.items || [];
     const itemSummary = typeof items === 'string' ? items : summarizeItems(items);
+    const slip = o?.slip;
+    const hasSlip = !!(slip && slip.base64);
+    const slipUploadedAt = slip?.uploadedAt ? new Date(slip.uploadedAt).toLocaleString('th-TH') : '';
+    const slipVerified = slip?.slipCheck?.success ? 'ผ่าน' : (hasSlip ? 'รอตรวจสอบ' : '');
+    const slipLink = hasSlip ? `${baseUrl}/api/slip/${o?.ref}` : '';
+    
     return [
       o?.ref || '',
       o?.date || o?.createdAt || o?.created_at || '',
@@ -34,6 +41,10 @@ const buildRows = (orders: any[]) => {
       o?.customerAddress || o?.address || '',
       itemSummary,
       o?.notes || o?.remark || '',
+      hasSlip ? 'มี' : 'ไม่มี',
+      slipUploadedAt,
+      slipVerified,
+      slipLink,
     ];
   });
 };
@@ -61,6 +72,12 @@ const ensureSheet = async (sheets: any, spreadsheetId: string) => {
 };
 
 export async function POST(req: NextRequest) {
+  // ตรวจสอบสิทธิ์ Admin
+  const authResult = await requireAdmin();
+  if (authResult instanceof NextResponse) {
+    return authResult;
+  }
+
   try {
     const body = await req.json();
     const mode = (body?.mode as 'create' | 'sync' | undefined) || 'sync';
@@ -90,18 +107,23 @@ export async function POST(req: NextRequest) {
 
     await ensureSheet(sheets, sheetId);
 
+    // Get base URL from request or environment
+    const host = req.headers.get('host') || 'localhost:3000';
+    const protocol = host.includes('localhost') ? 'http' : 'https';
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || `${protocol}://${host}`;
+
     const keys = await listKeys('orders/');
     const orders = (await Promise.all(keys.map(async (k) => {
       const data = await getJson<any>(k);
       return data ? { ...data, _key: k } : null;
     }))).filter(Boolean) as any[];
 
-    const header = ['Ref', 'Date', 'Name', 'Email', 'Phone', 'Amount', 'Status', 'Address', 'Items (summary)', 'Notes'];
-    const values = [header, ...buildRows(orders)];
+    const header = ['Ref', 'Date', 'Name', 'Email', 'Phone', 'Amount', 'Status', 'Address', 'Items (summary)', 'Notes', 'Slip', 'Slip Date', 'Slip Verified', 'Slip Link'];
+    const values = [header, ...buildRows(orders, baseUrl)];
 
     await sheets.spreadsheets.values.update({
       spreadsheetId: sheetId,
-      range: `${ORDERS_SHEET_TITLE}!A1:J${values.length}`,
+      range: `${ORDERS_SHEET_TITLE}!A1:N${values.length}`,
       valueInputOption: 'RAW',
       requestBody: { values },
     });

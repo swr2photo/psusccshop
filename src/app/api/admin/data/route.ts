@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getJson, listKeys } from '@/lib/filebase';
 import { ShopConfig } from '@/lib/config';
+import { requireAdmin } from '@/lib/auth';
 
 const CONFIG_KEY = 'config/shop-settings.json';
 
 export async function GET(req: NextRequest) {
+  // ตรวจสอบสิทธิ์ Admin
+  const authResult = await requireAdmin();
+  if (authResult instanceof NextResponse) {
+    return authResult;
+  }
+
   try {
     const cfg = (await getJson<ShopConfig>(CONFIG_KEY)) || {
       isOpen: true,

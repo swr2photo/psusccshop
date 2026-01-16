@@ -64,6 +64,9 @@ import {
   Edit,
   Check,
   MapPin,
+  Clock,
+  CheckCircle,
+  XCircle,
 } from 'lucide-react';
 import PaymentFlow from '@/components/PaymentFlow';
 import ProfileModal from '@/components/ProfileModal';
@@ -1613,10 +1616,33 @@ export default function HomePage() {
       const res = await getHistory(session.user.email, append ? historyCursor || undefined : undefined, pageSize);
 
       if (res.status === 'success') {
-        const history = res.data?.history || (res as any)?.history || [];
+        const rawHistory = res.data?.history || (res as any)?.history || [];
         const hasMore = Boolean(res.data?.hasMore);
         const nextCursor = res.data?.nextCursor || null;
-        if (Array.isArray(history)) {
+        if (Array.isArray(rawHistory)) {
+          // Normalize order data - calculate total from cart/items if not present
+          const history = rawHistory.map((order: any) => {
+            let total = order.total || order.totalAmount || order.amount || 0;
+            
+            // If total is 0 or missing, calculate from cart/items
+            if (!total || total === 0) {
+              const items = order.items || order.cart || [];
+              if (Array.isArray(items) && items.length > 0) {
+                total = items.reduce((sum: number, item: any) => {
+                  const price = item.unitPrice || item.subtotal || item.price || 0;
+                  const qty = item.qty || item.quantity || 1;
+                  return sum + (item.subtotal || (price * qty));
+                }, 0);
+              }
+            }
+            
+            return {
+              ...order,
+              total,
+              items: order.items || order.cart || [],
+            };
+          });
+          
           setOrderHistory((prev) => (append ? [...prev, ...history] : history));
           setHistoryHasMore(hasMore);
           setHistoryCursor(nextCursor);
@@ -2661,19 +2687,19 @@ export default function HomePage() {
           paymentOpenerRef.current = opener;
         }}
         onPaymentSuccess={(ref) => {
-          // Update local state instead of reloading from server
+          // Update local state to reflect successful payment verification
           setOrderHistory((prev) => {
             const orderExists = prev.some((order) => order.ref === ref);
             if (orderExists) {
               return prev.map((order) =>
-                order.ref === ref ? { ...order, status: 'VERIFYING' } : order
+                order.ref === ref ? { ...order, status: 'PAID' } : order
               );
             }
             // If order doesn't exist in history yet, add it
-            return [{ ref, status: 'VERIFYING', date: new Date().toISOString(), total: 0 }, ...prev];
+            return [{ ref, status: 'PAID', date: new Date().toISOString(), total: 0 }, ...prev];
           });
           setActiveTab('history');
-          showToast('success', 'บันทึกการชำระเงินแล้ว');
+          showToast('success', 'ชำระเงินสำเร็จ!');
         }}
       />
 
@@ -3313,8 +3339,11 @@ export default function HomePage() {
               fontSize: '0.75rem',
               fontWeight: 600,
               color: '#a5b4fc',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.5,
             }}>
-              📏 อก / ความยาว (นิ้ว)
+              <Ruler size={14} /> อก / ความยาว (นิ้ว)
             </Box>
             <Box sx={{
               px: 1.2,
@@ -3903,11 +3932,11 @@ export default function HomePage() {
 
                 // Status icon and color scheme
                 const getStatusIcon = () => {
-                  if (category === 'WAITING_PAYMENT') return '⏳';
-                  if (category === 'COMPLETED') return '✓';
-                  if (category === 'RECEIVED') return '📦';
-                  if (category === 'CANCELLED') return '✕';
-                  return '•';
+                  if (category === 'WAITING_PAYMENT') return <Clock size={14} />;
+                  if (category === 'COMPLETED') return <CheckCircle size={14} />;
+                  if (category === 'RECEIVED') return <Package size={14} />;
+                  if (category === 'CANCELLED') return <XCircle size={14} />;
+                  return <span>•</span>;
                 };
 
                 return (

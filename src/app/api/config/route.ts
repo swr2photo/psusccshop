@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getJson, putJson } from '@/lib/filebase';
 import { ShopConfig } from '@/lib/config';
+import { requireAdmin } from '@/lib/auth';
 
 const CONFIG_KEY = 'config/shop-settings.json';
 
@@ -20,6 +21,12 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  // ตรวจสอบสิทธิ์ Admin - เฉพาะ admin เท่านั้นที่แก้ config ได้
+  const authResult = await requireAdmin();
+  if (authResult instanceof NextResponse) {
+    return authResult;
+  }
+
   try {
     const body = await req.json();
     const config = body?.config as ShopConfig | undefined;

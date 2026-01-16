@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { S3Client, PutObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { requireAuth } from '@/lib/auth';
 
 const endpoint = process.env.FILEBASE_ENDPOINT || 'https://s3.filebase.com';
 const region = process.env.FILEBASE_REGION || 'us-east-1';
@@ -38,6 +39,12 @@ const getPublicUrl = (cid: string) => {
 };
 
 export async function POST(req: NextRequest) {
+  // ต้องเข้าสู่ระบบก่อนถึงจะ upload ได้
+  const authResult = await requireAuth();
+  if (authResult instanceof NextResponse) {
+    return authResult;
+  }
+
   try {
     if (!bucket) {
       return NextResponse.json({ status: 'error', message: 'Storage not configured' }, { status: 500 });
@@ -50,8 +57,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: 'error', message: 'Missing base64 data' }, { status: 400 });
     }
 
+    // Validate mime type - only allow images
+    const allowedMimes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
+    const contentType = mime || 'image/png';
+    if (!allowedMimes.includes(contentType)) {
+      return NextResponse.json({ status: 'error', message: 'Invalid file type. Only images allowed.' }, { status: 400 });
+    }
+
     // Extract base64 data (remove data:image/xxx;base64, prefix if present)
     const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
+    
+    // Validate base64 format
+    if (!/^[A-Za-z0-9+/=]+$/.test(base64Data)) {
+      return NextResponse.json({ status: 'error', message: 'Invalid base64 data' }, { status: 400 });
+    }
+
     const buffer = Buffer.from(base64Data, 'base64');
 
     // Check file size (max 5MB)
@@ -60,10 +80,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: 'error', message: 'File too large (max 5MB)' }, { status: 413 });
     }
 
+    // Validate file magic bytes for image types
+    const magicBytes = buffer.slice(0, 8);
+    const isPng = magicBytes[0] === 0x89 && magicBytes[1] === 0x50 && magicBytes[2] === 0x4E && magicBytes[3] === 0x47;
+    const isJpeg = magicBytes[0] === 0xFF && magicBytes[1] === 0xD8;
+    const isGif = magicBytes[0] === 0x47 && magicBytes[1] === 0x49 && magicBytes[2] === 0x46;
+    const isWebp = magicBytes[0] === 0x52 && magicBytes[1] === 0x49 && magicBytes[2] === 0x46 && magicBytes[3] === 0x46;
+    
+    if (!isPng && !isJpeg && !isGif && !isWebp) {
+      return NextResponse.json({ status: 'error', message: 'Invalid image file' }, { status: 400 });
+    }
+
     // Generate key and upload
     const fileName = generateFileName(filename || 'image.png');
     const key = `images/${fileName}`;
-    const contentType = mime || 'image/png';
 
     await client.send(
       new PutObjectCommand({

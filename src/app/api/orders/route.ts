@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getJson, putJson, listKeys, deleteObject } from '@/lib/filebase';
 import crypto from 'crypto';
+import { requireAuth, requireAdmin, isAdminEmail, isResourceOwner, normalizeEmail as authNormalizeEmail } from '@/lib/auth';
 
 const orderKey = (ref: string, date: Date) => {
   const yyyy = date.getFullYear();
@@ -57,12 +58,24 @@ const removeIndexEntry = async (email: string, ref: string) => {
 };
 
 export async function GET(req: NextRequest) {
+  // ต้องเข้าสู่ระบบก่อนถึงจะดู orders ได้
+  const authResult = await requireAuth();
+  if (authResult instanceof NextResponse) {
+    return authResult;
+  }
+  const currentUserEmail = authResult.email;
+  const isAdmin = isAdminEmail(currentUserEmail);
+
   const email = req.nextUrl.searchParams.get('email');
   const cursor = req.nextUrl.searchParams.get('cursor');
   const limitParam = Number(req.nextUrl.searchParams.get('limit'));
   const limit = Number.isFinite(limitParam) ? Math.min(100, Math.max(10, limitParam)) : 50;
+
+  // ถ้าไม่ใช่ admin ต้องดู orders ของตัวเองเท่านั้น
+  const queryEmail = isAdmin && email ? email : currentUserEmail;
+
   try {
-    const normalizedEmail = normalizeEmail(email);
+    const normalizedEmail = normalizeEmail(queryEmail);
     if (normalizedEmail) {
       const key = emailIndexKey(normalizedEmail);
       const cached = getCachedIndex(key);
@@ -139,6 +152,14 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
+  // ต้องเข้าสู่ระบบก่อน
+  const authResult = await requireAuth();
+  if (authResult instanceof NextResponse) {
+    return authResult;
+  }
+  const currentUserEmail = authResult.email;
+  const isAdmin = isAdminEmail(currentUserEmail);
+
   try {
     const body = await req.json();
     const ref = body?.ref as string | undefined;
@@ -150,7 +171,19 @@ export async function PUT(req: NextRequest) {
     if (!targetKey) return NextResponse.json({ status: 'error', message: 'order not found' }, { status: 404 });
 
     const existing = (await getJson<any>(targetKey)) || {};
-    const allowedFields = ['customerName', 'customerEmail', 'customerPhone', 'customerAddress', 'name', 'email', 'phone', 'address', 'amount', 'totalAmount', 'status', 'date', 'notes'];
+
+    // ตรวจสอบว่าเป็นเจ้าของ order หรือเป็น admin
+    const orderEmail = existing.customerEmail || existing.email;
+    if (!isResourceOwner(orderEmail, currentUserEmail) && !isAdmin) {
+      return NextResponse.json({ status: 'error', message: 'ไม่มีสิทธิ์แก้ไข order นี้' }, { status: 403 });
+    }
+
+    // User ปกติแก้ไขได้เฉพาะบางฟิลด์
+    const userAllowedFields = ['customerName', 'customerPhone', 'customerAddress', 'name', 'phone', 'address', 'notes'];
+    // Admin แก้ไขได้มากกว่า
+    const adminAllowedFields = ['customerName', 'customerEmail', 'customerPhone', 'customerAddress', 'name', 'email', 'phone', 'address', 'amount', 'totalAmount', 'status', 'date', 'notes'];
+    const allowedFields = isAdmin ? adminAllowedFields : userAllowedFields;
+
     const sanitizedUpdates: Record<string, any> = {};
     Object.entries(updates).forEach(([key, value]) => {
       if (allowedFields.includes(key)) sanitizedUpdates[key] = value;
@@ -168,15 +201,37 @@ export async function PUT(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  // ต้องเข้าสู่ระบบก่อน
+  const authResult = await requireAuth();
+  if (authResult instanceof NextResponse) {
+    return authResult;
+  }
+  const currentUserEmail = authResult.email;
+  const isAdmin = isAdminEmail(currentUserEmail);
+
   const ref = req.nextUrl.searchParams.get('ref');
   const hard = req.nextUrl.searchParams.get('hard') === 'true';
   if (!ref) return NextResponse.json({ status: 'error', message: 'missing ref' }, { status: 400 });
+
+  // Hard delete ทำได้เฉพาะ admin
+  if (hard && !isAdmin) {
+    return NextResponse.json({ status: 'error', message: 'เฉพาะ admin เท่านั้นที่ลบถาวรได้' }, { status: 403 });
+  }
+
   try {
     const keys = await listKeys('orders/');
     const targetKey = keys.find((k) => k.endsWith(`${ref}.json`));
     if (!targetKey) return NextResponse.json({ status: 'error', message: 'order not found' }, { status: 404 });
+
+    const existing = await getJson<any>(targetKey);
+    const orderEmail = existing?.customerEmail || existing?.email;
+
+    // ตรวจสอบสิทธิ์
+    if (!isResourceOwner(orderEmail, currentUserEmail) && !isAdmin) {
+      return NextResponse.json({ status: 'error', message: 'ไม่มีสิทธิ์ลบ order นี้' }, { status: 403 });
+    }
+
     if (hard) {
-      const existing = await getJson<any>(targetKey);
       if (existing?.customerEmail) {
         await removeIndexEntry(existing.customerEmail, ref);
       }
