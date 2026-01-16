@@ -44,6 +44,7 @@ import {
   Stack,
   IconButton,
   useMediaQuery,
+  Tooltip,
 } from '@mui/material';
 
 import {
@@ -70,6 +71,8 @@ import {
   Save,
   Edit as EditIconMUI,
   Check,
+  FormatLineSpacing,
+  Clear,
 } from '@mui/icons-material';
 
 import { isAdmin, Product, ShopConfig, SIZES } from '@/lib/config';
@@ -1653,14 +1656,10 @@ export default function AdminPage(): JSX.Element {
       setHasChanges(false);
     };
 
-    useEffect(() => {
-      if (!hasChanges) return;
-      const timer = setTimeout(() => {
-        saveFullConfig(localConfig);
-        setHasChanges(false);
-      }, 800);
-      return () => clearTimeout(timer);
-    }, [hasChanges, localConfig, saveFullConfig]);
+    const handleReset = () => {
+      setLocalConfig(config);
+      setHasChanges(false);
+    };
 
     // Section wrapper component
     const SettingSection = ({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) => (
@@ -1729,15 +1728,72 @@ export default function AdminPage(): JSX.Element {
 
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, maxWidth: 700 }}>
-        {/* Header */}
-        <Box sx={{ mb: 1 }}>
-          <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: '#f1f5f9' }}>
-            ⚙️ ตั้งค่าร้านค้า
-          </Typography>
-          <Typography sx={{ fontSize: '0.85rem', color: '#64748b' }}>
-            จัดการการตั้งค่าทั้งหมดของร้าน
-          </Typography>
+        {/* Header with Save Button */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+          <Box>
+            <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: '#f1f5f9' }}>
+              ⚙️ ตั้งค่าร้านค้า
+            </Typography>
+            <Typography sx={{ fontSize: '0.85rem', color: '#64748b' }}>
+              จัดการการตั้งค่าทั้งหมดของร้าน
+            </Typography>
+          </Box>
+          
+          {hasChanges && (
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                variant="outlined"
+                onClick={handleReset}
+                sx={{
+                  borderColor: ADMIN_THEME.border,
+                  color: ADMIN_THEME.muted,
+                  borderRadius: '10px',
+                  textTransform: 'none',
+                  '&:hover': { borderColor: '#ef4444', color: '#ef4444' },
+                }}
+              >
+                ยกเลิก
+              </Button>
+              <Button
+                variant="contained"
+                onClick={handleSave}
+                startIcon={<Save />}
+                sx={{
+                  background: ADMIN_THEME.gradient,
+                  borderRadius: '10px',
+                  textTransform: 'none',
+                  fontWeight: 700,
+                  boxShadow: '0 4px 15px rgba(139, 92, 246, 0.3)',
+                  animation: 'pulse 2s infinite',
+                  '@keyframes pulse': {
+                    '0%, 100%': { boxShadow: '0 4px 15px rgba(139, 92, 246, 0.3)' },
+                    '50%': { boxShadow: '0 4px 25px rgba(139, 92, 246, 0.5)' },
+                  },
+                }}
+              >
+                💾 บันทึกการตั้งค่า
+              </Button>
+            </Box>
+          )}
         </Box>
+
+        {/* Unsaved Changes Warning */}
+        {hasChanges && (
+          <Box sx={{
+            p: 2,
+            borderRadius: '12px',
+            bgcolor: 'rgba(251, 191, 36, 0.1)',
+            border: '1px solid rgba(251, 191, 36, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
+          }}>
+            <Box sx={{ fontSize: '1.5rem' }}>⚠️</Box>
+            <Typography sx={{ fontSize: '0.9rem', color: '#fbbf24' }}>
+              มีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก กดปุ่ม "บันทึกการตั้งค่า" เพื่อยืนยัน
+            </Typography>
+          </Box>
+        )}
 
         {/* Shop Status */}
         <SettingSection icon={<Store sx={{ fontSize: 20 }} />} title="สถานะร้านค้า">
@@ -1798,26 +1854,159 @@ export default function AdminPage(): JSX.Element {
               bgcolor: 'rgba(139, 92, 246, 0.05)',
               border: `1px solid ${ADMIN_THEME.border}`,
             }}>
+              {/* Formatting Toolbar */}
+              <Box sx={{ 
+                display: 'flex', 
+                gap: 0.5, 
+                p: 1, 
+                borderRadius: '8px', 
+                bgcolor: 'rgba(0,0,0,0.2)',
+                border: `1px solid ${ADMIN_THEME.border}`,
+              }}>
+                <Tooltip title="ขึ้นบรรทัดใหม่">
+                  <IconButton 
+                    size="small" 
+                    onClick={() => {
+                      const msg = localConfig.announcement?.message ?? '';
+                      handleChange({
+                        ...localConfig,
+                        announcement: {...(localConfig.announcement ?? { enabled: false, message: '', color: 'blue' }), message: msg + '\n'}
+                      });
+                    }}
+                    sx={{ color: ADMIN_THEME.text }}
+                  >
+                    <FormatLineSpacing sx={{ fontSize: 18 }} />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="เพิ่มอิโมจิ 🎉">
+                  <IconButton 
+                    size="small" 
+                    onClick={() => {
+                      const msg = localConfig.announcement?.message ?? '';
+                      handleChange({
+                        ...localConfig,
+                        announcement: {...(localConfig.announcement ?? { enabled: false, message: '', color: 'blue' }), message: msg + '🎉'}
+                      });
+                    }}
+                    sx={{ color: ADMIN_THEME.text }}
+                  >
+                    <span style={{ fontSize: 16 }}>🎉</span>
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="เพิ่มอิโมจิ ⚡">
+                  <IconButton 
+                    size="small" 
+                    onClick={() => {
+                      const msg = localConfig.announcement?.message ?? '';
+                      handleChange({
+                        ...localConfig,
+                        announcement: {...(localConfig.announcement ?? { enabled: false, message: '', color: 'blue' }), message: msg + '⚡'}
+                      });
+                    }}
+                    sx={{ color: ADMIN_THEME.text }}
+                  >
+                    <span style={{ fontSize: 16 }}>⚡</span>
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="เพิ่มอิโมจิ 🔥">
+                  <IconButton 
+                    size="small" 
+                    onClick={() => {
+                      const msg = localConfig.announcement?.message ?? '';
+                      handleChange({
+                        ...localConfig,
+                        announcement: {...(localConfig.announcement ?? { enabled: false, message: '', color: 'blue' }), message: msg + '🔥'}
+                      });
+                    }}
+                    sx={{ color: ADMIN_THEME.text }}
+                  >
+                    <span style={{ fontSize: 16 }}>🔥</span>
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="เพิ่มอิโมจิ 📢">
+                  <IconButton 
+                    size="small" 
+                    onClick={() => {
+                      const msg = localConfig.announcement?.message ?? '';
+                      handleChange({
+                        ...localConfig,
+                        announcement: {...(localConfig.announcement ?? { enabled: false, message: '', color: 'blue' }), message: msg + '📢'}
+                      });
+                    }}
+                    sx={{ color: ADMIN_THEME.text }}
+                  >
+                    <span style={{ fontSize: 16 }}>📢</span>
+                  </IconButton>
+                </Tooltip>
+                <Box sx={{ flex: 1 }} />
+                <Tooltip title="ล้างข้อความ">
+                  <IconButton 
+                    size="small" 
+                    onClick={() => {
+                      handleChange({
+                        ...localConfig,
+                        announcement: {...(localConfig.announcement ?? { enabled: false, message: '', color: 'blue' }), message: ''}
+                      });
+                    }}
+                    sx={{ color: '#ef4444' }}
+                  >
+                    <Clear sx={{ fontSize: 18 }} />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+
               <TextField
                 label="ข้อความประกาศ"
                 multiline
-                rows={2}
+                rows={4}
                 value={localConfig.announcement?.message ?? ''}
                 onChange={(e) => handleChange({
                   ...localConfig,
                   announcement: {...(localConfig.announcement ?? { enabled: false, message: '', color: 'blue' }), message: e.target.value}
                 })}
                 fullWidth
-                inputProps={{ maxLength: 200 }}
-                helperText={`${(localConfig.announcement?.message ?? '').length}/200 ตัวอักษร`}
+                placeholder="พิมพ์ข้อความประกาศ... กด Enter เพื่อขึ้นบรรทัดใหม่"
+                inputProps={{ maxLength: 500 }}
+                helperText={`${(localConfig.announcement?.message ?? '').length}/500 ตัวอักษร • รองรับหลายบรรทัด`}
                 sx={{
                   ...inputSx,
                   '& .MuiOutlinedInput-root': {
                     ...inputSx['& .MuiOutlinedInput-root'],
                     borderRadius: '10px',
+                    fontFamily: 'inherit',
+                  },
+                  '& textarea': {
+                    whiteSpace: 'pre-wrap',
                   },
                 }}
               />
+
+              {/* Preview */}
+              {(localConfig.announcement?.message ?? '').trim() && (
+                <Box sx={{ mt: 1 }}>
+                  <Typography sx={{ fontSize: '0.75rem', color: '#64748b', mb: 1 }}>ตัวอย่างการแสดงผล:</Typography>
+                  <Box sx={{
+                    p: 1.5,
+                    borderRadius: '8px',
+                    bgcolor: {
+                      blue: '#3b82f6',
+                      red: '#ef4444',
+                      emerald: '#10b981',
+                      orange: '#f59e0b',
+                    }[localConfig.announcement?.color ?? 'blue'] || '#3b82f6',
+                    textAlign: 'center',
+                  }}>
+                    <Typography sx={{ 
+                      fontSize: '0.9rem', 
+                      color: '#fff', 
+                      whiteSpace: 'pre-wrap',
+                      lineHeight: 1.6,
+                    }}>
+                      {localConfig.announcement?.message}
+                    </Typography>
+                  </Box>
+                </Box>
+              )}
 
               <Box>
                 <Typography sx={{ fontSize: '0.8rem', color: '#64748b', mb: 1 }}>สีพื้นหลัง</Typography>
