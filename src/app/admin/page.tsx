@@ -144,56 +144,35 @@ const loadAdminCache = (): { config: ShopConfig; orders: AdminOrder[]; logs: any
 const saveAdminCache = (payload: { config: ShopConfig; orders?: AdminOrder[]; logs?: any[][] }) => {
   if (typeof window === 'undefined' || ADMIN_CACHE_DISABLED) return;
   try {
-    const cached = loadAdminCache();
-    
-    // Strip base64 images from products before caching to avoid quota issues
-    const stripBase64FromProducts = (products: any[]) => {
-      return (products || []).map(p => ({
-        ...p,
-        // Keep URL images, remove base64 data URLs
-        coverImage: p.coverImage?.startsWith('data:') ? '' : p.coverImage,
-        images: (p.images || []).filter((img: string) => !img?.startsWith('data:')),
-      }));
+    // Very minimal cache - only essential data
+    const minimalCache = {
+      config: {
+        isOpen: payload.config?.isOpen ?? false,
+        sheetId: payload.config?.sheetId || '',
+        sheetUrl: payload.config?.sheetUrl || '',
+        announcement: payload.config?.announcement,
+        // Skip products entirely to save space
+        products: [],
+      },
+      orders: (payload.orders || []).slice(0, 10).map(o => ({ 
+        ref: o.ref, 
+        status: o.status,
+        name: o.name,
+        amount: o.amount,
+      })),
+      logs: [],
     };
     
-    const configToCache = {
-      ...payload.config,
-      products: stripBase64FromProducts(payload.config?.products || []),
-    };
-    
-    const next = {
-      config: configToCache || cached?.config || DEFAULT_CONFIG,
-      orders: payload.orders ?? cached?.orders ?? [],
-      logs: (payload.logs ?? cached?.logs ?? []).slice(0, 50), // Limit logs
-    };
-    const save = (data: any) => window.localStorage.setItem(ADMIN_CACHE_KEY, JSON.stringify(data));
-
     try {
-      save(next);
+      window.localStorage.setItem(ADMIN_CACHE_KEY, JSON.stringify(minimalCache));
     } catch (err: any) {
-      if (err?.name !== 'QuotaExceededError') throw err;
-      // Fallback: store smaller snapshot to avoid quota blowups in dev tools
-      const compact = {
-        config: { ...next.config, products: [] }, // Remove products entirely
-        orders: (next.orders || []).slice(0, 20).map(o => ({ ref: o.ref, status: o.status })),
-        logs: [],
-      };
-      try {
-        save(compact);
-        console.warn('Admin cache trimmed due to quota limit');
-      } catch (err2) {
-        console.warn('Admin cache disabled due to quota limit');
-        ADMIN_CACHE_DISABLED = true;
-      }
+      // If still fails, just disable cache
+      console.warn('Admin cache disabled');
+      ADMIN_CACHE_DISABLED = true;
+      try { window.localStorage.removeItem(ADMIN_CACHE_KEY); } catch {}
     }
   } catch (error) {
-    if ((error as any)?.name === 'QuotaExceededError') {
-      console.warn('Admin cache disabled due to quota limit');
-      ADMIN_CACHE_DISABLED = true;
-      window.localStorage.removeItem(ADMIN_CACHE_KEY);
-      return;
-    }
-    console.error('Failed to save admin cache', error);
+    ADMIN_CACHE_DISABLED = true;
   }
 };
 
@@ -312,6 +291,15 @@ const tableSx = {
 // ============== UTILITIES ==============
 const sanitizeInput = (str: string) => str.trim().slice(0, 500);
 const validatePrice = (price: number) => price >= 0 && price <= 999999;
+
+// Convert date-only "2026-01-14" to datetime-local "2026-01-14T00:00" format
+const toDateTimeLocal = (dateStr: string | undefined): string => {
+  if (!dateStr) return '';
+  // Already in datetime-local format
+  if (dateStr.includes('T')) return dateStr;
+  // Date-only format - add time
+  return `${dateStr}T00:00`;
+};
 
 // ============== MAIN COMPONENT ==============
 export default function AdminPage(): JSX.Element {
@@ -1552,7 +1540,7 @@ export default function AdminPage(): JSX.Element {
                 <TextField
                   label="วันที่"
                   type="datetime-local"
-                  value={orderEditor.date}
+                  value={toDateTimeLocal(orderEditor.date)}
                   onChange={(e) => setOrderEditor(prev => ({ ...prev, date: e.target.value }))}
                   InputLabelProps={{ shrink: true }}
                   fullWidth
@@ -3658,7 +3646,7 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any
               </Typography>
               <TextField
                 type="datetime-local"
-                value={product.startDate || ''}
+                value={toDateTimeLocal(product.startDate)}
                 onChange={(e) => onChange({...product, startDate: e.target.value})}
                 fullWidth
                 InputLabelProps={{ shrink: true }}
@@ -3686,7 +3674,7 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any
               </Typography>
               <TextField
                 type="datetime-local"
-                value={product.endDate || ''}
+                value={toDateTimeLocal(product.endDate)}
                 onChange={(e) => onChange({...product, endDate: e.target.value})}
                 fullWidth
                 InputLabelProps={{ shrink: true }}
