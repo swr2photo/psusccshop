@@ -317,39 +317,73 @@ export default function HomePage() {
   );
 
 
-  const BrandMark = ({ size = 36, showText = true }: { size?: number; showText?: boolean }) => (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+  const BrandMark = ({ size = 44, showText = true }: { size?: number; showText?: boolean }) => (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
       <Box
+        component="img"
+        src="/logo.png"
+        alt="PSU SCC Shop Logo"
         sx={{
-          width: size,
-          height: size,
-          borderRadius: '30%',
-          background: 'radial-gradient(circle at 30% 30%, #22d3ee 0%, #6366f1 45%, #0ea5e9 70%, #0f172a 100%)',
-          boxShadow: '0 10px 30px rgba(99,102,241,0.35)',
-          display: 'grid',
-          placeItems: 'center',
-          border: '1px solid rgba(255,255,255,0.12)',
+          height: { xs: size - 4, sm: size },
+          maxHeight: 48,
+          width: 'auto',
+          objectFit: 'contain',
+          borderRadius: '8px',
         }}
-      >
-        <Typography sx={{ fontWeight: 800, fontSize: size * 0.34, color: '#e0f2fe', letterSpacing: 0.6 }}>PSU</Typography>
-      </Box>
+      />
       {showText && (
         <Typography
           variant="h6"
           sx={{
-            fontWeight: 900,
-            letterSpacing: 0.2,
-            background: 'linear-gradient(120deg, #38bdf8 0%, #818cf8 50%, #c084fc 100%)',
+            fontWeight: 800,
+            fontSize: { xs: '0.95rem', sm: '1.1rem' },
+            letterSpacing: 0.5,
+            background: 'linear-gradient(135deg, #60a5fa 0%, #a78bfa 50%, #f472b6 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             textTransform: 'uppercase',
+            display: { xs: 'none', sm: 'block' },
           }}
         >
-          PSUSCCSHOP
+          PSU SCC SHOP
         </Typography>
       )}
     </Box>
   );
+
+  // Dynamic page title based on current tab/state
+  useEffect(() => {
+    const baseName = 'PSU SCC SHOP';
+    let title = baseName;
+    
+    if (productDialogOpen && selectedProduct) {
+      title = `${selectedProduct.name} | ${baseName}`;
+    } else if (showCart) {
+      title = `ตะกร้า (${cart.length}) | ${baseName}`;
+    } else if (showHistoryDialog) {
+      title = `ประวัติคำสั่งซื้อ | ${baseName}`;
+    } else if (showProfileModal) {
+      title = `โปรไฟล์ | ${baseName}`;
+    } else if (showOrderDialog) {
+      title = `ยืนยันคำสั่งซื้อ | ${baseName}`;
+    } else {
+      switch (activeTab) {
+        case 'cart':
+          title = `ตะกร้า (${cart.length}) | ${baseName}`;
+          break;
+        case 'history':
+          title = `ประวัติคำสั่งซื้อ | ${baseName}`;
+          break;
+        case 'profile':
+          title = `โปรไฟล์ | ${baseName}`;
+          break;
+        default:
+          title = baseName;
+      }
+    }
+    
+    document.title = title;
+  }, [activeTab, showCart, showHistoryDialog, showProfileModal, showOrderDialog, productDialogOpen, selectedProduct, cart.length]);
 
   useEffect(() => setMounted(true), []);
 
