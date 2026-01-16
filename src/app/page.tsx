@@ -3163,6 +3163,7 @@ export default function HomePage() {
         onClose={() => setShowSizeChart(false)}
         maxWidth="sm"
         fullWidth
+        sx={{ zIndex: 1500 }}
         PaperProps={{
           sx: {
             bgcolor: '#0a0f1a',
