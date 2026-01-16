@@ -34,7 +34,7 @@ export default function PaymentFlow({ registerOpener, onPaymentSuccess }: Paymen
       orderRef={paymentRef}
       onClose={handleClose}
       onSuccess={() => {
-        onPaymentSuccess();
+        onPaymentSuccess(paymentRef);
       }}
     />
   );
