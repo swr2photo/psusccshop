@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 
 const endpoint = process.env.FILEBASE_ENDPOINT || 'https://s3.filebase.com';
 const region = process.env.FILEBASE_REGION || 'us-east-1';
@@ -21,10 +21,20 @@ const generateFileName = (originalName: string) => {
   return `img_${timestamp}_${random}.${ext}`;
 };
 
-// Get public URL for uploaded file
-const getPublicUrl = (key: string) => {
-  // Filebase public URL format
-  return `https://${bucket}.s3.filebase.com/${key}`;
+// Get CID from Filebase using HeadObject
+const getCID = async (key: string): Promise<string | null> => {
+  try {
+    const head = await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+    // Filebase returns CID in x-amz-meta-cid header (accessible via Metadata)
+    return head.Metadata?.cid || null;
+  } catch {
+    return null;
+  }
+};
+
+// Get public URL using IPFS gateway
+const getPublicUrl = (cid: string) => {
+  return `https://ipfs.filebase.io/ipfs/${cid}`;
 };
 
 export async function POST(req: NextRequest) {
@@ -65,11 +75,22 @@ export async function POST(req: NextRequest) {
       })
     );
 
-    const url = getPublicUrl(key);
+    // Get CID from Filebase (IPFS)
+    const cid = await getCID(key);
+    if (!cid) {
+      // Fallback to S3 URL if CID not available
+      const fallbackUrl = `https://${bucket}.s3.filebase.com/${key}`;
+      return NextResponse.json({
+        status: 'success',
+        data: { url: fallbackUrl, key, size: buffer.length },
+      });
+    }
+
+    const url = getPublicUrl(cid);
 
     return NextResponse.json({
       status: 'success',
-      data: { url, key, size: buffer.length },
+      data: { url, key, cid, size: buffer.length },
     });
   } catch (error: any) {
     console.error('[upload] error', error);
@@ -135,7 +156,10 @@ export async function PUT(req: NextRequest) {
           })
         );
 
-        results.push({ url: getPublicUrl(key), key, originalIndex: i });
+        // Get CID for IPFS URL
+        const cid = await getCID(key);
+        const url = cid ? getPublicUrl(cid) : `https://${bucket}.s3.filebase.com/${key}`;
+        results.push({ url, key, originalIndex: i });
       } catch (err: any) {
         errors.push({ index: i, message: err?.message || 'Upload failed' });
       }
