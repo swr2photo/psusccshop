@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import type { JSX } from 'react';
-import { X, Upload, Check, Loader2, AlertCircle, CheckCircle2, Image, Clock3, ShieldCheck, Download } from 'lucide-react';
-import { Skeleton, Dialog, useMediaQuery } from '@mui/material';
+import { X, Upload, Check, Loader2, AlertCircle, CheckCircle2, Image, Clock3, Download, CreditCard, QrCode } from 'lucide-react';
+import { Drawer, Box, Typography, Button, IconButton, Skeleton, useMediaQuery, LinearProgress } from '@mui/material';
 
 interface PaymentModalProps {
   orderRef: string;
@@ -38,51 +38,70 @@ const usePaymentToast = () => {
 function PaymentToastContainer({
   toasts,
   removeToast,
-  inline = false,
 }: {
   toasts: Toast[];
   removeToast: (id: string) => void;
-  inline?: boolean;
 }) {
   const bgColors = {
-    success: 'bg-emerald-600',
-    error: 'bg-red-600',
-    info: 'bg-blue-600',
-    warning: 'bg-orange-600',
+    success: '#10b981',
+    error: '#ef4444',
+    info: '#3b82f6',
+    warning: '#f59e0b',
   } as const;
 
   const icons = {
-    success: <CheckCircle2 size={20} />,
-    error: <AlertCircle size={20} />,
-    info: <AlertCircle size={20} />,
-    warning: <AlertCircle size={20} />,
+    success: <CheckCircle2 size={18} />,
+    error: <AlertCircle size={18} />,
+    info: <AlertCircle size={18} />,
+    warning: <AlertCircle size={18} />,
   };
 
+  if (toasts.length === 0) return null;
+
   return (
-    <div
-      className={`${
-        inline
-          ? 'absolute inset-x-0 top-4 sm:top-5'
-          : 'fixed left-0 right-0'
-      } z-[200] flex flex-col items-center gap-3 px-3 sm:px-4 pointer-events-none`}
-      style={inline ? { paddingTop: 'env(safe-area-inset-top)' } : { top: 'max(1rem, env(safe-area-inset-top))' }}
+    <Box
+      sx={{
+        position: 'absolute',
+        top: 80,
+        left: 0,
+        right: 0,
+        zIndex: 100,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 1,
+        px: 2,
+        pointerEvents: 'none',
+      }}
     >
       {toasts.map((toast) => (
-        <div
+        <Box
           key={toast.id}
-          className={`${bgColors[toast.type]} text-white p-4 rounded-lg shadow-lg flex items-start gap-3 w-full max-w-md animate-in slide-in-from-top pointer-events-auto`}
+          sx={{
+            bgcolor: bgColors[toast.type],
+            color: 'white',
+            p: 2,
+            borderRadius: '12px',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+            maxWidth: 400,
+            width: '100%',
+            pointerEvents: 'auto',
+          }}
         >
-          <div className="flex-shrink-0 mt-0.5">{icons[toast.type]}</div>
-          <div className="flex-1">
-            <p className="font-bold text-sm">{toast.title}</p>
-            {toast.message && <p className="text-xs opacity-90 mt-1">{toast.message}</p>}
-          </div>
-          <button onClick={() => removeToast(toast.id)} className="text-white/60 hover:text-white transition">
-            <X size={16} />
-          </button>
-        </div>
+          <Box sx={{ flexShrink: 0 }}>{icons[toast.type]}</Box>
+          <Box sx={{ flex: 1 }}>
+            <Typography sx={{ fontWeight: 700, fontSize: '0.9rem' }}>{toast.title}</Typography>
+            {toast.message && <Typography sx={{ fontSize: '0.75rem', opacity: 0.9 }}>{toast.message}</Typography>}
+          </Box>
+          <IconButton size="small" onClick={() => removeToast(toast.id)} sx={{ color: 'white', opacity: 0.7 }}>
+            <X size={14} />
+          </IconButton>
+        </Box>
       ))}
-    </div>
+    </Box>
   );
 }
 
@@ -105,32 +124,6 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
 
   const hasSlip = Boolean(selectedFile);
   const discountValue = Math.abs(discount);
-  const statusLabel = verifying ? 'กำลังตรวจสอบสลิป' : hasSlip ? 'รอยืนยันการโอน' : 'รอแนบสลิป';
-  const statusTone = verifying
-    ? 'bg-cyan-500/15 text-cyan-100 border border-cyan-400/40'
-    : hasSlip
-      ? 'bg-emerald-500/15 text-emerald-100 border border-emerald-400/40'
-      : 'bg-amber-500/15 text-amber-100 border border-amber-400/40';
-  const steps = [
-    {
-      id: 1,
-      label: 'สแกน/โอนตามยอด',
-      hint: 'ใช้ QR ที่ระบบสร้าง',
-      state: loading ? 'active' : 'done',
-    },
-    {
-      id: 2,
-      label: 'แนบสลิป',
-      hint: hasSlip ? selectedFile?.name || 'อัปโหลดแล้ว' : 'รองรับ PNG/JPG สูงสุด 5MB',
-      state: verifying ? 'done' : hasSlip ? 'active' : 'pending',
-    },
-    {
-      id: 3,
-      label: 'ยืนยันและรอผล',
-      hint: verifying ? 'ระบบกำลังตรวจสอบ' : 'ใช้เวลา ~10-20 วินาที',
-      state: verifying ? 'active' : hasSlip ? 'pending' : 'disabled',
-    },
-  ] as const;
 
   useEffect(() => {
     fetchPaymentInfo();
@@ -265,289 +258,384 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
   };
 
   return (
-    <>
-      <Dialog
-        open
-        onClose={onClose}
-        fullWidth
-        fullScreen={isMobile}
-        maxWidth="lg"
-        sx={{
-          zIndex: 1700,
-          '& .MuiDialog-container': {
-            alignItems: 'flex-start',
-            paddingTop: { xs: 'max(12px, env(safe-area-inset-top))', sm: '20px' },
-            paddingBottom: { xs: '12px', sm: '20px' },
-            paddingLeft: { xs: 0, sm: '20px' },
-            paddingRight: { xs: 0, sm: '20px' },
-          },
-          '& .MuiDialog-paper': {
-            background: 'transparent',
-            boxShadow: 'none',
-            overflow: 'visible',
-            margin: 0,
-            maxHeight: 'calc(100vh - 24px)',
-          },
-        }}
-        BackdropProps={{
-          sx: {
-            backdropFilter: 'blur(10px)',
-            backgroundColor: 'rgba(5, 10, 26, 0.7)',
-          },
-        }}
-      >
-        <div className="relative w-full max-w-[calc(100vw)] sm:max-w-[min(1200px,calc(100vw-8px))] mx-auto max-h-[calc(100vh-32px)] overflow-y-auto overscroll-contain overflow-x-hidden px-2 sm:px-6 pb-4">
-          <div className="relative border border-slate-800/70 shadow-2xl rounded-3xl overflow-hidden text-slate-100 bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900">
-            <div className="sticky top-0 z-10 flex flex-col sm:flex-row items-start sm:items-start justify-between gap-3 sm:gap-4 px-5 sm:px-7 pt-5 sm:pt-6 pb-4 sm:pb-5 border-b border-slate-800/80 bg-slate-900/80 backdrop-blur-xl relative">
-              <button
-                onClick={onClose}
-                className="absolute right-4 sm:right-5 top-4 sm:top-5 h-10 w-10 rounded-full bg-white/10 hover:bg-white/15 text-white transition border border-white/15 flex items-center justify-center"
-              >
-                <X size={18} />
-              </button>
-              <div className="space-y-1 pr-12 sm:pr-16">
-                <p className="text-[11px] uppercase tracking-[0.18em] text-emerald-200/80">payment</p>
-                <h3 className="text-xl sm:text-2xl font-black leading-tight">ยืนยันการชำระเงิน</h3>
-                <p className="text-sm text-slate-400">หมายเลขออเดอร์: #{orderRef}</p>
-              </div>
-              <div className="flex items-center sm:items-center flex-wrap gap-2 sm:gap-3 w-full sm:w-auto justify-between sm:justify-end pr-12 sm:pr-16">
-                <div className={`px-3 py-2 rounded-full text-xs font-semibold ${statusTone}`}>{statusLabel}</div>
-              </div>
-            </div>
+    <Drawer
+      anchor="bottom"
+      open={true}
+      onClose={onClose}
+      PaperProps={{
+        sx: {
+          height: { xs: '95vh', sm: '90vh' },
+          maxHeight: '95vh',
+          borderTopLeftRadius: { xs: 20, sm: 24 },
+          borderTopRightRadius: { xs: 20, sm: 24 },
+          bgcolor: '#0a0f1a',
+          overflow: 'hidden',
+        },
+      }}
+    >
+      <PaymentToastContainer toasts={toasts} removeToast={removeToast} />
+      
+      {/* Header */}
+      <Box sx={{
+        px: { xs: 2, sm: 3 },
+        py: { xs: 1.5, sm: 2 },
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        background: 'linear-gradient(180deg, rgba(15,23,42,0.98) 0%, rgba(10,15,26,0.98) 100%)',
+        position: 'sticky',
+        top: 0,
+        zIndex: 10,
+      }}>
+        {/* Drag Handle */}
+        <Box sx={{ width: 36, height: 4, bgcolor: 'rgba(255,255,255,0.2)', borderRadius: 2, mx: 'auto', mb: 2 }} />
+        
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Box sx={{
+              width: 44,
+              height: 44,
+              borderRadius: '14px',
+              background: 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)',
+              display: 'grid',
+              placeItems: 'center',
+              boxShadow: '0 4px 14px rgba(16,185,129,0.3)',
+            }}>
+              <CreditCard size={22} color="white" />
+            </Box>
+            <Box>
+              <Typography sx={{ fontSize: '1.15rem', fontWeight: 800, color: '#f1f5f9' }}>
+                ชำระเงิน
+              </Typography>
+              <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>
+                #{orderRef}
+              </Typography>
+            </Box>
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{
+              px: 1.5,
+              py: 0.5,
+              borderRadius: '20px',
+              bgcolor: verifying ? 'rgba(6,182,212,0.15)' : hasSlip ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)',
+              border: `1px solid ${verifying ? 'rgba(6,182,212,0.4)' : hasSlip ? 'rgba(16,185,129,0.4)' : 'rgba(245,158,11,0.4)'}`,
+            }}>
+              <Typography sx={{ 
+                fontSize: '0.7rem', 
+                fontWeight: 600, 
+                color: verifying ? '#67e8f9' : hasSlip ? '#6ee7b7' : '#fbbf24' 
+              }}>
+                {verifying ? 'กำลังตรวจสอบ' : hasSlip ? 'พร้อมยืนยัน' : 'รอแนบสลิป'}
+              </Typography>
+            </Box>
+            <IconButton onClick={onClose} sx={{ color: '#94a3b8', bgcolor: 'rgba(255,255,255,0.05)', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
+              <X size={20} />
+            </IconButton>
+          </Box>
+        </Box>
+      </Box>
 
-            <div className="px-5 sm:px-7 py-5 sm:py-6 space-y-6">
-              <div className="hidden" />
-
-              {loading ? (
-                <div className="grid gap-5 sm:gap-6 lg:grid-cols-[1.05fr_1fr]">
-                  <div className="space-y-4">
-                    <Skeleton variant="rectangular" height={260} className="!bg-slate-800/80 rounded-2xl" />
-                    <Skeleton variant="rectangular" height={140} className="!bg-slate-800/80 rounded-2xl" />
-                  </div>
-                  <div className="space-y-4">
-                    <Skeleton variant="rectangular" height={320} className="!bg-slate-800/80 rounded-2xl" />
-                    <Skeleton variant="rectangular" height={82} className="!bg-slate-800/80 rounded-2xl" />
-                  </div>
-                </div>
-              ) : (
-                <div className="grid gap-5 sm:gap-6 lg:gap-7 lg:grid-cols-[1.05fr_1fr] items-start">
-                  <div className="space-y-5">
-                    <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-950 shadow-xl">
-                      <div className="absolute inset-0 opacity-70 bg-[radial-gradient(circle_at_20%_20%,rgba(16,185,129,0.08),transparent_35%),radial-gradient(circle_at_80%_0%,rgba(56,189,248,0.08),transparent_30%)]" />
-                      <div className="relative grid sm:grid-cols-[1.1fr_0.9fr] gap-4 p-4 sm:p-5">
-                        <div className="relative bg-white/90 rounded-xl border border-emerald-50 shadow-lg p-3 sm:p-4 flex items-center justify-center min-h-[220px] sm:min-h-[240px]">
-                          {qrUrl ? (
-                            <img src={qrUrl} alt="QR Code" className="w-full max-w-[340px] h-auto object-contain" />
-                          ) : (
-                            <div className="w-full aspect-square flex items-center justify-center text-slate-400">กำลังสร้าง QR...</div>
-                          )}
-                          <div className="pointer-events-none absolute inset-x-2 bottom-2 sm:bottom-3 bg-white/90 text-[11px] sm:text-xs text-slate-700 font-semibold px-2 py-1 rounded-md text-center shadow">
-                            ใช้สำหรับการชำระค่าเสื้อชุมนุมคอมพิวเตอร์เท่านั้น
-                          </div>
-                        </div>
-                        <div className="sm:col-span-2 flex flex-col sm:flex-row sm:items-center gap-3 text-xs sm:text-sm px-1 sm:px-0">
-                          <button
-                            onClick={handleSaveQr}
-                            disabled={!qrUrl || loading || downloading}
-                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-800 disabled:text-slate-500 text-white font-semibold px-3 py-2 shadow"
-                          >
-                            {downloading ? (
-                              <>
-                                <Loader2 size={16} className="animate-spin" />
-                                <span>บันทึก... {downloadProgress}%</span>
-                              </>
-                            ) : (
-                              <>
-                                <Download size={16} />
-                                <span>บันทึกคิวอาร์โค้ด</span>
-                              </>
-                            )}
-                          </button>
-                          <span className="text-slate-400">ไฟล์จะถูกเซฟเป็น PNG</span>
-                        </div>
-                        {downloading && (
-                          <div className="sm:col-span-2 px-1 sm:px-0">
-                            <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
-                              <div
-                                className="h-full bg-emerald-400 transition-[width] duration-150"
-                                style={{ width: `${Math.min(downloadProgress, 100)}%` }}
-                              />
-                            </div>
-                          </div>
-                        )}
-                        <div className="flex flex-col gap-3">
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm text-slate-300">ยอดสุทธิที่ต้องชำระ</p>
-                            <div className="flex items-center gap-1.5 text-xs text-emerald-200 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-400/30">
-                              <Clock3 size={14} />
-                              <span>ตรวจอัตโนมัติ</span>
-                            </div>
-                          </div>
-                          <div className="rounded-2xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-white p-4 sm:p-5 shadow-lg">
-                            <p className="text-4xl sm:text-5xl font-black tracking-tight leading-tight">{amount.toLocaleString()}฿</p>
-                            <p className="text-sm text-white/80 mt-1">โอนตามยอดนี้เท่านั้น</p>
-                          </div>
-                          <div className="grid grid-cols-2 gap-3 text-sm">
-                            <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-3">
-                              <p className="text-slate-400 text-xs">ค่าสินค้า</p>
-                              <p className="text-lg font-semibold mt-1">{baseAmount.toLocaleString()}฿</p>
-                            </div>
-                            <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-3">
-                              <p className="text-slate-400 text-xs">ส่วนลด</p>
-                              <p className="text-lg font-semibold mt-1 text-emerald-300">-{discountValue.toLocaleString()}฿</p>
-                            </div>
-                          </div>
-                          <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-3 text-sm flex flex-col gap-2">
-                            <div className="flex items-center justify-between">
-                              <p className="text-slate-300 font-semibold">โค้ดส่วนลด</p>
-                              <span className="text-[11px] text-amber-300 bg-amber-500/10 border border-amber-400/30 px-2 py-1 rounded-full">ยังไม่มา</span>
-                            </div>
-                            <div className="flex gap-2 flex-col sm:flex-row">
-                              <input
-                                type="text"
-                                disabled
-                                placeholder="ใส่โค้ดเร็วๆ นี้"
-                                className="w-full rounded-lg bg-slate-800/70 border border-slate-700 text-slate-400 px-3 py-2 text-sm cursor-not-allowed"
-                              />
-                              <button
-                                disabled
-                                className="sm:w-32 w-full rounded-lg bg-slate-800/70 text-slate-500 border border-slate-700 px-3 py-2 text-sm cursor-not-allowed"
-                              >
-                                ใช้โค้ด
-                              </button>
-                            </div>
-                          </div>
-                          <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-3 text-xs text-slate-300 space-y-1">
-                            <div className="flex items-center gap-2">
-                              <Clock3 size={14} className="text-cyan-300" />
-                              <span>อัปโหลดสลิปภายใน 15 นาที</span>
-                            </div>
-                            <p className="text-slate-400">ระบบจะตรวจอัตโนมัติทันทีที่อัปโหลด</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 sm:p-5 shadow-xl">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-cyan-500 to-emerald-500 text-slate-900 grid place-items-center">
-                            <Image size={18} />
-                          </div>
-                          <div>
-                            <p className="text-sm font-semibold">แนบสลิปโอนเงิน</p>
-                            <p className="text-xs text-slate-400">รองรับ PNG หรือ JPG สูงสุด 5MB</p>
-                          </div>
-                        </div>
-                        {hasSlip && (
-                          <button
-                            onClick={() => {
-                              setPreviewUrl(null);
-                              setSelectedFile(null);
-                            }}
-                            className="text-xs text-amber-200 bg-amber-500/10 border border-amber-400/30 px-3 py-1.5 rounded-full hover:bg-amber-500/15"
-                          >
-                            ลบไฟล์
-                          </button>
-                        )}
-                      </div>
-
-                      {!previewUrl ? (
-                        <button
-                          onClick={() => fileInputRef.current?.click()}
-                          onDragOver={(e) => {
-                            e.preventDefault();
-                            setDragActive(true);
-                          }}
-                          onDragLeave={() => setDragActive(false)}
-                          onDrop={(e) => {
-                            e.preventDefault();
-                            setDragActive(false);
-                            const droppedFile = e.dataTransfer.files?.[0];
-                            if (droppedFile) processFile(droppedFile);
-                          }}
-                            className={`w-full border-2 border-dashed rounded-2xl p-7 sm:p-10 transition flex flex-col items-center gap-3 cursor-pointer ${
-                            dragActive
-                              ? 'border-cyan-400 bg-cyan-500/10 text-cyan-100'
-                              : 'border-slate-700 bg-slate-900/70 text-slate-400 hover:border-cyan-400 hover:text-cyan-100'
-                          }`}
-                        >
-                          <Upload size={32} />
-                          <div className="text-center">
-                            <p className="font-semibold">ลากไฟล์หรือคลิกเพื่อเลือก</p>
-                            <p className="text-xs opacity-80 mt-0.5">ควรเป็นสลิปที่คมชัด เห็นยอดและเวลา</p>
-                          </div>
-                        </button>
-                      ) : (
-                        <div className="space-y-3">
-                          <div className="relative rounded-2xl overflow-hidden border border-slate-800 bg-slate-900/80">
-                            <img src={previewUrl} alt="Preview" className="w-full h-auto max-h-96 object-contain p-3" />
-                            <CheckCircle2 className="absolute bottom-3 right-3 text-emerald-400" size={26} />
-                          </div>
-                          <div className="flex items-center justify-between text-xs text-slate-300">
-                            <span className="truncate pr-2">{selectedFile?.name}</span>
-                            <button onClick={() => fileInputRef.current?.click()} className="text-cyan-300 hover:text-cyan-200 font-semibold">
-                              เปลี่ยนรูปภาพ
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      <input
-                        type="file"
-                        accept="image/*"
-                        ref={fileInputRef}
-                        onChange={(e) => e.target.files && processFile(e.target.files[0])}
-                        className="hidden"
-                      />
-
-                      <div className="mt-4 rounded-xl border border-slate-800 bg-slate-900/70 p-3 text-xs text-slate-300 space-y-1">
-                        <p className="font-semibold text-slate-200">คำแนะนำสั้นๆ</p>
-                        <p>• ใช้สลิปชัดเจน ไม่เกิน 5MB</p>
-                        <p>• เห็นยอด {amount.toLocaleString()}฿ และเวลาชัด</p>
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 shadow-inner space-y-3">
-                      <button
-                        onClick={handleConfirmPayment}
-                        disabled={verifying || loading || !selectedFile}
-                        className="w-full bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-500 text-white font-bold py-3.5 rounded-xl shadow-lg flex justify-center items-center gap-2 transition text-sm sm:text-base"
-                      >
-                        {verifying ? (
-                          <>
-                            <Loader2 size={20} className="animate-spin" />
-                            <span>กำลังตรวจสอบ...</span>
-                          </>
-                        ) : selectedFile ? (
-                          <>
-                            <Check size={20} />
-                            <span>ยืนยันการโอนเงิน</span>
-                          </>
-                        ) : (
-                          <>
-                            <AlertCircle size={20} />
-                            <span>กรุณาแนบสลิป</span>
-                          </>
-                        )}
-                      </button>
-
-                      <div className="flex items-center justify-between text-xs text-slate-400 flex-wrap gap-2">
-                        <span>ระบบตรวจสอบอัตโนมัติ โปรดรออยู่ในหน้านี้</span>
-                        <span className="text-emerald-200">ผลลัพธ์จะเด้งแจ้งเตือนทันที</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+      {/* Content */}
+      <Box sx={{ flex: 1, overflow: 'auto', WebkitOverflowScrolling: 'touch', px: { xs: 2, sm: 3 }, py: 2 }}>
+        {loading ? (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Skeleton variant="rectangular" height={260} sx={{ bgcolor: 'rgba(30,41,59,0.5)', borderRadius: '16px' }} />
+            <Skeleton variant="rectangular" height={140} sx={{ bgcolor: 'rgba(30,41,59,0.5)', borderRadius: '16px' }} />
+            <Skeleton variant="rectangular" height={200} sx={{ bgcolor: 'rgba(30,41,59,0.5)', borderRadius: '16px' }} />
+          </Box>
+        ) : (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, maxWidth: 600, mx: 'auto' }}>
+            {/* Amount Summary */}
+            <Box sx={{
+              p: 2.5,
+              borderRadius: '16px',
+              background: 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)',
+              color: 'white',
+              textAlign: 'center',
+            }}>
+              <Typography sx={{ fontSize: '0.8rem', opacity: 0.9, mb: 0.5 }}>ยอดที่ต้องชำระ</Typography>
+              <Typography sx={{ fontSize: '2.5rem', fontWeight: 900 }}>฿{amount.toLocaleString()}</Typography>
+              {discountValue > 0 && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 1, fontSize: '0.8rem' }}>
+                  <Typography sx={{ opacity: 0.8 }}>ค่าสินค้า ฿{baseAmount.toLocaleString()}</Typography>
+                  <Typography sx={{ color: '#a7f3d0' }}>ส่วนลด -฿{discountValue.toLocaleString()}</Typography>
+                </Box>
               )}
-            </div>
-          </div>
-        </div>
-        <PaymentToastContainer toasts={toasts} removeToast={removeToast} inline />
-      </Dialog>
-    </>
+            </Box>
+
+            {/* QR Code Section */}
+            <Box sx={{
+              p: 2,
+              borderRadius: '16px',
+              bgcolor: 'rgba(30,41,59,0.5)',
+              border: '1px solid rgba(255,255,255,0.06)',
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                <Box sx={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: '10px',
+                  bgcolor: 'rgba(16,185,129,0.15)',
+                  display: 'grid',
+                  placeItems: 'center',
+                }}>
+                  <QrCode size={18} style={{ color: '#6ee7b7' }} />
+                </Box>
+                <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: '#e2e8f0' }}>
+                  QR Code สำหรับโอนเงิน
+                </Typography>
+              </Box>
+              
+              {qrUrl ? (
+                <Box sx={{ 
+                  bgcolor: 'white', 
+                  borderRadius: '12px', 
+                  p: 2, 
+                  display: 'flex', 
+                  justifyContent: 'center',
+                  mb: 2,
+                }}>
+                  <Box
+                    component="img"
+                    src={qrUrl}
+                    alt="QR Code"
+                    sx={{ maxWidth: '100%', maxHeight: 280, objectFit: 'contain' }}
+                  />
+                </Box>
+              ) : (
+                <Box sx={{ 
+                  bgcolor: 'rgba(100,116,139,0.1)', 
+                  borderRadius: '12px', 
+                  p: 4, 
+                  textAlign: 'center',
+                  mb: 2,
+                }}>
+                  <Typography sx={{ color: '#64748b' }}>กำลังสร้าง QR...</Typography>
+                </Box>
+              )}
+
+              <Button
+                fullWidth
+                startIcon={downloading ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+                onClick={handleSaveQr}
+                disabled={!qrUrl || downloading}
+                sx={{
+                  py: 1.2,
+                  borderRadius: '10px',
+                  bgcolor: 'rgba(16,185,129,0.1)',
+                  border: '1px solid rgba(16,185,129,0.3)',
+                  color: '#6ee7b7',
+                  fontWeight: 600,
+                  textTransform: 'none',
+                  '&:hover': { bgcolor: 'rgba(16,185,129,0.2)' },
+                  '&:disabled': { opacity: 0.5 },
+                }}
+              >
+                {downloading ? `บันทึก... ${downloadProgress}%` : 'บันทึก QR Code'}
+              </Button>
+              {downloading && (
+                <LinearProgress 
+                  variant="determinate" 
+                  value={downloadProgress} 
+                  sx={{ 
+                    mt: 1, 
+                    borderRadius: 1, 
+                    bgcolor: 'rgba(255,255,255,0.1)',
+                    '& .MuiLinearProgress-bar': { bgcolor: '#10b981' }
+                  }} 
+                />
+              )}
+            </Box>
+
+            {/* Slip Upload Section */}
+            <Box sx={{
+              p: 2,
+              borderRadius: '16px',
+              bgcolor: 'rgba(30,41,59,0.5)',
+              border: '1px solid rgba(255,255,255,0.06)',
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <Box sx={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: '10px',
+                    bgcolor: 'rgba(6,182,212,0.15)',
+                    display: 'grid',
+                    placeItems: 'center',
+                  }}>
+                    <Image size={18} style={{ color: '#67e8f9' }} />
+                  </Box>
+                  <Box>
+                    <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: '#e2e8f0' }}>
+                      แนบสลิปโอนเงิน
+                    </Typography>
+                    <Typography sx={{ fontSize: '0.7rem', color: '#64748b' }}>
+                      รองรับ PNG, JPG สูงสุด 5MB
+                    </Typography>
+                  </Box>
+                </Box>
+                {hasSlip && (
+                  <Button
+                    size="small"
+                    onClick={() => { setPreviewUrl(null); setSelectedFile(null); }}
+                    sx={{ 
+                      color: '#fbbf24', 
+                      fontSize: '0.75rem',
+                      textTransform: 'none',
+                    }}
+                  >
+                    ลบ
+                  </Button>
+                )}
+              </Box>
+
+              {!previewUrl ? (
+                <Box
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+                  onDragLeave={() => setDragActive(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragActive(false);
+                    const droppedFile = e.dataTransfer.files?.[0];
+                    if (droppedFile) processFile(droppedFile);
+                  }}
+                  sx={{
+                    border: '2px dashed',
+                    borderColor: dragActive ? '#06b6d4' : 'rgba(255,255,255,0.15)',
+                    borderRadius: '12px',
+                    p: 4,
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    bgcolor: dragActive ? 'rgba(6,182,212,0.1)' : 'transparent',
+                    '&:hover': { borderColor: '#06b6d4', bgcolor: 'rgba(6,182,212,0.05)' },
+                  }}
+                >
+                  <Upload size={32} style={{ color: '#64748b', margin: '0 auto 8px' }} />
+                  <Typography sx={{ color: '#94a3b8', fontWeight: 600, mb: 0.5 }}>
+                    ลากไฟล์หรือคลิกเพื่อเลือก
+                  </Typography>
+                  <Typography sx={{ color: '#64748b', fontSize: '0.8rem' }}>
+                    ควรเป็นสลิปที่คมชัด เห็นยอดและเวลา
+                  </Typography>
+                </Box>
+              ) : (
+                <Box>
+                  <Box sx={{ 
+                    position: 'relative', 
+                    borderRadius: '12px', 
+                    overflow: 'hidden',
+                    border: '1px solid rgba(16,185,129,0.3)',
+                    mb: 1.5,
+                  }}>
+                    <Box
+                      component="img"
+                      src={previewUrl}
+                      alt="Preview"
+                      sx={{ width: '100%', maxHeight: 300, objectFit: 'contain', bgcolor: 'rgba(0,0,0,0.2)' }}
+                    />
+                    <Box sx={{
+                      position: 'absolute',
+                      bottom: 8,
+                      right: 8,
+                      bgcolor: 'rgba(16,185,129,0.9)',
+                      borderRadius: '50%',
+                      p: 0.5,
+                    }}>
+                      <CheckCircle2 size={20} color="white" />
+                    </Box>
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Typography sx={{ fontSize: '0.8rem', color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>
+                      {selectedFile?.name}
+                    </Typography>
+                    <Button
+                      size="small"
+                      onClick={() => fileInputRef.current?.click()}
+                      sx={{ color: '#67e8f9', fontSize: '0.75rem', textTransform: 'none' }}
+                    >
+                      เปลี่ยนรูป
+                    </Button>
+                  </Box>
+                </Box>
+              )}
+
+              <input
+                type="file"
+                accept="image/*"
+                ref={fileInputRef}
+                onChange={(e) => e.target.files && processFile(e.target.files[0])}
+                style={{ display: 'none' }}
+              />
+            </Box>
+
+            {/* Tips */}
+            <Box sx={{
+              p: 2,
+              borderRadius: '12px',
+              bgcolor: 'rgba(245,158,11,0.08)',
+              border: '1px solid rgba(245,158,11,0.2)',
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                <Clock3 size={16} style={{ color: '#fbbf24' }} />
+                <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: '#fbbf24' }}>
+                  คำแนะนำ
+                </Typography>
+              </Box>
+              <Typography sx={{ fontSize: '0.8rem', color: '#94a3b8', lineHeight: 1.6 }}>
+                • อัปโหลดสลิปภายใน 15 นาทีหลังสั่งซื้อ<br/>
+                • ระบบจะตรวจสอบอัตโนมัติทันที<br/>
+                • หากสลิปถูกปฏิเสธ สามารถแนบใหม่ได้
+              </Typography>
+            </Box>
+          </Box>
+        )}
+      </Box>
+
+      {/* Bottom Submit Button */}
+      <Box sx={{
+        px: { xs: 2, sm: 3 },
+        py: 2,
+        borderTop: '1px solid rgba(255,255,255,0.08)',
+        background: 'linear-gradient(180deg, rgba(15,23,42,0.98) 0%, rgba(10,15,26,0.98) 100%)',
+        backdropFilter: 'blur(20px)',
+        paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
+      }}>
+        <Box sx={{ maxWidth: 600, mx: 'auto' }}>
+          <Button
+            fullWidth
+            onClick={handleConfirmPayment}
+            disabled={verifying || loading || !selectedFile}
+            startIcon={verifying ? <Loader2 size={20} className="animate-spin" /> : hasSlip ? <Check size={20} /> : <AlertCircle size={20} />}
+            sx={{
+              py: 1.8,
+              borderRadius: '14px',
+              background: hasSlip && !verifying
+                ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                : 'rgba(100,116,139,0.2)',
+              color: hasSlip && !verifying ? 'white' : '#64748b',
+              fontSize: '1rem',
+              fontWeight: 700,
+              textTransform: 'none',
+              boxShadow: hasSlip && !verifying ? '0 4px 20px rgba(16,185,129,0.3)' : 'none',
+              '&:hover': {
+                background: hasSlip && !verifying
+                  ? 'linear-gradient(135deg, #059669 0%, #047857 100%)'
+                  : 'rgba(100,116,139,0.3)',
+              },
+              '&:disabled': {
+                background: verifying ? 'linear-gradient(135deg, #0891b2 0%, #06b6d4 100%)' : 'rgba(100,116,139,0.2)',
+                color: verifying ? 'white' : '#64748b',
+              },
+            }}
+          >
+            {verifying ? 'กำลังตรวจสอบ...' : hasSlip ? 'ยืนยันการโอนเงิน' : 'กรุณาแนบสลิป'}
+          </Button>
+          <Typography sx={{ textAlign: 'center', fontSize: '0.75rem', color: '#64748b', mt: 1.5 }}>
+            ระบบตรวจสอบอัตโนมัติ โปรดรออยู่ในหน้านี้
+          </Typography>
+        </Box>
+      </Box>
+    </Drawer>
   );
 }
