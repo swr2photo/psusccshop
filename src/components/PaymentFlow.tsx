@@ -5,7 +5,7 @@ import PaymentModal from "./PaymentModal";
 
 type PaymentFlowProps = {
   registerOpener: (opener: ((ref: string) => void) | null) => void;
-  onPaymentSuccess: () => void;
+  onPaymentSuccess: (ref: string) => void;
 };
 
 export default function PaymentFlow({ registerOpener, onPaymentSuccess }: PaymentFlowProps) {

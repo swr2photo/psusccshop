@@ -3,6 +3,7 @@
 import React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import {
   Alert,
@@ -60,6 +61,9 @@ import {
   X,
   Zap,
   Search,
+  Edit,
+  Check,
+  MapPin,
 } from 'lucide-react';
 import PaymentFlow from '@/components/PaymentFlow';
 import ProfileModal from '@/components/ProfileModal';
@@ -185,11 +189,31 @@ type CartItem = {
   };
 };
 
+type OrderHistoryItem = {
+  productId?: string;
+  name?: string;
+  productName?: string;
+  size?: string;
+  qty?: number;
+  quantity?: number;
+  customName?: string;
+  isLongSleeve?: boolean;
+  unitPrice?: number;
+  subtotal?: number;
+  options?: {
+    customName?: string;
+    isLongSleeve?: boolean;
+    customNumber?: string;
+  };
+};
+
 type OrderHistory = {
   ref: string;
   status: string;
   date: string;
   total?: number;
+  items?: OrderHistoryItem[];
+  cart?: OrderHistoryItem[]; // For backwards compatibility
 };
 
 type Interval = ReturnType<typeof setInterval>;
@@ -242,6 +266,7 @@ export default function HomePage() {
   const [productSearch, setProductSearch] = useState('');
   const [showSearchBar, setShowSearchBar] = useState(false);
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 0]);
+  const [editingCartItem, setEditingCartItem] = useState<CartItem | null>(null);
 
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productDialogOpen, setProductDialogOpen] = useState(false);
@@ -317,73 +342,42 @@ export default function HomePage() {
   );
 
 
-  const BrandMark = ({ size = 44, showText = true }: { size?: number; showText?: boolean }) => (
+  const BrandMark = ({ size = 36, showText = true }: { size?: number; showText?: boolean }) => (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
       <Box
-        component="img"
-        src="/logo.png"
-        alt="PSU SCC Shop Logo"
         sx={{
-          height: { xs: size - 4, sm: size },
-          maxHeight: 48,
-          width: 'auto',
-          objectFit: 'contain',
-          borderRadius: '8px',
+          width: size,
+          height: size,
+          position: 'relative',
+          borderRadius: '12px',
+          overflow: 'hidden',
+          flexShrink: 0,
         }}
-      />
+      >
+        <Image
+          src="/logo.png"
+          alt="PSU SCC Shop Logo"
+          fill
+          style={{ objectFit: 'contain' }}
+          priority
+        />
+      </Box>
       {showText && (
         <Typography
           variant="h6"
           sx={{
             fontWeight: 800,
-            fontSize: { xs: '0.95rem', sm: '1.1rem' },
             letterSpacing: 0.5,
-            background: 'linear-gradient(135deg, #60a5fa 0%, #a78bfa 50%, #f472b6 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
+            color: '#f1f5f9',
             textTransform: 'uppercase',
-            display: { xs: 'none', sm: 'block' },
+            fontSize: { xs: '1rem', sm: '1.25rem' },
           }}
         >
-          PSU SCC SHOP
+          SCC Shop
         </Typography>
       )}
     </Box>
   );
-
-  // Dynamic page title based on current tab/state
-  useEffect(() => {
-    const baseName = 'PSU SCC SHOP';
-    let title = baseName;
-    
-    if (productDialogOpen && selectedProduct) {
-      title = `${selectedProduct.name} | ${baseName}`;
-    } else if (showCart) {
-      title = `ตะกร้า (${cart.length}) | ${baseName}`;
-    } else if (showHistoryDialog) {
-      title = `ประวัติคำสั่งซื้อ | ${baseName}`;
-    } else if (showProfileModal) {
-      title = `โปรไฟล์ | ${baseName}`;
-    } else if (showOrderDialog) {
-      title = `ยืนยันคำสั่งซื้อ | ${baseName}`;
-    } else {
-      switch (activeTab) {
-        case 'cart':
-          title = `ตะกร้า (${cart.length}) | ${baseName}`;
-          break;
-        case 'history':
-          title = `ประวัติคำสั่งซื้อ | ${baseName}`;
-          break;
-        case 'profile':
-          title = `โปรไฟล์ | ${baseName}`;
-          break;
-        default:
-          title = baseName;
-      }
-    }
-    
-    document.title = title;
-  }, [activeTab, showCart, showHistoryDialog, showProfileModal, showOrderDialog, productDialogOpen, selectedProduct, cart.length]);
 
   useEffect(() => setMounted(true), []);
 
@@ -732,6 +726,17 @@ export default function HomePage() {
     saveCart(newCart);
   };
 
+  const updateCartItem = (id: string, updates: Partial<CartItem>) => {
+    const newCart = cart.map((item) => (item.id === id ? { ...item, ...updates } : item));
+    saveCart(newCart);
+    setEditingCartItem(null);
+    showToast('success', 'อัปเดตสินค้าในตะกร้าแล้ว');
+  };
+
+  const openEditCartItem = (item: CartItem) => {
+    setEditingCartItem(item);
+  };
+
   const stopProductHold = () => {
     if (productHoldTimer.current) {
       clearInterval(productHoldTimer.current);
@@ -773,275 +778,544 @@ export default function HomePage() {
   const getStatusLabel = (status: string): string => STATUS_LABELS[normalizeStatus(status)] || status;
   const getStatusColor = (status: string): string => STATUS_COLORS[normalizeStatus(status)] || '#475569';
 
+  // Calculate current price for product dialog
+  const getCurrentPrice = useCallback(() => {
+    if (!selectedProduct) return 0;
+    const basePrice = selectedProduct.sizePricing?.[productOptions.size] ?? selectedProduct.basePrice;
+    const longSleeveFee = selectedProduct.options?.hasLongSleeve && productOptions.isLongSleeve ? 50 : 0;
+    return (basePrice + longSleeveFee) * productOptions.quantity;
+  }, [selectedProduct, productOptions]);
+
   const renderProductDialog = () => {
     if (!selectedProduct) return null;
 
     const productContent = (
-      <Box
-        sx={{
-          width: { xs: '100%', sm: '92%', md: 1040 },
-          maxWidth: 'calc(100% - 24px)',
-          display: 'flex',
-          flexDirection: 'column',
-          height: '100%',
-          mx: 'auto',
-        }}
-      >
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 3, py: 2.5, borderBottom: '1px solid rgba(255,255,255,0.08)', background: 'linear-gradient(135deg, #6366f1 0%, #06b6d4 100%)', color: 'white' }}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.2 }}>
-            <Typography variant="h6" sx={{ fontWeight: 900 }}>{selectedProduct.name}</Typography>
-            <Typography variant="caption" sx={{ opacity: 0.88 }}>ปัดดูรายละเอียดและเลือกตัวเลือก</Typography>
-          </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
-            <Chip label={selectedProduct.type} size="small" sx={{ bgcolor: 'rgba(255,255,255,0.22)', color: 'white', fontWeight: 800 }} />
-            <IconButton onClick={() => setProductDialogOpen(false)} sx={{ color: 'white', bgcolor: 'rgba(0,0,0,0.18)', '&:hover': { bgcolor: 'rgba(0,0,0,0.28)' } }}>
-              <X />
+      <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: '#0a0f1a', color: '#f1f5f9' }}>
+        {/* Header */}
+        <Box sx={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 10,
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          background: 'linear-gradient(180deg, rgba(15,23,42,0.98) 0%, rgba(10,15,26,0.98) 100%)',
+          backdropFilter: 'blur(20px)',
+        }}>
+          {isMobile && (
+            <Box sx={{ width: 36, height: 4, bgcolor: 'rgba(255,255,255,0.2)', borderRadius: 2, mx: 'auto', mt: 1.5, mb: 1 }} />
+          )}
+          <Box sx={{ px: { xs: 2, sm: 3 }, py: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' }, fontWeight: 800, color: '#f1f5f9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {selectedProduct.name}
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                <Box sx={{
+                  px: 1.2,
+                  py: 0.3,
+                  borderRadius: '6px',
+                  bgcolor: 'rgba(99,102,241,0.15)',
+                  border: '1px solid rgba(99,102,241,0.3)',
+                }}>
+                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#a5b4fc' }}>
+                    {TYPE_LABELS[selectedProduct.type] || selectedProduct.type}
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+            <IconButton 
+              onClick={() => setProductDialogOpen(false)} 
+              sx={{ 
+                color: '#94a3b8', 
+                bgcolor: 'rgba(255,255,255,0.05)', 
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } 
+              }}
+            >
+              <X size={20} />
             </IconButton>
           </Box>
         </Box>
 
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 2, md: 3 }, alignItems: 'stretch', px: { xs: 1.5, md: 3 }, py: 3, overflow: 'auto', flex: 1, minHeight: 0, WebkitOverflowScrolling: 'touch' }}>
-          {inlineNotice && (
-            <Alert severity={inlineNotice.type} sx={{ borderRadius: 2, bgcolor: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.3)', color: '#e2e8f0' }}>
-              {inlineNotice.message}
-            </Alert>
-          )}
-          <Box sx={{ p: { xs: 1.5, md: 2 }, borderRadius: 2, border: '1px solid rgba(255,255,255,0.08)', background: 'linear-gradient(145deg, rgba(6,12,26,0.9), rgba(8,18,36,0.9))', boxShadow: '0 18px 42px rgba(0,0,0,0.35)' }}>
-            {productImages.length ? (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                <Box sx={{ position: 'relative', borderRadius: 2, overflow: 'hidden', background: 'linear-gradient(145deg, rgba(99,102,241,0.25), rgba(6,182,212,0.2))', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 18px 50px rgba(99,102,241,0.2)' }}>
+        {/* Inline Toast */}
+        {inlineNotice && (
+          <Alert
+            severity={inlineNotice.type}
+            icon={false}
+            sx={{
+              position: 'fixed',
+              top: { xs: 16, sm: 24 },
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 99999,
+              borderRadius: '12px',
+              bgcolor: 'rgba(30,30,30,0.95)',
+              backdropFilter: 'blur(20px)',
+              border: 'none',
+              color: '#fff',
+              py: 1.5,
+              px: 3,
+              fontSize: '0.95rem',
+              fontWeight: 500,
+              boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+              minWidth: { xs: 200, sm: 280 },
+              textAlign: 'center',
+            }}
+          >
+            {inlineNotice.message}
+          </Alert>
+        )}
+
+        {/* Content */}
+        <Box sx={{ flex: 1, overflow: 'auto', WebkitOverflowScrolling: 'touch', px: { xs: 2, sm: 3 }, py: 2.5 }}>
+          {/* Image Gallery */}
+          <Box sx={{ mb: 3 }}>
+            {productImages.length > 0 ? (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {/* Main Image */}
+                <Box sx={{ 
+                  position: 'relative', 
+                  borderRadius: '20px', 
+                  overflow: 'hidden',
+                  bgcolor: 'rgba(30,41,59,0.5)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                }}>
                   <Box
                     component="img"
                     src={productImages[activeImageIndex] || productImages[0]}
                     alt={`${selectedProduct.name} - รูปที่ ${activeImageIndex + 1}`}
                     loading="lazy"
-                    sx={{ width: '100%', height: { xs: 260, sm: 380, md: 520 }, objectFit: 'cover', display: 'block', backgroundColor: '#0b152c' }}
+                    sx={{ 
+                      width: '100%', 
+                      height: { xs: 280, sm: 360, md: 420 }, 
+                      objectFit: 'cover', 
+                      display: 'block',
+                    }}
                   />
                   {totalImages > 1 && (
                     <>
                       <IconButton
                         onClick={() => setActiveImageIndex((prev) => (prev - 1 + totalImages) % totalImages)}
-                        sx={{ position: 'absolute', top: '45%', left: 12, bgcolor: 'rgba(15,23,42,0.65)', color: 'white', '&:hover': { bgcolor: 'rgba(15,23,42,0.8)' } }}
+                        sx={{ 
+                          position: 'absolute', 
+                          top: '50%', 
+                          left: 12, 
+                          transform: 'translateY(-50%)',
+                          bgcolor: 'rgba(0,0,0,0.5)', 
+                          color: 'white', 
+                          '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' },
+                          width: 40,
+                          height: 40,
+                        }}
                       >
-                        <ChevronLeft />
+                        <ChevronLeft size={24} />
                       </IconButton>
                       <IconButton
                         onClick={() => setActiveImageIndex((prev) => (prev + 1) % totalImages)}
-                        sx={{ position: 'absolute', top: '45%', right: 12, bgcolor: 'rgba(15,23,42,0.65)', color: 'white', '&:hover': { bgcolor: 'rgba(15,23,42,0.8)' } }}
+                        sx={{ 
+                          position: 'absolute', 
+                          top: '50%', 
+                          right: 12, 
+                          transform: 'translateY(-50%)',
+                          bgcolor: 'rgba(0,0,0,0.5)', 
+                          color: 'white', 
+                          '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' },
+                          width: 40,
+                          height: 40,
+                        }}
                       >
-                        <ChevronRight />
+                        <ChevronRight size={24} />
                       </IconButton>
+                      {/* Image Counter */}
+                      <Box sx={{
+                        position: 'absolute',
+                        bottom: 12,
+                        right: 12,
+                        px: 1.5,
+                        py: 0.5,
+                        borderRadius: '20px',
+                        bgcolor: 'rgba(0,0,0,0.6)',
+                        backdropFilter: 'blur(10px)',
+                      }}>
+                        <Typography sx={{ fontSize: '0.75rem', color: 'white', fontWeight: 600 }}>
+                          {activeImageIndex + 1} / {totalImages}
+                        </Typography>
+                      </Box>
                     </>
                   )}
                 </Box>
 
+                {/* Thumbnail Gallery */}
                 {totalImages > 1 && (
-                  <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto', pb: 0.5 }}>
+                  <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto', pb: 0.5, '&::-webkit-scrollbar': { display: 'none' } }}>
                     {productImages.map((img, idx) => (
                       <Box
                         key={idx}
                         onClick={() => setActiveImageIndex(idx)}
                         sx={{
-                          width: 78,
-                          height: 78,
-                          borderRadius: 2,
+                          width: 64,
+                          height: 64,
+                          borderRadius: '12px',
                           border: activeImageIndex === idx ? '2px solid #6366f1' : '1px solid rgba(255,255,255,0.1)',
                           overflow: 'hidden',
                           cursor: 'pointer',
-                          opacity: activeImageIndex === idx ? 1 : 0.78,
+                          opacity: activeImageIndex === idx ? 1 : 0.6,
                           transition: 'all 0.2s',
                           flexShrink: 0,
+                          '&:hover': { opacity: 1 },
                         }}
                       >
-                        <Box component="img" src={img} alt={`${selectedProduct.name}-${idx}`} loading="lazy" sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', backgroundColor: '#0b152c' }} />
+                        <Box 
+                          component="img" 
+                          src={img} 
+                          alt={`${selectedProduct.name}-${idx}`} 
+                          loading="lazy" 
+                          sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} 
+                        />
                       </Box>
                     ))}
                   </Box>
                 )}
               </Box>
             ) : (
-              <Box sx={{ height: 220, borderRadius: 2, background: 'linear-gradient(145deg, rgba(99,102,241,0.25), rgba(6,182,212,0.2))', border: '1px dashed rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1' }}>
+              <Box sx={{ 
+                height: 200, 
+                borderRadius: '20px', 
+                bgcolor: 'rgba(30,41,59,0.5)',
+                border: '1px dashed rgba(255,255,255,0.15)', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                color: '#64748b' 
+              }}>
                 ไม่มีรูปภาพสินค้า
               </Box>
             )}
           </Box>
 
-          <Box sx={{ p: { xs: 1.5, md: 2 }, borderRadius: 2, border: '1px solid rgba(255,255,255,0.08)', background: 'linear-gradient(145deg, rgba(6,12,26,0.9), rgba(8,18,36,0.9))', boxShadow: '0 18px 42px rgba(0,0,0,0.35)', display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Typography variant="body2" sx={{ color: '#94a3b8' }}>
-              {selectedProduct.description}
-            </Typography>
-            <Divider sx={{ borderColor: '#334155' }} />
-
-            <Box>
-              <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1, color: '#f1f5f9' }}>
-                เลือกขนาด
-              </Typography>
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', mb: 1 }}>
-                <Button size="small" variant="outlined" onClick={() => setShowSizeChart(true)} sx={{ borderColor: '#6366f1', color: '#e2e8f0', ml: 1 }}>
-                  ตารางไซส์
-                </Button>
-              </Box>
-              <Box
-                sx={{
-                  display: 'grid',
-                  gridTemplateColumns: { xs: 'repeat(auto-fill, minmax(140px, 1fr))', sm: 'repeat(auto-fill, minmax(150px, 1fr))' },
-                  gap: 1,
-                  pb: 1,
-                }}
-              >
-                {displaySizes.map((size) => {
-                  const basePrice = selectedProduct?.sizePricing?.[size] ?? selectedProduct?.basePrice ?? 0;
-                  const longSleeveFee = selectedProduct.options?.hasLongSleeve && productOptions.isLongSleeve ? 50 : 0;
-                  const price = basePrice + longSleeveFee;
-                  const active = productOptions.size === size;
-                  return (
-                    <Box
-                      key={size}
-                      component="button"
-                      type="button"
-                      onClick={() => setProductOptions({ ...productOptions, size })}
-                      sx={{
-                        all: 'unset',
-                        cursor: 'pointer',
-                        borderRadius: 1.5,
-                        border: active ? '1px solid #6366f1' : '1px solid rgba(255,255,255,0.08)',
-                        bgcolor: active ? 'rgba(99,102,241,0.16)' : 'rgba(255,255,255,0.03)',
-                        boxShadow: active ? '0 0 0 1px rgba(99,102,241,0.18)' : 'none',
-                        padding: '12px 12px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 1,
-                        transition: 'all 0.15s ease',
-                        '&:hover': { borderColor: '#6366f1', transform: 'translateY(-1px)' },
-                      }}
-                    >
-                      <Box sx={{ width: 38, height: 38, borderRadius: 1.5, display: 'grid', placeItems: 'center', bgcolor: active ? 'rgba(99,102,241,0.22)' : 'rgba(255,255,255,0.05)', color: '#e2e8f0', fontWeight: 800 }}>
-                        {size}
-                      </Box>
-                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                        <Typography sx={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.95rem', lineHeight: 1.2 }}>
-                          {price.toLocaleString()}฿
-                        </Typography>
-                        {longSleeveFee > 0 && (
-                          <Typography sx={{ color: '#94a3b8', fontSize: '0.75rem' }}>
-                            +50 แขนยาวรวมแล้ว
-                          </Typography>
-                        )}
-                      </Box>
-                    </Box>
-                  );
-                })}
-              </Box>
-              <Typography variant="caption" sx={{ color: '#94a3b8' }}>
-                {selectedProduct.sizePricing && Object.keys(selectedProduct.sizePricing).length > 0 ? 'เลือกจากการ์ดหรือปัดในแถวเพื่อเห็นทุกไซส์' : 'ฟรีไซส์ · ใช้ราคาเริ่มต้น'}
+          {/* Description */}
+          {selectedProduct.description && (
+            <Box sx={{
+              p: 2,
+              mb: 3,
+              borderRadius: '14px',
+              bgcolor: 'rgba(30,41,59,0.3)',
+              border: '1px solid rgba(255,255,255,0.06)',
+            }}>
+              <Typography sx={{ fontSize: '0.9rem', color: '#94a3b8', lineHeight: 1.6 }}>
+                {selectedProduct.description}
               </Typography>
             </Box>
+          )}
 
-            {(selectedProduct.options?.hasCustomName || selectedProduct.options?.hasCustomNumber || selectedProduct.options?.hasLongSleeve) && (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: '#f1f5f9' }}>
+          {/* Size Selection */}
+          <Box sx={{
+            p: { xs: 2, sm: 2.5 },
+            mb: 2,
+            borderRadius: '18px',
+            bgcolor: 'rgba(30,41,59,0.5)',
+            border: '1px solid rgba(255,255,255,0.08)',
+          }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Box sx={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: '10px',
+                  bgcolor: 'rgba(99,102,241,0.15)',
+                  display: 'grid',
+                  placeItems: 'center',
+                }}>
+                  <Ruler size={18} color="#a5b4fc" />
+                </Box>
+                <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: '#e2e8f0' }}>
+                  เลือกขนาด
+                </Typography>
+              </Box>
+              <Button 
+                size="small" 
+                onClick={() => setShowSizeChart(true)} 
+                sx={{ 
+                  color: '#a5b4fc', 
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  textTransform: 'none',
+                  '&:hover': { bgcolor: 'rgba(99,102,241,0.1)' },
+                }}
+              >
+                ดูตารางไซส์
+              </Button>
+            </Box>
+
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              {displaySizes.map((size) => {
+                const basePrice = selectedProduct?.sizePricing?.[size] ?? selectedProduct?.basePrice ?? 0;
+                const longSleeveFee = selectedProduct.options?.hasLongSleeve && productOptions.isLongSleeve ? 50 : 0;
+                const price = basePrice + longSleeveFee;
+                const active = productOptions.size === size;
+                return (
+                  <Box
+                    key={size}
+                    onClick={() => setProductOptions({ ...productOptions, size })}
+                    sx={{
+                      px: 2,
+                      py: 1.2,
+                      borderRadius: '12px',
+                      border: active ? '2px solid #6366f1' : '1px solid rgba(255,255,255,0.1)',
+                      bgcolor: active ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.03)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      minWidth: 70,
+                      '&:hover': { 
+                        borderColor: active ? '#6366f1' : 'rgba(99,102,241,0.5)',
+                        bgcolor: active ? 'rgba(99,102,241,0.2)' : 'rgba(99,102,241,0.08)',
+                      },
+                    }}
+                  >
+                    <Typography sx={{ fontSize: '1rem', fontWeight: 800, color: active ? '#a5b4fc' : '#e2e8f0' }}>
+                      {size}
+                    </Typography>
+                    <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: active ? '#818cf8' : '#64748b' }}>
+                      ฿{price.toLocaleString()}
+                    </Typography>
+                  </Box>
+                );
+              })}
+            </Box>
+          </Box>
+
+          {/* Additional Options */}
+          {(selectedProduct.options?.hasCustomName || selectedProduct.options?.hasCustomNumber || selectedProduct.options?.hasLongSleeve) && (
+            <Box sx={{
+              p: { xs: 2, sm: 2.5 },
+              mb: 2,
+              borderRadius: '18px',
+              bgcolor: 'rgba(30,41,59,0.5)',
+              border: '1px solid rgba(255,255,255,0.08)',
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
+                <Box sx={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: '10px',
+                  bgcolor: 'rgba(16,185,129,0.15)',
+                  display: 'grid',
+                  placeItems: 'center',
+                }}>
+                  <Tag size={18} color="#6ee7b7" />
+                </Box>
+                <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: '#e2e8f0' }}>
                   ตัวเลือกเพิ่มเติม
                 </Typography>
+              </Box>
 
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {selectedProduct.options?.hasCustomName && (
                   <TextField
-                    label="ชื่อติดเสื้อ (สูงสุด 7 ตัวอักษร ภาษาอังกฤษเท่านั้น)"
+                    label="ชื่อติดเสื้อ (ภาษาอังกฤษ สูงสุด 7 ตัว)"
                     fullWidth
                     value={productOptions.customName}
                     onChange={(e) => setProductOptions({ ...productOptions, customName: normalizeEngName(e.target.value) })}
                     inputProps={{ maxLength: 7 }}
-                    helperText="ระบบจะแปลงเป็นตัวพิมพ์ใหญ่ และจำกัดไม่เกิน 7 ตัว"
-                    sx={{ '& .MuiOutlinedInput-root': { color: '#f1f5f9' }, '& .MuiOutlinedInput-notchedOutline': { borderColor: '#334155' }, '& label': { color: '#94a3b8' } }}
+                    placeholder="เช่น JOHN"
+                    sx={{ 
+                      '& .MuiOutlinedInput-root': { 
+                        color: '#f1f5f9',
+                        borderRadius: '12px',
+                        '& fieldset': { borderColor: 'rgba(255,255,255,0.15)' },
+                        '&:hover fieldset': { borderColor: 'rgba(99,102,241,0.5)' },
+                        '&.Mui-focused fieldset': { borderColor: '#6366f1' },
+                      }, 
+                      '& label': { color: '#64748b' },
+                      '& label.Mui-focused': { color: '#a5b4fc' },
+                    }}
                   />
                 )}
 
                 {selectedProduct.options?.hasCustomNumber && (
                   <TextField
-                    label="หมายเลขเสื้อ (0-99) *ต้องกรอก"
+                    label="หมายเลขเสื้อ (0-99) *จำเป็น"
                     fullWidth
                     value={productOptions.customNumber}
                     onChange={(e) => setProductOptions({ ...productOptions, customNumber: normalizeDigits99(e.target.value) })}
                     inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
-                    sx={{ '& .MuiOutlinedInput-root': { color: '#f1f5f9' }, '& .MuiOutlinedInput-notchedOutline': { borderColor: '#334155' }, '& label': { color: '#94a3b8' } }}
+                    placeholder="เช่น 10"
+                    sx={{ 
+                      '& .MuiOutlinedInput-root': { 
+                        color: '#f1f5f9',
+                        borderRadius: '12px',
+                        '& fieldset': { borderColor: 'rgba(255,255,255,0.15)' },
+                        '&:hover fieldset': { borderColor: 'rgba(99,102,241,0.5)' },
+                        '&.Mui-focused fieldset': { borderColor: '#6366f1' },
+                      }, 
+                      '& label': { color: '#64748b' },
+                      '& label.Mui-focused': { color: '#a5b4fc' },
+                    }}
                   />
                 )}
 
                 {selectedProduct.options?.hasLongSleeve && (
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={productOptions.isLongSleeve}
-                        onChange={(e) => setProductOptions({ ...productOptions, isLongSleeve: e.target.checked })}
-                        color="info"
-                      />
-                    }
-                    label="เลือกแขนยาว (+50)"
-                    sx={{ color: '#e2e8f0', ml: 0 }}
-                  />
-                )}
-
-                {(productOptions.customName || productOptions.customNumber || productOptions.isLongSleeve) && (
-                  <Typography variant="caption" sx={{ color: '#94a3b8' }}>
-                    ระบบจะบันทึกข้อมูลนี้ไปกับคำสั่งซื้อให้อัตโนมัติ{selectedProduct.options?.hasLongSleeve ? ' (+50 เมื่อเปิดแขนยาว)' : ''}
-                  </Typography>
+                  <Box 
+                    onClick={() => setProductOptions({ ...productOptions, isLongSleeve: !productOptions.isLongSleeve })}
+                    sx={{
+                      p: 2,
+                      borderRadius: '12px',
+                      border: productOptions.isLongSleeve ? '2px solid #f59e0b' : '1px solid rgba(255,255,255,0.1)',
+                      bgcolor: productOptions.isLongSleeve ? 'rgba(245,158,11,0.1)' : 'rgba(255,255,255,0.02)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      transition: 'all 0.2s ease',
+                      '&:hover': { borderColor: productOptions.isLongSleeve ? '#f59e0b' : 'rgba(245,158,11,0.5)' },
+                    }}
+                  >
+                    <Box>
+                      <Typography sx={{ fontSize: '0.95rem', fontWeight: 600, color: '#e2e8f0' }}>
+                        แขนยาว
+                      </Typography>
+                      <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>
+                        เพิ่ม ฿50 ต่อตัว
+                      </Typography>
+                    </Box>
+                    <Switch
+                      checked={productOptions.isLongSleeve}
+                      color="warning"
+                      sx={{ pointerEvents: 'none' }}
+                    />
+                  </Box>
                 )}
               </Box>
-            )}
+            </Box>
+          )}
 
-            <Box>
-              <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1, color: '#f1f5f9' }}>
+          {/* Quantity */}
+          <Box sx={{
+            p: { xs: 2, sm: 2.5 },
+            mb: 2,
+            borderRadius: '18px',
+            bgcolor: 'rgba(30,41,59,0.5)',
+            border: '1px solid rgba(255,255,255,0.08)',
+          }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: '#e2e8f0' }}>
                 จำนวน
               </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                bgcolor: 'rgba(255,255,255,0.05)',
+                borderRadius: '14px',
+                border: '1px solid rgba(255,255,255,0.1)',
+              }}>
                 <IconButton
-                  size="small"
                   onClick={() => setProductOptions({ ...productOptions, quantity: clampQty(productOptions.quantity - 1) })}
-                  sx={{ bgcolor: '#334155', color: '#f1f5f9' }}
+                  sx={{ color: '#94a3b8', p: 1.5, '&:hover': { color: '#f1f5f9' } }}
                 >
-                  <Minus size={18} />
+                  <Minus size={20} />
                 </IconButton>
-                <TextField
-                  type="number"
-                  size="small"
-                  value={productOptions.quantity}
-                  onChange={(e) => setProductOptions({ ...productOptions, quantity: clampQty(parseInt(e.target.value) || 1) })}
-                  inputProps={{ min: 1, style: { textAlign: 'center', color: '#f1f5f9' } }}
-                  sx={{ width: 90, '& .MuiOutlinedInput-notchedOutline': { borderColor: '#334155' } }}
-                />
+                <Typography sx={{ 
+                  color: '#f1f5f9', 
+                  minWidth: 48, 
+                  textAlign: 'center',
+                  fontWeight: 800,
+                  fontSize: '1.1rem',
+                }}>
+                  {productOptions.quantity}
+                </Typography>
                 <IconButton
-                  size="small"
                   onClick={() => setProductOptions({ ...productOptions, quantity: clampQty(productOptions.quantity + 1) })}
-                  sx={{ bgcolor: '#334155', color: '#f1f5f9' }}
+                  sx={{ color: '#94a3b8', p: 1.5, '&:hover': { color: '#f1f5f9' } }}
                 >
-                  <Plus size={18} />
+                  <Plus size={20} />
                 </IconButton>
               </Box>
             </Box>
           </Box>
+        </Box>
 
-          <Box sx={{ p: 2.5, pt: 2, borderTop: '1px solid rgba(255,255,255,0.08)', background: 'rgba(11,17,32,0.9)', display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 1 }}>
-            <Button
-              onClick={() => setProductDialogOpen(false)}
-              variant="outlined"
-              sx={{ color: '#f1f5f9', borderColor: '#334155' }}
-            >
-              ยกเลิก
-            </Button>
+        {/* Bottom Actions */}
+        <Box sx={{
+          px: { xs: 2, sm: 3 },
+          py: 2,
+          borderTop: '1px solid rgba(255,255,255,0.08)',
+          background: 'linear-gradient(180deg, rgba(15,23,42,0.98) 0%, rgba(10,15,26,0.98) 100%)',
+          backdropFilter: 'blur(20px)',
+          paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
+        }}>
+          {/* Price Summary */}
+          <Box sx={{
+            p: 2,
+            mb: 2,
+            borderRadius: '14px',
+            bgcolor: 'rgba(16,185,129,0.08)',
+            border: '1px solid rgba(16,185,129,0.2)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}>
+            <Box>
+              <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>ราคารวม</Typography>
+              <Typography sx={{ fontSize: '1.5rem', fontWeight: 900, color: '#10b981' }}>
+                ฿{getCurrentPrice().toLocaleString()}
+              </Typography>
+            </Box>
+            <Box sx={{ textAlign: 'right' }}>
+              <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>
+                {productOptions.size} × {productOptions.quantity}
+              </Typography>
+              {productOptions.isLongSleeve && (
+                <Typography sx={{ fontSize: '0.7rem', color: '#fbbf24' }}>+ แขนยาว</Typography>
+              )}
+            </Box>
+          </Box>
+
+          {/* Action Buttons */}
+          <Box sx={{ display: 'flex', gap: 1.5 }}>
             <Button
               onClick={handleAddToCart}
-              variant="contained"
               disabled={!isShopOpen}
               startIcon={<ShoppingCart size={18} />}
-              sx={{ background: 'linear-gradient(135deg, #6366f1 0%, #06b6d4 100%)', fontWeight: 800 }}
+              sx={{
+                flex: 1,
+                py: 1.5,
+                borderRadius: '14px',
+                bgcolor: 'rgba(99,102,241,0.15)',
+                border: '1px solid rgba(99,102,241,0.3)',
+                color: isShopOpen ? '#a5b4fc' : '#64748b',
+                fontSize: '0.9rem',
+                fontWeight: 700,
+                textTransform: 'none',
+                '&:hover': { bgcolor: 'rgba(99,102,241,0.25)' },
+                '&:disabled': { color: '#64748b', borderColor: 'rgba(100,116,139,0.3)' },
+              }}
             >
               เพิ่มลงตะกร้า
             </Button>
             <Button
               onClick={handleBuyNow}
-              variant="contained"
               disabled={!isShopOpen}
               startIcon={<Zap size={18} />}
-              sx={{ background: 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)', fontWeight: 800, boxShadow: '0 12px 32px rgba(16,185,129,0.35)' }}
+              sx={{
+                flex: 1.2,
+                py: 1.5,
+                borderRadius: '14px',
+                background: isShopOpen 
+                  ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                  : 'rgba(100,116,139,0.2)',
+                color: isShopOpen ? 'white' : '#64748b',
+                fontSize: '0.9rem',
+                fontWeight: 700,
+                textTransform: 'none',
+                boxShadow: isShopOpen ? '0 4px 20px rgba(16,185,129,0.3)' : 'none',
+                '&:hover': {
+                  background: isShopOpen 
+                    ? 'linear-gradient(135deg, #059669 0%, #047857 100%)'
+                    : 'rgba(100,116,139,0.3)',
+                },
+                '&:disabled': { background: 'rgba(100,116,139,0.2)', color: '#64748b' },
+              }}
             >
               ซื้อเลย
             </Button>
@@ -1058,26 +1332,15 @@ export default function HomePage() {
           onClose={() => setProductDialogOpen(false)}
           PaperProps={{
             sx: {
-              width: '100%',
-              maxWidth: '100%',
-              display: 'flex',
-              justifyContent: 'center',
-              bgcolor: 'rgba(10,14,26,0.95)',
-              color: '#f1f5f9',
-              borderTopLeftRadius: 16,
-              borderTopRightRadius: 16,
-              borderRadius: 0,
-              border: '1px solid rgba(255,255,255,0.12)',
-              boxShadow: '-18px 0 60px rgba(0,0,0,0.45)',
-              backdropFilter: 'blur(18px)',
-              maxHeight: '88vh',
-              overflowY: 'auto',
-              overflowX: 'hidden',
-              WebkitOverflowScrolling: 'touch',
-              p: { xs: 0, md: 1.5 },
-              zIndex: (theme) => theme.zIndex.modal + 40,
+              height: '92vh',
+              maxHeight: '92vh',
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              bgcolor: '#0a0f1a',
+              overflow: 'hidden',
             },
           }}
+          sx={{ zIndex: 8000 }}
         >
           {productContent}
         </Drawer>
@@ -1085,30 +1348,22 @@ export default function HomePage() {
     }
 
     return (
-      <Dialog
+      <Drawer
+        anchor="right"
         open={productDialogOpen}
         onClose={() => setProductDialogOpen(false)}
-        maxWidth="lg"
-        fullWidth
-        sx={{ '& .MuiDialog-container': { alignItems: 'center' } }}
         PaperProps={{
           sx: {
-            bgcolor: 'rgba(10,14,26,0.95)',
-            color: '#f1f5f9',
-            borderRadius: 2,
-            border: '1px solid rgba(255,255,255,0.12)',
-            boxShadow: '0 30px 80px rgba(0,0,0,0.6)',
-            backdropFilter: 'blur(18px)',
-            width: 'min(1100px, calc(100% - 48px))',
-            mx: 'auto',
-            my: { xs: 2, md: 4 },
-            maxHeight: 'calc(100vh - 64px)',
-            zIndex: (theme) => theme.zIndex.modal + 40,
+            width: '100%',
+            maxWidth: 520,
+            bgcolor: '#0a0f1a',
+            overflow: 'hidden',
           },
         }}
+        sx={{ zIndex: 8000 }}
       >
         {productContent}
-      </Dialog>
+      </Drawer>
     );
   };
   const historyFilters = useMemo(
@@ -1148,7 +1403,16 @@ export default function HomePage() {
 
       if (res.status === 'success') {
         showToast('success', 'ยกเลิกคำสั่งซื้อแล้ว');
-        await loadOrderHistory();
+        // Update local state immediately for instant UI feedback
+        setOrderHistory((prev) =>
+          prev.map((order) =>
+            order.ref === ref ? { ...order, status: 'CANCELLED' } : order
+          )
+        );
+        // Also refresh from server in background to ensure data consistency
+        setTimeout(() => {
+          loadOrderHistory();
+        }, 500);
       } else {
         showToast('error', res.message || 'ยกเลิกคำสั่งซื้อไม่สำเร็จ');
       }
@@ -1205,6 +1469,28 @@ export default function HomePage() {
 
       if (res.status === 'success') {
         showToast('success', `สั่งซื้อสำเร็จ หมายเลข: ${res.ref}`);
+        
+        // Add new order to history immediately with full item details
+        if (res.ref) {
+          const newOrder: OrderHistory = {
+            ref: res.ref,
+            status: 'PENDING',
+            date: new Date().toISOString(),
+            total: getTotalPrice(),
+            items: cart.map((item) => ({
+              productId: item.productId,
+              name: item.productName,
+              size: item.size,
+              qty: item.quantity,
+              customName: item.options.customName,
+              isLongSleeve: item.options.isLongSleeve,
+              unitPrice: item.unitPrice,
+              subtotal: item.unitPrice * item.quantity,
+            })),
+          };
+          setOrderHistory((prev) => [newOrder, ...prev]);
+        }
+        
         setCart([]);
         if (session?.user?.email) {
           saveCartApi(session.user.email, []).catch((err) => console.error('Failed to clear saved cart', err));
@@ -1308,9 +1594,12 @@ export default function HomePage() {
     } else if (tab === 'history') {
       setShowHistoryDialog(true);
       setShowCart(false);
-      setHistoryCursor(null);
-      setHistoryHasMore(false);
-      loadOrderHistory();
+      // Only load if history is empty (first time or needs refresh)
+      if (orderHistory.length === 0) {
+        setHistoryCursor(null);
+        setHistoryHasMore(false);
+        loadOrderHistory();
+      }
     } else if (tab === 'profile') {
       setSidebarOpen(false);
       setShowProfileModal(true);
@@ -1637,33 +1926,80 @@ export default function HomePage() {
           )}
         </Toolbar>
         {showSearchBar && (
-          <Box sx={{ px: { xs: 2, md: 3 }, pb: 1.5, pt: 0.5 }}>
-            <TextField
-              autoFocus
-              size="small"
-              value={productSearch}
-              onChange={(e) => setProductSearch(e.target.value)}
-              placeholder="ค้นหาชื่อสินค้า"
-              inputProps={{ maxLength: 50 }}
-              fullWidth
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  color: '#e2e8f0',
-                  background: 'rgba(15,23,42,0.9)',
-                  borderRadius: 1.5,
-                },
-                '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.12)' },
-                '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#6366f1' },
-                '& .MuiInputBase-input::placeholder': { color: '#94a3b8', opacity: 1 },
-              }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Search size={18} color="#94a3b8" />
-                  </InputAdornment>
-                ),
-              }}
-            />
+          <Box sx={{ px: { xs: 2, md: 3 }, pb: 2, pt: 1 }}>
+            <Box sx={{
+              p: 2,
+              borderRadius: '16px',
+              bgcolor: 'rgba(15,23,42,0.95)',
+              border: '1px solid rgba(99,102,241,0.2)',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+            }}>
+              <TextField
+                autoFocus
+                size="small"
+                value={productSearch}
+                onChange={(e) => setProductSearch(e.target.value)}
+                placeholder="ค้นหาชื่อสินค้า, ประเภท..."
+                inputProps={{ maxLength: 50 }}
+                fullWidth
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    color: '#e2e8f0',
+                    background: 'rgba(30,41,59,0.5)',
+                    borderRadius: '12px',
+                    '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
+                    '&:hover fieldset': { borderColor: 'rgba(99,102,241,0.5)' },
+                    '&.Mui-focused fieldset': { borderColor: '#6366f1' },
+                  },
+                  '& .MuiInputBase-input::placeholder': { color: '#64748b', opacity: 1 },
+                }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Search size={18} color="#6366f1" />
+                    </InputAdornment>
+                  ),
+                  endAdornment: productSearch && (
+                    <InputAdornment position="end">
+                      <IconButton size="small" onClick={() => setProductSearch('')} sx={{ color: '#64748b' }}>
+                        <X size={16} />
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+              />
+              
+              {/* Quick Filters */}
+              {productSearch && (
+                <Box sx={{ mt: 1.5, display: 'flex', flexWrap: 'wrap', gap: 0.8 }}>
+                  {Object.entries(TYPE_LABELS).slice(0, 4).map(([key, label]) => (
+                    <Chip
+                      key={key}
+                      label={label}
+                      size="small"
+                      onClick={() => setProductSearch(label)}
+                      sx={{
+                        bgcolor: productSearch.includes(label) ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.05)',
+                        color: productSearch.includes(label) ? '#a5b4fc' : '#94a3b8',
+                        border: '1px solid',
+                        borderColor: productSearch.includes(label) ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.1)',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        '&:hover': { bgcolor: 'rgba(99,102,241,0.15)' },
+                      }}
+                    />
+                  ))}
+                </Box>
+              )}
+
+              {/* Search Results Count */}
+              {productSearch && (
+                <Typography sx={{ mt: 1.5, fontSize: '0.75rem', color: '#64748b' }}>
+                  พบ {Object.values(filteredGroupedProducts).flat().length} รายการ
+                </Typography>
+              )}
+            </Box>
           </Box>
         )}
       </AppBar>
@@ -1811,17 +2147,116 @@ export default function HomePage() {
             
 
             {activeProductCount > 0 && (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mb: 2 }}>
-                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 1, alignItems: { xs: 'stretch', sm: 'center' } }}>
-                  <Typography variant="body2" sx={{ color: '#94a3b8' }}>
-                    พบสินค้า {filteredProductCount} / {activeProductCount}
-                  </Typography>
-                  <Box sx={{ flex: 1 }} />
+              <Box sx={{ mb: 3 }}>
+                {/* Modern Filter Bar */}
+                <Box sx={{
+                  p: 2,
+                  mb: 2,
+                  borderRadius: '18px',
+                  bgcolor: 'rgba(15,23,42,0.8)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  backdropFilter: 'blur(10px)',
+                }}>
+                  {/* Search and Stats Row */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <Box sx={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: '10px',
+                        bgcolor: 'rgba(99,102,241,0.15)',
+                        display: 'grid',
+                        placeItems: 'center',
+                      }}>
+                        <Store size={18} color="#a5b4fc" />
+                      </Box>
+                      <Box>
+                        <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#e2e8f0' }}>
+                          สินค้าทั้งหมด
+                        </Typography>
+                        <Typography sx={{ fontSize: '0.7rem', color: '#64748b' }}>
+                          พบ {filteredProductCount} จาก {activeProductCount} รายการ
+                        </Typography>
+                      </Box>
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <IconButton 
+                        onClick={() => setShowSearchBar(!showSearchBar)}
+                        sx={{ 
+                          color: showSearchBar ? '#6366f1' : '#94a3b8',
+                          bgcolor: showSearchBar ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.05)',
+                        }}
+                      >
+                        <Search size={18} />
+                      </IconButton>
+                    </Box>
+                  </Box>
+
+                  {/* Category Chips */}
+                  <Box sx={{
+                    display: 'flex',
+                    gap: 0.8,
+                    flexWrap: 'nowrap',
+                    overflowX: 'auto',
+                    pb: 0.5,
+                    mx: -1,
+                    px: 1,
+                    '&::-webkit-scrollbar': { display: 'none' },
+                  }}>
+                    {categoryMeta.map((cat) => {
+                      const active = categoryFilter === cat.key;
+                      return (
+                        <Box
+                          key={cat.key}
+                          onClick={() => setCategoryFilter(cat.key)}
+                          sx={{
+                            px: 1.8,
+                            py: 0.8,
+                            borderRadius: '12px',
+                            bgcolor: active ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.04)',
+                            border: active ? '1px solid rgba(99,102,241,0.5)' : '1px solid rgba(255,255,255,0.06)',
+                            color: active ? '#a5b4fc' : '#94a3b8',
+                            fontSize: '0.8rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap',
+                            transition: 'all 0.2s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 0.8,
+                            '&:hover': {
+                              bgcolor: active ? 'rgba(99,102,241,0.25)' : 'rgba(255,255,255,0.08)',
+                              borderColor: active ? 'rgba(99,102,241,0.6)' : 'rgba(255,255,255,0.12)',
+                            },
+                          }}
+                        >
+                          {cat.label}
+                          <Box sx={{
+                            px: 0.7,
+                            py: 0.1,
+                            borderRadius: '6px',
+                            bgcolor: active ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.08)',
+                            fontSize: '0.65rem',
+                            fontWeight: 700,
+                          }}>
+                            {cat.count}
+                          </Box>
+                        </Box>
+                      );
+                    })}
+                  </Box>
+
+                  {/* Price Range Filter */}
                   {priceBounds.max > 0 && priceBounds.max !== priceBounds.min && (
-                    <Box sx={{ minWidth: { xs: '100%', sm: 320 }, maxWidth: 420 }}>
-                      <Typography variant="caption" sx={{ color: '#94a3b8' }}>
-                        กรองราคา: {priceRange[0].toLocaleString()}฿ - {priceRange[1].toLocaleString()}฿
-                      </Typography>
+                    <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                        <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8' }}>
+                          กรองตามราคา
+                        </Typography>
+                        <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: '#10b981' }}>
+                          ฿{priceRange[0].toLocaleString()} - ฿{priceRange[1].toLocaleString()}
+                        </Typography>
+                      </Box>
                       <Slider
                         value={priceRange}
                         min={priceBounds.min}
@@ -1831,51 +2266,20 @@ export default function HomePage() {
                         valueLabelDisplay="off"
                         sx={{
                           color: '#6366f1',
-                          '& .MuiSlider-track': { border: 'none' },
+                          height: 6,
+                          '& .MuiSlider-track': { border: 'none', bgcolor: '#6366f1' },
+                          '& .MuiSlider-rail': { bgcolor: 'rgba(255,255,255,0.1)' },
                           '& .MuiSlider-thumb': {
-                            backgroundColor: '#e2e8f0',
+                            width: 18,
+                            height: 18,
+                            backgroundColor: '#fff',
                             border: '2px solid #6366f1',
+                            '&:hover': { boxShadow: '0 0 0 8px rgba(99,102,241,0.16)' },
                           },
                         }}
                       />
                     </Box>
                   )}
-                </Box>
-                <Box
-                  sx={{
-                    display: 'flex',
-                    gap: 0.75,
-                    flexWrap: 'nowrap',
-                    overflowX: 'auto',
-                    pb: 0.5,
-                    maskImage: 'linear-gradient(to right, transparent, black 12px, black 90%, transparent)',
-                    WebkitOverflowScrolling: 'touch',
-                  }}
-                >
-                  {categoryMeta.map((cat) => {
-                    const active = categoryFilter === cat.key;
-                    return (
-                      <Button
-                        key={cat.key}
-                        variant={active ? 'contained' : 'outlined'}
-                        size="small"
-                        onClick={() => setCategoryFilter(cat.key)}
-                        sx={{
-                          borderRadius: 1.2,
-                          borderColor: active ? 'transparent' : 'rgba(99,102,241,0.35)',
-                          background: active ? 'linear-gradient(135deg, #6366f1 0%, #06b6d4 100%)' : 'rgba(15,23,42,0.65)',
-                          color: active ? '#0b1120' : '#e2e8f0',
-                          fontWeight: 700,
-                          textTransform: 'none',
-                          px: 1.3,
-                          whiteSpace: 'nowrap',
-                          minWidth: 'max-content',
-                        }}
-                      >
-                        {cat.label} ({cat.count})
-                      </Button>
-                    );
-                  })}
                 </Box>
               </Box>
             )}
@@ -1883,16 +2287,30 @@ export default function HomePage() {
             {config?.products && Object.keys(filteredGroupedProducts).length > 0 ? (
               Object.entries(filteredGroupedProducts).map(([type, items]) => (
                 <Box key={type} sx={{ mb: 4 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                    <Chip label={TYPE_LABELS[type] || type || 'อื่นๆ'} color="primary" variant="outlined" sx={{ fontWeight: 700 }} />
-                    <Typography variant="h6" sx={{ color: '#e2e8f0', fontWeight: 800 }}>{TYPE_LABELS[type] || type || 'อื่นๆ'}</Typography>
-                    <Typography variant="body2" sx={{ color: '#94a3b8' }}>{items.length === 1 ? 'สินค้า 1 รายการ' : `สินค้า ${items.length} รายการ`}</Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
+                    <Box sx={{
+                      px: 1.5,
+                      py: 0.6,
+                      borderRadius: '10px',
+                      background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                    }}>
+                      <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: 'white' }}>
+                        {TYPE_LABELS[type] || type || 'อื่นๆ'}
+                      </Typography>
+                    </Box>
+                    <Typography sx={{ fontSize: '0.85rem', color: '#64748b' }}>
+                      {items.length} รายการ
+                    </Typography>
                   </Box>
-                  <Grid container spacing={3}>
+                  <Grid container spacing={2}>
                     {items.map((product) => (
-                      <Grid size={{ xs: 12, sm: 6, md: 4 }} key={product.id}>
-                        <Card
+                      <Grid size={{ xs: 6, sm: 6, md: 4, lg: 3 }} key={product.id}>
+                        <Box
                           onClick={() => {
+                            if (!isShopOpen) {
+                              showToast('warning', 'ร้านค้าปิดชั่วคราว ไม่สามารถสั่งซื้อได้');
+                              return;
+                            }
                             setSelectedProduct(product);
                             setProductDialogOpen(true);
                           }}
@@ -1901,78 +2319,147 @@ export default function HomePage() {
                             display: 'flex',
                             flexDirection: 'column',
                             cursor: 'pointer',
-                            background: 'linear-gradient(150deg, rgba(14,19,33,0.95), rgba(15,23,42,0.9))',
-                            border: '1px solid rgba(99,102,241,0.18)',
-                            borderRadius: 1.5,
+                            borderRadius: '20px',
                             overflow: 'hidden',
-                            boxShadow: '0 14px 34px rgba(0,0,0,0.28)',
-                            transition: 'transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease',
+                            bgcolor: 'rgba(15,23,42,0.8)',
+                            border: '1px solid rgba(255,255,255,0.08)',
+                            transition: 'all 0.25s ease',
                             '&:hover': {
                               transform: 'translateY(-4px)',
-                              boxShadow: '0 18px 38px rgba(99,102,241,0.24)',
-                              borderColor: '#6366f1',
+                              boxShadow: '0 20px 40px rgba(99,102,241,0.2)',
+                              borderColor: 'rgba(99,102,241,0.4)',
                             },
                           }}
                         >
-                          <CardMedia
-                            component="div"
-                            sx={{
-                              position: 'relative',
-                              bgcolor: '#0b1224',
-                              backgroundImage: product.images?.[0] ? `url(${product.images[0]})` : undefined,
-                              backgroundSize: 'cover',
-                              backgroundPosition: 'center',
-                              aspectRatio: '4 / 3',
-                              minHeight: 200,
-                              borderBottom: '1px solid rgba(255,255,255,0.06)',
-                            }}
-                          >
+                          {/* Product Image */}
+                          <Box sx={{
+                            position: 'relative',
+                            aspectRatio: '1 / 1',
+                            bgcolor: '#0b1224',
+                            backgroundImage: product.images?.[0] ? `url(${product.images[0]})` : undefined,
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
+                          }}>
                             {!product.images?.[0] && (
-                              <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#cbd5e1', fontWeight: 700 }}>
-                                ไม่มีภาพสินค้า
+                              <Box sx={{ 
+                                position: 'absolute', 
+                                inset: 0, 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'center', 
+                                color: '#475569',
+                                fontSize: '0.8rem',
+                              }}>
+                                ไม่มีรูป
                               </Box>
                             )}
-                            <Box sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, p: 1.5, background: 'linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.75) 100%)', display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                              <Chip label={product.type || 'OTHER'} size="small" sx={{ bgcolor: '#0ea5e9', color: 'white', fontWeight: 700 }} />
-                              {product.options?.hasLongSleeve && <Chip label="แขนยาว" size="small" sx={{ bgcolor: 'rgba(255,255,255,0.15)', color: '#e2e8f0' }} />}
-                              {product.options?.hasCustomName && <Chip label="ชื่อบนเสื้อ" size="small" sx={{ bgcolor: 'rgba(255,255,255,0.15)', color: '#e2e8f0' }} />}
+                            {/* Overlay badges */}
+                            <Box sx={{ 
+                              position: 'absolute', 
+                              top: 8, 
+                              left: 8, 
+                              display: 'flex', 
+                              flexDirection: 'column', 
+                              gap: 0.5 
+                            }}>
+                              {product.options?.hasLongSleeve && (
+                                <Box sx={{
+                                  px: 0.8,
+                                  py: 0.3,
+                                  borderRadius: '6px',
+                                  bgcolor: 'rgba(245,158,11,0.9)',
+                                  fontSize: '0.6rem',
+                                  fontWeight: 700,
+                                  color: 'white',
+                                }}>
+                                  แขนยาว
+                                </Box>
+                              )}
+                              {product.options?.hasCustomName && (
+                                <Box sx={{
+                                  px: 0.8,
+                                  py: 0.3,
+                                  borderRadius: '6px',
+                                  bgcolor: 'rgba(16,185,129,0.9)',
+                                  fontSize: '0.6rem',
+                                  fontWeight: 700,
+                                  color: 'white',
+                                }}>
+                                  สกรีนชื่อ
+                                </Box>
+                              )}
                             </Box>
-                          </CardMedia>
-                          <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                            <Typography variant="h6" sx={{ fontWeight: 800, color: '#f8fafc', letterSpacing: 0.1 }}>
-                              {product.name}
-                            </Typography>
-                            <Typography variant="body2" sx={{ color: '#cbd5e1', minHeight: 44 }}>
-                              {product.description}
-                            </Typography>
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start' }}>
-                              <Typography variant="h6" sx={{ color: '#10b981', fontWeight: 900 }}>
-                                {product.basePrice.toLocaleString()}฿
+                            {/* Price badge */}
+                            <Box sx={{
+                              position: 'absolute',
+                              bottom: 8,
+                              right: 8,
+                              px: 1.2,
+                              py: 0.5,
+                              borderRadius: '10px',
+                              bgcolor: 'rgba(0,0,0,0.7)',
+                              backdropFilter: 'blur(8px)',
+                            }}>
+                              <Typography sx={{ fontSize: '0.9rem', fontWeight: 800, color: '#10b981' }}>
+                                ฿{product.basePrice.toLocaleString()}
                               </Typography>
                             </Box>
-                          </CardContent>
-                          <Box sx={{ p: 2, pt: 0 }}>
-                            <Button
-                              variant="contained"
-                              fullWidth
-                              startIcon={<ShoppingCart size={18} />}
-                              disabled={!isShopOpen}
-                              sx={{
-                                background: isShopOpen ? 'linear-gradient(135deg, #6366f1 0%, #06b6d4 100%)' : 'linear-gradient(135deg, #475569 0%, #334155 100%)',
-                                fontWeight: 800,
-                                borderRadius: 1.5,
-                                py: 1.1,
-                                boxShadow: '0 10px 26px rgba(99, 102, 241, 0.28)',
-                                '&:hover': {
-                                  background: isShopOpen ? 'linear-gradient(135deg, #5458e9 0%, #05a2c2 100%)' : 'linear-gradient(135deg, #475569 0%, #334155 100%)',
-                                  boxShadow: isShopOpen ? '0 12px 30px rgba(99, 102, 241, 0.36)' : '0 10px 24px rgba(51,65,85,0.32)',
-                                },
-                              }}
-                            >
-                              {isShopOpen ? 'สั่งซื้อ' : 'ปิดบริการ'}
-                            </Button>
                           </Box>
-                        </Card>
+
+                          {/* Product Info */}
+                          <Box sx={{ p: 1.5, flex: 1, display: 'flex', flexDirection: 'column' }}>
+                            <Typography sx={{ 
+                              fontSize: { xs: '0.85rem', sm: '0.9rem' }, 
+                              fontWeight: 700, 
+                              color: '#f1f5f9',
+                              mb: 0.5,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                              lineHeight: 1.3,
+                            }}>
+                              {product.name}
+                            </Typography>
+                            <Typography sx={{ 
+                              fontSize: '0.7rem', 
+                              color: '#64748b',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              mb: 1,
+                            }}>
+                              {product.description || TYPE_LABELS[product.type] || product.type}
+                            </Typography>
+                            
+                            {/* Quick Add Button */}
+                            <Box sx={{ mt: 'auto' }}>
+                              <Button
+                                fullWidth
+                                disabled={!isShopOpen}
+                                sx={{
+                                  py: 0.8,
+                                  borderRadius: '10px',
+                                  background: isShopOpen 
+                                    ? 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' 
+                                    : 'rgba(100,116,139,0.2)',
+                                  color: isShopOpen ? 'white' : '#64748b',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 700,
+                                  textTransform: 'none',
+                                  '&:hover': {
+                                    background: isShopOpen 
+                                      ? 'linear-gradient(135deg, #5558e8 0%, #7c3aed 100%)' 
+                                      : 'rgba(100,116,139,0.2)',
+                                  },
+                                }}
+                              >
+                                {isShopOpen ? 'ดูรายละเอียด' : 'ปิดบริการ'}
+                              </Button>
+                            </Box>
+                          </Box>
+                        </Box>
                       </Grid>
                     ))}
                   </Grid>
@@ -2084,8 +2571,18 @@ export default function HomePage() {
         registerOpener={(opener) => {
           paymentOpenerRef.current = opener;
         }}
-        onPaymentSuccess={() => {
-          loadOrderHistory();
+        onPaymentSuccess={(ref) => {
+          // Update local state instead of reloading from server
+          setOrderHistory((prev) => {
+            const orderExists = prev.some((order) => order.ref === ref);
+            if (orderExists) {
+              return prev.map((order) =>
+                order.ref === ref ? { ...order, status: 'VERIFYING' } : order
+              );
+            }
+            // If order doesn't exist in history yet, add it
+            return [{ ref, status: 'VERIFYING', date: new Date().toISOString(), total: 0 }, ...prev];
+          });
           setActiveTab('history');
           showToast('success', 'บันทึกการชำระเงินแล้ว');
         }}
@@ -2099,241 +2596,734 @@ export default function HomePage() {
         />
       )}
 
+      {/* ===== Cart Drawer - Modern Design ===== */}
       <Drawer
         anchor="bottom"
         open={showCart}
         onClose={() => setShowCart(false)}
         PaperProps={{
           sx: {
-            bgcolor: 'rgba(15,23,42,0.92)',
-            color: '#f1f5f9',
-            borderTopLeftRadius: 16,
-            borderTopRightRadius: 16,
-            maxHeight: '80vh',
-            display: 'block',
-            backdropFilter: 'blur(18px)',
+            height: { xs: '90vh', sm: '80vh' },
+            maxHeight: '90vh',
+            borderTopLeftRadius: { xs: 20, sm: 24 },
+            borderTopRightRadius: { xs: 20, sm: 24 },
+            bgcolor: '#0a0f1a',
+            overflow: 'hidden',
           },
         }}
       >
-        <Box sx={{ p: 2 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6" sx={{ fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
-              <ShoppingCart size={24} />
-              ตะกร้าสินค้า
-            </Typography>
-            <IconButton onClick={() => setShowCart(false)} sx={{ color: '#f1f5f9' }}>
-              <X size={24} />
-            </IconButton>
-          </Box>
-          <Divider sx={{ mb: 2, borderColor: '#334155' }} />
-
-          {cart.length === 0 ? (
-            <Box sx={{ textAlign: 'center', py: 4 }}>
-              <ShoppingCart size={48} style={{ color: '#64748b', marginBottom: 16 }} />
-              <Typography sx={{ color: '#94a3b8' }}>ตะกร้าว่างเปล่า</Typography>
-            </Box>
-          ) : (
-            <>
-              <Box sx={{ maxHeight: '40vh', overflow: 'auto', mb: 2 }}>
-                {cart.map((item) => (
-                  <Box key={item.id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, pb: 2, borderBottom: '1px solid #334155' }}>
-                    <Box sx={{ flex: 1 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#f1f5f9' }}>
-                        {item.productName}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: '#94a3b8' }}>
-                        {item.size} × {item.quantity}
-                      </Typography>
-                      {(item.options.customName || item.options.customNumber || item.options.isLongSleeve) && (
-                        <Typography variant="caption" sx={{ color: '#cbd5e1', display: 'block' }}>
-                          {item.options.customName && `ชื่อ: ${item.options.customName}`} {item.options.customNumber && `เบอร์: ${item.options.customNumber}`} {item.options.isLongSleeve && '(แขนยาว)'}
-                        </Typography>
-                      )}
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
-                        <IconButton
-                          size="small"
-                          onClick={() => updateCartQuantity(item.id, item.quantity - 1)}
-                          onMouseDown={() => startCartHold(item.id, -1)}
-                          onMouseUp={() => stopCartHold(item.id)}
-                          onMouseLeave={() => stopCartHold(item.id)}
-                          onTouchStart={() => startCartHold(item.id, -1)}
-                          onTouchEnd={() => stopCartHold(item.id)}
-                          sx={{ bgcolor: '#334155', color: '#f1f5f9' }}
-                        >
-                          <Minus size={14} />
-                        </IconButton>
-                        <Typography sx={{ color: '#f1f5f9', minWidth: 20, textAlign: 'center' }}>{item.quantity}</Typography>
-                        <IconButton
-                          size="small"
-                          onClick={() => updateCartQuantity(item.id, item.quantity + 1)}
-                          onMouseDown={() => startCartHold(item.id, 1)}
-                          onMouseUp={() => stopCartHold(item.id)}
-                          onMouseLeave={() => stopCartHold(item.id)}
-                          onTouchStart={() => startCartHold(item.id, 1)}
-                          onTouchEnd={() => stopCartHold(item.id)}
-                          sx={{ bgcolor: '#334155', color: '#f1f5f9' }}
-                        >
-                          <Plus size={14} />
-                        </IconButton>
-                      </Box>
-                    </Box>
-                    <Box sx={{ textAlign: 'right' }}>
-                      <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#10b981' }}>
-                        {(item.unitPrice * item.quantity).toLocaleString()}฿
-                      </Typography>
-                      <IconButton size="small" onClick={() => removeFromCart(item.id)} sx={{ color: '#ef4444', mt: 0.5 }}>
-                        <X size={16} />
-                      </IconButton>
-                    </Box>
-                  </Box>
-                ))}
+        {/* Header */}
+        <Box sx={{
+          px: { xs: 2, sm: 3 },
+          py: { xs: 1.5, sm: 2 },
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          background: 'linear-gradient(180deg, rgba(15,23,42,0.98) 0%, rgba(10,15,26,0.98) 100%)',
+          position: 'sticky',
+          top: 0,
+          zIndex: 10,
+        }}>
+          {/* Drag Handle */}
+          <Box sx={{ width: 36, height: 4, bgcolor: 'rgba(255,255,255,0.2)', borderRadius: 2, mx: 'auto', mb: 2 }} />
+          
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box sx={{
+                width: 44,
+                height: 44,
+                borderRadius: '14px',
+                background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                display: 'grid',
+                placeItems: 'center',
+                boxShadow: '0 4px 14px rgba(99,102,241,0.3)',
+              }}>
+                <ShoppingCart size={22} color="white" />
               </Box>
-              <Divider sx={{ my: 2, borderColor: '#334155' }} />
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                <Typography sx={{ fontWeight: 'bold', color: '#f1f5f9' }}>รวมทั้งหมด:</Typography>
-                <Typography sx={{ fontWeight: 'bold', fontSize: 20, color: '#10b981' }}>
-                  {getTotalPrice().toLocaleString()}฿
+              <Box>
+                <Typography sx={{ fontSize: '1.15rem', fontWeight: 800, color: '#f1f5f9' }}>
+                  ตะกร้าสินค้า
+                </Typography>
+                <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>
+                  {cart.length} รายการ · {cart.reduce((sum, item) => sum + item.quantity, 0)} ชิ้น
                 </Typography>
               </Box>
+            </Box>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              {cart.length > 0 && (
+                <Button
+                  size="small"
+                  onClick={() => {
+                    if (confirm('ล้างตะกร้าทั้งหมด?')) {
+                      saveCart([]);
+                      showToast('success', 'ล้างตะกร้าแล้ว');
+                    }
+                  }}
+                  sx={{ 
+                    color: '#ef4444', 
+                    fontSize: '0.75rem',
+                    textTransform: 'none',
+                    '&:hover': { bgcolor: 'rgba(239,68,68,0.1)' },
+                  }}
+                >
+                  ล้างทั้งหมด
+                </Button>
+              )}
+              <IconButton onClick={() => setShowCart(false)} sx={{ color: '#94a3b8', bgcolor: 'rgba(255,255,255,0.05)', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
+                <X size={20} />
+              </IconButton>
+            </Box>
+          </Box>
+        </Box>
+
+        {/* Content */}
+        <Box sx={{ flex: 1, overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          {cart.length === 0 ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 10, gap: 2 }}>
+              <Box sx={{
+                width: 80,
+                height: 80,
+                borderRadius: '50%',
+                bgcolor: 'rgba(100,116,139,0.1)',
+                display: 'grid',
+                placeItems: 'center',
+              }}>
+                <ShoppingCart size={36} style={{ color: '#475569' }} />
+              </Box>
+              <Typography sx={{ color: '#64748b', fontSize: '1rem', fontWeight: 600 }}>ตะกร้าว่างเปล่า</Typography>
+              <Typography sx={{ color: '#475569', fontSize: '0.85rem' }}>เลือกสินค้าที่ต้องการแล้วเพิ่มลงตะกร้า</Typography>
               <Button
-                variant="contained"
-                fullWidth
-                size="large"
-                onClick={() => {
-                  if (!requireProfileBeforeCheckout()) return;
-                  setShowCart(false);
-                  setShowOrderDialog(true);
-                }}
-                disabled={!isShopOpen}
+                onClick={() => { setShowCart(false); setActiveTab('home'); }}
                 sx={{
-                  background: 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)',
-                  fontWeight: 700,
-                  borderRadius: 2,
-                  py: 1.5,
-                  boxShadow: '0 10px 26px rgba(16, 185, 129, 0.32)',
-                  '&:hover': { background: 'linear-gradient(135deg, #0ea472 0%, #0591b5 100%)', boxShadow: '0 12px 30px rgba(16, 185, 129, 0.42)' },
+                  mt: 1,
+                  px: 3,
+                  py: 1,
+                  borderRadius: '12px',
+                  background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                  color: 'white',
+                  fontWeight: 600,
+                  textTransform: 'none',
                 }}
               >
-                ดำเนินการสั่งซื้อ
+                เลือกซื้อสินค้า
               </Button>
-            </>
-          )}
-        </Box>
-      </Drawer>
-
-      {renderProductDialog()}
-
-      <Dialog
-        open={showSizeChart}
-        onClose={() => setShowSizeChart(false)}
-        maxWidth="md"
-        fullWidth
-        fullScreen={isMobile}
-        PaperProps={{
-          sx: {
-            width: { xs: '100%', sm: '92%', md: '960px' },
-            maxWidth: 'calc(100% - 24px)',
-          },
-        }}
-      >
-        <DialogTitle>ตารางไซส์</DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <Typography variant="body2" sx={{ color: '#0f172a' }}>
-            ตารางไซส์พร้อมสัดส่วนรอบอก/ความยาว (นิ้ว) ราคาต่อขนาด; เลือกแขนยาวจะบวกเพิ่ม 50฿/ตัว
-          </Typography>
-
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-            <Chip size="small" label="อก / ความยาว (นิ้ว)" sx={{ bgcolor: '#e2e8f0', color: '#0f172a', borderRadius: 1 }} />
-            <Chip size="small" label="ราคาอัปเดตตามสินค้า" sx={{ bgcolor: '#cbd5e1', color: '#0f172a', borderRadius: 1 }} />
-            <Chip size="small" label="แขนยาว +50฿" sx={{ bgcolor: '#fde68a', color: '#0f172a', borderRadius: 1 }} />
-          </Box>
-
-          {isMobile ? (
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(auto-fill, minmax(150px, 1fr))', sm: 'repeat(auto-fill, minmax(180px, 1fr))' }, gap: 1.5 }}>
-              {SIZE_ORDER.map((size) => {
-                const measurements = SIZE_MEASUREMENTS[size];
-                const row = sizeChartRows.find((r) => r.size === size);
+            </Box>
+          ) : (
+            <Box sx={{ px: { xs: 2, sm: 3 }, py: 2 }}>
+              {cart.map((item, idx) => {
+                const product = config?.products?.find(p => p.id === item.productId);
                 return (
-                  <Paper key={size} sx={{ bgcolor: '#0f172a', border: '1px solid #1f2937', borderRadius: 2, p: 1.5, boxShadow: '0 10px 26px rgba(0,0,0,0.18)' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                      <Chip label={size} size="small" sx={{ bgcolor: '#6366f1', color: 'white', fontWeight: 800 }} />
-                      <Typography sx={{ color: '#10b981', fontWeight: 800 }}>{row ? `${row.price.toLocaleString()}฿` : '—'}</Typography>
+                  <Box
+                    key={item.id}
+                    sx={{
+                      p: 2,
+                      mb: 1.5,
+                      borderRadius: '16px',
+                      bgcolor: 'rgba(30,41,59,0.5)',
+                      border: '1px solid rgba(255,255,255,0.06)',
+                      transition: 'all 0.2s ease',
+                      '&:hover': { bgcolor: 'rgba(30,41,59,0.7)' },
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', gap: 2 }}>
+                      {/* Product Image Thumbnail */}
+                      {product?.images?.[0] && (
+                        <Box sx={{
+                          width: 60,
+                          height: 60,
+                          borderRadius: '12px',
+                          overflow: 'hidden',
+                          flexShrink: 0,
+                          border: '1px solid rgba(255,255,255,0.1)',
+                        }}>
+                          <Box
+                            component="img"
+                            src={product.images[0]}
+                            alt={item.productName}
+                            sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        </Box>
+                      )}
+                      
+                      {/* Product Info */}
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: '#e2e8f0', mb: 0.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {item.productName}
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.6, mb: 1.5 }}>
+                          <Box sx={{
+                            px: 1,
+                            py: 0.2,
+                            borderRadius: '6px',
+                            bgcolor: 'rgba(99,102,241,0.15)',
+                            border: '1px solid rgba(99,102,241,0.3)',
+                          }}>
+                            <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: '#a5b4fc' }}>
+                              {item.size}
+                            </Typography>
+                          </Box>
+                          {item.options.isLongSleeve && (
+                            <Box sx={{
+                              px: 1,
+                              py: 0.2,
+                              borderRadius: '6px',
+                              bgcolor: 'rgba(245,158,11,0.15)',
+                              border: '1px solid rgba(245,158,11,0.3)',
+                            }}>
+                              <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: '#fbbf24' }}>
+                                แขนยาว
+                              </Typography>
+                            </Box>
+                          )}
+                          {item.options.customName && (
+                            <Box sx={{
+                              px: 1,
+                              py: 0.2,
+                              borderRadius: '6px',
+                              bgcolor: 'rgba(16,185,129,0.15)',
+                              border: '1px solid rgba(16,185,129,0.3)',
+                            }}>
+                              <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: '#6ee7b7' }}>
+                                {item.options.customName}
+                              </Typography>
+                            </Box>
+                          )}
+                          {item.options.customNumber && (
+                            <Box sx={{
+                              px: 1,
+                              py: 0.2,
+                              borderRadius: '6px',
+                              bgcolor: 'rgba(6,182,212,0.15)',
+                              border: '1px solid rgba(6,182,212,0.3)',
+                            }}>
+                              <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: '#67e8f9' }}>
+                                #{item.options.customNumber}
+                              </Typography>
+                            </Box>
+                          )}
+                        </Box>
+
+                        {/* Quantity & Actions Row */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Box sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              bgcolor: 'rgba(255,255,255,0.05)',
+                              borderRadius: '10px',
+                              border: '1px solid rgba(255,255,255,0.1)',
+                            }}>
+                              <IconButton
+                                size="small"
+                                onClick={() => updateCartQuantity(item.id, item.quantity - 1)}
+                                onMouseDown={() => startCartHold(item.id, -1)}
+                                onMouseUp={() => stopCartHold(item.id)}
+                                onMouseLeave={() => stopCartHold(item.id)}
+                                onTouchStart={() => startCartHold(item.id, -1)}
+                                onTouchEnd={() => stopCartHold(item.id)}
+                                sx={{ color: '#94a3b8', p: 0.8, '&:hover': { color: '#f1f5f9' } }}
+                              >
+                                <Minus size={14} />
+                              </IconButton>
+                              <Typography sx={{ 
+                                color: '#f1f5f9', 
+                                minWidth: 28, 
+                                textAlign: 'center',
+                                fontWeight: 700,
+                                fontSize: '0.85rem',
+                              }}>
+                                {item.quantity}
+                              </Typography>
+                              <IconButton
+                                size="small"
+                                onClick={() => updateCartQuantity(item.id, item.quantity + 1)}
+                                onMouseDown={() => startCartHold(item.id, 1)}
+                                onMouseUp={() => stopCartHold(item.id)}
+                                onMouseLeave={() => stopCartHold(item.id)}
+                                onTouchStart={() => startCartHold(item.id, 1)}
+                                onTouchEnd={() => stopCartHold(item.id)}
+                                sx={{ color: '#94a3b8', p: 0.8, '&:hover': { color: '#f1f5f9' } }}
+                              >
+                                <Plus size={14} />
+                              </IconButton>
+                            </Box>
+                            <Typography sx={{ fontSize: '0.7rem', color: '#64748b' }}>
+                              × ฿{item.unitPrice.toLocaleString()}
+                            </Typography>
+                          </Box>
+
+                          {/* Edit & Delete Buttons */}
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <IconButton
+                              size="small"
+                              onClick={() => openEditCartItem(item)}
+                              sx={{
+                                color: '#94a3b8',
+                                p: 0.6,
+                                '&:hover': { color: '#6366f1', bgcolor: 'rgba(99,102,241,0.1)' },
+                              }}
+                            >
+                              <Edit size={14} />
+                            </IconButton>
+                            <IconButton
+                              size="small"
+                              onClick={() => removeFromCart(item.id)}
+                              sx={{
+                                color: '#94a3b8',
+                                p: 0.6,
+                                '&:hover': { color: '#f87171', bgcolor: 'rgba(239,68,68,0.1)' },
+                              }}
+                            >
+                              <X size={14} />
+                            </IconButton>
+                          </Box>
+                        </Box>
+                      </Box>
+
+                      {/* Price */}
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center', minWidth: 70 }}>
+                        <Typography sx={{ fontSize: '1rem', fontWeight: 800, color: '#10b981' }}>
+                          ฿{(item.unitPrice * item.quantity).toLocaleString()}
+                        </Typography>
+                      </Box>
                     </Box>
-                    <Typography variant="body2" sx={{ color: '#e2e8f0', mb: 0.5 }}>
-                      {measurements ? `อก ${measurements.chest}" · ยาว ${measurements.length}"` : 'ไม่มีข้อมูลสัดส่วน'}
-                    </Typography>
-                    <Typography variant="caption" sx={{ color: '#94a3b8' }}>แขนยาว +50฿</Typography>
-                  </Paper>
+                  </Box>
                 );
               })}
             </Box>
-          ) : (
-            <Box sx={{ overflowX: 'auto' }}>
-              <Box
-                component="table"
-                sx={{
-                  borderCollapse: 'separate',
-                  borderSpacing: 0,
-                  width: '100%',
-                  minWidth: 520,
-                  background: '#111827',
-                  color: '#e5e7eb',
-                  borderRadius: 6,
-                  overflow: 'hidden',
-                  boxShadow: '0 10px 26px rgba(0,0,0,0.24)',
-                  fontSize: { xs: '0.86rem', sm: '0.92rem' },
-                }}
-              >
-                <Box component="thead" sx={{ background: '#1f2937' }}>
-                  <Box component="tr">
-                    <Box component="th" sx={{ px: 1.2, py: 1, textAlign: 'left', fontWeight: 800, borderBottom: '1px solid #1f2937' }}>ขนาด</Box>
-                    {SIZE_ORDER.map((size) => (
-                      <Box component="th" key={size} sx={{ px: 1.1, py: 1, textAlign: 'center', fontWeight: 800, borderBottom: '1px solid #1f2937' }}>{size}</Box>
-                    ))}
-                  </Box>
+          )}
+        </Box>
+
+        {/* Bottom Summary & Checkout */}
+        {cart.length > 0 && (
+          <Box sx={{
+            px: { xs: 2, sm: 3 },
+            py: 2,
+            borderTop: '1px solid rgba(255,255,255,0.08)',
+            background: 'linear-gradient(180deg, rgba(15,23,42,0.98) 0%, rgba(10,15,26,0.98) 100%)',
+            backdropFilter: 'blur(20px)',
+            paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
+          }}>
+            {/* Summary */}
+            <Box sx={{
+              p: 2,
+              mb: 2,
+              borderRadius: '14px',
+              bgcolor: 'rgba(16,185,129,0.08)',
+              border: '1px solid rgba(16,185,129,0.2)',
+            }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Box>
+                  <Typography sx={{ fontSize: '0.75rem', color: '#64748b', mb: 0.3 }}>ยอดรวมทั้งหมด</Typography>
+                  <Typography sx={{ fontSize: '1.6rem', fontWeight: 900, color: '#10b981' }}>
+                    ฿{getTotalPrice().toLocaleString()}
+                  </Typography>
                 </Box>
-                <Box component="tbody">
-                  <Box component="tr" sx={{ background: 'rgba(255,255,255,0.02)' }}>
-                    <Box component="td" sx={{ px: 1.2, py: 0.9, fontWeight: 700, borderBottom: '1px solid #1f2937' }}>รอบอก</Box>
-                    {SIZE_ORDER.map((size) => {
-                      const measurements = SIZE_MEASUREMENTS[size];
-                      return (
-                        <Box component="td" key={size} sx={{ textAlign: 'center', px: 1.1, py: 0.9, borderBottom: '1px solid #1f2937' }}>
-                          {measurements ? `${measurements.chest}"` : '—'}
-                        </Box>
-                      );
-                    })}
-                  </Box>
-                  <Box component="tr">
-                    <Box component="td" sx={{ px: 1.2, py: 0.9, fontWeight: 700, borderBottom: '1px solid #1f2937', background: 'rgba(255,255,255,0.02)' }}>ความยาว</Box>
-                    {SIZE_ORDER.map((size) => {
-                      const measurements = SIZE_MEASUREMENTS[size];
-                      return (
-                        <Box component="td" key={size} sx={{ textAlign: 'center', px: 1.1, py: 0.9, borderBottom: '1px solid #1f2937', background: 'rgba(255,255,255,0.02)' }}>
-                          {measurements ? `${measurements.length}"` : '—'}
-                        </Box>
-                      );
-                    })}
-                  </Box>
-                  <Box component="tr">
-                    <Box component="td" sx={{ px: 1.2, py: 0.95, fontWeight: 800, background: '#0f172a' }}>ราคา</Box>
-                    {SIZE_ORDER.map((size) => {
-                      const row = sizeChartRows.find((r) => r.size === size);
-                      return (
-                        <Box component="td" key={size} sx={{ textAlign: 'center', px: 1.1, py: 0.95, fontWeight: 700, background: '#111827' }}>
-                          {row ? `${row.price.toLocaleString()}฿` : '—'}
-                        </Box>
-                      );
-                    })}
-                  </Box>
+                <Box sx={{ textAlign: 'right' }}>
+                  <Typography sx={{ fontSize: '0.7rem', color: '#64748b' }}>{cart.length} รายการ</Typography>
+                  <Typography sx={{ fontSize: '0.7rem', color: '#64748b' }}>
+                    {cart.reduce((sum, item) => sum + item.quantity, 0)} ชิ้น
+                  </Typography>
                 </Box>
               </Box>
             </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowSizeChart(false)}>ปิด</Button>
-        </DialogActions>
+
+            {/* Checkout Button */}
+            <Button
+              fullWidth
+              onClick={() => {
+                if (!requireProfileBeforeCheckout()) return;
+                setShowCart(false);
+                setShowOrderDialog(true);
+              }}
+              disabled={!isShopOpen}
+              sx={{
+                py: 1.8,
+                borderRadius: '14px',
+                background: isShopOpen 
+                  ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                  : 'rgba(100,116,139,0.2)',
+                color: isShopOpen ? 'white' : '#64748b',
+                fontSize: '1rem',
+                fontWeight: 700,
+                textTransform: 'none',
+                boxShadow: isShopOpen ? '0 4px 20px rgba(16,185,129,0.3)' : 'none',
+                '&:hover': {
+                  background: isShopOpen 
+                    ? 'linear-gradient(135deg, #059669 0%, #047857 100%)'
+                    : 'rgba(100,116,139,0.3)',
+                  boxShadow: isShopOpen ? '0 6px 24px rgba(16,185,129,0.4)' : 'none',
+                },
+                '&:disabled': {
+                  background: 'rgba(100,116,139,0.2)',
+                  color: '#64748b',
+                },
+              }}
+            >
+              {isShopOpen ? 'ยืนยันและดำเนินการสั่งซื้อ' : 'ร้านค้าปิดชั่วคราว'}
+            </Button>
+          </Box>
+        )}
+      </Drawer>
+
+      {/* ===== Edit Cart Item Dialog ===== */}
+      <Dialog
+        open={!!editingCartItem}
+        onClose={() => setEditingCartItem(null)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: '#0a0f1a',
+            color: '#f1f5f9',
+            borderRadius: '20px',
+            border: '1px solid rgba(255,255,255,0.1)',
+            mx: 2,
+          },
+        }}
+      >
+        {editingCartItem && (() => {
+          const product = config?.products?.find(p => p.id === editingCartItem.productId);
+          const availableSizes = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'];
+          const displaySizes = product?.sizePricing ? Object.keys(product.sizePricing) : availableSizes;
+          return (
+            <>
+              <DialogTitle sx={{ 
+                borderBottom: '1px solid rgba(255,255,255,0.08)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <Edit size={20} color="#6366f1" />
+                  <Typography sx={{ fontWeight: 700 }}>แก้ไขสินค้า</Typography>
+                </Box>
+                <IconButton onClick={() => setEditingCartItem(null)} sx={{ color: '#94a3b8' }}>
+                  <X size={20} />
+                </IconButton>
+              </DialogTitle>
+              <DialogContent sx={{ pt: 3 }}>
+                <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#e2e8f0', mb: 2 }}>
+                  {editingCartItem.productName}
+                </Typography>
+
+                {/* Size Selection */}
+                <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: '#94a3b8', mb: 1 }}>ขนาด</Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}>
+                  {displaySizes.map((size) => {
+                    const basePrice = product?.sizePricing?.[size] ?? product?.basePrice ?? editingCartItem.unitPrice;
+                    const longSleeveFee = product?.options?.hasLongSleeve && editingCartItem.options.isLongSleeve ? 50 : 0;
+                    const active = editingCartItem.size === size;
+                    return (
+                      <Box
+                        key={size}
+                        onClick={() => setEditingCartItem({ 
+                          ...editingCartItem, 
+                          size, 
+                          unitPrice: basePrice + longSleeveFee 
+                        })}
+                        sx={{
+                          px: 2,
+                          py: 1,
+                          borderRadius: '10px',
+                          border: active ? '2px solid #6366f1' : '1px solid rgba(255,255,255,0.1)',
+                          bgcolor: active ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.03)',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          '&:hover': { borderColor: '#6366f1' },
+                        }}
+                      >
+                        <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: active ? '#a5b4fc' : '#e2e8f0' }}>
+                          {size}
+                        </Typography>
+                      </Box>
+                    );
+                  })}
+                </Box>
+
+                {/* Custom Options */}
+                {product?.options?.hasCustomName && (
+                  <TextField
+                    label="ชื่อติดเสื้อ"
+                    fullWidth
+                    value={editingCartItem.options.customName || ''}
+                    onChange={(e) => setEditingCartItem({
+                      ...editingCartItem,
+                      options: { ...editingCartItem.options, customName: normalizeEngName(e.target.value) }
+                    })}
+                    inputProps={{ maxLength: 7 }}
+                    sx={{ 
+                      mb: 2,
+                      '& .MuiOutlinedInput-root': { color: '#f1f5f9', borderRadius: '12px' },
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.15)' },
+                      '& label': { color: '#64748b' },
+                    }}
+                  />
+                )}
+
+                {product?.options?.hasCustomNumber && (
+                  <TextField
+                    label="หมายเลขเสื้อ"
+                    fullWidth
+                    value={editingCartItem.options.customNumber || ''}
+                    onChange={(e) => setEditingCartItem({
+                      ...editingCartItem,
+                      options: { ...editingCartItem.options, customNumber: normalizeDigits99(e.target.value) }
+                    })}
+                    inputProps={{ inputMode: 'numeric' }}
+                    sx={{ 
+                      mb: 2,
+                      '& .MuiOutlinedInput-root': { color: '#f1f5f9', borderRadius: '12px' },
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.15)' },
+                      '& label': { color: '#64748b' },
+                    }}
+                  />
+                )}
+
+                {product?.options?.hasLongSleeve && (
+                  <Box 
+                    onClick={() => {
+                      const newIsLong = !editingCartItem.options.isLongSleeve;
+                      const basePrice = product?.sizePricing?.[editingCartItem.size] ?? product?.basePrice ?? 0;
+                      setEditingCartItem({
+                        ...editingCartItem,
+                        options: { ...editingCartItem.options, isLongSleeve: newIsLong },
+                        unitPrice: basePrice + (newIsLong ? 50 : 0)
+                      });
+                    }}
+                    sx={{
+                      p: 2,
+                      mb: 2,
+                      borderRadius: '12px',
+                      border: editingCartItem.options.isLongSleeve ? '2px solid #f59e0b' : '1px solid rgba(255,255,255,0.1)',
+                      bgcolor: editingCartItem.options.isLongSleeve ? 'rgba(245,158,11,0.1)' : 'transparent',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <Typography sx={{ color: '#e2e8f0', fontWeight: 600 }}>แขนยาว (+฿50)</Typography>
+                    <Switch checked={editingCartItem.options.isLongSleeve} color="warning" sx={{ pointerEvents: 'none' }} />
+                  </Box>
+                )}
+
+                {/* Quantity */}
+                <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: '#94a3b8', mb: 1 }}>จำนวน</Typography>
+                <Box sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  bgcolor: 'rgba(255,255,255,0.05)',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  width: 'fit-content',
+                }}>
+                  <IconButton
+                    onClick={() => setEditingCartItem({ ...editingCartItem, quantity: Math.max(1, editingCartItem.quantity - 1) })}
+                    sx={{ color: '#94a3b8', p: 1.5 }}
+                  >
+                    <Minus size={18} />
+                  </IconButton>
+                  <Typography sx={{ color: '#f1f5f9', minWidth: 48, textAlign: 'center', fontWeight: 800, fontSize: '1.1rem' }}>
+                    {editingCartItem.quantity}
+                  </Typography>
+                  <IconButton
+                    onClick={() => setEditingCartItem({ ...editingCartItem, quantity: Math.min(99, editingCartItem.quantity + 1) })}
+                    sx={{ color: '#94a3b8', p: 1.5 }}
+                  >
+                    <Plus size={18} />
+                  </IconButton>
+                </Box>
+              </DialogContent>
+              <DialogActions sx={{ p: 3, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                <Button onClick={() => setEditingCartItem(null)} sx={{ color: '#94a3b8' }}>
+                  ยกเลิก
+                </Button>
+                <Button
+                  variant="contained"
+                  onClick={() => updateCartItem(editingCartItem.id, editingCartItem)}
+                  sx={{
+                    background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                    fontWeight: 700,
+                    borderRadius: '12px',
+                    px: 3,
+                  }}
+                >
+                  บันทึกการแก้ไข
+                </Button>
+              </DialogActions>
+            </>
+          );
+        })()}
+      </Dialog>
+
+      {renderProductDialog()}
+
+      {/* ===== Size Chart Dialog - Modern Design ===== */}
+      <Dialog
+        open={showSizeChart}
+        onClose={() => setShowSizeChart(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: '#0a0f1a',
+            color: '#f1f5f9',
+            borderRadius: '20px',
+            border: '1px solid rgba(255,255,255,0.1)',
+            mx: 2,
+            my: 'auto',
+            maxHeight: '85vh',
+          },
+        }}
+        slotProps={{
+          backdrop: {
+            sx: { backdropFilter: 'blur(8px)', bgcolor: 'rgba(0,0,0,0.6)' },
+          },
+        }}
+      >
+        {/* Header */}
+        <Box sx={{
+          px: 2.5,
+          py: 2,
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Box sx={{
+              width: 40,
+              height: 40,
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+              display: 'grid',
+              placeItems: 'center',
+            }}>
+              <Ruler size={20} color="white" />
+            </Box>
+            <Box>
+              <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', color: '#f1f5f9' }}>ตารางไซส์</Typography>
+              <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>สัดส่วนรอบอก/ความยาว (นิ้ว)</Typography>
+            </Box>
+          </Box>
+          <IconButton onClick={() => setShowSizeChart(false)} sx={{ color: '#94a3b8' }}>
+            <X size={22} />
+          </IconButton>
+        </Box>
+
+        {/* Content */}
+        <Box sx={{ px: 2.5, py: 2, overflow: 'auto' }}>
+          {/* Info Badges */}
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.8, mb: 2.5 }}>
+            <Box sx={{
+              px: 1.2,
+              py: 0.4,
+              borderRadius: '8px',
+              bgcolor: 'rgba(99,102,241,0.15)',
+              border: '1px solid rgba(99,102,241,0.3)',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              color: '#a5b4fc',
+            }}>
+              📏 อก / ความยาว (นิ้ว)
+            </Box>
+            <Box sx={{
+              px: 1.2,
+              py: 0.4,
+              borderRadius: '8px',
+              bgcolor: 'rgba(245,158,11,0.15)',
+              border: '1px solid rgba(245,158,11,0.3)',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              color: '#fbbf24',
+            }}>
+              แขนยาว +50฿
+            </Box>
+          </Box>
+
+          {/* Size Cards Grid */}
+          <Box sx={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(2, 1fr)', 
+            gap: 1.2,
+          }}>
+            {SIZE_ORDER.map((size) => {
+              const measurements = SIZE_MEASUREMENTS[size];
+              const row = sizeChartRows.find((r) => r.size === size);
+              return (
+                <Box 
+                  key={size} 
+                  sx={{ 
+                    p: 1.5,
+                    borderRadius: '14px',
+                    bgcolor: 'rgba(30,41,59,0.6)',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                    transition: 'all 0.2s ease',
+                    '&:hover': {
+                      bgcolor: 'rgba(30,41,59,0.8)',
+                      borderColor: 'rgba(99,102,241,0.3)',
+                    },
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                    <Box sx={{
+                      px: 1,
+                      py: 0.3,
+                      borderRadius: '8px',
+                      background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      color: 'white',
+                    }}>
+                      {size}
+                    </Box>
+                    <Typography sx={{ fontSize: '0.95rem', fontWeight: 800, color: '#10b981' }}>
+                      {row ? `฿${row.price.toLocaleString()}` : '—'}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', gap: 1.5 }}>
+                    <Box>
+                      <Typography sx={{ fontSize: '0.65rem', color: '#64748b', mb: 0.2 }}>รอบอก</Typography>
+                      <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: '#e2e8f0' }}>
+                        {measurements ? `${measurements.chest}"` : '—'}
+                      </Typography>
+                    </Box>
+                    <Box>
+                      <Typography sx={{ fontSize: '0.65rem', color: '#64748b', mb: 0.2 }}>ความยาว</Typography>
+                      <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: '#e2e8f0' }}>
+                        {measurements ? `${measurements.length}"` : '—'}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Box>
+              );
+            })}
+          </Box>
+        </Box>
+
+        {/* Footer */}
+        <Box sx={{ 
+          px: 2.5, 
+          py: 2, 
+          borderTop: '1px solid rgba(255,255,255,0.08)',
+        }}>
+          <Button
+            fullWidth
+            onClick={() => setShowSizeChart(false)}
+            sx={{
+              py: 1.3,
+              borderRadius: '12px',
+              bgcolor: 'rgba(255,255,255,0.05)',
+              color: '#94a3b8',
+              fontSize: '0.9rem',
+              fontWeight: 600,
+              '&:hover': {
+                bgcolor: 'rgba(255,255,255,0.1)',
+              },
+            }}
+          >
+            ปิด
+          </Button>
+        </Box>
       </Dialog>
 
       <Dialog
@@ -2346,74 +3336,242 @@ export default function HomePage() {
           sx: {
             width: { xs: '100%', sm: '92%', md: '720px' },
             maxWidth: 'calc(100% - 24px)',
-            bgcolor: '#1e293b',
+            bgcolor: '#0a0f1a',
             color: '#f1f5f9',
+            borderRadius: isMobile ? 0 : '20px',
+            border: isMobile ? 'none' : '1px solid rgba(255,255,255,0.1)',
           },
         }}
       >
-        <DialogTitle sx={{ background: 'linear-gradient(135deg, #6366f1 0%, #06b6d4 100%)', color: 'white' }}>
-          ยืนยันการสั่งซื้อ
+        <DialogTitle sx={{ 
+          background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', 
+          color: 'white',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1.5,
+        }}>
+          <ShoppingCart size={22} />
+          <Box>
+            <Typography sx={{ fontWeight: 700, fontSize: '1.1rem' }}>ยืนยันการสั่งซื้อ</Typography>
+            <Typography sx={{ fontSize: '0.75rem', opacity: 0.85 }}>{cart.length} รายการ</Typography>
+          </Box>
         </DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 3 }}>
-          <Paper sx={{ p: 2, bgcolor: '#334155' }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1, color: '#f1f5f9' }}>
-              สรุปคำสั่งซื้อ
-            </Typography>
-            {cart.map((item) => {
-              const optionText = [
-                item.options.customName ? `ชื่อ: ${item.options.customName}` : '',
-                item.options.customNumber ? `เบอร์: ${item.options.customNumber}` : '',
-                item.options.isLongSleeve ? '(แขนยาว)' : '',
-              ].filter(Boolean).join(' ');
-
-              return (
-                <Box key={item.id} sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <Box>
-                    <Typography variant="caption" sx={{ color: '#94a3b8', display: 'block' }}>
-                      {item.productName} × {item.quantity}
-                    </Typography>
-                    {optionText && (
-                      <Typography variant="caption" sx={{ color: '#cbd5e1', display: 'block' }}>
-                        {optionText}
-                      </Typography>
-                    )}
-                  </Box>
-                  <Typography variant="caption" sx={{ fontWeight: 'bold', color: '#10b981' }}>
-                    {(item.unitPrice * item.quantity).toLocaleString()}฿
-                  </Typography>
-                </Box>
-              );
-            })}
-            <Divider sx={{ my: 1, borderColor: '#475569' }} />
-            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-              <Typography sx={{ fontWeight: 'bold', color: '#f1f5f9' }}>รวม:</Typography>
-              <Typography sx={{ fontWeight: 'bold', color: '#10b981' }}>
-                {getTotalPrice().toLocaleString()}฿
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 3, bgcolor: '#0a0f1a' }}>
+          {/* Order Summary with Product Images */}
+          <Box sx={{ 
+            p: 2, 
+            borderRadius: '18px',
+            bgcolor: 'rgba(30,41,59,0.6)',
+            border: '1px solid rgba(255,255,255,0.06)',
+          }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+              <Package size={18} color="#94a3b8" />
+              <Typography sx={{ fontWeight: 700, color: '#f1f5f9', fontSize: '0.95rem' }}>
+                สรุปคำสั่งซื้อ
               </Typography>
             </Box>
-          </Paper>
-          <Paper sx={{ p: 2, bgcolor: '#0f172a', border: '1px solid #334155', borderRadius: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: '#f1f5f9' }}>ข้อมูลผู้รับสินค้า</Typography>
-              <Button size="small" variant="outlined" onClick={() => { setShowProfileModal(true); setPendingCheckout(true); }} sx={{ borderColor: '#6366f1', color: '#cbd5e1' }}>
-                แก้ไขโปรไฟล์
+            <Box sx={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: 1.5,
+              maxHeight: 280,
+              overflow: 'auto',
+            }}>
+              {cart.map((item) => {
+                const productInfo = config?.products?.find(p => p.id === item.productId);
+                const productImage = productInfo?.images?.[0];
+                
+                return (
+                  <Box key={item.id} sx={{ 
+                    display: 'flex', 
+                    gap: 1.5,
+                    p: 1.5,
+                    borderRadius: '14px',
+                    bgcolor: 'rgba(15,23,42,0.6)',
+                    border: '1px solid rgba(255,255,255,0.04)',
+                  }}>
+                    {/* Product Image */}
+                    <Box sx={{
+                      width: 60,
+                      height: 60,
+                      borderRadius: '12px',
+                      bgcolor: '#0b1224',
+                      backgroundImage: productImage ? `url(${productImage})` : undefined,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                      flexShrink: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      border: '1px solid rgba(255,255,255,0.06)',
+                    }}>
+                      {!productImage && (
+                        <Package size={22} style={{ color: '#475569' }} />
+                      )}
+                    </Box>
+                    {/* Product Details */}
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography sx={{ 
+                        fontSize: '0.85rem', 
+                        fontWeight: 600, 
+                        color: '#e2e8f0',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        mb: 0.5,
+                      }}>
+                        {item.productName}
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 0.8 }}>
+                        <Box sx={{
+                          px: 0.7,
+                          py: 0.15,
+                          borderRadius: '5px',
+                          bgcolor: 'rgba(99,102,241,0.15)',
+                          fontSize: '0.68rem',
+                          fontWeight: 600,
+                          color: '#a5b4fc',
+                        }}>
+                          Size: {item.size}
+                        </Box>
+                        <Box sx={{
+                          px: 0.7,
+                          py: 0.15,
+                          borderRadius: '5px',
+                          bgcolor: 'rgba(255,255,255,0.08)',
+                          fontSize: '0.68rem',
+                          fontWeight: 600,
+                          color: '#94a3b8',
+                        }}>
+                          x{item.quantity}
+                        </Box>
+                        {item.options.isLongSleeve && (
+                          <Box sx={{
+                            px: 0.7,
+                            py: 0.15,
+                            borderRadius: '5px',
+                            bgcolor: 'rgba(245,158,11,0.15)',
+                            fontSize: '0.68rem',
+                            fontWeight: 600,
+                            color: '#fbbf24',
+                          }}>
+                            แขนยาว
+                          </Box>
+                        )}
+                        {item.options.customName && (
+                          <Box sx={{
+                            px: 0.7,
+                            py: 0.15,
+                            borderRadius: '5px',
+                            bgcolor: 'rgba(16,185,129,0.15)',
+                            fontSize: '0.68rem',
+                            fontWeight: 600,
+                            color: '#34d399',
+                          }}>
+                            {item.options.customName}
+                          </Box>
+                        )}
+                        {item.options.customNumber && (
+                          <Box sx={{
+                            px: 0.7,
+                            py: 0.15,
+                            borderRadius: '5px',
+                            bgcolor: 'rgba(168,85,247,0.15)',
+                            fontSize: '0.68rem',
+                            fontWeight: 600,
+                            color: '#c084fc',
+                          }}>
+                            #{item.options.customNumber}
+                          </Box>
+                        )}
+                      </Box>
+                      <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: '#10b981' }}>
+                        ฿{(item.unitPrice * item.quantity).toLocaleString()}
+                      </Typography>
+                    </Box>
+                  </Box>
+                );
+              })}
+            </Box>
+            <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.08)' }} />
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography sx={{ fontWeight: 700, color: '#f1f5f9', fontSize: '1rem' }}>ยอดรวมทั้งหมด</Typography>
+              <Typography sx={{ fontWeight: 900, color: '#10b981', fontSize: '1.3rem' }}>
+                ฿{getTotalPrice().toLocaleString()}
+              </Typography>
+            </Box>
+          </Box>
+
+          {/* Recipient Info */}
+          <Box sx={{ 
+            p: 2, 
+            borderRadius: '18px',
+            bgcolor: 'rgba(99,102,241,0.08)', 
+            border: '1px solid rgba(99,102,241,0.2)',
+          }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <User size={18} color="#a5b4fc" />
+                <Typography sx={{ fontWeight: 700, color: '#f1f5f9', fontSize: '0.95rem' }}>ข้อมูลผู้รับสินค้า</Typography>
+              </Box>
+              <Button 
+                size="small" 
+                onClick={() => { setShowProfileModal(true); setPendingCheckout(true); }} 
+                sx={{ 
+                  borderRadius: '8px',
+                  px: 1.5,
+                  bgcolor: 'rgba(99,102,241,0.15)',
+                  color: '#a5b4fc', 
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  '&:hover': { bgcolor: 'rgba(99,102,241,0.25)' },
+                }}
+              >
+                แก้ไข
               </Button>
             </Box>
-            <Typography variant="body2" sx={{ color: '#e2e8f0', mb: 0.5 }}>ชื่อ: {orderData.name || '—'}</Typography>
-            <Typography variant="body2" sx={{ color: '#e2e8f0', mb: 0.5 }}>โทร: {orderData.phone || '—'}</Typography>
-            <Typography variant="body2" sx={{ color: '#e2e8f0' }}>IG: {orderData.instagram || '—'}</Typography>
-            {!profileComplete && (
-              <Typography variant="caption" sx={{ color: '#f97316', display: 'block', mt: 1 }}>
-                กรุณาบันทึกโปรไฟล์ (ชื่อไทย, เบอร์, IG) ก่อนยืนยัน
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+              <Typography sx={{ color: '#e2e8f0', fontSize: '0.9rem' }}>
+                <Box component="span" sx={{ color: '#64748b', mr: 1 }}>ชื่อ:</Box>{orderData.name || '—'}
               </Typography>
+              <Typography sx={{ color: '#e2e8f0', fontSize: '0.9rem' }}>
+                <Box component="span" sx={{ color: '#64748b', mr: 1 }}>โทร:</Box>{orderData.phone || '—'}
+              </Typography>
+              <Typography sx={{ color: '#e2e8f0', fontSize: '0.9rem' }}>
+                <Box component="span" sx={{ color: '#64748b', mr: 1 }}>IG:</Box>{orderData.instagram || '—'}
+              </Typography>
+            </Box>
+            {!profileComplete && (
+              <Box sx={{ 
+                mt: 1.5, 
+                p: 1, 
+                borderRadius: '8px',
+                bgcolor: 'rgba(249,115,22,0.1)',
+                border: '1px solid rgba(249,115,22,0.3)',
+              }}>
+                <Typography sx={{ color: '#fb923c', fontSize: '0.8rem', fontWeight: 600 }}>
+                  กรุณาบันทึกโปรไฟล์ (ชื่อไทย, เบอร์, IG) ก่อนยืนยัน
+                </Typography>
+              </Box>
             )}
-          </Paper>
+          </Box>
         </DialogContent>
-        <DialogActions sx={{ p: 2, gap: 1, borderTop: '1px solid #334155' }}>
+        <DialogActions sx={{ 
+          p: 2, 
+          gap: 1, 
+          borderTop: '1px solid rgba(255,255,255,0.08)',
+          bgcolor: '#0a0f1a',
+        }}>
           <Button
             onClick={() => setShowOrderDialog(false)}
-            variant="outlined"
-            sx={{ color: '#f1f5f9', borderColor: '#334155' }}
+            sx={{ 
+              flex: 1,
+              py: 1.3,
+              color: '#94a3b8', 
+              borderRadius: '12px',
+              fontSize: '0.9rem',
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.05)' },
+            }}
           >
             ยกเลิก
           </Button>
@@ -2422,15 +3580,24 @@ export default function HomePage() {
             variant="contained"
             disabled={!profileComplete || processing}
             sx={{
-              background: 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)',
+              flex: 1.5,
+              py: 1.3,
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
               fontWeight: 700,
-              borderRadius: 2,
-              px: 3,
-              boxShadow: '0 12px 30px rgba(16, 185, 129, 0.35)',
-              '&:hover': { background: 'linear-gradient(135deg, #0ea472 0%, #0591b5 100%)', boxShadow: '0 12px 34px rgba(16, 185, 129, 0.45)' },
+              fontSize: '0.95rem',
+              boxShadow: '0 8px 24px rgba(16, 185, 129, 0.35)',
+              '&:hover': { 
+                background: 'linear-gradient(135deg, #0ea472 0%, #047857 100%)', 
+                boxShadow: '0 12px 30px rgba(16, 185, 129, 0.45)' 
+              },
+              '&:disabled': {
+                background: 'rgba(100,116,139,0.3)',
+                color: '#64748b',
+              },
             }}
           >
-            ยืนยันการสั่งซื้อ
+            {processing ? 'กำลังดำเนินการ...' : 'ยืนยันการสั่งซื้อ'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -2491,164 +3658,479 @@ export default function HomePage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog
+      {/* ===== Order History Dialog - Modern Design ===== */}
+      <Drawer
+        anchor="bottom"
         open={showHistoryDialog}
         onClose={() => setShowHistoryDialog(false)}
-        maxWidth="md"
-        fullWidth
-        fullScreen={isMobile}
         PaperProps={{
           sx: {
-            width: { xs: '100%', sm: '94%', md: '960px' },
-            maxWidth: 'calc(100% - 24px)',
-            bgcolor: '#0f172a',
-            color: '#f1f5f9',
+            height: { xs: '92vh', sm: '85vh' },
+            maxHeight: '92vh',
+            borderTopLeftRadius: { xs: 20, sm: 24 },
+            borderTopRightRadius: { xs: 20, sm: 24 },
+            bgcolor: '#0a0f1a',
+            overflow: 'hidden',
           },
         }}
       >
-        <DialogTitle sx={{ background: 'linear-gradient(135deg, #6366f1 0%, #06b6d4 100%)', color: 'white', display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Package size={24} />
-          ประวัติคำสั่งซื้อ
-        </DialogTitle>
-        <DialogContent sx={{ pt: 3, maxHeight: '70vh' }}>
+        {/* Header */}
+        <Box sx={{
+          px: { xs: 2, sm: 3 },
+          py: { xs: 1.5, sm: 2 },
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          background: 'linear-gradient(180deg, rgba(15,23,42,0.98) 0%, rgba(10,15,26,0.98) 100%)',
+          backdropFilter: 'blur(20px)',
+          position: 'sticky',
+          top: 0,
+          zIndex: 10,
+        }}>
+          {/* Drag Handle */}
+          <Box sx={{ width: 36, height: 4, bgcolor: 'rgba(255,255,255,0.2)', borderRadius: 2, mx: 'auto', mb: 2 }} />
+          
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box sx={{
+                width: 40,
+                height: 40,
+                borderRadius: '12px',
+                background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                display: 'grid',
+                placeItems: 'center',
+              }}>
+                <Package size={20} color="white" />
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: '1.1rem', fontWeight: 700, color: '#f1f5f9' }}>
+                  คำสั่งซื้อของฉัน
+                </Typography>
+                <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>
+                  {orderHistory.length} รายการ
+                </Typography>
+              </Box>
+            </Box>
+            <IconButton onClick={() => setShowHistoryDialog(false)} sx={{ color: '#94a3b8' }}>
+              <X size={22} />
+            </IconButton>
+          </Box>
+
+          {/* Filter Tabs - Horizontal Scroll */}
+          <Box sx={{
+            display: 'flex',
+            gap: 1,
+            overflowX: 'auto',
+            pb: 0.5,
+            mx: -2,
+            px: 2,
+            '&::-webkit-scrollbar': { display: 'none' },
+            scrollbarWidth: 'none',
+          }}>
+            {historyFilters.map((filter) => {
+              const isActive = historyFilter === filter.key;
+              const count = filterCounts[filter.key] ?? 0;
+              return (
+                <Box
+                  key={filter.key}
+                  onClick={() => setHistoryFilter(filter.key as any)}
+                  sx={{
+                    px: 2,
+                    py: 0.8,
+                    borderRadius: '20px',
+                    bgcolor: isActive ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.04)',
+                    border: isActive ? '1px solid rgba(99,102,241,0.4)' : '1px solid rgba(255,255,255,0.06)',
+                    color: isActive ? '#a5b4fc' : '#94a3b8',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0.8,
+                    '&:hover': {
+                      bgcolor: isActive ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.08)',
+                    },
+                  }}
+                >
+                  {filter.label}
+                  <Box sx={{
+                    px: 0.8,
+                    py: 0.1,
+                    borderRadius: '8px',
+                    bgcolor: isActive ? 'rgba(99,102,241,0.3)' : 'rgba(255,255,255,0.08)',
+                    fontSize: '0.7rem',
+                    fontWeight: 700,
+                    minWidth: 20,
+                    textAlign: 'center',
+                  }}>
+                    {count}
+                  </Box>
+                </Box>
+              );
+            })}
+          </Box>
+        </Box>
+
+        {/* Content */}
+        <Box sx={{
+          flex: 1,
+          overflow: 'auto',
+          px: { xs: 2, sm: 3 },
+          py: 2,
+          WebkitOverflowScrolling: 'touch',
+        }}>
           {loadingHistory ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-              <CircularProgress sx={{ color: '#6366f1' }} />
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 8, gap: 2 }}>
+              <CircularProgress size={36} sx={{ color: '#6366f1' }} />
+              <Typography sx={{ color: '#64748b', fontSize: '0.9rem' }}>กำลังโหลดคำสั่งซื้อ...</Typography>
+            </Box>
+          ) : filteredOrders.length === 0 ? (
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 8, gap: 2 }}>
+              <Box sx={{
+                width: 80,
+                height: 80,
+                borderRadius: '50%',
+                bgcolor: 'rgba(100,116,139,0.1)',
+                display: 'grid',
+                placeItems: 'center',
+              }}>
+                <Package size={36} style={{ color: '#475569' }} />
+              </Box>
+              <Typography sx={{ color: '#64748b', fontSize: '0.95rem' }}>ไม่พบคำสั่งซื้อ</Typography>
+              <Typography sx={{ color: '#475569', fontSize: '0.8rem' }}>
+                {historyFilter === 'ALL' ? 'ยังไม่มีคำสั่งซื้อ' : 'ลองเปลี่ยนตัวกรองดู'}
+              </Typography>
             </Box>
           ) : (
-            <>
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
-                {historyFilters.map((filter) => {
-                  const isActive = historyFilter === filter.key;
-                  return (
-                    <Button
-                      key={filter.key}
-                      size="small"
-                      variant={isActive ? 'contained' : 'outlined'}
-                      onClick={() => setHistoryFilter(filter.key as any)}
-                      sx={{
-                        borderColor: filter.color,
-                        color: isActive ? '#0f172a' : filter.color,
-                        backgroundColor: isActive ? filter.color : 'transparent',
-                        textTransform: 'none',
-                        fontWeight: 700,
-                        borderRadius: 999,
-                        px: 1.5,
-                        '&:hover': { borderColor: filter.color, backgroundColor: isActive ? filter.color : `${filter.color}20` },
-                      }}
-                    >
-                      {filter.label} ({filterCounts[filter.key] ?? 0})
-                    </Button>
-                  );
-                })}
-              </Box>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              {filteredOrders.map((order, idx) => {
+                const statusKey = normalizeStatus(order.status);
+                const statusLabel = getStatusLabel(statusKey);
+                const statusColor = getStatusColor(statusKey);
+                const canCancel = CANCELABLE_STATUSES.includes(statusKey);
+                const canPay = PAYABLE_STATUSES.includes(statusKey);
+                const category = getStatusCategory(statusKey);
 
-              {filteredOrders.length === 0 ? (
-                <Box sx={{ textAlign: 'center', py: 4 }}>
-                  <Package size={48} style={{ color: '#64748b', marginBottom: 16 }} />
-                  <Typography sx={{ color: '#94a3b8' }}>ไม่พบคำสั่งซื้อในตัวกรองนี้</Typography>
-                </Box>
-              ) : (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-                  {filteredOrders.map((order, idx) => {
-                    const statusKey = normalizeStatus(order.status);
-                    const statusLabel = getStatusLabel(statusKey);
-                    const statusColor = getStatusColor(statusKey);
-                    const canCancel = CANCELABLE_STATUSES.includes(statusKey);
-                    const canPay = PAYABLE_STATUSES.includes(statusKey);
+                // Status icon and color scheme
+                const getStatusIcon = () => {
+                  if (category === 'WAITING_PAYMENT') return '⏳';
+                  if (category === 'COMPLETED') return '✓';
+                  if (category === 'RECEIVED') return '📦';
+                  if (category === 'CANCELLED') return '✕';
+                  return '•';
+                };
 
-                    const category = getStatusCategory(statusKey);
-                    const roadmapLabel =
-                      category === 'WAITING_PAYMENT'
-                        ? 'ขั้นตอน: รอชำระ / รอตรวจสลิป'
-                        : category === 'COMPLETED'
-                          ? 'ขั้นตอน: จ่ายแล้ว / รอตรวจสอบ'
-                          : category === 'RECEIVED'
-                            ? 'ขั้นตอน: พร้อมรับ / จัดส่ง / สำเร็จ'
-                            : category === 'CANCELLED'
-                              ? 'ขั้นตอน: ถูกยกเลิก'
-                              : 'ขั้นตอน: อื่นๆ';
-
-                    return (
-                      <Paper key={idx} sx={{ p: 2.5, bgcolor: '#1f2937', borderRadius: 2 }}>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: '#f1f5f9' }}>
-                            #{order.ref}
-                          </Typography>
-                          <Chip
-                            label={statusLabel}
-                            size="small"
-                            sx={{ bgcolor: statusColor, color: 'white' }}
-                          />
-                        </Box>
-                        <Typography variant="caption" sx={{ color: '#94a3b8', display: 'block', mb: 1 }}>
-                          {new Date(order.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
+                return (
+                  <Box
+                    key={idx}
+                    sx={{
+                      p: { xs: 2, sm: 2.5 },
+                      borderRadius: '18px',
+                      bgcolor: 'rgba(30,41,59,0.5)',
+                      border: '1px solid rgba(255,255,255,0.06)',
+                      transition: 'all 0.2s ease',
+                      '&:hover': {
+                        bgcolor: 'rgba(30,41,59,0.7)',
+                        borderColor: 'rgba(255,255,255,0.1)',
+                      },
+                    }}
+                  >
+                    {/* Order Header */}
+                    <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2 }}>
+                      <Box>
+                        <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: '#e2e8f0', letterSpacing: '0.02em' }}>
+                          #{order.ref}
                         </Typography>
-                        <Typography variant="caption" sx={{ color: '#cbd5e1', display: 'block', mb: 1 }}>{roadmapLabel}</Typography>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1.5, gap: 1 }}>
-                          <Typography variant="body1" sx={{ color: '#10b981', fontWeight: 'bold' }}>
-                            {order.total?.toLocaleString()}฿
-                          </Typography>
-                          <Box sx={{ display: 'flex', gap: 1 }}>
-                            {canPay && (
-                              <Button
-                                size="small"
-                                variant="contained"
-                                onClick={() => openPaymentFlow(order.ref)}
+                        <Typography sx={{ fontSize: '0.75rem', color: '#64748b', mt: 0.3 }}>
+                          {new Date(order.date).toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short', year: '2-digit' })}
+                          {' • '}
+                          {new Date(order.date).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
+                        </Typography>
+                      </Box>
+                      <Box sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 0.6,
+                        px: 1.2,
+                        py: 0.4,
+                        borderRadius: '8px',
+                        bgcolor: `${statusColor}18`,
+                        border: `1px solid ${statusColor}30`,
+                      }}>
+                        <Typography sx={{ fontSize: '0.7rem' }}>{getStatusIcon()}</Typography>
+                        <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: statusColor }}>
+                          {statusLabel}
+                        </Typography>
+                      </Box>
+                    </Box>
+
+                    {/* Product Items with Images */}
+                    {(() => {
+                      // Support both items and cart (backwards compatibility)
+                      const orderItems = order.items || order.cart || [];
+                      if (orderItems.length === 0) return null;
+                      
+                      return (
+                        <Box sx={{ 
+                          mb: 2, 
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          gap: 1,
+                        }}>
+                          {orderItems.slice(0, 3).map((item, itemIdx) => {
+                            const productInfo = config?.products?.find((p) => p.id === item.productId);
+                            const productImage = productInfo?.images?.[0];
+                            const itemName = item.name || item.productName || productInfo?.name || 'ไม่ทราบชื่อสินค้า';
+                            const itemQty = item.qty || item.quantity || 1;
+                            const itemIsLongSleeve = item.isLongSleeve || item.options?.isLongSleeve;
+                            const itemCustomName = item.customName || item.options?.customName;
+                            const itemSubtotal = item.subtotal || (item.unitPrice ? item.unitPrice * itemQty : 0);
+                            
+                            return (
+                              <Box
+                                key={itemIdx}
                                 sx={{
-                                  background: 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)',
-                                  color: 'white',
-                                  fontWeight: 700,
-                                  px: 1.5,
-                                  '&:hover': { background: 'linear-gradient(135deg, #0ea472 0%, #0591b5 100%)' },
+                                  display: 'flex',
+                                  gap: 1.5,
+                                  p: 1.2,
+                                  borderRadius: '12px',
+                                  bgcolor: 'rgba(15,23,42,0.5)',
+                                  border: '1px solid rgba(255,255,255,0.04)',
                                 }}
                               >
-                                ชำระเงิน
-                              </Button>
-                            )}
-                            {canCancel && (
-                              <Button
-                                size="small"
-                                variant="contained"
-                                onClick={() => handleCancelOrder(order.ref)}
-                                disabled={cancellingRef === order.ref}
-                                sx={{
-                                  background: '#ef4444',
-                                  color: 'white',
-                                  fontWeight: 700,
-                                  px: 1.5,
-                                  '&:hover': { background: '#dc2626' },
-                                }}
-                              >
-                                {cancellingRef === order.ref ? 'กำลังยกเลิก...' : 'ยกเลิกคำสั่งซื้อ'}
-                              </Button>
-                            )}
-                          </Box>
+                                {/* Product Image */}
+                                <Box sx={{
+                                  width: 56,
+                                  height: 56,
+                                  borderRadius: '10px',
+                                  bgcolor: '#0b1224',
+                                  backgroundImage: productImage ? `url(${productImage})` : undefined,
+                                  backgroundSize: 'cover',
+                                  backgroundPosition: 'center',
+                                  flexShrink: 0,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  border: '1px solid rgba(255,255,255,0.06)',
+                                }}>
+                                  {!productImage && (
+                                    <Package size={20} style={{ color: '#475569' }} />
+                                  )}
+                                </Box>
+                                {/* Product Details */}
+                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                  <Typography sx={{
+                                    fontSize: '0.82rem',
+                                    fontWeight: 600,
+                                    color: '#e2e8f0',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                    mb: 0.3,
+                                  }}>
+                                    {itemName}
+                                  </Typography>
+                                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 0.5 }}>
+                                    {item.size && (
+                                      <Box sx={{
+                                        px: 0.7,
+                                        py: 0.15,
+                                        borderRadius: '4px',
+                                        bgcolor: 'rgba(99,102,241,0.15)',
+                                        fontSize: '0.65rem',
+                                        fontWeight: 600,
+                                        color: '#a5b4fc',
+                                      }}>
+                                        Size: {item.size}
+                                      </Box>
+                                    )}
+                                    {itemIsLongSleeve && (
+                                      <Box sx={{
+                                        px: 0.7,
+                                        py: 0.15,
+                                        borderRadius: '4px',
+                                        bgcolor: 'rgba(245,158,11,0.15)',
+                                        fontSize: '0.65rem',
+                                        fontWeight: 600,
+                                        color: '#fbbf24',
+                                      }}>
+                                        แขนยาว
+                                      </Box>
+                                    )}
+                                    {itemCustomName && (
+                                      <Box sx={{
+                                        px: 0.7,
+                                        py: 0.15,
+                                        borderRadius: '4px',
+                                        bgcolor: 'rgba(16,185,129,0.15)',
+                                        fontSize: '0.65rem',
+                                        fontWeight: 600,
+                                        color: '#34d399',
+                                      }}>
+                                        {itemCustomName}
+                                      </Box>
+                                    )}
+                                  </Box>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <Typography sx={{ fontSize: '0.7rem', color: '#64748b' }}>
+                                      x{itemQty}
+                                    </Typography>
+                                    <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#10b981' }}>
+                                      ฿{itemSubtotal.toLocaleString()}
+                                    </Typography>
+                                  </Box>
+                                </Box>
+                              </Box>
+                            );
+                          })}
+                          {orderItems.length > 3 && (
+                            <Typography sx={{
+                              fontSize: '0.75rem',
+                              color: '#64748b',
+                              textAlign: 'center',
+                              py: 0.5,
+                            }}>
+                              +{orderItems.length - 3} รายการ
+                            </Typography>
+                          )}
                         </Box>
-                      </Paper>
-                    );
-                  })}
-                  {historyHasMore && (
-                    <Button
-                      variant="outlined"
-                      onClick={() => loadOrderHistory({ append: true })}
-                      disabled={loadingHistoryMore}
-                      sx={{ alignSelf: 'center', mt: 1, borderColor: '#6366f1', color: '#e2e8f0' }}
-                    >
-                      {loadingHistoryMore ? 'กำลังโหลด...' : 'โหลดเพิ่มเติม'}
-                    </Button>
-                  )}
+                      );
+                    })()}
+
+                    {/* Order Total & Actions */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pt: 1.5, borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                      <Box>
+                        <Typography sx={{ fontSize: '0.7rem', color: '#64748b', mb: 0.2 }}>ยอดรวม</Typography>
+                        <Typography sx={{ fontSize: '1.1rem', fontWeight: 800, color: '#10b981' }}>
+                          ฿{order.total?.toLocaleString() || '0'}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        {canPay && (
+                          <Button
+                            size="small"
+                            onClick={() => openPaymentFlow(order.ref)}
+                            sx={{
+                              px: 2,
+                              py: 0.8,
+                              borderRadius: '10px',
+                              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                              color: 'white',
+                              fontSize: '0.8rem',
+                              fontWeight: 700,
+                              textTransform: 'none',
+                              boxShadow: '0 4px 14px rgba(16,185,129,0.3)',
+                              '&:hover': {
+                                background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                                boxShadow: '0 6px 20px rgba(16,185,129,0.4)',
+                              },
+                            }}
+                          >
+                            ชำระเงิน
+                          </Button>
+                        )}
+                        {canCancel && (
+                          <Button
+                            size="small"
+                            onClick={() => handleCancelOrder(order.ref)}
+                            disabled={cancellingRef === order.ref}
+                            sx={{
+                              px: 2,
+                              py: 0.8,
+                              borderRadius: '10px',
+                              bgcolor: 'rgba(239,68,68,0.1)',
+                              border: '1px solid rgba(239,68,68,0.3)',
+                              color: '#f87171',
+                              fontSize: '0.8rem',
+                              fontWeight: 600,
+                              textTransform: 'none',
+                              '&:hover': {
+                                bgcolor: 'rgba(239,68,68,0.2)',
+                                borderColor: 'rgba(239,68,68,0.5)',
+                              },
+                              '&:disabled': {
+                                color: '#64748b',
+                                borderColor: 'rgba(100,116,139,0.3)',
+                              },
+                            }}
+                          >
+                            {cancellingRef === order.ref ? 'กำลังยกเลิก...' : 'ยกเลิก'}
+                          </Button>
+                        )}
+                      </Box>
+                    </Box>
+                  </Box>
+                );
+              })}
+
+              {/* Load More */}
+              {historyHasMore && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                  <Button
+                    onClick={() => loadOrderHistory({ append: true })}
+                    disabled={loadingHistoryMore}
+                    sx={{
+                      px: 4,
+                      py: 1,
+                      borderRadius: '12px',
+                      bgcolor: 'rgba(99,102,241,0.1)',
+                      border: '1px solid rgba(99,102,241,0.3)',
+                      color: '#a5b4fc',
+                      fontSize: '0.85rem',
+                      fontWeight: 600,
+                      textTransform: 'none',
+                      '&:hover': {
+                        bgcolor: 'rgba(99,102,241,0.2)',
+                      },
+                      '&:disabled': {
+                        color: '#64748b',
+                      },
+                    }}
+                  >
+                    {loadingHistoryMore ? (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <CircularProgress size={16} sx={{ color: '#a5b4fc' }} />
+                        กำลังโหลด...
+                      </Box>
+                    ) : (
+                      'โหลดเพิ่มเติม'
+                    )}
+                  </Button>
                 </Box>
               )}
-            </>
+            </Box>
           )}
-        </DialogContent>
-        <DialogActions sx={{ p: 2, borderTop: '1px solid #334155' }}>
-          <Button onClick={() => setShowHistoryDialog(false)} sx={{ color: '#f1f5f9' }}>
+        </Box>
+
+        {/* Bottom Safe Area */}
+        <Box sx={{
+          px: { xs: 2, sm: 3 },
+          py: 1.5,
+          borderTop: '1px solid rgba(255,255,255,0.06)',
+          background: 'rgba(10,15,26,0.98)',
+          backdropFilter: 'blur(20px)',
+          paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
+        }}>
+          <Button
+            fullWidth
+            onClick={() => setShowHistoryDialog(false)}
+            sx={{
+              py: 1.3,
+              borderRadius: '12px',
+              bgcolor: 'rgba(255,255,255,0.06)',
+              color: '#94a3b8',
+              fontSize: '0.9rem',
+              fontWeight: 600,
+              textTransform: 'none',
+              '&:hover': {
+                bgcolor: 'rgba(255,255,255,0.1)',
+              },
+            }}
+          >
             ปิด
           </Button>
-        </DialogActions>
-      </Dialog>
+        </Box>
+      </Drawer>
 
       <Box
         sx={{
@@ -2656,15 +4138,15 @@ export default function HomePage() {
           bottom: 0,
           left: 0,
           right: 0,
-          bgcolor: 'rgba(12,18,32,0.58)',
-          borderTop: '1px solid rgba(255,255,255,0.06)',
-          backdropFilter: 'none',
-          WebkitBackdropFilter: 'none',
-          boxShadow: '0 -10px 28px rgba(0,0,0,0.32)',
+          bgcolor: 'rgba(15,23,42,0.95)',
+          borderTop: '1px solid rgba(255,255,255,0.1)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          boxShadow: '0 -4px 20px rgba(0,0,0,0.4)',
           display: { xs: 'flex', md: 'none' },
           justifyContent: 'space-around',
-          py: 1.1,
-          px: 1.5,
+          py: 1,
+          px: 1,
           touchAction: 'pan-y',
           WebkitOverflowScrolling: 'touch',
           paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))',
@@ -2685,25 +4167,25 @@ export default function HomePage() {
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                gap: 0.35,
-                color: isActive ? '#e0e7ff' : '#cbd5e1',
-                borderRadius: 2.2,
-                px: 2,
-                py: 0.75,
-                background: isActive ? 'rgba(99,102,241,0.16)' : 'transparent',
-                border: '1px solid rgba(255,255,255,0.08)',
-                boxShadow: isActive ? '0 10px 22px rgba(0,0,0,0.18)' : 'none',
-                transform: isActive ? 'translateY(-1px)' : 'translateY(0)',
-                transition: 'color 0.2s ease, background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease',
+                gap: 0.3,
+                color: isActive ? '#6366f1' : '#94a3b8',
+                borderRadius: 0,
+                px: 2.5,
+                py: 0.5,
+                background: 'transparent',
+                border: 'none',
+                boxShadow: 'none',
+                transform: 'none',
+                transition: 'color 0.2s ease',
                 '&:hover': {
-                  background: isActive ? 'rgba(99,102,241,0.18)' : 'rgba(255,255,255,0.04)',
-                  borderColor: 'rgba(255,255,255,0.12)',
+                  background: 'transparent',
+                  color: isActive ? '#6366f1' : '#e2e8f0',
                 },
                 touchAction: 'manipulation',
               }}
             >
               {tab.icon}
-              <Typography variant="caption" sx={{ fontSize: '0.7rem', fontWeight: 600 }}>{tab.label}</Typography>
+              <Typography variant="caption" sx={{ fontSize: '0.65rem', fontWeight: isActive ? 700 : 500 }}>{tab.label}</Typography>
             </IconButton>
           );
         })}
@@ -2716,27 +4198,46 @@ export default function HomePage() {
         </Box>
       )}
 
-      {toast && !productDialogOpen && (
+      {toast && (
         <Snackbar
           open={!!toast}
-          autoHideDuration={3500}
+          autoHideDuration={3000}
           onClose={() => setToast(null)}
-          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
           TransitionComponent={ToastTransition}
           sx={{
-            mt: { xs: 1, sm: 2 },
-            mr: { xs: 1, sm: 2.5 },
-            zIndex: (theme) => theme.zIndex.modal + 300,
+            top: { xs: '16px !important', sm: '24px !important' },
+            zIndex: '99999 !important',
+            position: 'fixed',
             '& .MuiPaper-root': {
-              background: 'linear-gradient(135deg, rgba(99,102,241,0.9), rgba(6,182,212,0.9))',
+              background: 'rgba(30,30,30,0.95)',
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
               color: '#fff',
-              boxShadow: '0 18px 42px rgba(0,0,0,0.35)',
-              borderRadius: 12,
-              minWidth: 260,
+              boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+              borderRadius: '12px',
+              minWidth: { xs: 280, sm: 320 },
+              border: 'none',
             },
           }}
         >
-          <Alert severity={toast.type} sx={{ color: 'white' }}>
+          <Alert
+            severity={toast.type}
+            icon={false}
+            sx={{
+              bgcolor: 'transparent',
+              color: '#fff',
+              py: 1.5,
+              px: 2,
+              fontSize: '0.95rem',
+              fontWeight: 500,
+              '& .MuiAlert-message': {
+                padding: 0,
+                textAlign: 'center',
+                width: '100%',
+              },
+            }}
+          >
             {toast.message}
           </Alert>
         </Snackbar>
