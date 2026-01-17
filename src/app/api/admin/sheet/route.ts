@@ -227,7 +227,7 @@ export async function POST(req: NextRequest) {
     const factoryValues = buildFactoryExport(orders);
     await sheets.spreadsheets.values.update({
       spreadsheetId: sheetId,
-      range: `${FACTORY_EXPORT_TITLE}!A1:L${factoryValues.length}`,
+      range: `${FACTORY_EXPORT_TITLE}!A1:N${factoryValues.length}`,
       valueInputOption: 'RAW',
       requestBody: { values: factoryValues },
     });
