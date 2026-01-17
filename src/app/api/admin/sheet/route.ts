@@ -223,8 +223,9 @@ export async function POST(req: NextRequest) {
       requestBody: { values },
     });
 
-    // Factory export tab (optional format requested by vendor)
-    const factoryValues = buildFactoryExport(orders);
+    // Factory export tab (optional format requested by vendor) - only PAID orders
+    const paidOrders = orders.filter((o) => o?.status === 'PAID');
+    const factoryValues = buildFactoryExport(paidOrders);
     await sheets.spreadsheets.values.update({
       spreadsheetId: sheetId,
       range: `${FACTORY_EXPORT_TITLE}!A1:N${factoryValues.length}`,
