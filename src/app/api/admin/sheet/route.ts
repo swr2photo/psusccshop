@@ -66,7 +66,7 @@ const buildRows = (orders: any[], baseUrl: string) => {
 
 // Flatten items for factory export + size summary
 const buildFactoryExport = (orders: any[]) => {
-  const header = ['ลำดับ', 'ชื่อ', 'เบอร์เสื้อ', 'ไซซ์', 'ไซซ์กางเกง (ถ้ามี)', 'เบอร์กางเกง (ถ้ามี)', 'หมายเหตุ', 'คณะ/กลุ่ม', 'เรียงลำดับ', 'สำรอง', 'Size', 'จำนวนรวม'];
+  const header = ['ลำดับ', 'ชื่อ', 'เบอร์เสื้อ', 'ชื่อบนเสื้อ', 'ไซซ์', 'แขนยาว', 'ไซซ์กางเกง (ถ้ามี)', 'เบอร์กางเกง (ถ้ามี)', 'หมายเหตุ', 'คณะ/กลุ่ม', 'เรียงลำดับ', 'สำรอง', 'Size', 'จำนวนรวม'];
   const rows: any[] = [];
   const sizeCount: Record<string, number> = {};
 
@@ -81,7 +81,9 @@ const buildFactoryExport = (orders: any[]) => {
         rows.length + 1, // ลำดับ
         o?.customerName || o?.name || '',
         item.options?.customNumber || item.customNumber || '', // เบอร์เสื้อ
+        item.options?.customName || item.customName || '', // ชื่อบนเสื้อ
         size,
+        item.options?.isLongSleeve ? 'แขนยาว' : '',
         '', // ไซซ์กางเกง (ถ้ามี)
         '', // เบอร์กางเกง (ถ้ามี)
         o?.notes || o?.remark || '',
