@@ -215,3 +215,23 @@ body::before {
     opacity: 0;
   }
 }
+
+/* Shake Highlight Animation for form validation */
+.shake-highlight {
+  animation: shake-highlight 0.6s ease-out;
+}
+
+@keyframes shake-highlight {
+  0%, 100% {
+    transform: translateX(0);
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+  }
+  10%, 30%, 50%, 70%, 90% {
+    transform: translateX(-4px);
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.5);
+  }
+  20%, 40%, 60%, 80% {
+    transform: translateX(4px);
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.5);
+  }
+}

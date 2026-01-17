@@ -386,6 +386,7 @@ async function fetchJson<T = any>(path: string, opts?: FetchOptions): Promise<AP
   const init: RequestInit = {
     method: rest.method || 'GET',
     headers: { 'Content-Type': 'application/json', ...(headers || {}) },
+    cache: 'no-store', // ป้องกัน browser cache เพื่อให้ได้ข้อมูลล่าสุดเสมอ
     ...rest,
     body: body !== undefined ? JSON.stringify(body) : undefined,
   };

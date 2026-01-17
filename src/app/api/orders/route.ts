@@ -19,21 +19,20 @@ const emailIndexKey = (email: string) => {
   return `orders/index/${hash}.json`;
 };
 
-const INDEX_CACHE_TTL_MS = 60_000;
+// ปิด cache เนื่องจากทำให้สถานะไม่อัปเดตหลังชำระเงิน
+// Cache ถูกใช้ใน orders API แต่ payment/verify อัปเดต index ใน S3 โดยตรง
+// ทำให้ข้อมูลไม่ sync กัน
+const INDEX_CACHE_TTL_MS = 0; // ปิด cache
 const indexCache = new Map<string, { data: any[]; expires: number }>();
 
 const getCachedIndex = (key: string) => {
-  const cached = indexCache.get(key);
-  if (!cached) return null;
-  if (cached.expires < Date.now()) {
-    indexCache.delete(key);
-    return null;
-  }
-  return cached.data;
+  // ปิด cache - ให้ดึงข้อมูลใหม่ทุกครั้ง
+  return null;
 };
 
 const setCachedIndex = (key: string, data: any[]) => {
-  indexCache.set(key, { data, expires: Date.now() + INDEX_CACHE_TTL_MS });
+  // ปิด cache
+  // indexCache.set(key, { data, expires: Date.now() + INDEX_CACHE_TTL_MS });
 };
 
 const upsertIndexEntry = async (email: string, order: any) => {
@@ -78,15 +77,17 @@ export async function GET(req: NextRequest) {
     const normalizedEmail = normalizeEmail(queryEmail);
     if (normalizedEmail) {
       const key = emailIndexKey(normalizedEmail);
-      const cached = getCachedIndex(key);
-      const indexed = cached || (await getJson<any[]>(key));
+      // ดึงข้อมูลใหม่ทุกครั้ง ไม่ใช้ cache
+      const indexed = await getJson<any[]>(key);
       if (indexed) {
-        if (!cached) setCachedIndex(key, indexed);
         const startIdx = cursor ? Math.max(0, indexed.findIndex((o) => o?.ref === cursor) + 1) : 0;
         const slice = indexed.slice(startIdx, startIdx + limit);
         const hasMore = startIdx + limit < indexed.length;
         const nextCursor = hasMore ? indexed[startIdx + limit - 1]?.ref : null;
-        return NextResponse.json({ status: 'success', data: { history: slice, hasMore, nextCursor } });
+        return NextResponse.json(
+          { status: 'success', data: { history: slice, hasMore, nextCursor } },
+          { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' } }
+        );
       }
     }
 
@@ -120,10 +121,12 @@ export async function GET(req: NextRequest) {
     if (normalizedEmail && indexBucket.length > 0) {
       const key = emailIndexKey(normalizedEmail);
       await putJson(key, indexBucket);
-      setCachedIndex(key, indexBucket);
     }
 
-    return NextResponse.json({ status: 'success', data: { history, hasMore, nextCursor } });
+    return NextResponse.json(
+      { status: 'success', data: { history, hasMore, nextCursor } },
+      { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' } }
+    );
   } catch (error: any) {
     return NextResponse.json({ status: 'error', message: error?.message || 'load failed' }, { status: 500 });
   }

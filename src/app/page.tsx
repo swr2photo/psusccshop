@@ -88,8 +88,8 @@ import {
 
 const STATUS_LABELS: Record<string, string> = {
   PENDING: 'รอดำเนินการ',
-  PAID: 'ชำระแล้ว',
-  READY: 'พร้อมรับ',
+  PAID: 'ซื้อสำเร็จ',
+  READY: 'พร้อมรับสินค้า',
   SHIPPED: 'จัดส่งแล้ว',
   COMPLETED: 'สำเร็จ',
   CANCELLED: 'ยกเลิก',
@@ -106,7 +106,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 const STATUS_COLORS: Record<string, string> = {
   PENDING: '#f59e0b',
-  PAID: '#3b82f6',
+  PAID: '#10b981',
   READY: '#10b981',
   SHIPPED: '#0ea5e9',
   COMPLETED: '#22c55e',
@@ -163,7 +163,17 @@ const ANNOUNCEMENT_COLOR_MAP: Record<string, string> = {
   blue: '#3b82f6',
   red: '#ef4444',
   green: '#22c55e',
+  emerald: '#10b981',
   orange: '#f97316',
+};
+
+// Helper to get announcement color (supports both named colors and hex)
+const getAnnouncementColor = (color: string | undefined): string => {
+  if (!color) return '#3b82f6';
+  // If it's a hex color, return it directly
+  if (color.startsWith('#')) return color;
+  // Otherwise, look up in the map
+  return ANNOUNCEMENT_COLOR_MAP[color] || '#3b82f6';
 };
 
 const CONFIG_CACHE_KEY = 'shopConfigCache';
@@ -231,7 +241,8 @@ type Interval = ReturnType<typeof setInterval>;
 type LeanProduct = Pick<Product, 'id' | 'name' | 'description' | 'type' | 'images' | 'basePrice' | 'sizePricing' | 'isActive' | 'startDate' | 'endDate'>;
 type LeanConfig = {
   isOpen: boolean;
-  announcement?: ShopConfig['announcement'];
+  announcements: ShopConfig['announcements'];
+  announcementHistory?: ShopConfig['announcementHistory'];
   products: LeanProduct[];
 };
 
@@ -273,7 +284,9 @@ export default function HomePage() {
   const [processing, setProcessing] = useState(false);
 
   const [config, setConfig] = useState<ShopConfig | null>(null);
-  const [announcement, setAnnouncement] = useState<ShopConfig['announcement']>();
+  const [announcements, setAnnouncements] = useState<ShopConfig['announcements']>([]);
+  const [announcementHistory, setAnnouncementHistory] = useState<ShopConfig['announcementHistory']>([]);
+  const [showAnnouncementHistory, setShowAnnouncementHistory] = useState(false);
   const [isShopOpen, setIsShopOpen] = useState(true);
   const configFetchInFlight = useRef(false);
   const configPollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -301,6 +314,9 @@ export default function HomePage() {
     isLongSleeve: false,
   });
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const sizeSelectorRef = useRef<HTMLDivElement>(null);
+  const customNameInputRef = useRef<HTMLInputElement>(null);
+  const customNumberInputRef = useRef<HTMLInputElement>(null);
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const cartRef = useRef<CartItem[]>([]);
@@ -465,7 +481,8 @@ export default function HomePage() {
           const lean = sanitizeConfig(cfg);
           cacheConfig(lean);
           setConfig(cfg);
-          setAnnouncement(cfg.announcement);
+          setAnnouncements(cfg.announcements || []);
+          setAnnouncementHistory(cfg.announcementHistory || []);
           setIsShopOpen(cfg.isOpen);
         } else {
           console.warn('No config returned from getPublicConfig');
@@ -486,7 +503,8 @@ export default function HomePage() {
         const cached = loadCachedConfig();
         if (cached) {
           setConfig(cached as unknown as ShopConfig);
-          setAnnouncement(cached.announcement);
+          setAnnouncements(cached.announcements || []);
+          setAnnouncementHistory(cached.announcementHistory || []);
           setIsShopOpen(cached.isOpen);
           // Keep loading while we refresh from GAS to avoid stale cache
         }
@@ -634,7 +652,8 @@ export default function HomePage() {
 
   const sanitizeConfig = (cfg: ShopConfig): LeanConfig => ({
     isOpen: cfg.isOpen,
-    announcement: cfg.announcement,
+    announcements: cfg.announcements || [],
+    announcementHistory: cfg.announcementHistory || [],
     products: (cfg.products || []).map((p) => ({
       id: p.id,
       name: p.name,
@@ -690,19 +709,36 @@ export default function HomePage() {
 
   const buildCartItem = (): CartItem | null => {
     if (!selectedProduct || !productOptions.size) {
-      showToast('warning', 'กรุณาเลือกขนาด');
+      // Scroll to size selector and show visual feedback
+      sizeSelectorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => {
+        sizeSelectorRef.current?.classList.add('shake-highlight');
+        setTimeout(() => sizeSelectorRef.current?.classList.remove('shake-highlight'), 600);
+      }, 300);
       return null;
     }
 
     const normalizedCustomName = normalizeEngName(productOptions.customName);
 
     if (selectedProduct.options?.hasCustomName && !normalizedCustomName) {
-      showToast('warning', 'กรอกชื่อที่ต้องการพิมพ์บนเสื้อ (สูงสุด 7 ตัวอักษร)');
+      // Scroll to customName input and focus
+      customNameInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => {
+        customNameInputRef.current?.focus();
+        customNameInputRef.current?.parentElement?.parentElement?.classList.add('shake-highlight');
+        setTimeout(() => customNameInputRef.current?.parentElement?.parentElement?.classList.remove('shake-highlight'), 600);
+      }, 300);
       return null;
     }
 
     if (selectedProduct.options?.hasCustomNumber && !productOptions.customNumber) {
-      showToast('warning', 'กรอกหมายเลขที่ต้องการพิมพ์บนเสื้อ (จำเป็นต้องกรอก)');
+      // Scroll to customNumber input and focus
+      customNumberInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => {
+        customNumberInputRef.current?.focus();
+        customNumberInputRef.current?.parentElement?.parentElement?.classList.add('shake-highlight');
+        setTimeout(() => customNumberInputRef.current?.parentElement?.parentElement?.classList.remove('shake-highlight'), 600);
+      }, 300);
       return null;
     }
 
@@ -864,46 +900,90 @@ export default function HomePage() {
                 </Box>
               </Box>
             </Box>
-            <IconButton 
-              onClick={() => setProductDialogOpen(false)} 
-              sx={{ 
-                color: '#94a3b8', 
-                bgcolor: 'rgba(255,255,255,0.05)', 
-                '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } 
-              }}
-            >
-              <X size={20} />
-            </IconButton>
+            {!isMobile && (
+              <IconButton 
+                onClick={() => setProductDialogOpen(false)} 
+                sx={{ 
+                  color: '#94a3b8', 
+                  bgcolor: 'rgba(255,255,255,0.05)', 
+                  '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } 
+                }}
+              >
+                <X size={20} />
+              </IconButton>
+            )}
           </Box>
         </Box>
 
-        {/* Inline Toast */}
+        {/* Inline Toast - Enhanced Style */}
         {inlineNotice && (
-          <Alert
-            severity={inlineNotice.type}
-            icon={false}
-            sx={{
-              position: 'fixed',
-              top: { xs: 16, sm: 24 },
-              left: '50%',
-              transform: 'translateX(-50%)',
-              zIndex: 99999,
-              borderRadius: '12px',
-              bgcolor: 'rgba(30,30,30,0.95)',
-              backdropFilter: 'blur(20px)',
-              border: 'none',
-              color: '#fff',
-              py: 1.5,
-              px: 3,
-              fontSize: '0.95rem',
-              fontWeight: 500,
-              boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-              minWidth: { xs: 200, sm: 280 },
-              textAlign: 'center',
-            }}
-          >
-            {inlineNotice.message}
-          </Alert>
+          <Slide direction="up" in={true} mountOnEnter unmountOnExit>
+            <Box
+              sx={{
+                position: 'fixed',
+                bottom: { xs: 90, sm: 32 },
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 99999,
+                background: {
+                  success: 'linear-gradient(135deg, rgba(16, 185, 129, 0.98) 0%, rgba(5, 150, 105, 0.98) 100%)',
+                  error: 'linear-gradient(135deg, rgba(239, 68, 68, 0.98) 0%, rgba(220, 38, 38, 0.98) 100%)',
+                  warning: 'linear-gradient(135deg, rgba(245, 158, 11, 0.98) 0%, rgba(234, 88, 12, 0.98) 100%)',
+                  info: 'linear-gradient(135deg, rgba(59, 130, 246, 0.98) 0%, rgba(37, 99, 235, 0.98) 100%)',
+                }[inlineNotice.type],
+                backdropFilter: 'blur(16px)',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                borderRadius: '16px',
+                py: 1.5,
+                px: 2,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+                boxShadow: {
+                  success: '0 8px 32px rgba(16, 185, 129, 0.35)',
+                  error: '0 8px 32px rgba(239, 68, 68, 0.35)',
+                  warning: '0 8px 32px rgba(245, 158, 11, 0.35)',
+                  info: '0 8px 32px rgba(59, 130, 246, 0.35)',
+                }[inlineNotice.type],
+                minWidth: { xs: 220, sm: 300 },
+                animation: 'toastEnterBottom 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
+                '@keyframes toastEnterBottom': {
+                  '0%': { opacity: 0, transform: 'translateX(-50%) translateY(12px) scale(0.96)' },
+                  '100%': { opacity: 1, transform: 'translateX(-50%) translateY(0) scale(1)' },
+                },
+              }}
+              onClick={() => setInlineNotice(null)}
+            >
+              <Box 
+                sx={{ 
+                  width: 32,
+                  height: 32,
+                  borderRadius: '10px',
+                  bgcolor: 'rgba(255, 255, 255, 0.2)',
+                  display: 'grid',
+                  placeItems: 'center',
+                  color: '#fff', 
+                  flexShrink: 0,
+                }}
+              >
+                {inlineNotice.type === 'success' && <CheckCircle2 size={18} />}
+                {inlineNotice.type === 'error' && <AlertCircle size={18} />}
+                {inlineNotice.type === 'warning' && <AlertTriangle size={18} />}
+                {inlineNotice.type === 'info' && <Info size={18} />}
+              </Box>
+              <Typography
+                sx={{
+                  color: '#fff',
+                  fontSize: '0.9rem',
+                  fontWeight: 600,
+                  flex: 1,
+                  lineHeight: 1.4,
+                }}
+              >
+                {inlineNotice.message}
+              </Typography>
+            </Box>
+          </Slide>
         )}
 
         {/* Content */}
@@ -1136,7 +1216,7 @@ export default function HomePage() {
             </Box>
 
             {/* Size Selection Header */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+            <Box ref={sizeSelectorRef} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
               <Box sx={{
                 width: 36,
                 height: 36,
@@ -1234,6 +1314,7 @@ export default function HomePage() {
                     value={productOptions.customName}
                     onChange={(e) => setProductOptions({ ...productOptions, customName: normalizeEngName(e.target.value) })}
                     inputProps={{ maxLength: 7 }}
+                    inputRef={customNameInputRef}
                     placeholder="เช่น JOHN"
                     sx={{ 
                       '& .MuiOutlinedInput-root': { 
@@ -1256,6 +1337,7 @@ export default function HomePage() {
                     value={productOptions.customNumber}
                     onChange={(e) => setProductOptions({ ...productOptions, customNumber: normalizeDigits99(e.target.value) })}
                     inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
+                    inputRef={customNumberInputRef}
                     placeholder="เช่น 10"
                     sx={{ 
                       '& .MuiOutlinedInput-root': { 
@@ -1388,7 +1470,29 @@ export default function HomePage() {
           </Box>
 
           {/* Action Buttons */}
-          <Box sx={{ display: 'flex', gap: 1.5 }}>
+          <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+            {/* Close Button - Mobile Only */}
+            {isMobile && (
+              <Button
+                onClick={() => setProductDialogOpen(false)}
+                startIcon={<X size={18} />}
+                sx={{
+                  width: '100%',
+                  py: 1.2,
+                  mb: 0.5,
+                  borderRadius: '12px',
+                  bgcolor: 'rgba(100,116,139,0.15)',
+                  border: '1px solid rgba(100,116,139,0.3)',
+                  color: '#94a3b8',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  textTransform: 'none',
+                  '&:hover': { bgcolor: 'rgba(100,116,139,0.25)' },
+                }}
+              >
+                ปิด
+              </Button>
+            )}
             <Button
               onClick={handleAddToCart}
               disabled={!isShopOpen}
@@ -2229,11 +2333,315 @@ export default function HomePage() {
         </Alert>
       )}
 
-      {announcement?.enabled && announcement?.message && (
-        <Alert severity="info" sx={{ borderRadius: 0, bgcolor: ANNOUNCEMENT_COLOR_MAP[announcement.color] || '#3b82f6', color: 'white' }}>
-          {announcement.message}
-        </Alert>
+      {/* Multiple Announcements Banner */}
+      {announcements && announcements.filter(a => a.enabled).length > 0 && (
+        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+          {announcements.filter(a => a.enabled).map((ann, idx) => (
+            <Box
+              key={ann.id || idx}
+              sx={{
+                background: `linear-gradient(135deg, ${getAnnouncementColor(ann.color)} 0%, ${getAnnouncementColor(ann.color)}cc 50%, ${getAnnouncementColor(ann.color)}99 100%)`,
+                borderBottom: '1px solid rgba(255,255,255,0.1)',
+                position: 'relative',
+                overflow: 'hidden',
+              }}
+            >
+              {/* Background decoration */}
+              <Box
+                sx={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: `
+                    radial-gradient(circle at 0% 0%, rgba(255,255,255,0.15) 0%, transparent 50%),
+                    radial-gradient(circle at 100% 100%, rgba(255,255,255,0.1) 0%, transparent 50%)
+                  `,
+                  pointerEvents: 'none',
+                }}
+              />
+
+              <Container maxWidth="lg" sx={{ py: { xs: 1.5, sm: 2 }, position: 'relative', zIndex: 1 }}>
+                <Box sx={{ 
+                  display: 'flex', 
+                  flexDirection: { xs: 'column', md: 'row' },
+                  alignItems: 'center', 
+                  gap: { xs: 1.5, md: 2 },
+                }}>
+                  {/* Image */}
+                  {ann.imageUrl && (
+                    <Box
+                      component="img"
+                      src={ann.imageUrl}
+                      alt="Announcement"
+                      sx={{
+                        width: { xs: '100%', md: 150 },
+                        maxWidth: { xs: 250, md: 150 },
+                        height: 'auto',
+                        maxHeight: { xs: 120, md: 100 },
+                        borderRadius: '12px',
+                        objectFit: 'cover',
+                        boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+                        border: '2px solid rgba(255,255,255,0.2)',
+                        flexShrink: 0,
+                      }}
+                    />
+                  )}
+
+                  {/* Content */}
+                  <Box sx={{ flex: 1, textAlign: { xs: 'center', md: 'left' }, minWidth: 0 }}>
+                    {/* Badge */}
+                    <Box sx={{ 
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 0.5,
+                      px: 1.5,
+                      py: 0.25,
+                      mb: 0.75,
+                      borderRadius: '16px',
+                      bgcolor: 'rgba(255,255,255,0.2)',
+                    }}>
+                      <Box sx={{ 
+                        width: 6, 
+                        height: 6, 
+                        borderRadius: '50%', 
+                        bgcolor: '#fff',
+                        animation: 'pulse 2s ease-in-out infinite',
+                        '@keyframes pulse': {
+                          '0%, 100%': { opacity: 1 },
+                          '50%': { opacity: 0.4 },
+                        },
+                      }} />
+                      <Typography sx={{ color: '#fff', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase' }}>
+                        ประกาศ
+                      </Typography>
+                    </Box>
+
+                    {ann.message && (
+                      <Typography
+                        sx={{
+                          color: '#fff',
+                          fontSize: { xs: '0.9rem', sm: '0.95rem' },
+                          fontWeight: 500,
+                          lineHeight: 1.6,
+                          whiteSpace: 'pre-wrap',
+                          textShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                        }}
+                      >
+                        {ann.message}
+                      </Typography>
+                    )}
+
+                    {/* Footer */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: { xs: 'center', md: 'flex-start' }, gap: 1, mt: 1 }}>
+                      {ann.showLogo !== false && (
+                        <Box component="img" src="/logo.png" alt="Logo" sx={{ width: 20, height: 20, borderRadius: '4px' }} onError={(e: any) => { e.target.style.display = 'none'; }} />
+                      )}
+                      <Typography sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.7rem', fontWeight: 500 }}>
+                        {ann.displayName || (ann.postedBy === 'ระบบ' ? 'PSU SCC Shop' : 'แอดมิน')}
+                      </Typography>
+                      {ann.postedAt && (
+                        <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.65rem' }}>
+                          • {new Date(ann.postedAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
+                        </Typography>
+                      )}
+                    </Box>
+                  </Box>
+                </Box>
+              </Container>
+            </Box>
+          ))}
+          
+          {/* History button at bottom of announcements */}
+          {announcementHistory && announcementHistory.length > 0 && (
+            <Box sx={{ 
+              bgcolor: 'rgba(15, 23, 42, 0.95)', 
+              borderBottom: '1px solid rgba(255,255,255,0.1)',
+              py: 0.75,
+              textAlign: 'center',
+            }}>
+              <Button
+                size="small"
+                onClick={() => setShowAnnouncementHistory(true)}
+                sx={{
+                  color: '#94a3b8',
+                  fontSize: '0.7rem',
+                  px: 2,
+                  py: 0.5,
+                  borderRadius: '16px',
+                  bgcolor: 'rgba(255,255,255,0.05)',
+                  textTransform: 'none',
+                  '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' },
+                }}
+                startIcon={<History size={14} />}
+              >
+                ดูประกาศย้อนหลัง ({announcementHistory.length})
+              </Button>
+            </Box>
+          )}
+        </Box>
       )}
+
+      {/* Announcement History Dialog */}
+      <Dialog
+        open={showAnnouncementHistory}
+        onClose={() => setShowAnnouncementHistory(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: 'rgba(15, 23, 42, 0.98)',
+            backdropFilter: 'blur(20px)',
+            borderRadius: '20px',
+            border: '1px solid rgba(255,255,255,0.1)',
+            maxHeight: '80vh',
+          },
+        }}
+      >
+        <DialogTitle sx={{ 
+          borderBottom: '1px solid rgba(255,255,255,0.1)',
+          pb: 2,
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Box sx={{
+              width: 40,
+              height: 40,
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, #8b5cf6, #6366f1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              <History size={20} color="#fff" />
+            </Box>
+            <Box>
+              <Typography sx={{ fontWeight: 700, color: '#f1f5f9', fontSize: '1.1rem' }}>
+                ประวัติประกาศ
+              </Typography>
+              <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>
+                ประกาศย้อนหลังทั้งหมด {announcementHistory?.length || 0} รายการ
+              </Typography>
+            </Box>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ p: 0 }}>
+          {announcementHistory && announcementHistory.length > 0 ? (
+            <Box sx={{ py: 2 }}>
+              {announcementHistory.map((item, index) => (
+                <Box
+                  key={item.id || index}
+                  sx={{
+                    mx: 2,
+                    mb: 2,
+                    p: 2,
+                    borderRadius: '16px',
+                    background: `linear-gradient(135deg, ${getAnnouncementColor(item.color)}20, ${getAnnouncementColor(item.color)}10)`,
+                    border: `1px solid ${getAnnouncementColor(item.color)}40`,
+                    position: 'relative',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {/* Color indicator bar */}
+                  <Box sx={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    bottom: 0,
+                    width: 4,
+                    bgcolor: getAnnouncementColor(item.color),
+                  }} />
+
+                  {/* Date badge */}
+                  <Box sx={{ 
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 0.5,
+                    px: 1,
+                    py: 0.25,
+                    mb: 1,
+                    borderRadius: '8px',
+                    bgcolor: 'rgba(255,255,255,0.1)',
+                    fontSize: '0.7rem',
+                    color: '#94a3b8',
+                  }}>
+                    <Clock size={12} />
+                    {item.postedAt 
+                      ? new Date(item.postedAt).toLocaleDateString('th-TH', { 
+                          day: 'numeric', 
+                          month: 'long', 
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })
+                      : 'ไม่ระบุวันที่'
+                    }
+                  </Box>
+
+                  {/* Image */}
+                  {item.imageUrl && (
+                    <Box
+                      component="img"
+                      src={item.imageUrl}
+                      alt="Announcement"
+                      sx={{
+                        width: '100%',
+                        maxHeight: 150,
+                        objectFit: 'cover',
+                        borderRadius: '12px',
+                        mb: item.message ? 1.5 : 0,
+                      }}
+                    />
+                  )}
+
+                  {/* Message */}
+                  {item.message && (
+                    <Typography sx={{ 
+                      color: '#e2e8f0',
+                      fontSize: '0.9rem',
+                      lineHeight: 1.6,
+                      whiteSpace: 'pre-wrap',
+                    }}>
+                      {item.message}
+                    </Typography>
+                  )}
+
+                  {/* Posted by */}
+                  {(item.displayName || item.postedBy) && (
+                    <Typography sx={{ 
+                      mt: 1, 
+                      fontSize: '0.75rem', 
+                      color: '#64748b',
+                    }}>
+                      — {item.displayName || item.postedBy}
+                    </Typography>
+                  )}
+                </Box>
+              ))}
+            </Box>
+          ) : (
+            <Box sx={{ 
+              py: 6, 
+              textAlign: 'center',
+              color: '#64748b',
+            }}>
+              <History size={48} style={{ opacity: 0.3, marginBottom: 16 }} />
+              <Typography>ยังไม่มีประวัติประกาศ</Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ borderTop: '1px solid rgba(255,255,255,0.1)', p: 2 }}>
+          <Button 
+            onClick={() => setShowAnnouncementHistory(false)}
+            sx={{ 
+              color: '#94a3b8',
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.05)' },
+            }}
+          >
+            ปิด
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Drawer
         anchor="right"
@@ -2803,6 +3211,11 @@ export default function HomePage() {
           });
           setActiveTab('history');
           showToast('success', 'ชำระเงินสำเร็จ!');
+          
+          // Refresh order history from server to get complete data
+          setTimeout(() => {
+            loadOrderHistory();
+          }, 500);
         }}
       />
 
@@ -3178,6 +3591,57 @@ export default function HomePage() {
             >
               {isShopOpen ? 'ยืนยันและดำเนินการสั่งซื้อ' : 'ร้านค้าปิดชั่วคราว'}
             </Button>
+
+            {/* Close Button */}
+            <Button
+              fullWidth
+              onClick={() => setShowCart(false)}
+              startIcon={<X size={18} />}
+              sx={{
+                mt: 1,
+                py: 1.2,
+                borderRadius: '12px',
+                bgcolor: 'rgba(100,116,139,0.15)',
+                border: '1px solid rgba(100,116,139,0.3)',
+                color: '#94a3b8',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                textTransform: 'none',
+                '&:hover': { bgcolor: 'rgba(100,116,139,0.25)' },
+              }}
+            >
+              ปิด
+            </Button>
+          </Box>
+        )}
+
+        {/* Empty cart close button */}
+        {cart.length === 0 && (
+          <Box sx={{
+            px: { xs: 2, sm: 3 },
+            py: 2,
+            borderTop: '1px solid rgba(255,255,255,0.06)',
+            background: 'rgba(10,15,26,0.98)',
+            paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
+          }}>
+            <Button
+              fullWidth
+              onClick={() => setShowCart(false)}
+              startIcon={<X size={18} />}
+              sx={{
+                py: 1.2,
+                borderRadius: '12px',
+                bgcolor: 'rgba(100,116,139,0.15)',
+                border: '1px solid rgba(100,116,139,0.3)',
+                color: '#94a3b8',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                textTransform: 'none',
+                '&:hover': { bgcolor: 'rgba(100,116,139,0.25)' },
+              }}
+            >
+              ปิด
+            </Button>
           </Box>
         )}
       </Drawer>
@@ -3214,9 +3678,6 @@ export default function HomePage() {
                   <Edit size={20} color="#6366f1" />
                   <Typography sx={{ fontWeight: 700 }}>แก้ไขสินค้า</Typography>
                 </Box>
-                <IconButton onClick={() => setEditingCartItem(null)} sx={{ color: '#94a3b8' }}>
-                  <X size={20} />
-                </IconButton>
               </DialogTitle>
               <DialogContent sx={{ pt: 3 }}>
                 <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#e2e8f0', mb: 2 }}>
@@ -3424,9 +3885,6 @@ export default function HomePage() {
               <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>สัดส่วนรอบอก/ความยาว (นิ้ว)</Typography>
             </Box>
           </Box>
-          <IconButton onClick={() => setShowSizeChart(false)} sx={{ color: '#94a3b8' }}>
-            <X size={22} />
-          </IconButton>
         </Box>
 
         {/* Content */}
@@ -3931,9 +4389,6 @@ export default function HomePage() {
                 </Typography>
               </Box>
             </Box>
-            <IconButton onClick={() => setShowHistoryDialog(false)} sx={{ color: '#94a3b8' }}>
-              <X size={22} />
-            </IconButton>
           </Box>
 
           {/* Filter Tabs - Horizontal Scroll */}
@@ -4079,7 +4534,7 @@ export default function HomePage() {
                         bgcolor: `${statusColor}18`,
                         border: `1px solid ${statusColor}30`,
                       }}>
-                        <Typography sx={{ fontSize: '0.7rem' }}>{getStatusIcon()}</Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', color: statusColor }}>{getStatusIcon()}</Box>
                         <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: statusColor }}>
                           {statusLabel}
                         </Typography>
@@ -4106,6 +4561,7 @@ export default function HomePage() {
                             const itemQty = item.qty || item.quantity || 1;
                             const itemIsLongSleeve = item.isLongSleeve || item.options?.isLongSleeve;
                             const itemCustomName = item.customName || item.options?.customName;
+                            const itemCustomNumber = item.customNumber || item.options?.customNumber;
                             const itemSubtotal = item.subtotal || (item.unitPrice ? item.unitPrice * itemQty : 0);
                             
                             return (
@@ -4190,6 +4646,19 @@ export default function HomePage() {
                                         color: '#34d399',
                                       }}>
                                         {itemCustomName}
+                                      </Box>
+                                    )}
+                                    {itemCustomNumber && (
+                                      <Box sx={{
+                                        px: 0.7,
+                                        py: 0.15,
+                                        borderRadius: '4px',
+                                        bgcolor: 'rgba(236,72,153,0.15)',
+                                        fontSize: '0.65rem',
+                                        fontWeight: 600,
+                                        color: '#f472b6',
+                                      }}>
+                                        #{itemCustomNumber}
                                       </Box>
                                     )}
                                   </Box>
@@ -4425,12 +4894,12 @@ export default function HomePage() {
         <Box
           sx={{
             position: 'fixed',
-            top: { xs: 16, sm: 24 },
+            bottom: { xs: 90, sm: 32 },
             left: '50%',
             transform: 'translateX(-50%)',
             zIndex: 99999,
             display: 'flex',
-            flexDirection: 'column',
+            flexDirection: 'column-reverse',
             gap: 1.5,
             width: { xs: 'calc(100% - 32px)', sm: 'auto' },
             maxWidth: 420,
@@ -4461,7 +4930,7 @@ export default function HomePage() {
               },
             };
             return (
-              <Slide key={t.id} in direction="down" timeout={350}>
+              <Slide key={t.id} in direction="up" timeout={350}>
                 <Box
                   sx={{
                     background: colors[t.type].bg,
@@ -4476,9 +4945,9 @@ export default function HomePage() {
                     boxShadow: colors[t.type].shadow,
                     cursor: 'pointer',
                     pointerEvents: 'auto',
-                    animation: 'toastEnter 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
-                    '@keyframes toastEnter': {
-                      '0%': { opacity: 0, transform: 'translateY(-12px) scale(0.96)' },
+                    animation: 'toastEnterBottom 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
+                    '@keyframes toastEnterBottom': {
+                      '0%': { opacity: 0, transform: 'translateY(12px) scale(0.96)' },
                       '100%': { opacity: 1, transform: 'translateY(0) scale(1)' },
                     },
                     transition: 'all 0.2s ease',

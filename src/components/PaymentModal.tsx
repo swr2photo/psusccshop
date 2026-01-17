@@ -2,13 +2,23 @@
 
 import { useState, useEffect, useRef } from 'react';
 import type { JSX } from 'react';
-import { X, Upload, Check, Loader2, AlertCircle, CheckCircle2, Image, Clock3, Download, CreditCard, QrCode, Copy, Smartphone, ArrowRight, Sparkles, AlertTriangle, Info } from 'lucide-react';
-import { Drawer, Box, Typography, Button, IconButton, Skeleton, useMediaQuery, LinearProgress, Slide } from '@mui/material';
+import { X, Upload, Check, Loader2, AlertCircle, CheckCircle2, Image, Clock3, Download, CreditCard, QrCode, Copy, Smartphone, ArrowRight, Sparkles, AlertTriangle, Info, ShoppingBag, Tag, Hash, Shirt, Clock } from 'lucide-react';
+import { Drawer, Box, Typography, Button, IconButton, Skeleton, useMediaQuery, LinearProgress, Slide, Collapse } from '@mui/material';
 
 interface PaymentModalProps {
   orderRef: string;
   onClose: () => void;
   onSuccess: () => void;
+}
+
+interface CartItem {
+  productName: string;
+  size: string;
+  quantity: number;
+  unitPrice: number;
+  customName?: string;
+  customNumber?: string;
+  isLongSleeve?: boolean;
 }
 
 interface Toast {
@@ -96,12 +106,12 @@ function PaymentToastContainer({
     <Box
       sx={{
         position: 'absolute',
-        top: { xs: 85, sm: 90 },
+        bottom: { xs: 200, sm: 180 },
         left: 0,
         right: 0,
         zIndex: 100,
         display: 'flex',
-        flexDirection: 'column',
+        flexDirection: 'column-reverse',
         alignItems: 'center',
         gap: 1.5,
         px: 2,
@@ -111,7 +121,7 @@ function PaymentToastContainer({
       {toasts.map((toast) => {
         const style = TOAST_STYLES[toast.type];
         return (
-          <Slide key={toast.id} direction="down" in={true} mountOnEnter unmountOnExit>
+          <Slide key={toast.id} direction="up" in={true} mountOnEnter unmountOnExit>
             <Box
               sx={{
                 background: style.bg,
@@ -128,9 +138,9 @@ function PaymentToastContainer({
                 maxWidth: 380,
                 width: '100%',
                 pointerEvents: 'auto',
-                animation: 'toastSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
-                '@keyframes toastSlideIn': {
-                  '0%': { opacity: 0, transform: 'translateY(-12px) scale(0.96)' },
+                animation: 'toastSlideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
+                '@keyframes toastSlideUp': {
+                  '0%': { opacity: 0, transform: 'translateY(12px) scale(0.96)' },
                   '100%': { opacity: 1, transform: 'translateY(0) scale(1)' },
                 },
                 '&:hover': {
@@ -179,6 +189,9 @@ function PaymentToastContainer({
   );
 }
 
+// สถานะที่ถือว่าชำระเงินแล้ว
+const PAID_STATUSES = ['PAID', 'COMPLETED', 'SHIPPED', 'READY', 'VERIFYING'];
+
 export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentModalProps): JSX.Element {
   const { toasts, addToast, removeToast } = usePaymentToast();
   const isMobile = useMediaQuery('(max-width: 640px)');
@@ -190,6 +203,12 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
   const [discount, setDiscount] = useState(0);
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [showCartDetails, setShowCartDetails] = useState(false);
+  const [orderStatus, setOrderStatus] = useState<string>('PENDING');
+  
+  // ตรวจสอบว่าชำระเงินแล้วหรือยัง
+  const isPaid = PAID_STATUSES.includes(orderStatus.toUpperCase());
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -223,6 +242,8 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
         setAmount(Number(info.finalAmount ?? info.amount ?? 0));
         setBaseAmount(Number(info.baseAmount ?? info.amount ?? 0));
         setDiscount(Number(info.discount ?? 0));
+        setCartItems(info.cart || []);
+        setOrderStatus(info.status || 'PENDING');
       } else {
         addToast('error', 'ข้อผิดพลาด', data.message || 'ไม่พบข้อมูลชำระเงิน');
       }
@@ -274,16 +295,46 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
         const data: any = await res.json();
 
         if (data.status === 'success') {
-          addToast('success', 'ชำระเงินสำเร็จ');
+          // แสดงชื่อผู้โอนถ้ามี
+          const senderName = data.data?.senderName;
+          const successMsg = senderName 
+            ? `ขอบคุณ ${senderName}` 
+            : 'ระบบได้รับสลิปแล้ว';
+          addToast('success', 'ชำระเงินสำเร็จ', successMsg);
           setTimeout(() => {
             onSuccess();
             onClose();
-          }, 1500);
+          }, 1800);
         } else {
-          addToast('error', 'ตรวจสอบไม่ผ่าน', data.message);
+          // แสดงข้อความ error ที่เฉพาะเจาะจง
+          const errorCode = data.code;
+          let title = 'ตรวจสอบไม่ผ่าน';
+          let message = data.message || 'กรุณาตรวจสอบสลิปและลองใหม่';
+
+          // ปรับ title ตาม error code
+          if (errorCode === 1012) {
+            title = 'สลิปซ้ำ';
+            message = 'สลิปนี้เคยใช้แล้ว กรุณาโอนเงินใหม่';
+          } else if (errorCode === 1013) {
+            title = '💰 ยอดเงินไม่ตรง';
+          } else if (errorCode === 1014) {
+            title = '🏦 บัญชีผิด';
+            message = 'กรุณาโอนเข้าบัญชีที่ถูกต้อง';
+          } else if (errorCode === 1007 || errorCode === 1008) {
+            title = '📷 QR ไม่ถูกต้อง';
+          }
+
+          addToast('error', title, message);
+          
+          // ถ้าสลิปซ้ำหรือบัญชีผิด ให้ reset slip
+          if (errorCode === 1012 || errorCode === 1014) {
+            setSelectedFile(null);
+            setPreviewUrl(null);
+            setActiveStep(0);
+          }
         }
       } catch (error) {
-        addToast('error', 'เกิดข้อผิดพลาด');
+        addToast('error', 'เกิดข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
       } finally {
         setVerifying(false);
       }
@@ -400,18 +451,6 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
               </Typography>
             </Box>
           </Box>
-          <IconButton 
-            onClick={onClose} 
-            sx={{ 
-              color: '#94a3b8', 
-              bgcolor: 'rgba(255,255,255,0.05)', 
-              width: 40,
-              height: 40,
-              '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } 
-            }}
-          >
-            <X size={20} />
-          </IconButton>
         </Box>
 
         {/* Progress Steps - Simplified */}
@@ -478,6 +517,247 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
             <Skeleton variant="rectangular" height={120} sx={{ bgcolor: 'rgba(30,41,59,0.5)', borderRadius: '20px' }} />
             <Skeleton variant="rectangular" height={300} sx={{ bgcolor: 'rgba(30,41,59,0.5)', borderRadius: '20px' }} />
             <Skeleton variant="rectangular" height={180} sx={{ bgcolor: 'rgba(30,41,59,0.5)', borderRadius: '20px' }} />
+          </Box>
+        ) : isPaid ? (
+          /* ============== ALREADY PAID UI ============== */
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, maxWidth: 500, mx: 'auto' }}>
+            {/* Success Hero Card */}
+            <Box sx={{
+              p: 4,
+              borderRadius: '24px',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              color: 'white',
+              textAlign: 'center',
+              position: 'relative',
+              overflow: 'hidden',
+            }}>
+              {/* Decorative circles */}
+              <Box sx={{
+                position: 'absolute',
+                top: -40,
+                right: -40,
+                width: 120,
+                height: 120,
+                borderRadius: '50%',
+                bgcolor: 'rgba(255,255,255,0.1)',
+              }} />
+              <Box sx={{
+                position: 'absolute',
+                bottom: -30,
+                left: -30,
+                width: 80,
+                height: 80,
+                borderRadius: '50%',
+                bgcolor: 'rgba(255,255,255,0.08)',
+              }} />
+              
+              {/* Success Icon */}
+              <Box sx={{
+                width: 80,
+                height: 80,
+                borderRadius: '50%',
+                bgcolor: 'rgba(255,255,255,0.2)',
+                display: 'grid',
+                placeItems: 'center',
+                mx: 'auto',
+                mb: 2,
+                boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+              }}>
+                <Check size={40} strokeWidth={3} />
+              </Box>
+              
+              <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, mb: 1 }}>
+                ชำระเงินสำเร็จแล้ว! 🎉
+              </Typography>
+              <Typography sx={{ fontSize: '0.9rem', opacity: 0.9, mb: 2 }}>
+                คำสั่งซื้อนี้ได้รับการชำระเงินเรียบร้อยแล้ว
+              </Typography>
+              
+              {/* Order Reference */}
+              <Box sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 1,
+                px: 2,
+                py: 0.8,
+                borderRadius: '20px',
+                bgcolor: 'rgba(255,255,255,0.2)',
+              }}>
+                <Typography sx={{ fontSize: '0.8rem', opacity: 0.9 }}>
+                  หมายเลขคำสั่งซื้อ:
+                </Typography>
+                <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, fontFamily: 'monospace' }}>
+                  {orderRef}
+                </Typography>
+              </Box>
+            </Box>
+
+            {/* Status Info Card */}
+            <Box sx={{
+              p: 2.5,
+              borderRadius: '20px',
+              bgcolor: 'rgba(30,41,59,0.4)',
+              border: '1px solid rgba(255,255,255,0.06)',
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                <Box sx={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: '10px',
+                  background: 'linear-gradient(135deg, rgba(59,130,246,0.2) 0%, rgba(6,182,212,0.2) 100%)',
+                  display: 'grid',
+                  placeItems: 'center',
+                }}>
+                  <Clock size={18} style={{ color: '#60a5fa' }} />
+                </Box>
+                <Box>
+                  <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#e2e8f0' }}>
+                    สถานะคำสั่งซื้อ
+                  </Typography>
+                  <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>
+                    อัปเดตล่าสุด
+                  </Typography>
+                </Box>
+              </Box>
+              
+              <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                p: 1.5,
+                borderRadius: '12px',
+                bgcolor: 'rgba(16,185,129,0.1)',
+                border: '1px solid rgba(16,185,129,0.2)',
+              }}>
+                <Box sx={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: '50%',
+                  bgcolor: '#10b981',
+                  display: 'grid',
+                  placeItems: 'center',
+                }}>
+                  <Check size={14} color="white" />
+                </Box>
+                <Box>
+                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#6ee7b7' }}>
+                    {orderStatus === 'PAID' && 'ซื้อสำเร็จ - รอรับสินค้า'}
+                    {orderStatus === 'READY' && 'พร้อมรับสินค้า'}
+                    {orderStatus === 'SHIPPED' && 'จัดส่งแล้ว'}
+                    {orderStatus === 'COMPLETED' && 'สำเร็จ'}
+                    {orderStatus === 'VERIFYING' && 'กำลังตรวจสอบสลิป'}
+                    {!['PAID', 'READY', 'SHIPPED', 'COMPLETED', 'VERIFYING'].includes(orderStatus) && 'ดำเนินการแล้ว'}
+                  </Typography>
+                  <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                    รอแอดมินเตรียมสินค้า
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+
+            {/* Amount Paid Card */}
+            <Box sx={{
+              p: 2.5,
+              borderRadius: '20px',
+              bgcolor: 'rgba(30,41,59,0.4)',
+              border: '1px solid rgba(255,255,255,0.06)',
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Typography sx={{ fontSize: '0.9rem', color: '#94a3b8' }}>
+                  ยอดที่ชำระแล้ว
+                </Typography>
+                <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: '#10b981' }}>
+                  ฿{amount.toLocaleString()}
+                </Typography>
+              </Box>
+            </Box>
+
+            {/* Cart Items - Show in Already Paid view */}
+            {cartItems.length > 0 && (
+              <Box sx={{
+                borderRadius: '20px',
+                bgcolor: 'rgba(30,41,59,0.4)',
+                border: '1px solid rgba(255,255,255,0.06)',
+                overflow: 'hidden',
+              }}>
+                <Box sx={{ 
+                  px: 2.5, 
+                  py: 2, 
+                  borderBottom: '1px solid rgba(255,255,255,0.06)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <ShoppingBag size={18} style={{ color: '#c4b5fd' }} />
+                    <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#e2e8f0' }}>
+                      รายการสินค้า ({cartItems.length})
+                    </Typography>
+                  </Box>
+                </Box>
+                <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  {cartItems.map((item, index) => (
+                    <Box 
+                      key={index}
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        py: 1,
+                        px: 1.5,
+                        borderRadius: '10px',
+                        bgcolor: 'rgba(15,23,42,0.3)',
+                      }}
+                    >
+                      <Box>
+                        <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: '#e2e8f0' }}>
+                          {item.productName}
+                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.3 }}>
+                          <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                            ไซส์ {item.size} • x{item.quantity}
+                          </Typography>
+                          {item.customName && (
+                            <Box sx={{ px: 0.8, py: 0.2, borderRadius: '4px', bgcolor: 'rgba(236,72,153,0.15)' }}>
+                              <Typography sx={{ fontSize: '0.6rem', color: '#f472b6' }}>{item.customName}</Typography>
+                            </Box>
+                          )}
+                          {item.customNumber && (
+                            <Box sx={{ px: 0.8, py: 0.2, borderRadius: '4px', bgcolor: 'rgba(251,191,36,0.15)' }}>
+                              <Typography sx={{ fontSize: '0.6rem', color: '#fbbf24' }}>#{item.customNumber}</Typography>
+                            </Box>
+                          )}
+                        </Box>
+                      </Box>
+                      <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#6ee7b7' }}>
+                        ฿{(item.unitPrice * item.quantity).toLocaleString()}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+            )}
+
+            {/* Close Button */}
+            <Button
+              fullWidth
+              onClick={onClose}
+              sx={{
+                py: 1.8,
+                borderRadius: '16px',
+                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                color: 'white',
+                fontSize: '1rem',
+                fontWeight: 700,
+                textTransform: 'none',
+                boxShadow: '0 8px 24px rgba(59,130,246,0.35)',
+                '&:hover': {
+                  background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                },
+              }}
+            >
+              ปิด
+            </Button>
           </Box>
         ) : (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, maxWidth: 500, mx: 'auto' }}>
@@ -550,6 +830,161 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                 </Box>
               )}
             </Box>
+
+            {/* Cart Items Card */}
+            {cartItems.length > 0 && (
+              <Box sx={{
+                borderRadius: '24px',
+                bgcolor: 'rgba(30,41,59,0.4)',
+                border: '1px solid rgba(255,255,255,0.06)',
+                overflow: 'hidden',
+              }}>
+                {/* Card Header - Clickable */}
+                <Box 
+                  onClick={() => setShowCartDetails(!showCartDetails)}
+                  sx={{ 
+                    px: 2.5, 
+                    py: 2, 
+                    borderBottom: showCartDetails ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    cursor: 'pointer',
+                    transition: 'background 0.2s',
+                    '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' },
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <Box sx={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: '12px',
+                      background: 'linear-gradient(135deg, rgba(139,92,246,0.2) 0%, rgba(236,72,153,0.2) 100%)',
+                      display: 'grid',
+                      placeItems: 'center',
+                    }}>
+                      <ShoppingBag size={20} style={{ color: '#c4b5fd' }} />
+                    </Box>
+                    <Box>
+                      <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#e2e8f0' }}>
+                        รายการสินค้า
+                      </Typography>
+                      <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>
+                        {cartItems.length} รายการ • {cartItems.reduce((sum, item) => sum + item.quantity, 0)} ชิ้น
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box sx={{
+                      px: 1.5,
+                      py: 0.5,
+                      borderRadius: '20px',
+                      bgcolor: 'rgba(139,92,246,0.1)',
+                      border: '1px solid rgba(139,92,246,0.2)',
+                    }}>
+                      <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#c4b5fd' }}>
+                        {showCartDetails ? 'ซ่อน' : 'ดูรายละเอียด'}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Box>
+                
+                {/* Cart Items List */}
+                <Collapse in={showCartDetails}>
+                  <Box sx={{ px: 2, py: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                    {cartItems.map((item, index) => (
+                      <Box 
+                        key={index}
+                        sx={{
+                          p: 2,
+                          borderRadius: '16px',
+                          bgcolor: 'rgba(15,23,42,0.5)',
+                          border: '1px solid rgba(255,255,255,0.04)',
+                        }}
+                      >
+                        {/* Product Name & Quantity */}
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                          <Box sx={{ flex: 1 }}>
+                            <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: '#e2e8f0' }}>
+                              {item.productName}
+                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                              <Typography sx={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                                ไซส์ {item.size}
+                              </Typography>
+                              <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>•</Typography>
+                              <Typography sx={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                                x{item.quantity}
+                              </Typography>
+                            </Box>
+                          </Box>
+                          <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#6ee7b7' }}>
+                            ฿{(item.unitPrice * item.quantity).toLocaleString()}
+                          </Typography>
+                        </Box>
+                        
+                        {/* Custom Options Badges */}
+                        {(item.customName || item.customNumber || item.isLongSleeve) && (
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.8, mt: 1.5 }}>
+                            {item.customName && (
+                              <Box sx={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 0.5,
+                                px: 1.2,
+                                py: 0.4,
+                                borderRadius: '8px',
+                                bgcolor: 'rgba(236,72,153,0.15)',
+                                border: '1px solid rgba(236,72,153,0.3)',
+                              }}>
+                                <Tag size={12} style={{ color: '#f472b6' }} />
+                                <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#f9a8d4' }}>
+                                  {item.customName}
+                                </Typography>
+                              </Box>
+                            )}
+                            {item.customNumber && (
+                              <Box sx={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 0.5,
+                                px: 1.2,
+                                py: 0.4,
+                                borderRadius: '8px',
+                                bgcolor: 'rgba(251,191,36,0.15)',
+                                border: '1px solid rgba(251,191,36,0.3)',
+                              }}>
+                                <Hash size={12} style={{ color: '#fbbf24' }} />
+                                <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#fcd34d' }}>
+                                  เบอร์ {item.customNumber}
+                                </Typography>
+                              </Box>
+                            )}
+                            {item.isLongSleeve && (
+                              <Box sx={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 0.5,
+                                px: 1.2,
+                                py: 0.4,
+                                borderRadius: '8px',
+                                bgcolor: 'rgba(34,211,238,0.15)',
+                                border: '1px solid rgba(34,211,238,0.3)',
+                              }}>
+                                <Shirt size={12} style={{ color: '#22d3ee' }} />
+                                <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#67e8f9' }}>
+                                  แขนยาว
+                                </Typography>
+                              </Box>
+                            )}
+                          </Box>
+                        )}
+                      </Box>
+                    ))}
+                  </Box>
+                </Collapse>
+              </Box>
+            )}
 
             {/* QR Code Card */}
             <Box sx={{
@@ -920,6 +1355,27 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
               กรุณาแนบสลิปก่อนกดยืนยัน
             </Typography>
           )}
+
+          {/* Close Button */}
+          <Button
+            fullWidth
+            onClick={onClose}
+            startIcon={<X size={18} />}
+            sx={{
+              mt: 1.5,
+              py: 1.2,
+              borderRadius: '12px',
+              bgcolor: 'rgba(100,116,139,0.15)',
+              border: '1px solid rgba(100,116,139,0.3)',
+              color: '#94a3b8',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              textTransform: 'none',
+              '&:hover': { bgcolor: 'rgba(100,116,139,0.25)' },
+            }}
+          >
+            ปิด
+          </Button>
         </Box>
       </Box>
     </Drawer>

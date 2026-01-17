@@ -59,7 +59,7 @@ export async function GET(
         <head><title>ไม่พบสลิป</title><meta charset="utf-8"></head>
         <body style="font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #1e293b; color: #94a3b8;">
           <div style="text-align: center;">
-            <h1 style="color: #f59e0b;">⚠️ ไม่พบสลิป</h1>
+            <h1 style="color: #f59e0b;">ไม่พบสลิป</h1>
             <p>ออเดอร์ #${ref} ยังไม่มีการอัพโหลดสลิป</p>
           </div>
         </body>
@@ -75,7 +75,7 @@ export async function GET(
       : `data:${mime};base64,${slip.base64}`;
     
     const uploadedAt = slip.uploadedAt ? new Date(slip.uploadedAt).toLocaleString('th-TH') : '-';
-    const verified = slip.slipCheck?.success ? '✅ ผ่านการตรวจสอบ' : '⏳ รอตรวจสอบ';
+    const verified = slip.slipCheck?.success ? 'ผ่านการตรวจสอบ' : 'รอตรวจสอบ';
     const slipData = slip.slipCheck?.data;
     
     // Return HTML page with slip image

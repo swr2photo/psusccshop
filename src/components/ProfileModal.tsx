@@ -127,12 +127,12 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
         },
       }}
     >
-      {/* Inline Notification Toast */}
+      {/* Inline Notification Toast - Bottom */}
       {notification && (
         <Box
           sx={{
             position: 'absolute',
-            top: { xs: 85, sm: 90 },
+            bottom: { xs: 160, sm: 130 },
             left: '50%',
             transform: 'translateX(-50%)',
             zIndex: 100,
@@ -140,7 +140,7 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
             maxWidth: 380,
           }}
         >
-          <Slide direction="down" in={true} mountOnEnter unmountOnExit>
+          <Slide direction="up" in={true} mountOnEnter unmountOnExit>
             <Box
               sx={{
                 background: NOTIFICATION_STYLES[notification.type].bg,
@@ -153,9 +153,9 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
                 display: 'flex',
                 alignItems: 'center',
                 gap: 1.5,
-                animation: 'notificationSlide 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
-                '@keyframes notificationSlide': {
-                  '0%': { opacity: 0, transform: 'translateY(-12px) scale(0.96)' },
+                animation: 'notificationSlideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
+                '@keyframes notificationSlideUp': {
+                  '0%': { opacity: 0, transform: 'translateY(12px) scale(0.96)' },
                   '100%': { opacity: 1, transform: 'translateY(0) scale(1)' },
                 },
               }}
@@ -176,13 +176,6 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
               <Typography sx={{ fontWeight: 600, fontSize: '0.85rem', flex: 1 }}>
                 {notification.message}
               </Typography>
-              <IconButton 
-                size="small" 
-                onClick={() => setNotification(null)} 
-                sx={{ color: 'white', opacity: 0.8, p: 0.3 }}
-              >
-                <X size={14} />
-              </IconButton>
             </Box>
           </Slide>
         </Box>
@@ -224,18 +217,6 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
               </Typography>
             </Box>
           </Box>
-          <IconButton 
-            onClick={onClose} 
-            sx={{ 
-              color: '#94a3b8', 
-              bgcolor: 'rgba(255,255,255,0.05)', 
-              width: 40,
-              height: 40,
-              '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } 
-            }}
-          >
-            <X size={20} />
-          </IconButton>
         </Box>
       </Box>
 
@@ -540,6 +521,27 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
               กรุณายินยอมนโยบายความเป็นส่วนตัวก่อนดำเนินการ
             </Typography>
           )}
+
+          {/* Close Button */}
+          <Button
+            fullWidth
+            onClick={onClose}
+            startIcon={<X size={18} />}
+            sx={{
+              mt: 1.5,
+              py: 1.2,
+              borderRadius: '12px',
+              bgcolor: 'rgba(100,116,139,0.15)',
+              border: '1px solid rgba(100,116,139,0.3)',
+              color: '#94a3b8',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              textTransform: 'none',
+              '&:hover': { bgcolor: 'rgba(100,116,139,0.25)' },
+            }}
+          >
+            ปิด
+          </Button>
         </Box>
       </Box>
     </Drawer>

@@ -35,15 +35,70 @@ export interface ShopConfig {
     productsKey?: string;
   sheetId?: string;
   sheetUrl?: string;
+  /** Legacy single announcement (deprecated, kept for backward compatibility) */
   announcement?: {
     enabled: boolean;
     message: string;
     color: string;
+    /** Image URL for announcement (optional) */
+    imageUrl?: string;
+    /** Who posted this announcement */
+    postedBy?: string;
+    /** Custom display name for announcement */
+    displayName?: string;
+    /** Timestamp when posted */
+    postedAt?: string;
+    /** Type: 'text' | 'image' | 'both' */
+    type?: 'text' | 'image' | 'both';
+    /** Show logo in announcement */
+    showLogo?: boolean;
+    /** Unique ID for this announcement */
+    id?: string;
   };
+  /** Multiple announcements (new system) */
+  announcements?: Array<{
+    id: string;
+    enabled: boolean;
+    message: string;
+    color: string;
+    imageUrl?: string;
+    postedBy?: string;
+    displayName?: string;
+    postedAt: string;
+    type?: 'text' | 'image' | 'both';
+    showLogo?: boolean;
+    /** Priority/order for display */
+    priority?: number;
+  }>;
+  /** Announcement history (last 50) */
+  announcementHistory?: Array<{
+    id: string;
+    message: string;
+    color: string;
+    imageUrl?: string;
+    postedBy?: string;
+    displayName?: string;
+    postedAt: string;
+    type?: 'text' | 'image' | 'both';
+    deletedAt?: string;
+    deletedBy?: string;
+  }>;
   bankAccount?: {
     bankName: string;
     accountName: string;
     accountNumber: string;
+  };
+  /** List of admin emails (managed by super admin) */
+  adminEmails?: string[];
+  /** Admin permissions - what each admin can do */
+  adminPermissions?: {
+    [email: string]: {
+      canManageShop?: boolean;      // เปิด/ปิดร้าน
+      canManageSheet?: boolean;     // จัดการ Sheet
+      canManageAnnouncement?: boolean; // ประกาศ
+      canManageOrders?: boolean;    // จัดการออเดอร์
+      canManageProducts?: boolean;  // จัดการสินค้า
+    };
   };
 }
 
@@ -94,13 +149,34 @@ const ADMIN_EMAILS_RAW = [
   // Add more admin emails here
 ];
 
+// Super admin - can manage other admins (cannot be removed)
+export const SUPER_ADMIN_EMAIL = 'doralaikon.th@gmail.com';
+
 // Normalize to lowercase and trim to avoid casing/whitespace mismatches
 export const ADMIN_EMAILS = ADMIN_EMAILS_RAW.map((e) => e.trim().toLowerCase()).filter(Boolean);
+
+// Dynamic admin check - supports runtime admin list from config
+let dynamicAdminEmails: string[] = [];
+
+export const setDynamicAdminEmails = (emails: string[]) => {
+  dynamicAdminEmails = emails.map(e => e.trim().toLowerCase()).filter(Boolean);
+};
+
+export const isSuperAdmin = (email: string | null): boolean => {
+  if (!email) return false;
+  return email.trim().toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
+};
 
 export const isAdmin = (email: string | null): boolean => {
   if (!email) return false;
   const normalized = email.trim().toLowerCase();
-  return ADMIN_EMAILS.includes(normalized);
+  // Check super admin first
+  if (normalized === SUPER_ADMIN_EMAIL.toLowerCase()) return true;
+  // Check static list
+  if (ADMIN_EMAILS.includes(normalized)) return true;
+  // Check dynamic list from config
+  if (dynamicAdminEmails.includes(normalized)) return true;
+  return false;
 };
 
 export const SIZES = ['S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL', '7XL'];

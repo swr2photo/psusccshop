@@ -92,9 +92,21 @@ import {
   Warning,
   Description,
   HistoryEdu,
+  ShoppingBag,
+  ExpandMore,
+  ExpandLess,
+  PersonAdd,
+  AdminPanelSettings,
+  Shield,
+  Announcement,
+  NotificationsActive,
+  ToggleOn,
+  ToggleOff,
+  ContentCopy,
+  Archive,
 } from '@mui/icons-material';
 
-import { isAdmin, Product, ShopConfig, SIZES } from '@/lib/config';
+import { isAdmin, isSuperAdmin, setDynamicAdminEmails, SUPER_ADMIN_EMAIL, Product, ShopConfig, SIZES } from '@/lib/config';
 import { deleteOrderAdmin, getAdminData, saveShopConfig, syncOrdersSheet, updateOrderAdmin, updateOrderStatusAPI } from '@/lib/api-client';
 
 // ============== TYPES ==============
@@ -102,6 +114,20 @@ interface AdminDataResponse {
   orders?: any[];
   logs?: any[][];
   config?: ShopConfig;
+}
+
+interface CartItemAdmin {
+  id?: string;
+  productId?: string;
+  productName?: string;
+  size?: string;
+  quantity: number;
+  unitPrice: number;
+  options?: {
+    customName?: string;
+    customNumber?: string;
+    isLongSleeve?: boolean;
+  };
 }
 
 interface AdminOrder {
@@ -118,7 +144,7 @@ interface AdminOrder {
     fileName?: string;
     mime?: string;
   };
-  cart?: Array<{ unitPrice: number; quantity: number }>;
+  cart?: CartItemAdmin[];
 }
 
 interface Toast {
@@ -131,12 +157,36 @@ interface Toast {
 const DEFAULT_CONFIG: ShopConfig = {
   isOpen: true,
   closeDate: '',
-  announcement: { enabled: false, message: '', color: 'blue' },
+  announcements: [],
   products: [],
   sheetId: '',
   sheetUrl: '',
   bankAccount: { bankName: '', accountName: '', accountNumber: '' },
+  announcementHistory: [],
 };
+
+// Preset colors for color picker
+const PRESET_COLORS = [
+  '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16',
+  '#22c55e', '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9',
+  '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef',
+  '#ec4899', '#f43f5e', '#64748b', '#1e293b', '#000000',
+];
+
+// Announcement type definition
+interface Announcement {
+  id: string;
+  enabled: boolean;
+  message: string;
+  color: string;
+  imageUrl?: string;
+  postedBy?: string;
+  displayName?: string;
+  postedAt: string;
+  type?: 'text' | 'image' | 'both';
+  showLogo?: boolean;
+  priority?: number;
+}
 
 const ADMIN_CACHE_KEY = 'psusccshop-admin-cache';
 let ADMIN_CACHE_DISABLED = false;
@@ -189,7 +239,7 @@ const saveAdminCache = (payload: { config: ShopConfig; orders?: AdminOrder[]; lo
         isOpen: payload.config?.isOpen ?? false,
         sheetId: payload.config?.sheetId || '',
         sheetUrl: payload.config?.sheetUrl || '',
-        announcement: payload.config?.announcement,
+        announcements: payload.config?.announcements || [],
         // Skip products entirely to save space
         products: [],
       },
@@ -327,6 +377,70 @@ const tableSx = {
   '& thead th': { backgroundColor: 'rgba(255,255,255,0.08)', color: ADMIN_THEME.text },
 };
 
+// ============== SETTINGS COMPONENTS (Stable - defined outside to prevent remount) ==============
+const SettingSection = ({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) => (
+  <Box sx={{
+    ...glassCardSx,
+    overflow: 'hidden',
+  }}>
+    <Box sx={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 2,
+      p: 2.5,
+      borderBottom: `1px solid ${ADMIN_THEME.border}`,
+      background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(59, 130, 246, 0.05) 100%)',
+    }}>
+      <Box sx={{
+        width: 40,
+        height: 40,
+        borderRadius: '12px',
+        background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#fff',
+      }}>
+        {icon}
+      </Box>
+      <Typography sx={{ fontSize: '1.1rem', fontWeight: 700, color: '#f1f5f9' }}>
+        {title}
+      </Typography>
+    </Box>
+    <Box sx={{ p: 2.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {children}
+    </Box>
+  </Box>
+);
+
+const SettingToggleRow = ({ label, description, checked, onChange }: { label: string; description?: string; checked: boolean; onChange: (checked: boolean) => void }) => (
+  <Box sx={{ 
+    display: 'flex', 
+    justifyContent: 'space-between', 
+    alignItems: 'center',
+    py: 0.5,
+  }}>
+    <Box>
+      <Typography sx={{ fontSize: '0.95rem', fontWeight: 500, color: '#e2e8f0' }}>{label}</Typography>
+      {description && (
+        <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>{description}</Typography>
+      )}
+    </Box>
+    <Switch
+      checked={checked}
+      onChange={(e) => onChange(e.target.checked)}
+      sx={{
+        '& .MuiSwitch-switchBase.Mui-checked': {
+          color: '#10b981',
+        },
+        '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+          backgroundColor: '#10b981',
+        },
+      }}
+    />
+  </Box>
+);
+
 // ============== UTILITIES ==============
 const sanitizeInput = (str: string) => str.trim().slice(0, 500);
 const validatePrice = (price: number) => price >= 0 && price <= 999999;
@@ -339,6 +453,1362 @@ const toDateTimeLocal = (dateStr: string | undefined): string => {
   // Date-only format - add time
   return `${dateStr}T00:00`;
 };
+
+// ============== SETTINGS VIEW COMPONENT (Stable - React.memo outside AdminPage) ==============
+interface SettingsViewProps {
+  localConfig: ShopConfig;
+  hasChanges: boolean;
+  loading: boolean;
+  lastSavedTime: Date | null;
+  newAdminEmail: string;
+  userEmail: string | null | undefined;
+  sheetSyncing: boolean;
+  onConfigChange: (newVal: ShopConfig) => void;
+  onSave: () => void;
+  onReset: () => void;
+  onNewAdminEmailChange: (email: string) => void;
+  showToast: (type: 'success' | 'error' | 'info' | 'warning', message: string) => void;
+  triggerSheetSync: (action: 'sync' | 'create') => void;
+  onImageUpload?: (file: File) => Promise<string | null>;
+}
+
+import React from 'react';
+
+const SettingsView = React.memo(function SettingsView({
+  localConfig,
+  hasChanges,
+  loading,
+  lastSavedTime,
+  newAdminEmail,
+  userEmail,
+  sheetSyncing,
+  onConfigChange,
+  onSave,
+  onReset,
+  onNewAdminEmailChange,
+  showToast,
+  triggerSheetSync,
+}: SettingsViewProps) {
+  const isSuperAdminUser = isSuperAdmin(userEmail ?? null);
+
+  // Get admin permissions
+  const adminPerms = localConfig.adminPermissions?.[userEmail?.toLowerCase() ?? ''] ?? {
+    canManageShop: false,
+    canManageSheet: false,
+    canManageAnnouncement: true, // Default: admins can manage announcements
+    canManageOrders: true,
+    canManageProducts: true,
+  };
+
+  // Super admin has all permissions
+  const canManageShop = isSuperAdminUser || adminPerms.canManageShop;
+  const canManageSheet = isSuperAdminUser || adminPerms.canManageSheet;
+  const canManageAnnouncement = isSuperAdminUser || adminPerms.canManageAnnouncement;
+
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, maxWidth: 700 }}>
+      {/* Header with Save Button */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1, flexWrap: 'wrap', gap: 2 }}>
+        <Box>
+          <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: '#f1f5f9', display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Settings sx={{ fontSize: 24 }} />
+            ตั้งค่าร้านค้า
+          </Typography>
+          <Typography sx={{ fontSize: '0.85rem', color: '#64748b' }}>
+            {isSuperAdminUser ? 'จัดการการตั้งค่าทั้งหมดของร้าน' : 'จัดการประกาศและการตั้งค่าที่ได้รับอนุญาต'}
+          </Typography>
+        </Box>
+        
+        <Box sx={{ display: 'flex', gap: 1, opacity: hasChanges ? 1 : 0, pointerEvents: hasChanges ? 'auto' : 'none', transition: 'opacity 0.2s' }}>
+          <Button
+            variant="outlined"
+            onClick={onReset}
+            sx={{
+              borderColor: ADMIN_THEME.border,
+              color: ADMIN_THEME.muted,
+              borderRadius: '10px',
+              textTransform: 'none',
+              '&:hover': { borderColor: '#ef4444', color: '#ef4444' },
+            }}
+          >
+            ยกเลิก
+          </Button>
+          <Button
+            variant="contained"
+            onClick={onSave}
+            startIcon={<Save />}
+            sx={{
+              background: ADMIN_THEME.gradient,
+              borderRadius: '10px',
+              textTransform: 'none',
+              fontWeight: 700,
+              boxShadow: '0 4px 15px rgba(139, 92, 246, 0.3)',
+              animation: hasChanges ? 'pulse 2s infinite' : 'none',
+              '@keyframes pulse': {
+                '0%, 100%': { boxShadow: '0 4px 15px rgba(139, 92, 246, 0.3)' },
+                '50%': { boxShadow: '0 4px 25px rgba(139, 92, 246, 0.5)' },
+              },
+            }}
+          >
+            บันทึกการตั้งค่า
+          </Button>
+        </Box>
+      </Box>
+
+      {/* Unsaved Changes Warning - use opacity instead of conditional render to prevent layout shift */}
+      <Box sx={{
+        p: 2,
+        borderRadius: '12px',
+        bgcolor: 'rgba(251, 191, 36, 0.1)',
+        border: '1px solid rgba(251, 191, 36, 0.3)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 2,
+        opacity: hasChanges ? 1 : 0,
+        maxHeight: hasChanges ? 100 : 0,
+        overflow: 'hidden',
+        transition: 'opacity 0.2s, max-height 0.2s',
+        mb: hasChanges ? 0 : -3,
+      }}>
+        <Warning sx={{ fontSize: 24, color: '#fbbf24' }} />
+        <Typography sx={{ fontSize: '0.9rem', color: '#fbbf24' }}>
+          มีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก กดปุ่ม "บันทึกการตั้งค่า" เพื่อยืนยัน
+        </Typography>
+      </Box>
+
+      {/* Shop Status - Only for Super Admin or admins with permission */}
+      {canManageShop && (
+        <SettingSection icon={<Store sx={{ fontSize: 20 }} />} title="สถานะร้านค้า">
+          <SettingToggleRow
+            label="เปิดรับออเดอร์"
+            description={localConfig.isOpen ? 'ร้านเปิดให้บริการอยู่' : 'ปิดรับออเดอร์ชั่วคราว'}
+            checked={localConfig.isOpen}
+            onChange={(checked) => onConfigChange({...localConfig, isOpen: checked})}
+          />
+          {!localConfig.isOpen && (
+            <Box sx={{ 
+              mt: 1, 
+              p: 2, 
+              borderRadius: '12px', 
+              bgcolor: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid rgba(239, 68, 68, 0.2)',
+            }}>
+              <Typography sx={{ fontSize: '0.85rem', color: '#f87171', mb: 1.5 }}>
+                <CalendarToday sx={{ fontSize: 20, mr: 1, verticalAlign: 'middle' }} />
+                กำหนดวันเปิดร้าน
+              </Typography>
+              <TextField
+                type="date"
+                value={localConfig.closeDate}
+                onChange={(e) => onConfigChange({...localConfig, closeDate: e.target.value})}
+                fullWidth
+                sx={{
+                  ...inputSx,
+                  '& .MuiOutlinedInput-root': {
+                    ...inputSx['& .MuiOutlinedInput-root'],
+                    borderRadius: '10px',
+                  },
+                }}
+              />
+            </Box>
+          )}
+        </SettingSection>
+      )}
+
+      {/* Google Sheet - Only for Super Admin or admins with permission */}
+      {canManageSheet && (
+        <SettingSection icon={<Bolt sx={{ fontSize: 20 }} />} title="Google Sheet">
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <TextField
+              label="Sheet ID"
+              placeholder="1abc123..."
+              value={localConfig.sheetId || ''}
+              onChange={(e) => onConfigChange({ ...localConfig, sheetId: e.target.value, sheetUrl: e.target.value ? `https://docs.google.com/spreadsheets/d/${e.target.value}` : '' })}
+              fullWidth
+              sx={{
+                ...inputSx,
+                '& .MuiOutlinedInput-root': {
+                  ...inputSx['& .MuiOutlinedInput-root'],
+                  borderRadius: '10px',
+                },
+              }}
+              helperText="ใส่ ID จาก URL ของ Google Sheet"
+            />
+            
+            {localConfig.sheetUrl && (
+              <Box sx={{
+                p: 2,
+                borderRadius: '12px',
+                bgcolor: 'rgba(16, 185, 129, 0.1)',
+                border: '1px solid rgba(16, 185, 129, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 2,
+              }}>
+                <Box sx={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: '10px',
+                  bgcolor: '#10b981',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <Check sx={{ color: '#fff', fontSize: 20 }} />
+                </Box>
+                <Box sx={{ flex: 1 }}>
+                  <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: '#10b981' }}>
+                    เชื่อมต่อแล้ว
+                  </Typography>
+                  <Typography 
+                    component="a"
+                    href={localConfig.sheetUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    sx={{ 
+                      fontSize: '0.8rem', 
+                      color: '#64748b',
+                      textDecoration: 'underline',
+                      '&:hover': { color: '#94a3b8' },
+                    }}
+                  >
+                    เปิด Google Sheet
+                  </Typography>
+                </Box>
+              </Box>
+            )}
+
+            <Box sx={{ display: 'flex', gap: 1.5 }}>
+              <Button
+                onClick={() => triggerSheetSync(localConfig.sheetId ? 'sync' : 'create')}
+                disabled={sheetSyncing}
+                sx={{ ...gradientButtonSx, flex: 1, gap: 1 }}
+              >
+                <Bolt sx={{ fontSize: 18 }} />
+                {sheetSyncing ? 'กำลังซิงก์...' : localConfig.sheetId ? 'ซิงก์ทันที' : 'สร้าง Sheet ใหม่'}
+              </Button>
+            </Box>
+          </Box>
+        </SettingSection>
+      )}
+
+      {/* Admin Management - Only visible to Super Admin */}
+      {isSuperAdminUser && (
+        <SettingSection icon={<AdminPanelSettings sx={{ fontSize: 20 }} />} title="จัดการแอดมิน">
+          <Box sx={{ mb: 2 }}>
+            <Box sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 1, 
+              mb: 1.5,
+              p: 1.5,
+              borderRadius: '10px',
+              bgcolor: 'rgba(251, 191, 36, 0.1)',
+              border: '1px solid rgba(251, 191, 36, 0.3)',
+            }}>
+              <Shield sx={{ fontSize: 18, color: '#fbbf24' }} />
+              <Typography sx={{ fontSize: '0.8rem', color: '#fbbf24' }}>
+                เฉพาะบัญชีสูงสุดเท่านั้นที่สามารถจัดการแอดมินได้
+              </Typography>
+            </Box>
+            
+            {/* Super Admin Badge */}
+            <Box sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 1.5, 
+              p: 2,
+              borderRadius: '12px',
+              bgcolor: 'rgba(16, 185, 129, 0.1)',
+              border: '1px solid rgba(16, 185, 129, 0.3)',
+              mb: 2,
+            }}>
+              <Box sx={{
+                width: 40,
+                height: 40,
+                borderRadius: '10px',
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <Shield sx={{ fontSize: 20, color: '#fff' }} />
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>บัญชีสูงสุด (Super Admin)</Typography>
+                <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: '#34d399' }}>
+                  {SUPER_ADMIN_EMAIL}
+                </Typography>
+              </Box>
+            </Box>
+
+            {/* Add Admin Form */}
+            <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+              <TextField
+                placeholder="กรอกอีเมลแอดมินใหม่..."
+                value={newAdminEmail}
+                onChange={(e) => onNewAdminEmailChange(e.target.value)}
+                fullWidth
+                size="small"
+                sx={{
+                  ...inputSx,
+                  '& .MuiOutlinedInput-root': {
+                    ...inputSx['& .MuiOutlinedInput-root'],
+                    borderRadius: '10px',
+                  },
+                }}
+              />
+              <Button
+                onClick={() => {
+                  const email = newAdminEmail.trim().toLowerCase();
+                  if (!email) return;
+                  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                    showToast('error', 'รูปแบบอีเมลไม่ถูกต้อง');
+                    return;
+                  }
+                  if (email === SUPER_ADMIN_EMAIL.toLowerCase()) {
+                    showToast('warning', 'ไม่สามารถเพิ่มบัญชีสูงสุดซ้ำได้');
+                    return;
+                  }
+                  const currentAdmins = localConfig.adminEmails || [];
+                  if (currentAdmins.map(e => e.toLowerCase()).includes(email)) {
+                    showToast('warning', 'อีเมลนี้เป็นแอดมินอยู่แล้ว');
+                    return;
+                  }
+                  onConfigChange({
+                    ...localConfig,
+                    adminEmails: [...currentAdmins, email]
+                  });
+                  onNewAdminEmailChange('');
+                  showToast('success', `เพิ่ม ${email} เป็นแอดมินแล้ว (กรุณาบันทึกการตั้งค่า)`);
+                }}
+                sx={{
+                  ...gradientButtonSx,
+                  minWidth: 100,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <PersonAdd sx={{ fontSize: 18, mr: 0.5 }} />
+                เพิ่ม
+              </Button>
+            </Box>
+
+            {/* Admin List */}
+            <Typography sx={{ fontSize: '0.8rem', color: '#64748b', mb: 1 }}>
+              รายชื่อแอดมิน ({(localConfig.adminEmails || []).length} คน)
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              {(localConfig.adminEmails || []).length === 0 ? (
+                <Box sx={{
+                  p: 2,
+                  borderRadius: '10px',
+                  bgcolor: 'rgba(255,255,255,0.03)',
+                  border: `1px solid ${ADMIN_THEME.border}`,
+                  textAlign: 'center',
+                }}>
+                  <Typography sx={{ fontSize: '0.85rem', color: '#64748b' }}>
+                    ยังไม่มีแอดมินเพิ่มเติม
+                  </Typography>
+                </Box>
+              ) : (
+                (localConfig.adminEmails || []).map((adminEmail, idx) => {
+                  const perms = localConfig.adminPermissions?.[adminEmail.toLowerCase()] ?? {
+                    canManageShop: false,
+                    canManageSheet: false,
+                    canManageAnnouncement: true,
+                    canManageOrders: true,
+                    canManageProducts: true,
+                  };
+                  
+                  const togglePermission = (key: string, value: boolean) => {
+                    const currentPerms = localConfig.adminPermissions ?? {};
+                    onConfigChange({
+                      ...localConfig,
+                      adminPermissions: {
+                        ...currentPerms,
+                        [adminEmail.toLowerCase()]: {
+                          ...perms,
+                          [key]: value,
+                        }
+                      }
+                    });
+                  };
+
+                  return (
+                    <Box
+                      key={idx}
+                      sx={{
+                        borderRadius: '12px',
+                        bgcolor: 'rgba(255,255,255,0.03)',
+                        border: `1px solid ${ADMIN_THEME.border}`,
+                        overflow: 'hidden',
+                      }}
+                    >
+                      {/* Admin Header */}
+                      <Box sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1.5,
+                        p: 1.5,
+                        borderBottom: `1px solid ${ADMIN_THEME.border}`,
+                        bgcolor: 'rgba(139, 92, 246, 0.05)',
+                      }}>
+                        <Box sx={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: '8px',
+                          bgcolor: 'rgba(139, 92, 246, 0.2)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}>
+                          <Person sx={{ fontSize: 18, color: '#a78bfa' }} />
+                        </Box>
+                        <Typography sx={{ flex: 1, fontSize: '0.9rem', color: '#e2e8f0', fontWeight: 600 }}>
+                          {adminEmail}
+                        </Typography>
+                        <IconButton
+                          size="small"
+                          onClick={() => {
+                            const currentAdmins = localConfig.adminEmails || [];
+                            const currentPerms = { ...(localConfig.adminPermissions ?? {}) };
+                            delete currentPerms[adminEmail.toLowerCase()];
+                            onConfigChange({
+                              ...localConfig,
+                              adminEmails: currentAdmins.filter((_, i) => i !== idx),
+                              adminPermissions: currentPerms,
+                            });
+                            showToast('info', `ลบ ${adminEmail} ออกจากแอดมินแล้ว (กรุณาบันทึกการตั้งค่า)`);
+                          }}
+                          sx={{
+                            color: '#ef4444',
+                            '&:hover': { bgcolor: 'rgba(239, 68, 68, 0.1)' },
+                          }}
+                        >
+                          <Delete sx={{ fontSize: 18 }} />
+                        </IconButton>
+                      </Box>
+                      
+                      {/* Permissions */}
+                      <Box sx={{ p: 1.5 }}>
+                        <Typography sx={{ fontSize: '0.75rem', color: '#64748b', mb: 1 }}>สิทธิ์การใช้งาน:</Typography>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                          {[
+                            { key: 'canManageShop', label: '🏪 เปิด/ปิดร้าน', color: '#10b981' },
+                            { key: 'canManageSheet', label: '📊 จัดการ Sheet', color: '#3b82f6' },
+                            { key: 'canManageAnnouncement', label: '📢 ประกาศ', color: '#f59e0b' },
+                            { key: 'canManageOrders', label: '📦 จัดการออเดอร์', color: '#8b5cf6' },
+                            { key: 'canManageProducts', label: '🛍️ จัดการสินค้า', color: '#ec4899' },
+                          ].map(perm => (
+                            <Box
+                              key={perm.key}
+                              onClick={() => togglePermission(perm.key, !perms[perm.key as keyof typeof perms])}
+                              sx={{
+                                px: 1.5,
+                                py: 0.5,
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                fontSize: '0.75rem',
+                                fontWeight: 500,
+                                bgcolor: perms[perm.key as keyof typeof perms] 
+                                  ? `${perm.color}20` 
+                                  : 'rgba(255,255,255,0.05)',
+                                color: perms[perm.key as keyof typeof perms] 
+                                  ? perm.color 
+                                  : '#64748b',
+                                border: `1px solid ${perms[perm.key as keyof typeof perms] 
+                                  ? perm.color 
+                                  : 'transparent'}`,
+                                transition: 'all 0.2s ease',
+                                '&:hover': { 
+                                  bgcolor: perms[perm.key as keyof typeof perms] 
+                                    ? `${perm.color}30` 
+                                    : 'rgba(255,255,255,0.1)',
+                                },
+                              }}
+                            >
+                              {perm.label}
+                            </Box>
+                          ))}
+                        </Box>
+                      </Box>
+                    </Box>
+                  );
+                })
+              )}
+            </Box>
+          </Box>
+        </SettingSection>
+      )}
+
+      {/* Save Status */}
+      <Box sx={{ 
+        ...glassCardSx,
+        p: 2,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Box sx={{
+            width: 10,
+            height: 10,
+            borderRadius: '50%',
+            bgcolor: hasChanges ? '#f59e0b' : '#10b981',
+            boxShadow: `0 0 12px ${hasChanges ? '#f59e0b' : '#10b981'}`,
+          }} />
+          <Typography sx={{ fontSize: '0.85rem', color: '#94a3b8' }}>
+            {hasChanges ? 'มีการเปลี่ยนแปลงที่ยังไม่บันทึก' : 'บันทึกล่าสุด: ' + (lastSavedTime ? lastSavedTime.toLocaleString('th-TH') : '-')}
+          </Typography>
+        </Box>
+        <Button
+          onClick={onSave}
+          disabled={!hasChanges || loading}
+          sx={{
+            ...gradientButtonSx,
+            minWidth: 120,
+            opacity: hasChanges ? 1 : 0.5,
+          }}
+        >
+          <Save sx={{ fontSize: 18, mr: 1 }} />
+          บันทึก
+        </Button>
+      </Box>
+    </Box>
+  );
+});
+
+// ============== ANNOUNCEMENTS VIEW COMPONENT ==============
+interface AnnouncementsViewProps {
+  config: ShopConfig;
+  saveConfig: (newConfig: ShopConfig) => Promise<void>;
+  showToast: (type: 'success' | 'error' | 'info' | 'warning', message: string) => void;
+  userEmail: string | null | undefined;
+  onImageUpload: (file: File) => Promise<string | null>;
+}
+
+const AnnouncementsView = React.memo(function AnnouncementsView({
+  config,
+  saveConfig,
+  showToast,
+  userEmail,
+  onImageUpload,
+}: AnnouncementsViewProps) {
+  const isSuperAdminUser = isSuperAdmin(userEmail ?? null);
+  const [announcements, setAnnouncements] = React.useState<Announcement[]>(config.announcements || []);
+  const [history, setHistory] = React.useState(config.announcementHistory || []);
+  const [editingAnn, setEditingAnn] = React.useState<Announcement | null>(null);
+  const [showHistory, setShowHistory] = React.useState(false);
+  const [uploadingImage, setUploadingImage] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+
+  // Sync from config
+  React.useEffect(() => {
+    setAnnouncements(config.announcements || []);
+    setHistory(config.announcementHistory || []);
+  }, [config.announcements, config.announcementHistory]);
+
+  const createNewAnnouncement = (): Announcement => ({
+    id: `ann_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+    enabled: true,
+    message: '',
+    color: '#3b82f6',
+    postedAt: new Date().toISOString(),
+    postedBy: userEmail || 'แอดมิน',
+    displayName: '',
+    type: 'text',
+    showLogo: true,
+    priority: 0,
+  });
+
+  const handleAddNew = () => {
+    setEditingAnn(createNewAnnouncement());
+  };
+
+  const handleEdit = (ann: Announcement) => {
+    setEditingAnn({ ...ann });
+  };
+
+  const handleDelete = async (ann: Announcement) => {
+    const result = await Swal.fire({
+      title: 'ยืนยันการลบ?',
+      text: 'ประกาศนี้จะถูกย้ายไปประวัติ',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'ลบ',
+      cancelButtonText: 'ยกเลิก',
+      background: '#1e293b',
+      color: '#f1f5f9',
+    });
+
+    if (result.isConfirmed) {
+      setSaving(true);
+      try {
+        const newAnnouncements = announcements.filter(a => a.id !== ann.id);
+        const newHistory = [
+          {
+            ...ann,
+            deletedAt: new Date().toISOString(),
+            deletedBy: userEmail || 'แอดมิน',
+          },
+          ...history,
+        ].slice(0, 50); // Keep last 50
+
+        await saveConfig({
+          ...config,
+          announcements: newAnnouncements,
+          announcementHistory: newHistory,
+        });
+
+        setAnnouncements(newAnnouncements);
+        setHistory(newHistory);
+        showToast('success', 'ลบประกาศสำเร็จ');
+      } catch (error) {
+        showToast('error', 'ไม่สามารถลบประกาศได้');
+      } finally {
+        setSaving(false);
+      }
+    }
+  };
+
+  const handleToggleEnabled = async (ann: Announcement) => {
+    setSaving(true);
+    try {
+      const newAnnouncements = announcements.map(a => 
+        a.id === ann.id ? { ...a, enabled: !a.enabled } : a
+      );
+      await saveConfig({ ...config, announcements: newAnnouncements });
+      setAnnouncements(newAnnouncements);
+      showToast('success', ann.enabled ? 'ปิดประกาศแล้ว' : 'เปิดประกาศแล้ว');
+    } catch (error) {
+      showToast('error', 'ไม่สามารถเปลี่ยนสถานะได้');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveAnnouncement = async () => {
+    if (!editingAnn) return;
+    if (!editingAnn.message && !editingAnn.imageUrl) {
+      showToast('error', 'กรุณากรอกข้อความหรืออัพโหลดรูปภาพ');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const isNew = !announcements.find(a => a.id === editingAnn.id);
+      let newAnnouncements: Announcement[];
+
+      if (isNew) {
+        newAnnouncements = [editingAnn, ...announcements];
+      } else {
+        newAnnouncements = announcements.map(a => 
+          a.id === editingAnn.id ? editingAnn : a
+        );
+      }
+
+      await saveConfig({ ...config, announcements: newAnnouncements });
+      setAnnouncements(newAnnouncements);
+      setEditingAnn(null);
+      showToast('success', isNew ? 'สร้างประกาศสำเร็จ' : 'แก้ไขประกาศสำเร็จ');
+    } catch (error) {
+      showToast('error', 'ไม่สามารถบันทึกประกาศได้');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      showToast('error', 'กรุณาเลือกไฟล์รูปภาพเท่านั้น');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('error', 'ไฟล์รูปภาพต้องมีขนาดไม่เกิน 5MB');
+      return;
+    }
+
+    setUploadingImage(true);
+    try {
+      const imageUrl = await onImageUpload(file);
+      if (imageUrl && editingAnn) {
+        setEditingAnn({
+          ...editingAnn,
+          imageUrl,
+          type: editingAnn.message ? 'both' : 'image',
+        });
+        showToast('success', 'อัพโหลดรูปภาพสำเร็จ');
+      }
+    } catch (err: any) {
+      showToast('error', err?.message || 'อัพโหลดรูปภาพล้มเหลว');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleRestoreFromHistory = async (histItem: typeof history[0]) => {
+    const result = await Swal.fire({
+      title: 'กู้คืนประกาศ?',
+      text: 'ประกาศนี้จะถูกเพิ่มกลับไปยังรายการประกาศ',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#10b981',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'กู้คืน',
+      cancelButtonText: 'ยกเลิก',
+      background: '#1e293b',
+      color: '#f1f5f9',
+    });
+
+    if (result.isConfirmed) {
+      setSaving(true);
+      try {
+        const restored: Announcement = {
+          id: `ann_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+          enabled: false,
+          message: histItem.message,
+          color: histItem.color,
+          imageUrl: histItem.imageUrl,
+          postedBy: userEmail || 'แอดมิน',
+          displayName: histItem.displayName,
+          postedAt: new Date().toISOString(),
+          type: histItem.type,
+          showLogo: true,
+        };
+
+        const newAnnouncements = [restored, ...announcements];
+        const newHistory = history.filter(h => h.id !== histItem.id);
+
+        await saveConfig({
+          ...config,
+          announcements: newAnnouncements,
+          announcementHistory: newHistory,
+        });
+
+        setAnnouncements(newAnnouncements);
+        setHistory(newHistory);
+        showToast('success', 'กู้คืนประกาศสำเร็จ');
+      } catch (error) {
+        showToast('error', 'ไม่สามารถกู้คืนประกาศได้');
+      } finally {
+        setSaving(false);
+      }
+    }
+  };
+
+  const handleDeleteFromHistory = async (histItem: typeof history[0]) => {
+    const result = await Swal.fire({
+      title: 'ลบถาวร?',
+      text: 'ประกาศนี้จะถูกลบออกจากประวัติอย่างถาวร',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'ลบถาวร',
+      cancelButtonText: 'ยกเลิก',
+      background: '#1e293b',
+      color: '#f1f5f9',
+    });
+
+    if (result.isConfirmed) {
+      setSaving(true);
+      try {
+        const newHistory = history.filter(h => h.id !== histItem.id);
+        await saveConfig({ ...config, announcementHistory: newHistory });
+        setHistory(newHistory);
+        showToast('success', 'ลบประวัติสำเร็จ');
+      } catch (error) {
+        showToast('error', 'ไม่สามารถลบประวัติได้');
+      } finally {
+        setSaving(false);
+      }
+    }
+  };
+
+  const activeCount = announcements.filter(a => a.enabled).length;
+
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, maxWidth: 900 }}>
+      {/* Header */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2 }}>
+        <Box>
+          <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: '#f1f5f9', display: 'flex', alignItems: 'center', gap: 1 }}>
+            <NotificationsActive sx={{ fontSize: 28 }} />
+            จัดการประกาศ
+          </Typography>
+          <Typography sx={{ fontSize: '0.85rem', color: '#64748b' }}>
+            สร้าง แก้ไข และจัดการประกาศทั้งหมด • {announcements.length} รายการ ({activeCount} เปิดอยู่)
+          </Typography>
+        </Box>
+        <Box sx={{ display: 'flex', gap: 1.5 }}>
+          <Button
+            onClick={() => setShowHistory(true)}
+            sx={{
+              ...secondaryButtonSx,
+              gap: 1,
+            }}
+          >
+            <Archive sx={{ fontSize: 18 }} />
+            ประวัติ ({history.length})
+          </Button>
+          <Button
+            onClick={handleAddNew}
+            sx={{
+              ...gradientButtonSx,
+              gap: 1,
+            }}
+          >
+            <Add sx={{ fontSize: 20 }} />
+            สร้างประกาศใหม่
+          </Button>
+        </Box>
+      </Box>
+
+      {/* Active Announcements List */}
+      {announcements.length === 0 ? (
+        <Box sx={{
+          ...glassCardSx,
+          p: 6,
+          textAlign: 'center',
+        }}>
+          <Announcement sx={{ fontSize: 64, color: '#334155', mb: 2 }} />
+          <Typography sx={{ fontSize: '1.1rem', fontWeight: 600, color: '#94a3b8', mb: 1 }}>
+            ยังไม่มีประกาศ
+          </Typography>
+          <Typography sx={{ fontSize: '0.85rem', color: '#64748b', mb: 3 }}>
+            คลิกปุ่ม "สร้างประกาศใหม่" เพื่อเริ่มต้น
+          </Typography>
+          <Button onClick={handleAddNew} sx={gradientButtonSx}>
+            <Add sx={{ mr: 1 }} /> สร้างประกาศแรก
+          </Button>
+        </Box>
+      ) : (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {announcements.map((ann) => (
+            <Box
+              key={ann.id}
+              sx={{
+                ...glassCardSx,
+                p: 0,
+                overflow: 'hidden',
+                opacity: ann.enabled ? 1 : 0.6,
+                border: ann.enabled ? `1px solid ${ann.color}40` : `1px solid ${ADMIN_THEME.border}`,
+              }}
+            >
+              {/* Color bar */}
+              <Box sx={{ height: 4, bgcolor: ann.color }} />
+              
+              <Box sx={{ p: 2 }}>
+                <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
+                  {/* Image preview */}
+                  {ann.imageUrl && (
+                    <Box
+                      component="img"
+                      src={ann.imageUrl}
+                      alt="Announcement"
+                      sx={{
+                        width: 80,
+                        height: 60,
+                        objectFit: 'cover',
+                        borderRadius: '8px',
+                        flexShrink: 0,
+                      }}
+                    />
+                  )}
+
+                  {/* Content */}
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                      <Box
+                        sx={{
+                          px: 1,
+                          py: 0.25,
+                          borderRadius: '6px',
+                          bgcolor: ann.enabled ? 'rgba(16, 185, 129, 0.15)' : 'rgba(100, 116, 139, 0.15)',
+                          color: ann.enabled ? '#10b981' : '#64748b',
+                          fontSize: '0.7rem',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {ann.enabled ? '🟢 เปิดอยู่' : '⚪ ปิดอยู่'}
+                      </Box>
+                      <Typography sx={{ fontSize: '0.7rem', color: '#64748b' }}>
+                        {new Date(ann.postedAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      </Typography>
+                    </Box>
+                    
+                    <Typography sx={{ 
+                      color: '#e2e8f0', 
+                      fontSize: '0.9rem',
+                      whiteSpace: 'pre-wrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                    }}>
+                      {ann.message || '(รูปภาพอย่างเดียว)'}
+                    </Typography>
+
+                    {ann.displayName && (
+                      <Typography sx={{ fontSize: '0.75rem', color: '#64748b', mt: 0.5 }}>
+                        ประกาศโดย: {ann.displayName}
+                      </Typography>
+                    )}
+                  </Box>
+
+                  {/* Actions */}
+                  <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
+                    <Tooltip title={ann.enabled ? 'ปิดประกาศ' : 'เปิดประกาศ'}>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleToggleEnabled(ann)}
+                        disabled={saving}
+                        sx={{ 
+                          color: ann.enabled ? '#10b981' : '#64748b',
+                          '&:hover': { bgcolor: 'rgba(16, 185, 129, 0.1)' },
+                        }}
+                      >
+                        {ann.enabled ? <ToggleOn /> : <ToggleOff />}
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="แก้ไข">
+                      <IconButton
+                        size="small"
+                        onClick={() => handleEdit(ann)}
+                        sx={{ color: '#3b82f6', '&:hover': { bgcolor: 'rgba(59, 130, 246, 0.1)' } }}
+                      >
+                        <Edit sx={{ fontSize: 18 }} />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="ลบ">
+                      <IconButton
+                        size="small"
+                        onClick={() => handleDelete(ann)}
+                        disabled={saving}
+                        sx={{ color: '#ef4444', '&:hover': { bgcolor: 'rgba(239, 68, 68, 0.1)' } }}
+                      >
+                        <Delete sx={{ fontSize: 18 }} />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                </Box>
+              </Box>
+            </Box>
+          ))}
+        </Box>
+      )}
+
+      {/* Edit/Create Dialog */}
+      <Dialog
+        open={!!editingAnn}
+        onClose={() => setEditingAnn(null)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: ADMIN_THEME.bgCard,
+            backdropFilter: 'blur(20px)',
+            border: `1px solid ${ADMIN_THEME.border}`,
+            borderRadius: '16px',
+          },
+        }}
+      >
+        <DialogTitle sx={{ 
+          borderBottom: `1px solid ${ADMIN_THEME.border}`,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1.5,
+        }}>
+          <Box sx={{
+            width: 40,
+            height: 40,
+            borderRadius: '12px',
+            bgcolor: editingAnn?.id?.startsWith('ann_') && !announcements.find(a => a.id === editingAnn?.id) ? '#10b981' : '#3b82f6',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            {announcements.find(a => a.id === editingAnn?.id) ? <Edit sx={{ color: '#fff' }} /> : <Add sx={{ color: '#fff' }} />}
+          </Box>
+          <Typography sx={{ fontWeight: 700, color: '#f1f5f9' }}>
+            {announcements.find(a => a.id === editingAnn?.id) ? 'แก้ไขประกาศ' : 'สร้างประกาศใหม่'}
+          </Typography>
+        </DialogTitle>
+
+        <DialogContent sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+          {editingAnn && (
+            <>
+              {/* Enable Toggle */}
+              <SettingToggleRow
+                label="เปิดใช้งานประกาศ"
+                description="เมื่อเปิด ประกาศจะแสดงบนหน้าร้าน"
+                checked={editingAnn.enabled}
+                onChange={(checked) => setEditingAnn({ ...editingAnn, enabled: checked })}
+              />
+
+              {/* Type Selection */}
+              <Box>
+                <Typography sx={{ fontSize: '0.8rem', color: '#64748b', mb: 1 }}>ประเภทประกาศ</Typography>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  {[
+                    { value: 'text', label: '📝 ข้อความ' },
+                    { value: 'image', label: '🖼️ รูปภาพ' },
+                    { value: 'both', label: '📝🖼️ ทั้งสอง' },
+                  ].map(option => (
+                    <Box
+                      key={option.value}
+                      onClick={() => setEditingAnn({ ...editingAnn, type: option.value as any })}
+                      sx={{
+                        flex: 1,
+                        py: 1.5,
+                        borderRadius: '10px',
+                        cursor: 'pointer',
+                        textAlign: 'center',
+                        bgcolor: (editingAnn.type ?? 'text') === option.value 
+                          ? 'rgba(139, 92, 246, 0.3)' 
+                          : 'rgba(255,255,255,0.05)',
+                        border: `2px solid ${(editingAnn.type ?? 'text') === option.value 
+                          ? '#8b5cf6' 
+                          : 'transparent'}`,
+                        transition: 'all 0.2s ease',
+                        '&:hover': { bgcolor: 'rgba(139, 92, 246, 0.15)' },
+                      }}
+                    >
+                      <Typography sx={{ 
+                        fontSize: '0.85rem', 
+                        fontWeight: 600,
+                        color: (editingAnn.type ?? 'text') === option.value ? '#fff' : '#94a3b8',
+                      }}>
+                        {option.label}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+
+              {/* Message Input */}
+              {((editingAnn.type ?? 'text') === 'text' || editingAnn.type === 'both') && (
+                <TextField
+                  label="ข้อความประกาศ"
+                  multiline
+                  rows={4}
+                  value={editingAnn.message}
+                  onChange={(e) => setEditingAnn({ ...editingAnn, message: e.target.value })}
+                  fullWidth
+                  placeholder="พิมพ์ข้อความประกาศ..."
+                  inputProps={{ maxLength: 500 }}
+                  helperText={`${editingAnn.message.length}/500 ตัวอักษร`}
+                  sx={inputSx}
+                />
+              )}
+
+              {/* Image Upload */}
+              {((editingAnn.type ?? 'text') === 'image' || editingAnn.type === 'both') && (
+                <Box>
+                  <Typography sx={{ fontSize: '0.8rem', color: '#64748b', mb: 1 }}>รูปภาพประกาศ</Typography>
+                  {editingAnn.imageUrl ? (
+                    <Box sx={{ position: 'relative' }}>
+                      <Box
+                        component="img"
+                        src={editingAnn.imageUrl}
+                        alt="Announcement"
+                        sx={{
+                          width: '100%',
+                          maxHeight: 200,
+                          objectFit: 'cover',
+                          borderRadius: '12px',
+                          border: `1px solid ${ADMIN_THEME.border}`,
+                        }}
+                      />
+                      <IconButton
+                        onClick={() => setEditingAnn({ ...editingAnn, imageUrl: undefined, type: editingAnn.message ? 'text' : 'text' })}
+                        sx={{
+                          position: 'absolute',
+                          top: 8,
+                          right: 8,
+                          bgcolor: 'rgba(239, 68, 68, 0.9)',
+                          color: '#fff',
+                          '&:hover': { bgcolor: '#ef4444' },
+                        }}
+                        size="small"
+                      >
+                        <Delete sx={{ fontSize: 18 }} />
+                      </IconButton>
+                    </Box>
+                  ) : (
+                    <Button
+                      component="label"
+                      disabled={uploadingImage}
+                      sx={{
+                        ...secondaryButtonSx,
+                        py: 3,
+                        width: '100%',
+                        border: `2px dashed ${ADMIN_THEME.border}`,
+                        bgcolor: 'transparent',
+                        '&:hover': { borderColor: '#8b5cf6' },
+                      }}
+                    >
+                      {uploadingImage ? (
+                        <CircularProgress size={24} sx={{ color: '#8b5cf6' }} />
+                      ) : (
+                        <>
+                          <ImageIcon sx={{ fontSize: 24, mr: 1 }} />
+                          คลิกเพื่ออัพโหลดรูปภาพ (สูงสุด 5MB)
+                        </>
+                      )}
+                      <input
+                        type="file"
+                        hidden
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                      />
+                    </Button>
+                  )}
+                </Box>
+              )}
+
+              {/* Display Name */}
+              <TextField
+                label="ชื่อที่แสดงในประกาศ"
+                value={editingAnn.displayName || ''}
+                onChange={(e) => setEditingAnn({ ...editingAnn, displayName: e.target.value })}
+                fullWidth
+                size="small"
+                placeholder="เช่น ทีมงาน PSU SCC Shop"
+                helperText="ถ้าไม่ระบุจะแสดงเป็น 'แอดมิน'"
+                sx={inputSx}
+              />
+
+              {/* Show Logo Toggle */}
+              <SettingToggleRow
+                label="แสดงโลโก้เว็บไซต์"
+                description="แสดงโลโก้ของเว็บไซต์ในประกาศ"
+                checked={editingAnn.showLogo ?? true}
+                onChange={(checked) => setEditingAnn({ ...editingAnn, showLogo: checked })}
+              />
+
+              {/* Color Picker */}
+              <Box>
+                <Typography sx={{ fontSize: '0.8rem', color: '#64748b', mb: 1.5 }}>สีพื้นหลัง</Typography>
+                <Box sx={{ 
+                  height: 40, 
+                  borderRadius: '12px', 
+                  bgcolor: editingAnn.color,
+                  mb: 2,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
+                }}>
+                  <Typography sx={{ fontSize: '0.8rem', color: '#fff', fontWeight: 600, textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
+                    {editingAnn.color}
+                  </Typography>
+                </Box>
+                <Box sx={{ 
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(10, 1fr)', 
+                  gap: 0.75,
+                  p: 1.5,
+                  borderRadius: '12px',
+                  bgcolor: 'rgba(0,0,0,0.2)',
+                  border: `1px solid ${ADMIN_THEME.border}`,
+                }}>
+                  {PRESET_COLORS.map(color => (
+                    <Box
+                      key={color}
+                      onClick={() => setEditingAnn({ ...editingAnn, color })}
+                      sx={{
+                        width: '100%',
+                        aspectRatio: '1',
+                        borderRadius: '8px',
+                        bgcolor: color,
+                        cursor: 'pointer',
+                        border: editingAnn.color === color ? '3px solid #fff' : '2px solid transparent',
+                        boxShadow: editingAnn.color === color ? `0 0 10px ${color}` : 'none',
+                        transition: 'all 0.2s ease',
+                        '&:hover': { transform: 'scale(1.15)' },
+                      }}
+                    />
+                  ))}
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 2 }}>
+                  <TextField
+                    size="small"
+                    value={editingAnn.color}
+                    onChange={(e) => {
+                      if (/^#[0-9A-Fa-f]{0,6}$/.test(e.target.value)) {
+                        setEditingAnn({ ...editingAnn, color: e.target.value });
+                      }
+                    }}
+                    placeholder="#3b82f6"
+                    sx={{ flex: 1, ...inputSx }}
+                  />
+                  <input
+                    type="color"
+                    value={editingAnn.color}
+                    onChange={(e) => setEditingAnn({ ...editingAnn, color: e.target.value })}
+                    style={{ width: 45, height: 45, padding: 0, border: 'none', borderRadius: '10px', cursor: 'pointer' }}
+                  />
+                </Box>
+              </Box>
+
+              {/* Preview */}
+              {(editingAnn.message || editingAnn.imageUrl) && (
+                <Box sx={{ mt: 1 }}>
+                  <Typography sx={{ fontSize: '0.75rem', color: '#64748b', mb: 1 }}>ตัวอย่างการแสดงผล:</Typography>
+                  <Box sx={{ p: 2, borderRadius: '12px', bgcolor: editingAnn.color }}>
+                    {editingAnn.imageUrl && (
+                      <Box
+                        component="img"
+                        src={editingAnn.imageUrl}
+                        alt="Preview"
+                        sx={{ width: '100%', maxHeight: 120, objectFit: 'cover', borderRadius: '8px', mb: editingAnn.message ? 1.5 : 0 }}
+                      />
+                    )}
+                    {editingAnn.message && (
+                      <Typography sx={{ fontSize: '0.9rem', color: '#fff', whiteSpace: 'pre-wrap', textAlign: 'center' }}>
+                        {editingAnn.message}
+                      </Typography>
+                    )}
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1, mt: 1 }}>
+                      {editingAnn.showLogo && (
+                        <Box component="img" src="/logo.png" alt="Logo" sx={{ width: 20, height: 20, borderRadius: '4px' }} onError={(e: any) => { e.target.style.display = 'none'; }} />
+                      )}
+                      <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.7)' }}>
+                        — {editingAnn.displayName || 'แอดมิน'}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Box>
+              )}
+            </>
+          )}
+        </DialogContent>
+
+        <DialogActions sx={{ borderTop: `1px solid ${ADMIN_THEME.border}`, p: 2, gap: 1 }}>
+          <Button onClick={() => setEditingAnn(null)} sx={secondaryButtonSx}>
+            ยกเลิก
+          </Button>
+          <Button
+            onClick={handleSaveAnnouncement}
+            disabled={saving || (!editingAnn?.message && !editingAnn?.imageUrl)}
+            sx={gradientButtonSx}
+          >
+            {saving ? <CircularProgress size={20} sx={{ mr: 1 }} /> : <Save sx={{ mr: 1 }} />}
+            บันทึก
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* History Dialog */}
+      <Dialog
+        open={showHistory}
+        onClose={() => setShowHistory(false)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: ADMIN_THEME.bgCard,
+            backdropFilter: 'blur(20px)',
+            border: `1px solid ${ADMIN_THEME.border}`,
+            borderRadius: '16px',
+            maxHeight: '80vh',
+          },
+        }}
+      >
+        <DialogTitle sx={{ 
+          borderBottom: `1px solid ${ADMIN_THEME.border}`,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1.5,
+        }}>
+          <Box sx={{
+            width: 40,
+            height: 40,
+            borderRadius: '12px',
+            bgcolor: '#8b5cf6',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            <History sx={{ color: '#fff' }} />
+          </Box>
+          <Box>
+            <Typography sx={{ fontWeight: 700, color: '#f1f5f9' }}>ประวัติประกาศ</Typography>
+            <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>ประกาศที่ถูกลบไปแล้ว {history.length} รายการ</Typography>
+          </Box>
+        </DialogTitle>
+
+        <DialogContent sx={{ p: 0 }}>
+          {history.length === 0 ? (
+            <Box sx={{ p: 6, textAlign: 'center' }}>
+              <Archive sx={{ fontSize: 64, color: '#334155', mb: 2 }} />
+              <Typography sx={{ color: '#64748b' }}>ยังไม่มีประวัติประกาศ</Typography>
+            </Box>
+          ) : (
+            <Box sx={{ py: 2 }}>
+              {history.map((item, idx) => (
+                <Box
+                  key={item.id || idx}
+                  sx={{
+                    mx: 2,
+                    mb: 2,
+                    p: 2,
+                    borderRadius: '12px',
+                    bgcolor: 'rgba(255,255,255,0.03)',
+                    border: `1px solid ${ADMIN_THEME.border}`,
+                    position: 'relative',
+                  }}
+                >
+                  <Box sx={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 4, bgcolor: item.color, borderRadius: '12px 0 0 12px' }} />
+                  
+                  <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
+                    {item.imageUrl && (
+                      <Box component="img" src={item.imageUrl} alt="" sx={{ width: 60, height: 45, objectFit: 'cover', borderRadius: '8px' }} />
+                    )}
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                        <Typography sx={{ fontSize: '0.7rem', color: '#64748b' }}>
+                          ลบเมื่อ: {item.deletedAt ? new Date(item.deletedAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}
+                        </Typography>
+                      </Box>
+                      <Typography sx={{ color: '#94a3b8', fontSize: '0.85rem', whiteSpace: 'pre-wrap', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                        {item.message || '(รูปภาพอย่างเดียว)'}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', gap: 0.5 }}>
+                      <Tooltip title="กู้คืน">
+                        <IconButton size="small" onClick={() => handleRestoreFromHistory(item)} disabled={saving} sx={{ color: '#10b981' }}>
+                          <ContentCopy sx={{ fontSize: 18 }} />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="ลบถาวร">
+                        <IconButton size="small" onClick={() => handleDeleteFromHistory(item)} disabled={saving} sx={{ color: '#ef4444' }}>
+                          <Delete sx={{ fontSize: 18 }} />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                  </Box>
+                </Box>
+              ))}
+            </Box>
+          )}
+        </DialogContent>
+
+        <DialogActions sx={{ borderTop: `1px solid ${ADMIN_THEME.border}`, p: 2 }}>
+          <Button onClick={() => setShowHistory(false)} sx={secondaryButtonSx}>ปิด</Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+});
 
 // ============== MAIN COMPONENT ==============
 export default function AdminPage(): JSX.Element {
@@ -362,6 +1832,7 @@ export default function AdminPage(): JSX.Element {
   // Settings state (moved from SettingsView to prevent re-render issues)
   const [settingsLocalConfig, setSettingsLocalConfig] = useState<ShopConfig>(DEFAULT_CONFIG);
   const [settingsHasChanges, setSettingsHasChanges] = useState(false);
+  const [newAdminEmail, setNewAdminEmail] = useState('');
   const [orderEditor, setOrderEditor] = useState({
     open: false,
     ref: '',
@@ -373,6 +1844,7 @@ export default function AdminPage(): JSX.Element {
   });
   // Batch selection state
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
+  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
   const [batchStatusDialogOpen, setBatchStatusDialogOpen] = useState(false);
   const [batchNewStatus, setBatchNewStatus] = useState('PAID');
   const [batchUpdating, setBatchUpdating] = useState(false);
@@ -384,7 +1856,18 @@ export default function AdminPage(): JSX.Element {
   const fetchInFlightRef = useRef(false);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
-  const isAuthorized = isAdmin(session?.user?.email ?? null);
+  // Check authorization including dynamic admin list from config
+  const isAuthorized = useMemo(() => {
+    const email = session?.user?.email;
+    if (!email) return false;
+    const normalized = email.trim().toLowerCase();
+    // Check static admin list
+    if (isAdmin(normalized)) return true;
+    // Check dynamic admin list from loaded config
+    const dynamicAdmins = (config.adminEmails || []).map(e => e.trim().toLowerCase());
+    return dynamicAdmins.includes(normalized);
+  }, [session?.user?.email, config.adminEmails]);
+  
   const isSessionLoading = status === 'loading';
   const isDataLoading = loading && !hasInitialData;
 
@@ -441,6 +1924,8 @@ export default function AdminPage(): JSX.Element {
           ]);
         }
         setConfig(nextConfig);
+        // Sync dynamic admin emails from config
+        setDynamicAdminEmails(nextConfig.adminEmails || []);
         setOrders(normalizedOrders);
         setLogs(nextLogs);
         setLastSavedTime(new Date());
@@ -497,6 +1982,19 @@ export default function AdminPage(): JSX.Element {
   // Toggle order selection
   const toggleOrderSelection = (ref: string) => {
     setSelectedOrders(prev => {
+      const next = new Set(prev);
+      if (next.has(ref)) {
+        next.delete(ref);
+      } else {
+        next.add(ref);
+      }
+      return next;
+    });
+  };
+
+  // Toggle order expansion (show cart items)
+  const toggleOrderExpand = (ref: string) => {
+    setExpandedOrders(prev => {
       const next = new Set(prev);
       if (next.has(ref)) {
         next.delete(ref);
@@ -608,7 +2106,43 @@ export default function AdminPage(): JSX.Element {
     try {
       // Upload images first if any are base64
       const productsWithUrls = await uploadImagesToStorage(newConfig.products || []);
-      const configWithUrls = { ...newConfig, products: productsWithUrls };
+      let configWithUrls = { ...newConfig, products: productsWithUrls };
+      
+      // Add announcement to history if it has content and is enabled
+      const currentAnnouncement = configWithUrls.announcement;
+      const previousAnnouncement = config?.announcement;
+      
+      // Check if announcement content changed (message or image)
+      const announcementChanged = currentAnnouncement?.enabled && 
+        (currentAnnouncement.message || currentAnnouncement.imageUrl) &&
+        (currentAnnouncement.message !== previousAnnouncement?.message ||
+         currentAnnouncement.imageUrl !== previousAnnouncement?.imageUrl);
+      
+      if (announcementChanged && currentAnnouncement) {
+        const announcementHistory = [...(configWithUrls.announcementHistory || [])];
+        
+        // Create history entry
+        const historyEntry = {
+          id: `ann_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+          message: currentAnnouncement.message || '',
+          color: currentAnnouncement.color || '#3b82f6',
+          imageUrl: currentAnnouncement.imageUrl,
+          postedBy: currentAnnouncement.postedBy,
+          displayName: currentAnnouncement.displayName,
+          postedAt: currentAnnouncement.postedAt || new Date().toISOString(),
+          type: currentAnnouncement.type,
+        };
+        
+        // Add to beginning of history (newest first)
+        announcementHistory.unshift(historyEntry);
+        
+        // Keep only last 20 announcements
+        if (announcementHistory.length > 20) {
+          announcementHistory.splice(20);
+        }
+        
+        configWithUrls = { ...configWithUrls, announcementHistory };
+      }
       
       // Save to local state/cache immediately for instant UI feedback
       setConfig(configWithUrls);
@@ -628,7 +2162,7 @@ export default function AdminPage(): JSX.Element {
     } finally {
       setSaving(false);
     }
-  }, [orders, logs, showToast, session?.user?.email, addLog]);
+  }, [orders, logs, showToast, session?.user?.email, addLog, config?.announcement]);
 
   // Update Order Status
   const updateOrderStatus = async (ref: string, newStatus: string) => {
@@ -766,24 +2300,37 @@ export default function AdminPage(): JSX.Element {
     }
   };
 
-  // 🔐 Authentication Check
+  // 🔐 Authentication Check - Load data first, then check authorization
   useEffect(() => {
     if (status === 'loading') return;
 
     if (status === 'authenticated') {
-      if (!session?.user?.email || !isAdmin(session.user.email)) {
-        Swal.fire({
-          icon: 'error',
-          title: 'ไม่มีสิทธิ์เข้าถึง',
-          text: 'บัญชีของคุณไม่มีสิทธิ์เข้าถึงหน้านี้',
-          confirmButtonText: 'กลับหน้าหลัก',
-          didClose: () => router.push('/')
-        });
-        return;
-      }
+      // Always fetch data first - authorization check happens after config loads
       fetchData();
     }
-  }, [status, session, router, fetchData]);
+  }, [status, fetchData]);
+
+  // Check authorization after config loads (includes dynamic admin list)
+  useEffect(() => {
+    if (status !== 'authenticated' || !session?.user?.email) return;
+    if (loading) return; // Wait for config to load
+    
+    // Now check with loaded config (including dynamic admins)
+    const email = session.user.email.trim().toLowerCase();
+    const staticAdmin = isAdmin(email);
+    const dynamicAdmins = (config.adminEmails || []).map(e => e.trim().toLowerCase());
+    const dynamicAdmin = dynamicAdmins.includes(email);
+    
+    if (!staticAdmin && !dynamicAdmin) {
+      Swal.fire({
+        icon: 'error',
+        title: 'ไม่มีสิทธิ์เข้าถึง',
+        text: 'บัญชีของคุณไม่มีสิทธิ์เข้าถึงหน้านี้',
+        confirmButtonText: 'กลับหน้าหลัก',
+        didClose: () => router.push('/')
+      });
+    }
+  }, [status, session, loading, config.adminEmails, router]);
 
   // 🔁 Lightweight polling for fresher data
   useEffect(() => {
@@ -1452,6 +2999,175 @@ export default function AdminPage(): JSX.Element {
                     </Box>
                   </Box>
 
+                  {/* Cart Items Preview */}
+                  {order.cart && order.cart.length > 0 && (
+                    <Box sx={{ mt: 2 }}>
+                      <Box 
+                        onClick={() => toggleOrderExpand(order.ref)}
+                        sx={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: 1,
+                          cursor: 'pointer',
+                          py: 1,
+                          px: 1.5,
+                          borderRadius: '10px',
+                          bgcolor: 'rgba(99, 102, 241, 0.08)',
+                          border: '1px solid rgba(99, 102, 241, 0.2)',
+                          transition: 'all 0.2s ease',
+                          '&:hover': {
+                            bgcolor: 'rgba(99, 102, 241, 0.15)',
+                          },
+                        }}
+                      >
+                        <ShoppingBag sx={{ fontSize: 18, color: '#818cf8' }} />
+                        <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: '#a5b4fc', flex: 1 }}>
+                          สินค้า {order.cart.length} รายการ
+                        </Typography>
+                        {expandedOrders.has(order.ref) ? (
+                          <ExpandLess sx={{ fontSize: 20, color: '#818cf8' }} />
+                        ) : (
+                          <ExpandMore sx={{ fontSize: 20, color: '#818cf8' }} />
+                        )}
+                      </Box>
+                      
+                      {/* Expanded Cart Items */}
+                      {expandedOrders.has(order.ref) && (
+                        <Box sx={{ 
+                          mt: 1.5, 
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          gap: 1,
+                        }}>
+                          {order.cart.map((item, idx) => {
+                            const product = config.products?.find(p => p.id === item.productId);
+                            return (
+                              <Box 
+                                key={item.id || idx}
+                                sx={{
+                                  display: 'flex',
+                                  alignItems: 'flex-start',
+                                  gap: 1.5,
+                                  p: 1.5,
+                                  borderRadius: '10px',
+                                  bgcolor: 'rgba(255,255,255,0.03)',
+                                  border: `1px solid ${ADMIN_THEME.border}`,
+                                }}
+                              >
+                                {/* Product Image */}
+                                {product?.images?.[0] ? (
+                                  <Box
+                                    component="img"
+                                    src={product.images[0]}
+                                    alt={item.productName}
+                                    sx={{
+                                      width: 48,
+                                      height: 48,
+                                      borderRadius: '8px',
+                                      objectFit: 'cover',
+                                      border: '1px solid rgba(255,255,255,0.1)',
+                                    }}
+                                  />
+                                ) : (
+                                  <Box sx={{
+                                    width: 48,
+                                    height: 48,
+                                    borderRadius: '8px',
+                                    bgcolor: 'rgba(99, 102, 241, 0.15)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                  }}>
+                                    <Inventory sx={{ fontSize: 20, color: '#818cf8' }} />
+                                  </Box>
+                                )}
+                                
+                                {/* Item Details */}
+                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                  <Typography sx={{ 
+                                    fontSize: '0.85rem', 
+                                    fontWeight: 600, 
+                                    color: '#f1f5f9',
+                                    mb: 0.3,
+                                  }}>
+                                    {item.productName || product?.name || 'สินค้าไม่ระบุ'}
+                                  </Typography>
+                                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 0.5 }}>
+                                    {item.size && (
+                                      <Chip
+                                        size="small"
+                                        label={`ไซส์ ${item.size}`}
+                                        sx={{
+                                          height: 20,
+                                          fontSize: '0.7rem',
+                                          bgcolor: 'rgba(16, 185, 129, 0.15)',
+                                          color: '#34d399',
+                                          border: '1px solid rgba(16, 185, 129, 0.3)',
+                                        }}
+                                      />
+                                    )}
+                                    {item.options?.customName && (
+                                      <Chip
+                                        size="small"
+                                        label={`ชื่อ: ${item.options.customName}`}
+                                        sx={{
+                                          height: 20,
+                                          fontSize: '0.7rem',
+                                          bgcolor: 'rgba(251, 191, 36, 0.15)',
+                                          color: '#fcd34d',
+                                          border: '1px solid rgba(251, 191, 36, 0.3)',
+                                        }}
+                                      />
+                                    )}
+                                    {item.options?.customNumber && (
+                                      <Chip
+                                        size="small"
+                                        label={`เบอร์: ${item.options.customNumber}`}
+                                        sx={{
+                                          height: 20,
+                                          fontSize: '0.7rem',
+                                          bgcolor: 'rgba(244, 114, 182, 0.15)',
+                                          color: '#f472b6',
+                                          border: '1px solid rgba(244, 114, 182, 0.3)',
+                                        }}
+                                      />
+                                    )}
+                                    {item.options?.isLongSleeve && (
+                                      <Chip
+                                        size="small"
+                                        label="แขนยาว"
+                                        sx={{
+                                          height: 20,
+                                          fontSize: '0.7rem',
+                                          bgcolor: 'rgba(99, 102, 241, 0.15)',
+                                          color: '#a5b4fc',
+                                          border: '1px solid rgba(99, 102, 241, 0.3)',
+                                        }}
+                                      />
+                                    )}
+                                  </Box>
+                                  <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>
+                                    จำนวน: {item.quantity} ชิ้น × ฿{Number(item.unitPrice).toLocaleString()}
+                                  </Typography>
+                                </Box>
+                                
+                                {/* Item Total */}
+                                <Typography sx={{ 
+                                  fontSize: '0.9rem', 
+                                  fontWeight: 700, 
+                                  color: '#10b981',
+                                  whiteSpace: 'nowrap',
+                                }}>
+                                  ฿{(item.quantity * item.unitPrice).toLocaleString()}
+                                </Typography>
+                              </Box>
+                            );
+                          })}
+                        </Box>
+                      )}
+                    </Box>
+                  )}
+
                   {/* Date and Actions */}
                   <Box sx={{
                     display: 'flex',
@@ -1811,528 +3527,70 @@ export default function AdminPage(): JSX.Element {
     );
   };
 
-  const SettingsView = (): JSX.Element => {
-    // Use parent-level state to prevent re-mount losing focus
-    const localConfig = settingsLocalConfig;
-    const hasChanges = settingsHasChanges;
+  // Callbacks for SettingsView component
+  const handleSettingsConfigChange = useCallback((newVal: ShopConfig) => {
+    setSettingsLocalConfig(newVal);
+    setSettingsHasChanges(true);
+  }, []);
 
-    const handleChange = (newVal: ShopConfig) => {
-      setSettingsLocalConfig(newVal);
-      setSettingsHasChanges(true);
-    };
+  const handleSettingsSave = useCallback(() => {
+    saveFullConfig(settingsLocalConfig);
+    setSettingsHasChanges(false);
+  }, [settingsLocalConfig, saveFullConfig]);
 
-    const handleSave = () => {
-      saveFullConfig(localConfig);
-      setSettingsHasChanges(false);
-    };
+  const handleSettingsReset = useCallback(() => {
+    setSettingsLocalConfig(config);
+    setSettingsHasChanges(false);
+  }, [config]);
 
-    const handleReset = () => {
-      setSettingsLocalConfig(config);
-      setSettingsHasChanges(false);
-    };
+  const handleNewAdminEmailChange = useCallback((email: string) => {
+    setNewAdminEmail(email);
+  }, []);
 
-    // Section wrapper component
-    const SettingSection = ({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) => (
-      <Box sx={{
-        ...glassCardSx,
-        overflow: 'hidden',
-      }}>
-        <Box sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 2,
-          p: 2.5,
-          borderBottom: `1px solid ${ADMIN_THEME.border}`,
-          background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(59, 130, 246, 0.05) 100%)',
-        }}>
-          <Box sx={{
-            width: 40,
-            height: 40,
-            borderRadius: '12px',
-            background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#fff',
-          }}>
-            {icon}
-          </Box>
-          <Typography sx={{ fontSize: '1.1rem', fontWeight: 700, color: '#f1f5f9' }}>
-            {title}
-          </Typography>
-        </Box>
-        <Box sx={{ p: 2.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {children}
-        </Box>
-      </Box>
-    );
+  // Handle image upload for announcements
+  const handleAnnouncementImageUpload = useCallback(async (file: File): Promise<string | null> => {
+    try {
+      // Convert file to base64
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      
+      const base64 = await base64Promise;
 
-    // Toggle row component
-    const ToggleRow = ({ label, description, checked, onChange }: { label: string; description?: string; checked: boolean; onChange: (checked: boolean) => void }) => (
-      <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center',
-        py: 0.5,
-      }}>
-        <Box>
-          <Typography sx={{ fontSize: '0.95rem', fontWeight: 500, color: '#e2e8f0' }}>{label}</Typography>
-          {description && (
-            <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>{description}</Typography>
-          )}
-        </Box>
-        <Switch
-          checked={checked}
-          onChange={(e) => onChange(e.target.checked)}
-          sx={{
-            '& .MuiSwitch-switchBase.Mui-checked': {
-              color: '#10b981',
-            },
-            '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-              backgroundColor: '#10b981',
-            },
-          }}
-        />
-      </Box>
-    );
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          base64,
+          filename: file.name,
+          mime: file.type,
+        }),
+      });
 
-    return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, maxWidth: 700 }}>
-        {/* Header with Save Button */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-          <Box>
-            <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: '#f1f5f9', display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Settings sx={{ fontSize: 24 }} />
-              ตั้งค่าร้านค้า
-            </Typography>
-            <Typography sx={{ fontSize: '0.85rem', color: '#64748b' }}>
-              จัดการการตั้งค่าทั้งหมดของร้าน
-            </Typography>
-          </Box>
-          
-          {hasChanges && (
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Button
-                variant="outlined"
-                onClick={handleReset}
-                sx={{
-                  borderColor: ADMIN_THEME.border,
-                  color: ADMIN_THEME.muted,
-                  borderRadius: '10px',
-                  textTransform: 'none',
-                  '&:hover': { borderColor: '#ef4444', color: '#ef4444' },
-                }}
-              >
-                ยกเลิก
-              </Button>
-              <Button
-                variant="contained"
-                onClick={handleSave}
-                startIcon={<Save />}
-                sx={{
-                  background: ADMIN_THEME.gradient,
-                  borderRadius: '10px',
-                  textTransform: 'none',
-                  fontWeight: 700,
-                  boxShadow: '0 4px 15px rgba(139, 92, 246, 0.3)',
-                  animation: 'pulse 2s infinite',
-                  '@keyframes pulse': {
-                    '0%, 100%': { boxShadow: '0 4px 15px rgba(139, 92, 246, 0.3)' },
-                    '50%': { boxShadow: '0 4px 25px rgba(139, 92, 246, 0.5)' },
-                  },
-                }}
-              >
-                บันทึกการตั้งค่า
-              </Button>
-            </Box>
-          )}
-        </Box>
+      const data = await response.json();
+      
+      if (!response.ok || data.status === 'error') {
+        console.error('Upload failed:', data.message);
+        throw new Error(data.message || 'Upload failed');
+      }
 
-        {/* Unsaved Changes Warning */}
-        {hasChanges && (
-          <Box sx={{
-            p: 2,
-            borderRadius: '12px',
-            bgcolor: 'rgba(251, 191, 36, 0.1)',
-            border: '1px solid rgba(251, 191, 36, 0.3)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 2,
-          }}>
-            <Warning sx={{ fontSize: 24, color: '#fbbf24' }} />
-            <Typography sx={{ fontSize: '0.9rem', color: '#fbbf24' }}>
-              มีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก กดปุ่ม "บันทึกการตั้งค่า" เพื่อยืนยัน
-            </Typography>
-          </Box>
-        )}
+      // API returns { status: 'success', data: { url, key, cid, size } }
+      const imageUrl = data.data?.url || data.url;
+      if (!imageUrl) {
+        throw new Error('No URL returned from upload');
+      }
 
-        {/* Shop Status */}
-        <SettingSection icon={<Store sx={{ fontSize: 20 }} />} title="สถานะร้านค้า">
-          <ToggleRow
-            label="เปิดรับออเดอร์"
-            description={localConfig.isOpen ? 'ร้านเปิดให้บริการอยู่' : 'ปิดรับออเดอร์ชั่วคราว'}
-            checked={localConfig.isOpen}
-            onChange={(checked) => handleChange({...localConfig, isOpen: checked})}
-          />
-          {!localConfig.isOpen && (
-            <Box sx={{ 
-              mt: 1, 
-              p: 2, 
-              borderRadius: '12px', 
-              bgcolor: 'rgba(239, 68, 68, 0.1)',
-              border: '1px solid rgba(239, 68, 68, 0.2)',
-            }}>
-              <Typography sx={{ fontSize: '0.85rem', color: '#f87171', mb: 1.5 }}>
-                <CalendarToday sx={{ fontSize: 20, mr: 1, verticalAlign: 'middle' }} />
-                กำหนดวันเปิดร้าน
-              </Typography>
-              <TextField
-                type="date"
-                value={localConfig.closeDate}
-                onChange={(e) => handleChange({...localConfig, closeDate: e.target.value})}
-                fullWidth
-                sx={{
-                  ...inputSx,
-                  '& .MuiOutlinedInput-root': {
-                    ...inputSx['& .MuiOutlinedInput-root'],
-                    borderRadius: '10px',
-                  },
-                }}
-              />
-            </Box>
-          )}
-        </SettingSection>
-
-        {/* Announcement */}
-        <SettingSection icon={<Notifications sx={{ fontSize: 20 }} />} title="ประกาศ">
-          <ToggleRow
-            label="แสดงประกาศ"
-            description="แสดงแถบประกาศบนหน้าร้าน"
-            checked={localConfig.announcement?.enabled ?? false}
-            onChange={(checked) => handleChange({
-              ...localConfig,
-              announcement: {...(localConfig.announcement ?? { enabled: false, message: '', color: 'blue' }), enabled: checked}
-            })}
-          />
-
-          {(localConfig.announcement?.enabled) && (
-            <Box sx={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              gap: 2,
-              mt: 1,
-              p: 2,
-              borderRadius: '12px',
-              bgcolor: 'rgba(139, 92, 246, 0.05)',
-              border: `1px solid ${ADMIN_THEME.border}`,
-            }}>
-              {/* Formatting Toolbar */}
-              <Box sx={{ 
-                display: 'flex', 
-                gap: 0.5, 
-                p: 1, 
-                borderRadius: '8px', 
-                bgcolor: 'rgba(0,0,0,0.2)',
-                border: `1px solid ${ADMIN_THEME.border}`,
-              }}>
-                <Tooltip title="ขึ้นบรรทัดใหม่">
-                  <IconButton 
-                    size="small" 
-                    onClick={() => {
-                      const msg = localConfig.announcement?.message ?? '';
-                      handleChange({
-                        ...localConfig,
-                        announcement: {...(localConfig.announcement ?? { enabled: false, message: '', color: 'blue' }), message: msg + '\n'}
-                      });
-                    }}
-                    sx={{ color: ADMIN_THEME.text }}
-                  >
-                    <FormatLineSpacing sx={{ fontSize: 18 }} />
-                  </IconButton>
-                </Tooltip>
-                <Tooltip title="เพิ่มสัญลักษณ์ ปาร์ตี้">
-                  <IconButton 
-                    size="small" 
-                    onClick={() => {
-                      const msg = localConfig.announcement?.message ?? '';
-                      handleChange({
-                        ...localConfig,
-                        announcement: {...(localConfig.announcement ?? { enabled: false, message: '', color: 'blue' }), message: msg + ' 🎉'}
-                      });
-                    }}
-                    sx={{ color: '#fbbf24' }}
-                  >
-                    <Celebration sx={{ fontSize: 18 }} />
-                  </IconButton>
-                </Tooltip>
-                <Tooltip title="เพิ่มสัญลักษณ์ สายฟ้า">
-                  <IconButton 
-                    size="small" 
-                    onClick={() => {
-                      const msg = localConfig.announcement?.message ?? '';
-                      handleChange({
-                        ...localConfig,
-                        announcement: {...(localConfig.announcement ?? { enabled: false, message: '', color: 'blue' }), message: msg + ' ⚡'}
-                      });
-                    }}
-                    sx={{ color: '#facc15' }}
-                  >
-                    <ElectricBolt sx={{ fontSize: 18 }} />
-                  </IconButton>
-                </Tooltip>
-                <Tooltip title="เพิ่มสัญลักษณ์ ไฟ">
-                  <IconButton 
-                    size="small" 
-                    onClick={() => {
-                      const msg = localConfig.announcement?.message ?? '';
-                      handleChange({
-                        ...localConfig,
-                        announcement: {...(localConfig.announcement ?? { enabled: false, message: '', color: 'blue' }), message: msg + ' 🔥'}
-                      });
-                    }}
-                    sx={{ color: '#f97316' }}
-                  >
-                    <Whatshot sx={{ fontSize: 18 }} />
-                  </IconButton>
-                </Tooltip>
-                <Tooltip title="เพิ่มสัญลักษณ์ ประกาศ">
-                  <IconButton 
-                    size="small" 
-                    onClick={() => {
-                      const msg = localConfig.announcement?.message ?? '';
-                      handleChange({
-                        ...localConfig,
-                        announcement: {...(localConfig.announcement ?? { enabled: false, message: '', color: 'blue' }), message: msg + ' 📢'}
-                      });
-                    }}
-                    sx={{ color: '#3b82f6' }}
-                  >
-                    <Campaign sx={{ fontSize: 18 }} />
-                  </IconButton>
-                </Tooltip>
-                <Box sx={{ flex: 1 }} />
-                <Tooltip title="ล้างข้อความ">
-                  <IconButton 
-                    size="small" 
-                    onClick={() => {
-                      handleChange({
-                        ...localConfig,
-                        announcement: {...(localConfig.announcement ?? { enabled: false, message: '', color: 'blue' }), message: ''}
-                      });
-                    }}
-                    sx={{ color: '#ef4444' }}
-                  >
-                    <Clear sx={{ fontSize: 18 }} />
-                  </IconButton>
-                </Tooltip>
-              </Box>
-
-              <TextField
-                label="ข้อความประกาศ"
-                multiline
-                rows={4}
-                value={localConfig.announcement?.message ?? ''}
-                onChange={(e) => handleChange({
-                  ...localConfig,
-                  announcement: {...(localConfig.announcement ?? { enabled: false, message: '', color: 'blue' }), message: e.target.value}
-                })}
-                fullWidth
-                placeholder="พิมพ์ข้อความประกาศ... กด Enter เพื่อขึ้นบรรทัดใหม่"
-                inputProps={{ maxLength: 500 }}
-                helperText={`${(localConfig.announcement?.message ?? '').length}/500 ตัวอักษร • รองรับหลายบรรทัด`}
-                sx={{
-                  ...inputSx,
-                  '& .MuiOutlinedInput-root': {
-                    ...inputSx['& .MuiOutlinedInput-root'],
-                    borderRadius: '10px',
-                    fontFamily: 'inherit',
-                  },
-                  '& textarea': {
-                    whiteSpace: 'pre-wrap',
-                  },
-                }}
-              />
-
-              {/* Preview */}
-              {(localConfig.announcement?.message ?? '').trim() && (
-                <Box sx={{ mt: 1 }}>
-                  <Typography sx={{ fontSize: '0.75rem', color: '#64748b', mb: 1 }}>ตัวอย่างการแสดงผล:</Typography>
-                  <Box sx={{
-                    p: 1.5,
-                    borderRadius: '8px',
-                    bgcolor: {
-                      blue: '#3b82f6',
-                      red: '#ef4444',
-                      emerald: '#10b981',
-                      orange: '#f59e0b',
-                    }[localConfig.announcement?.color ?? 'blue'] || '#3b82f6',
-                    textAlign: 'center',
-                  }}>
-                    <Typography sx={{ 
-                      fontSize: '0.9rem', 
-                      color: '#fff', 
-                      whiteSpace: 'pre-wrap',
-                      lineHeight: 1.6,
-                    }}>
-                      {localConfig.announcement?.message}
-                    </Typography>
-                  </Box>
-                </Box>
-              )}
-
-              <Box>
-                <Typography sx={{ fontSize: '0.8rem', color: '#64748b', mb: 1 }}>สีพื้นหลัง</Typography>
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                  {[
-                    { value: 'blue', color: '#3b82f6', label: 'น้ำเงิน' },
-                    { value: 'red', color: '#ef4444', label: 'แดง' },
-                    { value: 'emerald', color: '#10b981', label: 'เขียว' },
-                    { value: 'orange', color: '#f59e0b', label: 'ส้ม' },
-                  ].map(option => (
-                    <Box
-                      key={option.value}
-                      onClick={() => handleChange({
-                        ...localConfig,
-                        announcement: {...(localConfig.announcement ?? { enabled: false, message: '', color: 'blue' }), color: option.value as any}
-                      })}
-                      sx={{
-                        flex: 1,
-                        py: 1,
-                        borderRadius: '10px',
-                        cursor: 'pointer',
-                        textAlign: 'center',
-                        bgcolor: localConfig.announcement?.color === option.value ? option.color : 'rgba(255,255,255,0.05)',
-                        border: `2px solid ${localConfig.announcement?.color === option.value ? option.color : 'transparent'}`,
-                        transition: 'all 0.2s ease',
-                        '&:hover': { transform: 'translateY(-1px)' },
-                      }}
-                    >
-                      <Typography sx={{ 
-                        fontSize: '0.75rem', 
-                        fontWeight: 600,
-                        color: localConfig.announcement?.color === option.value ? '#fff' : '#94a3b8',
-                      }}>
-                        {option.label}
-                      </Typography>
-                    </Box>
-                  ))}
-                </Box>
-              </Box>
-            </Box>
-          )}
-        </SettingSection>
-
-        {/* Google Sheet */}
-        <SettingSection icon={<Bolt sx={{ fontSize: 20 }} />} title="Google Sheet">
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <TextField
-              label="Sheet ID"
-              placeholder="1abc123..."
-              value={localConfig.sheetId || ''}
-              onChange={(e) => handleChange({ ...localConfig, sheetId: e.target.value, sheetUrl: e.target.value ? `https://docs.google.com/spreadsheets/d/${e.target.value}` : '' })}
-              fullWidth
-              sx={{
-                ...inputSx,
-                '& .MuiOutlinedInput-root': {
-                  ...inputSx['& .MuiOutlinedInput-root'],
-                  borderRadius: '10px',
-                },
-              }}
-              helperText="ใส่ ID จาก URL ของ Google Sheet"
-            />
-            
-            {localConfig.sheetUrl && (
-              <Box sx={{
-                p: 2,
-                borderRadius: '12px',
-                bgcolor: 'rgba(16, 185, 129, 0.1)',
-                border: '1px solid rgba(16, 185, 129, 0.2)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 2,
-              }}>
-                <Box sx={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: '10px',
-                  bgcolor: '#10b981',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                  <Check sx={{ color: '#fff', fontSize: 20 }} />
-                </Box>
-                <Box sx={{ flex: 1 }}>
-                  <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: '#10b981' }}>
-                    เชื่อมต่อแล้ว
-                  </Typography>
-                  <Typography 
-                    component="a"
-                    href={localConfig.sheetUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    sx={{ 
-                      fontSize: '0.8rem', 
-                      color: '#64748b',
-                      textDecoration: 'underline',
-                      '&:hover': { color: '#94a3b8' },
-                    }}
-                  >
-                    เปิด Google Sheet
-                  </Typography>
-                </Box>
-              </Box>
-            )}
-
-            <Box sx={{ display: 'flex', gap: 1.5 }}>
-              <Button
-                onClick={() => triggerSheetSync(localConfig.sheetId ? 'sync' : 'create')}
-                disabled={sheetSyncing}
-                sx={{ ...gradientButtonSx, flex: 1, gap: 1 }}
-              >
-                <Bolt sx={{ fontSize: 18 }} />
-                {sheetSyncing ? 'กำลังซิงก์...' : localConfig.sheetId ? 'ซิงก์ทันที' : 'สร้าง Sheet ใหม่'}
-              </Button>
-            </Box>
-          </Box>
-        </SettingSection>
-
-        {/* Save Status */}
-        <Box sx={{ 
-          ...glassCardSx,
-          p: 2,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Box sx={{
-              width: 10,
-              height: 10,
-              borderRadius: '50%',
-              bgcolor: hasChanges ? '#f59e0b' : '#10b981',
-              boxShadow: `0 0 12px ${hasChanges ? '#f59e0b' : '#10b981'}`,
-            }} />
-            <Typography sx={{ fontSize: '0.85rem', color: '#94a3b8' }}>
-              {hasChanges ? 'มีการเปลี่ยนแปลงที่ยังไม่บันทึก' : 'บันทึกล่าสุด: ' + (lastSavedTime ? lastSavedTime.toLocaleString('th-TH') : '-')}
-            </Typography>
-          </Box>
-          <Button
-            onClick={handleSave}
-            disabled={!hasChanges || loading}
-            sx={{
-              ...gradientButtonSx,
-              minWidth: 120,
-              opacity: hasChanges ? 1 : 0.5,
-            }}
-          >
-            <Save sx={{ fontSize: 18, mr: 1 }} />
-            บันทึก
-          </Button>
-        </Box>
-      </Box>
-    );
-  };
+      return imageUrl;
+    } catch (error: any) {
+      console.error('Image upload error:', error);
+      throw error; // Re-throw to let caller handle
+    }
+  }, []);
 
   const LogsView = (): JSX.Element => {
     const [logFilter, setLogFilter] = useState<string>('ALL');
@@ -2767,7 +4025,7 @@ export default function AdminPage(): JSX.Element {
     );
   }
 
-  // Access Denied - logged in but not admin
+  // Access Denied - logged in but not admin - just redirect (Swal already shown in useEffect)
   if (!isAuthorized) {
     return (
       <Box
@@ -2776,80 +4034,16 @@ export default function AdminPage(): JSX.Element {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: `radial-gradient(ellipse at top, rgba(239,68,68,0.1) 0%, transparent 50%),
+          flexDirection: 'column',
+          gap: 3,
+          background: `radial-gradient(ellipse at top, rgba(99,102,241,0.1) 0%, transparent 50%),
                        linear-gradient(180deg, #0a0f1a 0%, #0f172a 50%, #0a0f1a 100%)`,
-          p: 2,
         }}
       >
-        <Box
-          sx={{
-            ...glassCardSx,
-            maxWidth: 440,
-            textAlign: 'center',
-            p: 0,
-            overflow: 'hidden',
-          }}
-        >
-          {/* Error Header */}
-          <Box
-            sx={{
-              background: 'linear-gradient(135deg, rgba(239,68,68,0.2) 0%, rgba(248,113,113,0.1) 100%)',
-              p: 4,
-            }}
-          >
-            <Box
-              sx={{
-                width: 80,
-                height: 80,
-                borderRadius: '24px',
-                background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                mx: 'auto',
-                mb: 2,
-                boxShadow: '0 20px 40px rgba(239,68,68,0.3)',
-              }}
-            >
-              <Lock sx={{ fontSize: 40, color: '#fff' }} />
-            </Box>
-            <Typography sx={{ fontSize: '1.4rem', fontWeight: 800, color: '#f1f5f9' }}>
-              ไม่มีสิทธิ์เข้าถึง
-            </Typography>
-          </Box>
-
-          {/* Content */}
-          <Box sx={{ p: 4 }}>
-            <Typography sx={{ fontSize: '0.9rem', color: '#94a3b8', mb: 1 }}>
-              บัญชี {session?.user?.email || 'ของคุณ'}
-            </Typography>
-            <Typography sx={{ fontSize: '0.85rem', color: '#64748b', mb: 3 }}>
-              ไม่ได้รับอนุญาตให้เข้าถึงหน้านี้
-            </Typography>
-
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-              <Button
-                onClick={() => signOut()}
-                sx={{
-                  ...secondaryButtonSx,
-                  py: 1.5,
-                }}
-              >
-                ออกจากระบบ
-              </Button>
-              <Button
-                onClick={() => router.push('/')}
-                fullWidth
-                sx={{
-                  ...gradientButtonSx,
-                  py: 1.5,
-                }}
-              >
-                กลับหน้าหลัก
-              </Button>
-            </Box>
-          </Box>
-        </Box>
+        <CircularProgress size={48} sx={{ color: '#8b5cf6' }} />
+        <Typography sx={{ fontSize: '0.9rem', color: '#64748b' }}>
+          กำลังตรวจสอบสิทธิ์...
+        </Typography>
       </Box>
     );
   }
@@ -3088,16 +4282,16 @@ export default function AdminPage(): JSX.Element {
           open={isDesktop ? true : sidebarOpen}
           onClose={() => setSidebarOpen(false)}
           sx={{
-            width: 260,
+            width: { xs: '100%', md: 260 },
             flexShrink: 0,
             '& .MuiDrawer-paper': {
-              width: 260,
+              width: { xs: '100%', md: 260 },
               background: ADMIN_THEME.bgSidebar,
               color: ADMIN_THEME.text,
-              borderRight: `1px solid ${ADMIN_THEME.border}`,
+              borderRight: { xs: 'none', md: `1px solid ${ADMIN_THEME.border}` },
               boxSizing: 'border-box',
               position: { xs: 'fixed', md: 'relative' },
-              height: { xs: 'auto', md: '100%' },
+              height: { xs: '100%', md: '100%' },
               backdropFilter: 'blur(20px)',
               pt: { xs: 2, md: 0 },
             }
@@ -3107,14 +4301,58 @@ export default function AdminPage(): JSX.Element {
           anchor="left"
         >
           {/* Sidebar Content */}
-          <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1, height: '100%' }}>
+            {/* Mobile Header with Close Button */}
+            {!isDesktop && (
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between',
+                mb: 2,
+                pb: 2,
+                borderBottom: `1px solid ${ADMIN_THEME.border}`,
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <Box sx={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: '12px',
+                    background: ADMIN_THEME.gradient,
+                    display: 'grid',
+                    placeItems: 'center',
+                  }}>
+                    <Bolt sx={{ color: '#fff', fontSize: 22 }} />
+                  </Box>
+                  <Box>
+                    <Typography sx={{ fontSize: '1rem', fontWeight: 800, color: '#f1f5f9' }}>
+                      Admin Panel
+                    </Typography>
+                    <Typography sx={{ fontSize: '0.7rem', color: '#64748b' }}>
+                      เลือกเมนู
+                    </Typography>
+                  </Box>
+                </Box>
+                <IconButton 
+                  onClick={() => setSidebarOpen(false)}
+                  sx={{ 
+                    color: '#94a3b8',
+                    bgcolor: 'rgba(255,255,255,0.05)',
+                    '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' },
+                  }}
+                >
+                  <Close />
+                </IconButton>
+              </Box>
+            )}
+            
             {/* Navigation Items */}
             {[
               { icon: <Dashboard sx={{ fontSize: 20 }} />, label: 'แดชบอร์ด', idx: 0, color: '#a5b4fc' },
               { icon: <ShoppingCart sx={{ fontSize: 20 }} />, label: 'จัดการสินค้า', idx: 1, color: '#fbbf24' },
               { icon: <Receipt sx={{ fontSize: 20 }} />, label: 'ออเดอร์', idx: 2, color: '#34d399', badge: pendingCount },
-              { icon: <Settings sx={{ fontSize: 20 }} />, label: 'ตั้งค่าร้าน', idx: 3, color: '#60a5fa' },
-              { icon: <History sx={{ fontSize: 20 }} />, label: 'ประวัติการใช้งาน', idx: 4, color: '#f472b6' },
+              { icon: <NotificationsActive sx={{ fontSize: 20 }} />, label: 'ประกาศ', idx: 3, color: '#f472b6' },
+              { icon: <Settings sx={{ fontSize: 20 }} />, label: 'ตั้งค่าร้าน', idx: 4, color: '#60a5fa' },
+              { icon: <History sx={{ fontSize: 20 }} />, label: 'ประวัติการใช้งาน', idx: 5, color: '#94a3b8' },
             ].map((item) => {
               const isActive = activeTab === item.idx;
               return (
@@ -3185,6 +4423,7 @@ export default function AdminPage(): JSX.Element {
               borderRadius: '14px',
               bgcolor: 'rgba(16,185,129,0.1)',
               border: '1px solid rgba(16,185,129,0.2)',
+              mb: !isDesktop ? 2 : 0,
             }}>
               <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#34d399', mb: 0.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>
                 ร้านค้า: 
@@ -3195,6 +4434,28 @@ export default function AdminPage(): JSX.Element {
                 สินค้า {config.products?.length || 0} รายการ
               </Typography>
             </Box>
+            
+            {/* Mobile Close Button */}
+            {!isDesktop && (
+              <Button
+                fullWidth
+                onClick={() => setSidebarOpen(false)}
+                startIcon={<Close />}
+                sx={{
+                  py: 1.5,
+                  borderRadius: '12px',
+                  bgcolor: 'rgba(100,116,139,0.15)',
+                  border: '1px solid rgba(100,116,139,0.3)',
+                  color: '#94a3b8',
+                  fontSize: '0.9rem',
+                  fontWeight: 600,
+                  textTransform: 'none',
+                  '&:hover': { bgcolor: 'rgba(100,116,139,0.25)' },
+                }}
+              >
+                ปิดเมนู
+              </Button>
+            )}
           </Box>
         </Drawer>
 
@@ -3221,8 +4482,34 @@ export default function AdminPage(): JSX.Element {
             />
           )}
           {activeTab === 2 && <OrdersView />}
-          {activeTab === 3 && <SettingsView />}
-          {activeTab === 4 && <LogsView />}
+          {activeTab === 3 && (
+            <AnnouncementsView
+              config={config}
+              saveConfig={saveFullConfig}
+              showToast={showToast}
+              userEmail={session?.user?.email}
+              onImageUpload={handleAnnouncementImageUpload}
+            />
+          )}
+          {activeTab === 4 && (
+            <SettingsView
+              localConfig={settingsLocalConfig}
+              hasChanges={settingsHasChanges}
+              loading={loading}
+              lastSavedTime={lastSavedTime}
+              newAdminEmail={newAdminEmail}
+              userEmail={session?.user?.email}
+              sheetSyncing={sheetSyncing}
+              onConfigChange={handleSettingsConfigChange}
+              onSave={handleSettingsSave}
+              onReset={handleSettingsReset}
+              onNewAdminEmailChange={handleNewAdminEmailChange}
+              showToast={showToast}
+              triggerSheetSync={triggerSheetSync}
+              onImageUpload={handleAnnouncementImageUpload}
+            />
+          )}
+          {activeTab === 5 && <LogsView />}
         </Box>
       </Box>
 
@@ -3930,14 +5217,24 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any
     }
   };
 
+  const isMobileDevice = useMediaQuery('(max-width: 600px)');
+
   return (
     <Dialog
       open={!!product}
       onClose={handleDialogClose}
       maxWidth="md"
       fullWidth
+      fullScreen={isMobileDevice}
       disableEscapeKeyDown
-      PaperProps={{ sx: { ...glassCardSx, background: 'rgba(15,23,42,0.94)', borderColor: ADMIN_THEME.border } }}
+      PaperProps={{ 
+        sx: { 
+          ...glassCardSx, 
+          background: 'rgba(15,23,42,0.94)', 
+          borderColor: ADMIN_THEME.border,
+          borderRadius: isMobileDevice ? 0 : undefined,
+        } 
+      }}
     >
       <DialogTitle sx={{ background: ADMIN_THEME.gradient, color: '#fff', fontWeight: 'bold', pb: 2 }}>
         {product.id.startsWith('prod_') ? 'New' : 'Edit'} Product

@@ -27,6 +27,17 @@ export async function GET(req: NextRequest) {
     const finalAmount = Math.max(0, baseAmount - discount);
     const qrUrl = finalAmount > 0 ? generatePromptPayQR(finalAmount) : null;
 
+    // ดึงข้อมูลสินค้าจาก order
+    const cartItems = (order.cart || order.items || []).map((item: any) => ({
+      productName: item.productName || item.name || 'สินค้า',
+      size: item.size || '-',
+      quantity: item.quantity || item.qty || 1,
+      unitPrice: item.unitPrice || item.price || 0,
+      customName: item.options?.customName || item.customName || '',
+      customNumber: item.options?.customNumber || item.customNumber || '',
+      isLongSleeve: item.options?.isLongSleeve || item.isLongSleeve || false,
+    }));
+
     return NextResponse.json({
       status: 'success',
       data: {
@@ -38,6 +49,8 @@ export async function GET(req: NextRequest) {
         discount,
         finalAmount,
         qrUrl,
+        cart: cartItems,
+        status: order.status || 'PENDING',
       },
     });
   } catch (error: any) {
