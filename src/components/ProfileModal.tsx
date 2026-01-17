@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, ShieldCheck, User, Phone, Instagram, AlertTriangle, MapPin, Check, Sparkles, UserCircle } from 'lucide-react';
-import { Drawer, Box, Typography, Button, IconButton, TextField, InputAdornment, Checkbox, FormControlLabel, useMediaQuery } from '@mui/material';
+import { X, ShieldCheck, User, Phone, Instagram, AlertTriangle, MapPin, Check, Sparkles, UserCircle, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Drawer, Box, Typography, Button, IconButton, TextField, InputAdornment, Checkbox, FormControlLabel, useMediaQuery, Slide } from '@mui/material';
 
 interface ProfileModalProps {
   initialData: { name: string; phone: string; address: string; instagram: string };
@@ -10,11 +10,34 @@ interface ProfileModalProps {
   onSave: (data: any) => void;
 }
 
+// ============== INLINE NOTIFICATION ==============
+
+interface InlineNotification {
+  type: 'success' | 'error' | 'warning';
+  message: string;
+}
+
+const NOTIFICATION_STYLES = {
+  success: {
+    bg: 'linear-gradient(135deg, rgba(16, 185, 129, 0.95) 0%, rgba(5, 150, 105, 0.95) 100%)',
+    icon: <CheckCircle2 size={16} />,
+  },
+  error: {
+    bg: 'linear-gradient(135deg, rgba(239, 68, 68, 0.95) 0%, rgba(220, 38, 38, 0.95) 100%)',
+    icon: <AlertCircle size={16} />,
+  },
+  warning: {
+    bg: 'linear-gradient(135deg, rgba(245, 158, 11, 0.95) 0%, rgba(234, 88, 12, 0.95) 100%)',
+    icon: <AlertTriangle size={16} />,
+  },
+};
+
 export default function ProfileModal({ initialData, onClose, onSave }: ProfileModalProps) {
   const isMobile = useMediaQuery('(max-width: 640px)');
   const [formData, setFormData] = useState(initialData);
   const [pdpaAccepted, setPdpaAccepted] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [notification, setNotification] = useState<InlineNotification | null>(null);
 
   useEffect(() => {
     if (initialData.name && initialData.phone && initialData.instagram) {
@@ -22,16 +45,43 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
     }
   }, [initialData]);
 
+  // Auto-hide notification
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => setNotification(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
+
+  const showNotification = (type: InlineNotification['type'], message: string) => {
+    setNotification({ type, message });
+  };
+
   const sanitizeThai = (value: string) => value.replace(/[^\u0E00-\u0E7F\s]/g, '').trimStart();
   const sanitizePhone = (value: string) => value.replace(/\D/g, '').slice(0, 12);
 
   const validate = () => {
     const nextErrors: Record<string, string> = {};
-    if (!formData.name || !/^[\u0E00-\u0E7F\s]+$/.test(formData.name.trim())) nextErrors.name = 'กรอกชื่อ-นามสกุลภาษาไทย';
-    if (!formData.phone || formData.phone.length < 9) nextErrors.phone = 'กรอกเบอร์โทรให้ถูกต้อง';
-    if (!formData.instagram.trim()) nextErrors.instagram = 'กรอก Instagram (จำเป็น)';
-    if (!pdpaAccepted) nextErrors.pdpa = 'กรุณายืนยันการใช้ข้อมูล';
+    if (!formData.name || !/^[\u0E00-\u0E7F\s]+$/.test(formData.name.trim())) {
+      nextErrors.name = 'กรอกชื่อ-นามสกุลภาษาไทย';
+    }
+    if (!formData.phone || formData.phone.length < 9) {
+      nextErrors.phone = 'กรอกเบอร์โทรให้ถูกต้อง';
+    }
+    if (!formData.instagram.trim()) {
+      nextErrors.instagram = 'กรอก Instagram (จำเป็น)';
+    }
+    if (!pdpaAccepted) {
+      nextErrors.pdpa = 'กรุณายืนยันการใช้ข้อมูล';
+    }
     setErrors(nextErrors);
+    
+    // Show notification for first error
+    if (Object.keys(nextErrors).length > 0) {
+      const firstError = Object.values(nextErrors)[0];
+      showNotification('warning', firstError);
+    }
+    
     return Object.keys(nextErrors).length === 0;
   };
 
@@ -77,6 +127,67 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
         },
       }}
     >
+      {/* Inline Notification Toast */}
+      {notification && (
+        <Box
+          sx={{
+            position: 'absolute',
+            top: { xs: 85, sm: 90 },
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 100,
+            width: 'calc(100% - 32px)',
+            maxWidth: 380,
+          }}
+        >
+          <Slide direction="down" in={true} mountOnEnter unmountOnExit>
+            <Box
+              sx={{
+                background: NOTIFICATION_STYLES[notification.type].bg,
+                backdropFilter: 'blur(16px)',
+                color: 'white',
+                py: 1.5,
+                px: 2,
+                borderRadius: '14px',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+                animation: 'notificationSlide 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
+                '@keyframes notificationSlide': {
+                  '0%': { opacity: 0, transform: 'translateY(-12px) scale(0.96)' },
+                  '100%': { opacity: 1, transform: 'translateY(0) scale(1)' },
+                },
+              }}
+            >
+              <Box
+                sx={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: '8px',
+                  bgcolor: 'rgba(255, 255, 255, 0.2)',
+                  display: 'grid',
+                  placeItems: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                {NOTIFICATION_STYLES[notification.type].icon}
+              </Box>
+              <Typography sx={{ fontWeight: 600, fontSize: '0.85rem', flex: 1 }}>
+                {notification.message}
+              </Typography>
+              <IconButton 
+                size="small" 
+                onClick={() => setNotification(null)} 
+                sx={{ color: 'white', opacity: 0.8, p: 0.3 }}
+              >
+                <X size={14} />
+              </IconButton>
+            </Box>
+          </Slide>
+        </Box>
+      )}
+
       {/* Header */}
       <Box sx={{
         px: { xs: 2, sm: 3 },

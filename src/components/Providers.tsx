@@ -4,6 +4,9 @@
 import { SessionProvider } from "next-auth/react";
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
+import { NotificationProvider } from './NotificationContext';
+import ToastContainer from './ToastContainer';
+import CookieConsentBanner from './CookieConsentBanner';
 
 // Liquid glass dark theme
 const darkTheme = createTheme({
@@ -137,7 +140,11 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     <SessionProvider>
       <ThemeProvider theme={darkTheme}>
         <CssBaseline />
-        {children}
+        <NotificationProvider>
+          {children}
+          <ToastContainer />
+          <CookieConsentBanner />
+        </NotificationProvider>
       </ThemeProvider>
     </SessionProvider>
   );

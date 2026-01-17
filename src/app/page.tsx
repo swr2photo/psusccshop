@@ -43,6 +43,9 @@ import useMediaQuery from '@mui/material/useMediaQuery';
 import Grid from '@mui/material/Grid';
 import {
   AlertTriangle,
+  CheckCircle2,
+  AlertCircle,
+  Info,
   ChevronLeft,
   ChevronRight,
   History,
@@ -142,7 +145,7 @@ const TYPE_LABELS: Record<string, string> = {
   OTHER: 'อื่นๆ',
 };
 
-const SIZE_ORDER = ['S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'] as const;
+const SIZE_ORDER = ['S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL', '7XL'] as const;
 const SIZE_MEASUREMENTS: Record<(typeof SIZE_ORDER)[number], { chest: number; length: number }> = {
   S: { chest: 36, length: 25 },
   M: { chest: 38, length: 26 },
@@ -151,6 +154,9 @@ const SIZE_MEASUREMENTS: Record<(typeof SIZE_ORDER)[number], { chest: number; le
   '2XL': { chest: 44, length: 29 },
   '3XL': { chest: 46, length: 30 },
   '4XL': { chest: 48, length: 31 },
+  '5XL': { chest: 50, length: 32 },
+  '6XL': { chest: 52, length: 33 },
+  '7XL': { chest: 54, length: 34 },
 };
 
 const ANNOUNCEMENT_COLOR_MAP: Record<string, string> = {
@@ -166,6 +172,7 @@ const CONFIG_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 type ToastSeverity = 'success' | 'error' | 'warning' | 'info';
 
 type Toast = {
+  id: string;
   type: ToastSeverity;
   message: string;
 };
@@ -335,9 +342,10 @@ export default function HomePage() {
   const [showRefreshDroplet, setShowRefreshDroplet] = useState(false);
   const hideNavBars = navHidden || productDialogOpen;
 
-  const [toast, setToast] = useState<Toast | null>(null);
+  const [toasts, setToasts] = useState<Toast[]>([]);
   const [inlineNotice, setInlineNotice] = useState<Toast | null>(null);
-  const ToastTransition = (props: any) => <Slide {...props} direction="left" />;
+  const toastTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const ToastTransition = (props: any) => <Slide {...props} direction="down" />;
 
   const bottomTabs = useMemo(
     () => [
@@ -601,9 +609,25 @@ export default function HomePage() {
   }, [selectedProduct]);
 
   const showToast = (type: ToastSeverity, message: string) => {
-    setToast({ type, message });
+    const id = `${type}-${message}`;
+    
+    // ป้องกันการซ้ำซ้อน - ถ้ามี toast เดียวกันอยู่แล้วให้ข้าม
+    setToasts((prev) => {
+      if (prev.some((t) => t.id === id)) return prev;
+      return [...prev, { id, type, message }].slice(-3); // เก็บแค่ 3 อันล่าสุด
+    });
+    
+    // ลบ toast อัตโนมัติหลัง 3 วินาที
+    if (toastTimeoutsRef.current.has(id)) {
+      clearTimeout(toastTimeoutsRef.current.get(id)!);
+    }
+    toastTimeoutsRef.current.set(id, setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+      toastTimeoutsRef.current.delete(id);
+    }, 3000));
+    
     if (productDialogOpen) {
-      setInlineNotice({ type, message });
+      setInlineNotice({ id, type, message });
       setTimeout(() => setInlineNotice(null), 2000);
     }
   };
@@ -1816,26 +1840,105 @@ export default function HomePage() {
 
         <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 3 }}>
           <Container maxWidth="sm">
-            <Card sx={{ bgcolor: '#1e293b', border: '1px solid #334155', p: 4, textAlign: 'center' }}>
-              <LogIn size={64} style={{ color: '#6366f1', margin: '0 auto 24px', display: 'block' }} />
-              <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 2, color: '#f1f5f9' }}>
-                ต้องเข้าสู่ระบบ
+            <Card 
+              sx={{ 
+                bgcolor: 'rgba(30, 41, 59, 0.8)', 
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(99, 102, 241, 0.2)', 
+                borderRadius: '24px',
+                p: { xs: 3, sm: 5 }, 
+                textAlign: 'center',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 40px rgba(99, 102, 241, 0.1)',
+              }}
+            >
+              {/* Web Logo */}
+              <Box
+                sx={{
+                  width: 100,
+                  height: 100,
+                  position: 'relative',
+                  borderRadius: '24px',
+                  overflow: 'hidden',
+                  margin: '0 auto 24px',
+                  boxShadow: '0 10px 30px rgba(99, 102, 241, 0.3)',
+                  border: '2px solid rgba(99, 102, 241, 0.3)',
+                }}
+              >
+                <Image
+                  src="/logo.png"
+                  alt="PSU SCC Shop Logo"
+                  fill
+                  style={{ objectFit: 'contain' }}
+                  priority
+                />
+              </Box>
+              
+              <Typography 
+                variant="h4" 
+                sx={{ 
+                  fontWeight: 800, 
+                  mb: 1, 
+                  color: '#f1f5f9',
+                  background: 'linear-gradient(135deg, #f1f5f9 0%, #c084fc 50%, #6366f1 100%)',
+                  backgroundClip: 'text',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                }}
+              >
+                SCC Shop
               </Typography>
-              <Typography sx={{ color: '#94a3b8', mb: 4 }}>
-                กรุณาล็อกอินด้วย Google เพื่อเริ่มช้อปปิ้ง
+              <Typography sx={{ color: '#94a3b8', mb: 4, fontSize: '1rem' }}>
+                ร้านค้าชุมนุมคอมพิวเตอร์ ม.อ.
               </Typography>
+              
+              <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)', mb: 4 }} />
+              
+              <Typography sx={{ color: '#64748b', mb: 3, fontSize: '0.9rem' }}>
+                เข้าสู่ระบบเพื่อเริ่มช้อปปิ้ง
+              </Typography>
+              
               <Button
                 variant="contained"
                 size="large"
-                startIcon={<LogIn />}
-                onClick={() => signIn('google')}
+                onClick={() => signIn('google', { redirect: true, callbackUrl: '/', prompt: 'select_account' })}
                 sx={{
-                  background: 'linear-gradient(135deg, #6366f1 0%, #06b6d4 100%)',
+                  background: '#ffffff',
+                  color: '#1f2937',
                   width: '100%',
+                  py: 1.5,
+                  borderRadius: '14px',
+                  fontWeight: 600,
+                  fontSize: '1rem',
+                  textTransform: 'none',
+                  boxShadow: '0 4px 14px rgba(0,0,0,0.15)',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 1.5,
+                  '&:hover': {
+                    background: '#f8fafc',
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 8px 25px rgba(0,0,0,0.2)',
+                  },
+                  '&:active': {
+                    transform: 'translateY(0)',
+                  },
                 }}
               >
+                {/* Google Logo SVG */}
+                <svg width="20" height="20" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
                 เข้าสู่ระบบด้วย Google
               </Button>
+              
+              <Typography sx={{ color: '#475569', mt: 4, fontSize: '0.75rem' }}>
+                โดยการเข้าสู่ระบบ คุณยอมรับ<br/>ข้อกำหนดและเงื่อนไขการใช้งาน
+              </Typography>
             </Card>
           </Container>
         </Box>
@@ -4317,49 +4420,121 @@ export default function HomePage() {
         </Box>
       )}
 
-      {toast && (
-        <Snackbar
-          open={!!toast}
-          autoHideDuration={3000}
-          onClose={() => setToast(null)}
-          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-          TransitionComponent={ToastTransition}
+      {/* Enhanced Modern Toast Container */}
+      {toasts.length > 0 && (
+        <Box
           sx={{
-            top: { xs: '16px !important', sm: '24px !important' },
-            zIndex: '99999 !important',
             position: 'fixed',
-            '& .MuiPaper-root': {
-              background: 'rgba(30,30,30,0.95)',
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
-              color: '#fff',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-              borderRadius: '12px',
-              minWidth: { xs: 280, sm: 320 },
-              border: 'none',
-            },
+            top: { xs: 16, sm: 24 },
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 99999,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 1.5,
+            width: { xs: 'calc(100% - 32px)', sm: 'auto' },
+            maxWidth: 420,
+            pointerEvents: 'none',
           }}
         >
-          <Alert
-            severity={toast.type}
-            icon={false}
-            sx={{
-              bgcolor: 'transparent',
-              color: '#fff',
-              py: 1.5,
-              px: 2,
-              fontSize: '0.95rem',
-              fontWeight: 500,
-              '& .MuiAlert-message': {
-                padding: 0,
-                textAlign: 'center',
-                width: '100%',
+          {toasts.map((t) => {
+            const colors = {
+              success: { 
+                bg: 'linear-gradient(135deg, rgba(16, 185, 129, 0.98) 0%, rgba(5, 150, 105, 0.98) 100%)', 
+                icon: <CheckCircle2 size={18} />,
+                shadow: '0 8px 32px rgba(16, 185, 129, 0.35)',
               },
-            }}
-          >
-            {toast.message}
-          </Alert>
-        </Snackbar>
+              error: { 
+                bg: 'linear-gradient(135deg, rgba(239, 68, 68, 0.98) 0%, rgba(220, 38, 38, 0.98) 100%)', 
+                icon: <AlertCircle size={18} />,
+                shadow: '0 8px 32px rgba(239, 68, 68, 0.35)',
+              },
+              warning: { 
+                bg: 'linear-gradient(135deg, rgba(245, 158, 11, 0.98) 0%, rgba(234, 88, 12, 0.98) 100%)', 
+                icon: <AlertTriangle size={18} />,
+                shadow: '0 8px 32px rgba(245, 158, 11, 0.35)',
+              },
+              info: { 
+                bg: 'linear-gradient(135deg, rgba(59, 130, 246, 0.98) 0%, rgba(37, 99, 235, 0.98) 100%)', 
+                icon: <Info size={18} />,
+                shadow: '0 8px 32px rgba(59, 130, 246, 0.35)',
+              },
+            };
+            return (
+              <Slide key={t.id} in direction="down" timeout={350}>
+                <Box
+                  sx={{
+                    background: colors[t.type].bg,
+                    backdropFilter: 'blur(16px)',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    borderRadius: '16px',
+                    py: 1.5,
+                    px: 2,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1.5,
+                    boxShadow: colors[t.type].shadow,
+                    cursor: 'pointer',
+                    pointerEvents: 'auto',
+                    animation: 'toastEnter 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
+                    '@keyframes toastEnter': {
+                      '0%': { opacity: 0, transform: 'translateY(-12px) scale(0.96)' },
+                      '100%': { opacity: 1, transform: 'translateY(0) scale(1)' },
+                    },
+                    transition: 'all 0.2s ease',
+                    '&:hover': {
+                      transform: 'scale(1.02)',
+                      boxShadow: `${colors[t.type].shadow}, 0 0 0 2px rgba(255, 255, 255, 0.1)`,
+                    },
+                  }}
+                  onClick={() => setToasts((prev) => prev.filter((toast) => toast.id !== t.id))}
+                >
+                  <Box 
+                    sx={{ 
+                      width: 32,
+                      height: 32,
+                      borderRadius: '10px',
+                      bgcolor: 'rgba(255, 255, 255, 0.2)',
+                      display: 'grid',
+                      placeItems: 'center',
+                      color: '#fff', 
+                      flexShrink: 0,
+                    }}
+                  >
+                    {colors[t.type].icon}
+                  </Box>
+                  <Typography
+                    sx={{
+                      color: '#fff',
+                      fontSize: '0.9rem',
+                      fontWeight: 600,
+                      flex: 1,
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    {t.message}
+                  </Typography>
+                  <Box
+                    sx={{
+                      color: 'rgba(255,255,255,0.8)',
+                      p: 0.5,
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      '&:hover': { 
+                        color: '#fff',
+                        bgcolor: 'rgba(255, 255, 255, 0.15)',
+                      },
+                    }}
+                  >
+                    <X size={16} />
+                  </Box>
+                </Box>
+              </Slide>
+            );
+          })}
+        </Box>
       )}
 
       <Backdrop

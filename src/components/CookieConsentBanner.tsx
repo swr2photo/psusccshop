@@ -1,0 +1,367 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { X, Cookie, Shield, Check, ChevronDown, ChevronUp, Settings2 } from 'lucide-react';
+import { Box, Typography, Button, IconButton, Collapse, Switch, Slide } from '@mui/material';
+import { useNotification, COOKIE_CATEGORIES, CookieCategory } from './NotificationContext';
+
+export default function CookieConsentBanner() {
+  const { showConsentBanner, acceptAll, acceptEssential, updateConsent } = useNotification();
+  const [showDetails, setShowDetails] = useState(false);
+  const [customConsent, setCustomConsent] = useState({
+    essential: true,
+    functional: true,
+    analytics: false,
+    marketing: false,
+  });
+
+  if (!showConsentBanner) return null;
+
+  const handleSaveCustom = () => {
+    updateConsent(customConsent);
+  };
+
+  const toggleCategory = (category: CookieCategory) => {
+    if (category === 'essential') return; // Cannot disable essential
+    setCustomConsent((prev) => ({
+      ...prev,
+      [category]: !prev[category],
+    }));
+  };
+
+  return (
+    <Slide direction="up" in={showConsentBanner} mountOnEnter unmountOnExit>
+      <Box
+        sx={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          zIndex: 9999,
+          p: { xs: 2, sm: 3 },
+          pb: { xs: 'max(16px, env(safe-area-inset-bottom))', sm: 3 },
+        }}
+      >
+        <Box
+          sx={{
+            maxWidth: 520,
+            mx: 'auto',
+            borderRadius: '24px',
+            bgcolor: 'rgba(15, 23, 42, 0.98)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            boxShadow: '0 -8px 40px rgba(0, 0, 0, 0.4), 0 4px 20px rgba(139, 92, 246, 0.1)',
+            overflow: 'hidden',
+          }}
+        >
+          {/* Header */}
+          <Box
+            sx={{
+              p: 2.5,
+              pb: 2,
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 2,
+            }}
+          >
+            <Box
+              sx={{
+                width: 48,
+                height: 48,
+                borderRadius: '14px',
+                background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
+                display: 'grid',
+                placeItems: 'center',
+                flexShrink: 0,
+                boxShadow: '0 4px 16px rgba(139, 92, 246, 0.3)',
+              }}
+            >
+              <Cookie size={24} color="white" />
+            </Box>
+            <Box sx={{ flex: 1 }}>
+              <Typography
+                sx={{
+                  fontSize: '1.1rem',
+                  fontWeight: 800,
+                  color: '#f1f5f9',
+                  mb: 0.5,
+                }}
+              >
+                🍪 เราใช้คุกกี้
+              </Typography>
+              <Typography
+                sx={{
+                  fontSize: '0.85rem',
+                  color: '#94a3b8',
+                  lineHeight: 1.5,
+                }}
+              >
+                เพื่อมอบประสบการณ์ที่ดีที่สุดในการใช้งาน เราจะเก็บข้อมูลการใช้งานและตะกร้าสินค้าของคุณ
+              </Typography>
+            </Box>
+          </Box>
+
+          {/* Expand/Collapse Details */}
+          <Box sx={{ px: 2.5, pb: 2 }}>
+            <Button
+              fullWidth
+              onClick={() => setShowDetails(!showDetails)}
+              endIcon={showDetails ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+              startIcon={<Settings2 size={16} />}
+              sx={{
+                py: 1,
+                borderRadius: '12px',
+                bgcolor: 'rgba(255, 255, 255, 0.05)',
+                color: '#94a3b8',
+                textTransform: 'none',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                '&:hover': {
+                  bgcolor: 'rgba(255, 255, 255, 0.08)',
+                },
+              }}
+            >
+              ตั้งค่าคุกกี้
+            </Button>
+          </Box>
+
+          {/* Cookie Settings */}
+          <Collapse in={showDetails}>
+            <Box
+              sx={{
+                px: 2.5,
+                pb: 2,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 1.5,
+              }}
+            >
+              {(Object.keys(COOKIE_CATEGORIES) as CookieCategory[]).map((category) => {
+                const info = COOKIE_CATEGORIES[category];
+                const isEnabled = customConsent[category];
+                const isRequired = info.required;
+
+                return (
+                  <Box
+                    key={category}
+                    sx={{
+                      p: 2,
+                      borderRadius: '14px',
+                      bgcolor: isEnabled ? 'rgba(139, 92, 246, 0.1)' : 'rgba(30, 41, 59, 0.5)',
+                      border: `1px solid ${isEnabled ? 'rgba(139, 92, 246, 0.3)' : 'rgba(255, 255, 255, 0.05)'}`,
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 2,
+                      }}
+                    >
+                      <Box sx={{ flex: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                          <Typography
+                            sx={{
+                              fontSize: '0.9rem',
+                              fontWeight: 700,
+                              color: '#e2e8f0',
+                            }}
+                          >
+                            {info.name}
+                          </Typography>
+                          {isRequired && (
+                            <Box
+                              sx={{
+                                px: 1,
+                                py: 0.2,
+                                borderRadius: '6px',
+                                bgcolor: 'rgba(16, 185, 129, 0.15)',
+                                border: '1px solid rgba(16, 185, 129, 0.3)',
+                              }}
+                            >
+                              <Typography
+                                sx={{
+                                  fontSize: '0.65rem',
+                                  fontWeight: 600,
+                                  color: '#6ee7b7',
+                                }}
+                              >
+                                จำเป็น
+                              </Typography>
+                            </Box>
+                          )}
+                        </Box>
+                        <Typography
+                          sx={{
+                            fontSize: '0.75rem',
+                            color: '#64748b',
+                            lineHeight: 1.4,
+                          }}
+                        >
+                          {info.description}
+                        </Typography>
+                      </Box>
+                      <Switch
+                        checked={isEnabled}
+                        disabled={isRequired}
+                        onChange={() => toggleCategory(category)}
+                        sx={{
+                          '& .MuiSwitch-switchBase': {
+                            '&.Mui-checked': {
+                              color: '#8b5cf6',
+                              '& + .MuiSwitch-track': {
+                                bgcolor: 'rgba(139, 92, 246, 0.5)',
+                              },
+                            },
+                            '&.Mui-disabled': {
+                              color: '#10b981',
+                              '& + .MuiSwitch-track': {
+                                bgcolor: 'rgba(16, 185, 129, 0.5)',
+                                opacity: 1,
+                              },
+                            },
+                          },
+                          '& .MuiSwitch-track': {
+                            bgcolor: 'rgba(255, 255, 255, 0.1)',
+                          },
+                        }}
+                      />
+                    </Box>
+                  </Box>
+                );
+              })}
+            </Box>
+          </Collapse>
+
+          {/* Action Buttons */}
+          <Box
+            sx={{
+              p: 2.5,
+              pt: 0,
+              display: 'flex',
+              gap: 1.5,
+              flexDirection: { xs: 'column', sm: 'row' },
+            }}
+          >
+            {showDetails ? (
+              <>
+                <Button
+                  fullWidth
+                  onClick={acceptEssential}
+                  sx={{
+                    py: 1.5,
+                    borderRadius: '14px',
+                    bgcolor: 'rgba(255, 255, 255, 0.05)',
+                    color: '#94a3b8',
+                    textTransform: 'none',
+                    fontSize: '0.9rem',
+                    fontWeight: 600,
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    '&:hover': {
+                      bgcolor: 'rgba(255, 255, 255, 0.1)',
+                    },
+                  }}
+                >
+                  เฉพาะที่จำเป็น
+                </Button>
+                <Button
+                  fullWidth
+                  onClick={handleSaveCustom}
+                  startIcon={<Check size={18} />}
+                  sx={{
+                    py: 1.5,
+                    borderRadius: '14px',
+                    background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
+                    color: 'white',
+                    textTransform: 'none',
+                    fontSize: '0.9rem',
+                    fontWeight: 700,
+                    boxShadow: '0 4px 16px rgba(139, 92, 246, 0.3)',
+                    '&:hover': {
+                      background: 'linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)',
+                    },
+                  }}
+                >
+                  บันทึกการตั้งค่า
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  fullWidth
+                  onClick={acceptEssential}
+                  sx={{
+                    py: 1.5,
+                    borderRadius: '14px',
+                    bgcolor: 'rgba(255, 255, 255, 0.05)',
+                    color: '#94a3b8',
+                    textTransform: 'none',
+                    fontSize: '0.9rem',
+                    fontWeight: 600,
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    '&:hover': {
+                      bgcolor: 'rgba(255, 255, 255, 0.1)',
+                    },
+                  }}
+                >
+                  ปฏิเสธ
+                </Button>
+                <Button
+                  fullWidth
+                  onClick={acceptAll}
+                  startIcon={<Check size={18} />}
+                  sx={{
+                    py: 1.5,
+                    borderRadius: '14px',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: 'white',
+                    textTransform: 'none',
+                    fontSize: '0.9rem',
+                    fontWeight: 700,
+                    boxShadow: '0 4px 16px rgba(16, 185, 129, 0.3)',
+                    '&:hover': {
+                      background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
+                    },
+                  }}
+                >
+                  ยอมรับทั้งหมด
+                </Button>
+              </>
+            )}
+          </Box>
+
+          {/* Privacy Link */}
+          <Box
+            sx={{
+              px: 2.5,
+              pb: 2,
+              pt: 0,
+              textAlign: 'center',
+            }}
+          >
+            <Typography
+              sx={{
+                fontSize: '0.75rem',
+                color: '#64748b',
+              }}
+            >
+              อ่านเพิ่มเติม:{' '}
+              <Box
+                component="span"
+                sx={{
+                  color: '#a78bfa',
+                  cursor: 'pointer',
+                  '&:hover': { textDecoration: 'underline' },
+                }}
+              >
+                นโยบายความเป็นส่วนตัว
+              </Box>
+            </Typography>
+          </Box>
+        </Box>
+      </Box>
+    </Slide>
+  );
+}

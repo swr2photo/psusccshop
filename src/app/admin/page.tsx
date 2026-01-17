@@ -122,6 +122,7 @@ interface AdminOrder {
 }
 
 interface Toast {
+  id: string;
   type: 'success' | 'error' | 'info' | 'warning';
   message: string;
 }
@@ -348,8 +349,9 @@ export default function AdminPage(): JSX.Element {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [toast] = useState<Toast | null>(null);
+  const [toasts, setToasts] = useState<Toast[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const toastTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [logs, setLogs] = useState<any[][]>([]);
@@ -386,9 +388,21 @@ export default function AdminPage(): JSX.Element {
   const isSessionLoading = status === 'loading';
   const isDataLoading = loading && !hasInitialData;
 
-  const showToast = useCallback((_type: 'success' | 'error' | 'info' | 'warning', _message: string) => {
-    // Notifications disabled per request
-    return;
+  const showToast = useCallback((type: 'success' | 'error' | 'info' | 'warning', message: string) => {
+    const id = `${type}-${message}`;
+    
+    setToasts((prev) => {
+      if (prev.some((t) => t.id === id)) return prev;
+      return [...prev, { id, type, message }].slice(-3);
+    });
+    
+    if (toastTimeoutsRef.current.has(id)) {
+      clearTimeout(toastTimeoutsRef.current.get(id)!);
+    }
+    toastTimeoutsRef.current.set(id, setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+      toastTimeoutsRef.current.delete(id);
+    }, 3000));
   }, []);
 
   const addLog = useCallback((action: string, detail: string, overrides?: { config?: ShopConfig; orders?: AdminOrder[] }) => {
@@ -2647,7 +2661,7 @@ export default function AdminPage(): JSX.Element {
 
               {/* Google Sign In Button */}
               <Button
-                onClick={() => signIn('google')}
+                onClick={() => signIn('google', { prompt: 'select_account' })}
                 fullWidth
                 sx={{
                   py: 1.8,
@@ -3375,6 +3389,91 @@ export default function AdminPage(): JSX.Element {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Modern Toast Container */}
+      {toasts.length > 0 && (
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 20,
+            right: 20,
+            zIndex: 99999,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 1,
+            maxWidth: 380,
+          }}
+        >
+          {toasts.map((t) => {
+            const colors: Record<string, { bg: string; border: string }> = {
+              success: { bg: 'linear-gradient(135deg, rgba(16,185,129,0.95) 0%, rgba(5,150,105,0.95) 100%)', border: 'rgba(52,211,153,0.5)' },
+              error: { bg: 'linear-gradient(135deg, rgba(239,68,68,0.95) 0%, rgba(220,38,38,0.95) 100%)', border: 'rgba(248,113,113,0.5)' },
+              warning: { bg: 'linear-gradient(135deg, rgba(245,158,11,0.95) 0%, rgba(217,119,6,0.95) 100%)', border: 'rgba(251,191,36,0.5)' },
+              info: { bg: 'linear-gradient(135deg, rgba(59,130,246,0.95) 0%, rgba(37,99,235,0.95) 100%)', border: 'rgba(96,165,250,0.5)' },
+            };
+            const icons: Record<string, JSX.Element> = {
+              success: <CheckCircle sx={{ fontSize: 20 }} />,
+              error: <Close sx={{ fontSize: 20 }} />,
+              warning: <Notifications sx={{ fontSize: 20 }} />,
+              info: <Dashboard sx={{ fontSize: 20 }} />,
+            };
+            return (
+              <Box
+                key={t.id}
+                sx={{
+                  background: colors[t.type].bg,
+                  borderRadius: '14px',
+                  py: 1.5,
+                  px: 2.5,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.5,
+                  boxShadow: '0 10px 40px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.1) inset',
+                  backdropFilter: 'blur(10px)',
+                  cursor: 'pointer',
+                  animation: 'slideIn 0.3s ease-out',
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    transform: 'translateX(-4px)',
+                    boxShadow: '0 12px 45px rgba(0,0,0,0.35)',
+                  },
+                  '@keyframes slideIn': {
+                    '0%': { opacity: 0, transform: 'translateX(100%)' },
+                    '100%': { opacity: 1, transform: 'translateX(0)' },
+                  },
+                }}
+                onClick={() => setToasts((prev) => prev.filter((toast) => toast.id !== t.id))}
+              >
+                <Box sx={{ color: '#fff', display: 'flex', alignItems: 'center' }}>
+                  {icons[t.type]}
+                </Box>
+                <Typography
+                  sx={{
+                    color: '#fff',
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    flex: 1,
+                    textShadow: '0 1px 2px rgba(0,0,0,0.2)',
+                  }}
+                >
+                  {t.message}
+                </Typography>
+                <Box
+                  sx={{
+                    color: 'rgba(255,255,255,0.7)',
+                    cursor: 'pointer',
+                    '&:hover': { color: '#fff' },
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Close sx={{ fontSize: 16 }} />
+                </Box>
+              </Box>
+            );
+          })}
+        </Box>
+      )}
     </Box>
   );
 }
