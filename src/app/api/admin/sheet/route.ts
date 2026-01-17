@@ -18,6 +18,7 @@ export async function GET() {
 
 const ORDERS_SHEET_TITLE = 'Orders';
 const VENDOR_SHEET_TITLE = 'Orders Vendor';
+const FACTORY_EXPORT_TITLE = 'Factory Export';
 
 const summarizeItems = (items: any[]): string => {
   if (!Array.isArray(items) || items.length === 0) return '';
@@ -61,6 +62,46 @@ const buildRows = (orders: any[], baseUrl: string) => {
       slipLink,
     ];
   });
+};
+
+// Flatten items for factory export + size summary
+const buildFactoryExport = (orders: any[]) => {
+  const header = ['ลำดับ', 'ชื่อ', 'เบอร์เสื้อ', 'ไซซ์', 'ไซซ์กางเกง (ถ้ามี)', 'เบอร์กางเกง (ถ้ามี)', 'หมายเหตุ', 'คณะ/กลุ่ม', 'เรียงลำดับ', 'สำรอง', 'Size', 'จำนวนรวม'];
+  const rows: any[] = [];
+  const sizeCount: Record<string, number> = {};
+
+  orders.forEach((o) => {
+    const items = o?.items || o?.cart || o?.raw?.items || [];
+    items.forEach((item: any) => {
+      const size = item.size || '';
+      const qty = Number(item.quantity ?? 1) || 1;
+      sizeCount[size] = (sizeCount[size] || 0) + qty;
+
+      rows.push([
+        rows.length + 1, // ลำดับ
+        o?.customerName || o?.name || '',
+        item.options?.customNumber || item.customNumber || '', // เบอร์เสื้อ
+        size,
+        '', // ไซซ์กางเกง (ถ้ามี)
+        '', // เบอร์กางเกง (ถ้ามี)
+        o?.notes || o?.remark || '',
+        '', // คณะ/กลุ่ม (optional)
+        '', // เรียงลำดับ
+        '', // สำรอง
+        size,
+        qty,
+      ]);
+    });
+  });
+
+  const summaryHeader = ['Size', 'จำนวนรวม'];
+  const summaryRows = Object.entries(sizeCount)
+    .filter(([size]) => size)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([size, qty]) => [size, qty]);
+
+  const values = [header, ...rows, [], summaryHeader, ...summaryRows];
+  return values;
 };
 
 // Vendor rows: remove email and slip columns for sharing with factory
@@ -115,7 +156,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const mode = (body?.mode as 'create' | 'sync' | undefined) || 'sync';
     let sheetId: string | undefined = body?.sheetId ?? process.env.GOOGLE_SHEET_ID ?? undefined;
-    let vendorSheetId: string | undefined = body?.vendorSheetId ?? process.env.VENDOR_SHEET_ID ?? undefined;
+    // Vendor sheet now optional; if not provided we will skip factory sync entirely
+    const vendorSheetIdInput: string | undefined = body?.vendorSheetId ?? process.env.VENDOR_SHEET_ID ?? undefined;
+    let vendorSheetId: string | undefined = vendorSheetIdInput;
 
     // Fail fast with clear message when service account creds are missing to avoid opaque 502
     if (!process.env.GOOGLE_CLIENT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY) {
@@ -130,7 +173,6 @@ export async function POST(req: NextRequest) {
 
     const sheets = await getSheets();
     let created = false;
-    let vendorCreated = false;
 
     if (!sheetId || mode === 'create') {
       const createdSheet = await sheets.spreadsheets.create({
@@ -150,29 +192,13 @@ export async function POST(req: NextRequest) {
       created = true;
     }
 
-    if (!vendorSheetId || mode === 'create') {
-      const createdVendorSheet = await sheets.spreadsheets.create({
-        requestBody: {
-          properties: { title: `PSU Orders Vendor ${new Date().toISOString().slice(0, 10)}` },
-          sheets: [
-            {
-              properties: {
-                title: VENDOR_SHEET_TITLE,
-                gridProperties: { frozenRowCount: 1 },
-              },
-            },
-          ],
-        },
-      });
-      vendorSheetId = createdVendorSheet.data.spreadsheetId ?? undefined;
-      vendorCreated = true;
-    }
-
     if (!sheetId) return NextResponse.json({ status: 'error', message: 'missing sheet id' }, { status: 400 });
-    if (!vendorSheetId) return NextResponse.json({ status: 'error', message: 'missing vendor sheet id' }, { status: 400 });
 
     await ensureSheet(sheets, sheetId);
-    await ensureSheet(sheets, vendorSheetId, VENDOR_SHEET_TITLE);
+    await ensureSheet(sheets, sheetId, FACTORY_EXPORT_TITLE);
+    if (vendorSheetId) {
+      await ensureSheet(sheets, vendorSheetId, VENDOR_SHEET_TITLE);
+    }
 
     // Get base URL from request or environment
     const host = req.headers.get('host') || 'localhost:3000';
@@ -195,15 +221,29 @@ export async function POST(req: NextRequest) {
       requestBody: { values },
     });
 
-    const vendorHeader = ['Ref', 'Date', 'Name', 'Phone', 'Amount', 'Status', 'Address', 'Items (summary)', 'Notes'];
-    const vendorValues = [vendorHeader, ...buildVendorRows(orders)];
-
+    // Factory export tab (optional format requested by vendor)
+    const factoryValues = buildFactoryExport(orders);
     await sheets.spreadsheets.values.update({
-      spreadsheetId: vendorSheetId,
-      range: `${VENDOR_SHEET_TITLE}!A1:I${vendorValues.length}`,
+      spreadsheetId: sheetId,
+      range: `${FACTORY_EXPORT_TITLE}!A1:L${factoryValues.length}`,
       valueInputOption: 'RAW',
-      requestBody: { values: vendorValues },
+      requestBody: { values: factoryValues },
     });
+
+    let vendorSheetUrl: string | undefined;
+    if (vendorSheetId) {
+      const vendorHeader = ['Ref', 'Date', 'Name', 'Phone', 'Amount', 'Status', 'Address', 'Items (summary)', 'Notes'];
+      const vendorValues = [vendorHeader, ...buildVendorRows(orders)];
+
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: vendorSheetId,
+        range: `${VENDOR_SHEET_TITLE}!A1:I${vendorValues.length}`,
+        valueInputOption: 'RAW',
+        requestBody: { values: vendorValues },
+      });
+
+      vendorSheetUrl = `https://docs.google.com/spreadsheets/d/${vendorSheetId}`;
+    }
 
     return NextResponse.json({
       status: 'success',
@@ -211,10 +251,10 @@ export async function POST(req: NextRequest) {
         sheetId,
         sheetUrl: sheetId ? `https://docs.google.com/spreadsheets/d/${sheetId}` : undefined,
         vendorSheetId,
-        vendorSheetUrl: vendorSheetId ? `https://docs.google.com/spreadsheets/d/${vendorSheetId}` : undefined,
+        vendorSheetUrl,
         rows: orders.length,
       },
-      message: created || vendorCreated ? 'สร้าง Sheet และซิงก์ข้อมูลแล้ว' : 'ซิงก์ข้อมูลล่าสุดแล้ว',
+      message: created ? 'สร้าง Sheet และซิงก์ข้อมูลแล้ว' : 'ซิงก์ข้อมูลล่าสุดแล้ว',
     });
   } catch (error: any) {
     console.error('Sheet sync error:', error);

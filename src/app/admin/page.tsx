@@ -2271,13 +2271,15 @@ export default function AdminPage(): JSX.Element {
   };
 
   const triggerSheetSync = useCallback(async (mode: 'sync' | 'create' = 'sync', opts?: { silent?: boolean }) => {
-    const effectiveMode = (!config.sheetId || !config.vendorSheetId) ? 'create' : mode;
+    // Factory sheet no longer required; create if main sheet missing only
+    const effectiveMode = (!config.sheetId) ? 'create' : mode;
     setSheetSyncing(true);
     try {
       const res = await syncOrdersSheet(
         effectiveMode,
         effectiveMode === 'create' ? undefined : config.sheetId,
-        effectiveMode === 'create' ? undefined : config.vendorSheetId
+        // vendor sheet optional now; pass only if present
+        effectiveMode === 'create' ? undefined : (config.vendorSheetId || undefined)
       );
       if (res.status !== 'success') {
         throw new Error(res.message || 'sync failed');
