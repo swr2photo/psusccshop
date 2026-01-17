@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getJson, putJson, listKeys } from '@/lib/filebase';
 import { requireAdmin } from '@/lib/auth';
+import { triggerSheetSync } from '@/lib/sheet-sync';
 
 export async function POST(req: NextRequest) {
   // ตรวจสอบสิทธิ์ Admin
@@ -22,6 +23,8 @@ export async function POST(req: NextRequest) {
       order.status = status;
       await putJson(targetKey, order);
     }
+    // Auto sync to Google Sheets
+    triggerSheetSync().catch(() => {});
     return NextResponse.json({ status: 'success' });
   } catch (error: any) {
     return NextResponse.json({ status: 'error', message: error?.message || 'update failed' }, { status: 500 });

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { listKeys, getJson, putJson } from '@/lib/filebase';
 import { calculateOrderTotal } from '@/lib/payment-utils';
 import { requireAuth, isResourceOwner, isAdminEmail } from '@/lib/auth';
+import { triggerSheetSync } from '@/lib/sheet-sync';
 import crypto from 'crypto';
 
 // ============== EMAIL INDEX HELPER ==============
@@ -308,6 +309,9 @@ export async function POST(req: NextRequest) {
     }
 
     console.log(`[payment-verify] ✅ Order ${ref} marked as PAID and index updated`);
+
+    // ✅ Auto sync to Google Sheets
+    triggerSheetSync().catch(() => {});
 
     // ส่งข้อมูลกลับ
     return NextResponse.json({

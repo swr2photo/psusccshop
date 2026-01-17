@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getJson, putJson, listKeys, deleteObject } from '@/lib/filebase';
 import crypto from 'crypto';
 import { requireAuth, requireAdmin, isAdminEmail, isResourceOwner, normalizeEmail as authNormalizeEmail } from '@/lib/auth';
+import { triggerSheetSync } from '@/lib/sheet-sync';
 
 const orderKey = (ref: string, date: Date) => {
   const yyyy = date.getFullYear();
@@ -148,6 +149,8 @@ export async function POST(req: NextRequest) {
     if (order.customerEmail) {
       await upsertIndexEntry(order.customerEmail, order);
     }
+    // Auto sync to Google Sheets
+    triggerSheetSync().catch(() => {});
     return NextResponse.json({ status: 'success', ref });
   } catch (error: any) {
     return NextResponse.json({ status: 'error', message: error?.message || 'submit failed' }, { status: 500 });
@@ -197,6 +200,8 @@ export async function PUT(req: NextRequest) {
     if (next.customerEmail) {
       await upsertIndexEntry(next.customerEmail, next);
     }
+    // Auto sync to Google Sheets
+    triggerSheetSync().catch(() => {});
     return NextResponse.json({ status: 'success', data: next });
   } catch (error: any) {
     return NextResponse.json({ status: 'error', message: error?.message || 'update failed' }, { status: 500 });
@@ -239,6 +244,8 @@ export async function DELETE(req: NextRequest) {
         await removeIndexEntry(existing.customerEmail, ref);
       }
       await deleteObject(targetKey);
+      // Auto sync to Google Sheets
+      triggerSheetSync().catch(() => {});
       return NextResponse.json({ status: 'success', message: 'deleted' });
     }
 
@@ -250,6 +257,8 @@ export async function DELETE(req: NextRequest) {
         await upsertIndexEntry(order.customerEmail, order);
       }
     }
+    // Auto sync to Google Sheets
+    triggerSheetSync().catch(() => {});
     return NextResponse.json({ status: 'success', message: 'cancelled' });
   } catch (error: any) {
     return NextResponse.json({ status: 'error', message: error?.message || 'cancel failed' }, { status: 500 });
