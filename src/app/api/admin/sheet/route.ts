@@ -260,6 +260,15 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('Sheet sync error:', error);
-    return NextResponse.json({ status: 'error', message: error?.message || 'sync failed' }, { status: 500 });
+    // Provide more specific error messages
+    let message = error?.message || 'sync failed';
+    if (message.includes('invalid_grant') || message.includes('Invalid JWT')) {
+      message = 'Google Service Account credentials ไม่ถูกต้องหรือหมดอายุ - กรุณาตรวจสอบ GOOGLE_PRIVATE_KEY';
+    } else if (message.includes('Permission denied') || message.includes('forbidden')) {
+      message = 'ไม่มีสิทธิ์เข้าถึง Google Sheet - ตรวจสอบว่า service account มีสิทธิ์แก้ไข Sheet แล้ว';
+    } else if (message.includes('not found')) {
+      message = 'ไม่พบ Google Sheet - ตรวจสอบ GOOGLE_SHEET_ID';
+    }
+    return NextResponse.json({ status: 'error', message }, { status: 500 });
   }
 }

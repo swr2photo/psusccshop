@@ -4395,7 +4395,11 @@ export default function AdminPage(): JSX.Element {
             }
           }}
           variant={isDesktop ? 'permanent' : 'temporary'}
-          ModalProps={{ keepMounted: true }}
+          ModalProps={{ 
+            keepMounted: true,
+            disableEnforceFocus: true,
+            disableRestoreFocus: true,
+          }}
           anchor="left"
         >
           {/* Sidebar Content */}
