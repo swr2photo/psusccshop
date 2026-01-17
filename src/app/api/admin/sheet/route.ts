@@ -4,6 +4,7 @@ import { getJson, listKeys } from '@/lib/filebase';
 import { requireAdmin } from '@/lib/auth';
 
 const ORDERS_SHEET_TITLE = 'Orders';
+const VENDOR_SHEET_TITLE = 'Orders Vendor';
 
 const summarizeItems = (items: any[]): string => {
   if (!Array.isArray(items) || items.length === 0) return '';
@@ -49,10 +50,29 @@ const buildRows = (orders: any[], baseUrl: string) => {
   });
 };
 
-const ensureSheet = async (sheets: any, spreadsheetId: string) => {
+// Vendor rows: remove email and slip columns for sharing with factory
+const buildVendorRows = (orders: any[]) => {
+  return orders.map((o) => {
+    const items = o?.items || o?.cart || o?.raw?.items || [];
+    const itemSummary = typeof items === 'string' ? items : summarizeItems(items);
+    return [
+      o?.ref || '',
+      o?.date || o?.createdAt || o?.created_at || '',
+      o?.customerName || o?.name || '',
+      o?.customerPhone || o?.phone || '',
+      Number(o?.totalAmount ?? o?.amount ?? o?.baseAmount ?? 0) || 0,
+      o?.status || '',
+      o?.customerAddress || o?.address || '',
+      itemSummary,
+      o?.notes || o?.remark || '',
+    ];
+  });
+};
+
+const ensureSheet = async (sheets: any, spreadsheetId: string, title: string = ORDERS_SHEET_TITLE) => {
   const meta = await sheets.spreadsheets.get({ spreadsheetId });
-  const hasOrdersSheet = meta.data?.sheets?.some((s: any) => s.properties?.title === ORDERS_SHEET_TITLE);
-  if (!hasOrdersSheet) {
+  const hasSheet = meta.data?.sheets?.some((s: any) => s.properties?.title === title);
+  if (!hasSheet) {
     await sheets.spreadsheets.batchUpdate({
       spreadsheetId,
       requestBody: {
@@ -60,7 +80,7 @@ const ensureSheet = async (sheets: any, spreadsheetId: string) => {
           {
             addSheet: {
               properties: {
-                title: ORDERS_SHEET_TITLE,
+                title,
                 gridProperties: { frozenRowCount: 1 },
               },
             },
@@ -82,8 +102,10 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const mode = (body?.mode as 'create' | 'sync' | undefined) || 'sync';
     let sheetId: string | undefined = body?.sheetId ?? process.env.GOOGLE_SHEET_ID ?? undefined;
+    let vendorSheetId: string | undefined = body?.vendorSheetId ?? process.env.VENDOR_SHEET_ID ?? undefined;
     const sheets = await getSheets();
     let created = false;
+    let vendorCreated = false;
 
     if (!sheetId || mode === 'create') {
       const createdSheet = await sheets.spreadsheets.create({
@@ -103,9 +125,29 @@ export async function POST(req: NextRequest) {
       created = true;
     }
 
+    if (!vendorSheetId || mode === 'create') {
+      const createdVendorSheet = await sheets.spreadsheets.create({
+        requestBody: {
+          properties: { title: `PSU Orders Vendor ${new Date().toISOString().slice(0, 10)}` },
+          sheets: [
+            {
+              properties: {
+                title: VENDOR_SHEET_TITLE,
+                gridProperties: { frozenRowCount: 1 },
+              },
+            },
+          ],
+        },
+      });
+      vendorSheetId = createdVendorSheet.data.spreadsheetId ?? undefined;
+      vendorCreated = true;
+    }
+
     if (!sheetId) return NextResponse.json({ status: 'error', message: 'missing sheet id' }, { status: 400 });
+    if (!vendorSheetId) return NextResponse.json({ status: 'error', message: 'missing vendor sheet id' }, { status: 400 });
 
     await ensureSheet(sheets, sheetId);
+    await ensureSheet(sheets, vendorSheetId, VENDOR_SHEET_TITLE);
 
     // Get base URL from request or environment
     const host = req.headers.get('host') || 'localhost:3000';
@@ -128,14 +170,26 @@ export async function POST(req: NextRequest) {
       requestBody: { values },
     });
 
+    const vendorHeader = ['Ref', 'Date', 'Name', 'Phone', 'Amount', 'Status', 'Address', 'Items (summary)', 'Notes'];
+    const vendorValues = [vendorHeader, ...buildVendorRows(orders)];
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: vendorSheetId,
+      range: `${VENDOR_SHEET_TITLE}!A1:I${vendorValues.length}`,
+      valueInputOption: 'RAW',
+      requestBody: { values: vendorValues },
+    });
+
     return NextResponse.json({
       status: 'success',
       data: {
         sheetId,
         sheetUrl: sheetId ? `https://docs.google.com/spreadsheets/d/${sheetId}` : undefined,
+        vendorSheetId,
+        vendorSheetUrl: vendorSheetId ? `https://docs.google.com/spreadsheets/d/${vendorSheetId}` : undefined,
         rows: orders.length,
       },
-      message: created ? 'สร้าง Sheet และซิงก์ข้อมูลแล้ว' : 'ซิงก์ข้อมูลล่าสุดแล้ว',
+      message: created || vendorCreated ? 'สร้าง Sheet และซิงก์ข้อมูลแล้ว' : 'ซิงก์ข้อมูลล่าสุดแล้ว',
     });
   } catch (error: any) {
     console.error('Sheet sync error:', error);

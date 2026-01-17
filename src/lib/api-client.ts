@@ -511,9 +511,10 @@ export async function getPublicConfig(): Promise<APIResponse> {
 
 export async function syncOrdersSheet(
   mode: 'create' | 'sync',
-  sheetId?: string
+  sheetId?: string,
+  vendorSheetId?: string
 ): Promise<APIResponse> {
-  return fetchJson('/api/admin/sheet', { method: 'POST', body: { mode, sheetId } });
+  return fetchJson('/api/admin/sheet', { method: 'POST', body: { mode, sheetId, vendorSheetId } });
 }
 
 // --- ADMIN ENDPOINTS ---

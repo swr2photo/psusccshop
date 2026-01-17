@@ -161,6 +161,8 @@ const DEFAULT_CONFIG: ShopConfig = {
   products: [],
   sheetId: '',
   sheetUrl: '',
+  vendorSheetId: '',
+  vendorSheetUrl: '',
   bankAccount: { bankName: '', accountName: '', accountNumber: '' },
   announcementHistory: [],
 };
@@ -239,6 +241,8 @@ const saveAdminCache = (payload: { config: ShopConfig; orders?: AdminOrder[]; lo
         isOpen: payload.config?.isOpen ?? false,
         sheetId: payload.config?.sheetId || '',
         sheetUrl: payload.config?.sheetUrl || '',
+        vendorSheetId: payload.config?.vendorSheetId || '',
+        vendorSheetUrl: payload.config?.vendorSheetUrl || '',
         announcements: payload.config?.announcements || [],
         // Skip products entirely to save space
         products: [],
@@ -454,6 +458,16 @@ const toDateTimeLocal = (dateStr: string | undefined): string => {
   return `${dateStr}T00:00`;
 };
 
+// Accept both Sheet ID or full URL and normalize to id + url
+const extractSheetInfo = (input: string): { sheetId: string; sheetUrl: string } => {
+  const value = (input || '').trim();
+  if (!value) return { sheetId: '', sheetUrl: '' };
+  const match = value.match(/\/d\/([a-zA-Z0-9-_]+)/);
+  const sheetId = match?.[1] || value;
+  const sheetUrl = sheetId ? `https://docs.google.com/spreadsheets/d/${sheetId}` : '';
+  return { sheetId, sheetUrl };
+};
+
 // ============== SETTINGS VIEW COMPONENT (Stable - React.memo outside AdminPage) ==============
 interface SettingsViewProps {
   localConfig: ShopConfig;
@@ -621,9 +635,12 @@ const SettingsView = React.memo(function SettingsView({
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <TextField
               label="Sheet ID"
-              placeholder="1abc123..."
+              placeholder="วาง Sheet ID หรือ URL ก็ได้"
               value={localConfig.sheetId || ''}
-              onChange={(e) => onConfigChange({ ...localConfig, sheetId: e.target.value, sheetUrl: e.target.value ? `https://docs.google.com/spreadsheets/d/${e.target.value}` : '' })}
+              onChange={(e) => {
+                const { sheetId, sheetUrl } = extractSheetInfo(e.target.value);
+                onConfigChange({ ...localConfig, sheetId, sheetUrl });
+              }}
               fullWidth
               sx={{
                 ...inputSx,
@@ -632,7 +649,26 @@ const SettingsView = React.memo(function SettingsView({
                   borderRadius: '10px',
                 },
               }}
-              helperText="ใส่ ID จาก URL ของ Google Sheet"
+              helperText="ใส่ Sheet ID หรือ URL ของ Google Sheet"
+            />
+
+            <TextField
+              label="Vendor Sheet ID"
+              placeholder="วาง Sheet ID หรือ URL ให้โรงงาน"
+              value={localConfig.vendorSheetId || ''}
+              onChange={(e) => {
+                const { sheetId, sheetUrl } = extractSheetInfo(e.target.value);
+                onConfigChange({ ...localConfig, vendorSheetId: sheetId, vendorSheetUrl: sheetUrl });
+              }}
+              fullWidth
+              sx={{
+                ...inputSx,
+                '& .MuiOutlinedInput-root': {
+                  ...inputSx['& .MuiOutlinedInput-root'],
+                  borderRadius: '10px',
+                },
+              }}
+              helperText="ชีตสำหรับส่งให้โรงงาน (ตัดอีเมล/ลิงก์สลิปออก)"
             />
             
             {localConfig.sheetUrl && (
@@ -673,6 +709,49 @@ const SettingsView = React.memo(function SettingsView({
                     }}
                   >
                     เปิด Google Sheet
+                  </Typography>
+                </Box>
+              </Box>
+            )}
+
+            {localConfig.vendorSheetUrl && (
+              <Box sx={{
+                p: 2,
+                borderRadius: '12px',
+                bgcolor: 'rgba(59,130,246,0.1)',
+                border: '1px solid rgba(59,130,246,0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 2,
+              }}>
+                <Box sx={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: '10px',
+                  bgcolor: '#3b82f6',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <Check sx={{ color: '#fff', fontSize: 20 }} />
+                </Box>
+                <Box sx={{ flex: 1 }}>
+                  <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: '#3b82f6' }}>
+                    เชื่อมต่อชีตโรงงานแล้ว
+                  </Typography>
+                  <Typography 
+                    component="a"
+                    href={localConfig.vendorSheetUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    sx={{ 
+                      fontSize: '0.8rem', 
+                      color: '#64748b',
+                      textDecoration: 'underline',
+                      '&:hover': { color: '#94a3b8' },
+                    }}
+                  >
+                    เปิด Vendor Sheet
                   </Typography>
                 </Box>
               </Box>
@@ -2192,29 +2271,46 @@ export default function AdminPage(): JSX.Element {
   };
 
   const triggerSheetSync = useCallback(async (mode: 'sync' | 'create' = 'sync', opts?: { silent?: boolean }) => {
-    if (mode === 'sync' && !config.sheetId) return;
+    const effectiveMode = (!config.sheetId || !config.vendorSheetId) ? 'create' : mode;
     setSheetSyncing(true);
     try {
-      const res = await syncOrdersSheet(mode, mode === 'create' ? undefined : config.sheetId);
+      const res = await syncOrdersSheet(
+        effectiveMode,
+        effectiveMode === 'create' ? undefined : config.sheetId,
+        effectiveMode === 'create' ? undefined : config.vendorSheetId
+      );
       if (res.status !== 'success') {
         throw new Error(res.message || 'sync failed');
       }
 
       const nextSheetId = (res.data as any)?.sheetId || config.sheetId || '';
       const nextSheetUrl = (res.data as any)?.sheetUrl || config.sheetUrl || (nextSheetId ? `https://docs.google.com/spreadsheets/d/${nextSheetId}` : '');
+      const nextVendorSheetId = (res.data as any)?.vendorSheetId || config.vendorSheetId || '';
+      const nextVendorSheetUrl = (res.data as any)?.vendorSheetUrl || config.vendorSheetUrl || (nextVendorSheetId ? `https://docs.google.com/spreadsheets/d/${nextVendorSheetId}` : '');
 
-      if (nextSheetId !== config.sheetId || nextSheetUrl !== config.sheetUrl) {
-        const nextConfig = { ...config, sheetId: nextSheetId, sheetUrl: nextSheetUrl };
+      if (
+        nextSheetId !== config.sheetId ||
+        nextSheetUrl !== config.sheetUrl ||
+        nextVendorSheetId !== config.vendorSheetId ||
+        nextVendorSheetUrl !== config.vendorSheetUrl
+      ) {
+        const nextConfig = { 
+          ...config, 
+          sheetId: nextSheetId, 
+          sheetUrl: nextSheetUrl,
+          vendorSheetId: nextVendorSheetId,
+          vendorSheetUrl: nextVendorSheetUrl,
+        };
         setConfig(nextConfig);
         saveAdminCache({ config: nextConfig, orders, logs });
         await saveFullConfig(nextConfig);
-        addLog('SYNC_SHEET', mode === 'create' ? 'สร้าง Sheet ใหม่' : 'ซิงก์ Sheet', { config: nextConfig });
+        addLog('SYNC_SHEET', effectiveMode === 'create' ? 'สร้าง Sheet ใหม่' : 'ซิงก์ Sheet', { config: nextConfig });
       } else {
         addLog('SYNC_SHEET', 'ซิงก์ Sheet', { config });
       }
 
       if (!opts?.silent) {
-        showToast('success', res.message || (mode === 'create' ? 'สร้าง Sheet สำเร็จ' : 'ซิงก์ Sheet แล้ว'));
+        showToast('success', res.message || (effectiveMode === 'create' ? 'สร้าง Sheet สำเร็จ' : 'ซิงก์ Sheet แล้ว'));
       }
     } catch (error: any) {
       if (!opts?.silent) {

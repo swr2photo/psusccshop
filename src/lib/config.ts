@@ -35,6 +35,8 @@ export interface ShopConfig {
     productsKey?: string;
   sheetId?: string;
   sheetUrl?: string;
+  vendorSheetId?: string;
+  vendorSheetUrl?: string;
   /** Legacy single announcement (deprecated, kept for backward compatibility) */
   announcement?: {
     enabled: boolean;
@@ -261,6 +263,8 @@ export const DEFAULT_CONFIG: ShopConfig = {
   products: [],
   sheetId: '',
   sheetUrl: '',
+  vendorSheetId: '',
+  vendorSheetUrl: '',
   announcement: {
     enabled: false,
     message: '',

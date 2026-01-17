@@ -217,6 +217,7 @@ type OrderHistoryItem = {
   qty?: number;
   quantity?: number;
   customName?: string;
+  customNumber?: string;
   isLongSleeve?: boolean;
   unitPrice?: number;
   subtotal?: number;
