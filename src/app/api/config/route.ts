@@ -12,6 +12,9 @@ const DEFAULT_CONFIG: ShopConfig = {
   products: [],
   sheetId: '',
   sheetUrl: '',
+  // Keep factory sheet linkage in defaults so it never disappears when config is empty
+  vendorSheetId: '',
+  vendorSheetUrl: '',
   bankAccount: { bankName: '', accountName: '', accountNumber: '' },
 };
 

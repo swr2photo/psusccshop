@@ -1,27 +1,29 @@
-// middleware.ts
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // --- CORS config ---
 const allowedOrigins = [
-  'https://psusccshop.psusci.club',
-  'https://www.psusccshop.psusci.club',
+  'https://sccshop.psusci.club',
+  'https://www.sccshop.psusci.club',
 ];
 
 // Check if origin is allowed
 function isAllowedOrigin(origin: string | null): boolean {
   // No origin header = same-origin request (allowed)
   if (!origin) return true;
-  
+
   // Exact match for production domains
   if (allowedOrigins.includes(origin)) return true;
-  
+
   // Allow subdomains of psusci.club
   if (origin.endsWith('.psusci.club')) return true;
-  
+
   // Allow localhost for development
   if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) return true;
-  
+
+  // Allow GitHub Codespaces public URLs (HMR/CSR in dev)
+  if (origin.endsWith('.app.github.dev')) return true;
+
   return false;
 }
 
@@ -29,13 +31,13 @@ function isAllowedOrigin(origin: string | null): boolean {
 const rateLimitMap = new Map<string, { count: number; last: number }>();
 const RATE_LIMIT = 60; // max requests per minute per IP
 
-export function middleware(request: NextRequest) {
+export default function proxy(request: NextRequest) {
   const origin = request.headers.get('origin');
-  
+
   // --- CORS ---
   if (!isAllowedOrigin(origin)) {
     return NextResponse.json(
-      { status: 'error', message: 'CORS policy: This origin is not allowed' }, 
+      { status: 'error', message: 'CORS policy: This origin is not allowed' },
       { status: 403 }
     );
   }
@@ -60,14 +62,14 @@ export function middleware(request: NextRequest) {
   response.headers.set(
     'Content-Security-Policy',
     [
-      "default-src 'self' https://psusccshop.psusci.club;",
-      "script-src 'self' 'unsafe-inline' https://psusccshop.psusci.club;",
+      "default-src 'self' https://sccshop.psusci.club;",
+      "script-src 'self' 'unsafe-inline' https://sccshop.psusci.club;",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;",
       "img-src * data: blob:;",
       "font-src 'self' https://fonts.gstatic.com;",
       "connect-src *;",
       "frame-ancestors 'none';",
-      "object-src 'none';"
+      "object-src 'none';",
     ].join(' ')
   );
   return response;

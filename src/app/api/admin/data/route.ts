@@ -3,6 +3,10 @@ import { getJson, listKeys } from '@/lib/filebase';
 import { ShopConfig } from '@/lib/config';
 import { requireAdmin } from '@/lib/auth';
 
+// Ensure Node runtime (uses filebase S3 client) and skip static caching
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 const CONFIG_KEY = 'config/shop-settings.json';
 
 export async function GET(req: NextRequest) {
@@ -20,6 +24,9 @@ export async function GET(req: NextRequest) {
       products: [],
       sheetId: '',
       sheetUrl: '',
+      // Preserve factory sheet linkage when config file is absent
+      vendorSheetId: '',
+      vendorSheetUrl: '',
     };
     const keys = await listKeys('orders/');
     const orders = await Promise.all(

@@ -3,6 +3,19 @@ import { getSheets } from '@/lib/google';
 import { getJson, listKeys } from '@/lib/filebase';
 import { requireAdmin } from '@/lib/auth';
 
+// Force Node runtime (googleapis needs Node, not Edge)
+export const runtime = 'nodejs';
+// Avoid static optimization; always run fresh
+export const dynamic = 'force-dynamic';
+
+export async function OPTIONS() {
+  return NextResponse.json({ status: 'ok' }, { status: 200 });
+}
+
+export async function GET() {
+  return NextResponse.json({ status: 'error', message: 'Use POST to sync sheets' }, { status: 405 });
+}
+
 const ORDERS_SHEET_TITLE = 'Orders';
 const VENDOR_SHEET_TITLE = 'Orders Vendor';
 
@@ -103,6 +116,18 @@ export async function POST(req: NextRequest) {
     const mode = (body?.mode as 'create' | 'sync' | undefined) || 'sync';
     let sheetId: string | undefined = body?.sheetId ?? process.env.GOOGLE_SHEET_ID ?? undefined;
     let vendorSheetId: string | undefined = body?.vendorSheetId ?? process.env.VENDOR_SHEET_ID ?? undefined;
+
+    // Fail fast with clear message when service account creds are missing to avoid opaque 502
+    if (!process.env.GOOGLE_CLIENT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY) {
+      return NextResponse.json(
+        {
+          status: 'error',
+          message: 'Google service account env missing (GOOGLE_CLIENT_EMAIL / GOOGLE_PRIVATE_KEY)',
+        },
+        { status: 500 }
+      );
+    }
+
     const sheets = await getSheets();
     let created = false;
     let vendorCreated = false;
