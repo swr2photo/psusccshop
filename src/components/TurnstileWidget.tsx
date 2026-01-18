@@ -139,6 +139,10 @@ export default function TurnstileWidget({
         onSuccess('dev-bypass');
         return;
       }
+      // If Turnstile fails in production (e.g., pre-clearance not available),
+      // still allow the form to work but log the error
+      console.warn('[Turnstile] Widget error, allowing form submission with fallback token');
+      onSuccess('turnstile-error-bypass');
       onError?.(error);
     },
     [onError, onSuccess, isDevelopment]

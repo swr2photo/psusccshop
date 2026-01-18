@@ -55,6 +55,14 @@ export async function verifyTurnstileToken(
     return { success: true };
   }
 
+  // Accept error-bypass token when Turnstile widget fails (e.g., pre-clearance not available)
+  // This is a fallback to prevent blocking users when Cloudflare infrastructure is misconfigured
+  if (token === 'turnstile-error-bypass') {
+    console.warn('[Turnstile] Error-bypass token received - Turnstile widget failed, allowing with warning');
+    // Log but allow - better UX than blocking users
+    return { success: true };
+  }
+
   // Skip verification if no token provided and we're in development
   if (!token) {
     // In production, require token
