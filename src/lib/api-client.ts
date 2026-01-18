@@ -420,6 +420,7 @@ export async function submitOrder(data: {
   customerInstagram: string;
   cart: any[];
   totalAmount: number;
+  turnstileToken?: string;
 }): Promise<APIResponse> {
   return fetchJson('/api/orders', { method: 'POST', body: data });
 }

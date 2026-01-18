@@ -46,8 +46,24 @@ export async function verifyTurnstileToken(
     return { success: true };
   }
 
+  // Accept dev-bypass token from frontend in development mode
+  if (token === 'dev-bypass') {
+    if (process.env.NODE_ENV === 'production') {
+      return { success: false, error: 'Invalid bypass token in production' };
+    }
+    console.warn('[Turnstile] Dev-bypass token accepted (dev mode)');
+    return { success: true };
+  }
+
+  // Skip verification if no token provided and we're in development
   if (!token) {
-    return { success: false, error: 'Missing Turnstile token' };
+    // In production, require token
+    if (process.env.NODE_ENV === 'production') {
+      return { success: false, error: 'กรุณายืนยันว่าคุณไม่ใช่บอท' };
+    }
+    // In development, allow without token
+    console.warn('[Turnstile] No token provided, skipping verification (dev mode)');
+    return { success: true };
   }
 
   try {

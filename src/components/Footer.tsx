@@ -25,12 +25,12 @@ export default function Footer() {
               </Link>
             </li>
             <li>
-              <Link href="/payment" className="hover:text-indigo-400 transition flex items-center gap-2">
+              <Link href="/#payment" className="hover:text-indigo-400 transition flex items-center gap-2">
                 แจ้งชำระเงิน
               </Link>
             </li>
             <li>
-              <Link href="/orders" className="hover:text-indigo-400 transition flex items-center gap-2">
+              <Link href="/#history" className="hover:text-indigo-400 transition flex items-center gap-2">
                 ตรวจสอบสถานะ
               </Link>
             </li>

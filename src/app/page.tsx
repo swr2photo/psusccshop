@@ -74,6 +74,7 @@ import {
 import PaymentFlow from '@/components/PaymentFlow';
 import ProfileModal from '@/components/ProfileModal';
 import Footer from '@/components/Footer';
+import TurnstileWidget from '@/components/TurnstileWidget';
 import { Product, ShopConfig } from '@/lib/config';
 import {
   cancelOrder,
@@ -353,6 +354,7 @@ export default function HomePage() {
   );
   const [savingProfile, setSavingProfile] = useState(false);
   const [pendingCheckout, setPendingCheckout] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string>('');
   const [navHidden, setNavHidden] = useState(false);
   const lastScrollYRef = useRef(0);
   const scrollIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -399,6 +401,7 @@ export default function HomePage() {
           src="/logo.png"
           alt="PSU SCC Shop Logo"
           fill
+          sizes="48px"
           style={{ objectFit: 'contain' }}
           priority
         />
@@ -1686,6 +1689,7 @@ export default function HomePage() {
         customerInstagram: orderData.instagram,
         cart: cart,
         totalAmount: getTotalPrice(),
+        turnstileToken,
       });
 
       if (res.status === 'success') {
@@ -1973,6 +1977,7 @@ export default function HomePage() {
                   src="/logo.png"
                   alt="PSU SCC Shop Logo"
                   fill
+                  sizes="64px"
                   style={{ objectFit: 'contain' }}
                   priority
                 />
@@ -4235,6 +4240,22 @@ export default function HomePage() {
                 </Typography>
               </Box>
             )}
+          </Box>
+
+          {/* Turnstile Bot Protection */}
+          <Box sx={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            pt: 1,
+          }}>
+            <TurnstileWidget
+              onSuccess={(token) => setTurnstileToken(token)}
+              onExpire={() => setTurnstileToken('')}
+              onError={() => setTurnstileToken('')}
+              theme="dark"
+              size="normal"
+              action="order"
+            />
           </Box>
         </DialogContent>
         <DialogActions sx={{ 

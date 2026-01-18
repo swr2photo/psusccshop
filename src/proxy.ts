@@ -138,13 +138,19 @@ function isSuspiciousUserAgent(userAgent: string | null): boolean {
 }
 
 /**
- * Routes that require stricter rate limiting
+ * Routes that require stricter rate limiting (POST/PUT/DELETE only)
+ * GET requests have higher limits for better UX
  */
 const STRICT_RATE_LIMIT_ROUTES = [
-  '/api/orders',
   '/api/payment',
   '/payment/verify',
   '/api/upload',
+];
+
+/**
+ * Routes with moderate rate limiting (all methods)
+ */
+const MODERATE_RATE_LIMIT_ROUTES = [
   '/api/admin',
 ];
 
@@ -162,6 +168,7 @@ const BOT_PROTECTED_ROUTES = [
 export default function proxy(request: NextRequest) {
   const origin = request.headers.get('origin');
   const pathname = request.nextUrl.pathname;
+  const method = request.method;
   const ip = getIP(request);
   const userAgent = request.headers.get('user-agent');
 
@@ -205,13 +212,34 @@ export default function proxy(request: NextRequest) {
     );
   }
   
-  // Apply rate limiting
+  // Apply rate limiting based on route and method
   const isStrictRoute = STRICT_RATE_LIMIT_ROUTES.some(route => pathname.startsWith(route));
-  const rateLimit = isStrictRoute ? 30 : 200; // requests per minute
+  const isModerateRoute = MODERATE_RATE_LIMIT_ROUTES.some(route => pathname.startsWith(route));
+  const isWriteMethod = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method);
+  
+  // Rate limits: 
+  // - Strict routes (payment, upload): 30/min
+  // - Moderate routes (admin): 60/min
+  // - Write methods on API: 60/min
+  // - Read methods: 200/min
+  let rateLimit = 200;
+  let rateLimitKey = 'normal';
+  
+  if (isStrictRoute) {
+    rateLimit = 30;
+    rateLimitKey = 'strict';
+  } else if (isModerateRoute) {
+    rateLimit = 60;
+    rateLimitKey = 'moderate';
+  } else if (isWriteMethod && pathname.startsWith('/api/')) {
+    rateLimit = 60;
+    rateLimitKey = 'write';
+  }
+  
   const windowSeconds = 60;
   
-  if (!checkMiddlewareRateLimit(`${ip}:${isStrictRoute ? 'strict' : 'normal'}`, rateLimit, windowSeconds)) {
-    console.warn(`[Security] Rate limit exceeded: ${ip} on ${pathname}`);
+  if (!checkMiddlewareRateLimit(`${ip}:${rateLimitKey}`, rateLimit, windowSeconds)) {
+    console.warn(`[Security] Rate limit exceeded: ${ip} on ${pathname} (${rateLimitKey})`);
     return new NextResponse(
       JSON.stringify({ status: 'error', message: 'Too many requests. Please try again later.' }),
       {

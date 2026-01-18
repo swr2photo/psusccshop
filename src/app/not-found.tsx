@@ -107,7 +107,7 @@ export default function NotFound() {
           </Link>
           <span className="text-slate-600">•</span>
           <Link 
-            href="/orders" 
+            href="/#history" 
             className="flex items-center gap-2 text-slate-400 hover:text-indigo-400 transition-colors"
           >
             <Search className="w-4 h-4" />

@@ -102,9 +102,21 @@ export default function TurnstileWidget({
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
   const [isReady, setIsReady] = useState(false);
+  const [devMode, setDevMode] = useState(false);
 
   // Check if site key is configured
   const hasSiteKey = !!TURNSTILE_SITE_KEY;
+  
+  // Check if we're in development (GitHub Codespaces, localhost, etc.)
+  // Production domain: sccshop.psusci.club - should use real Turnstile
+  const isDevelopment = typeof window !== 'undefined' && (
+    process.env.NODE_ENV === 'development' &&
+    (
+      window.location.hostname.includes('github.dev') ||
+      window.location.hostname.includes('localhost') ||
+      window.location.hostname.includes('127.0.0.1')
+    )
+  );
 
   const handleSuccess = useCallback(
     (token: string) => {
@@ -120,19 +132,31 @@ export default function TurnstileWidget({
   const handleError = useCallback(
     (error: any) => {
       console.error('[Turnstile] Error:', error);
+      // In development, bypass on error
+      if (isDevelopment) {
+        console.warn('[Turnstile] Development mode - bypassing verification');
+        setDevMode(true);
+        onSuccess('dev-bypass');
+        return;
+      }
       onError?.(error);
     },
-    [onError]
+    [onError, onSuccess, isDevelopment]
   );
 
   useEffect(() => {
+    // Skip and auto-pass in development
+    if (isDevelopment) {
+      console.warn('[Turnstile] Development mode detected, auto-bypassing');
+      setDevMode(true);
+      onSuccess('dev-bypass');
+      return;
+    }
+
     // Skip if no site key configured
     if (!hasSiteKey) {
       console.warn('[Turnstile] Site key not configured, widget disabled');
-      // Still call onSuccess with empty token to allow form submission in dev
-      if (process.env.NODE_ENV === 'development') {
-        onSuccess('dev-bypass');
-      }
+      onSuccess('dev-bypass');
       return;
     }
 
@@ -183,7 +207,21 @@ export default function TurnstileWidget({
         }
       }
     };
-  }, [hasSiteKey, handleSuccess, handleExpire, handleError, theme, size, action]);
+  }, [hasSiteKey, handleSuccess, handleExpire, handleError, theme, size, action, isDevelopment]);
+
+  // Show dev mode indicator
+  if (devMode || isDevelopment) {
+    return (
+      <div className={className}>
+        <div className="flex items-center gap-2 text-sm text-green-400 py-2 px-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          <span>🔧 Dev Mode - Bot protection bypassed</span>
+        </div>
+      </div>
+    );
+  }
 
   // Don't render anything if no site key
   if (!hasSiteKey) {
