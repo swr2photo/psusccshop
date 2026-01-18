@@ -103,6 +103,19 @@ export default function TurnstileWidget({
   const widgetIdRef = useRef<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [devMode, setDevMode] = useState(false);
+  const initializedRef = useRef(false);
+  
+  // Store callbacks in refs to avoid re-renders
+  const onSuccessRef = useRef(onSuccess);
+  const onExpireRef = useRef(onExpire);
+  const onErrorRef = useRef(onError);
+  
+  // Update refs when callbacks change
+  useEffect(() => {
+    onSuccessRef.current = onSuccess;
+    onExpireRef.current = onExpire;
+    onErrorRef.current = onError;
+  }, [onSuccess, onExpire, onError]);
 
   // Check if site key is configured
   const hasSiteKey = !!TURNSTILE_SITE_KEY;
@@ -118,49 +131,26 @@ export default function TurnstileWidget({
     )
   );
 
-  const handleSuccess = useCallback(
-    (token: string) => {
-      onSuccess(token);
-    },
-    [onSuccess]
-  );
-
-  const handleExpire = useCallback(() => {
-    onExpire?.();
-  }, [onExpire]);
-
-  const handleError = useCallback(
-    (error: any) => {
-      console.error('[Turnstile] Error:', error);
-      // In development, bypass on error
-      if (isDevelopment) {
-        console.warn('[Turnstile] Development mode - bypassing verification');
-        setDevMode(true);
-        onSuccess('dev-bypass');
-        return;
-      }
-      // If Turnstile fails in production (e.g., pre-clearance not available),
-      // still allow the form to work but log the error
-      console.warn('[Turnstile] Widget error, allowing form submission with fallback token');
-      onSuccess('turnstile-error-bypass');
-      onError?.(error);
-    },
-    [onError, onSuccess, isDevelopment]
-  );
-
   useEffect(() => {
+    // Prevent multiple initializations
+    if (initializedRef.current) {
+      return;
+    }
+    
     // Skip and auto-pass in development
     if (isDevelopment) {
       console.warn('[Turnstile] Development mode detected, auto-bypassing');
       setDevMode(true);
-      onSuccess('dev-bypass');
+      onSuccessRef.current('dev-bypass');
+      initializedRef.current = true;
       return;
     }
 
     // Skip if no site key configured
     if (!hasSiteKey) {
       console.warn('[Turnstile] Site key not configured, widget disabled');
-      onSuccess('dev-bypass');
+      onSuccessRef.current('dev-bypass');
+      initializedRef.current = true;
       return;
     }
 
@@ -180,23 +170,42 @@ export default function TurnstileWidget({
         } catch (e) {
           // Ignore
         }
+        widgetIdRef.current = null;
       }
 
       // Render new widget
-      widgetIdRef.current = window.turnstile.render(containerRef.current, {
-        sitekey: TURNSTILE_SITE_KEY,
-        callback: handleSuccess,
-        'expired-callback': handleExpire,
-        'error-callback': handleError,
-        theme,
-        size,
-        action,
-        retry: 'auto',
-        'retry-interval': 5000,
-        'refresh-expired': 'auto',
-      });
+      try {
+        widgetIdRef.current = window.turnstile.render(containerRef.current, {
+          sitekey: TURNSTILE_SITE_KEY,
+          callback: (token: string) => {
+            onSuccessRef.current(token);
+          },
+          'expired-callback': () => {
+            onExpireRef.current?.();
+          },
+          'error-callback': (error: any) => {
+            console.error('[Turnstile] Error:', error);
+            // If Turnstile fails, still allow the form to work
+            console.warn('[Turnstile] Widget error, allowing form submission with fallback token');
+            onSuccessRef.current('turnstile-error-bypass');
+            onErrorRef.current?.(error);
+          },
+          theme,
+          size,
+          action,
+          retry: 'auto',
+          'retry-interval': 8000,
+          'refresh-expired': 'auto',
+        });
 
-      setIsReady(true);
+        setIsReady(true);
+        initializedRef.current = true;
+      } catch (e) {
+        console.error('[Turnstile] Failed to render widget:', e);
+        // Allow form submission on render failure
+        onSuccessRef.current('turnstile-error-bypass');
+        initializedRef.current = true;
+      }
     };
 
     initWidget();
@@ -209,9 +218,10 @@ export default function TurnstileWidget({
         } catch (e) {
           // Ignore
         }
+        widgetIdRef.current = null;
       }
     };
-  }, [hasSiteKey, handleSuccess, handleExpire, handleError, theme, size, action, isDevelopment]);
+  }, [hasSiteKey, theme, size, action, isDevelopment]);
 
   // Show dev mode indicator
   if (devMode || isDevelopment) {
