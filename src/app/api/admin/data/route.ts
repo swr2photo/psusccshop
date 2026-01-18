@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getJson, listKeys } from '@/lib/filebase';
 import { ShopConfig } from '@/lib/config';
 import { requireAdmin } from '@/lib/auth';
+import { sanitizeConfigForAdmin, sanitizeOrdersForAdmin } from '@/lib/sanitize';
 
 // Ensure Node runtime (uses filebase S3 client) and skip static caching
 export const runtime = 'nodejs';
@@ -35,7 +36,15 @@ export async function GET(req: NextRequest) {
         return data ? { ...data, _key: k } : null;
       })
     );
-    return NextResponse.json({ status: 'success', data: { config: cfg, orders: orders.filter(Boolean), logs: [] } });
+    
+    // Sanitize: Admin เห็นได้มากกว่า แต่ยังต้องซ่อน raw slip base64
+    const sanitizedConfig = sanitizeConfigForAdmin(cfg);
+    const sanitizedOrders = sanitizeOrdersForAdmin(orders.filter(Boolean));
+    
+    return NextResponse.json(
+      { status: 'success', data: { config: sanitizedConfig, orders: sanitizedOrders, logs: [] } },
+      { headers: { 'Content-Type': 'application/json; charset=utf-8' } }
+    );
   } catch (error: any) {
     return NextResponse.json({ status: 'error', message: error?.message || 'load failed' }, { status: 500 });
   }

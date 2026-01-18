@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getJson, putJson } from '@/lib/filebase';
 import { ShopConfig } from '@/lib/config';
 import { requireAdmin } from '@/lib/auth';
+import { sanitizeConfigForPublic, sanitizeObjectUtf8 } from '@/lib/sanitize';
 
 const CONFIG_KEY = 'config/shop-settings.json';
 
@@ -20,7 +21,14 @@ const DEFAULT_CONFIG: ShopConfig = {
 
 export async function GET() {
   const cfg = (await getJson<ShopConfig>(CONFIG_KEY)) || DEFAULT_CONFIG;
-  return NextResponse.json({ status: 'success', data: cfg });
+  
+  // Sanitize: ลบ adminEmails, adminPermissions, sheetId ก่อนส่งให้ frontend
+  const sanitizedConfig = sanitizeConfigForPublic(cfg);
+  
+  return NextResponse.json(
+    { status: 'success', data: sanitizedConfig },
+    { headers: { 'Content-Type': 'application/json; charset=utf-8' } }
+  );
 }
 
 export async function POST(req: NextRequest) {
@@ -34,8 +42,15 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const config = body?.config as ShopConfig | undefined;
     if (!config) return NextResponse.json({ status: 'error', message: 'missing config' }, { status: 400 });
-    await putJson(CONFIG_KEY, config);
-    return NextResponse.json({ status: 'success', data: config });
+    
+    // Sanitize UTF-8 input ก่อนบันทึก
+    const sanitizedConfig = sanitizeObjectUtf8(config);
+    
+    await putJson(CONFIG_KEY, sanitizedConfig);
+    return NextResponse.json(
+      { status: 'success', data: sanitizedConfig },
+      { headers: { 'Content-Type': 'application/json; charset=utf-8' } }
+    );
   } catch (error: any) {
     return NextResponse.json({
       status: 'error',

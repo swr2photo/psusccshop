@@ -33,12 +33,15 @@ const nextConfig: NextConfig = {
           key: 'Content-Security-Policy',
           value:
             [
-              "default-src 'self' https://psusccshop.psusci.club;",
-              "script-src 'self' 'unsafe-inline' https://psusccshop.psusci.club;",
+              "default-src 'self' https://sccshop.psusci.club;",
+              // Allow Cloudflare Turnstile scripts
+              "script-src 'self' 'unsafe-inline' https://sccshop.psusci.club https://challenges.cloudflare.com;",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;",
               "img-src * data: blob:;",
               "font-src 'self' https://fonts.gstatic.com;",
               "connect-src *;",
+              // Allow Turnstile iframe
+              "frame-src https://challenges.cloudflare.com;",
               "frame-ancestors 'none';",
               "object-src 'none';"
             ].join(' '),

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { S3Client, PutObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { requireAuth } from '@/lib/auth';
+import { checkCombinedRateLimit, RATE_LIMITS, getRateLimitHeaders } from '@/lib/rate-limit';
 
 const endpoint = process.env.FILEBASE_ENDPOINT || 'https://s3.filebase.com';
 const region = process.env.FILEBASE_REGION || 'us-east-1';
@@ -39,6 +40,21 @@ const getPublicUrl = (cid: string) => {
 };
 
 export async function POST(req: NextRequest) {
+  // Rate limiting สำหรับ upload
+  const rateLimitResult = checkCombinedRateLimit(req, RATE_LIMITS.upload);
+  if (!rateLimitResult.allowed) {
+    return NextResponse.json(
+      { status: 'error', message: 'คุณอัปโหลดไฟล์เร็วเกินไป กรุณารอสักครู่' },
+      { 
+        status: 429, 
+        headers: { 
+          'Content-Type': 'application/json; charset=utf-8',
+          ...getRateLimitHeaders(rateLimitResult),
+        } 
+      }
+    );
+  }
+
   // ต้องเข้าสู่ระบบก่อนถึงจะ upload ได้
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) {
