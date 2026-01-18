@@ -2,6 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { listKeys, getJson } from '@/lib/filebase';
 import { generatePromptPayQR, calculateOrderTotal } from '@/lib/payment-utils';
 import { requireAuth, isResourceOwner, isAdminEmail } from '@/lib/auth';
+import { maskPhone } from '@/lib/sanitize';
+
+// Mask account number - แสดงแค่ 4 ตัวท้าย
+const maskAccountNumber = (accountNumber: string): string => {
+  if (!accountNumber) return '';
+  const cleaned = accountNumber.replace(/\D/g, '');
+  if (cleaned.length <= 4) return accountNumber;
+  const lastFour = cleaned.slice(-4);
+  return `${'*'.repeat(cleaned.length - 4)}${lastFour}`;
+};
 import { sanitizeUtf8Input, sanitizeObjectUtf8 } from '@/lib/sanitize';
 
 const findOrderKey = async (ref: string): Promise<string | null> => {
@@ -79,7 +89,8 @@ export async function GET(req: NextRequest) {
         ref: sanitizedRef,
         bankName,
         accountName,
-        accountNumber,
+        // ⚠️ SECURITY: Mask account number - แสดงแค่ 4 ตัวท้าย
+        accountNumber: maskAccountNumber(accountNumber),
         baseAmount,
         discount,
         finalAmount,

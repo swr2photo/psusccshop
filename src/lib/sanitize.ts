@@ -3,6 +3,53 @@
 
 import { ShopConfig, Product } from './config';
 
+// ==================== IMAGE URL PROXY ====================
+
+/**
+ * Secret key for encoding/decoding image URLs
+ * ใช้ XOR encryption อย่างง่ายเพื่อซ่อน URL จริง
+ */
+const IMAGE_PROXY_SECRET = process.env.IMAGE_PROXY_SECRET || 'psusccshop-image-proxy-2026';
+
+/**
+ * Encode real image URL to proxy URL
+ * แปลง https://ipfs.filebase.io/... → /api/image/[encoded-id]
+ */
+export function encodeImageUrl(url: string | undefined | null): string {
+  if (!url) return '';
+  
+  // Skip if already a proxy URL
+  if (url.startsWith('/api/image/')) return url;
+  
+  // Skip data URLs
+  if (url.startsWith('data:')) return url;
+  
+  // XOR with secret key
+  const encoded = Buffer.from(url).map((byte, i) => 
+    byte ^ IMAGE_PROXY_SECRET.charCodeAt(i % IMAGE_PROXY_SECRET.length)
+  );
+  
+  // Convert to URL-safe base64
+  const base64Id = Buffer.from(encoded)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+  
+  return `/api/image/${base64Id}`;
+}
+
+/**
+ * Encode all image URLs in a product
+ */
+function sanitizeProductImages(product: Product): Product {
+  return {
+    ...product,
+    images: (product.images || []).map(encodeImageUrl),
+    coverImage: encodeImageUrl(product.coverImage),
+  };
+}
+
 // ==================== SENSITIVE FIELD DEFINITIONS ====================
 
 /**
@@ -90,6 +137,7 @@ export function maskPhone(phone: string | null | undefined): string {
 
 /**
  * Public config fields that are safe for frontend
+ * ⚠️ SECURITY: ไม่รวม sheetUrl, sheetId, vendorSheetUrl, vendorSheetId
  */
 interface PublicShopConfig {
   isOpen: boolean;
@@ -121,36 +169,48 @@ interface PublicShopConfig {
   bankAccount?: {
     bankName: string;
     accountName: string;
-    accountNumber: string;
+    // ⚠️ Mask account number for security
+    accountNumberMasked: string;
   };
-  // sheetUrl is public for linking
-  sheetUrl?: string;
-  vendorSheetUrl?: string;
+}
+
+/**
+ * Mask account number - แสดงแค่ 4 ตัวท้าย
+ * เช่น 123-456789-0 → ***-******-0 (แสดง 4 ตัวสุดท้าย)
+ */
+function maskAccountNumber(accountNumber: string | null | undefined): string {
+  if (!accountNumber) return '';
+  const cleaned = accountNumber.replace(/\D/g, '');
+  if (cleaned.length <= 4) return accountNumber;
+  const lastFour = cleaned.slice(-4);
+  const maskedPart = '*'.repeat(cleaned.length - 4);
+  return `${maskedPart}${lastFour}`;
 }
 
 /**
  * Sanitize shop config for public/frontend use
- * Removes: adminEmails, adminPermissions, sheetId, vendorSheetId
+ * ⚠️ SECURITY: Removes adminEmails, adminPermissions, sheetId, sheetUrl, vendorSheetId, vendorSheetUrl
+ * ⚠️ SECURITY: Encodes all image URLs to hide real storage paths
  */
 export function sanitizeConfigForPublic(config: ShopConfig | null): PublicShopConfig | null {
   if (!config) return null;
   
-  // Explicitly pick only safe fields
+  // ⚠️ SECURITY: Explicitly pick only safe fields - NO sheet URLs!
+  // ⚠️ SECURITY: Encode all image URLs
   const sanitized: PublicShopConfig = {
     isOpen: config.isOpen,
     closeDate: config.closeDate,
-    products: config.products || [],
-    sheetUrl: config.sheetUrl,
-    vendorSheetUrl: config.vendorSheetUrl,
+    products: (config.products || []).map(sanitizeProductImages),
+    // ❌ REMOVED: sheetUrl, vendorSheetUrl - ไม่ส่งให้ frontend
   };
   
-  // Copy announcement without postedBy email
+  // Copy announcement without postedBy email, encode image URLs
   if (config.announcement) {
     sanitized.announcement = {
       enabled: config.announcement.enabled,
       message: config.announcement.message,
       color: config.announcement.color,
-      imageUrl: config.announcement.imageUrl,
+      imageUrl: encodeImageUrl(config.announcement.imageUrl),
       displayName: config.announcement.displayName,
       postedAt: config.announcement.postedAt,
       type: config.announcement.type,
@@ -159,14 +219,14 @@ export function sanitizeConfigForPublic(config: ShopConfig | null): PublicShopCo
     };
   }
   
-  // Copy announcements without postedBy emails
+  // Copy announcements without postedBy emails, encode image URLs
   if (config.announcements) {
     sanitized.announcements = config.announcements.map(a => ({
       id: a.id,
       enabled: a.enabled,
       message: a.message,
       color: a.color,
-      imageUrl: a.imageUrl,
+      imageUrl: encodeImageUrl(a.imageUrl),
       displayName: a.displayName,
       postedAt: a.postedAt,
       type: a.type,
@@ -175,12 +235,12 @@ export function sanitizeConfigForPublic(config: ShopConfig | null): PublicShopCo
     }));
   }
   
-  // Bank account is public info for payment
+  // Bank account - mask account number for security
   if (config.bankAccount) {
     sanitized.bankAccount = {
       bankName: config.bankAccount.bankName,
       accountName: config.bankAccount.accountName,
-      accountNumber: config.bankAccount.accountNumber,
+      accountNumberMasked: maskAccountNumber(config.bankAccount.accountNumber),
     };
   }
   
@@ -189,17 +249,44 @@ export function sanitizeConfigForPublic(config: ShopConfig | null): PublicShopCo
 
 /**
  * Sanitize config for admin use (keeps some sensitive fields but removes API keys)
+ * ⚠️ SECURITY: Still encodes image URLs to prevent URL exposure in network requests
  */
 export function sanitizeConfigForAdmin(config: ShopConfig | null): ShopConfig | null {
   if (!config) return null;
   
   // For admin, we keep adminEmails and permissions but remove any API keys
-  const result = { ...config };
+  // Still encode image URLs to prevent exposure
+  const result: ShopConfig = {
+    ...config,
+    // Encode product images
+    products: (config.products || []).map(p => ({
+      ...p,
+      images: (p.images || []).map(encodeImageUrl),
+      coverImage: encodeImageUrl(p.coverImage),
+    })),
+  };
+  
+  // Encode announcement images
+  if (result.announcement) {
+    result.announcement = {
+      ...result.announcement,
+      imageUrl: encodeImageUrl(result.announcement.imageUrl),
+    };
+  }
+  
+  // Encode announcements images
+  if (result.announcements) {
+    result.announcements = result.announcements.map(a => ({
+      ...a,
+      imageUrl: encodeImageUrl(a.imageUrl),
+    }));
+  }
   
   // Clean announcement history from raw data
   if (result.announcementHistory) {
     result.announcementHistory = result.announcementHistory.map(h => ({
       ...h,
+      imageUrl: encodeImageUrl(h.imageUrl),
       // Keep postedBy for admin audit trail
     }));
   }

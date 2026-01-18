@@ -235,3 +235,133 @@ body::before {
     box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.5);
   }
 }
+
+/* ==================== IMAGE PROTECTION STYLES ==================== */
+/* รองรับ iOS, macOS, Windows, Android */
+
+/* Universal protection - ป้องกันการ select และ drag */
+.protected-image,
+.protected-image *,
+.protected-image-container,
+.protected-image-container * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  -webkit-touch-callout: none !important;
+  -webkit-user-drag: none !important;
+  -khtml-user-drag: none !important;
+  -moz-user-drag: none !important;
+  -o-user-drag: none !important;
+}
+
+/* Allow container to receive events but block image interactions */
+.protected-image-container {
+  pointer-events: auto;
+}
+
+.protected-image-container img,
+.protected-image-container canvas,
+.protected-image img,
+.protected-image canvas {
+  pointer-events: none !important;
+}
+
+/* Overlay that captures all events */
+.protected-image-overlay {
+  pointer-events: auto !important;
+}
+
+/* iOS Safari specific - ป้องกัน long-press save image */
+img, canvas, video {
+  -webkit-touch-callout: none !important;
+}
+
+/* iOS specific - ป้องกัน callout menu */
+@supports (-webkit-touch-callout: none) {
+  img, canvas, video, .protected-image, .protected-image-container {
+    -webkit-touch-callout: none !important;
+    touch-action: manipulation;
+  }
+}
+
+/* Hide images when printing - ป้องกันการ print */
+@media print {
+  body {
+    display: none !important;
+    visibility: hidden !important;
+  }
+  
+  .protected-image,
+  .protected-image-container,
+  .no-print,
+  img,
+  canvas,
+  video {
+    display: none !important;
+    visibility: hidden !important;
+  }
+}
+
+/* Screenshot protection - เมื่อตรวจจับ screenshot */
+body.page-hidden .protected-content,
+body.page-hidden .protected-image,
+body.page-hidden .protected-image-container,
+body.page-hidden img,
+body.page-hidden canvas,
+body.page-hidden video {
+  filter: brightness(0) !important;
+  -webkit-filter: brightness(0) !important;
+  opacity: 0 !important;
+  transition: none !important;
+}
+
+/* Alternative: blur instead of black */
+body.page-blurred .protected-content,
+body.page-blurred .protected-image,
+body.page-blurred .protected-image-container {
+  filter: blur(30px) brightness(0.3) !important;
+  -webkit-filter: blur(30px) brightness(0.3) !important;
+}
+
+/* Disable text selection on product images */
+.product-image-container {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.product-image-container img,
+.product-image-container canvas {
+  pointer-events: none !important;
+  -webkit-user-drag: none !important;
+  -webkit-touch-callout: none !important;
+}
+
+/* No-copy class - ป้องกันการ copy text */
+.no-copy {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+}
+
+/* Prevent save as on all images */
+img {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -o-user-select: none;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* Re-enable pointer events for clickable images */
+a img,
+button img,
+.clickable img {
+  pointer-events: auto;
+}
+
+

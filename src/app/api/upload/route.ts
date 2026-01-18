@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { S3Client, PutObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { requireAuth } from '@/lib/auth';
 import { checkCombinedRateLimit, RATE_LIMITS, getRateLimitHeaders } from '@/lib/rate-limit';
+import { encodeImageUrl } from '@/lib/sanitize';
 
 const endpoint = process.env.FILEBASE_ENDPOINT || 'https://s3.filebase.com';
 const region = process.env.FILEBASE_REGION || 'us-east-1';
@@ -124,19 +125,20 @@ export async function POST(req: NextRequest) {
     // Get CID from Filebase (IPFS)
     const cid = await getCID(key);
     if (!cid) {
-      // Fallback to S3 URL if CID not available
+      // Fallback to S3 URL if CID not available - encode to hide real URL
       const fallbackUrl = `https://${bucket}.s3.filebase.com/${key}`;
       return NextResponse.json({
         status: 'success',
-        data: { url: fallbackUrl, key, size: buffer.length },
+        data: { url: encodeImageUrl(fallbackUrl), key, size: buffer.length },
       });
     }
 
     const url = getPublicUrl(cid);
 
+    // ⚠️ SECURITY: Encode URL to hide real IPFS path
     return NextResponse.json({
       status: 'success',
-      data: { url, key, cid, size: buffer.length },
+      data: { url: encodeImageUrl(url), key, cid, size: buffer.length },
     });
   } catch (error: any) {
     console.error('[upload] error', error);
@@ -168,9 +170,15 @@ export async function PUT(req: NextRequest) {
     for (let i = 0; i < images.length; i++) {
       const { base64, filename, mime } = images[i];
       
-      // Skip if already a URL (not base64)
-      if (typeof base64 === 'string' && (base64.startsWith('http://') || base64.startsWith('https://'))) {
+      // Skip if already a proxy URL (encoded)
+      if (typeof base64 === 'string' && base64.startsWith('/api/image/')) {
         results.push({ url: base64, key: '', originalIndex: i });
+        continue;
+      }
+      
+      // Skip if already a URL (not base64) - but encode it
+      if (typeof base64 === 'string' && (base64.startsWith('http://') || base64.startsWith('https://'))) {
+        results.push({ url: encodeImageUrl(base64), key: '', originalIndex: i });
         continue;
       }
 
@@ -204,8 +212,9 @@ export async function PUT(req: NextRequest) {
 
         // Get CID for IPFS URL
         const cid = await getCID(key);
-        const url = cid ? getPublicUrl(cid) : `https://${bucket}.s3.filebase.com/${key}`;
-        results.push({ url, key, originalIndex: i });
+        const rawUrl = cid ? getPublicUrl(cid) : `https://${bucket}.s3.filebase.com/${key}`;
+        // ⚠️ SECURITY: Encode URL to hide real storage path
+        results.push({ url: encodeImageUrl(rawUrl), key, originalIndex: i });
       } catch (err: any) {
         errors.push({ index: i, message: err?.message || 'Upload failed' });
       }

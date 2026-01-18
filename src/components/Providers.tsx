@@ -7,6 +7,20 @@ import CssBaseline from '@mui/material/CssBaseline';
 import { NotificationProvider } from './NotificationContext';
 import ToastContainer from './ToastContainer';
 import CookieConsentBanner from './CookieConsentBanner';
+import { useScreenshotProtection } from '@/hooks';
+
+// Screenshot protection wrapper
+function ScreenshotProtectionProvider({ children }: { children: React.ReactNode }) {
+  // Enable screenshot protection across the entire app
+  useScreenshotProtection({
+    blackoutDuration: 300,
+    onScreenshotAttempt: () => {
+      console.log('[Security] Screenshot attempt detected');
+    },
+  });
+
+  return <>{children}</>;
+}
 
 // Liquid glass dark theme
 const darkTheme = createTheme({
@@ -141,7 +155,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       <ThemeProvider theme={darkTheme}>
         <CssBaseline />
         <NotificationProvider>
-          {children}
+          <ScreenshotProtectionProvider>
+            {children}
+          </ScreenshotProtectionProvider>
           <ToastContainer />
           <CookieConsentBanner />
         </NotificationProvider>
