@@ -13,8 +13,8 @@ import { useScreenshotProtection } from '@/hooks';
 function ScreenshotProtectionProvider({ children }: { children: React.ReactNode }) {
   // Enable screenshot protection across the entire app
   useScreenshotProtection({
-    blackoutDuration: 300,
-    onScreenshotAttempt: () => {
+    recoveryTime: 300,
+    onScreenshotDetected: () => {
       console.log('[Security] Screenshot attempt detected');
     },
   });
