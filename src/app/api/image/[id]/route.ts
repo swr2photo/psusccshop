@@ -93,7 +93,6 @@ export async function GET(
     // ⚠️ SECURITY: Basic referer check - must come from our site
     const referer = req.headers.get('referer');
     const host = req.headers.get('host');
-    const origin = req.headers.get('origin');
     
     // Allow requests from same origin or no referer (direct image loading)
     // Block requests from other domains trying to hotlink
@@ -105,9 +104,22 @@ export async function GET(
           'localhost',
           '127.0.0.1',
           process.env.NEXTAUTH_URL ? new URL(process.env.NEXTAUTH_URL).host : null,
-        ].filter(Boolean);
+        ].filter(Boolean) as string[];
         
-        if (!allowedHosts.some(h => refererUrl.host === h || refererUrl.host.endsWith(`.${h}`))) {
+        // Also allow GitHub Codespaces and common dev environments
+        const isDevEnvironment = 
+          refererUrl.host.includes('github.dev') ||
+          refererUrl.host.includes('gitpod.io') ||
+          refererUrl.host.includes('codespaces') ||
+          refererUrl.host.includes('vercel.app') ||
+          refererUrl.host.includes('localhost') ||
+          refererUrl.host.includes('127.0.0.1');
+        
+        const isAllowedHost = allowedHosts.some(h => 
+          refererUrl.host === h || refererUrl.host.endsWith(`.${h}`)
+        );
+        
+        if (!isAllowedHost && !isDevEnvironment) {
           console.warn('[Image Proxy] Blocked hotlink from:', referer);
           return new NextResponse(null, { status: 403 });
         }

@@ -250,17 +250,33 @@ export async function PUT(req: NextRequest) {
 
     // User ปกติแก้ไขได้เฉพาะบางฟิลด์
     const userAllowedFields = ['customerName', 'customerPhone', 'customerAddress', 'name', 'phone', 'address', 'notes'];
-    // Admin แก้ไขได้มากกว่า
-    const adminAllowedFields = ['customerName', 'customerEmail', 'customerPhone', 'customerAddress', 'name', 'email', 'phone', 'address', 'amount', 'totalAmount', 'status', 'date', 'notes'];
+    // Admin แก้ไขได้มากกว่า รวมถึง cart items
+    const adminAllowedFields = ['customerName', 'customerEmail', 'customerPhone', 'customerAddress', 'name', 'email', 'phone', 'address', 'amount', 'totalAmount', 'status', 'date', 'notes', 'cart'];
     const allowedFields = isAdmin ? adminAllowedFields : userAllowedFields;
 
     // Sanitize UTF-8 และกรอง fields
     const sanitizedUpdates: Record<string, any> = {};
     Object.entries(updates).forEach(([key, value]) => {
       if (allowedFields.includes(key)) {
-        sanitizedUpdates[key] = typeof value === 'string' ? sanitizeUtf8Input(value) : value;
+        if (key === 'cart' && Array.isArray(value)) {
+          // Sanitize cart items
+          sanitizedUpdates[key] = value.map((item: any) => sanitizeObjectUtf8(item));
+        } else {
+          sanitizedUpdates[key] = typeof value === 'string' ? sanitizeUtf8Input(value) : value;
+        }
       }
     });
+    
+    // Recalculate totalAmount if cart was updated
+    if (sanitizedUpdates.cart && Array.isArray(sanitizedUpdates.cart)) {
+      const cartTotal = sanitizedUpdates.cart.reduce((sum: number, item: any) => {
+        const price = Number(item?.unitPrice ?? 0);
+        const qty = Number(item?.quantity ?? 1);
+        return sum + (price * qty);
+      }, 0);
+      sanitizedUpdates.totalAmount = cartTotal;
+      sanitizedUpdates.amount = cartTotal;
+    }
 
     const next = { ...existing, ...sanitizedUpdates };
     await putJson(targetKey, next);

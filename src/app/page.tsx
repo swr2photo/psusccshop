@@ -488,10 +488,26 @@ export default function HomePage() {
         if (cfg) {
           const lean = sanitizeConfig(cfg);
           cacheConfig(lean);
-          setConfig(cfg);
-          setAnnouncements(cfg.announcements || []);
-          setAnnouncementHistory(cfg.announcementHistory || []);
-          setIsShopOpen(cfg.isOpen);
+          // Only update state if data actually changed to prevent flickering
+          setConfig(prev => {
+            if (!prev) return cfg;
+            // Simple comparison of key fields
+            const changed = prev.isOpen !== cfg.isOpen || 
+              JSON.stringify(prev.products) !== JSON.stringify(cfg.products) ||
+              JSON.stringify(prev.announcements) !== JSON.stringify(cfg.announcements);
+            return changed ? cfg : prev;
+          });
+          setAnnouncements(prev => {
+            const nextJson = JSON.stringify(cfg.announcements || []);
+            const prevJson = JSON.stringify(prev);
+            return prevJson === nextJson ? prev : (cfg.announcements || []);
+          });
+          setAnnouncementHistory(prev => {
+            const nextJson = JSON.stringify(cfg.announcementHistory || []);
+            const prevJson = JSON.stringify(prev);
+            return prevJson === nextJson ? prev : (cfg.announcementHistory || []);
+          });
+          setIsShopOpen(prev => prev === cfg.isOpen ? prev : cfg.isOpen);
         } else {
           console.warn('No config returned from getPublicConfig');
         }
@@ -877,49 +893,86 @@ export default function HomePage() {
 
     const productContent = (
       <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: '#0a0f1a', color: '#f1f5f9' }}>
-        {/* Header */}
+        {/* Header - Enhanced Design */}
         <Box sx={{
           position: 'sticky',
           top: 0,
           zIndex: 10,
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
-          background: 'linear-gradient(180deg, rgba(15,23,42,0.98) 0%, rgba(10,15,26,0.98) 100%)',
-          backdropFilter: 'blur(20px)',
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
+          background: 'linear-gradient(180deg, rgba(10,15,26,0.98) 0%, rgba(15,23,42,0.95) 100%)',
+          backdropFilter: 'blur(24px)',
         }}>
           {isMobile && (
-            <Box sx={{ width: 36, height: 4, bgcolor: 'rgba(255,255,255,0.2)', borderRadius: 2, mx: 'auto', mt: 1.5, mb: 1 }} />
+            <Box sx={{ 
+              width: 40, 
+              height: 5, 
+              bgcolor: 'rgba(255,255,255,0.25)', 
+              borderRadius: 3, 
+              mx: 'auto', 
+              mt: 1.5, 
+              mb: 0.5,
+              cursor: 'grab',
+            }} />
           )}
-          <Box sx={{ px: { xs: 2, sm: 3 }, py: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Box sx={{ px: { xs: 2.5, sm: 3 }, py: { xs: 1.5, sm: 2 }, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' }, fontWeight: 800, color: '#f1f5f9', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <Typography sx={{ 
+                fontSize: { xs: '1.15rem', sm: '1.35rem' }, 
+                fontWeight: 800, 
+                color: '#f1f5f9', 
+                overflow: 'hidden', 
+                textOverflow: 'ellipsis', 
+                whiteSpace: 'nowrap',
+                letterSpacing: '-0.02em',
+              }}>
                 {selectedProduct.name}
               </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.75 }}>
                 <Box sx={{
-                  px: 1.2,
-                  py: 0.3,
-                  borderRadius: '6px',
-                  bgcolor: 'rgba(99,102,241,0.15)',
-                  border: '1px solid rgba(99,102,241,0.3)',
+                  px: 1.5,
+                  py: 0.4,
+                  borderRadius: '8px',
+                  background: 'linear-gradient(135deg, rgba(99,102,241,0.2) 0%, rgba(139,92,246,0.15) 100%)',
+                  border: '1px solid rgba(99,102,241,0.35)',
                 }}>
-                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#a5b4fc' }}>
+                  <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: '#a5b4fc', letterSpacing: '0.02em' }}>
                     {TYPE_LABELS[selectedProduct.type] || selectedProduct.type}
                   </Typography>
                 </Box>
+                {selectedProduct.options?.hasLongSleeve && (
+                  <Box sx={{
+                    px: 1,
+                    py: 0.3,
+                    borderRadius: '6px',
+                    bgcolor: 'rgba(245,158,11,0.15)',
+                    border: '1px solid rgba(245,158,11,0.3)',
+                  }}>
+                    <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: '#fbbf24' }}>
+                      แขนยาว
+                    </Typography>
+                  </Box>
+                )}
               </Box>
             </Box>
-            {!isMobile && (
-              <IconButton 
-                onClick={() => setProductDialogOpen(false)} 
-                sx={{ 
-                  color: '#94a3b8', 
-                  bgcolor: 'rgba(255,255,255,0.05)', 
-                  '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } 
-                }}
-              >
-                <X size={20} />
-              </IconButton>
-            )}
+
+            <IconButton 
+              onClick={() => setProductDialogOpen(false)} 
+              sx={{ 
+                color: '#94a3b8', 
+                bgcolor: 'rgba(255,255,255,0.06)', 
+                border: '1px solid rgba(255,255,255,0.1)',
+                width: 40,
+                height: 40,
+                '&:hover': { 
+                  bgcolor: 'rgba(239,68,68,0.15)', 
+                  borderColor: 'rgba(239,68,68,0.3)',
+                  color: '#f87171',
+                },
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <X size={20} />
+            </IconButton>
           </Box>
         </Box>
 
@@ -995,18 +1048,19 @@ export default function HomePage() {
         )}
 
         {/* Content */}
-        <Box sx={{ flex: 1, overflow: 'auto', WebkitOverflowScrolling: 'touch', px: { xs: 2, sm: 3 }, py: 2.5 }}>
-          {/* Image Gallery */}
-          <Box sx={{ mb: 3 }}>
+        <Box sx={{ flex: 1, overflow: 'auto', WebkitOverflowScrolling: 'touch', px: { xs: 2.5, sm: 3 }, py: 3 }}>
+          {/* Image Gallery - Enhanced */}
+          <Box sx={{ mb: 3.5 }}>
             {productImages.length > 0 ? (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {/* Main Image */}
                 <Box sx={{ 
                   position: 'relative', 
-                  borderRadius: '20px', 
+                  borderRadius: '24px', 
                   overflow: 'hidden',
-                  bgcolor: 'rgba(30,41,59,0.5)',
-                  border: '1px solid rgba(255,255,255,0.08)',
+                  bgcolor: 'rgba(30,41,59,0.6)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)',
                 }}>
                   <Box
                     component="img"
@@ -1015,11 +1069,22 @@ export default function HomePage() {
                     loading="lazy"
                     sx={{ 
                       width: '100%', 
-                      height: { xs: 280, sm: 360, md: 420 }, 
+                      height: { xs: 300, sm: 380, md: 440 }, 
                       objectFit: 'cover', 
                       display: 'block',
+                      transition: 'transform 0.3s ease',
                     }}
                   />
+                  {/* Gradient overlay at bottom */}
+                  <Box sx={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    height: 80,
+                    background: 'linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.6) 100%)',
+                    pointerEvents: 'none',
+                  }} />
                   {totalImages > 1 && (
                     <>
                       <IconButton
@@ -1029,11 +1094,14 @@ export default function HomePage() {
                           top: '50%', 
                           left: 12, 
                           transform: 'translateY(-50%)',
-                          bgcolor: 'rgba(0,0,0,0.5)', 
+                          bgcolor: 'rgba(0,0,0,0.6)', 
+                          backdropFilter: 'blur(8px)',
                           color: 'white', 
-                          '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' },
-                          width: 40,
-                          height: 40,
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          '&:hover': { bgcolor: 'rgba(0,0,0,0.8)', transform: 'translateY(-50%) scale(1.05)' },
+                          transition: 'all 0.2s ease',
+                          width: 44,
+                          height: 44,
                         }}
                       >
                         <ChevronLeft size={24} />
@@ -1045,27 +1113,45 @@ export default function HomePage() {
                           top: '50%', 
                           right: 12, 
                           transform: 'translateY(-50%)',
-                          bgcolor: 'rgba(0,0,0,0.5)', 
+                          bgcolor: 'rgba(0,0,0,0.6)', 
+                          backdropFilter: 'blur(8px)',
                           color: 'white', 
-                          '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' },
-                          width: 40,
-                          height: 40,
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          '&:hover': { bgcolor: 'rgba(0,0,0,0.8)', transform: 'translateY(-50%) scale(1.05)' },
+                          transition: 'all 0.2s ease',
+                          width: 44,
+                          height: 44,
                         }}
                       >
                         <ChevronRight size={24} />
                       </IconButton>
-                      {/* Image Counter */}
+                      {/* Image Counter - Enhanced */}
                       <Box sx={{
                         position: 'absolute',
-                        bottom: 12,
-                        right: 12,
-                        px: 1.5,
-                        py: 0.5,
-                        borderRadius: '20px',
-                        bgcolor: 'rgba(0,0,0,0.6)',
-                        backdropFilter: 'blur(10px)',
+                        bottom: 16,
+                        right: 16,
+                        px: 2,
+                        py: 0.75,
+                        borderRadius: '24px',
+                        bgcolor: 'rgba(0,0,0,0.65)',
+                        backdropFilter: 'blur(12px)',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 0.75,
                       }}>
-                        <Typography sx={{ fontSize: '0.75rem', color: 'white', fontWeight: 600 }}>
+                        <Box sx={{ 
+                          width: 6, 
+                          height: 6, 
+                          borderRadius: '50%', 
+                          bgcolor: '#6366f1',
+                          animation: 'pulse 2s infinite',
+                          '@keyframes pulse': {
+                            '0%, 100%': { opacity: 1 },
+                            '50%': { opacity: 0.5 },
+                          },
+                        }} />
+                        <Typography sx={{ fontSize: '0.8rem', color: 'white', fontWeight: 700, letterSpacing: '0.05em' }}>
                           {activeImageIndex + 1} / {totalImages}
                         </Typography>
                       </Box>
@@ -1073,24 +1159,35 @@ export default function HomePage() {
                   )}
                 </Box>
 
-                {/* Thumbnail Gallery */}
+                {/* Thumbnail Gallery - Enhanced */}
                 {totalImages > 1 && (
-                  <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto', pb: 0.5, '&::-webkit-scrollbar': { display: 'none' } }}>
+                  <Box sx={{ 
+                    display: 'flex', 
+                    gap: 1.5, 
+                    overflowX: 'auto', 
+                    pb: 1, 
+                    px: 0.5,
+                    '&::-webkit-scrollbar': { height: 4 },
+                    '&::-webkit-scrollbar-track': { bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 2 },
+                    '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(99,102,241,0.3)', borderRadius: 2 },
+                  }}>
                     {productImages.map((img, idx) => (
                       <Box
                         key={idx}
                         onClick={() => setActiveImageIndex(idx)}
                         sx={{
-                          width: 64,
-                          height: 64,
-                          borderRadius: '12px',
-                          border: activeImageIndex === idx ? '2px solid #6366f1' : '1px solid rgba(255,255,255,0.1)',
+                          width: 72,
+                          height: 72,
+                          borderRadius: '14px',
+                          border: activeImageIndex === idx ? '2px solid #6366f1' : '1px solid rgba(255,255,255,0.12)',
                           overflow: 'hidden',
                           cursor: 'pointer',
-                          opacity: activeImageIndex === idx ? 1 : 0.6,
-                          transition: 'all 0.2s',
+                          opacity: activeImageIndex === idx ? 1 : 0.55,
+                          transform: activeImageIndex === idx ? 'scale(1.02)' : 'scale(1)',
+                          transition: 'all 0.25s ease',
                           flexShrink: 0,
-                          '&:hover': { opacity: 1 },
+                          boxShadow: activeImageIndex === idx ? '0 4px 16px rgba(99,102,241,0.3)' : 'none',
+                          '&:hover': { opacity: 1, borderColor: 'rgba(99,102,241,0.5)' },
                         }}
                       >
                         <Box 
@@ -1107,48 +1204,73 @@ export default function HomePage() {
               </Box>
             ) : (
               <Box sx={{ 
-                height: 200, 
-                borderRadius: '20px', 
-                bgcolor: 'rgba(30,41,59,0.5)',
-                border: '1px dashed rgba(255,255,255,0.15)', 
+                height: 220, 
+                borderRadius: '24px', 
+                bgcolor: 'rgba(30,41,59,0.4)',
+                border: '2px dashed rgba(255,255,255,0.12)', 
                 display: 'flex', 
+                flexDirection: 'column', 
                 alignItems: 'center', 
                 justifyContent: 'center', 
-                color: '#64748b' 
+                gap: 1,
               }}>
-                ไม่มีรูปภาพสินค้า
+                <Box sx={{ 
+                  width: 56, 
+                  height: 56, 
+                  borderRadius: '16px', 
+                  bgcolor: 'rgba(100,116,139,0.15)',
+                  display: 'grid',
+                  placeItems: 'center',
+                }}>
+                  <Store size={28} color="#64748b" />
+                </Box>
+                <Typography sx={{ color: '#64748b', fontSize: '0.9rem', fontWeight: 500 }}>
+                  ไม่มีรูปภาพสินค้า
+                </Typography>
               </Box>
             )}
           </Box>
 
-          {/* Description */}
+          {/* Description - Enhanced */}
           {selectedProduct.description && (
             <Box sx={{
-              p: 2,
+              p: 2.5,
               mb: 3,
-              borderRadius: '14px',
-              bgcolor: 'rgba(30,41,59,0.3)',
-              border: '1px solid rgba(255,255,255,0.06)',
+              borderRadius: '18px',
+              background: 'linear-gradient(135deg, rgba(30,41,59,0.4) 0%, rgba(30,41,59,0.2) 100%)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              position: 'relative',
+              overflow: 'hidden',
             }}>
-              <Typography sx={{ fontSize: '0.9rem', color: '#94a3b8', lineHeight: 1.6 }}>
+              <Box sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: 4,
+                height: '100%',
+                background: 'linear-gradient(180deg, #6366f1 0%, #8b5cf6 100%)',
+                borderRadius: '4px 0 0 4px',
+              }} />
+              <Typography sx={{ fontSize: '0.92rem', color: '#b8c5d6', lineHeight: 1.7, pl: 1.5 }}>
                 {selectedProduct.description}
               </Typography>
             </Box>
           )}
 
-          {/* Size Chart & Selection - Combined Modern Design */}
+          {/* Size Chart & Selection - Enhanced Modern Design */}
           <Box sx={{
-            p: { xs: 2, sm: 2.5 },
-            mb: 2,
-            borderRadius: '18px',
-            bgcolor: 'rgba(30,41,59,0.5)',
-            border: '1px solid rgba(255,255,255,0.08)',
+            p: { xs: 2.5, sm: 3 },
+            mb: 2.5,
+            borderRadius: '20px',
+            background: 'linear-gradient(135deg, rgba(30,41,59,0.6) 0%, rgba(30,41,59,0.3) 100%)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
           }}>
             {/* Size Chart Table - Now at Top */}
             <Box sx={{ 
-              mb: 2.5, 
-              p: 1.5, 
-              borderRadius: '14px', 
+              mb: 3, 
+              p: 2, 
+              borderRadius: '16px', 
               bgcolor: 'rgba(15,23,42,0.6)',
               border: '1px solid rgba(99,102,241,0.2)',
             }}>
@@ -1396,43 +1518,71 @@ export default function HomePage() {
             </Box>
           )}
 
-          {/* Quantity */}
+          {/* Quantity - Enhanced */}
           <Box sx={{
-            p: { xs: 2, sm: 2.5 },
-            mb: 2,
-            borderRadius: '18px',
-            bgcolor: 'rgba(30,41,59,0.5)',
-            border: '1px solid rgba(255,255,255,0.08)',
+            p: { xs: 2.5, sm: 3 },
+            mb: 2.5,
+            borderRadius: '20px',
+            background: 'linear-gradient(135deg, rgba(30,41,59,0.6) 0%, rgba(30,41,59,0.3) 100%)',
+            border: '1px solid rgba(255,255,255,0.1)',
           }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: '#e2e8f0' }}>
-                จำนวน
-              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Box sx={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: '12px',
+                  bgcolor: 'rgba(99,102,241,0.15)',
+                  display: 'grid',
+                  placeItems: 'center',
+                }}>
+                  <Package size={20} color="#a5b4fc" />
+                </Box>
+                <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#e2e8f0' }}>
+                  จำนวน
+                </Typography>
+              </Box>
               <Box sx={{
                 display: 'flex',
                 alignItems: 'center',
-                bgcolor: 'rgba(255,255,255,0.05)',
-                borderRadius: '14px',
-                border: '1px solid rgba(255,255,255,0.1)',
+                bgcolor: 'rgba(0,0,0,0.3)',
+                borderRadius: '16px',
+                border: '1px solid rgba(255,255,255,0.12)',
+                overflow: 'hidden',
               }}>
                 <IconButton
                   onClick={() => setProductOptions({ ...productOptions, quantity: clampQty(productOptions.quantity - 1) })}
-                  sx={{ color: '#94a3b8', p: 1.5, '&:hover': { color: '#f1f5f9' } }}
+                  sx={{ 
+                    color: '#94a3b8', 
+                    p: 1.5, 
+                    borderRadius: 0,
+                    '&:hover': { color: '#f87171', bgcolor: 'rgba(239,68,68,0.1)' },
+                    transition: 'all 0.2s ease',
+                  }}
                 >
                   <Minus size={20} />
                 </IconButton>
                 <Typography sx={{ 
                   color: '#f1f5f9', 
-                  minWidth: 48, 
+                  minWidth: 56, 
                   textAlign: 'center',
                   fontWeight: 800,
-                  fontSize: '1.1rem',
+                  fontSize: '1.2rem',
+                  borderLeft: '1px solid rgba(255,255,255,0.08)',
+                  borderRight: '1px solid rgba(255,255,255,0.08)',
+                  py: 0.5,
                 }}>
                   {productOptions.quantity}
                 </Typography>
                 <IconButton
                   onClick={() => setProductOptions({ ...productOptions, quantity: clampQty(productOptions.quantity + 1) })}
-                  sx={{ color: '#94a3b8', p: 1.5, '&:hover': { color: '#f1f5f9' } }}
+                  sx={{ 
+                    color: '#94a3b8', 
+                    p: 1.5, 
+                    borderRadius: 0,
+                    '&:hover': { color: '#10b981', bgcolor: 'rgba(16,185,129,0.1)' },
+                    transition: 'all 0.2s ease',
+                  }}
                 >
                   <Plus size={20} />
                 </IconButton>
@@ -1441,82 +1591,96 @@ export default function HomePage() {
           </Box>
         </Box>
 
-        {/* Bottom Actions */}
+        {/* Bottom Actions - Enhanced */}
         <Box sx={{
-          px: { xs: 2, sm: 3 },
-          py: 2,
-          borderTop: '1px solid rgba(255,255,255,0.08)',
-          background: 'linear-gradient(180deg, rgba(15,23,42,0.98) 0%, rgba(10,15,26,0.98) 100%)',
-          backdropFilter: 'blur(20px)',
-          paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
+          px: { xs: 2.5, sm: 3 },
+          py: 2.5,
+          borderTop: '1px solid rgba(255,255,255,0.1)',
+          background: 'linear-gradient(180deg, rgba(10,15,26,0.98) 0%, rgba(5,10,20,0.99) 100%)',
+          backdropFilter: 'blur(24px)',
+          paddingBottom: 'max(20px, env(safe-area-inset-bottom))',
         }}>
-          {/* Price Summary */}
+          {/* Price Summary - Enhanced */}
           <Box sx={{
-            p: 2,
-            mb: 2,
-            borderRadius: '14px',
-            bgcolor: 'rgba(16,185,129,0.08)',
-            border: '1px solid rgba(16,185,129,0.2)',
+            p: 2.5,
+            mb: 2.5,
+            borderRadius: '18px',
+            background: 'linear-gradient(135deg, rgba(16,185,129,0.12) 0%, rgba(16,185,129,0.05) 100%)',
+            border: '1px solid rgba(16,185,129,0.25)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
+            position: 'relative',
+            overflow: 'hidden',
           }}>
-            <Box>
-              <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>ราคารวม</Typography>
-              <Typography sx={{ fontSize: '1.5rem', fontWeight: 900, color: '#10b981' }}>
+            {/* Background glow */}
+            <Box sx={{
+              position: 'absolute',
+              top: -20,
+              right: -20,
+              width: 100,
+              height: 100,
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(16,185,129,0.2) 0%, transparent 70%)',
+              pointerEvents: 'none',
+            }} />
+            <Box sx={{ position: 'relative', zIndex: 1 }}>
+              <Typography sx={{ fontSize: '0.78rem', color: '#6ee7b7', fontWeight: 600, mb: 0.3 }}>ราคารวม</Typography>
+              <Typography sx={{ 
+                fontSize: '1.75rem', 
+                fontWeight: 900, 
+                color: '#10b981',
+                lineHeight: 1,
+                textShadow: '0 2px 12px rgba(16,185,129,0.3)',
+              }}>
                 ฿{getCurrentPrice().toLocaleString()}
               </Typography>
             </Box>
-            <Box sx={{ textAlign: 'right' }}>
-              <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>
-                {productOptions.size} × {productOptions.quantity}
-              </Typography>
+            <Box sx={{ textAlign: 'right', position: 'relative', zIndex: 1 }}>
+              <Box sx={{
+                px: 1.5,
+                py: 0.5,
+                borderRadius: '10px',
+                bgcolor: 'rgba(0,0,0,0.3)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                mb: 0.5,
+              }}>
+                <Typography sx={{ fontSize: '0.85rem', color: '#e2e8f0', fontWeight: 700 }}>
+                  {productOptions.size} × {productOptions.quantity}
+                </Typography>
+              </Box>
               {productOptions.isLongSleeve && (
-                <Typography sx={{ fontSize: '0.7rem', color: '#fbbf24' }}>+ แขนยาว</Typography>
+                <Typography sx={{ fontSize: '0.72rem', color: '#fbbf24', fontWeight: 600 }}>+ แขนยาว ฿50</Typography>
               )}
             </Box>
           </Box>
 
-          {/* Action Buttons */}
-          <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
-            {/* Close Button - Mobile Only */}
-            {isMobile && (
-              <Button
-                onClick={() => setProductDialogOpen(false)}
-                startIcon={<X size={18} />}
-                sx={{
-                  width: '100%',
-                  py: 1.2,
-                  mb: 0.5,
-                  borderRadius: '12px',
-                  bgcolor: 'rgba(100,116,139,0.15)',
-                  border: '1px solid rgba(100,116,139,0.3)',
-                  color: '#94a3b8',
-                  fontSize: '0.85rem',
-                  fontWeight: 600,
-                  textTransform: 'none',
-                  '&:hover': { bgcolor: 'rgba(100,116,139,0.25)' },
-                }}
-              >
-                ปิด
-              </Button>
-            )}
+          {/* Action Buttons - Enhanced */}
+          <Box sx={{ display: 'flex', gap: 1.5 }}>
             <Button
               onClick={handleAddToCart}
               disabled={!isShopOpen}
-              startIcon={<ShoppingCart size={18} />}
+              startIcon={<ShoppingCart size={20} />}
               sx={{
                 flex: 1,
-                py: 1.5,
-                borderRadius: '14px',
-                bgcolor: 'rgba(99,102,241,0.15)',
-                border: '1px solid rgba(99,102,241,0.3)',
+                py: 1.6,
+                borderRadius: '16px',
+                background: isShopOpen 
+                  ? 'linear-gradient(135deg, rgba(99,102,241,0.2) 0%, rgba(139,92,246,0.15) 100%)'
+                  : 'rgba(100,116,139,0.1)',
+                border: isShopOpen ? '1px solid rgba(99,102,241,0.4)' : '1px solid rgba(100,116,139,0.2)',
                 color: isShopOpen ? '#a5b4fc' : '#64748b',
-                fontSize: '0.9rem',
+                fontSize: '0.95rem',
                 fontWeight: 700,
                 textTransform: 'none',
-                '&:hover': { bgcolor: 'rgba(99,102,241,0.25)' },
-                '&:disabled': { color: '#64748b', borderColor: 'rgba(100,116,139,0.3)' },
+                boxShadow: isShopOpen ? '0 4px 20px rgba(99,102,241,0.2)' : 'none',
+                transition: 'all 0.25s ease',
+                '&:hover': { 
+                  background: isShopOpen ? 'linear-gradient(135deg, rgba(99,102,241,0.3) 0%, rgba(139,92,246,0.25) 100%)' : 'rgba(100,116,139,0.1)',
+                  transform: isShopOpen ? 'translateY(-2px)' : 'none',
+                  boxShadow: isShopOpen ? '0 8px 30px rgba(99,102,241,0.3)' : 'none',
+                },
+                '&:disabled': { color: '#64748b', borderColor: 'rgba(100,116,139,0.2)' },
               }}
             >
               เพิ่มลงตะกร้า
@@ -1524,25 +1688,28 @@ export default function HomePage() {
             <Button
               onClick={handleBuyNow}
               disabled={!isShopOpen}
-              startIcon={<Zap size={18} />}
+              startIcon={<Zap size={20} />}
               sx={{
-                flex: 1.2,
-                py: 1.5,
-                borderRadius: '14px',
+                flex: 1.3,
+                py: 1.6,
+                borderRadius: '16px',
                 background: isShopOpen 
                   ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                  : 'rgba(100,116,139,0.2)',
+                  : 'rgba(100,116,139,0.15)',
                 color: isShopOpen ? 'white' : '#64748b',
-                fontSize: '0.9rem',
-                fontWeight: 700,
+                fontSize: '0.95rem',
+                fontWeight: 800,
                 textTransform: 'none',
-                boxShadow: isShopOpen ? '0 4px 20px rgba(16,185,129,0.3)' : 'none',
+                boxShadow: isShopOpen ? '0 4px 20px rgba(16,185,129,0.35)' : 'none',
+                transition: 'all 0.25s ease',
                 '&:hover': {
                   background: isShopOpen 
-                    ? 'linear-gradient(135deg, #059669 0%, #047857 100%)'
-                    : 'rgba(100,116,139,0.3)',
+                    ? 'linear-gradient(135deg, #059669 0%, #047857 100%)' 
+                    : 'rgba(100,116,139,0.15)',
+                  transform: isShopOpen ? 'translateY(-2px)' : 'none',
+                  boxShadow: isShopOpen ? '0 8px 30px rgba(16,185,129,0.45)' : 'none',
                 },
-                '&:disabled': { background: 'rgba(100,116,139,0.2)', color: '#64748b' },
+                '&:disabled': { background: 'rgba(100,116,139,0.15)', color: '#64748b' },
               }}
             >
               ซื้อเลย
@@ -1560,14 +1727,16 @@ export default function HomePage() {
           onClose={() => setProductDialogOpen(false)}
           PaperProps={{
             sx: {
-              height: '92vh',
-              maxHeight: '92vh',
-              borderTopLeftRadius: 24,
-              borderTopRightRadius: 24,
+              height: '95vh',
+              maxHeight: '95vh',
+              borderTopLeftRadius: 28,
+              borderTopRightRadius: 28,
               bgcolor: '#0a0f1a',
               overflow: 'hidden',
+              boxShadow: '0 -10px 60px rgba(0,0,0,0.5), 0 -4px 20px rgba(99,102,241,0.15)',
             },
           }}
+          transitionDuration={{ enter: 350, exit: 250 }}
           sx={{ zIndex: 8000 }}
         >
           {productContent}
@@ -1583,17 +1752,20 @@ export default function HomePage() {
         PaperProps={{
           sx: {
             width: '100%',
-            maxWidth: 520,
+            maxWidth: 560,
             bgcolor: '#0a0f1a',
             overflow: 'hidden',
+            boxShadow: '-10px 0 60px rgba(0,0,0,0.5), -4px 0 20px rgba(99,102,241,0.15)',
           },
         }}
+        transitionDuration={{ enter: 300, exit: 200 }}
         sx={{ zIndex: 8000 }}
       >
         {productContent}
       </Drawer>
     );
   };
+
   const historyFilters = useMemo(
     () => [
       { key: 'ALL', label: 'ทั้งหมด', color: '#64748b' },
@@ -1903,11 +2075,11 @@ export default function HomePage() {
   const activeProductCount = useMemo(() => Object.values(groupedProducts).reduce((acc, items) => acc + items.length, 0), [groupedProducts]);
 
   const priceBounds = useMemo(() => {
-    const all = Object.values(groupedProducts).flat();
+    const all = Object.values(allGroupedProducts).flat();
     if (all.length === 0) return { min: 0, max: 0 };
     const prices = all.map(getBasePrice);
     return { min: Math.min(...prices), max: Math.max(...prices) };
-  }, [groupedProducts]);
+  }, [allGroupedProducts]);
 
   useEffect(() => {
     if (priceBounds.max === 0 && priceBounds.min === 0) return;
@@ -2958,7 +3130,7 @@ export default function HomePage() {
                     {items.map((product) => {
                       const productStatus = getProductStatus(product);
                       const isProductAvailable = productStatus === 'OPEN' && isShopOpen;
-                      const showProductDetails = productStatus === 'OPEN'; // Show image/price only for OPEN products
+                      const isProductClosed = productStatus !== 'OPEN'; // Product is closed/coming soon/ended
                       
                       return (
                       <Grid size={{ xs: 6, sm: 6, md: 4, lg: 3 }} key={product.id}>
@@ -2984,9 +3156,10 @@ export default function HomePage() {
                             borderRadius: '20px',
                             overflow: 'hidden',
                             bgcolor: 'rgba(15,23,42,0.8)',
-                            border: `1px solid ${showProductDetails ? 'rgba(255,255,255,0.08)' : SHOP_STATUS_CONFIG[productStatus].borderColor}`,
+                            border: `1px solid ${isProductClosed ? SHOP_STATUS_CONFIG[productStatus].borderColor : 'rgba(255,255,255,0.08)'}`,
                             transition: 'all 0.25s ease',
                             position: 'relative',
+                            opacity: isProductClosed ? 0.85 : 1,
                             '&:hover': isProductAvailable ? {
                               transform: 'translateY(-4px)',
                               boxShadow: '0 20px 40px rgba(99,102,241,0.2)',
@@ -3001,83 +3174,32 @@ export default function HomePage() {
                             bgcolor: '#0b1224',
                             overflow: 'hidden',
                           }}>
-                            {/* Show actual image only for OPEN products */}
-                            {showProductDetails ? (
-                              <>
-                                <Box sx={{
-                                  position: 'absolute',
-                                  inset: 0,
-                                  backgroundImage: product.images?.[0] ? `url(${product.images[0]})` : undefined,
-                                  backgroundSize: 'cover',
-                                  backgroundPosition: 'center',
-                                }} />
-                                {!product.images?.[0] && (
-                                  <Box sx={{ 
-                                    position: 'absolute', 
-                                    inset: 0, 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    justifyContent: 'center', 
-                                    color: '#475569',
-                                    fontSize: '0.8rem',
-                                  }}>
-                                    ไม่มีรูป
-                                  </Box>
-                                )}
-                                {/* Feature badges for open products */}
-                                <Box sx={{ 
-                                  position: 'absolute', 
-                                  top: 8, 
-                                  left: 8, 
-                                  display: 'flex', 
-                                  flexDirection: 'column', 
-                                  gap: 0.5 
-                                }}>
-                                  {product.options?.hasLongSleeve && (
-                                    <Box sx={{
-                                      px: 0.8,
-                                      py: 0.3,
-                                      borderRadius: '6px',
-                                      bgcolor: 'rgba(245,158,11,0.9)',
-                                      fontSize: '0.6rem',
-                                      fontWeight: 700,
-                                      color: 'white',
-                                    }}>
-                                      แขนยาว
-                                    </Box>
-                                  )}
-                                  {product.options?.hasCustomName && (
-                                    <Box sx={{
-                                      px: 0.8,
-                                      py: 0.3,
-                                      borderRadius: '6px',
-                                      bgcolor: 'rgba(16,185,129,0.9)',
-                                      fontSize: '0.6rem',
-                                      fontWeight: 700,
-                                      color: 'white',
-                                    }}>
-                                      สกรีนชื่อ
-                                    </Box>
-                                  )}
-                                </Box>
-                                {/* Price badge - only for open products */}
-                                <Box sx={{
-                                  position: 'absolute',
-                                  bottom: 8,
-                                  right: 8,
-                                  px: 1.2,
-                                  py: 0.5,
-                                  borderRadius: '10px',
-                                  bgcolor: 'rgba(0,0,0,0.7)',
-                                  backdropFilter: 'blur(8px)',
-                                }}>
-                                  <Typography sx={{ fontSize: '0.9rem', fontWeight: 800, color: '#10b981' }}>
-                                    ฿{product.basePrice.toLocaleString()}
-                                  </Typography>
-                                </Box>
-                              </>
-                            ) : (
-                              /* Status placeholder for non-open products */
+                            {/* Always show product image */}
+                            <Box sx={{
+                              position: 'absolute',
+                              inset: 0,
+                              backgroundImage: product.images?.[0] ? `url(${product.images[0]})` : undefined,
+                              backgroundSize: 'cover',
+                              backgroundPosition: 'center',
+                              filter: isProductClosed ? 'grayscale(40%) brightness(0.7)' : 'none',
+                              transition: 'filter 0.3s ease',
+                            }} />
+                            {!product.images?.[0] && (
+                              <Box sx={{ 
+                                position: 'absolute', 
+                                inset: 0, 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'center', 
+                                color: '#475569',
+                                fontSize: '0.8rem',
+                              }}>
+                                ไม่มีรูป
+                              </Box>
+                            )}
+                            
+                            {/* Status Overlay for closed products */}
+                            {isProductClosed && (
                               <Box sx={{
                                 position: 'absolute',
                                 inset: 0,
@@ -3085,51 +3207,113 @@ export default function HomePage() {
                                 flexDirection: 'column',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                background: SHOP_STATUS_CONFIG[productStatus].bgGradient,
+                                background: 'rgba(0,0,0,0.6)',
+                                backdropFilter: 'blur(2px)',
                               }}>
                                 <Box
                                   sx={{
-                                    width: 56,
-                                    height: 56,
-                                    borderRadius: '16px',
+                                    width: 48,
+                                    height: 48,
+                                    borderRadius: '14px',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    background: `linear-gradient(135deg, ${SHOP_STATUS_CONFIG[productStatus].color}30 0%, ${SHOP_STATUS_CONFIG[productStatus].color}10 100%)`,
-                                    border: `1px solid ${SHOP_STATUS_CONFIG[productStatus].color}40`,
+                                    background: `linear-gradient(135deg, ${SHOP_STATUS_CONFIG[productStatus].color}40 0%, ${SHOP_STATUS_CONFIG[productStatus].color}20 100%)`,
+                                    border: `2px solid ${SHOP_STATUS_CONFIG[productStatus].color}`,
                                     color: SHOP_STATUS_CONFIG[productStatus].color,
-                                    mb: 1.5,
+                                    mb: 1,
+                                    boxShadow: `0 0 20px ${SHOP_STATUS_CONFIG[productStatus].color}40`,
                                   }}
                                 >
                                   {(() => {
                                     const IconComponent = SHOP_STATUS_CONFIG[productStatus].icon;
-                                    return <IconComponent size={28} />;
+                                    return <IconComponent size={24} />;
                                   })()}
                                 </Box>
                                 <Typography
                                   sx={{
-                                    fontSize: '0.85rem',
-                                    fontWeight: 700,
+                                    fontSize: '0.8rem',
+                                    fontWeight: 800,
                                     color: SHOP_STATUS_CONFIG[productStatus].color,
                                     textAlign: 'center',
                                     px: 2,
+                                    textShadow: '0 2px 8px rgba(0,0,0,0.5)',
                                   }}
                                 >
                                   {SHOP_STATUS_CONFIG[productStatus].label}
                                 </Typography>
                                 {/* Show date info */}
                                 {product.startDate && productStatus === 'COMING_SOON' && (
-                                  <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8', mt: 0.5 }}>
+                                  <Typography sx={{ fontSize: '0.65rem', color: '#e2e8f0', mt: 0.5, textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
                                     เปิด {new Date(product.startDate).toLocaleDateString('th-TH')}
                                   </Typography>
                                 )}
                                 {product.endDate && productStatus === 'ORDER_ENDED' && (
-                                  <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8', mt: 0.5 }}>
+                                  <Typography sx={{ fontSize: '0.65rem', color: '#e2e8f0', mt: 0.5, textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
                                     หมดเขต {new Date(product.endDate).toLocaleDateString('th-TH')}
                                   </Typography>
                                 )}
                               </Box>
                             )}
+                            
+                            {/* Feature badges */}
+                            {!isProductClosed && (
+                              <Box sx={{ 
+                                position: 'absolute', 
+                                top: 8, 
+                                left: 8, 
+                                display: 'flex', 
+                                flexDirection: 'column', 
+                                gap: 0.5 
+                              }}>
+                                {product.options?.hasLongSleeve && (
+                                  <Box sx={{
+                                    px: 0.8,
+                                    py: 0.3,
+                                    borderRadius: '6px',
+                                    bgcolor: 'rgba(245,158,11,0.9)',
+                                    fontSize: '0.6rem',
+                                    fontWeight: 700,
+                                    color: 'white',
+                                  }}>
+                                    แขนยาว
+                                  </Box>
+                                )}
+                                {product.options?.hasCustomName && (
+                                  <Box sx={{
+                                    px: 0.8,
+                                    py: 0.3,
+                                    borderRadius: '6px',
+                                    bgcolor: 'rgba(16,185,129,0.9)',
+                                    fontSize: '0.6rem',
+                                    fontWeight: 700,
+                                    color: 'white',
+                                  }}>
+                                    สกรีนชื่อ
+                                  </Box>
+                                )}
+                              </Box>
+                            )}
+                            
+                            {/* Price badge */}
+                            <Box sx={{
+                              position: 'absolute',
+                              bottom: 8,
+                              right: 8,
+                              px: 1.2,
+                              py: 0.5,
+                              borderRadius: '10px',
+                              bgcolor: isProductClosed ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.7)',
+                              backdropFilter: 'blur(8px)',
+                            }}>
+                              <Typography sx={{ 
+                                fontSize: '0.9rem', 
+                                fontWeight: 800, 
+                                color: isProductClosed ? '#94a3b8' : '#10b981',
+                              }}>
+                                ฿{product.basePrice.toLocaleString()}
+                              </Typography>
+                            </Box>
                           </Box>
 
                           {/* Product Info */}
@@ -3137,7 +3321,7 @@ export default function HomePage() {
                             <Typography sx={{ 
                               fontSize: { xs: '0.85rem', sm: '0.9rem' }, 
                               fontWeight: 700, 
-                              color: showProductDetails ? '#f1f5f9' : '#94a3b8',
+                              color: isProductClosed ? '#94a3b8' : '#f1f5f9',
                               mb: 0.5,
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
@@ -3156,15 +3340,12 @@ export default function HomePage() {
                               whiteSpace: 'nowrap',
                               mb: 1,
                             }}>
-                              {showProductDetails 
-                                ? (product.description || TYPE_LABELS[product.type] || product.type)
-                                : SHOP_STATUS_CONFIG[productStatus].description
-                              }
+                              {product.description || TYPE_LABELS[product.type] || product.type}
                             </Typography>
                             
                             {/* Status/Action Button */}
                             <Box sx={{ mt: 'auto' }}>
-                              {showProductDetails ? (
+                              {!isProductClosed ? (
                                 <Button
                                   fullWidth
                                   disabled={!isProductAvailable}
