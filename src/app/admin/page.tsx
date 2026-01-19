@@ -2464,6 +2464,41 @@ export default function AdminPage(): JSX.Element {
 
   const resetOrderEditor = () => setOrderEditor({ open: false, ref: '', name: '', email: '', amount: 0, status: 'PENDING', date: '', cart: [] });
 
+  // Calculate unit price for a cart item based on product pricing
+  const calculateItemUnitPrice = (item: CartItemAdmin, product: Product | undefined): number => {
+    if (!product) return item.unitPrice || 0;
+    
+    // Base price
+    let price = product.basePrice || 0;
+    
+    // Add size pricing if available
+    if (item.size && product.sizePricing?.[item.size]) {
+      price = product.sizePricing[item.size];
+    }
+    
+    // Add long sleeve surcharge (+50)
+    if (item.options?.isLongSleeve) {
+      price += 50;
+    }
+    
+    return price;
+  };
+
+  // Update cart item with recalculated price
+  const updateCartItem = (idx: number, updates: Partial<CartItemAdmin>) => {
+    const newCart = [...orderEditor.cart];
+    const updatedItem = { ...newCart[idx], ...updates };
+    
+    // Find the product to recalculate price
+    const product = config.products?.find(p => p.id === updatedItem.productId);
+    
+    // Recalculate unit price
+    updatedItem.unitPrice = calculateItemUnitPrice(updatedItem, product);
+    
+    newCart[idx] = updatedItem;
+    setOrderEditor(prev => ({ ...prev, cart: newCart }));
+  };
+
   const openOrderEditor = (order: AdminOrder) => {
     setOrderEditor({
       open: true,
@@ -3673,23 +3708,28 @@ export default function AdminPage(): JSX.Element {
             รายละเอียดออเดอร์
           </Typography>
           <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-            <TextField
-              label="ยอดชำระ (บาท)"
-              type="number"
-              value={orderEditor.amount}
-              onChange={(e) => setOrderEditor(prev => ({ ...prev, amount: Number(e.target.value) }))}
-              fullWidth
-              InputProps={{
-                startAdornment: <Typography sx={{ color: '#10b981', mr: 1, fontWeight: 600 }}>฿</Typography>,
-              }}
-              sx={{
-                ...inputSx,
-                '& .MuiOutlinedInput-root': {
-                  ...inputSx['& .MuiOutlinedInput-root'],
-                  borderRadius: '12px',
-                },
-              }}
-            />
+            {/* Calculated Amount - Read Only */}
+            <Box sx={{
+              p: 2,
+              borderRadius: '12px',
+              bgcolor: 'rgba(16, 185, 129, 0.1)',
+              border: '1px solid rgba(16, 185, 129, 0.3)',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+            }}>
+              <Typography sx={{ fontSize: '0.7rem', color: '#64748b', mb: 0.5 }}>
+                ยอดชำระ (คำนวณจากตะกร้า)
+              </Typography>
+              <Typography sx={{ fontSize: '1.25rem', fontWeight: 700, color: '#10b981' }}>
+                ฿{orderEditor.cart.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0).toLocaleString()}
+              </Typography>
+              {orderEditor.amount > 0 && orderEditor.amount !== orderEditor.cart.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0) && (
+                <Typography sx={{ fontSize: '0.7rem', color: '#f59e0b', mt: 0.5 }}>
+                  ยอดเดิม: ฿{orderEditor.amount.toLocaleString()}
+                </Typography>
+              )}
+            </Box>
             <TextField
               label="วันที่"
               type="datetime-local"
@@ -3711,7 +3751,7 @@ export default function AdminPage(): JSX.Element {
         {/* Cart Items Section */}
         {orderEditor.cart && orderEditor.cart.length > 0 && (
           <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
               <Typography sx={{ 
                 fontSize: '0.75rem', 
                 fontWeight: 600, 
@@ -3721,13 +3761,38 @@ export default function AdminPage(): JSX.Element {
               }}>
                 รายการสินค้า ({orderEditor.cart.length} รายการ)
               </Typography>
-              <Typography sx={{ 
-                fontSize: '0.85rem', 
-                fontWeight: 700, 
-                color: '#10b981',
-              }}>
-                รวม ฿{orderEditor.cart.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0).toLocaleString()}
-              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Button
+                  size="small"
+                  onClick={() => {
+                    // Recalculate all prices
+                    const newCart = orderEditor.cart.map(item => {
+                      const product = config.products?.find(p => p.id === item.productId);
+                      return {
+                        ...item,
+                        unitPrice: calculateItemUnitPrice(item, product),
+                      };
+                    });
+                    setOrderEditor(prev => ({ ...prev, cart: newCart }));
+                  }}
+                  sx={{
+                    fontSize: '0.7rem',
+                    color: '#f59e0b',
+                    borderColor: 'rgba(245,158,11,0.3)',
+                    '&:hover': { borderColor: '#f59e0b', bgcolor: 'rgba(245,158,11,0.1)' },
+                  }}
+                  variant="outlined"
+                >
+                  🔄 คำนวณราคาใหม่
+                </Button>
+                <Typography sx={{ 
+                  fontSize: '0.85rem', 
+                  fontWeight: 700, 
+                  color: '#10b981',
+                }}>
+                  รวม ฿{orderEditor.cart.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0).toLocaleString()}
+                </Typography>
+              </Box>
             </Box>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
               {orderEditor.cart.map((item, idx) => {
@@ -3781,6 +3846,11 @@ export default function AdminPage(): JSX.Element {
                         </Typography>
                         <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>
                           ราคาต่อชิ้น: ฿{Number(item.unitPrice).toLocaleString()}
+                          {product && item.unitPrice !== calculateItemUnitPrice(item, product) && (
+                            <span style={{ color: '#f59e0b', marginLeft: 8 }}>
+                              → ฿{calculateItemUnitPrice(item, product).toLocaleString()}
+                            </span>
+                          )}
                         </Typography>
                       </Box>
                       <IconButton
@@ -3800,11 +3870,7 @@ export default function AdminPage(): JSX.Element {
                       {/* Size */}
                       <Select
                         value={item.size || ''}
-                        onChange={(e) => {
-                          const newCart = [...orderEditor.cart];
-                          newCart[idx] = { ...newCart[idx], size: e.target.value };
-                          setOrderEditor(prev => ({ ...prev, cart: newCart }));
-                        }}
+                        onChange={(e) => updateCartItem(idx, { size: e.target.value })}
                         size="small"
                         displayEmpty
                         sx={{ 
@@ -3825,11 +3891,7 @@ export default function AdminPage(): JSX.Element {
                       <TextField
                         type="number"
                         value={item.quantity}
-                        onChange={(e) => {
-                          const newCart = [...orderEditor.cart];
-                          newCart[idx] = { ...newCart[idx], quantity: Math.max(1, Number(e.target.value)) };
-                          setOrderEditor(prev => ({ ...prev, cart: newCart }));
-                        }}
+                        onChange={(e) => updateCartItem(idx, { quantity: Math.max(1, Number(e.target.value)) })}
                         size="small"
                         InputProps={{
                           startAdornment: <Typography sx={{ color: '#64748b', mr: 1, fontSize: '0.8rem' }}>จำนวน</Typography>,
@@ -3852,10 +3914,8 @@ export default function AdminPage(): JSX.Element {
                         label="ชื่อติดเสื้อ (ภาษาอังกฤษ)"
                         value={item.options?.customName || ''}
                         onChange={(e) => {
-                          const newCart = [...orderEditor.cart];
-                          const newOptions = { ...newCart[idx].options, customName: e.target.value.replace(/[^a-zA-Z\s]/g, '').toUpperCase().slice(0, 7) };
-                          newCart[idx] = { ...newCart[idx], options: newOptions };
-                          setOrderEditor(prev => ({ ...prev, cart: newCart }));
+                          const newOptions = { ...item.options, customName: e.target.value.replace(/[^a-zA-Z\s]/g, '').toUpperCase().slice(0, 7) };
+                          updateCartItem(idx, { options: newOptions });
                         }}
                         size="small"
                         inputProps={{ maxLength: 7 }}
@@ -3876,10 +3936,8 @@ export default function AdminPage(): JSX.Element {
                         onChange={(e) => {
                           const digits = e.target.value.replace(/\D/g, '');
                           const num = digits ? String(Math.min(99, Number(digits))) : '';
-                          const newCart = [...orderEditor.cart];
-                          const newOptions = { ...newCart[idx].options, customNumber: num };
-                          newCart[idx] = { ...newCart[idx], options: newOptions };
-                          setOrderEditor(prev => ({ ...prev, cart: newCart }));
+                          const newOptions = { ...item.options, customNumber: num };
+                          updateCartItem(idx, { options: newOptions });
                         }}
                         size="small"
                         placeholder="เช่น 10"
@@ -3895,10 +3953,8 @@ export default function AdminPage(): JSX.Element {
                       {/* Long Sleeve Toggle */}
                       <Box 
                         onClick={() => {
-                          const newCart = [...orderEditor.cart];
-                          const newOptions = { ...newCart[idx].options, isLongSleeve: !newCart[idx].options?.isLongSleeve };
-                          newCart[idx] = { ...newCart[idx], options: newOptions };
-                          setOrderEditor(prev => ({ ...prev, cart: newCart }));
+                          const newOptions = { ...item.options, isLongSleeve: !item.options?.isLongSleeve };
+                          updateCartItem(idx, { options: newOptions });
                         }}
                         sx={{
                           p: 1.5,
