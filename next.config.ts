@@ -34,8 +34,8 @@ const nextConfig: NextConfig = {
           value:
             [
               "default-src 'self' https://sccshop.psusci.club;",
-              // Allow Cloudflare Turnstile scripts
-              "script-src 'self' 'unsafe-inline' https://sccshop.psusci.club https://challenges.cloudflare.com;",
+              // Allow Cloudflare Turnstile scripts and Cloudflare Web Analytics
+              "script-src 'self' 'unsafe-inline' https://sccshop.psusci.club https://challenges.cloudflare.com https://static.cloudflareinsights.com;",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;",
               "img-src * data: blob:;",
               "font-src 'self' https://fonts.gstatic.com;",

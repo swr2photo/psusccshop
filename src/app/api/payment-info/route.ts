@@ -67,6 +67,12 @@ export async function GET(req: NextRequest) {
     const accountName = process.env.PAYMENT_ACCOUNT_NAME || 'PSUSCCSHOP';
     const accountNumber = process.env.PAYMENT_ACCOUNT || '000-000000-0';
 
+    // ตรวจสอบสถานะระบบชำระเงิน
+    const CONFIG_KEY = 'config/shop-settings.json';
+    const shopConfig = await getJson<any>(CONFIG_KEY);
+    const paymentEnabled = shopConfig?.paymentEnabled !== false;
+    const paymentDisabledMessage = shopConfig?.paymentDisabledMessage || 'ระบบชำระเงินปิดให้บริการชั่วคราว';
+
     const baseAmount = Number(order.totalAmount ?? order.amount ?? calculateOrderTotal(order.cart || [])) || 0;
     const discount = Number(order.discount ?? 0);
     const finalAmount = Math.max(0, baseAmount - discount);
@@ -99,6 +105,9 @@ export async function GET(req: NextRequest) {
         status: order.status || 'PENDING',
         // ไม่ส่ง slip data ให้ frontend - เฉพาะ admin เท่านั้นที่เห็น slip
         hasSlip: !!(order.slip && order.slip.base64),
+        // สถานะระบบชำระเงิน
+        paymentEnabled,
+        paymentDisabledMessage: paymentEnabled ? null : paymentDisabledMessage,
       },
     };
 

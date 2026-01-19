@@ -75,6 +75,7 @@ import PaymentFlow from '@/components/PaymentFlow';
 import ProfileModal from '@/components/ProfileModal';
 import Footer from '@/components/Footer';
 import TurnstileWidget from '@/components/TurnstileWidget';
+import { ShopStatusBanner, getProductStatus, getShopStatus, SHOP_STATUS_CONFIG, type ShopStatusType } from '@/components/ShopStatusCard';
 import { Product, ShopConfig } from '@/lib/config';
 import {
   cancelOrder,
@@ -167,6 +168,8 @@ const ANNOUNCEMENT_COLOR_MAP: Record<string, string> = {
   emerald: '#10b981',
   orange: '#f97316',
 };
+
+// Shop status helpers imported from ShopStatusCard component
 
 // Helper to get announcement color (supports both named colors and hex)
 const getAnnouncementColor = (color: string | undefined): string => {
@@ -423,6 +426,7 @@ export default function HomePage() {
     </Box>
   );
 
+  // ==================== SHOP STATUS CARD COMPONENT ====================
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
@@ -1871,6 +1875,19 @@ export default function HomePage() {
     }));
   }, [displaySizes, selectedProduct]);
 
+  // All products (including non-active for showing status badges)
+  const allGroupedProducts = useMemo(() => {
+    const items = config?.products || [];
+    const map: Record<string, Product[]> = {};
+    items.forEach((p) => {
+      const key = p.type || 'OTHER';
+      if (!map[key]) map[key] = [];
+      map[key].push(p);
+    });
+    return map;
+  }, [config?.products]);
+
+  // Only active products (for counting and filtering)
   const groupedProducts = useMemo(() => {
     const items = (config?.products || []).filter((p) => isProductCurrentlyOpen(p));
     const map: Record<string, Product[]> = {};
@@ -1882,6 +1899,7 @@ export default function HomePage() {
     return map;
   }, [config?.products]);
 
+  const totalProductCount = useMemo(() => Object.values(allGroupedProducts).reduce((acc, items) => acc + items.length, 0), [allGroupedProducts]);
   const activeProductCount = useMemo(() => Object.values(groupedProducts).reduce((acc, items) => acc + items.length, 0), [groupedProducts]);
 
   const priceBounds = useMemo(() => {
@@ -1898,15 +1916,16 @@ export default function HomePage() {
 
   const categoryMeta = useMemo(
     () => [
-      { key: 'ALL', label: 'ทั้งหมด', count: activeProductCount },
-      ...Object.entries(groupedProducts).map(([key, items]) => ({ key, label: TYPE_LABELS[key] || key || 'อื่นๆ', count: items.length })),
+      { key: 'ALL', label: 'ทั้งหมด', count: totalProductCount },
+      ...Object.entries(allGroupedProducts).map(([key, items]) => ({ key, label: TYPE_LABELS[key] || key || 'อื่นๆ', count: items.length })),
     ],
-    [activeProductCount, groupedProducts]
+    [totalProductCount, allGroupedProducts]
   );
 
+  // Filter products - show all products including inactive ones (with status badges)
   const filteredGroupedProducts = useMemo(() => {
     const term = productSearch.trim().toLowerCase();
-    const entries = Object.entries(groupedProducts)
+    const entries = Object.entries(allGroupedProducts)
       .filter(([key]) => categoryFilter === 'ALL' || key === categoryFilter)
       .map(([key, items]) => {
         const byName = term ? items.filter((p) => p.name?.toLowerCase().includes(term)) : items;
@@ -1918,7 +1937,7 @@ export default function HomePage() {
       })
       .filter(([, items]) => items.length > 0);
     return Object.fromEntries(entries);
-  }, [categoryFilter, groupedProducts, priceRange, productSearch]);
+  }, [categoryFilter, allGroupedProducts, priceRange, productSearch]);
 
   const filteredProductCount = useMemo(
     () => Object.values(filteredGroupedProducts).reduce((acc, items) => acc + items.length, 0),
@@ -2332,12 +2351,13 @@ export default function HomePage() {
         )}
       </AppBar>
 
-      {!isShopOpen && (
-        <Alert severity="warning" sx={{ borderRadius: 0 }}>
-          <AlertTriangle style={{ marginRight: 8, display: 'inline' }} size={20} />
-          ร้านค้าปิดให้บริการชั่วคราว
-        </Alert>
-      )}
+      {/* Shop Status Banner - Shows different states (not open, coming soon, order ended, etc.) */}
+      <ShopStatusBanner 
+        isOpen={isShopOpen}
+        closeDate={config?.closeDate}
+        openDate={config?.openDate}
+        customMessage={config?.closedMessage}
+      />
 
       {/* Multiple Announcements Banner */}
       {announcements && announcements.filter(a => a.enabled).length > 0 && (
@@ -2807,7 +2827,7 @@ export default function HomePage() {
                           สินค้าทั้งหมด
                         </Typography>
                         <Typography sx={{ fontSize: '0.7rem', color: '#64748b' }}>
-                          พบ {filteredProductCount} จาก {activeProductCount} รายการ
+                          พบ {filteredProductCount} รายการ ({activeProductCount} เปิดขาย)
                         </Typography>
                       </Box>
                     </Box>
@@ -2935,12 +2955,22 @@ export default function HomePage() {
                     </Typography>
                   </Box>
                   <Grid container spacing={2}>
-                    {items.map((product) => (
+                    {items.map((product) => {
+                      const productStatus = getProductStatus(product);
+                      const isProductAvailable = productStatus === 'OPEN' && isShopOpen;
+                      const showProductDetails = productStatus === 'OPEN'; // Show image/price only for OPEN products
+                      
+                      return (
                       <Grid size={{ xs: 6, sm: 6, md: 4, lg: 3 }} key={product.id}>
                         <Box
                           onClick={() => {
                             if (!isShopOpen) {
                               showToast('warning', 'ร้านค้าปิดชั่วคราว ไม่สามารถสั่งซื้อได้');
+                              return;
+                            }
+                            if (productStatus !== 'OPEN') {
+                              const statusConfig = SHOP_STATUS_CONFIG[productStatus];
+                              showToast('info', `${product.name} - ${statusConfig.label}`);
                               return;
                             }
                             setSelectedProduct(product);
@@ -2950,92 +2980,156 @@ export default function HomePage() {
                             height: '100%',
                             display: 'flex',
                             flexDirection: 'column',
-                            cursor: 'pointer',
+                            cursor: isProductAvailable ? 'pointer' : 'default',
                             borderRadius: '20px',
                             overflow: 'hidden',
                             bgcolor: 'rgba(15,23,42,0.8)',
-                            border: '1px solid rgba(255,255,255,0.08)',
+                            border: `1px solid ${showProductDetails ? 'rgba(255,255,255,0.08)' : SHOP_STATUS_CONFIG[productStatus].borderColor}`,
                             transition: 'all 0.25s ease',
-                            '&:hover': {
+                            position: 'relative',
+                            '&:hover': isProductAvailable ? {
                               transform: 'translateY(-4px)',
                               boxShadow: '0 20px 40px rgba(99,102,241,0.2)',
                               borderColor: 'rgba(99,102,241,0.4)',
-                            },
+                            } : {},
                           }}
                         >
-                          {/* Product Image */}
+                          {/* Product Image Area */}
                           <Box sx={{
                             position: 'relative',
                             aspectRatio: '1 / 1',
                             bgcolor: '#0b1224',
-                            backgroundImage: product.images?.[0] ? `url(${product.images[0]})` : undefined,
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center',
+                            overflow: 'hidden',
                           }}>
-                            {!product.images?.[0] && (
-                              <Box sx={{ 
-                                position: 'absolute', 
-                                inset: 0, 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                justifyContent: 'center', 
-                                color: '#475569',
-                                fontSize: '0.8rem',
+                            {/* Show actual image only for OPEN products */}
+                            {showProductDetails ? (
+                              <>
+                                <Box sx={{
+                                  position: 'absolute',
+                                  inset: 0,
+                                  backgroundImage: product.images?.[0] ? `url(${product.images[0]})` : undefined,
+                                  backgroundSize: 'cover',
+                                  backgroundPosition: 'center',
+                                }} />
+                                {!product.images?.[0] && (
+                                  <Box sx={{ 
+                                    position: 'absolute', 
+                                    inset: 0, 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center', 
+                                    color: '#475569',
+                                    fontSize: '0.8rem',
+                                  }}>
+                                    ไม่มีรูป
+                                  </Box>
+                                )}
+                                {/* Feature badges for open products */}
+                                <Box sx={{ 
+                                  position: 'absolute', 
+                                  top: 8, 
+                                  left: 8, 
+                                  display: 'flex', 
+                                  flexDirection: 'column', 
+                                  gap: 0.5 
+                                }}>
+                                  {product.options?.hasLongSleeve && (
+                                    <Box sx={{
+                                      px: 0.8,
+                                      py: 0.3,
+                                      borderRadius: '6px',
+                                      bgcolor: 'rgba(245,158,11,0.9)',
+                                      fontSize: '0.6rem',
+                                      fontWeight: 700,
+                                      color: 'white',
+                                    }}>
+                                      แขนยาว
+                                    </Box>
+                                  )}
+                                  {product.options?.hasCustomName && (
+                                    <Box sx={{
+                                      px: 0.8,
+                                      py: 0.3,
+                                      borderRadius: '6px',
+                                      bgcolor: 'rgba(16,185,129,0.9)',
+                                      fontSize: '0.6rem',
+                                      fontWeight: 700,
+                                      color: 'white',
+                                    }}>
+                                      สกรีนชื่อ
+                                    </Box>
+                                  )}
+                                </Box>
+                                {/* Price badge - only for open products */}
+                                <Box sx={{
+                                  position: 'absolute',
+                                  bottom: 8,
+                                  right: 8,
+                                  px: 1.2,
+                                  py: 0.5,
+                                  borderRadius: '10px',
+                                  bgcolor: 'rgba(0,0,0,0.7)',
+                                  backdropFilter: 'blur(8px)',
+                                }}>
+                                  <Typography sx={{ fontSize: '0.9rem', fontWeight: 800, color: '#10b981' }}>
+                                    ฿{product.basePrice.toLocaleString()}
+                                  </Typography>
+                                </Box>
+                              </>
+                            ) : (
+                              /* Status placeholder for non-open products */
+                              <Box sx={{
+                                position: 'absolute',
+                                inset: 0,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                background: SHOP_STATUS_CONFIG[productStatus].bgGradient,
                               }}>
-                                ไม่มีรูป
+                                <Box
+                                  sx={{
+                                    width: 56,
+                                    height: 56,
+                                    borderRadius: '16px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    background: `linear-gradient(135deg, ${SHOP_STATUS_CONFIG[productStatus].color}30 0%, ${SHOP_STATUS_CONFIG[productStatus].color}10 100%)`,
+                                    border: `1px solid ${SHOP_STATUS_CONFIG[productStatus].color}40`,
+                                    color: SHOP_STATUS_CONFIG[productStatus].color,
+                                    mb: 1.5,
+                                  }}
+                                >
+                                  {(() => {
+                                    const IconComponent = SHOP_STATUS_CONFIG[productStatus].icon;
+                                    return <IconComponent size={28} />;
+                                  })()}
+                                </Box>
+                                <Typography
+                                  sx={{
+                                    fontSize: '0.85rem',
+                                    fontWeight: 700,
+                                    color: SHOP_STATUS_CONFIG[productStatus].color,
+                                    textAlign: 'center',
+                                    px: 2,
+                                  }}
+                                >
+                                  {SHOP_STATUS_CONFIG[productStatus].label}
+                                </Typography>
+                                {/* Show date info */}
+                                {product.startDate && productStatus === 'COMING_SOON' && (
+                                  <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8', mt: 0.5 }}>
+                                    เปิด {new Date(product.startDate).toLocaleDateString('th-TH')}
+                                  </Typography>
+                                )}
+                                {product.endDate && productStatus === 'ORDER_ENDED' && (
+                                  <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8', mt: 0.5 }}>
+                                    หมดเขต {new Date(product.endDate).toLocaleDateString('th-TH')}
+                                  </Typography>
+                                )}
                               </Box>
                             )}
-                            {/* Overlay badges */}
-                            <Box sx={{ 
-                              position: 'absolute', 
-                              top: 8, 
-                              left: 8, 
-                              display: 'flex', 
-                              flexDirection: 'column', 
-                              gap: 0.5 
-                            }}>
-                              {product.options?.hasLongSleeve && (
-                                <Box sx={{
-                                  px: 0.8,
-                                  py: 0.3,
-                                  borderRadius: '6px',
-                                  bgcolor: 'rgba(245,158,11,0.9)',
-                                  fontSize: '0.6rem',
-                                  fontWeight: 700,
-                                  color: 'white',
-                                }}>
-                                  แขนยาว
-                                </Box>
-                              )}
-                              {product.options?.hasCustomName && (
-                                <Box sx={{
-                                  px: 0.8,
-                                  py: 0.3,
-                                  borderRadius: '6px',
-                                  bgcolor: 'rgba(16,185,129,0.9)',
-                                  fontSize: '0.6rem',
-                                  fontWeight: 700,
-                                  color: 'white',
-                                }}>
-                                  สกรีนชื่อ
-                                </Box>
-                              )}
-                            </Box>
-                            {/* Price badge */}
-                            <Box sx={{
-                              position: 'absolute',
-                              bottom: 8,
-                              right: 8,
-                              px: 1.2,
-                              py: 0.5,
-                              borderRadius: '10px',
-                              bgcolor: 'rgba(0,0,0,0.7)',
-                              backdropFilter: 'blur(8px)',
-                            }}>
-                              <Typography sx={{ fontSize: '0.9rem', fontWeight: 800, color: '#10b981' }}>
-                                ฿{product.basePrice.toLocaleString()}
-                              </Typography>
-                            </Box>
                           </Box>
 
                           {/* Product Info */}
@@ -3043,7 +3137,7 @@ export default function HomePage() {
                             <Typography sx={{ 
                               fontSize: { xs: '0.85rem', sm: '0.9rem' }, 
                               fontWeight: 700, 
-                              color: '#f1f5f9',
+                              color: showProductDetails ? '#f1f5f9' : '#94a3b8',
                               mb: 0.5,
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
@@ -3062,45 +3156,86 @@ export default function HomePage() {
                               whiteSpace: 'nowrap',
                               mb: 1,
                             }}>
-                              {product.description || TYPE_LABELS[product.type] || product.type}
+                              {showProductDetails 
+                                ? (product.description || TYPE_LABELS[product.type] || product.type)
+                                : SHOP_STATUS_CONFIG[productStatus].description
+                              }
                             </Typography>
                             
-                            {/* Quick Add Button */}
+                            {/* Status/Action Button */}
                             <Box sx={{ mt: 'auto' }}>
-                              <Button
-                                fullWidth
-                                disabled={!isShopOpen}
-                                sx={{
-                                  py: 0.8,
-                                  borderRadius: '10px',
-                                  background: isShopOpen 
-                                    ? 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' 
-                                    : 'rgba(100,116,139,0.2)',
-                                  color: isShopOpen ? 'white' : '#64748b',
-                                  fontSize: '0.75rem',
-                                  fontWeight: 700,
-                                  textTransform: 'none',
-                                  '&:hover': {
-                                    background: isShopOpen 
-                                      ? 'linear-gradient(135deg, #5558e8 0%, #7c3aed 100%)' 
+                              {showProductDetails ? (
+                                <Button
+                                  fullWidth
+                                  disabled={!isProductAvailable}
+                                  sx={{
+                                    py: 0.8,
+                                    borderRadius: '10px',
+                                    background: isProductAvailable 
+                                      ? 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' 
                                       : 'rgba(100,116,139,0.2)',
-                                  },
-                                }}
-                              >
-                                {isShopOpen ? 'ดูรายละเอียด' : 'ปิดบริการ'}
-                              </Button>
+                                    color: isProductAvailable ? 'white' : '#64748b',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 700,
+                                    textTransform: 'none',
+                                    '&:hover': {
+                                      background: isProductAvailable 
+                                        ? 'linear-gradient(135deg, #5558e8 0%, #7c3aed 100%)' 
+                                        : 'rgba(100,116,139,0.2)',
+                                    },
+                                  }}
+                                >
+                                  {isShopOpen ? 'ดูรายละเอียด' : 'ร้านปิดชั่วคราว'}
+                                </Button>
+                              ) : (
+                                <Box
+                                  sx={{
+                                    py: 0.8,
+                                    px: 1.5,
+                                    borderRadius: '10px',
+                                    background: SHOP_STATUS_CONFIG[productStatus].bgGradient,
+                                    border: `1px solid ${SHOP_STATUS_CONFIG[productStatus].borderColor}`,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: 0.75,
+                                  }}
+                                >
+                                  {(() => {
+                                    const IconComponent = SHOP_STATUS_CONFIG[productStatus].icon;
+                                    return <IconComponent size={14} color={SHOP_STATUS_CONFIG[productStatus].color} />;
+                                  })()}
+                                  <Typography 
+                                    sx={{ 
+                                      fontSize: '0.75rem', 
+                                      fontWeight: 700, 
+                                      color: SHOP_STATUS_CONFIG[productStatus].color,
+                                    }}
+                                  >
+                                    {SHOP_STATUS_CONFIG[productStatus].label}
+                                  </Typography>
+                                </Box>
+                              )}
                             </Box>
                           </Box>
                         </Box>
                       </Grid>
-                    ))}
+                    );
+                    })}
                   </Grid>
                 </Box>
               ))
             ) : (
               <Box sx={{ textAlign: 'center', py: 8 }}>
-                <Store style={{ fontSize: 64, color: '#64748b', marginBottom: 16, display: 'block' }} />
-                <Typography variant="h6" sx={{ color: '#94a3b8' }}>ยังไม่มีสินค้า</Typography>
+                <Store size={64} style={{ color: '#64748b', marginBottom: 16 }} />
+                <Typography variant="h6" sx={{ color: '#94a3b8', mb: 1 }}>
+                  {totalProductCount > 0 ? 'ไม่พบสินค้าที่ค้นหา' : 'ยังไม่มีสินค้า'}
+                </Typography>
+                {totalProductCount === 0 && (
+                  <Typography sx={{ color: '#64748b', fontSize: '0.9rem' }}>
+                    รอติดตามสินค้าใหม่เร็วๆ นี้
+                  </Typography>
+                )}
               </Box>
             )}
           </Container>

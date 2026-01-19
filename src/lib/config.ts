@@ -28,7 +28,15 @@ export interface Product {
 export interface ShopConfig {
   isOpen: boolean;
   closeDate: string;
-    products: Product[];
+  /** วันที่เปิดร้าน (สำหรับแสดง "รอเปิด" หรือ "เร็วๆ นี้") */
+  openDate?: string;
+  /** ข้อความแสดงเมื่อร้านปิด */
+  closedMessage?: string;
+  /** ระบบชำระเงินเปิด/ปิด */
+  paymentEnabled?: boolean;
+  /** ข้อความแสดงเมื่อปิดระบบชำระเงิน */
+  paymentDisabledMessage?: string;
+  products: Product[];
     /**
      * Firestore/Storage key for products (optional, for large data)
      */

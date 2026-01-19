@@ -9,6 +9,10 @@ const CONFIG_KEY = 'config/shop-settings.json';
 const DEFAULT_CONFIG: ShopConfig = {
   isOpen: true,
   closeDate: '',
+  openDate: '',
+  closedMessage: '',
+  paymentEnabled: true,
+  paymentDisabledMessage: '',
   announcement: { enabled: false, message: '', color: 'blue' },
   products: [],
   sheetId: '',

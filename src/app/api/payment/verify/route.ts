@@ -197,6 +197,8 @@ const findOrderKey = async (ref: string): Promise<string | null> => {
   return keys.find((k) => k.endsWith(`${ref}.json`)) || null;
 };
 
+const CONFIG_KEY = 'config/shop-settings.json';
+
 export async function POST(req: NextRequest) {
   // ต้องเข้าสู่ระบบก่อน
   const authResult = await requireAuth();
@@ -207,6 +209,18 @@ export async function POST(req: NextRequest) {
   const isAdmin = isAdminEmail(currentUserEmail);
 
   try {
+    // ตรวจสอบว่าระบบชำระเงินเปิดอยู่หรือไม่ (admin ข้ามได้)
+    if (!isAdmin) {
+      const config = await getJson<any>(CONFIG_KEY);
+      if (config && config.paymentEnabled === false) {
+        const message = config.paymentDisabledMessage || 'ระบบชำระเงินปิดให้บริการชั่วคราว กรุณารอการแจ้งเปิดจากแอดมิน';
+        return NextResponse.json(
+          { status: 'error', message, code: 'PAYMENT_DISABLED' },
+          { status: 503, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
+        );
+      }
+    }
+
     const { ref, base64, mime, name } = await req.json();
     if (!ref || !base64) {
       return NextResponse.json({ status: 'error', message: 'กรุณาอัพโหลดสลิปและระบุหมายเลขคำสั่งซื้อ' }, { status: 400 });

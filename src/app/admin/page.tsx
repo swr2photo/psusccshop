@@ -157,6 +157,10 @@ interface Toast {
 const DEFAULT_CONFIG: ShopConfig = {
   isOpen: true,
   closeDate: '',
+  openDate: '',
+  closedMessage: '',
+  paymentEnabled: true,
+  paymentDisabledMessage: '',
   announcements: [],
   products: [],
   sheetId: '',
@@ -606,16 +610,117 @@ const SettingsView = React.memo(function SettingsView({
               borderRadius: '12px', 
               bgcolor: 'rgba(239, 68, 68, 0.1)',
               border: '1px solid rgba(239, 68, 68, 0.2)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 2,
             }}>
-              <Typography sx={{ fontSize: '0.85rem', color: '#f87171', mb: 1.5 }}>
-                <CalendarToday sx={{ fontSize: 20, mr: 1, verticalAlign: 'middle' }} />
-                กำหนดวันเปิดร้าน
+              <Box>
+                <Typography sx={{ fontSize: '0.85rem', color: '#f87171', mb: 1 }}>
+                  <CalendarToday sx={{ fontSize: 18, mr: 1, verticalAlign: 'middle' }} />
+                  กำหนดวันเปิดร้านใหม่ (ถ้ามี)
+                </Typography>
+                <TextField
+                  type="datetime-local"
+                  value={localConfig.openDate || ''}
+                  onChange={(e) => onConfigChange({...localConfig, openDate: e.target.value})}
+                  placeholder="เช่น 2025-01-20T09:00"
+                  fullWidth
+                  sx={{
+                    ...inputSx,
+                    '& .MuiOutlinedInput-root': {
+                      ...inputSx['& .MuiOutlinedInput-root'],
+                      borderRadius: '10px',
+                    },
+                  }}
+                />
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: '0.85rem', color: '#f87171', mb: 1 }}>
+                  <Warning sx={{ fontSize: 18, mr: 1, verticalAlign: 'middle' }} />
+                  ข้อความแจ้งผู้ใช้ (ไม่บังคับ)
+                </Typography>
+                <TextField
+                  placeholder="เช่น: ร้านปิดปรับปรุงถึงวันที่ 20 ม.ค."
+                  value={localConfig.closedMessage || ''}
+                  onChange={(e) => onConfigChange({...localConfig, closedMessage: e.target.value})}
+                  fullWidth
+                  multiline
+                  rows={2}
+                  sx={{
+                    ...inputSx,
+                    '& .MuiOutlinedInput-root': {
+                      ...inputSx['& .MuiOutlinedInput-root'],
+                      borderRadius: '10px',
+                    },
+                  }}
+                />
+              </Box>
+            </Box>
+          )}
+          
+          {/* Close Date - กำหนดวันปิดรับออเดอร์ */}
+          {localConfig.isOpen && (
+            <Box sx={{ 
+              mt: 1, 
+              p: 2, 
+              borderRadius: '12px', 
+              bgcolor: 'rgba(245, 158, 11, 0.1)',
+              border: '1px solid rgba(245, 158, 11, 0.2)',
+            }}>
+              <Typography sx={{ fontSize: '0.85rem', color: '#fbbf24', mb: 1 }}>
+                <CalendarToday sx={{ fontSize: 18, mr: 1, verticalAlign: 'middle' }} />
+                กำหนดวันปิดรับออเดอร์ (ไม่บังคับ)
               </Typography>
               <TextField
-                type="date"
-                value={localConfig.closeDate}
+                type="datetime-local"
+                value={localConfig.closeDate || ''}
                 onChange={(e) => onConfigChange({...localConfig, closeDate: e.target.value})}
+                placeholder="เช่น 2025-01-25T23:59"
                 fullWidth
+                sx={{
+                  ...inputSx,
+                  '& .MuiOutlinedInput-root': {
+                    ...inputSx['& .MuiOutlinedInput-root'],
+                    borderRadius: '10px',
+                  },
+                }}
+              />
+              <Typography sx={{ fontSize: '0.75rem', color: '#94a3b8', mt: 1 }}>
+                เมื่อถึงวันนี้ ระบบจะแสดงสถานะ "หมดเขตสั่งซื้อ" โดยอัตโนมัติ
+              </Typography>
+            </Box>
+          )}
+        </SettingSection>
+      )}
+
+      {/* Payment System Toggle - Only for Super Admin or admins with shop permission */}
+      {canManageShop && (
+        <SettingSection icon={<AttachMoney sx={{ fontSize: 20 }} />} title="ระบบชำระเงิน">
+          <SettingToggleRow
+            label="เปิดรับชำระเงิน"
+            description={localConfig.paymentEnabled !== false ? 'ผู้ใช้สามารถอัพโหลดสลิปได้' : 'ปิดรับชำระเงินชั่วคราว'}
+            checked={localConfig.paymentEnabled !== false}
+            onChange={(checked) => onConfigChange({...localConfig, paymentEnabled: checked})}
+          />
+          {localConfig.paymentEnabled === false && (
+            <Box sx={{ 
+              mt: 1, 
+              p: 2, 
+              borderRadius: '12px', 
+              bgcolor: 'rgba(249, 115, 22, 0.1)',
+              border: '1px solid rgba(249, 115, 22, 0.2)',
+            }}>
+              <Typography sx={{ fontSize: '0.85rem', color: '#fb923c', mb: 1.5 }}>
+                <Warning sx={{ fontSize: 20, mr: 1, verticalAlign: 'middle' }} />
+                ข้อความแจ้งผู้ใช้ (ไม่บังคับ)
+              </Typography>
+              <TextField
+                placeholder="เช่น: ระบบปิดปรับปรุงถึง 18:00 น."
+                value={localConfig.paymentDisabledMessage || ''}
+                onChange={(e) => onConfigChange({...localConfig, paymentDisabledMessage: e.target.value})}
+                fullWidth
+                multiline
+                rows={2}
                 sx={{
                   ...inputSx,
                   '& .MuiOutlinedInput-root': {

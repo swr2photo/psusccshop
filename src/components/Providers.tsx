@@ -10,12 +10,20 @@ import CookieConsentBanner from './CookieConsentBanner';
 import { useScreenshotProtection } from '@/hooks';
 
 // Screenshot protection wrapper
+// Throttle logging to avoid console spam
+let lastScreenshotLog = 0;
+const SCREENSHOT_LOG_INTERVAL = 10000; // 10 seconds
+
 function ScreenshotProtectionProvider({ children }: { children: React.ReactNode }) {
   // Enable screenshot protection across the entire app
   useScreenshotProtection({
     recoveryTime: 300,
     onScreenshotDetected: () => {
-      console.log('[Security] Screenshot attempt detected');
+      const now = Date.now();
+      if (now - lastScreenshotLog > SCREENSHOT_LOG_INTERVAL) {
+        console.log('[Security] Screenshot protection active');
+        lastScreenshotLog = now;
+      }
     },
   });
 

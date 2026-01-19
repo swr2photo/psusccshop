@@ -207,6 +207,10 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
   const [showCartDetails, setShowCartDetails] = useState(false);
   const [orderStatus, setOrderStatus] = useState<string>('PENDING');
   
+  // สถานะระบบชำระเงิน
+  const [paymentEnabled, setPaymentEnabled] = useState(true);
+  const [paymentDisabledMessage, setPaymentDisabledMessage] = useState<string | null>(null);
+  
   // ตรวจสอบว่าชำระเงินแล้วหรือยัง
   const isPaid = PAID_STATUSES.includes(orderStatus.toUpperCase());
 
@@ -244,6 +248,9 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
         setDiscount(Number(info.discount ?? 0));
         setCartItems(info.cart || []);
         setOrderStatus(info.status || 'PENDING');
+        // สถานะระบบชำระเงิน
+        setPaymentEnabled(info.paymentEnabled !== false);
+        setPaymentDisabledMessage(info.paymentDisabledMessage || null);
       } else {
         addToast('error', 'ข้อผิดพลาด', data.message || 'ไม่พบข้อมูลชำระเงิน');
       }
@@ -322,6 +329,12 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
             message = 'กรุณาโอนเข้าบัญชีที่ถูกต้อง';
           } else if (errorCode === 1007 || errorCode === 1008) {
             title = '📷 QR ไม่ถูกต้อง';
+          } else if (errorCode === 'PAYMENT_DISABLED') {
+            title = '⚠️ ระบบชำระเงินปิด';
+            message = data.message || 'ระบบชำระเงินปิดชั่วคราว กรุณารอแอดมินเปิดระบบ';
+            // อัปเดตสถานะเพื่อแสดง UI ที่ถูกต้อง
+            setPaymentEnabled(false);
+            setPaymentDisabledMessage(data.message);
           }
 
           addToast('error', title, message);
@@ -831,6 +844,48 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
               )}
             </Box>
 
+            {/* Payment Disabled Alert */}
+            {!paymentEnabled && (
+              <Box sx={{
+                p: 2.5,
+                borderRadius: '20px',
+                background: 'linear-gradient(135deg, rgba(239,68,68,0.15) 0%, rgba(220,38,38,0.1) 100%)',
+                border: '1px solid rgba(239,68,68,0.3)',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 2,
+              }}>
+                <Box sx={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: '12px',
+                  bgcolor: 'rgba(239,68,68,0.2)',
+                  display: 'grid',
+                  placeItems: 'center',
+                  flexShrink: 0,
+                }}>
+                  <AlertCircle size={24} style={{ color: '#f87171' }} />
+                </Box>
+                <Box>
+                  <Typography sx={{ 
+                    fontSize: '1rem', 
+                    fontWeight: 700, 
+                    color: '#fca5a5', 
+                    mb: 0.5 
+                  }}>
+                    ⚠️ ระบบชำระเงินปิดชั่วคราว
+                  </Typography>
+                  <Typography sx={{ 
+                    fontSize: '0.85rem', 
+                    color: '#fda4af',
+                    lineHeight: 1.6,
+                  }}>
+                    {paymentDisabledMessage || 'ขณะนี้ระบบชำระเงินปิดให้บริการชั่วคราว กรุณารอแอดมินเปิดระบบก่อนทำการชำระเงิน'}
+                  </Typography>
+                </Box>
+              </Box>
+            )}
+
             {/* Cart Items Card */}
             {cartItems.length > 0 && (
               <Box sx={{
@@ -1037,7 +1092,30 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
               
               {/* QR Image */}
               <Box sx={{ p: 3, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                {qrUrl ? (
+                {!paymentEnabled ? (
+                  /* Payment Disabled - Hide QR */
+                  <Box sx={{ 
+                    width: 220,
+                    height: 220,
+                    bgcolor: 'rgba(239,68,68,0.1)', 
+                    borderRadius: '20px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 1.5,
+                    mb: 2,
+                    border: '2px dashed rgba(239,68,68,0.3)',
+                  }}>
+                    <AlertCircle size={40} style={{ color: '#f87171' }} />
+                    <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: '#fca5a5', textAlign: 'center', px: 2 }}>
+                      ระบบชำระเงินปิดอยู่
+                    </Typography>
+                    <Typography sx={{ fontSize: '0.75rem', color: '#fb7185', textAlign: 'center', px: 2 }}>
+                      รอแอดมินเปิดระบบก่อน
+                    </Typography>
+                  </Box>
+                ) : qrUrl ? (
                   <Box sx={{ 
                     bgcolor: 'white', 
                     borderRadius: '20px', 
@@ -1075,16 +1153,16 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                   fullWidth
                   startIcon={downloading ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
                   onClick={handleSaveQr}
-                  disabled={!qrUrl || downloading}
+                  disabled={!qrUrl || downloading || !paymentEnabled}
                   sx={{
                     py: 1.3,
                     borderRadius: '12px',
-                    bgcolor: 'rgba(16,185,129,0.1)',
-                    border: '1px solid rgba(16,185,129,0.3)',
-                    color: '#6ee7b7',
+                    bgcolor: paymentEnabled ? 'rgba(16,185,129,0.1)' : 'rgba(100,116,139,0.1)',
+                    border: paymentEnabled ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(100,116,139,0.2)',
+                    color: paymentEnabled ? '#6ee7b7' : '#64748b',
                     fontWeight: 600,
                     textTransform: 'none',
-                    '&:hover': { bgcolor: 'rgba(16,185,129,0.2)' },
+                    '&:hover': { bgcolor: paymentEnabled ? 'rgba(16,185,129,0.2)' : 'rgba(100,116,139,0.15)' },
                     '&:disabled': { opacity: 0.5 },
                   }}
                 >
@@ -1159,7 +1237,35 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
               </Box>
               
               <Box sx={{ p: 2.5 }}>
-                {!previewUrl ? (
+                {!paymentEnabled ? (
+                  /* Payment Disabled - Cannot Upload */
+                  <Box sx={{
+                    border: '2px dashed rgba(239,68,68,0.3)',
+                    borderRadius: '16px',
+                    p: 4,
+                    textAlign: 'center',
+                    bgcolor: 'rgba(239,68,68,0.05)',
+                  }}>
+                    <Box sx={{
+                      width: 64,
+                      height: 64,
+                      borderRadius: '20px',
+                      bgcolor: 'rgba(239,68,68,0.1)',
+                      display: 'grid',
+                      placeItems: 'center',
+                      mx: 'auto',
+                      mb: 2,
+                    }}>
+                      <AlertCircle size={28} style={{ color: '#f87171' }} />
+                    </Box>
+                    <Typography sx={{ color: '#fca5a5', fontWeight: 600, mb: 0.5, fontSize: '1rem' }}>
+                      ระบบชำระเงินปิดอยู่
+                    </Typography>
+                    <Typography sx={{ color: '#fb7185', fontSize: '0.8rem' }}>
+                      รอแอดมินเปิดระบบก่อนทำการชำระเงิน
+                    </Typography>
+                  </Box>
+                ) : !previewUrl ? (
                   <Box
                     onClick={() => fileInputRef.current?.click()}
                     onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
@@ -1318,39 +1424,85 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
         paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
       }}>
         <Box sx={{ maxWidth: 500, mx: 'auto' }}>
-          <Button
-            fullWidth
-            onClick={handleConfirmPayment}
-            disabled={verifying || loading || !selectedFile}
-            startIcon={verifying ? <Loader2 size={22} className="animate-spin" /> : hasSlip ? <Check size={22} /> : <Upload size={22} />}
-            sx={{
-              py: 2,
-              borderRadius: '16px',
-              background: hasSlip && !verifying
-                ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                : 'rgba(100,116,139,0.15)',
-              color: hasSlip && !verifying ? 'white' : '#64748b',
-              fontSize: '1.05rem',
-              fontWeight: 700,
-              textTransform: 'none',
-              boxShadow: hasSlip && !verifying ? '0 8px 32px rgba(16,185,129,0.35)' : 'none',
-              transition: 'all 0.3s ease',
-              '&:hover': {
+          {isPaid ? (
+            /* Already Paid - Show Close Button */
+            <Button
+              fullWidth
+              onClick={onClose}
+              sx={{
+                py: 2,
+                borderRadius: '16px',
+                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                color: 'white',
+                fontSize: '1.05rem',
+                fontWeight: 700,
+                textTransform: 'none',
+                boxShadow: '0 8px 24px rgba(59,130,246,0.35)',
+                '&:hover': {
+                  background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                },
+              }}
+            >
+              ปิดหน้าต่าง
+            </Button>
+          ) : !paymentEnabled ? (
+            /* Payment Disabled - Show Disabled Button */
+            <Button
+              fullWidth
+              disabled
+              startIcon={<AlertCircle size={22} />}
+              sx={{
+                py: 2,
+                borderRadius: '16px',
+                background: 'rgba(239,68,68,0.15)',
+                color: '#f87171',
+                fontSize: '1.05rem',
+                fontWeight: 700,
+                textTransform: 'none',
+                '&:disabled': {
+                  background: 'rgba(239,68,68,0.15)',
+                  color: '#f87171',
+                },
+              }}
+            >
+              ระบบชำระเงินปิดอยู่
+            </Button>
+          ) : (
+            /* Normal Payment Button */
+            <Button
+              fullWidth
+              onClick={handleConfirmPayment}
+              disabled={verifying || loading || !selectedFile}
+              startIcon={verifying ? <Loader2 size={22} className="animate-spin" /> : hasSlip ? <Check size={22} /> : <Upload size={22} />}
+              sx={{
+                py: 2,
+                borderRadius: '16px',
                 background: hasSlip && !verifying
-                  ? 'linear-gradient(135deg, #059669 0%, #047857 100%)'
-                  : 'rgba(100,116,139,0.2)',
-                transform: hasSlip && !verifying ? 'translateY(-2px)' : 'none',
-                boxShadow: hasSlip && !verifying ? '0 12px 40px rgba(16,185,129,0.4)' : 'none',
-              },
-              '&:disabled': {
-                background: verifying ? 'linear-gradient(135deg, #0891b2 0%, #06b6d4 100%)' : 'rgba(100,116,139,0.15)',
-                color: verifying ? 'white' : '#64748b',
-              },
-            }}
-          >
-            {verifying ? 'กำลังตรวจสอบสลิป...' : hasSlip ? '✓ ยืนยันการชำระเงิน' : 'แนบสลิปเพื่อชำระเงิน'}
-          </Button>
-          {!hasSlip && (
+                  ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                  : 'rgba(100,116,139,0.15)',
+                color: hasSlip && !verifying ? 'white' : '#64748b',
+                fontSize: '1.05rem',
+                fontWeight: 700,
+                textTransform: 'none',
+                boxShadow: hasSlip && !verifying ? '0 8px 32px rgba(16,185,129,0.35)' : 'none',
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  background: hasSlip && !verifying
+                    ? 'linear-gradient(135deg, #059669 0%, #047857 100%)'
+                    : 'rgba(100,116,139,0.2)',
+                  transform: hasSlip && !verifying ? 'translateY(-2px)' : 'none',
+                  boxShadow: hasSlip && !verifying ? '0 12px 40px rgba(16,185,129,0.4)' : 'none',
+                },
+                '&:disabled': {
+                  background: verifying ? 'linear-gradient(135deg, #0891b2 0%, #06b6d4 100%)' : 'rgba(100,116,139,0.15)',
+                  color: verifying ? 'white' : '#64748b',
+                },
+              }}
+            >
+              {verifying ? 'กำลังตรวจสอบสลิป...' : hasSlip ? '✓ ยืนยันการชำระเงิน' : 'แนบสลิปเพื่อชำระเงิน'}
+            </Button>
+          )}
+          {!hasSlip && paymentEnabled && !isPaid && (
             <Typography sx={{ textAlign: 'center', fontSize: '0.75rem', color: '#475569', mt: 1.5 }}>
               กรุณาแนบสลิปก่อนกดยืนยัน
             </Typography>
