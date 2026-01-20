@@ -9,8 +9,8 @@ declare module "next-auth" {
     user: {
       id?: string;
       name?: string | null;
+      email?: string | null;
       image?: string | null;
-      // email?: string | null; // ไม่ต้องใส่อีเมล
     };
     accessToken?: string;
     error?: string;
