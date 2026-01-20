@@ -69,6 +69,20 @@ export const SHOP_STATUS_CONFIG: Record<ShopStatusType, Omit<ShopStatusInfo, 'ty
   },
 };
 
+// Helper to check if a date string is valid
+const isValidDate = (dateString?: string): boolean => {
+  if (!dateString || dateString.trim() === '') return false;
+  const date = new Date(dateString);
+  return !isNaN(date.getTime());
+};
+
+// Helper to get end of day (23:59:59.999) for a date
+const getEndOfDay = (date: Date): Date => {
+  const endOfDay = new Date(date);
+  endOfDay.setHours(23, 59, 59, 999);
+  return endOfDay;
+};
+
 // Helper to determine shop status
 export const getShopStatus = (isOpen: boolean, closeDate?: string, openDate?: string): ShopStatusType => {
   const now = new Date();
@@ -76,17 +90,14 @@ export const getShopStatus = (isOpen: boolean, closeDate?: string, openDate?: st
   // Check if shop is explicitly closed
   if (!isOpen) return 'TEMPORARILY_CLOSED';
   
-  // Check if there's an opening date in the future
-  if (openDate) {
-    const open = new Date(openDate);
+  // Check if there's an opening date in the future (only if valid date)
+  if (isValidDate(openDate)) {
+    const open = new Date(openDate!);
     if (now < open) return 'WAITING_TO_OPEN';
   }
   
-  // Check if the closing date has passed
-  if (closeDate) {
-    const close = new Date(closeDate);
-    if (now > close) return 'ORDER_ENDED';
-  }
+  // ไม่ตรวจสอบ closeDate - ให้ร้านเปิดตลอดถ้า isOpen = true
+  // (ลบ logic ORDER_ENDED เพื่อไม่แสดงสถานะ "หมดเขตสั่งซื้อ")
   
   return 'OPEN';
 };
@@ -94,21 +105,25 @@ export const getShopStatus = (isOpen: boolean, closeDate?: string, openDate?: st
 // Helper to determine product status
 export const getProductStatus = (product: { isActive?: boolean; startDate?: string; endDate?: string }): ShopStatusType => {
   const now = new Date();
-  const start = product.startDate ? new Date(product.startDate) : null;
-  const end = product.endDate ? new Date(product.endDate) : null;
+  const start = isValidDate(product.startDate) ? new Date(product.startDate!) : null;
+  // ไม่ตรวจสอบ endDate - ให้สินค้าเปิดตลอดถ้า isActive = true
   
   if (!product.isActive) return 'TEMPORARILY_CLOSED';
   if (start && now < start) return 'COMING_SOON';
-  if (end && now > end) return 'ORDER_ENDED';
+  // ไม่ return ORDER_ENDED อีกต่อไป
   return 'OPEN';
 };
 
 // Format countdown time
 export const formatCountdown = (targetDate: Date): string => {
+  // Handle invalid date
+  if (!targetDate || isNaN(targetDate.getTime())) return '';
+  
   const now = new Date();
   const diff = targetDate.getTime() - now.getTime();
   
-  if (diff <= 0) return 'หมดเวลาแล้ว';
+  // ไม่แสดง "หมดเวลาแล้ว" - return empty string แทน
+  if (diff <= 0) return '';
   
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
   const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
@@ -280,7 +295,7 @@ export default function ShopStatusCard({
               >
                 <Clock size={16} color={config.color} />
                 <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: '#f1f5f9' }}>
-                  {status === 'COMING_SOON' || status === 'WAITING_TO_OPEN' ? 'เปิดใน ' : 'เหลือเวลา '}
+                  {(status === 'COMING_SOON' || status === 'WAITING_TO_OPEN') ? 'เปิดใน ' : ''}
                   <Box component="span" sx={{ color: config.color, fontWeight: 700 }}>
                     {countdown}
                   </Box>
@@ -350,11 +365,6 @@ export function ProductStatusBadge({ product }: ProductStatusBadgeProps) {
       {product.startDate && status === 'COMING_SOON' && (
         <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8', mt: 0.5 }}>
           เปิด {new Date(product.startDate).toLocaleDateString('th-TH')}
-        </Typography>
-      )}
-      {product.endDate && status === 'ORDER_ENDED' && (
-        <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8', mt: 0.5 }}>
-          หมดเขต {new Date(product.endDate).toLocaleDateString('th-TH')}
         </Typography>
       )}
     </Box>

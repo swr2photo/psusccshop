@@ -2476,9 +2476,9 @@ export default function AdminPage(): JSX.Element {
       price = product.sizePricing[item.size];
     }
     
-    // Add long sleeve surcharge (+50)
+    // Add long sleeve surcharge (use product config or default 50)
     if (item.options?.isLongSleeve) {
-      price += 50;
+      price += product.options?.longSleevePrice ?? 50;
     }
     
     return price;
@@ -3970,7 +3970,7 @@ export default function AdminPage(): JSX.Element {
                         }}
                       >
                         <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: '#e2e8f0' }}>
-                          แขนยาว (+฿50)
+                          แขนยาว (+฿{config.products?.find(p => p.id === item.productId)?.options?.longSleevePrice ?? 50})
                         </Typography>
                         <Switch
                           checked={item.options?.isLongSleeve || false}
@@ -5573,7 +5573,7 @@ function ProductsView({ config, searchTerm, setSearchTerm, saveFullConfig, showT
       startDate: '',
       endDate: '',
       isActive: true,
-      options: { hasCustomName: false, hasCustomNumber: false, hasLongSleeve: false }
+      options: { hasCustomName: false, hasCustomNumber: false, hasLongSleeve: false, longSleevePrice: 50 }
     };
     setEditingProduct(newP);
   };
@@ -6110,6 +6110,25 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any
               sx={{ color: ADMIN_THEME.text }}
             />
           ))}
+          
+          {/* Long Sleeve Price Input - แสดงเมื่อเปิดใช้ hasLongSleeve */}
+          {product.options?.hasLongSleeve && (
+            <Box sx={{ mt: 1.5, ml: 4 }}>
+              <TextField
+                label="ราคาเพิ่มแขนยาว (฿)"
+                type="number"
+                value={product.options?.longSleevePrice ?? 50}
+                onChange={(e) => onChange({
+                  ...product,
+                  options: { ...product.options, longSleevePrice: Math.max(0, Number(e.target.value)) }
+                })}
+                inputProps={{ min: 0, max: 999999 }}
+                size="small"
+                sx={{ ...inputSx, width: 180 }}
+                helperText="ราคาที่จะบวกเพิ่มเมื่อเลือกแขนยาว"
+              />
+            </Box>
+          )}
         </Box>
 
         <FormControlLabel

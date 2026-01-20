@@ -22,6 +22,7 @@ export interface Product {
     hasCustomName: boolean;
     hasCustomNumber: boolean;
     hasLongSleeve: boolean;
+    longSleevePrice?: number; // ราคาเพิ่มสำหรับแขนยาว (default 50)
   };
 }
 

@@ -767,7 +767,9 @@ export default function HomePage() {
     }
 
     const basePrice = selectedProduct.sizePricing?.[productOptions.size] ?? selectedProduct.basePrice;
-    const longSleeveFee = selectedProduct.options?.hasLongSleeve && productOptions.isLongSleeve ? 50 : 0;
+    const longSleeveFee = selectedProduct.options?.hasLongSleeve && productOptions.isLongSleeve 
+      ? (selectedProduct.options?.longSleevePrice ?? 50) 
+      : 0;
     const unitPrice = basePrice + longSleeveFee;
     const quantity = clampQty(productOptions.quantity);
 
@@ -884,7 +886,9 @@ export default function HomePage() {
   const getCurrentPrice = useCallback(() => {
     if (!selectedProduct) return 0;
     const basePrice = selectedProduct.sizePricing?.[productOptions.size] ?? selectedProduct.basePrice;
-    const longSleeveFee = selectedProduct.options?.hasLongSleeve && productOptions.isLongSleeve ? 50 : 0;
+    const longSleeveFee = selectedProduct.options?.hasLongSleeve && productOptions.isLongSleeve 
+      ? (selectedProduct.options?.longSleevePrice ?? 50) 
+      : 0;
     return (basePrice + longSleeveFee) * productOptions.quantity;
   }, [selectedProduct, productOptions]);
 
@@ -1366,7 +1370,9 @@ export default function HomePage() {
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
               {displaySizes.map((size) => {
                 const basePrice = selectedProduct?.sizePricing?.[size] ?? selectedProduct?.basePrice ?? 0;
-                const longSleeveFee = selectedProduct.options?.hasLongSleeve && productOptions.isLongSleeve ? 50 : 0;
+                const longSleeveFee = selectedProduct.options?.hasLongSleeve && productOptions.isLongSleeve 
+                  ? (selectedProduct.options?.longSleevePrice ?? 50) 
+                  : 0;
                 const price = basePrice + longSleeveFee;
                 const active = productOptions.size === size;
                 const sizeKey = size as keyof typeof SIZE_MEASUREMENTS;
@@ -1504,7 +1510,7 @@ export default function HomePage() {
                         แขนยาว
                       </Typography>
                       <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>
-                        เพิ่ม ฿50 ต่อตัว
+                        เพิ่ม ฿{selectedProduct.options?.longSleevePrice ?? 50} ต่อตัว
                       </Typography>
                     </Box>
                     <Switch
@@ -1649,8 +1655,8 @@ export default function HomePage() {
                   {productOptions.size} × {productOptions.quantity}
                 </Typography>
               </Box>
-              {productOptions.isLongSleeve && (
-                <Typography sx={{ fontSize: '0.72rem', color: '#fbbf24', fontWeight: 600 }}>+ แขนยาว ฿50</Typography>
+              {productOptions.isLongSleeve && selectedProduct && (
+                <Typography sx={{ fontSize: '0.72rem', color: '#fbbf24', fontWeight: 600 }}>+ แขนยาว ฿{selectedProduct.options?.longSleevePrice ?? 50}</Typography>
               )}
             </Box>
           </Box>
@@ -3248,11 +3254,6 @@ export default function HomePage() {
                                     เปิด {new Date(product.startDate).toLocaleDateString('th-TH')}
                                   </Typography>
                                 )}
-                                {product.endDate && productStatus === 'ORDER_ENDED' && (
-                                  <Typography sx={{ fontSize: '0.65rem', color: '#e2e8f0', mt: 0.5, textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
-                                    หมดเขต {new Date(product.endDate).toLocaleDateString('th-TH')}
-                                  </Typography>
-                                )}
                               </Box>
                             )}
                             
@@ -4011,7 +4012,9 @@ export default function HomePage() {
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}>
                   {displaySizes.map((size) => {
                     const basePrice = product?.sizePricing?.[size] ?? product?.basePrice ?? editingCartItem.unitPrice;
-                    const longSleeveFee = product?.options?.hasLongSleeve && editingCartItem.options.isLongSleeve ? 50 : 0;
+                    const longSleeveFee = product?.options?.hasLongSleeve && editingCartItem.options.isLongSleeve 
+                      ? (product?.options?.longSleevePrice ?? 50) 
+                      : 0;
                     const active = editingCartItem.size === size;
                     return (
                       <Box
@@ -4084,10 +4087,11 @@ export default function HomePage() {
                     onClick={() => {
                       const newIsLong = !editingCartItem.options.isLongSleeve;
                       const basePrice = product?.sizePricing?.[editingCartItem.size] ?? product?.basePrice ?? 0;
+                      const sleeveFee = product?.options?.longSleevePrice ?? 50;
                       setEditingCartItem({
                         ...editingCartItem,
                         options: { ...editingCartItem.options, isLongSleeve: newIsLong },
-                        unitPrice: basePrice + (newIsLong ? 50 : 0)
+                        unitPrice: basePrice + (newIsLong ? sleeveFee : 0)
                       });
                     }}
                     sx={{
@@ -4102,7 +4106,7 @@ export default function HomePage() {
                       justifyContent: 'space-between',
                     }}
                   >
-                    <Typography sx={{ color: '#e2e8f0', fontWeight: 600 }}>แขนยาว (+฿50)</Typography>
+                    <Typography sx={{ color: '#e2e8f0', fontWeight: 600 }}>แขนยาว (+฿{product?.options?.longSleevePrice ?? 50})</Typography>
                     <Switch checked={editingCartItem.options.isLongSleeve} color="warning" sx={{ pointerEvents: 'none' }} />
                   </Box>
                 )}
@@ -4238,7 +4242,7 @@ export default function HomePage() {
               fontWeight: 600,
               color: '#fbbf24',
             }}>
-              แขนยาว +50฿
+              แขนยาว +{selectedProduct?.options?.longSleevePrice ?? 50}฿
             </Box>
           </Box>
 

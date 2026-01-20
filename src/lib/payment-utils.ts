@@ -35,7 +35,7 @@ export function generatePromptPayQR(amount: number) {
 }
 
 // --- Pricing Logic (ต้องตรงกับหน้าเว็บ) ---
-export function calculateOrderTotal(items: any[]) {
+export function calculateOrderTotal(items: any[], longSleevePrice: number = 50) {
   if (!Array.isArray(items)) return 0;
   let total = 0;
   
@@ -52,8 +52,9 @@ export function calculateOrderTotal(items: any[]) {
     
     if (name.includes('JERSEY')) { 
       p = PRICES.JERSEY[size] || 339;
-      // แขนยาว +50
-      if ((item.sleeve || '').toUpperCase() === 'LONG' || name.includes('LONG')) p += 50; 
+      // แขนยาว - ใช้ค่าจาก item หรือ parameter
+      const itemLongSleevePrice = item.longSleevePrice ?? longSleevePrice;
+      if ((item.sleeve || '').toUpperCase() === 'LONG' || name.includes('LONG')) p += itemLongSleevePrice; 
     }
     else if (name.includes('CREW')) { 
       p = PRICES.CREW[size] || 249; 
