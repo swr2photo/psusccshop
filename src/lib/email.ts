@@ -580,3 +580,29 @@ export async function sendOrderStatusEmail(order: any, newStatus: string): Promi
     orderRef: order.ref,
   });
 }
+
+/**
+ * ส่งอีเมลแจ้งยกเลิก order (สำหรับ auto-cancel)
+ */
+export async function sendOrderCancelledEmail(order: {
+  ref: string;
+  customerName: string;
+  customerEmail: string;
+  reason?: string;
+}): Promise<void> {
+  const template = generateOrderCancelledEmail({
+    ref: order.ref,
+    customerName: order.customerName,
+    reason: order.reason,
+  });
+
+  await sendEmail({
+    to: order.customerEmail,
+    subject: template.subject,
+    html: template.html,
+    text: template.text,
+    type: 'order_cancelled',
+    orderRef: order.ref,
+  });
+}
+

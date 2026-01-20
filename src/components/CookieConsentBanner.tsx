@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { X, Cookie, Shield, Check, ChevronDown, ChevronUp, Settings2 } from 'lucide-react';
 import { Box, Typography, Button, IconButton, Collapse, Switch, Slide } from '@mui/material';
 import { useNotification, COOKIE_CATEGORIES, CookieCategory } from './NotificationContext';
+import Link from 'next/link';
 
 export default function CookieConsentBanner() {
   const { showConsentBanner, acceptAll, acceptEssential, updateConsent } = useNotification();
@@ -348,16 +349,15 @@ export default function CookieConsentBanner() {
               }}
             >
               อ่านเพิ่มเติม:{' '}
-              <Box
-                component="span"
-                sx={{
+              <Link
+                href="/privacy"
+                style={{
                   color: '#a78bfa',
-                  cursor: 'pointer',
-                  '&:hover': { textDecoration: 'underline' },
+                  textDecoration: 'none',
                 }}
               >
                 นโยบายความเป็นส่วนตัว
-              </Box>
+              </Link>
             </Typography>
           </Box>
         </Box>

@@ -1,4 +1,4 @@
-import { Facebook, Instagram, Mail } from 'lucide-react';
+import { Facebook, Instagram, Mail, Shield } from 'lucide-react';
 import Link from 'next/link';
 
 export default function Footer() {
@@ -34,6 +34,12 @@ export default function Footer() {
                 ตรวจสอบสถานะ
               </Link>
             </li>
+            <li>
+              <Link href="/privacy" className="hover:text-indigo-400 transition flex items-center gap-2">
+                <Shield size={14} />
+                นโยบายความเป็นส่วนตัว
+              </Link>
+            </li>
           </ul>
         </div>
 
@@ -47,7 +53,7 @@ export default function Footer() {
             <a href="https://instagram.com/psuscc" className="hover:text-pink-500 transition" title="Instagram">
               <Instagram size={20} />
             </a>
-            <a href="psuscc@psusci.club" className="hover:text-emerald-500 transition" title="Email">
+            <a href="mailto:psuscc@psusci.club" className="hover:text-emerald-500 transition" title="Email">
               <Mail size={20} />
             </a>
           </div>
