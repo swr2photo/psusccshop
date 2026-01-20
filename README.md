@@ -70,3 +70,4 @@ Email notifications are sent automatically when:
 - Order status changes → Status update email (PAID, READY, SHIPPED, COMPLETED, CANCELLED)
 
 If `RESEND_API_KEY` is not set, emails are logged to console only (dev mode).
+// Deployment trigger: 1768916157
