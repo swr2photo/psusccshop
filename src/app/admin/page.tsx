@@ -103,11 +103,15 @@ import {
   ToggleOn,
   ToggleOff,
   ContentCopy,
+  Send,
+  Groups,
   Archive,
 } from '@mui/icons-material';
 
 import { isAdmin, isSuperAdmin, setDynamicAdminEmails, SUPER_ADMIN_EMAIL, Product, ShopConfig, SIZES } from '@/lib/config';
 import { deleteOrderAdmin, getAdminData, saveShopConfig, syncOrdersSheet, updateOrderAdmin, updateOrderStatusAPI } from '@/lib/api-client';
+import EmailManagement from '@/components/admin/EmailManagement';
+import UserLogsView from '@/components/admin/UserLogsView';
 
 // ============== TYPES ==============
 interface AdminDataResponse {
@@ -4156,10 +4160,19 @@ export default function AdminPage(): JSX.Element {
 
     const getActionTheme = (action: string) => {
       switch (action) {
-        case 'UPDATE_CONFIG': return { icon: <Settings sx={{ fontSize: 16 }} />, color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.15)' };
-        case 'UPDATE_STATUS': return { icon: <Update sx={{ fontSize: 16 }} />, color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' };
+        case 'UPDATE_CONFIG': 
+        case 'SAVE_CONFIG': return { icon: <Settings sx={{ fontSize: 16 }} />, color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.15)' };
+        case 'UPDATE_STATUS': 
+        case 'BATCH_UPDATE_STATUS': return { icon: <Update sx={{ fontSize: 16 }} />, color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' };
         case 'SEND_EMAIL': return { icon: <Email sx={{ fontSize: 16 }} />, color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' };
         case 'SUBMIT_ORDER': return { icon: <ShoppingCart sx={{ fontSize: 16 }} />, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)' };
+        case 'SYNC_FILEBASE': return { icon: <Refresh sx={{ fontSize: 16 }} />, color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.15)' };
+        case 'SYNC_SHEET': return { icon: <Description sx={{ fontSize: 16 }} />, color: '#22c55e', bg: 'rgba(34, 197, 94, 0.15)' };
+        case 'EDIT_ORDER': return { icon: <Edit sx={{ fontSize: 16 }} />, color: '#eab308', bg: 'rgba(234, 179, 8, 0.15)' };
+        case 'DELETE_ORDER': 
+        case 'CANCEL_ORDER': return { icon: <Delete sx={{ fontSize: 16 }} />, color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' };
+        case 'CREATE_PRODUCT':
+        case 'EDIT_PRODUCT': return { icon: <Inventory sx={{ fontSize: 16 }} />, color: '#f472b6', bg: 'rgba(244, 114, 182, 0.15)' };
         default: return { icon: <Description sx={{ fontSize: 16 }} />, color: '#64748b', bg: 'rgba(100, 116, 139, 0.15)' };
       }
     };
@@ -4187,10 +4200,16 @@ export default function AdminPage(): JSX.Element {
         }}>
           {[
             { value: 'ALL', label: 'ทั้งหมด', icon: <Description sx={{ fontSize: 16 }} /> },
-            { value: 'UPDATE_CONFIG', label: 'ตั้งค่า', icon: <Settings sx={{ fontSize: 16 }} /> },
-            { value: 'UPDATE_STATUS', label: 'สถานะ', icon: <Update sx={{ fontSize: 16 }} /> },
-            { value: 'SEND_EMAIL', label: 'อีเมล', icon: <Email sx={{ fontSize: 16 }} /> },
-            { value: 'SUBMIT_ORDER', label: 'ออเดอร์ใหม่', icon: <ShoppingCart sx={{ fontSize: 16 }} /> },
+            { value: 'SAVE_CONFIG', label: 'ตั้งค่า', icon: <Settings sx={{ fontSize: 16 }} /> },
+            { value: 'UPDATE_STATUS', label: 'เปลี่ยนสถานะ', icon: <Update sx={{ fontSize: 16 }} /> },
+            { value: 'BATCH_UPDATE_STATUS', label: 'เปลี่ยนหลายรายการ', icon: <Update sx={{ fontSize: 16 }} /> },
+            { value: 'EDIT_ORDER', label: 'แก้ไขออเดอร์', icon: <Edit sx={{ fontSize: 16 }} /> },
+            { value: 'DELETE_ORDER', label: 'ลบออเดอร์', icon: <Delete sx={{ fontSize: 16 }} /> },
+            { value: 'CANCEL_ORDER', label: 'ยกเลิกออเดอร์', icon: <Delete sx={{ fontSize: 16 }} /> },
+            { value: 'SYNC_FILEBASE', label: 'ซิงก์ข้อมูล', icon: <Refresh sx={{ fontSize: 16 }} /> },
+            { value: 'SYNC_SHEET', label: 'ซิงก์ Sheet', icon: <Description sx={{ fontSize: 16 }} /> },
+            { value: 'CREATE_PRODUCT', label: 'เพิ่มสินค้า', icon: <Inventory sx={{ fontSize: 16 }} /> },
+            { value: 'EDIT_PRODUCT', label: 'แก้ไขสินค้า', icon: <Inventory sx={{ fontSize: 16 }} /> },
           ].map(filter => {
             const isActive = logFilter === filter.value;
             const count = filter.value === 'ALL' ? logs.length : logs.filter(l => l[2] === filter.value).length;
@@ -4911,7 +4930,9 @@ export default function AdminPage(): JSX.Element {
               { icon: <Receipt sx={{ fontSize: 20 }} />, label: 'ออเดอร์', idx: 2, color: '#34d399', badge: pendingCount },
               { icon: <NotificationsActive sx={{ fontSize: 20 }} />, label: 'ประกาศ', idx: 3, color: '#f472b6' },
               { icon: <Settings sx={{ fontSize: 20 }} />, label: 'ตั้งค่าร้าน', idx: 4, color: '#60a5fa' },
-              { icon: <History sx={{ fontSize: 20 }} />, label: 'ประวัติการใช้งาน', idx: 5, color: '#94a3b8' },
+              { icon: <Send sx={{ fontSize: 20 }} />, label: 'ส่งอีเมล', idx: 5, color: '#10b981' },
+              { icon: <Groups sx={{ fontSize: 20 }} />, label: 'ประวัติผู้ใช้', idx: 6, color: '#f97316' },
+              { icon: <History sx={{ fontSize: 20 }} />, label: 'ประวัติระบบ', idx: 7, color: '#94a3b8' },
             ].map((item) => {
               const isActive = activeTab === item.idx;
               return (
@@ -5068,7 +5089,9 @@ export default function AdminPage(): JSX.Element {
               onImageUpload={handleAnnouncementImageUpload}
             />
           )}
-          {activeTab === 5 && <LogsView />}
+          {activeTab === 5 && <EmailManagement showToast={showToast} />}
+          {activeTab === 6 && <UserLogsView showToast={showToast} />}
+          {activeTab === 7 && <LogsView />}
         </Box>
       </Box>
 

@@ -6,6 +6,7 @@ import { triggerSheetSync } from '@/lib/sheet-sync';
 import { sanitizeOrderForUser, sanitizeOrdersForUser, sanitizeObjectUtf8, sanitizeUtf8Input } from '@/lib/sanitize';
 import { verifyTurnstileToken, getClientIP } from '@/lib/cloudflare';
 import { checkCombinedRateLimit, RATE_LIMITS, getRateLimitHeaders } from '@/lib/rate-limit';
+import { sendOrderConfirmationEmail } from '@/lib/email';
 
 const orderKey = (ref: string, date: Date) => {
   const yyyy = date.getFullYear();
@@ -194,6 +195,17 @@ export async function POST(req: NextRequest) {
     if (order.customerEmail) {
       await upsertIndexEntry(order.customerEmail, order);
     }
+    
+    // Send order confirmation email
+    if (order.customerEmail) {
+      try {
+        await sendOrderConfirmationEmail(order);
+      } catch (emailError) {
+        console.error('[Orders API] Failed to send confirmation email:', emailError);
+        // Don't fail the request if email fails
+      }
+    }
+    
     // Auto sync to Google Sheets
     triggerSheetSync().catch(() => {});
     return NextResponse.json(

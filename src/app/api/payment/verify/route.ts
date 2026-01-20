@@ -3,6 +3,7 @@ import { listKeys, getJson, putJson } from '@/lib/filebase';
 import { calculateOrderTotal } from '@/lib/payment-utils';
 import { requireAuth, isResourceOwner, isAdminEmail } from '@/lib/auth';
 import { triggerSheetSync } from '@/lib/sheet-sync';
+import { sendPaymentReceivedEmail } from '@/lib/email';
 import crypto from 'crypto';
 
 // ============== EMAIL INDEX HELPER ==============
@@ -323,6 +324,16 @@ export async function POST(req: NextRequest) {
     }
 
     console.log(`[payment-verify] ✅ Order ${ref} marked as PAID and index updated`);
+
+    // ✅ Send payment received email
+    if (customerEmail) {
+      try {
+        await sendPaymentReceivedEmail(updated);
+      } catch (emailError) {
+        console.error('[payment-verify] Failed to send payment email:', emailError);
+        // Don't fail if email fails
+      }
+    }
 
     // ✅ Auto sync to Google Sheets
     triggerSheetSync().catch(() => {});
