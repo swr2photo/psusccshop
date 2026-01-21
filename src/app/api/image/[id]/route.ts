@@ -1,58 +1,91 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { smartDecryptUrl, encryptImageUrl } from '@/lib/image-crypto';
+import { S3Client, GetObjectCommand, PutObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { Readable } from 'stream';
+import crypto from 'crypto';
 
 // Ensure Node runtime for fetch
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// ==================== IMAGE URL ENCODING ====================
+// ==================== S3 CLIENT FOR IMAGE CACHE ====================
+
+const endpoint = process.env.FILEBASE_ENDPOINT || 'https://s3.filebase.com';
+const region = process.env.FILEBASE_REGION || 'us-east-1';
+const bucket = process.env.FILEBASE_BUCKET;
+const accessKeyId = process.env.FILEBASE_ACCESS_KEY;
+const secretAccessKey = process.env.FILEBASE_SECRET_KEY;
+
+const s3Client = new S3Client({
+  region,
+  endpoint,
+  credentials: accessKeyId && secretAccessKey ? { accessKeyId, secretAccessKey } : undefined,
+});
+
+// ==================== IMAGE CACHE FUNCTIONS ====================
 
 /**
- * Secret key for encoding/decoding URLs
- * ใช้ XOR encryption อย่างง่ายเพื่อซ่อน URL จริง
+ * Generate cache key from URL hash
  */
-const SECRET_KEY = process.env.IMAGE_PROXY_SECRET || 'psusccshop-image-proxy-2026';
-
-/**
- * Encode URL to safe base64 ID
- */
-export function encodeImageUrl(url: string): string {
-  if (!url) return '';
-  
-  // XOR with secret key
-  const encoded = Buffer.from(url).map((byte, i) => 
-    byte ^ SECRET_KEY.charCodeAt(i % SECRET_KEY.length)
-  );
-  
-  // Convert to URL-safe base64
-  return Buffer.from(encoded)
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '');
+function getCacheKey(url: string): string {
+  const hash = crypto.createHash('sha256').update(url).digest('hex');
+  return `image-cache/${hash.substring(0, 2)}/${hash}`;
 }
 
 /**
- * Decode base64 ID back to URL
+ * Check if image exists in cache
  */
-function decodeImageUrl(id: string): string | null {
-  if (!id) return null;
+async function getFromCache(cacheKey: string): Promise<{ buffer: Buffer; contentType: string } | null> {
+  if (!bucket) return null;
   
   try {
-    // Restore base64 padding
-    let base64 = id.replace(/-/g, '+').replace(/_/g, '/');
-    const padding = (4 - (base64.length % 4)) % 4;
-    base64 += '='.repeat(padding);
+    const response = await s3Client.send(new GetObjectCommand({
+      Bucket: bucket,
+      Key: cacheKey,
+    }));
     
-    // Decode and XOR with secret key
-    const decoded = Buffer.from(base64, 'base64').map((byte, i) => 
-      byte ^ SECRET_KEY.charCodeAt(i % SECRET_KEY.length)
-    );
+    if (!response.Body) return null;
     
-    return Buffer.from(decoded).toString('utf-8');
-  } catch {
+    const chunks: Buffer[] = [];
+    for await (const chunk of response.Body as Readable) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    
+    return {
+      buffer: Buffer.concat(chunks),
+      contentType: response.ContentType || 'image/jpeg',
+    };
+  } catch (error: any) {
+    if (error?.$metadata?.httpStatusCode === 404) return null;
     return null;
   }
 }
+
+/**
+ * Save image to cache for permanent storage
+ */
+async function saveToCache(cacheKey: string, buffer: Buffer, contentType: string): Promise<void> {
+  if (!bucket) return;
+  
+  try {
+    await s3Client.send(new PutObjectCommand({
+      Bucket: bucket,
+      Key: cacheKey,
+      Body: buffer,
+      ContentType: contentType,
+      // Cache metadata
+      Metadata: {
+        'cached-at': new Date().toISOString(),
+        'original-size': buffer.length.toString(),
+      },
+    }));
+  } catch (error) {
+    console.error('[Image Cache] Failed to save:', error);
+  }
+}
+
+// Re-export encodeImageUrl for backward compatibility
+export { encryptImageUrl as encodeImageUrl };
 
 // ==================== ALLOWED DOMAINS ====================
 
@@ -128,8 +161,8 @@ export async function GET(
       }
     }
 
-    // Decode the image URL
-    const imageUrl = decodeImageUrl(id);
+    // Decrypt the image URL using smart decryption (AES or legacy XOR)
+    const imageUrl = smartDecryptUrl(id);
     
     if (!imageUrl) {
       return NextResponse.json({ error: 'Invalid image ID' }, { status: 400 });
@@ -141,7 +174,24 @@ export async function GET(
       return NextResponse.json({ error: 'URL not allowed' }, { status: 403 });
     }
 
-    // Fetch the image
+    // Generate cache key
+    const cacheKey = getCacheKey(imageUrl);
+    
+    // ✅ Check cache first - permanent storage
+    const cached = await getFromCache(cacheKey);
+    if (cached) {
+      return new NextResponse(new Uint8Array(cached.buffer), {
+        status: 200,
+        headers: {
+          'Content-Type': cached.contentType,
+          'Cache-Control': 'public, max-age=31536000, immutable', // 1 year, immutable
+          'X-Content-Type-Options': 'nosniff',
+          'X-Cache': 'HIT',
+        },
+      });
+    }
+
+    // Fetch the image from origin
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
@@ -149,7 +199,7 @@ export async function GET(
       signal: controller.signal,
       headers: {
         'Accept': 'image/*',
-        'User-Agent': 'PSUSCCSHOP-ImageProxy/1.0',
+        'User-Agent': 'PSUSCCSHOP-ImageProxy/2.0',
       },
     });
 
@@ -169,15 +219,19 @@ export async function GET(
     }
 
     // Get image data
-    const imageBuffer = await response.arrayBuffer();
+    const imageBuffer = Buffer.from(await response.arrayBuffer());
 
-    // Return image with cache headers
-    return new NextResponse(imageBuffer, {
+    // ✅ Save to cache for permanent storage (async, don't wait)
+    saveToCache(cacheKey, imageBuffer, contentType).catch(() => {});
+
+    // Return image with long cache headers
+    return new NextResponse(new Uint8Array(imageBuffer), {
       status: 200,
       headers: {
         'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=86400, s-maxage=604800', // 1 day client, 7 days CDN
+        'Cache-Control': 'public, max-age=31536000, immutable', // 1 year, immutable
         'X-Content-Type-Options': 'nosniff',
+        'X-Cache': 'MISS',
       },
     });
 

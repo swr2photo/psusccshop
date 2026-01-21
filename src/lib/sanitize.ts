@@ -2,18 +2,15 @@
 // Data sanitization utilities for API responses
 
 import { ShopConfig, Product } from './config';
+import { encryptImageUrl } from './image-crypto';
 
 // ==================== IMAGE URL PROXY ====================
 
 /**
- * Secret key for encoding/decoding image URLs
- * ใช้ XOR encryption อย่างง่ายเพื่อซ่อน URL จริง
- */
-const IMAGE_PROXY_SECRET = process.env.IMAGE_PROXY_SECRET || 'psusccshop-image-proxy-2026';
-
-/**
- * Encode real image URL to proxy URL
- * แปลง https://ipfs.filebase.io/... → /api/image/[encoded-id]
+ * Encode real image URL to proxy URL using AES-256-GCM encryption
+ * แปลง https://ipfs.filebase.io/... → /api/image/[encrypted-id]
+ * 
+ * Uses advanced encryption from image-crypto module
  */
 export function encodeImageUrl(url: string | undefined | null): string {
   if (!url) return '';
@@ -24,19 +21,8 @@ export function encodeImageUrl(url: string | undefined | null): string {
   // Skip data URLs
   if (url.startsWith('data:')) return url;
   
-  // XOR with secret key
-  const encoded = Buffer.from(url).map((byte, i) => 
-    byte ^ IMAGE_PROXY_SECRET.charCodeAt(i % IMAGE_PROXY_SECRET.length)
-  );
-  
-  // Convert to URL-safe base64
-  const base64Id = Buffer.from(encoded)
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '');
-  
-  return `/api/image/${base64Id}`;
+  // Use AES-256-GCM encryption
+  return encryptImageUrl(url);
 }
 
 /**
