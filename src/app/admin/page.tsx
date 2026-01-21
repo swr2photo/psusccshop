@@ -529,6 +529,7 @@ const SettingsView = React.memo(function SettingsView({
     canManageAnnouncement: true, // Default: admins can manage announcements
     canManageOrders: true,
     canManageProducts: true,
+    canManagePickup: false,
   };
 
   // Super admin has all permissions
@@ -1015,6 +1016,7 @@ const SettingsView = React.memo(function SettingsView({
                     canManageAnnouncement: true,
                     canManageOrders: true,
                     canManageProducts: true,
+                    canManagePickup: false,
                   };
                   
                   const togglePermission = (key: string, value: boolean) => {
@@ -1096,6 +1098,7 @@ const SettingsView = React.memo(function SettingsView({
                             { key: 'canManageAnnouncement', label: '📢 ประกาศ', color: '#f59e0b' },
                             { key: 'canManageOrders', label: '📦 จัดการออเดอร์', color: '#8b5cf6' },
                             { key: 'canManageProducts', label: '🛍️ จัดการสินค้า', color: '#ec4899' },
+                            { key: 'canManagePickup', label: '📍 จัดการรับสินค้า', color: '#06b6d4' },
                           ].map(perm => (
                             <Box
                               key={perm.key}
@@ -2171,6 +2174,28 @@ export default function AdminPage(): JSX.Element {
     const dynamicAdmins = (config.adminEmails || []).map(e => e.trim().toLowerCase());
     return dynamicAdmins.includes(normalized);
   }, [session?.user?.email, config.adminEmails]);
+
+  // Calculate admin permissions
+  const userEmail = session?.user?.email?.toLowerCase() ?? '';
+  const isSuperAdminUser = isSuperAdmin(session?.user?.email ?? null);
+  const adminPerms = useMemo(() => {
+    return config.adminPermissions?.[userEmail] ?? {
+      canManageShop: false,
+      canManageSheet: false,
+      canManageAnnouncement: true,
+      canManageOrders: true,
+      canManageProducts: true,
+      canManagePickup: false,
+    };
+  }, [config.adminPermissions, userEmail]);
+
+  // Permission flags - super admin has all permissions
+  const canManageShop = isSuperAdminUser || adminPerms.canManageShop;
+  const canManageSheet = isSuperAdminUser || adminPerms.canManageSheet;
+  const canManageAnnouncement = isSuperAdminUser || adminPerms.canManageAnnouncement;
+  const canManageOrders = isSuperAdminUser || adminPerms.canManageOrders;
+  const canManageProducts = isSuperAdminUser || adminPerms.canManageProducts;
+  const canManagePickup = isSuperAdminUser || adminPerms.canManagePickup;
   
   const isSessionLoading = status === 'loading';
   const isDataLoading = loading && !hasInitialData;
@@ -2752,6 +2777,41 @@ export default function AdminPage(): JSX.Element {
       });
     }
   }, [config, settingsHasChanges]);
+
+  // ✅ No Permission View
+  const NoPermissionView = ({ permission }: { permission: string }): JSX.Element => (
+    <Box sx={{ 
+      display: 'flex', 
+      flexDirection: 'column', 
+      alignItems: 'center', 
+      justifyContent: 'center',
+      minHeight: 300,
+      textAlign: 'center',
+      p: 4,
+    }}>
+      <Box sx={{
+        width: 80,
+        height: 80,
+        borderRadius: '20px',
+        bgcolor: 'rgba(239,68,68,0.1)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        mb: 3,
+      }}>
+        <Lock sx={{ fontSize: 40, color: '#ef4444' }} />
+      </Box>
+      <Typography sx={{ fontSize: '1.2rem', fontWeight: 700, color: '#f1f5f9', mb: 1 }}>
+        ไม่มีสิทธิ์เข้าถึง
+      </Typography>
+      <Typography sx={{ fontSize: '0.9rem', color: '#94a3b8', mb: 2 }}>
+        คุณไม่มีสิทธิ์ในการ{permission}
+      </Typography>
+      <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>
+        กรุณาติดต่อ Super Admin เพื่อขอสิทธิ์เพิ่มเติม
+      </Typography>
+    </Box>
+  );
 
   // ✅ View Components
   const DashboardView = (): JSX.Element => {
@@ -5999,16 +6059,16 @@ export default function AdminPage(): JSX.Element {
             
             {/* Navigation Items */}
             {[
-              { icon: <Dashboard sx={{ fontSize: 20 }} />, label: 'แดชบอร์ด', idx: 0, color: '#a5b4fc' },
-              { icon: <ShoppingCart sx={{ fontSize: 20 }} />, label: 'จัดการสินค้า', idx: 1, color: '#fbbf24' },
-              { icon: <Receipt sx={{ fontSize: 20 }} />, label: 'ออเดอร์', idx: 2, color: '#34d399', badge: pendingCount },
-              { icon: <QrCodeScanner sx={{ fontSize: 20 }} />, label: 'รับสินค้า', idx: 3, color: '#06b6d4' },
-              { icon: <NotificationsActive sx={{ fontSize: 20 }} />, label: 'ประกาศ', idx: 4, color: '#f472b6' },
-              { icon: <Settings sx={{ fontSize: 20 }} />, label: 'ตั้งค่าร้าน', idx: 5, color: '#60a5fa' },
-              { icon: <Send sx={{ fontSize: 20 }} />, label: 'ส่งอีเมล', idx: 6, color: '#10b981' },
-              { icon: <Groups sx={{ fontSize: 20 }} />, label: 'ประวัติผู้ใช้', idx: 7, color: '#f97316' },
-              { icon: <History sx={{ fontSize: 20 }} />, label: 'ประวัติระบบ', idx: 8, color: '#94a3b8' },
-            ].map((item) => {
+              { icon: <Dashboard sx={{ fontSize: 20 }} />, label: 'แดชบอร์ด', idx: 0, color: '#a5b4fc', show: true },
+              { icon: <ShoppingCart sx={{ fontSize: 20 }} />, label: 'จัดการสินค้า', idx: 1, color: '#fbbf24', show: canManageProducts },
+              { icon: <Receipt sx={{ fontSize: 20 }} />, label: 'ออเดอร์', idx: 2, color: '#34d399', badge: pendingCount, show: canManageOrders },
+              { icon: <QrCodeScanner sx={{ fontSize: 20 }} />, label: 'รับสินค้า', idx: 3, color: '#06b6d4', show: canManagePickup },
+              { icon: <NotificationsActive sx={{ fontSize: 20 }} />, label: 'ประกาศ', idx: 4, color: '#f472b6', show: canManageAnnouncement },
+              { icon: <Settings sx={{ fontSize: 20 }} />, label: 'ตั้งค่าร้าน', idx: 5, color: '#60a5fa', show: canManageShop || canManageSheet || isSuperAdminUser },
+              { icon: <Send sx={{ fontSize: 20 }} />, label: 'ส่งอีเมล', idx: 6, color: '#10b981', show: canManageOrders },
+              { icon: <Groups sx={{ fontSize: 20 }} />, label: 'ประวัติผู้ใช้', idx: 7, color: '#f97316', show: isSuperAdminUser },
+              { icon: <History sx={{ fontSize: 20 }} />, label: 'ประวัติระบบ', idx: 8, color: '#94a3b8', show: isSuperAdminUser },
+            ].filter(item => item.show).map((item) => {
               const isActive = activeTab === item.idx;
               return (
                 <Box
@@ -6126,26 +6186,34 @@ export default function AdminPage(): JSX.Element {
         }}>
           {activeTab === 0 && <DashboardView />}
           {activeTab === 1 && (
-            <ProductsView
-              config={config}
-              searchTerm={searchTerm}
-              setSearchTerm={setSearchTerm}
-              saveFullConfig={saveFullConfig}
-              showToast={showToast}
-              addLog={addLog}
-              saving={saving}
-            />
+            canManageProducts ? (
+              <ProductsView
+                config={config}
+                searchTerm={searchTerm}
+                setSearchTerm={setSearchTerm}
+                saveFullConfig={saveFullConfig}
+                showToast={showToast}
+                addLog={addLog}
+                saving={saving}
+              />
+            ) : (
+              <NoPermissionView permission="จัดการสินค้า" />
+            )
           )}
-          {activeTab === 2 && OrdersView()}
-          {activeTab === 3 && PickupView()}
+          {activeTab === 2 && (canManageOrders ? OrdersView() : <NoPermissionView permission="จัดการออเดอร์" />)}
+          {activeTab === 3 && (canManagePickup ? PickupView() : <NoPermissionView permission="จัดการรับสินค้า" />)}
           {activeTab === 4 && (
-            <AnnouncementsView
-              config={config}
-              saveConfig={saveFullConfig}
-              showToast={showToast}
-              userEmail={session?.user?.email}
-              onImageUpload={handleAnnouncementImageUpload}
-            />
+            canManageAnnouncement ? (
+              <AnnouncementsView
+                config={config}
+                saveConfig={saveFullConfig}
+                showToast={showToast}
+                userEmail={session?.user?.email}
+                onImageUpload={handleAnnouncementImageUpload}
+              />
+            ) : (
+              <NoPermissionView permission="จัดการประกาศ" />
+            )
           )}
           {activeTab === 5 && (
             <SettingsView
@@ -6165,9 +6233,9 @@ export default function AdminPage(): JSX.Element {
               onImageUpload={handleAnnouncementImageUpload}
             />
           )}
-          {activeTab === 6 && <EmailManagement showToast={showToast} />}
-          {activeTab === 7 && <UserLogsView showToast={showToast} />}
-          {activeTab === 8 && <LogsView />}
+          {activeTab === 6 && (canManageOrders ? <EmailManagement showToast={showToast} /> : <NoPermissionView permission="ส่งอีเมล" />)}
+          {activeTab === 7 && (isSuperAdminUser ? <UserLogsView showToast={showToast} /> : <NoPermissionView permission="ดูประวัติผู้ใช้" />)}
+          {activeTab === 8 && (isSuperAdminUser ? <LogsView /> : <NoPermissionView permission="ดูประวัติระบบ" />)}
         </Box>
       </Box>
 
