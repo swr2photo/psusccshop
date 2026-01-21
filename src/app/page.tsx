@@ -3270,7 +3270,7 @@ export default function HomePage() {
                           sx={{
                             height: '100%',
                             display: 'flex',
-                            flexDirection: { xs: 'row', sm: 'column' }, // Horizontal on mobile
+                            flexDirection: 'column', // Always vertical
                             cursor: isProductAvailable ? 'pointer' : 'default',
                             borderRadius: '20px',
                             overflow: 'hidden',
@@ -3289,8 +3289,7 @@ export default function HomePage() {
                           {/* Product Image Area */}
                           <Box sx={{
                             position: 'relative',
-                            width: { xs: 140, sm: '100%' }, // Fixed width on mobile
-                            minWidth: { xs: 140, sm: 'auto' },
+                            width: '100%',
                             aspectRatio: '1 / 1',
                             bgcolor: '#0b1224',
                             overflow: 'hidden',
@@ -3440,14 +3439,13 @@ export default function HomePage() {
 
                           {/* Product Info */}
                           <Box sx={{ 
-                            p: { xs: 1.5, sm: 2 }, 
+                            p: 2, 
                             flex: 1, 
                             display: 'flex', 
                             flexDirection: 'column',
-                            justifyContent: { xs: 'center', sm: 'flex-start' },
                           }}>
                             <Typography sx={{ 
-                              fontSize: { xs: '0.95rem', sm: '0.95rem' }, 
+                              fontSize: '0.95rem', 
                               fontWeight: 700, 
                               color: isProductClosed ? '#94a3b8' : '#f1f5f9',
                               mb: 0.5,
@@ -3463,12 +3461,12 @@ export default function HomePage() {
                             
                             {/* Description - Show more lines */}
                             <Typography sx={{ 
-                              fontSize: { xs: '0.75rem', sm: '0.75rem' }, 
+                              fontSize: '0.75rem', 
                               color: '#94a3b8',
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
                               display: '-webkit-box',
-                              WebkitLineClamp: { xs: 2, sm: 3 },
+                              WebkitLineClamp: 2,
                               WebkitBoxOrient: 'vertical',
                               lineHeight: 1.4,
                               mb: 1,

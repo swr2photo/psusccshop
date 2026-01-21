@@ -6597,7 +6597,7 @@ const ProductCardItem = ({ product, onEdit, onDelete, onToggle, onPickupSetting 
         <Typography variant="h6" color="success.main" sx={{ fontWeight: 'bold', mb: 2 }}>
           ฿{product.basePrice}
         </Typography>
-        <Stack direction="row" spacing={1}>
+        <Stack direction="column" spacing={1}>
           <Button
             size="small"
             variant="outlined"
@@ -6607,7 +6607,7 @@ const ProductCardItem = ({ product, onEdit, onDelete, onToggle, onPickupSetting 
             startIcon={<EditIconMUI />}
             sx={{ borderColor: ADMIN_THEME.border, color: ADMIN_THEME.text, '&:hover': { borderColor: '#6366f1', background: 'rgba(99,102,241,0.08)' } }}
           >
-            Edit
+            แก้ไข
           </Button>
           <Button
             size="small"
@@ -6618,7 +6618,7 @@ const ProductCardItem = ({ product, onEdit, onDelete, onToggle, onPickupSetting 
             startIcon={<Delete />}
             sx={{ borderColor: 'rgba(239,68,68,0.45)' }}
           >
-            Delete
+            ลบ
           </Button>
         </Stack>
         {/* Quick Toggle Switch */}
