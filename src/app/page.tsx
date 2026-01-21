@@ -3252,7 +3252,7 @@ export default function HomePage() {
                       const isProductClosed = productStatus !== 'OPEN'; // Product is closed/coming soon/ended
                       
                       return (
-                      <Grid size={{ xs: 6, sm: 6, md: 4, lg: 3 }} key={product.id}>
+                      <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={product.id}>
                         <Box
                           onClick={() => {
                             if (!isShopOpen) {
@@ -3524,19 +3524,6 @@ export default function HomePage() {
                                 </Box>
                               )}
                             </Box>
-
-                            {/* Available Sizes */}
-                            {product.sizePricing && Object.keys(product.sizePricing).length > 0 && (
-                              <Box sx={{ mb: 1 }}>
-                                <Typography sx={{ 
-                                  fontSize: '0.65rem', 
-                                  color: '#64748b', 
-                                  mb: 0.3,
-                                }}>
-                                  ไซส์: {Object.keys(product.sizePricing).join(', ')}
-                                </Typography>
-                              </Box>
-                            )}
                             
                             {/* Status/Action Button */}
                             <Box sx={{ mt: 'auto' }}>
