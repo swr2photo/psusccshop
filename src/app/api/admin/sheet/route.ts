@@ -67,7 +67,7 @@ const buildRows = (orders: any[], baseUrl: string) => {
 // Flatten items for factory export + size summary - Beautiful format for production
 const buildFactoryExport = (orders: any[]) => {
   // Define size order for sorting
-  const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', 'XXL', 'XXXL'];
+  const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL', '7XL', '8XL', '9XL', '10XL'];
   const getSizeIndex = (size: string) => {
     const idx = sizeOrder.findIndex(s => size?.toUpperCase()?.includes(s));
     return idx === -1 ? 999 : idx;

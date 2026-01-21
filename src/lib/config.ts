@@ -190,7 +190,7 @@ export const isAdmin = (email: string | null): boolean => {
   return false;
 };
 
-export const SIZES = ['S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL', '7XL'];
+export const SIZES = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL', '7XL', '8XL', '9XL', '10XL'];
 export const ORDER_STATUSES = ['PENDING', 'PAID', 'READY', 'SHIPPED', 'COMPLETED', 'CANCELLED'];
 export const PRODUCT_TYPES = ['JERSEY', 'CREW', 'OTHER'];
 export const ANNOUNCEMENT_COLORS = ['blue', 'red', 'green', 'orange'];

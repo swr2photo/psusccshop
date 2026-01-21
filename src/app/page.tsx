@@ -148,8 +148,9 @@ const TYPE_LABELS: Record<string, string> = {
   OTHER: 'อื่นๆ',
 };
 
-const SIZE_ORDER = ['S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL', '7XL'] as const;
+const SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL', '7XL', '8XL', '9XL', '10XL'] as const;
 const SIZE_MEASUREMENTS: Record<(typeof SIZE_ORDER)[number], { chest: number; length: number }> = {
+  XS: { chest: 34, length: 24 },
   S: { chest: 36, length: 25 },
   M: { chest: 38, length: 26 },
   L: { chest: 40, length: 27 },
@@ -160,6 +161,9 @@ const SIZE_MEASUREMENTS: Record<(typeof SIZE_ORDER)[number], { chest: number; le
   '5XL': { chest: 50, length: 32 },
   '6XL': { chest: 52, length: 33 },
   '7XL': { chest: 54, length: 34 },
+  '8XL': { chest: 56, length: 35 },
+  '9XL': { chest: 58, length: 36 },
+  '10XL': { chest: 60, length: 37 },
 };
 
 const ANNOUNCEMENT_COLOR_MAP: Record<string, string> = {
@@ -4052,7 +4056,7 @@ export default function HomePage() {
       >
         {editingCartItem && (() => {
           const product = config?.products?.find(p => p.id === editingCartItem.productId);
-          const availableSizes = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL'];
+          const availableSizes = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL', '7XL', '8XL', '9XL', '10XL'];
           const displaySizes = product?.sizePricing ? Object.keys(product.sizePricing) : availableSizes;
           return (
             <>
