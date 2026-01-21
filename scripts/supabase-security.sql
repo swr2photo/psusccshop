@@ -108,7 +108,8 @@ RETURNS BOOLEAN AS $$
 BEGIN
   RETURN current_setting('request.jwt.claims', true)::json->>'role' = 'service_role';
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = '';
 
 -- Function to get current user email hash (for future use with Supabase Auth)
 CREATE OR REPLACE FUNCTION get_user_email_hash()
@@ -122,7 +123,8 @@ BEGIN
   END IF;
   RETURN encode(digest(lower(trim(user_email)), 'sha256'), 'hex');
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = '';
 
 -- ==================== AUDIT LOG TABLE ====================
 -- สำหรับบันทึก security events
@@ -162,24 +164,25 @@ BEGIN
   cutoff_date := NOW() - (retention_days || ' days')::INTERVAL;
   
   -- Delete old cancelled orders (keep completed orders longer)
-  DELETE FROM orders 
+  DELETE FROM public.orders 
   WHERE status = 'CANCELLED' 
   AND created_at < cutoff_date;
   GET DIAGNOSTICS orders_deleted = ROW_COUNT;
   
   -- Delete old email logs
-  DELETE FROM email_logs 
+  DELETE FROM public.email_logs 
   WHERE created_at < cutoff_date;
   GET DIAGNOSTICS logs_deleted = ROW_COUNT;
   
   -- Delete old audit logs (keep 2 years)
-  DELETE FROM security_audit_log 
+  DELETE FROM public.security_audit_log 
   WHERE created_at < (NOW() - INTERVAL '730 days');
   GET DIAGNOSTICS audit_deleted = ROW_COUNT;
   
   RETURN QUERY SELECT orders_deleted, logs_deleted, audit_deleted;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = '';
 
 -- ==================== COMMENTS ====================
 COMMENT ON TABLE security_audit_log IS 'Security audit trail for compliance and monitoring';

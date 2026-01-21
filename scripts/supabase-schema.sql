@@ -165,7 +165,8 @@ BEGIN
   NEW.updated_at = NOW();
   RETURN NEW;
 END;
-$$ language 'plpgsql';
+$$ LANGUAGE plpgsql
+SET search_path = '';
 
 -- Apply triggers
 DROP TRIGGER IF EXISTS update_orders_updated_at ON orders;
@@ -271,8 +272,9 @@ ON CONFLICT (key) DO NOTHING;
 
 -- ==================== USEFUL VIEWS ====================
 
--- Orders summary view
-CREATE OR REPLACE VIEW orders_summary AS
+-- Orders summary view (uses invoker's permissions for RLS compliance)
+CREATE OR REPLACE VIEW orders_summary 
+WITH (security_invoker = on) AS
 SELECT 
   date_trunc('day', created_at) as date,
   status,
@@ -282,8 +284,9 @@ FROM orders
 GROUP BY date_trunc('day', created_at), status
 ORDER BY date DESC;
 
--- Orders by status view
-CREATE OR REPLACE VIEW orders_by_status AS
+-- Orders by status view (uses invoker's permissions for RLS compliance)
+CREATE OR REPLACE VIEW orders_by_status 
+WITH (security_invoker = on) AS
 SELECT 
   status,
   COUNT(*) as count,
