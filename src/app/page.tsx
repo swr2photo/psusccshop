@@ -622,7 +622,22 @@ export default function HomePage() {
     if (selectedProduct) setActiveImageIndex(0);
   }, [selectedProduct]);
 
-  // 🔄 Realtime-ish updates: background polling + visibility/focus refresh
+  // � Auto-close product dialog when shop becomes closed
+  useEffect(() => {
+    if (!isShopOpen && productDialogOpen) {
+      setProductDialogOpen(false);
+      setSelectedProduct(null);
+      setProductOptions({ size: '', quantity: 1, customName: '', customNumber: '', isLongSleeve: false });
+      showToast('warning', 'ร้านค้าปิดชั่วคราว ไม่สามารถสั่งซื้อได้');
+    }
+    // Also close order dialog if shop is closed
+    if (!isShopOpen && showOrderDialog) {
+      setShowOrderDialog(false);
+      showToast('warning', 'ร้านค้าปิดชั่วคราว ไม่สามารถสั่งซื้อได้');
+    }
+  }, [isShopOpen, productDialogOpen, showOrderDialog]);
+
+  // �🔄 Realtime-ish updates: background polling + visibility/focus refresh
   useEffect(() => {
     const intervalMs = 12000; // 12s polling for fresher catalog
     configPollTimer.current = setInterval(() => {
@@ -732,6 +747,12 @@ export default function HomePage() {
   };
 
   const buildCartItem = (): CartItem | null => {
+    // Block cart operations when shop is closed
+    if (!isShopOpen) {
+      showToast('warning', 'ร้านค้าปิดชั่วคราว ไม่สามารถสั่งซื้อได้');
+      return null;
+    }
+    
     if (!selectedProduct || !productOptions.size) {
       // Scroll to size selector and show visual feedback
       sizeSelectorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1839,6 +1860,11 @@ export default function HomePage() {
   }, [orderData]);
 
   const requireProfileBeforeCheckout = () => {
+    // Block checkout if shop is closed
+    if (!isShopOpen) {
+      showToast('warning', 'ร้านค้าปิดชั่วคราว ไม่สามารถสั่งซื้อได้');
+      return false;
+    }
     if (!profileComplete) {
       showToast('warning', 'กรุณาบันทึกโปรไฟล์ก่อนชำระเงิน');
       setShowProfileModal(true);
@@ -1849,6 +1875,13 @@ export default function HomePage() {
   };
 
   const submitOrder = async () => {
+    // Block submission if shop is closed
+    if (!isShopOpen) {
+      showToast('warning', 'ร้านค้าปิดชั่วคราว ไม่สามารถสั่งซื้อได้');
+      setShowOrderDialog(false);
+      return;
+    }
+    
     if (!profileComplete) {
       showToast('warning', 'กรุณาบันทึกโปรไฟล์ให้ครบก่อนยืนยันคำสั่งซื้อ');
       setShowProfileModal(true);
