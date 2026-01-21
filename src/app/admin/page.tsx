@@ -6,6 +6,7 @@ import { useSession, signIn, signOut } from 'next-auth/react';
 import { Scanner } from '@yudiel/react-qr-scanner';
 import { useRouter } from 'next/navigation';
 import Swal from 'sweetalert2';
+import { useRealtimeAdminOrders } from '@/hooks/useRealtimeOrders';
 import {
   Box,
   AppBar,
@@ -2752,10 +2753,74 @@ export default function AdminPage(): JSX.Element {
 
   // 🔁 Lightweight polling for fresher data
   // ⚠️ Pause polling when order editor is open to prevent flickering
+  // ℹ️ Now uses Supabase Realtime as primary, polling as fallback
+  
+  // Handle realtime order changes
+  const handleRealtimeOrderChange = useCallback((change: { type: string; order: any; oldOrder?: any }) => {
+    console.log('[Admin Realtime] Order change:', change.type, change.order?.ref);
+    
+    if (change.type === 'UPDATE' && change.order) {
+      setOrders((prev) => {
+        const existingIndex = prev.findIndex((o) => o.ref === change.order.ref);
+        if (existingIndex >= 0) {
+          const updated = [...prev];
+          // Convert DB format to AdminOrder format
+          updated[existingIndex] = {
+            ...updated[existingIndex],
+            status: change.order.status,
+            amount: change.order.total_amount ?? updated[existingIndex].amount,
+            cart: change.order.cart || updated[existingIndex].cart,
+            date: change.order.date || change.order.created_at || updated[existingIndex].date,
+            slip: change.order.slip_data ?? updated[existingIndex].slip,
+          };
+          return updated;
+        }
+        return prev;
+      });
+    } else if (change.type === 'INSERT' && change.order) {
+      // Add new order to list
+      const newOrder: AdminOrder = {
+        ref: change.order.ref,
+        date: change.order.date || change.order.created_at,
+        status: change.order.status,
+        amount: change.order.total_amount ?? 0,
+        name: change.order.customer_name || '',
+        email: change.order.customer_email || '',
+        cart: change.order.cart || [],
+        slip: change.order.slip_data,
+        raw: change.order,
+      };
+      setOrders((prev) => {
+        // Check if already exists
+        if (prev.some((o) => o.ref === newOrder.ref)) return prev;
+        return [newOrder, ...prev];
+      });
+    } else if (change.type === 'DELETE' && change.oldOrder) {
+      setOrders((prev) => prev.filter((o) => o.ref !== change.oldOrder.ref));
+    }
+  }, []);
+
+  // Use realtime subscriptions for admin
+  const { isConnected: realtimeConnected } = useRealtimeAdminOrders(handleRealtimeOrderChange);
+
   useEffect(() => {
     if (status !== 'authenticated') return;
     if (orderEditor.open) return; // Don't poll while editing
-    
+
+    // If realtime is connected, use longer polling interval as fallback
+    if (realtimeConnected) {
+      // Still poll occasionally to catch any missed updates
+      const intervalMs = 60000; // 60s fallback polling when realtime is active
+      const tick = async () => {
+        await fetchData({ silent: true });
+      };
+      pollingRef.current = setInterval(tick, intervalMs);
+      return () => {
+        if (pollingRef.current) clearInterval(pollingRef.current);
+      };
+    }
+
+    // Fallback: regular polling when realtime is not available
     const intervalMs = 10000; // 10s polling
     const tick = async () => {
       await fetchData({ silent: true });
@@ -2765,7 +2830,7 @@ export default function AdminPage(): JSX.Element {
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
-  }, [status, fetchData, orderEditor.open]);
+  }, [status, fetchData, orderEditor.open, realtimeConnected]);
 
   // Sync settings local config with main config (only when no unsaved changes)
   useEffect(() => {

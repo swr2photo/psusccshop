@@ -79,6 +79,7 @@ import TurnstileWidget from '@/components/TurnstileWidget';
 import { ShopStatusBanner, getProductStatus, getShopStatus, SHOP_STATUS_CONFIG, type ShopStatusType } from '@/components/ShopStatusCard';
 import OptimizedImage, { preloadImages, OptimizedBackground } from '@/components/OptimizedImage';
 import { Product, ShopConfig } from '@/lib/config';
+import { useRealtimeOrders } from '@/hooks/useRealtimeOrders';
 import {
   cancelOrder,
   getCart,
@@ -659,26 +660,100 @@ export default function HomePage() {
     }
   }, [isShopOpen, productDialogOpen, showOrderDialog]);
 
-  // �🔄 Realtime-ish updates: background polling + visibility/focus refresh
-  useEffect(() => {
-    const intervalMs = 12000; // 12s polling for fresher catalog
-    configPollTimer.current = setInterval(() => {
-      refreshConfig();
-    }, intervalMs);
+  // 🔄 Realtime config updates via Supabase + fallback polling for visibility changes
+  const handleConfigChange = useCallback((newConfig: ShopConfig) => {
+    console.log('[Realtime] Config updated from server');
+    // Set the full config (realtime gives us the complete config)
+    setConfig(newConfig);
+    // Also cache it as lean for session storage
+    const lean = sanitizeConfig(newConfig);
+    cacheConfig(lean);
+  }, []);
 
+  const handleOrderChange = useCallback((change: { type: string; order: any; oldOrder?: any }) => {
+    console.log('[Realtime] Order change received:', change.type);
+    if (change.type === 'UPDATE' && change.order) {
+      // Update order in history if it exists
+      setOrderHistory((prev) => {
+        const existingIndex = prev.findIndex((o) => o.ref === change.order.ref);
+        if (existingIndex >= 0) {
+          const updated = [...prev];
+          // Convert DB format to OrderHistory format
+          updated[existingIndex] = {
+            ...updated[existingIndex],
+            status: change.order.status,
+            total: change.order.total_amount,
+            cart: change.order.cart || [],
+            date: change.order.date || change.order.created_at,
+          };
+          return updated;
+        }
+        return prev;
+      });
+    } else if (change.type === 'INSERT' && change.order) {
+      // Add new order to history
+      const newOrder: OrderHistory = {
+        ref: change.order.ref,
+        date: change.order.date || change.order.created_at,
+        status: change.order.status,
+        total: change.order.total_amount,
+        cart: change.order.cart || [],
+      };
+      setOrderHistory((prev) => {
+        // Check if already exists
+        if (prev.some((o) => o.ref === newOrder.ref)) return prev;
+        return [newOrder, ...prev];
+      });
+    }
+  }, []);
+
+  // Use realtime subscriptions
+  const { isConnected: realtimeConnected, connectionError: realtimeError } = useRealtimeOrders({
+    emailHash: undefined, // Will be set when we have email hash
+    adminMode: false,
+    onOrderChange: handleOrderChange,
+    onConfigChange: handleConfigChange,
+    enabled: typeof window !== 'undefined',
+  });
+
+  // Fallback: Refresh on visibility change (in case realtime disconnects)
+  useEffect(() => {
     const handleVisibility = () => {
-      if (!document.hidden) refreshConfig();
+      if (!document.hidden && !realtimeConnected) {
+        refreshConfig();
+      }
     };
 
     window.addEventListener('focus', handleVisibility);
     document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
-      if (configPollTimer.current) clearInterval(configPollTimer.current);
       window.removeEventListener('focus', handleVisibility);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [refreshConfig]);
+  }, [refreshConfig, realtimeConnected]);
+
+  // Fallback polling only when realtime is disconnected
+  useEffect(() => {
+    if (realtimeConnected) {
+      // Realtime connected, clear polling
+      if (configPollTimer.current) {
+        clearInterval(configPollTimer.current);
+        configPollTimer.current = null;
+      }
+      return;
+    }
+
+    // Fallback polling when realtime is not available
+    const intervalMs = 30000; // 30s polling as fallback
+    configPollTimer.current = setInterval(() => {
+      refreshConfig();
+    }, intervalMs);
+
+    return () => {
+      if (configPollTimer.current) clearInterval(configPollTimer.current);
+    };
+  }, [refreshConfig, realtimeConnected]);
 
   useEffect(() => {
     if (!selectedProduct) return;
@@ -686,6 +761,7 @@ export default function HomePage() {
     const defaultSize = sizeKeys.length > 0 ? sizeKeys[0] : 'ฟรีไซส์';
     setProductOptions((prev) => ({ ...prev, size: defaultSize }));
   }, [selectedProduct]);
+
 
   const showToast = (type: ToastSeverity, message: string) => {
     const id = `${type}-${message}`;

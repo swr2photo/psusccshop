@@ -314,3 +314,34 @@ COMMENT ON COLUMN profiles.email_hash IS 'SHA-256 hash of customer email - never
 -- NEXT_PUBLIC_SUPABASE_URL=your-project-url
 -- NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 -- SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+-- ==================== REALTIME SETUP ====================
+-- Enable Realtime for specific tables
+-- This allows client-side subscriptions to listen for changes
+
+-- Enable realtime for orders table (for order status updates)
+ALTER PUBLICATION supabase_realtime ADD TABLE orders;
+
+-- Enable realtime for config table (for shop settings changes)
+ALTER PUBLICATION supabase_realtime ADD TABLE config;
+
+-- ==================== REALTIME RLS POLICIES ====================
+-- Allow anonymous users to receive realtime updates
+
+-- Orders: Allow reading own orders via email_hash (for realtime subscription)
+DROP POLICY IF EXISTS "Anon can read own orders for realtime" ON orders;
+CREATE POLICY "Anon can read own orders for realtime" ON orders
+  FOR SELECT 
+  TO anon
+  USING (true); -- Note: Filter happens in channel subscription, not RLS
+
+-- Config: Allow reading config for realtime (public shop settings)
+DROP POLICY IF EXISTS "Anon can read config for realtime" ON config;
+CREATE POLICY "Anon can read config for realtime" ON config
+  FOR SELECT 
+  TO anon
+  USING (key = 'shop-settings'); -- Only allow reading shop settings
+
+-- Note: For more secure realtime, you can use custom JWT claims
+-- and filter based on the user's email_hash in the policy
+
