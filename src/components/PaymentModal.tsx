@@ -1295,6 +1295,18 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                         ฿{amount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
                       </Typography>
                     </Box>
+                    {/* Account Name */}
+                    <Box sx={{ mt: 1, textAlign: 'center', bgcolor: 'rgba(255,255,255,0.1)', borderRadius: 1.5, px: 2, py: 0.75 }}>
+                      <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.65rem' }}>
+                        ชื่อบัญชี
+                      </Typography>
+                      <Typography sx={{ color: '#fff', fontWeight: 600, fontSize: '0.8rem' }}>
+                        นายวีรชาติ แก้วขำ
+                      </Typography>
+                      <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.6rem' }}>
+                        (เลขานุการชุมนุมคอมพิวเตอร์)
+                      </Typography>
+                    </Box>
                     <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.65rem', mt: 1, textAlign: 'center' }}>
                       สแกน QR Code ด้วยแอปธนาคาร
                     </Typography>

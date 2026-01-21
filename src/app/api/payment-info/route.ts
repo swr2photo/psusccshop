@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
     }
 
     const bankName = process.env.PAYMENT_BANK || 'SCB';
-    const accountName = process.env.PAYMENT_ACCOUNT_NAME || 'PSUSCCSHOP';
+    const accountName = process.env.PAYMENT_ACCOUNT_NAME || 'นายวีรชาติ แก้วขำ (เลขานุการชุมนุม)';
     const accountNumber = process.env.PAYMENT_ACCOUNT || '000-000000-0';
 
     // ตรวจสอบสถานะระบบชำระเงิน
