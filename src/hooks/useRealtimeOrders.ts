@@ -10,6 +10,15 @@ import { createClient, RealtimeChannel } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
+// Debug: Check if Supabase is configured correctly
+if (typeof window !== 'undefined') {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.warn('[Realtime] Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY');
+  } else if (!supabaseAnonKey.startsWith('eyJ')) {
+    console.warn('[Realtime] NEXT_PUBLIC_SUPABASE_ANON_KEY should be a JWT token starting with "eyJ"');
+  }
+}
+
 const supabase = supabaseUrl && supabaseAnonKey 
   ? createClient(supabaseUrl, supabaseAnonKey, {
       auth: {

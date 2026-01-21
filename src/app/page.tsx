@@ -79,7 +79,7 @@ import TurnstileWidget from '@/components/TurnstileWidget';
 import { ShopStatusBanner, getProductStatus, getShopStatus, SHOP_STATUS_CONFIG, type ShopStatusType } from '@/components/ShopStatusCard';
 import OptimizedImage, { preloadImages, OptimizedBackground } from '@/components/OptimizedImage';
 import { Product, ShopConfig } from '@/lib/config';
-import { useRealtimeOrders } from '@/hooks/useRealtimeOrders';
+import { useRealtimeOrdersByEmail } from '@/hooks/useRealtimeOrders';
 import {
   cancelOrder,
   getCart,
@@ -707,14 +707,13 @@ export default function HomePage() {
     }
   }, []);
 
-  // Use realtime subscriptions
-  const { isConnected: realtimeConnected, connectionError: realtimeError } = useRealtimeOrders({
-    emailHash: undefined, // Will be set when we have email hash
-    adminMode: false,
-    onOrderChange: handleOrderChange,
-    onConfigChange: handleConfigChange,
-    enabled: typeof window !== 'undefined',
-  });
+  // Use realtime subscriptions for user's orders
+  const userEmail = session?.user?.email;
+  const { isConnected: realtimeConnected, connectionError: realtimeError } = useRealtimeOrdersByEmail(
+    userEmail,
+    handleOrderChange,
+    handleConfigChange
+  );
 
   // Fallback: Refresh on visibility change (in case realtime disconnects)
   useEffect(() => {
@@ -4981,10 +4980,32 @@ export default function HomePage() {
               }}>
                 <Package size={20} color="white" />
               </Box>
-              <Box>
-                <Typography sx={{ fontSize: '1.1rem', fontWeight: 700, color: '#f1f5f9' }}>
-                  คำสั่งซื้อของฉัน
-                </Typography>
+              <Box sx={{ flex: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography sx={{ fontSize: '1.1rem', fontWeight: 700, color: '#f1f5f9' }}>
+                    คำสั่งซื้อของฉัน
+                  </Typography>
+                  {/* Realtime indicator */}
+                  {realtimeConnected && (
+                    <Chip
+                      size="small"
+                      label="LIVE"
+                      sx={{
+                        height: 18,
+                        fontSize: '0.6rem',
+                        fontWeight: 700,
+                        bgcolor: 'rgba(34, 197, 94, 0.2)',
+                        color: '#22c55e',
+                        border: '1px solid rgba(34, 197, 94, 0.3)',
+                        animation: 'pulse 2s infinite',
+                        '@keyframes pulse': {
+                          '0%, 100%': { opacity: 1 },
+                          '50%': { opacity: 0.6 },
+                        },
+                      }}
+                    />
+                  )}
+                </Box>
                 <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>
                   {orderHistory.length} รายการ
                 </Typography>

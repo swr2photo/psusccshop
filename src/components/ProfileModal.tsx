@@ -424,7 +424,7 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
               </Box>
               <Box sx={{ flex: 1 }}>
                 <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: pdpaAccepted ? '#6ee7b7' : '#e2e8f0', mb: 0.3 }}>
-                  {pdpaAccepted ? '✓ ยินยอมแล้ว' : 'นโยบายความเป็นส่วนตัว'}
+                  {pdpaAccepted ? 'ยินยอมแล้ว' : 'นโยบายความเป็นส่วนตัว'}
                 </Typography>
                 <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8', lineHeight: 1.5 }}>
                   ข้อมูลของท่านจะถูกใช้เพื่อการจัดส่งและติดต่อเท่านั้น
@@ -527,7 +527,7 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
               },
             }}
           >
-            {isFormValid ? '✓ บันทึกและดำเนินการต่อ' : 'กรอกข้อมูลให้ครบถ้วน'}
+            {isFormValid ? 'บันทึกและดำเนินการต่อ' : 'กรอกข้อมูลให้ครบถ้วน'}
           </Button>
           {!pdpaAccepted && (
             <Typography sx={{ textAlign: 'center', fontSize: '0.7rem', color: '#475569', mt: 1 }}>
