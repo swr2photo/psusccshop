@@ -24,6 +24,23 @@ export interface Product {
     hasLongSleeve: boolean;
     longSleevePrice?: number; // ราคาเพิ่มสำหรับแขนยาว (default 50)
   };
+  /** Per-product pickup settings */
+  pickup?: {
+    /** Whether pickup is enabled for this product */
+    enabled: boolean;
+    /** Pickup location for this product */
+    location?: string;
+    /** Pickup date/time start */
+    startDate?: string;
+    /** Pickup date/time end */
+    endDate?: string;
+    /** Additional notes */
+    notes?: string;
+    /** Last updated by */
+    updatedBy?: string;
+    /** Last update time */
+    updatedAt?: string;
+  };
 }
 
 export interface ShopConfig {
@@ -109,7 +126,25 @@ export interface ShopConfig {
       canManageAnnouncement?: boolean; // ประกาศ
       canManageOrders?: boolean;    // จัดการออเดอร์
       canManageProducts?: boolean;  // จัดการสินค้า
+      canManagePickup?: boolean;    // จัดการรับสินค้า
     };
+  };
+  /** Pickup system configuration */
+  pickup?: {
+    /** Whether pickup is currently available */
+    enabled: boolean;
+    /** Pickup location */
+    location: string;
+    /** Pickup date/time start */
+    startDate?: string;
+    /** Pickup date/time end */
+    endDate?: string;
+    /** Additional notes for pickup */
+    notes?: string;
+    /** Last updated by */
+    updatedBy?: string;
+    /** Last update time */
+    updatedAt?: string;
   };
 }
 

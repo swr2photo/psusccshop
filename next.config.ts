@@ -42,7 +42,8 @@ const nextConfig: NextConfig = {
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;",
             "img-src 'self' data: blob: https://*.filebase.io https://*.filebase.com https://lh3.googleusercontent.com https://ui-avatars.com;",
             "font-src 'self' https://fonts.gstatic.com;",
-            "connect-src 'self' https://*.filebase.com https://*.filebase.io https://api.resend.com https://challenges.cloudflare.com;",
+            "connect-src 'self' https://*.filebase.com https://*.filebase.io https://api.resend.com https://challenges.cloudflare.com https://fastly.jsdelivr.net;",
+            "media-src 'self' data: blob:;",
             "frame-src https://challenges.cloudflare.com;",
             "frame-ancestors 'none';",
             "object-src 'none';",
@@ -71,10 +72,10 @@ const nextConfig: NextConfig = {
           key: 'Referrer-Policy',
           value: 'strict-origin-when-cross-origin',
         },
-        // Permissions Policy - Disable unnecessary features
+        // Permissions Policy - Allow camera for QR scanning
         {
           key: 'Permissions-Policy',
-          value: 'camera=(), microphone=(), geolocation=(), interest-cohort=(), payment=(self), usb=()',
+          value: 'camera=(self), microphone=(), geolocation=(), interest-cohort=(), payment=(self), usb=()',
         },
         // Prevent DNS prefetching to avoid information leakage
         {

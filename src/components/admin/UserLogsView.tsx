@@ -183,302 +183,253 @@ export default function UserLogsView({ showToast }: Props) {
   };
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-      {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-        <Box>
-          <Typography variant="h5" sx={{ fontWeight: 800, color: THEME.text, mb: 0.5 }}>
-            👥 ประวัติการใช้งานผู้ใช้
-          </Typography>
-          <Typography sx={{ color: THEME.textSecondary, fontSize: '0.9rem' }}>
-            ติดตามกิจกรรมของลูกค้าบนเว็บไซต์
-          </Typography>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, height: '100%' }}>
+      {/* Sticky Header */}
+      <Box sx={{ 
+        position: 'sticky',
+        top: 0,
+        zIndex: 10,
+        bgcolor: THEME.bg,
+        pb: 1.5,
+        mx: { xs: -2, md: -3 },
+        px: { xs: 2, md: 3 },
+      }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5, mb: 1.5 }}>
+          <Box>
+            <Typography sx={{ fontSize: { xs: '1rem', md: '1.3rem' }, fontWeight: 800, color: THEME.text }}>
+              👥 ประวัติผู้ใช้
+            </Typography>
+            <Typography sx={{ color: THEME.textSecondary, fontSize: '0.75rem' }}>
+              {filteredLogs.length}/{logs.length} รายการ
+            </Typography>
+          </Box>
+          <IconButton
+            onClick={fetchData}
+            disabled={loading}
+            size="small"
+            sx={{
+              bgcolor: 'rgba(99,102,241,0.1)',
+              border: `1px solid ${THEME.border}`,
+              color: THEME.primary,
+            }}
+          >
+            {loading ? <CircularProgress size={18} sx={{ color: THEME.primary }} /> : <Refresh sx={{ fontSize: 18 }} />}
+          </IconButton>
         </Box>
-        <Button
-          variant="outlined"
-          startIcon={loading ? <CircularProgress size={16} sx={{ color: THEME.primary }} /> : <Refresh />}
-          onClick={fetchData}
-          disabled={loading}
-          sx={{
-            borderColor: THEME.border,
-            color: THEME.textSecondary,
-            '&:hover': { borderColor: THEME.primary, color: THEME.primary },
-          }}
-        >
-          รีเฟรช
-        </Button>
+
+        {/* Filters - Compact */}
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+          <TextField
+            placeholder="ค้นหา..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            size="small"
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search sx={{ color: THEME.muted, fontSize: 18 }} />
+                </InputAdornment>
+              ),
+            }}
+            sx={{
+              flex: 1,
+              minWidth: 150,
+              '& .MuiOutlinedInput-root': {
+                bgcolor: THEME.glassSoft,
+                borderRadius: '10px',
+                '& fieldset': { borderColor: THEME.border },
+              },
+              '& .MuiInputBase-input': { color: THEME.text, fontSize: '0.8rem', py: 0.8 },
+            }}
+          />
+
+          <FormControl size="small" sx={{ minWidth: { xs: 100, sm: 150 } }}>
+            <Select
+              value={filterAction}
+              onChange={(e) => setFilterAction(e.target.value)}
+              displayEmpty
+              sx={{
+                bgcolor: THEME.glassSoft,
+                color: THEME.text,
+                fontSize: '0.75rem',
+                borderRadius: '10px',
+                '& fieldset': { borderColor: THEME.border },
+                '& .MuiSvgIcon-root': { color: THEME.muted },
+                '& .MuiSelect-select': { py: 0.8 },
+              }}
+            >
+              <MenuItem value="" sx={{ fontSize: '0.8rem' }}>ทั้งหมด</MenuItem>
+              {Object.entries(actionLabels).map(([key, { label }]) => (
+                <MenuItem key={key} value={key} sx={{ fontSize: '0.8rem' }}>{label}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Box>
       </Box>
 
-      {/* Stats Cards */}
+      {/* Stats Cards - Compact */}
       {stats && (
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 2 }}>
-          <StatCard icon={<TrendingUp />} label="กิจกรรมทั้งหมด" value={stats.total} color={THEME.primary} />
-          <StatCard icon={<Groups />} label="ผู้ใช้ไม่ซ้ำ" value={stats.uniqueUsers} color={THEME.success} />
-          <StatCard icon={<AccessTime />} label="24 ชม. ล่าสุด" value={stats.last24h} color={THEME.info} />
-          <StatCard icon={<Login />} label="เข้าสู่ระบบ" value={stats.byAction['login'] || 0} color={THEME.warning} />
+        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1 }}>
+          <StatCard icon={<TrendingUp />} label="ทั้งหมด" value={stats.total} color={THEME.primary} />
+          <StatCard icon={<Groups />} label="ผู้ใช้" value={stats.uniqueUsers} color={THEME.success} />
+          <StatCard icon={<AccessTime />} label="24ชม." value={stats.last24h} color={THEME.info} />
+          <StatCard icon={<Login />} label="ล็อกอิน" value={stats.byAction['login'] || 0} color={THEME.warning} />
         </Box>
       )}
 
-      {/* Filters & Table */}
-      <Card sx={{ bgcolor: THEME.bgCard, border: `1px solid ${THEME.border}`, borderRadius: '16px' }}>
-        <CardContent>
-          {/* Filters */}
-          <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
-            <TextField
-              placeholder="ค้นหาอีเมล, ชื่อ, รายละเอียด..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              size="small"
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Search sx={{ color: THEME.muted }} />
-                  </InputAdornment>
-                ),
-              }}
-              sx={{
-                minWidth: 280,
-                '& .MuiOutlinedInput-root': {
-                  bgcolor: THEME.glassSoft,
-                  '& fieldset': { borderColor: THEME.border },
-                  '&:hover fieldset': { borderColor: THEME.primary },
-                },
-                '& .MuiInputBase-input': { color: THEME.text },
-              }}
-            />
+      {/* Logs List - Mobile Card View */}
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <CircularProgress sx={{ color: THEME.primary }} />
+        </Box>
+      ) : (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          {paginatedLogs.map((log) => {
+            const actionInfo = actionLabels[log.action] || { label: log.action, color: THEME.muted, icon: <Visibility sx={{ fontSize: 14 }} /> };
+            const isExpanded = expandedLog === log.id;
 
-            <FormControl size="small" sx={{ minWidth: 180 }}>
-              <InputLabel sx={{ color: THEME.muted }}>กรองตามกิจกรรม</InputLabel>
-              <Select
-                value={filterAction}
-                onChange={(e) => setFilterAction(e.target.value)}
-                label="กรองตามกิจกรรม"
+            return (
+              <Box
+                key={log.id}
+                onClick={() => setExpandedLog(isExpanded ? null : log.id)}
                 sx={{
-                  bgcolor: THEME.glassSoft,
-                  color: THEME.text,
-                  '& fieldset': { borderColor: THEME.border },
-                  '& .MuiSvgIcon-root': { color: THEME.muted },
+                  bgcolor: THEME.bgCard,
+                  border: `1px solid ${THEME.border}`,
+                  borderRadius: '12px',
+                  p: 1.5,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  '&:active': { transform: 'scale(0.99)' },
                 }}
               >
-                <MenuItem value="">ทั้งหมด</MenuItem>
-                {Object.entries(actionLabels).map(([key, { label }]) => (
-                  <MenuItem key={key} value={key}>{label}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Box>
-
-          {loading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-              <CircularProgress sx={{ color: THEME.primary }} />
-            </Box>
-          ) : (
-            <>
-              <TableContainer sx={{ maxHeight: 500 }}>
-                <Table size="small" stickyHeader>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell sx={{ bgcolor: THEME.glass, color: THEME.textSecondary, fontWeight: 700 }}>กิจกรรม</TableCell>
-                      <TableCell sx={{ bgcolor: THEME.glass, color: THEME.textSecondary, fontWeight: 700 }}>ผู้ใช้</TableCell>
-                      <TableCell sx={{ bgcolor: THEME.glass, color: THEME.textSecondary, fontWeight: 700 }}>รายละเอียด</TableCell>
-                      <TableCell sx={{ bgcolor: THEME.glass, color: THEME.textSecondary, fontWeight: 700 }}>เวลา</TableCell>
-                      <TableCell sx={{ bgcolor: THEME.glass, color: THEME.textSecondary, fontWeight: 700, width: 60 }}></TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {paginatedLogs.map((log) => {
-                      const actionInfo = actionLabels[log.action] || { label: log.action, color: THEME.muted, icon: <Visibility sx={{ fontSize: 16 }} /> };
-                      const isExpanded = expandedLog === log.id;
-                      const ua = parseUserAgent(log.userAgent);
-
-                      return (
-                        <Fragment key={log.id}>
-                          <TableRow
-                            hover
-                            sx={{
-                              cursor: 'pointer',
-                              '& td': { borderColor: THEME.border },
-                              '&:hover': { bgcolor: THEME.glassSoft },
-                            }}
-                            onClick={() => setExpandedLog(isExpanded ? null : log.id)}
-                          >
-                            <TableCell>
-                              <Chip
-                                size="small"
-                                icon={actionInfo.icon}
-                                label={actionInfo.label}
-                                sx={{
-                                  bgcolor: `${actionInfo.color}20`,
-                                  color: actionInfo.color,
-                                  fontWeight: 600,
-                                  fontSize: '0.7rem',
-                                  '& .MuiChip-icon': { color: actionInfo.color },
-                                }}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <Avatar sx={{ bgcolor: THEME.primary, width: 28, height: 28, fontSize: '0.75rem' }}>
-                                  {(log.name || log.email).charAt(0).toUpperCase()}
-                                </Avatar>
-                                <Box>
-                                  <Typography sx={{ color: THEME.text, fontSize: '0.85rem', fontWeight: 600 }}>
-                                    {log.name || 'ไม่ระบุชื่อ'}
-                                  </Typography>
-                                  <Typography sx={{ color: THEME.muted, fontSize: '0.7rem' }}>
-                                    {log.email}
-                                  </Typography>
-                                </Box>
-                              </Box>
-                            </TableCell>
-                            <TableCell>
-                              <Typography sx={{ color: THEME.textSecondary, fontSize: '0.85rem', maxWidth: 250, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {log.details || '-'}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              <Typography sx={{ color: THEME.muted, fontSize: '0.8rem' }}>
-                                {formatDate(log.timestamp)}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              <IconButton size="small" sx={{ color: THEME.muted }}>
-                                {isExpanded ? <ExpandLess /> : <ExpandMore />}
-                              </IconButton>
-                            </TableCell>
-                          </TableRow>
-                          <TableRow>
-                            <TableCell colSpan={5} sx={{ p: 0, borderBottom: isExpanded ? undefined : 'none' }}>
-                              <Collapse in={isExpanded}>
-                                <Box sx={{ p: 2, bgcolor: THEME.glassSoft }}>
-                                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 2 }}>
-                                    <Box>
-                                      <Typography sx={{ color: THEME.muted, fontSize: '0.75rem', mb: 0.5 }}>ID</Typography>
-                                      <Typography sx={{ color: THEME.textSecondary, fontSize: '0.85rem' }}>{log.id}</Typography>
-                                    </Box>
-                                    <Box>
-                                      <Typography sx={{ color: THEME.muted, fontSize: '0.75rem', mb: 0.5 }}>IP Address</Typography>
-                                      <Typography sx={{ color: THEME.textSecondary, fontSize: '0.85rem' }}>{log.ip || 'ไม่ทราบ'}</Typography>
-                                    </Box>
-                                    <Box>
-                                      <Typography sx={{ color: THEME.muted, fontSize: '0.75rem', mb: 0.5 }}>Browser / OS</Typography>
-                                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                        <Computer sx={{ fontSize: 14, color: THEME.muted }} />
-                                        <Typography sx={{ color: THEME.textSecondary, fontSize: '0.85rem' }}>
-                                          {ua.browser} / {ua.os}
-                                        </Typography>
-                                      </Box>
-                                    </Box>
-                                    {log.metadata && Object.keys(log.metadata).length > 0 && (
-                                      <Box sx={{ gridColumn: { md: 'span 2' } }}>
-                                        <Typography sx={{ color: THEME.muted, fontSize: '0.75rem', mb: 0.5 }}>Metadata</Typography>
-                                        <Box sx={{ bgcolor: THEME.glass, p: 1, borderRadius: '8px' }}>
-                                          <pre style={{ margin: 0, fontSize: '0.75rem', color: THEME.textSecondary, whiteSpace: 'pre-wrap' }}>
-                                            {JSON.stringify(log.metadata, null, 2)}
-                                          </pre>
-                                        </Box>
-                                      </Box>
-                                    )}
-                                  </Box>
-                                </Box>
-                              </Collapse>
-                            </TableCell>
-                          </TableRow>
-                        </Fragment>
-                      );
-                    })}
-                    {paginatedLogs.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={5} sx={{ textAlign: 'center', py: 4 }}>
-                          <Typography sx={{ color: THEME.muted }}>
-                            {searchTerm || filterAction ? 'ไม่พบผลลัพธ์' : 'ยังไม่มีประวัติการใช้งาน'}
-                          </Typography>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-
-              {totalPages > 1 && (
-                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-                  <Pagination
-                    count={totalPages}
-                    page={page}
-                    onChange={(_, p) => setPage(p)}
-                    sx={{
-                      '& .MuiPaginationItem-root': {
-                        color: THEME.textSecondary,
-                        '&.Mui-selected': { bgcolor: THEME.primary, color: '#fff' },
-                      },
-                    }}
-                  />
+                {/* Header Row */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.8 }}>
+                  <Box sx={{ 
+                    width: 28, 
+                    height: 28, 
+                    borderRadius: '8px', 
+                    bgcolor: `${actionInfo.color}20`, 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    color: actionInfo.color,
+                  }}>
+                    {actionInfo.icon}
+                  </Box>
+                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: actionInfo.color, flex: 1 }}>
+                    {actionInfo.label}
+                  </Typography>
+                  <Typography sx={{ color: THEME.muted, fontSize: '0.65rem' }}>
+                    {formatDate(log.timestamp)}
+                  </Typography>
+                  <IconButton size="small" sx={{ p: 0.3, color: THEME.muted }}>
+                    {isExpanded ? <ExpandLess sx={{ fontSize: 16 }} /> : <ExpandMore sx={{ fontSize: 16 }} />}
+                  </IconButton>
                 </Box>
-              )}
-            </>
-          )}
-        </CardContent>
-      </Card>
 
-      {/* Activity Summary */}
-      {stats && Object.keys(stats.byAction).length > 0 && (
-        <Card sx={{ bgcolor: THEME.bgCard, border: `1px solid ${THEME.border}`, borderRadius: '16px' }}>
-          <CardContent>
-            <Typography sx={{ color: THEME.text, fontWeight: 700, mb: 2 }}>
-              📊 สรุปกิจกรรม
-            </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-              {Object.entries(stats.byAction)
-                .sort(([, a], [, b]) => b - a)
-                .map(([action, count]) => {
-                  const actionInfo = actionLabels[action] || { label: action, color: THEME.muted };
-                  return (
-                    <Chip
-                      key={action}
-                      label={`${actionInfo.label}: ${count}`}
-                      sx={{
-                        bgcolor: `${actionInfo.color}20`,
-                        color: actionInfo.color,
-                        fontWeight: 600,
-                      }}
-                    />
-                  );
-                })}
+                {/* User Info */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, mb: 0.5 }}>
+                  <Avatar sx={{ bgcolor: THEME.primary, width: 20, height: 20, fontSize: '0.65rem' }}>
+                    {(log.name || log.email).charAt(0).toUpperCase()}
+                  </Avatar>
+                  <Typography sx={{ color: THEME.text, fontSize: '0.75rem', fontWeight: 600 }}>
+                    {log.name || log.email.split('@')[0]}
+                  </Typography>
+                </Box>
+
+                {/* Details */}
+                {log.details && (
+                  <Typography sx={{ 
+                    color: THEME.textSecondary, 
+                    fontSize: '0.7rem', 
+                    overflow: 'hidden', 
+                    textOverflow: 'ellipsis', 
+                    whiteSpace: isExpanded ? 'normal' : 'nowrap',
+                  }}>
+                    {log.details}
+                  </Typography>
+                )}
+
+                {/* Expanded Info */}
+                <Collapse in={isExpanded}>
+                  <Box sx={{ mt: 1, pt: 1, borderTop: `1px solid ${THEME.border}` }}>
+                    <Typography sx={{ color: THEME.muted, fontSize: '0.65rem', mb: 0.3 }}>
+                      อีเมล: {log.email}
+                    </Typography>
+                    {log.ip && (
+                      <Typography sx={{ color: THEME.muted, fontSize: '0.65rem', mb: 0.3 }}>
+                        IP: {log.ip}
+                      </Typography>
+                    )}
+                    {log.metadata && Object.keys(log.metadata).length > 0 && (
+                      <Box sx={{ 
+                        bgcolor: THEME.glassSoft, 
+                        borderRadius: '6px', 
+                        p: 0.8, 
+                        mt: 0.5,
+                        fontSize: '0.6rem',
+                        color: THEME.textSecondary,
+                        fontFamily: 'monospace',
+                        overflow: 'auto',
+                      }}>
+                        {JSON.stringify(log.metadata, null, 2)}
+                      </Box>
+                    )}
+                  </Box>
+                </Collapse>
+              </Box>
+            );
+          })}
+
+          {paginatedLogs.length === 0 && (
+            <Box sx={{ textAlign: 'center', py: 4, color: THEME.muted }}>
+              {searchTerm || filterAction ? 'ไม่พบผลลัพธ์' : 'ยังไม่มีประวัติ'}
             </Box>
-          </CardContent>
-        </Card>
+          )}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+              <Pagination
+                count={totalPages}
+                page={page}
+                onChange={(_, p) => setPage(p)}
+                size="small"
+                sx={{
+                  '& .MuiPaginationItem-root': {
+                    color: THEME.textSecondary,
+                    fontSize: '0.75rem',
+                    '&.Mui-selected': { bgcolor: THEME.primary, color: '#fff' },
+                  },
+                }}
+              />
+            </Box>
+          )}
+        </Box>
       )}
     </Box>
   );
 }
 
-// Stat Card Component
+// Stat Card Component - Compact
 function StatCard({ icon, label, value, color }: { icon: ReactElement; label: string; value: number; color: string }) {
   return (
-    <Card sx={{ bgcolor: THEME.glassSoft, border: `1px solid ${THEME.border}`, borderRadius: '12px' }}>
-      <CardContent sx={{ p: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Box sx={{
-            width: 40,
-            height: 40,
-            borderRadius: '10px',
-            bgcolor: `${color}20`,
-            display: 'grid',
-            placeItems: 'center',
-            color: color,
-          }}>
-            {icon}
-          </Box>
-          <Box>
-            <Typography sx={{ color: THEME.muted, fontSize: '0.75rem' }}>
-              {label}
-            </Typography>
-            <Typography sx={{ color: THEME.text, fontWeight: 700, fontSize: '1.25rem' }}>
-              {value.toLocaleString()}
-            </Typography>
-          </Box>
-        </Box>
-      </CardContent>
-    </Card>
+    <Box sx={{ 
+      bgcolor: THEME.glassSoft, 
+      border: `1px solid ${THEME.border}`, 
+      borderRadius: '10px',
+      p: 1,
+      textAlign: 'center',
+    }}>
+      <Box sx={{ color: color, mb: 0.3, '& svg': { fontSize: 18 } }}>
+        {icon}
+      </Box>
+      <Typography sx={{ color: THEME.text, fontWeight: 700, fontSize: '1rem' }}>
+        {value.toLocaleString()}
+      </Typography>
+      <Typography sx={{ color: THEME.muted, fontSize: '0.6rem' }}>
+        {label}
+      </Typography>
+    </Box>
   );
 }

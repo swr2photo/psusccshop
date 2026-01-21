@@ -46,8 +46,8 @@ const securityHeaders = {
   // Referrer policy
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   
-  // Permissions policy
-  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+  // Permissions policy - Allow camera for QR scanning
+  'Permissions-Policy': 'camera=(self), microphone=(), geolocation=()',
   
   // HSTS (HTTP Strict Transport Security)
   'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',

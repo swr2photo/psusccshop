@@ -3,6 +3,27 @@ import { getJson, putJson, listKeys } from '@/lib/filebase';
 import { requireAdmin } from '@/lib/auth';
 import { triggerSheetSync } from '@/lib/sheet-sync';
 import { sendOrderStatusEmail } from '@/lib/email';
+import crypto from 'crypto';
+
+// Helper to generate email index key
+const normalizeEmail = (email?: string | null) => (email || '').trim().toLowerCase();
+const emailIndexKey = (email: string) => {
+  const normalized = normalizeEmail(email);
+  const hash = crypto.createHash('sha256').update(normalized).digest('hex');
+  return `orders/index/${hash}.json`;
+};
+
+// Update order in user's index
+const updateIndexEntry = async (email: string, order: any) => {
+  const normalized = normalizeEmail(email);
+  if (!normalized) return;
+  const key = emailIndexKey(normalized);
+  const existing = (await getJson<any[]>(key)) || [];
+  // Replace existing entry with updated order
+  const filtered = existing.filter((o) => o?.ref !== order?.ref);
+  const next = [order, ...filtered].slice(0, 500);
+  await putJson(key, next);
+};
 
 export async function POST(req: NextRequest) {
   // ตรวจสอบสิทธิ์ Admin
@@ -37,10 +58,17 @@ export async function POST(req: NextRequest) {
         order.shippingProvider = body.shippingProvider || '';
       }
       
+      // Save order file
       await putJson(targetKey, order);
       
+      // Update user's index so they see the new status immediately
+      const customerEmail = order.customerEmail || order.email;
+      if (customerEmail) {
+        await updateIndexEntry(customerEmail, order);
+      }
+      
       // Send email notification if status changed and email is enabled
-      if (sendEmail && previousStatus !== status && (order.customerEmail || order.email)) {
+      if (sendEmail && previousStatus !== status && customerEmail) {
         try {
           await sendOrderStatusEmail(order, status);
         } catch (emailError) {

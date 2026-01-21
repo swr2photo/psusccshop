@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useSession, signIn, signOut } from 'next-auth/react';
+import { QRCodeSVG } from 'qrcode.react';
 import {
   Alert,
   AppBar,
@@ -307,6 +308,7 @@ export default function HomePage() {
   const [showCart, setShowCart] = useState(false);
   const [showHistoryDialog, setShowHistoryDialog] = useState(false);
   const [showOrderDialog, setShowOrderDialog] = useState(false);
+  const [showQRFullscreen, setShowQRFullscreen] = useState<string | null>(null); // Store order ref for fullscreen QR
   const paymentOpenerRef = useRef<((ref: string) => void) | null>(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'home' | 'cart' | 'history' | 'profile'>('home');
@@ -1327,8 +1329,66 @@ export default function HomePage() {
                   ตารางไซส์ (นิ้ว)
                 </Typography>
               </Box>
+              
+              {/* Mobile: Horizontal scrollable cards */}
               <Box sx={{ 
-                display: 'grid', 
+                display: { xs: 'flex', sm: 'none' },
+                overflowX: 'auto',
+                gap: 1,
+                pb: 1,
+                mx: -1,
+                px: 1,
+                '&::-webkit-scrollbar': { height: 4 },
+                '&::-webkit-scrollbar-track': { bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 2 },
+                '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(99,102,241,0.3)', borderRadius: 2 },
+              }}>
+                {displaySizes.map((size) => {
+                  const sizeKey = size as keyof typeof SIZE_MEASUREMENTS;
+                  const measurement = SIZE_MEASUREMENTS[sizeKey];
+                  const isSelected = productOptions.size === size;
+                  return (
+                    <Box 
+                      key={size}
+                      sx={{
+                        flexShrink: 0,
+                        minWidth: 70,
+                        p: 1.5,
+                        borderRadius: '12px',
+                        bgcolor: isSelected ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.03)',
+                        border: isSelected ? '2px solid rgba(99,102,241,0.5)' : '1px solid rgba(255,255,255,0.08)',
+                        textAlign: 'center',
+                      }}
+                    >
+                      <Typography sx={{ 
+                        fontSize: '0.85rem', 
+                        fontWeight: 800, 
+                        color: isSelected ? '#a5b4fc' : '#e2e8f0',
+                        mb: 0.5,
+                      }}>
+                        {size}
+                      </Typography>
+                      <Box sx={{ fontSize: '0.65rem', color: '#64748b' }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 0.5 }}>
+                          <span>อก</span>
+                          <span style={{ color: isSelected ? '#a5b4fc' : '#94a3b8', fontWeight: 600 }}>
+                            {measurement?.chest || '-'}
+                          </span>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 0.5 }}>
+                          <span>ยาว</span>
+                          <span style={{ color: isSelected ? '#a5b4fc' : '#94a3b8', fontWeight: 600 }}>
+                            {measurement?.length || '-'}
+                          </span>
+                        </Box>
+                      </Box>
+                    </Box>
+                  );
+                })}
+              </Box>
+
+              {/* Desktop: Grid table */}
+              <Box sx={{ 
+                display: { xs: 'none', sm: 'grid' },
                 gridTemplateColumns: 'auto 1fr',
                 gap: 0,
                 fontSize: '0.72rem',
@@ -3380,14 +3440,14 @@ export default function HomePage() {
 
                           {/* Product Info */}
                           <Box sx={{ 
-                            p: { xs: 1.5, sm: 1.5 }, 
+                            p: { xs: 1.5, sm: 2 }, 
                             flex: 1, 
                             display: 'flex', 
                             flexDirection: 'column',
                             justifyContent: { xs: 'center', sm: 'flex-start' },
                           }}>
                             <Typography sx={{ 
-                              fontSize: { xs: '0.95rem', sm: '0.9rem' }, 
+                              fontSize: { xs: '0.95rem', sm: '0.95rem' }, 
                               fontWeight: 700, 
                               color: isProductClosed ? '#94a3b8' : '#f1f5f9',
                               mb: 0.5,
@@ -3400,16 +3460,85 @@ export default function HomePage() {
                             }}>
                               {product.name}
                             </Typography>
+                            
+                            {/* Description - Show more lines */}
                             <Typography sx={{ 
-                              fontSize: { xs: '0.75rem', sm: '0.7rem' }, 
-                              color: '#64748b',
+                              fontSize: { xs: '0.75rem', sm: '0.75rem' }, 
+                              color: '#94a3b8',
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
+                              display: '-webkit-box',
+                              WebkitLineClamp: { xs: 2, sm: 3 },
+                              WebkitBoxOrient: 'vertical',
+                              lineHeight: 1.4,
                               mb: 1,
                             }}>
                               {product.description || TYPE_LABELS[product.type] || product.type}
                             </Typography>
+
+                            {/* Product Features/Options Badges */}
+                            <Box sx={{ 
+                              display: 'flex', 
+                              flexWrap: 'wrap', 
+                              gap: 0.5, 
+                              mb: 1,
+                            }}>
+                              {product.options?.hasLongSleeve && (
+                                <Box sx={{
+                                  px: 0.8,
+                                  py: 0.2,
+                                  borderRadius: '6px',
+                                  bgcolor: 'rgba(245,158,11,0.15)',
+                                  border: '1px solid rgba(245,158,11,0.3)',
+                                  fontSize: '0.6rem',
+                                  fontWeight: 600,
+                                  color: '#fbbf24',
+                                }}>
+                                  มีแขนยาว
+                                </Box>
+                              )}
+                              {product.options?.hasCustomName && (
+                                <Box sx={{
+                                  px: 0.8,
+                                  py: 0.2,
+                                  borderRadius: '6px',
+                                  bgcolor: 'rgba(16,185,129,0.15)',
+                                  border: '1px solid rgba(16,185,129,0.3)',
+                                  fontSize: '0.6rem',
+                                  fontWeight: 600,
+                                  color: '#34d399',
+                                }}>
+                                  สกรีนชื่อได้
+                                </Box>
+                              )}
+                              {product.options?.hasCustomNumber && (
+                                <Box sx={{
+                                  px: 0.8,
+                                  py: 0.2,
+                                  borderRadius: '6px',
+                                  bgcolor: 'rgba(99,102,241,0.15)',
+                                  border: '1px solid rgba(99,102,241,0.3)',
+                                  fontSize: '0.6rem',
+                                  fontWeight: 600,
+                                  color: '#a5b4fc',
+                                }}>
+                                  สกรีนเบอร์ได้
+                                </Box>
+                              )}
+                            </Box>
+
+                            {/* Available Sizes */}
+                            {product.sizePricing && Object.keys(product.sizePricing).length > 0 && (
+                              <Box sx={{ mb: 1 }}>
+                                <Typography sx={{ 
+                                  fontSize: '0.65rem', 
+                                  color: '#64748b', 
+                                  mb: 0.3,
+                                }}>
+                                  ไซส์: {Object.keys(product.sizePricing).join(', ')}
+                                </Typography>
+                              </Box>
+                            )}
                             
                             {/* Status/Action Button */}
                             <Box sx={{ mt: 'auto' }}>
@@ -5100,6 +5229,106 @@ export default function HomePage() {
                       );
                     })()}
 
+                    {/* QR Code for Pickup - Show when order is ready */}
+                    {['READY', 'SHIPPED', 'PAID'].includes(statusKey) && (
+                      <Box sx={{
+                        mt: 2,
+                        p: 2,
+                        borderRadius: '16px',
+                        background: 'linear-gradient(135deg, rgba(6,182,212,0.1) 0%, rgba(16,185,129,0.1) 100%)',
+                        border: '1px solid rgba(6,182,212,0.3)',
+                      }}>
+                        {/* Per-Product Pickup Location Info */}
+                        {(() => {
+                          // Get unique pickup info from products in this order
+                          const orderItems = order.items || order.cart || [];
+                          const productIds = orderItems.map((item: any) => item.productId || item.id).filter(Boolean);
+                          const productsWithPickup = config?.products?.filter(
+                            (p) => p.pickup?.enabled && productIds.includes(p.id)
+                          ) || [];
+                          
+                          if (productsWithPickup.length === 0) return null;
+                          
+                          // Group by location
+                          const uniqueLocations = [...new Set(productsWithPickup.map(p => p.pickup?.location).filter(Boolean))];
+                          
+                          return (
+                            <Box sx={{ 
+                              mb: 2, 
+                              p: 1.5, 
+                              borderRadius: '12px', 
+                              bgcolor: 'rgba(16,185,129,0.1)',
+                              border: '1px solid rgba(16,185,129,0.2)',
+                              textAlign: 'left',
+                            }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+                                <MapPin size={14} style={{ color: '#10b981' }} />
+                                <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#10b981' }}>
+                                  สถานที่รับสินค้า
+                                </Typography>
+                              </Box>
+                              {uniqueLocations.map((loc, idx) => (
+                                <Typography key={idx} sx={{ fontSize: '0.85rem', color: '#f1f5f9', fontWeight: 600 }}>
+                                  {loc}
+                                </Typography>
+                              ))}
+                              {/* Show date range from first product with pickup */}
+                              {productsWithPickup[0]?.pickup && (productsWithPickup[0].pickup.startDate || productsWithPickup[0].pickup.endDate) && (
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 1 }}>
+                                  <Clock size={14} style={{ color: '#64748b' }} />
+                                  <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                                    {productsWithPickup[0].pickup.startDate && new Date(productsWithPickup[0].pickup.startDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                    {productsWithPickup[0].pickup.startDate && productsWithPickup[0].pickup.endDate && ' - '}
+                                    {productsWithPickup[0].pickup.endDate && new Date(productsWithPickup[0].pickup.endDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                  </Typography>
+                                </Box>
+                              )}
+                              {productsWithPickup[0]?.pickup?.notes && (
+                                <Typography sx={{ fontSize: '0.7rem', color: '#fbbf24', mt: 0.5 }}>
+                                  📝 {productsWithPickup[0].pickup.notes}
+                                </Typography>
+                              )}
+                            </Box>
+                          );
+                        })()}
+                        
+                        {/* QR Button */}
+                        <Button
+                          fullWidth
+                          onClick={() => setShowQRFullscreen(order.ref)}
+                          sx={{
+                            py: 1.5,
+                            borderRadius: '12px',
+                            background: 'linear-gradient(135deg, #06b6d4 0%, #10b981 100%)',
+                            color: 'white',
+                            fontSize: '0.9rem',
+                            fontWeight: 700,
+                            textTransform: 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 1,
+                            boxShadow: '0 4px 14px rgba(6,182,212,0.3)',
+                            '&:hover': {
+                              background: 'linear-gradient(135deg, #0891b2 0%, #059669 100%)',
+                              boxShadow: '0 6px 20px rgba(6,182,212,0.4)',
+                            },
+                          }}
+                        >
+                          <Package size={20} />
+                          แสดง QR รับสินค้า
+                        </Button>
+                        <Typography sx={{ 
+                          fontSize: '0.7rem', 
+                          color: '#64748b', 
+                          textAlign: 'center',
+                          mt: 1,
+                        }}>
+                          กดเพื่อแสดง QR Code สำหรับรับสินค้า
+                        </Typography>
+                      </Box>
+                    )}
+
                     {/* Order Total & Actions */}
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pt: 1.5, borderTop: '1px solid rgba(255,255,255,0.04)' }}>
                       <Box>
@@ -5446,6 +5675,188 @@ export default function HomePage() {
           </Typography>
         </Box>
       </Backdrop>
+
+      {/* Fullscreen QR Code Dialog */}
+      <Dialog
+        open={!!showQRFullscreen}
+        onClose={() => setShowQRFullscreen(null)}
+        fullScreen
+        PaperProps={{
+          sx: {
+            bgcolor: '#0a0f1a',
+            backgroundImage: 'radial-gradient(circle at 50% 50%, rgba(6, 182, 212, 0.1) 0%, transparent 50%)',
+          },
+        }}
+      >
+        <Box sx={{
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          p: 3,
+          position: 'relative',
+        }}>
+          {/* Close Button */}
+          <IconButton
+            onClick={() => setShowQRFullscreen(null)}
+            sx={{
+              position: 'absolute',
+              top: 16,
+              right: 16,
+              bgcolor: 'rgba(255,255,255,0.1)',
+              color: '#f1f5f9',
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' },
+            }}
+          >
+            <X size={24} />
+          </IconButton>
+
+          {/* Header */}
+          <Box sx={{ textAlign: 'center', mb: 4 }}>
+            <Box sx={{
+              width: 64,
+              height: 64,
+              borderRadius: '20px',
+              background: 'linear-gradient(135deg, #06b6d4 0%, #10b981 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              mx: 'auto',
+              mb: 2,
+              boxShadow: '0 8px 32px rgba(6, 182, 212, 0.3)',
+            }}>
+              <Package size={32} color="white" />
+            </Box>
+            <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: '#f1f5f9', mb: 0.5 }}>
+              QR Code รับสินค้า
+            </Typography>
+            <Typography sx={{ fontSize: '0.9rem', color: '#94a3b8' }}>
+              แสดง QR Code นี้ให้พนักงาน
+            </Typography>
+          </Box>
+
+          {/* QR Code */}
+          <Box sx={{
+            p: 4,
+            borderRadius: '24px',
+            bgcolor: 'white',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+            mb: 3,
+          }}>
+            <QRCodeSVG
+              value={`ORDER:${showQRFullscreen || ''}`}
+              size={Math.min(280, typeof window !== 'undefined' ? window.innerWidth - 100 : 280)}
+              level="H"
+              includeMargin={false}
+            />
+          </Box>
+
+          {/* Order Ref */}
+          <Box sx={{
+            px: 3,
+            py: 1.5,
+            borderRadius: '16px',
+            bgcolor: 'rgba(255,255,255,0.05)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            mb: 4,
+          }}>
+            <Typography sx={{ 
+              fontSize: '0.75rem', 
+              color: '#64748b', 
+              textAlign: 'center',
+              mb: 0.5,
+            }}>
+              หมายเลขคำสั่งซื้อ
+            </Typography>
+            <Typography sx={{ 
+              fontSize: '1.3rem', 
+              fontWeight: 800, 
+              color: '#06b6d4',
+              fontFamily: 'monospace',
+              textAlign: 'center',
+              letterSpacing: '0.05em',
+            }}>
+              {showQRFullscreen}
+            </Typography>
+          </Box>
+
+          {/* Pickup Location - Per Product */}
+          {(() => {
+            // Find the order to get product IDs
+            const targetOrder = orderHistory.find((o: any) => o.ref === showQRFullscreen);
+            if (!targetOrder) return null;
+            
+            const orderItems = targetOrder.items || targetOrder.cart || [];
+            const productIds = orderItems.map((item: any) => item.productId || item.id).filter(Boolean);
+            const productsWithPickup = config?.products?.filter(
+              (p) => p.pickup?.enabled && productIds.includes(p.id)
+            ) || [];
+            
+            if (productsWithPickup.length === 0) return null;
+            
+            const uniqueLocations = [...new Set(productsWithPickup.map(p => p.pickup?.location).filter(Boolean))];
+            const firstPickup = productsWithPickup[0]?.pickup;
+            
+            return (
+              <Box sx={{ 
+                maxWidth: 360,
+                width: '100%',
+                p: 2.5, 
+                borderRadius: '16px', 
+                bgcolor: 'rgba(16,185,129,0.1)',
+                border: '1px solid rgba(16,185,129,0.3)',
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <MapPin size={18} style={{ color: '#10b981' }} />
+                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#10b981' }}>
+                    สถานที่รับสินค้า
+                  </Typography>
+                </Box>
+                {uniqueLocations.map((loc, idx) => (
+                  <Typography key={idx} sx={{ fontSize: '1rem', color: '#f1f5f9', fontWeight: 600, mb: 0.5 }}>
+                    {loc}
+                  </Typography>
+                ))}
+                {firstPickup && (firstPickup.startDate || firstPickup.endDate) && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 1 }}>
+                    <Clock size={14} style={{ color: '#64748b' }} />
+                    <Typography sx={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                      {firstPickup.startDate && new Date(firstPickup.startDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      {firstPickup.startDate && firstPickup.endDate && ' - '}
+                      {firstPickup.endDate && new Date(firstPickup.endDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    </Typography>
+                  </Box>
+                )}
+                {firstPickup?.notes && (
+                  <Typography sx={{ fontSize: '0.8rem', color: '#fbbf24', mt: 1 }}>
+                    📝 {firstPickup.notes}
+                  </Typography>
+                )}
+              </Box>
+            );
+          })()}
+
+          {/* Close Button at Bottom */}
+          <Button
+            onClick={() => setShowQRFullscreen(null)}
+            sx={{
+              mt: 4,
+              px: 4,
+              py: 1.5,
+              borderRadius: '12px',
+              bgcolor: 'rgba(255,255,255,0.1)',
+              color: '#f1f5f9',
+              fontSize: '1rem',
+              fontWeight: 600,
+              textTransform: 'none',
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.15)' },
+            }}
+          >
+            ปิด
+          </Button>
+        </Box>
+      </Dialog>
     </Box>
   );
 }
