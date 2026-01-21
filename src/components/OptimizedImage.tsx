@@ -121,12 +121,18 @@ function OptimizedImageComponent({
   const imgRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Intersection Observer for lazy loading
+  // Intersection Observer for lazy loading (with fallback for older browsers)
   useEffect(() => {
     if (priority || isInView) return;
 
+    // Fallback for browsers without IntersectionObserver (older Safari/iPad)
+    if (typeof IntersectionObserver === 'undefined') {
+      setIsInView(true);
+      return;
+    }
+
     const observer = new IntersectionObserver(
-      (entries) => {
+      function(entries) {
         if (entries[0].isIntersecting) {
           setIsInView(true);
           observer.disconnect();
@@ -142,7 +148,7 @@ function OptimizedImageComponent({
       observer.observe(containerRef.current);
     }
 
-    return () => observer.disconnect();
+    return function() { observer.disconnect(); };
   }, [priority, isInView]);
 
   // Preload priority images immediately
@@ -337,12 +343,18 @@ export const OptimizedBackground = memo(function OptimizedBackgroundComponent({
   const [isInView, setIsInView] = useState(priority);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Intersection Observer for lazy loading
+  // Intersection Observer for lazy loading (with fallback for older browsers)
   useEffect(() => {
     if (priority || isInView || !src) return;
 
+    // Fallback for browsers without IntersectionObserver (older Safari/iPad)
+    if (typeof IntersectionObserver === 'undefined') {
+      setIsInView(true);
+      return;
+    }
+
     const observer = new IntersectionObserver(
-      (entries) => {
+      function(entries) {
         if (entries[0].isIntersecting) {
           setIsInView(true);
           observer.disconnect();
@@ -358,7 +370,7 @@ export const OptimizedBackground = memo(function OptimizedBackgroundComponent({
       observer.observe(containerRef.current);
     }
 
-    return () => observer.disconnect();
+    return function() { observer.disconnect(); };
   }, [priority, isInView, src]);
 
   // Preload image when in view
