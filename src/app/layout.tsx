@@ -15,6 +15,13 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
+      <head>
+        {/* Preconnect to external resources for faster loading */}
+        <link rel="preconnect" href="https://ipfs.filebase.io" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://s3.filebase.com" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://ipfs.filebase.io" />
+        <link rel="dns-prefetch" href="https://s3.filebase.com" />
+      </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased relative min-h-screen overflow-x-hidden`}>
         <div className="pointer-events-none fixed inset-0 overflow-hidden">
           <div className="absolute -left-10 -top-24 h-80 w-80 rounded-full bg-[radial-gradient(circle_at_30%_30%,rgba(90,200,250,0.35),transparent_65%)] blur-3xl" />

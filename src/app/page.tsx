@@ -76,6 +76,7 @@ import ProfileModal from '@/components/ProfileModal';
 import Footer from '@/components/Footer';
 import TurnstileWidget from '@/components/TurnstileWidget';
 import { ShopStatusBanner, getProductStatus, getShopStatus, SHOP_STATUS_CONFIG, type ShopStatusType } from '@/components/ShopStatusCard';
+import OptimizedImage, { preloadImages, OptimizedBackground } from '@/components/OptimizedImage';
 import { Product, ShopConfig } from '@/lib/config';
 import {
   cancelOrder,
@@ -538,7 +539,14 @@ export default function HomePage() {
           const cachedCfg = cached as unknown as ShopConfig;
           const shopStatus = getShopStatus(cachedCfg.isOpen, cachedCfg.closeDate, cachedCfg.openDate);
           setIsShopOpen(shopStatus === 'OPEN');
-          // Keep loading while we refresh from GAS to avoid stale cache
+          
+          // Preload product images from cache (first image of each product)
+          const imageUrls = (cachedCfg.products || [])
+            .flatMap((p: Product) => p.images?.slice(0, 1) || [])
+            .filter(Boolean);
+          if (imageUrls.length > 0) {
+            preloadImages(imageUrls).catch(() => {});
+          }
         }
 
         await refreshConfig();
@@ -2618,17 +2626,18 @@ export default function HomePage() {
                 }}>
                   {/* Image */}
                   {ann.imageUrl && (
-                    <Box
-                      component="img"
+                    <OptimizedImage
                       src={ann.imageUrl}
                       alt="Announcement"
-                      sx={{
-                        width: { xs: '100%', md: 150 },
-                        maxWidth: { xs: 250, md: 150 },
-                        height: 'auto',
-                        maxHeight: { xs: 120, md: 100 },
-                        borderRadius: '12px',
-                        objectFit: 'cover',
+                      width={150}
+                      height={100}
+                      objectFit="cover"
+                      priority
+                      borderRadius="12px"
+                      style={{
+                        width: '100%',
+                        maxWidth: isMobile ? 250 : 150,
+                        maxHeight: isMobile ? 120 : 100,
                         boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
                         border: '2px solid rgba(255,255,255,0.2)',
                         flexShrink: 0,
@@ -2827,17 +2836,14 @@ export default function HomePage() {
 
                   {/* Image */}
                   {item.imageUrl && (
-                    <Box
-                      component="img"
+                    <OptimizedImage
                       src={item.imageUrl}
                       alt="Announcement"
-                      sx={{
-                        width: '100%',
-                        maxHeight: 150,
-                        objectFit: 'cover',
-                        borderRadius: '12px',
-                        mb: item.message ? 1.5 : 0,
-                      }}
+                      width="100%"
+                      height={150}
+                      objectFit="cover"
+                      borderRadius="12px"
+                      style={{ marginBottom: item.message ? 12 : 0 }}
                     />
                   )}
 
@@ -3176,7 +3182,7 @@ export default function HomePage() {
                     </Typography>
                   </Box>
                   <Grid container spacing={2}>
-                    {items.map((product) => {
+                    {items.map((product, productIdx) => {
                       const productStatus = getProductStatus(product);
                       const isProductAvailable = productStatus === 'OPEN' && isShopOpen;
                       const isProductClosed = productStatus !== 'OPEN'; // Product is closed/coming soon/ended
@@ -3225,17 +3231,24 @@ export default function HomePage() {
                             bgcolor: '#0b1224',
                             overflow: 'hidden',
                           }}>
-                            {/* Always show product image */}
-                            <Box sx={{
-                              position: 'absolute',
-                              inset: 0,
-                              backgroundImage: product.images?.[0] ? `url(${product.images[0]})` : undefined,
-                              backgroundSize: 'cover',
-                              backgroundPosition: 'center',
-                              filter: isProductClosed ? 'grayscale(40%) brightness(0.7)' : 'none',
-                              transition: 'filter 0.3s ease',
-                            }} />
-                            {!product.images?.[0] && (
+                            {/* Optimized product image with lazy loading */}
+                            {product.images?.[0] ? (
+                              <OptimizedImage
+                                src={product.images[0]}
+                                alt={product.name}
+                                width="100%"
+                                height="100%"
+                                objectFit="cover"
+                                priority={productIdx < 4} // First 4 products load eagerly
+                                placeholder="skeleton"
+                                style={{
+                                  position: 'absolute',
+                                  inset: 0,
+                                  filter: isProductClosed ? 'grayscale(40%) brightness(0.7)' : 'none',
+                                  transition: 'filter 0.3s ease',
+                                }}
+                              />
+                            ) : (
                               <Box sx={{ 
                                 position: 'absolute', 
                                 inset: 0, 
@@ -3248,7 +3261,6 @@ export default function HomePage() {
                                 ไม่มีรูป
                               </Box>
                             )}
-                            
                             {/* Status Overlay for closed products */}
                             {isProductClosed && (
                               <Box sx={{
@@ -3739,11 +3751,13 @@ export default function HomePage() {
                           flexShrink: 0,
                           border: '1px solid rgba(255,255,255,0.1)',
                         }}>
-                          <Box
-                            component="img"
+                          <OptimizedImage
                             src={product.images[0]}
                             alt={item.productName}
-                            sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            width={60}
+                            height={60}
+                            objectFit="cover"
+                            placeholder="skeleton"
                           />
                         </Box>
                       )}
@@ -4878,7 +4892,8 @@ export default function HomePage() {
                 const statusLabel = getStatusLabel(statusKey);
                 const statusColor = getStatusColor(statusKey);
                 const canCancel = CANCELABLE_STATUSES.includes(statusKey);
-                const canPay = PAYABLE_STATUSES.includes(statusKey);
+                // ชำระเงินได้เฉพาะเมื่อร้านค้ายังเปิดรับออเดอร์อยู่
+                const canPay = isShopOpen && PAYABLE_STATUSES.includes(statusKey);
                 const category = getStatusCategory(statusKey);
 
                 // Status icon and color scheme
@@ -5089,7 +5104,7 @@ export default function HomePage() {
                           ฿{order.total?.toLocaleString() || '0'}
                         </Typography>
                       </Box>
-                      <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
                         {canPay && (
                           <Button
                             size="small"
@@ -5112,6 +5127,23 @@ export default function HomePage() {
                           >
                             ชำระเงิน
                           </Button>
+                        )}
+                        {/* แสดงข้อความเมื่อหมดเขตชำระเงินแล้ว */}
+                        {!isShopOpen && PAYABLE_STATUSES.includes(statusKey) && (
+                          <Typography sx={{ 
+                            fontSize: '0.7rem', 
+                            color: '#f59e0b',
+                            bgcolor: 'rgba(245,158,11,0.1)',
+                            px: 1.5,
+                            py: 0.5,
+                            borderRadius: '8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 0.5,
+                          }}>
+                            <Clock size={12} />
+                            หมดเขตชำระเงิน
+                          </Typography>
                         )}
                         {canCancel && (
                           <Button

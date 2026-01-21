@@ -76,11 +76,30 @@ const isValidDate = (dateString?: string): boolean => {
   return !isNaN(date.getTime());
 };
 
-// Helper to get end of day (23:59:59.999) for a date
-const getEndOfDay = (date: Date): Date => {
-  const endOfDay = new Date(date);
-  endOfDay.setHours(23, 59, 59, 999);
-  return endOfDay;
+// Helper to check if datetime string includes time component
+const hasTimeComponent = (dateString: string): boolean => {
+  // Check if string contains time (T00:00 or space with time)
+  return dateString.includes('T') || /\d{2}:\d{2}/.test(dateString);
+};
+
+// Helper to get the close datetime - use exact time if specified, otherwise end of day
+const getCloseDateTime = (dateString: string): Date => {
+  const date = new Date(dateString);
+  // If no time component was specified, use end of day (23:59:59)
+  if (!hasTimeComponent(dateString)) {
+    date.setHours(23, 59, 59, 999);
+  }
+  return date;
+};
+
+// Helper to get the open datetime - use exact time if specified, otherwise start of day
+const getOpenDateTime = (dateString: string): Date => {
+  const date = new Date(dateString);
+  // If no time component was specified, use start of day (00:00:00)
+  if (!hasTimeComponent(dateString)) {
+    date.setHours(0, 0, 0, 0);
+  }
+  return date;
 };
 
 // Helper to determine shop status
@@ -92,13 +111,13 @@ export const getShopStatus = (isOpen: boolean, closeDate?: string, openDate?: st
   
   // Check if there's an opening date in the future (only if valid date)
   if (isValidDate(openDate)) {
-    const open = new Date(openDate!);
+    const open = getOpenDateTime(openDate!);
     if (now < open) return 'WAITING_TO_OPEN';
   }
   
-  // Check if closeDate has passed - use end of day for closeDate
+  // Check if closeDate has passed - use exact time if specified
   if (isValidDate(closeDate)) {
-    const close = getEndOfDay(new Date(closeDate!));
+    const close = getCloseDateTime(closeDate!);
     if (now > close) return 'ORDER_ENDED';
   }
   
@@ -108,8 +127,8 @@ export const getShopStatus = (isOpen: boolean, closeDate?: string, openDate?: st
 // Helper to determine product status
 export const getProductStatus = (product: { isActive?: boolean; startDate?: string; endDate?: string }): ShopStatusType => {
   const now = new Date();
-  const start = isValidDate(product.startDate) ? new Date(product.startDate!) : null;
-  const end = isValidDate(product.endDate) ? getEndOfDay(new Date(product.endDate!)) : null;
+  const start = isValidDate(product.startDate) ? getOpenDateTime(product.startDate!) : null;
+  const end = isValidDate(product.endDate) ? getCloseDateTime(product.endDate!) : null;
   
   if (!product.isActive) return 'TEMPORARILY_CLOSED';
   if (start && now < start) return 'COMING_SOON';

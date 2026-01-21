@@ -110,6 +110,40 @@ function isAllowedUrl(url: string): boolean {
   }
 }
 
+// ==================== HEAD REQUEST FOR FASTER CHECKS ====================
+
+export async function HEAD(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    
+    if (!id) {
+      return new NextResponse(null, { status: 400 });
+    }
+
+    const imageUrl = smartDecryptUrl(id);
+    if (!imageUrl || !isAllowedUrl(imageUrl)) {
+      return new NextResponse(null, { status: 400 });
+    }
+
+    const cacheKey = getCacheKey(imageUrl);
+    const cached = await getFromCache(cacheKey);
+    
+    return new NextResponse(null, {
+      status: 200,
+      headers: {
+        'Content-Type': cached?.contentType || 'image/jpeg',
+        'Cache-Control': 'public, max-age=31536000, immutable',
+        'X-Cache': cached ? 'HIT' : 'MISS',
+      },
+    });
+  } catch {
+    return new NextResponse(null, { status: 500 });
+  }
+}
+
 // ==================== IMAGE PROXY ROUTE ====================
 
 export async function GET(
@@ -184,9 +218,12 @@ export async function GET(
         status: 200,
         headers: {
           'Content-Type': cached.contentType,
-          'Cache-Control': 'public, max-age=31536000, immutable', // 1 year, immutable
+          'Cache-Control': 'public, max-age=31536000, s-maxage=31536000, stale-while-revalidate=86400, immutable',
+          'CDN-Cache-Control': 'public, max-age=31536000',
+          'Vercel-CDN-Cache-Control': 'public, max-age=31536000',
           'X-Content-Type-Options': 'nosniff',
           'X-Cache': 'HIT',
+          'Vary': 'Accept',
         },
       });
     }
@@ -229,9 +266,13 @@ export async function GET(
       status: 200,
       headers: {
         'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=31536000, immutable', // 1 year, immutable
+        'Content-Length': imageBuffer.length.toString(),
+        'Cache-Control': 'public, max-age=31536000, s-maxage=31536000, stale-while-revalidate=86400, immutable',
+        'CDN-Cache-Control': 'public, max-age=31536000',
+        'Vercel-CDN-Cache-Control': 'public, max-age=31536000',
         'X-Content-Type-Options': 'nosniff',
         'X-Cache': 'MISS',
+        'Vary': 'Accept',
       },
     });
 
