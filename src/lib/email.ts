@@ -331,7 +331,10 @@ export function generatePaymentReceivedEmail(order: {
 export function generateOrderReadyEmail(order: {
   ref: string;
   customerName: string;
+  pickupLocation?: string;
+  pickupNotes?: string;
 }): EmailTemplate {
+  const location = order.pickupLocation || 'ชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์';
   const content = `
     <h2>📦 สินค้าพร้อมรับแล้ว!</h2>
     <p>สวัสดีคุณ ${order.customerName}</p>
@@ -347,8 +350,8 @@ export function generateOrderReadyEmail(order: {
     
     <h3 style="color: #f1f5f9;">📍 สถานที่รับสินค้า</h3>
     <div class="box box-info">
-      <p style="margin: 0; color: #f1f5f9;"><strong>ชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์</strong></p>
-      <p style="margin: 8px 0 0; color: #94a3b8;">มหาวิทยาลัยสงขลานครินทร์ วิทยาเขตหาดใหญ่</p>
+      <p style="margin: 0; color: #f1f5f9;"><strong>${location}</strong></p>
+      ${order.pickupNotes ? `<p style="margin: 8px 0 0; color: #94a3b8;">${order.pickupNotes}</p>` : ''}
       <p style="margin: 8px 0 0; color: #6366f1;">กรุณานำหลักฐานยืนยันตัวตนมาด้วย</p>
     </div>
     
@@ -360,7 +363,7 @@ export function generateOrderReadyEmail(order: {
   return {
     subject: `📦 สินค้าพร้อมรับ #${order.ref} - ${SHOP_NAME}`,
     html: baseTemplate(content, `คำสั่งซื้อ #${order.ref} พร้อมให้รับแล้ว`),
-    text: `สินค้าพร้อมรับแล้ว! คำสั่งซื้อ: ${order.ref} รับได้ที่ชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ ม.อ.`,
+    text: `สินค้าพร้อมรับแล้ว! คำสั่งซื้อ: ${order.ref} รับได้ที่ ${location}`,
   };
 }
 
@@ -539,7 +542,7 @@ export async function sendPaymentReceivedEmail(order: any): Promise<void> {
   });
 }
 
-export async function sendOrderStatusEmail(order: any, newStatus: string): Promise<void> {
+export async function sendOrderStatusEmail(order: any, newStatus: string, options?: { pickupLocation?: string; pickupNotes?: string }): Promise<void> {
   const email = order.customerEmail || order.email;
   const name = order.customerName || order.name;
   
@@ -552,7 +555,12 @@ export async function sendOrderStatusEmail(order: any, newStatus: string): Promi
       type = 'payment_received';
       break;
     case 'READY':
-      template = generateOrderReadyEmail({ ref: order.ref, customerName: name });
+      template = generateOrderReadyEmail({ 
+        ref: order.ref, 
+        customerName: name,
+        pickupLocation: options?.pickupLocation || order.pickupLocation,
+        pickupNotes: options?.pickupNotes || order.pickupNotes,
+      });
       type = 'order_ready';
       break;
     case 'SHIPPED':

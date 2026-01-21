@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getJson, putJson, listKeys } from '@/lib/filebase';
 import { requireAdmin } from '@/lib/auth';
 import { ShopConfig } from '@/lib/config';
+import { sendOrderStatusEmail } from '@/lib/email';
 import crypto from 'crypto';
 
 export const runtime = 'nodejs';
@@ -108,6 +109,8 @@ export async function POST(req: NextRequest) {
             readyAt: new Date().toISOString(),
             readyBy: authResult.email,
             readyReason: `Pickup enabled for product: ${config.products[productIndex].name}`,
+            pickupLocation: pickupSettings.location,
+            pickupNotes: pickupSettings.notes,
           };
           
           await putJson(key, updatedOrder);
@@ -116,6 +119,16 @@ export async function POST(req: NextRequest) {
           const customerEmail = order.customerEmail || order.email;
           if (customerEmail) {
             await updateIndexEntry(customerEmail, updatedOrder);
+            
+            // Send email notification with pickup location
+            try {
+              await sendOrderStatusEmail(updatedOrder, 'READY', {
+                pickupLocation: pickupSettings.location,
+                pickupNotes: pickupSettings.notes,
+              });
+            } catch (emailErr) {
+              console.error('[Pickup Enable] Email send error:', emailErr);
+            }
           }
           
           updatedCount++;

@@ -3,6 +3,7 @@ import { getJson, putJson, listKeys } from '@/lib/filebase';
 import { requireAdmin } from '@/lib/auth';
 import { triggerSheetSync } from '@/lib/sheet-sync';
 import { sendOrderStatusEmail } from '@/lib/email';
+import { ShopConfig } from '@/lib/config';
 import crypto from 'crypto';
 
 // Helper to generate email index key
@@ -70,7 +71,31 @@ export async function POST(req: NextRequest) {
       // Send email notification if status changed and email is enabled
       if (sendEmail && previousStatus !== status && customerEmail) {
         try {
-          await sendOrderStatusEmail(order, status);
+          // For READY status, get pickup location from product settings
+          let pickupOptions: { pickupLocation?: string; pickupNotes?: string } = {};
+          if (status.toUpperCase() === 'READY') {
+            const config = await getJson<ShopConfig>('config/shop-settings.json');
+            if (config?.products) {
+              const items = order.cart || order.items || [];
+              const productIds = items.map((item: any) => item.productId || item.id).filter(Boolean);
+              
+              // Find products with pickup enabled that are in this order
+              const productsWithPickup = config.products.filter(p => 
+                p.pickup?.enabled && productIds.includes(p.id)
+              );
+              
+              if (productsWithPickup.length > 0) {
+                // Use first product's pickup location (or combine if multiple)
+                const locations = [...new Set(productsWithPickup.map(p => p.pickup?.location).filter(Boolean))];
+                const notes = [...new Set(productsWithPickup.map(p => p.pickup?.notes).filter(Boolean))];
+                pickupOptions = {
+                  pickupLocation: locations.join(' / '),
+                  pickupNotes: notes.join(' / '),
+                };
+              }
+            }
+          }
+          await sendOrderStatusEmail(order, status, pickupOptions);
         } catch (emailError) {
           console.error('[Status API] Failed to send email:', emailError);
           // Don't fail the request if email fails
