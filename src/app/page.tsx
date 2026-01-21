@@ -3084,9 +3084,9 @@ export default function HomePage() {
         </Box>
       </Drawer>
 
-      <Box sx={{ display: 'flex', flex: 1 }}>
-        <Box sx={{ flex: 1, p: { xs: 2, md: 3 } }}>
-          <Container maxWidth="lg">
+      <Box sx={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        <Box sx={{ flex: 1, p: { xs: 2, md: 3 }, overflow: 'auto', maxWidth: '100%' }}>
+          <Container maxWidth="lg" sx={{ px: { xs: 0, sm: 2 } }}>
             
 
             {activeProductCount > 0 && (
@@ -3245,14 +3245,14 @@ export default function HomePage() {
                       {items.length} รายการ
                     </Typography>
                   </Box>
-                  <Grid container spacing={2}>
+                  <Grid container spacing={2} sx={{ width: '100%', m: 0 }}>
                     {items.map((product, productIdx) => {
                       const productStatus = getProductStatus(product);
                       const isProductAvailable = productStatus === 'OPEN' && isShopOpen;
                       const isProductClosed = productStatus !== 'OPEN'; // Product is closed/coming soon/ended
                       
                       return (
-                      <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={product.id}>
+                      <Grid size={{ xs: 6, sm: 6, md: 4, lg: 3 }} key={product.id}>
                         <Box
                           onClick={() => {
                             if (!isShopOpen) {
