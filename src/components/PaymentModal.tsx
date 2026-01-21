@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import type { JSX } from 'react';
 import { X, Upload, Check, Loader2, AlertCircle, CheckCircle2, Image, Clock3, Download, CreditCard, QrCode, Copy, Smartphone, ArrowRight, Sparkles, AlertTriangle, Info, ShoppingBag, Tag, Hash, Shirt, Clock } from 'lucide-react';
 import { Drawer, Box, Typography, Button, IconButton, Skeleton, useMediaQuery, LinearProgress, Slide, Collapse } from '@mui/material';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface PaymentModalProps {
   orderRef: string;
@@ -197,6 +198,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
   const isMobile = useMediaQuery('(max-width: 640px)');
   const [loading, setLoading] = useState(true);
   const [verifying, setVerifying] = useState(false);
+  const [qrPayload, setQrPayload] = useState<string | null>(null);
   const [qrUrl, setQrUrl] = useState<string | null>(null);
   const [amount, setAmount] = useState(0);
   const [baseAmount, setBaseAmount] = useState(0);
@@ -242,6 +244,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
 
       if (data.status === 'success') {
         const info = data.data || data;
+        setQrPayload(info.qrPayload || null);
         setQrUrl(info.qrUrl || null);
         setAmount(Number(info.finalAmount ?? info.amount ?? 0));
         setBaseAmount(Number(info.baseAmount ?? info.amount ?? 0));
@@ -355,6 +358,128 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
   };
 
   const handleSaveQr = async () => {
+    // If we have qrPayload, convert SVG to PNG and download
+    if (qrPayload) {
+      try {
+        setDownloading(true);
+        setDownloadProgress(30);
+        
+        // Find the QR SVG element by ID
+        const svgElement = document.getElementById('promptpay-qr-svg');
+        if (!svgElement) {
+          addToast('error', 'ไม่พบ QR Code');
+          setDownloading(false);
+          setDownloadProgress(0);
+          return;
+        }
+        
+        setDownloadProgress(50);
+        
+        // Get SVG data
+        const svgData = new XMLSerializer().serializeToString(svgElement);
+        const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+        const svgUrl = URL.createObjectURL(svgBlob);
+        
+        // Create canvas with padding for nice output
+        const canvas = document.createElement('canvas');
+        const padding = 40;
+        const qrSize = 200;
+        const totalSize = qrSize + (padding * 2);
+        canvas.width = totalSize;
+        canvas.height = totalSize + 60; // Extra space for text
+        const ctx = canvas.getContext('2d');
+        
+        if (!ctx) {
+          addToast('error', 'ไม่สามารถสร้างรูปได้');
+          setDownloading(false);
+          setDownloadProgress(0);
+          return;
+        }
+        
+        // Draw gradient background
+        const gradient = ctx.createLinearGradient(0, 0, totalSize, totalSize);
+        gradient.addColorStop(0, '#1a237e');
+        gradient.addColorStop(0.5, '#283593');
+        gradient.addColorStop(1, '#3949ab');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw white rounded rectangle for QR
+        ctx.fillStyle = '#ffffff';
+        const rx = 16;
+        const qrX = padding;
+        const qrY = padding;
+        ctx.beginPath();
+        ctx.moveTo(qrX + rx, qrY);
+        ctx.lineTo(qrX + qrSize - rx, qrY);
+        ctx.quadraticCurveTo(qrX + qrSize, qrY, qrX + qrSize, qrY + rx);
+        ctx.lineTo(qrX + qrSize, qrY + qrSize - rx);
+        ctx.quadraticCurveTo(qrX + qrSize, qrY + qrSize, qrX + qrSize - rx, qrY + qrSize);
+        ctx.lineTo(qrX + rx, qrY + qrSize);
+        ctx.quadraticCurveTo(qrX, qrY + qrSize, qrX, qrY + qrSize - rx);
+        ctx.lineTo(qrX, qrY + rx);
+        ctx.quadraticCurveTo(qrX, qrY, qrX + rx, qrY);
+        ctx.closePath();
+        ctx.fill();
+        
+        setDownloadProgress(70);
+        
+        // Load and draw QR
+        const img = document.createElement('img') as HTMLImageElement;
+        img.onload = () => {
+          ctx.drawImage(img, padding + 10, padding + 10, qrSize - 20, qrSize - 20);
+          
+          // Draw amount text
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 20px Arial, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(`฿${amount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}`, totalSize / 2, totalSize + 35);
+          
+          // Draw "PromptPay" text
+          ctx.font = '12px Arial, sans-serif';
+          ctx.fillStyle = 'rgba(255,255,255,0.7)';
+          ctx.fillText('PromptPay', totalSize / 2, totalSize + 52);
+          
+          setDownloadProgress(90);
+          
+          // Convert to blob and download
+          canvas.toBlob((blob) => {
+            if (blob) {
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.href = url;
+              link.download = `promptpay-qr-${orderRef}.png`;
+              link.click();
+              URL.revokeObjectURL(url);
+              setDownloadProgress(100);
+              addToast('success', 'บันทึก QR Code แล้ว');
+            } else {
+              addToast('error', 'บันทึกไม่สำเร็จ');
+            }
+            setDownloading(false);
+            setTimeout(() => setDownloadProgress(0), 500);
+          }, 'image/png', 0.95);
+          
+          URL.revokeObjectURL(svgUrl);
+        };
+        
+        img.onerror = () => {
+          addToast('error', 'โหลด QR ไม่สำเร็จ');
+          setDownloading(false);
+          setDownloadProgress(0);
+          URL.revokeObjectURL(svgUrl);
+        };
+        
+        img.src = svgUrl;
+      } catch (error) {
+        addToast('error', 'บันทึกไม่สำเร็จ', 'ลองใหม่อีกครั้ง');
+        setDownloading(false);
+        setDownloadProgress(0);
+      }
+      return;
+    }
+    
+    // Legacy: download from qrUrl
     if (!qrUrl) {
       addToast('warning', 'ยังไม่มี QR');
       return;
@@ -1115,7 +1240,53 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                       รอแอดมินเปิดระบบก่อน
                     </Typography>
                   </Box>
+                ) : qrPayload ? (
+                  <Box sx={{ 
+                    background: 'linear-gradient(135deg, #1a237e 0%, #283593 50%, #3949ab 100%)',
+                    borderRadius: '20px', 
+                    p: 2,
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+                    mb: 2,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                  }}>
+                    {/* PromptPay Header */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                      <Typography sx={{ color: '#fff', fontWeight: 700, letterSpacing: 1, textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
+                        พร้อมเพย์
+                      </Typography>
+                      <Box component="span" sx={{ bgcolor: '#fff', color: '#1a237e', px: 1, py: 0.25, borderRadius: 1, fontSize: '0.65rem', fontWeight: 700 }}>
+                        PROMPTPAY
+                      </Box>
+                    </Box>
+                    {/* QR Code */}
+                    <Box sx={{ bgcolor: '#fff', p: 2, borderRadius: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
+                      <QRCodeSVG
+                        id="promptpay-qr-svg"
+                        value={qrPayload}
+                        size={200}
+                        level="M"
+                        includeMargin={false}
+                        bgColor="#ffffff"
+                        fgColor="#1a237e"
+                      />
+                    </Box>
+                    {/* Amount */}
+                    <Box sx={{ mt: 1.5, textAlign: 'center' }}>
+                      <Typography sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.75rem', mb: 0.25 }}>
+                        จำนวนเงิน
+                      </Typography>
+                      <Typography sx={{ color: '#fff', fontWeight: 700, fontSize: '1.25rem', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
+                        ฿{amount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
+                      </Typography>
+                    </Box>
+                    <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.65rem', mt: 1, textAlign: 'center' }}>
+                      สแกน QR Code ด้วยแอปธนาคาร
+                    </Typography>
+                  </Box>
                 ) : qrUrl ? (
+                  /* Legacy fallback using img tag */
                   <Box sx={{ 
                     bgcolor: 'white', 
                     borderRadius: '20px', 
@@ -1153,7 +1324,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                   fullWidth
                   startIcon={downloading ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
                   onClick={handleSaveQr}
-                  disabled={!qrUrl || downloading || !paymentEnabled}
+                  disabled={(!qrPayload && !qrUrl) || downloading || !paymentEnabled}
                   sx={{
                     py: 1.3,
                     borderRadius: '12px',

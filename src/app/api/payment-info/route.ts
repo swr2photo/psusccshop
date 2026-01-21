@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { listKeys, getJson } from '@/lib/filebase';
-import { generatePromptPayQR, calculateOrderTotal } from '@/lib/payment-utils';
+import { generatePromptPayPayload, generatePromptPayQR, calculateOrderTotal } from '@/lib/payment-utils';
 import { requireAuth, isResourceOwner, isAdminEmail } from '@/lib/auth';
 import { maskPhone } from '@/lib/sanitize';
 
@@ -76,6 +76,8 @@ export async function GET(req: NextRequest) {
     const baseAmount = Number(order.totalAmount ?? order.amount ?? calculateOrderTotal(order.cart || [])) || 0;
     const discount = Number(order.discount ?? 0);
     const finalAmount = Math.max(0, baseAmount - discount);
+    // Generate both QR payload (for client-side rendering) and legacy URL
+    const qrPayload = finalAmount > 0 ? generatePromptPayPayload(finalAmount) : null;
     const qrUrl = finalAmount > 0 ? generatePromptPayQR(finalAmount) : null;
 
     // ดึงข้อมูลสินค้าจาก order และ sanitize
@@ -100,7 +102,8 @@ export async function GET(req: NextRequest) {
         baseAmount,
         discount,
         finalAmount,
-        qrUrl,
+        qrPayload, // For client-side QR rendering with qrcode.react
+        qrUrl,     // Legacy URL fallback
         cart: cartItems,
         status: order.status || 'PENDING',
         // ไม่ส่ง slip data ให้ frontend - เฉพาะ admin เท่านั้นที่เห็น slip

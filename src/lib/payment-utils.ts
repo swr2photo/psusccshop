@@ -13,7 +13,11 @@ function tlv(id: string, val: string) {
   return id + String(val.length).padStart(2, '0') + val;
 }
 
-export function generatePromptPayQR(amount: number) {
+/**
+ * Generate PromptPay payload string for QR code
+ * Returns the raw payload data (not a URL) for use with qrcode.react
+ */
+export function generatePromptPayPayload(amount: number): string {
   const ppID = process.env.PROMPTPAY_ID || '';
   if (!ppID) return '';
   
@@ -31,7 +35,17 @@ export function generatePromptPayQR(amount: number) {
     '5303764', tlv('54', amountStr), '5802TH', '6304'
   ].join('');
 
-  return `https://quickchart.io/qr?size=300&text=${encodeURIComponent(payload + crc16(payload))}`;
+  return payload + crc16(payload);
+}
+
+/**
+ * @deprecated Use generatePromptPayPayload instead and render QR code client-side
+ * Legacy function that returns quickchart.io URL
+ */
+export function generatePromptPayQR(amount: number): string {
+  const payload = generatePromptPayPayload(amount);
+  if (!payload) return '';
+  return `https://quickchart.io/qr?size=300&text=${encodeURIComponent(payload)}`;
 }
 
 // --- Pricing Logic (ต้องตรงกับหน้าเว็บ) ---

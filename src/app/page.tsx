@@ -3157,7 +3157,7 @@ export default function HomePage() {
                           sx={{
                             height: '100%',
                             display: 'flex',
-                            flexDirection: { xs: 'row', sm: 'column' },
+                            flexDirection: { xs: 'row', sm: 'column' }, // Horizontal on mobile
                             cursor: isProductAvailable ? 'pointer' : 'default',
                             borderRadius: '20px',
                             overflow: 'hidden',
@@ -3176,12 +3176,11 @@ export default function HomePage() {
                           {/* Product Image Area */}
                           <Box sx={{
                             position: 'relative',
-                            width: { xs: 140, sm: '100%' },
+                            width: { xs: 140, sm: '100%' }, // Fixed width on mobile
                             minWidth: { xs: 140, sm: 'auto' },
-                            aspectRatio: { xs: '1 / 1', sm: '1 / 1' },
+                            aspectRatio: '1 / 1',
                             bgcolor: '#0b1224',
                             overflow: 'hidden',
-                            flexShrink: 0,
                           }}>
                             {/* Always show product image */}
                             <Box sx={{
@@ -3299,7 +3298,7 @@ export default function HomePage() {
                               </Box>
                             )}
                             
-                            {/* Price badge - hide on mobile horizontal layout */}
+                            {/* Price badge */}
                             <Box sx={{
                               position: 'absolute',
                               bottom: 8,
@@ -3309,7 +3308,6 @@ export default function HomePage() {
                               borderRadius: '10px',
                               bgcolor: isProductClosed ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.7)',
                               backdropFilter: 'blur(8px)',
-                              display: { xs: 'none', sm: 'block' },
                             }}>
                               <Typography sx={{ 
                                 fontSize: '0.9rem', 
@@ -3322,9 +3320,15 @@ export default function HomePage() {
                           </Box>
 
                           {/* Product Info */}
-                          <Box sx={{ p: { xs: 2, sm: 1.5 }, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: { xs: 'center', sm: 'flex-start' } }}>
+                          <Box sx={{ 
+                            p: { xs: 1.5, sm: 1.5 }, 
+                            flex: 1, 
+                            display: 'flex', 
+                            flexDirection: 'column',
+                            justifyContent: { xs: 'center', sm: 'flex-start' },
+                          }}>
                             <Typography sx={{ 
-                              fontSize: { xs: '1rem', sm: '0.9rem' }, 
+                              fontSize: { xs: '0.95rem', sm: '0.9rem' }, 
                               fontWeight: 700, 
                               color: isProductClosed ? '#94a3b8' : '#f1f5f9',
                               mb: 0.5,
@@ -3337,20 +3341,8 @@ export default function HomePage() {
                             }}>
                               {product.name}
                             </Typography>
-                            
-                            {/* Price on mobile */}
                             <Typography sx={{ 
-                              fontSize: '1.1rem', 
-                              fontWeight: 800, 
-                              color: isProductClosed ? '#94a3b8' : '#10b981',
-                              display: { xs: 'block', sm: 'none' },
-                              mb: 0.5,
-                            }}>
-                              ฿{product.basePrice.toLocaleString()}
-                            </Typography>
-                            
-                            <Typography sx={{ 
-                              fontSize: { xs: '0.8rem', sm: '0.7rem' }, 
+                              fontSize: { xs: '0.75rem', sm: '0.7rem' }, 
                               color: '#64748b',
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
@@ -3358,7 +3350,6 @@ export default function HomePage() {
                               mb: 1,
                             }}>
                               {product.description || TYPE_LABELS[product.type] || product.type}
-                            </Typography>
                             </Typography>
                             
                             {/* Status/Action Button */}
