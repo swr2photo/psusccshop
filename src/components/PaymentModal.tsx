@@ -542,10 +542,10 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
       onClose={onClose}
       PaperProps={{
         sx: {
-          height: { xs: '95vh', sm: '90vh' },
-          maxHeight: '95vh',
-          borderTopLeftRadius: { xs: 24, sm: 28 },
-          borderTopRightRadius: { xs: 24, sm: 28 },
+          height: { xs: '85vh', sm: '85vh' },
+          maxHeight: { xs: '85vh', sm: '90vh' },
+          borderTopLeftRadius: { xs: 20, sm: 24 },
+          borderTopRightRadius: { xs: 20, sm: 24 },
           bgcolor: '#0a0f1a',
           overflow: 'hidden',
         },
@@ -553,11 +553,11 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
     >
       <PaymentToastContainer toasts={toasts} removeToast={removeToast} />
       
-      {/* Header */}
+      {/* Header - Compact */}
       <Box sx={{
         px: { xs: 2, sm: 3 },
-        pt: 1.5,
-        pb: 2,
+        pt: 1,
+        pb: 1.5,
         borderBottom: '1px solid rgba(255,255,255,0.06)',
         background: 'linear-gradient(180deg, rgba(15,23,42,0.98) 0%, rgba(10,15,26,0.98) 100%)',
         position: 'sticky',
@@ -565,48 +565,62 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
         zIndex: 10,
       }}>
         {/* Drag Handle */}
-        <Box sx={{ width: 40, height: 5, bgcolor: 'rgba(255,255,255,0.15)', borderRadius: 3, mx: 'auto', mb: 2 }} />
+        <Box sx={{ width: 36, height: 4, bgcolor: 'rgba(255,255,255,0.15)', borderRadius: 3, mx: 'auto', mb: 1.5 }} />
         
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <Box sx={{
-              width: 48,
-              height: 48,
-              borderRadius: '16px',
+              width: 40,
+              height: 40,
+              borderRadius: '12px',
               background: 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)',
               display: 'grid',
               placeItems: 'center',
-              boxShadow: '0 8px 24px rgba(16,185,129,0.3)',
+              boxShadow: '0 4px 16px rgba(16,185,129,0.25)',
             }}>
-              <CreditCard size={24} color="white" />
+              <CreditCard size={20} color="white" />
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '1.2rem', fontWeight: 800, color: '#f1f5f9' }}>
+              <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#f1f5f9', lineHeight: 1.2 }}>
                 ชำระเงิน
               </Typography>
-              <Typography sx={{ fontSize: '0.8rem', color: '#64748b', fontFamily: 'monospace' }}>
+              <Typography sx={{ fontSize: '0.75rem', color: '#64748b', fontFamily: 'monospace' }}>
                 #{orderRef}
               </Typography>
             </Box>
           </Box>
+          
+          {/* Close Button */}
+          <IconButton
+            onClick={onClose}
+            size="small"
+            sx={{
+              bgcolor: 'rgba(255,255,255,0.05)',
+              color: '#94a3b8',
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.1)', color: '#f1f5f9' },
+            }}
+          >
+            <X size={20} />
+          </IconButton>
         </Box>
 
-        {/* Progress Steps - Simplified */}
+        {/* Progress Steps - Compact */}
         <Box sx={{ 
           display: 'flex', 
           alignItems: 'center', 
           justifyContent: 'center',
-          gap: 1,
+          gap: 0.5,
+          mt: 1.5,
         }}>
           {steps.map((step, index) => (
-            <Box key={step} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box key={step} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
               <Box sx={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 0.8,
-                px: 1.5,
-                py: 0.6,
-                borderRadius: '20px',
+                gap: 0.5,
+                px: 1,
+                py: 0.4,
+                borderRadius: '16px',
                 bgcolor: activeStep >= index 
                   ? index === 2 && hasSlip ? 'rgba(16, 185, 129, 0.15)' : 'rgba(6, 182, 212, 0.15)'
                   : 'rgba(255,255,255,0.03)',
@@ -616,22 +630,22 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                 transition: 'all 0.3s ease',
               }}>
                 <Box sx={{
-                  width: 20,
-                  height: 20,
+                  width: 16,
+                  height: 16,
                   borderRadius: '50%',
                   bgcolor: activeStep >= index 
                     ? index === 2 && hasSlip ? '#10b981' : '#06b6d4'
                     : 'rgba(255,255,255,0.1)',
                   display: 'grid',
                   placeItems: 'center',
-                  fontSize: '0.7rem',
+                  fontSize: '0.6rem',
                   fontWeight: 700,
                   color: activeStep >= index ? 'white' : '#64748b',
                 }}>
-                  {activeStep > index ? <Check size={12} /> : index + 1}
+                  {activeStep > index ? <Check size={10} /> : index + 1}
                 </Box>
                 <Typography sx={{ 
-                  fontSize: '0.75rem', 
+                  fontSize: '0.65rem', 
                   fontWeight: 600, 
                   color: activeStep >= index 
                     ? index === 2 && hasSlip ? '#6ee7b7' : '#67e8f9'
@@ -641,7 +655,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                 </Typography>
               </Box>
               {index < steps.length - 1 && (
-                <ArrowRight size={14} style={{ color: '#475569' }} />
+                <ArrowRight size={12} style={{ color: '#475569' }} />
               )}
             </Box>
           ))}

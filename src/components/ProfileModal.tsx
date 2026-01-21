@@ -118,10 +118,10 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
       onClose={onClose}
       PaperProps={{
         sx: {
-          height: { xs: '92vh', sm: '85vh' },
-          maxHeight: '92vh',
-          borderTopLeftRadius: { xs: 24, sm: 28 },
-          borderTopRightRadius: { xs: 24, sm: 28 },
+          height: { xs: '80vh', sm: '80vh' },
+          maxHeight: { xs: '85vh', sm: '85vh' },
+          borderTopLeftRadius: { xs: 20, sm: 24 },
+          borderTopRightRadius: { xs: 20, sm: 24 },
           bgcolor: '#0a0f1a',
           overflow: 'hidden',
         },
@@ -181,11 +181,11 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
         </Box>
       )}
 
-      {/* Header */}
+      {/* Header - Compact */}
       <Box sx={{
         px: { xs: 2, sm: 3 },
-        pt: 1.5,
-        pb: 2,
+        pt: 1,
+        pb: 1.5,
         borderBottom: '1px solid rgba(255,255,255,0.06)',
         background: 'linear-gradient(180deg, rgba(15,23,42,0.98) 0%, rgba(10,15,26,0.98) 100%)',
         position: 'sticky',
@@ -193,30 +193,43 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
         zIndex: 10,
       }}>
         {/* Drag Handle */}
-        <Box sx={{ width: 40, height: 5, bgcolor: 'rgba(255,255,255,0.15)', borderRadius: 3, mx: 'auto', mb: 2 }} />
+        <Box sx={{ width: 36, height: 4, bgcolor: 'rgba(255,255,255,0.15)', borderRadius: 3, mx: 'auto', mb: 1.5 }} />
         
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <Box sx={{
-              width: 48,
-              height: 48,
-              borderRadius: '16px',
+              width: 40,
+              height: 40,
+              borderRadius: '12px',
               background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
               display: 'grid',
               placeItems: 'center',
-              boxShadow: '0 8px 24px rgba(139,92,246,0.3)',
+              boxShadow: '0 4px 16px rgba(139,92,246,0.25)',
             }}>
-              <UserCircle size={24} color="white" />
+              <UserCircle size={20} color="white" />
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '1.2rem', fontWeight: 800, color: '#f1f5f9' }}>
+              <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#f1f5f9', lineHeight: 1.2 }}>
                 ข้อมูลผู้ติดต่อ
               </Typography>
-              <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>
+              <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>
                 กรอกข้อมูลเพื่อดำเนินการสั่งซื้อ
               </Typography>
             </Box>
           </Box>
+          
+          {/* Close Button */}
+          <IconButton
+            onClick={onClose}
+            size="small"
+            sx={{
+              bgcolor: 'rgba(255,255,255,0.05)',
+              color: '#94a3b8',
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.1)', color: '#f1f5f9' },
+            }}
+          >
+            <X size={20} />
+          </IconButton>
         </Box>
       </Box>
 
@@ -228,35 +241,35 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
           flex: 1, 
           overflow: 'auto', 
           WebkitOverflowScrolling: 'touch',
-          px: { xs: 2, sm: 3 },
-          py: 2.5,
+          px: { xs: 1.5, sm: 2.5 },
+          py: 2,
         }}
       >
-        <Box sx={{ maxWidth: 480, mx: 'auto', display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+        <Box sx={{ maxWidth: 480, mx: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
           
           {/* Name Card */}
           <Box sx={{
-            p: 2.5,
-            borderRadius: '20px',
+            p: 2,
+            borderRadius: '16px',
             bgcolor: 'rgba(30,41,59,0.4)',
             border: '1px solid rgba(255,255,255,0.06)',
           }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
               <Box sx={{
-                width: 36,
-                height: 36,
-                borderRadius: '10px',
+                width: 32,
+                height: 32,
+                borderRadius: '8px',
                 background: 'linear-gradient(135deg, rgba(139,92,246,0.2) 0%, rgba(99,102,241,0.2) 100%)',
                 display: 'grid',
                 placeItems: 'center',
               }}>
-                <User size={18} style={{ color: '#a78bfa' }} />
+                <User size={16} style={{ color: '#a78bfa' }} />
               </Box>
               <Box>
-                <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: '#e2e8f0' }}>
+                <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#e2e8f0' }}>
                   ชื่อ-นามสกุล
                 </Typography>
-                <Typography sx={{ fontSize: '0.7rem', color: '#64748b' }}>
+                <Typography sx={{ fontSize: '0.65rem', color: '#64748b' }}>
                   กรุณากรอกเป็นภาษาไทย
                 </Typography>
               </Box>
@@ -284,23 +297,23 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
 
           {/* Contact Card */}
           <Box sx={{
-            p: 2.5,
-            borderRadius: '20px',
+            p: 2,
+            borderRadius: '16px',
             bgcolor: 'rgba(30,41,59,0.4)',
             border: '1px solid rgba(255,255,255,0.06)',
           }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
               <Box sx={{
-                width: 36,
-                height: 36,
-                borderRadius: '10px',
+                width: 32,
+                height: 32,
+                borderRadius: '8px',
                 background: 'linear-gradient(135deg, rgba(16,185,129,0.2) 0%, rgba(6,182,212,0.2) 100%)',
                 display: 'grid',
                 placeItems: 'center',
               }}>
-                <Phone size={18} style={{ color: '#6ee7b7' }} />
+                <Phone size={16} style={{ color: '#6ee7b7' }} />
               </Box>
-              <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: '#e2e8f0' }}>
+              <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#e2e8f0' }}>
                 ข้อมูลติดต่อ
               </Typography>
             </Box>
@@ -343,27 +356,27 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
 
           {/* Address Card */}
           <Box sx={{
-            p: 2.5,
-            borderRadius: '20px',
+            p: 2,
+            borderRadius: '16px',
             bgcolor: 'rgba(30,41,59,0.4)',
             border: '1px solid rgba(255,255,255,0.06)',
           }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
               <Box sx={{
-                width: 36,
-                height: 36,
-                borderRadius: '10px',
+                width: 32,
+                height: 32,
+                borderRadius: '8px',
                 background: 'linear-gradient(135deg, rgba(245,158,11,0.2) 0%, rgba(234,88,12,0.2) 100%)',
                 display: 'grid',
                 placeItems: 'center',
               }}>
-                <MapPin size={18} style={{ color: '#fbbf24' }} />
+                <MapPin size={16} style={{ color: '#fbbf24' }} />
               </Box>
               <Box>
-                <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: '#e2e8f0' }}>
+                <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#e2e8f0' }}>
                   ที่อยู่จัดส่ง
                 </Typography>
-                <Typography sx={{ fontSize: '0.7rem', color: '#64748b' }}>
+                <Typography sx={{ fontSize: '0.65rem', color: '#64748b' }}>
                   ไม่บังคับ - กรอกเมื่อต้องการจัดส่ง
                 </Typography>
               </Box>
@@ -371,7 +384,7 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
             <TextField
               fullWidth
               multiline
-              rows={3}
+              rows={2}
               placeholder="บ้านเลขที่ หมู่บ้าน ซอย ถนน ตำบล อำเภอ จังหวัด รหัสไปรษณีย์"
               value={formData.address}
               onChange={e => setFormData({...formData, address: e.target.value})}
@@ -381,8 +394,8 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
 
           {/* PDPA Card */}
           <Box sx={{
-            p: 2.5,
-            borderRadius: '20px',
+            p: 2,
+            borderRadius: '16px',
             background: pdpaAccepted 
               ? 'linear-gradient(135deg, rgba(16,185,129,0.1) 0%, rgba(6,182,212,0.1) 100%)'
               : 'rgba(30,41,59,0.4)',
@@ -391,11 +404,11 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
               : '1px solid rgba(255,255,255,0.06)',
             transition: 'all 0.3s ease',
           }}>
-            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, mb: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, mb: 1.5 }}>
               <Box sx={{
-                width: 40,
-                height: 40,
-                borderRadius: '12px',
+                width: 36,
+                height: 36,
+                borderRadius: '10px',
                 background: pdpaAccepted
                   ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
                   : 'rgba(139,92,246,0.15)',
@@ -405,16 +418,16 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
                 transition: 'all 0.3s ease',
               }}>
                 {pdpaAccepted 
-                  ? <Check size={20} style={{ color: 'white' }} />
-                  : <ShieldCheck size={20} style={{ color: '#a78bfa' }} />
+                  ? <Check size={18} style={{ color: 'white' }} />
+                  : <ShieldCheck size={18} style={{ color: '#a78bfa' }} />
                 }
               </Box>
               <Box sx={{ flex: 1 }}>
-                <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: pdpaAccepted ? '#6ee7b7' : '#e2e8f0', mb: 0.5 }}>
+                <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: pdpaAccepted ? '#6ee7b7' : '#e2e8f0', mb: 0.3 }}>
                   {pdpaAccepted ? '✓ ยินยอมแล้ว' : 'นโยบายความเป็นส่วนตัว'}
                 </Typography>
-                <Typography sx={{ fontSize: '0.8rem', color: '#94a3b8', lineHeight: 1.6 }}>
-                  ข้อมูลของท่านจะถูกใช้เพื่อการจัดส่งและติดต่อเท่านั้น ไม่เปิดเผยต่อบุคคลภายนอก
+                <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8', lineHeight: 1.5 }}>
+                  ข้อมูลของท่านจะถูกใช้เพื่อการจัดส่งและติดต่อเท่านั้น
                 </Typography>
               </Box>
             </Box>
@@ -425,8 +438,8 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
                 display: 'flex',
                 alignItems: 'center',
                 gap: 1.5,
-                p: 1.5,
-                borderRadius: '12px',
+                p: 1.2,
+                borderRadius: '10px',
                 bgcolor: pdpaAccepted ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.03)',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
@@ -434,18 +447,18 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
               }}
             >
               <Box sx={{
-                width: 24,
-                height: 24,
-                borderRadius: '8px',
+                width: 22,
+                height: 22,
+                borderRadius: '6px',
                 bgcolor: pdpaAccepted ? '#10b981' : 'rgba(255,255,255,0.1)',
                 border: pdpaAccepted ? 'none' : '2px solid rgba(255,255,255,0.2)',
                 display: 'grid',
                 placeItems: 'center',
                 transition: 'all 0.2s ease',
               }}>
-                {pdpaAccepted && <Check size={14} style={{ color: 'white' }} />}
+                {pdpaAccepted && <Check size={12} style={{ color: 'white' }} />}
               </Box>
-              <Typography sx={{ fontSize: '0.9rem', color: pdpaAccepted ? '#6ee7b7' : '#e2e8f0', fontWeight: 600 }}>
+              <Typography sx={{ fontSize: '0.8rem', color: pdpaAccepted ? '#6ee7b7' : '#e2e8f0', fontWeight: 600 }}>
                 ยินยอมให้ใช้ข้อมูลตามนโยบาย
               </Typography>
             </Box>
@@ -469,14 +482,14 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
         </Box>
       </Box>
 
-      {/* Bottom Submit Button */}
+      {/* Bottom Submit Button - Compact */}
       <Box sx={{
         px: { xs: 2, sm: 3 },
-        py: 2,
+        py: 1.5,
         borderTop: '1px solid rgba(255,255,255,0.08)',
         background: 'linear-gradient(180deg, rgba(15,23,42,0.98) 0%, rgba(10,15,26,0.98) 100%)',
         backdropFilter: 'blur(20px)',
-        paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
+        paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
       }}>
         <Box sx={{ maxWidth: 480, mx: 'auto' }}>
           <Button
@@ -484,20 +497,20 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
             type="submit"
             onClick={handleSubmit}
             disabled={!pdpaAccepted}
-            startIcon={isFormValid ? <Sparkles size={20} /> : <Check size={20} />}
+            startIcon={isFormValid ? <Sparkles size={18} /> : <Check size={18} />}
             sx={{
-              py: 2,
-              borderRadius: '16px',
+              py: 1.5,
+              borderRadius: '14px',
               background: isFormValid 
                 ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
                 : pdpaAccepted
                   ? 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)'
                   : 'rgba(100,116,139,0.15)',
               color: pdpaAccepted ? 'white' : '#64748b',
-              fontSize: '1.05rem',
+              fontSize: '0.95rem',
               fontWeight: 700,
               textTransform: 'none',
-              boxShadow: isFormValid ? '0 8px 32px rgba(16,185,129,0.35)' : 'none',
+              boxShadow: isFormValid ? '0 6px 24px rgba(16,185,129,0.3)' : 'none',
               transition: 'all 0.3s ease',
               '&:hover': {
                 background: isFormValid 
@@ -505,8 +518,8 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
                   : pdpaAccepted
                     ? 'linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)'
                     : 'rgba(100,116,139,0.2)',
-                transform: isFormValid ? 'translateY(-2px)' : 'none',
-                boxShadow: isFormValid ? '0 12px 40px rgba(16,185,129,0.4)' : 'none',
+                transform: isFormValid ? 'translateY(-1px)' : 'none',
+                boxShadow: isFormValid ? '0 8px 32px rgba(16,185,129,0.35)' : 'none',
               },
               '&:disabled': {
                 background: 'rgba(100,116,139,0.15)',
@@ -517,31 +530,10 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
             {isFormValid ? '✓ บันทึกและดำเนินการต่อ' : 'กรอกข้อมูลให้ครบถ้วน'}
           </Button>
           {!pdpaAccepted && (
-            <Typography sx={{ textAlign: 'center', fontSize: '0.75rem', color: '#475569', mt: 1.5 }}>
+            <Typography sx={{ textAlign: 'center', fontSize: '0.7rem', color: '#475569', mt: 1 }}>
               กรุณายินยอมนโยบายความเป็นส่วนตัวก่อนดำเนินการ
             </Typography>
           )}
-
-          {/* Close Button */}
-          <Button
-            fullWidth
-            onClick={onClose}
-            startIcon={<X size={18} />}
-            sx={{
-              mt: 1.5,
-              py: 1.2,
-              borderRadius: '12px',
-              bgcolor: 'rgba(100,116,139,0.15)',
-              border: '1px solid rgba(100,116,139,0.3)',
-              color: '#94a3b8',
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              textTransform: 'none',
-              '&:hover': { bgcolor: 'rgba(100,116,139,0.25)' },
-            }}
-          >
-            ปิด
-          </Button>
         </Box>
       </Box>
     </Drawer>
