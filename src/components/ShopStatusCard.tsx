@@ -96,8 +96,11 @@ export const getShopStatus = (isOpen: boolean, closeDate?: string, openDate?: st
     if (now < open) return 'WAITING_TO_OPEN';
   }
   
-  // ไม่ตรวจสอบ closeDate - ให้ร้านเปิดตลอดถ้า isOpen = true
-  // (ลบ logic ORDER_ENDED เพื่อไม่แสดงสถานะ "หมดเขตสั่งซื้อ")
+  // Check if closeDate has passed - use end of day for closeDate
+  if (isValidDate(closeDate)) {
+    const close = getEndOfDay(new Date(closeDate!));
+    if (now > close) return 'ORDER_ENDED';
+  }
   
   return 'OPEN';
 };
@@ -106,11 +109,11 @@ export const getShopStatus = (isOpen: boolean, closeDate?: string, openDate?: st
 export const getProductStatus = (product: { isActive?: boolean; startDate?: string; endDate?: string }): ShopStatusType => {
   const now = new Date();
   const start = isValidDate(product.startDate) ? new Date(product.startDate!) : null;
-  // ไม่ตรวจสอบ endDate - ให้สินค้าเปิดตลอดถ้า isActive = true
+  const end = isValidDate(product.endDate) ? getEndOfDay(new Date(product.endDate!)) : null;
   
   if (!product.isActive) return 'TEMPORARILY_CLOSED';
   if (start && now < start) return 'COMING_SOON';
-  // ไม่ return ORDER_ENDED อีกต่อไป
+  if (end && now > end) return 'ORDER_ENDED';
   return 'OPEN';
 };
 

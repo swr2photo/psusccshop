@@ -246,6 +246,8 @@ type Interval = ReturnType<typeof setInterval>;
 type LeanProduct = Pick<Product, 'id' | 'name' | 'description' | 'type' | 'images' | 'basePrice' | 'sizePricing' | 'isActive' | 'startDate' | 'endDate'>;
 type LeanConfig = {
   isOpen: boolean;
+  closeDate?: string;
+  openDate?: string;
   announcements: ShopConfig['announcements'];
   announcementHistory?: ShopConfig['announcementHistory'];
   products: LeanProduct[];
@@ -507,7 +509,10 @@ export default function HomePage() {
             const prevJson = JSON.stringify(prev);
             return prevJson === nextJson ? prev : (cfg.announcementHistory || []);
           });
-          setIsShopOpen(prev => prev === cfg.isOpen ? prev : cfg.isOpen);
+          // Calculate actual shop open status based on isOpen flag AND closeDate
+          const shopStatus = getShopStatus(cfg.isOpen, cfg.closeDate, cfg.openDate);
+          const actuallyOpen = shopStatus === 'OPEN';
+          setIsShopOpen(prev => prev === actuallyOpen ? prev : actuallyOpen);
         } else {
           console.warn('No config returned from getPublicConfig');
         }
@@ -529,7 +534,10 @@ export default function HomePage() {
           setConfig(cached as unknown as ShopConfig);
           setAnnouncements(cached.announcements || []);
           setAnnouncementHistory(cached.announcementHistory || []);
-          setIsShopOpen(cached.isOpen);
+          // Calculate actual shop open status based on isOpen flag AND closeDate
+          const cachedCfg = cached as unknown as ShopConfig;
+          const shopStatus = getShopStatus(cachedCfg.isOpen, cachedCfg.closeDate, cachedCfg.openDate);
+          setIsShopOpen(shopStatus === 'OPEN');
           // Keep loading while we refresh from GAS to avoid stale cache
         }
 
@@ -691,6 +699,8 @@ export default function HomePage() {
 
   const sanitizeConfig = (cfg: ShopConfig): LeanConfig => ({
     isOpen: cfg.isOpen,
+    closeDate: cfg.closeDate,
+    openDate: cfg.openDate,
     announcements: cfg.announcements || [],
     announcementHistory: cfg.announcementHistory || [],
     products: (cfg.products || []).map((p) => ({
