@@ -2,49 +2,18 @@
 // Cron job to auto-cancel orders that haven't been paid within 24 hours
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getJson, putJson, listKeys } from '@/lib/filebase';
+import { putJson, getExpiredUnpaidOrders } from '@/lib/filebase';
 import { sendOrderCancelledEmail } from '@/lib/email';
 import { triggerSheetSync } from '@/lib/sheet-sync';
-import crypto from 'crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// สถานะที่ยังไม่ได้ชำระเงิน
-const UNPAID_STATUSES = ['PENDING', 'WAITING_PAYMENT', 'AWAITING_PAYMENT', 'UNPAID', 'DRAFT'];
-
-// เวลาหมดอายุ (24 ชั่วโมง ในมิลลิวินาที)
+// เวลาหมดอายุ (24 ชั่วโมง)
 const EXPIRY_HOURS = 24;
-const EXPIRY_MS = EXPIRY_HOURS * 60 * 60 * 1000;
 
 // Secret key for cron authentication (ป้องกันไม่ให้ใครเรียกใช้ได้โดยตรง)
 const CRON_SECRET = process.env.CRON_SECRET || 'psusccshop-cron-2026';
-
-const normalizeEmail = (email?: string | null) => (email || '').trim().toLowerCase();
-
-const emailIndexKey = (email: string) => {
-  const normalized = normalizeEmail(email);
-  const hash = crypto.createHash('sha256').update(normalized).digest('hex');
-  return `orders/index/${hash}.json`;
-};
-
-/**
- * อัปเดต index ของ email เมื่อ order ถูกยกเลิก
- */
-const updateEmailIndex = async (email: string, updatedOrder: any) => {
-  const normalized = normalizeEmail(email);
-  if (!normalized) return;
-  
-  const key = emailIndexKey(normalized);
-  const existing = (await getJson<any[]>(key)) || [];
-  
-  // Update order ใน index
-  const updated = existing.map(o => 
-    o.ref === updatedOrder.ref ? updatedOrder : o
-  );
-  
-  await putJson(key, updated);
-};
 
 export async function GET(req: NextRequest) {
   // ตรวจสอบ authorization
@@ -65,67 +34,51 @@ export async function GET(req: NextRequest) {
   try {
     console.log('[Cron] Starting auto-cancel expired orders...');
     
-    const now = Date.now();
-    const keys = await listKeys('orders/');
+    // Use optimized Supabase query to get expired unpaid orders
+    const expiredOrders = await getExpiredUnpaidOrders(EXPIRY_HOURS);
     
-    let checkedCount = 0;
     let cancelledCount = 0;
     let errorCount = 0;
     const cancelledOrders: string[] = [];
     
-    for (const key of keys) {
-      // Skip index files
-      if (key.includes('/index/')) continue;
-      if (!key.endsWith('.json')) continue;
-      
-      checkedCount++;
-      
+    for (const order of expiredOrders) {
       try {
-        const order = await getJson<any>(key);
-        if (!order) continue;
+        console.log(`[Cron] Cancelling expired order: ${order.ref}`);
         
-        const status = (order.status || '').toUpperCase();
-        const orderDate = new Date(order.date || order.createdAt);
-        const orderAge = now - orderDate.getTime();
+        // อัปเดตสถานะเป็น CANCELLED
+        const updatedOrder = {
+          ...order,
+          status: 'CANCELLED',
+          cancelReason: 'ยกเลิกอัตโนมัติ: ไม่ได้ชำระเงินภายใน 24 ชั่วโมง',
+          cancelledAt: new Date().toISOString(),
+          cancelledBy: 'SYSTEM_AUTO',
+        };
         
-        // ตรวจสอบว่าเป็น order ที่ยังไม่ชำระเงินและเกิน 24 ชั่วโมง
-        if (UNPAID_STATUSES.includes(status) && orderAge > EXPIRY_MS) {
-          console.log(`[Cron] Cancelling expired order: ${order.ref} (age: ${Math.round(orderAge / 3600000)}h)`);
-          
-          // อัปเดตสถานะเป็น CANCELLED
-          const updatedOrder = {
-            ...order,
-            status: 'CANCELLED',
-            cancelReason: 'ยกเลิกอัตโนมัติ: ไม่ได้ชำระเงินภายใน 24 ชั่วโมง',
-            cancelledAt: new Date().toISOString(),
-            cancelledBy: 'SYSTEM_AUTO',
-          };
-          
-          await putJson(key, updatedOrder);
-          
-          // อัปเดต email index
-          const email = order.customerEmail || order.email;
-          if (email) {
-            await updateEmailIndex(email, updatedOrder);
-          }
-          
-          // ส่ง email แจ้งลูกค้า
-          try {
-            await sendOrderCancelledEmail({
-              ref: order.ref,
-              customerName: order.customerName || order.name,
-              customerEmail: email,
-              reason: 'ไม่ได้ชำระเงินภายใน 24 ชั่วโมง หากต้องการสั่งซื้อใหม่ สามารถทำรายการได้ที่เว็บไซต์',
-            });
-          } catch (emailError) {
-            console.error(`[Cron] Failed to send cancellation email for ${order.ref}:`, emailError);
-          }
-          
-          cancelledOrders.push(order.ref);
-          cancelledCount++;
+        // Use orderKey pattern for putJson
+        const date = new Date(order.date || order.createdAt);
+        const yyyy = date.getFullYear();
+        const mm = String(date.getMonth() + 1).padStart(2, '0');
+        const key = `orders/${yyyy}-${mm}/${order.ref}.json`;
+        
+        await putJson(key, updatedOrder);
+        
+        // ส่ง email แจ้งลูกค้า
+        const email = order.customerEmail || order.email;
+        try {
+          await sendOrderCancelledEmail({
+            ref: order.ref,
+            customerName: order.customerName || order.name,
+            customerEmail: email,
+            reason: 'ไม่ได้ชำระเงินภายใน 24 ชั่วโมง หากต้องการสั่งซื้อใหม่ สามารถทำรายการได้ที่เว็บไซต์',
+          });
+        } catch (emailError) {
+          console.error(`[Cron] Failed to send cancellation email for ${order.ref}:`, emailError);
         }
+        
+        cancelledOrders.push(order.ref);
+        cancelledCount++;
       } catch (orderError) {
-        console.error(`[Cron] Error processing order ${key}:`, orderError);
+        console.error(`[Cron] Error processing order ${order.ref}:`, orderError);
         errorCount++;
       }
     }
@@ -139,9 +92,9 @@ export async function GET(req: NextRequest) {
     
     const result = {
       status: 'success',
-      message: `Processed ${checkedCount} orders, cancelled ${cancelledCount}`,
+      message: `Checked ${expiredOrders.length} expired orders, cancelled ${cancelledCount}`,
       details: {
-        checked: checkedCount,
+        checked: expiredOrders.length,
         cancelled: cancelledCount,
         errors: errorCount,
         cancelledOrders,

@@ -1,0 +1,14 @@
+# Railway Cron Service Configuration
+# Use this for the cron worker service
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile.cron"
+
+[deploy]
+startCommand = "npm run cron"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5
+
+# No public URL needed - internal only
+# Set CRON_HEALTH_PORT=8080 if you want health checks

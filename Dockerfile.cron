@@ -1,0 +1,21 @@
+# Railway Cron Worker
+# ใช้สำหรับรัน cron jobs บน Railway แทน Vercel Cron
+
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install dependencies
+COPY package*.json ./
+RUN npm ci --only=production
+
+# Install tsx for running TypeScript
+RUN npm install -g tsx
+
+# Copy cron worker script
+COPY scripts/cron-worker.ts ./scripts/
+
+# Set timezone
+ENV TZ=Asia/Bangkok
+
+CMD ["tsx", "scripts/cron-worker.ts"]

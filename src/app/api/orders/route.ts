@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getJson, putJson, listKeys, deleteObject } from '@/lib/filebase';
+import { getJson, putJson, listKeys, deleteObject, getOrdersByEmail, getAllOrders, getOrderByRef, updateOrderByRef } from '@/lib/filebase';
 import crypto from 'crypto';
 import { requireAuth, requireAdmin, isAdminEmail, isResourceOwner, normalizeEmail as authNormalizeEmail } from '@/lib/auth';
 import { triggerSheetSync } from '@/lib/sheet-sync';
@@ -24,41 +24,15 @@ const emailIndexKey = (email: string) => {
   return `orders/index/${hash}.json`;
 };
 
-// ปิด cache เนื่องจากทำให้สถานะไม่อัปเดตหลังชำระเงิน
-// Cache ถูกใช้ใน orders API แต่ payment/verify อัปเดต index ใน S3 โดยตรง
-// ทำให้ข้อมูลไม่ sync กัน
-const INDEX_CACHE_TTL_MS = 0; // ปิด cache
-const indexCache = new Map<string, { data: any[]; expires: number }>();
-
-const getCachedIndex = (key: string) => {
-  // ปิด cache - ให้ดึงข้อมูลใหม่ทุกครั้ง
-  return null;
-};
-
-const setCachedIndex = (key: string, data: any[]) => {
-  // ปิด cache
-  // indexCache.set(key, { data, expires: Date.now() + INDEX_CACHE_TTL_MS });
-};
-
+// Index functions - now handled by Supabase automatically
+// These are kept for backward compatibility but don't do anything
 const upsertIndexEntry = async (email: string, order: any) => {
-  const normalized = normalizeEmail(email);
-  if (!normalized) return;
-  const key = emailIndexKey(normalized);
-  indexCache.delete(key);
-  const existing = (await getJson<any[]>(key)) || [];
-  const filtered = existing.filter((o) => o?.ref !== order?.ref);
-  const next = [order, ...filtered].slice(0, 500);
-  await putJson(key, next);
+  // Supabase automatically maintains indexes via email_hash column
+  // No manual index management needed
 };
 
 const removeIndexEntry = async (email: string, ref: string) => {
-  const normalized = normalizeEmail(email);
-  if (!normalized) return;
-  const key = emailIndexKey(normalized);
-  indexCache.delete(key);
-  const existing = (await getJson<any[]>(key)) || [];
-  const filtered = existing.filter((o) => o?.ref !== ref);
-  await putJson(key, filtered);
+  // Supabase automatically handles this when order is deleted
 };
 
 export async function GET(req: NextRequest) {
@@ -71,7 +45,8 @@ export async function GET(req: NextRequest) {
   const isAdmin = isAdminEmail(currentUserEmail);
 
   const email = req.nextUrl.searchParams.get('email');
-  const cursor = req.nextUrl.searchParams.get('cursor');
+  const offsetParam = Number(req.nextUrl.searchParams.get('offset'));
+  const offset = Number.isFinite(offsetParam) ? Math.max(0, offsetParam) : 0;
   const limitParam = Number(req.nextUrl.searchParams.get('limit'));
   const limit = Number.isFinite(limitParam) ? Math.min(100, Math.max(10, limitParam)) : 50;
 
@@ -80,63 +55,17 @@ export async function GET(req: NextRequest) {
 
   try {
     const normalizedEmail = normalizeEmail(queryEmail);
-    if (normalizedEmail) {
-      const key = emailIndexKey(normalizedEmail);
-      // ดึงข้อมูลใหม่ทุกครั้ง ไม่ใช้ cache
-      const indexed = await getJson<any[]>(key);
-      if (indexed) {
-        const startIdx = cursor ? Math.max(0, indexed.findIndex((o) => o?.ref === cursor) + 1) : 0;
-        const slice = indexed.slice(startIdx, startIdx + limit);
-        const hasMore = startIdx + limit < indexed.length;
-        const nextCursor = hasMore ? indexed[startIdx + limit - 1]?.ref : null;
-        
-        // Sanitize: ลบ slip data และ sensitive fields ออกก่อนส่ง
-        const sanitizedHistory = sanitizeOrdersForUser(slice);
-        
-        return NextResponse.json(
-          { status: 'success', data: { history: sanitizedHistory, hasMore, nextCursor } },
-          { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Content-Type': 'application/json; charset=utf-8' } }
-        );
-      }
-    }
-
-    const keys = await listKeys('orders/');
-    const sorted = [...keys].sort().reverse();
-    const startIndex = cursor ? sorted.findIndex((k) => k.endsWith(`${cursor}.json`)) + 1 : 0;
-    const matches: any[] = [];
-    const indexBucket: any[] = [];
-    const targetEmail = normalizedEmail;
-
-    for (let i = startIndex; i < sorted.length; i += 1) {
-      const data = await getJson<any>(sorted[i]);
-      if (!data) continue;
-      if (normalizedEmail && normalizeEmail(data.customerEmail) !== targetEmail) {
-        continue;
-      }
-
-      const enriched = { ...data, _key: sorted[i] };
-      matches.push(enriched);
-      if (normalizedEmail && indexBucket.length < 500) {
-        indexBucket.push(enriched);
-      }
-
-      if (matches.length > limit && (!normalizedEmail || indexBucket.length >= 500)) break;
-    }
-
-    const hasMore = matches.length > limit;
-    const history = hasMore ? matches.slice(0, limit) : matches;
-    const nextCursor = hasMore ? matches[limit]?.ref ?? null : null;
-
-    if (normalizedEmail && indexBucket.length > 0) {
-      const key = emailIndexKey(normalizedEmail);
-      await putJson(key, indexBucket);
-    }
-
+    
+    // Use optimized Supabase query
+    const { orders, total } = await getOrdersByEmail(normalizedEmail, { limit, offset });
+    
+    const hasMore = offset + orders.length < total;
+    
     // Sanitize: ลบ slip data และ sensitive fields ออกก่อนส่ง
-    const sanitizedHistory = sanitizeOrdersForUser(history);
+    const sanitizedHistory = sanitizeOrdersForUser(orders);
 
     return NextResponse.json(
-      { status: 'success', data: { history: sanitizedHistory, hasMore, nextCursor } },
+      { status: 'success', data: { history: sanitizedHistory, hasMore, total } },
       { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Content-Type': 'application/json; charset=utf-8' } }
     );
   } catch (error: any) {
