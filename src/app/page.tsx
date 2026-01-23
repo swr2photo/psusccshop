@@ -1,6 +1,1240 @@
 'use client';
 
 import React from 'react';
+import ChatIcon from '@mui/icons-material/Chat';
+import SendIcon from '@mui/icons-material/Send';
+import CloseIcon from '@mui/icons-material/Close';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import StorefrontIcon from '@mui/icons-material/Storefront';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import CheckIcon from '@mui/icons-material/Check';
+import FullscreenIcon from '@mui/icons-material/Fullscreen';
+import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
+
+// ==================== CHATBOT COMPONENT (Enhanced with Logo & AI) ====================
+const QUICK_QUESTIONS = [
+  '🛒 วิธีสั่งซื้อ',
+  '💰 ราคาสินค้า',
+  '📏 ไซซ์และขนาด',
+  '📦 การจัดส่ง',
+  '💳 วิธีชำระเงิน',
+  '❓ ติดต่อร้าน',
+];
+
+interface ChatMessage {
+  id: string;
+  sender: 'user' | 'bot';
+  text: string;
+  timestamp: Date;
+  suggestions?: string[];
+  relatedQuestions?: string[];
+  source?: 'ai' | 'faq' | 'fallback' | 'error';
+  confidence?: number;
+  productImages?: { name: string; image: string; }[];
+  modelUsed?: string; // ชื่อโมเดล AI ที่ใช้
+}
+
+// Session storage key for chat history (encrypted)
+const CHAT_STORAGE_KEY = 'scc_chat_history';
+const CHAT_SESSION_ID_KEY = 'scc_chat_session_id';
+
+function ShirtChatBot() {
+  const [open, setOpen] = React.useState(false);
+  const [input, setInput] = React.useState('');
+  const [messages, setMessages] = React.useState<ChatMessage[]>([]);
+  const [loading, setLoading] = React.useState(false);
+  const [showPulse, setShowPulse] = React.useState(true);
+  const [aiEnabled, setAiEnabled] = React.useState(false);
+  const [userSession, setUserSession] = React.useState<{ name?: string; email?: string; image?: string } | null>(null);
+  const [isFullscreen, setIsFullscreen] = React.useState(false);
+  const [copiedMessageId, setCopiedMessageId] = React.useState<string | null>(null);
+  const [shopInfo, setShopInfo] = React.useState<{
+    totalProducts?: number; 
+    availableProducts?: number;
+    priceRange?: { min: number; max: number };
+  } | null>(null);
+  const messagesEndRef = React.useRef<HTMLDivElement>(null);
+  const messagesContainerRef = React.useRef<HTMLDivElement>(null);
+
+  // Generate unique session ID for secure storage
+  const getSessionId = React.useCallback(() => {
+    if (typeof window === 'undefined') return '';
+    let sessionId = sessionStorage.getItem(CHAT_SESSION_ID_KEY);
+    if (!sessionId) {
+      sessionId = `chat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      sessionStorage.setItem(CHAT_SESSION_ID_KEY, sessionId);
+    }
+    return sessionId;
+  }, []);
+
+  // Save chat history securely (session-only, no sensitive data)
+  const saveChatHistory = React.useCallback((msgs: ChatMessage[]) => {
+    if (typeof window === 'undefined') return;
+    try {
+      // Only save last 20 messages, sanitize data
+      const sanitizedMsgs = msgs.slice(-20).map(m => ({
+        id: m.id,
+        sender: m.sender,
+        text: m.text.slice(0, 2000), // Limit text length
+        timestamp: m.timestamp.toISOString(),
+        source: m.source,
+      }));
+      sessionStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(sanitizedMsgs));
+    } catch (e) {
+      console.warn('Failed to save chat history');
+    }
+  }, []);
+
+  // Load chat history from session storage
+  const loadChatHistory = React.useCallback(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const saved = sessionStorage.getItem(CHAT_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.map((m: any) => ({
+          ...m,
+          timestamp: new Date(m.timestamp),
+        }));
+      }
+    } catch (e) {
+      console.warn('Failed to load chat history');
+    }
+    return [];
+  }, []);
+
+  // Fetch user session on mount
+  React.useEffect(() => {
+    fetch('/api/auth/session')
+      .then(res => res.json())
+      .then(data => {
+        if (data?.user) {
+          setUserSession({
+            name: data.user.name,
+            email: data.user.email,
+            image: data.user.image,
+          });
+        }
+      })
+      .catch(() => {});
+    
+    // Load saved chat history
+    const savedMessages = loadChatHistory();
+    if (savedMessages.length > 0) {
+      setMessages(savedMessages);
+    }
+  }, [loadChatHistory]);
+
+  // Save messages when they change
+  React.useEffect(() => {
+    if (messages.length > 0) {
+      saveChatHistory(messages);
+    }
+  }, [messages, saveChatHistory]);
+
+  // Auto scroll to bottom with delay to ensure DOM is updated
+  const scrollToBottom = React.useCallback(() => {
+    setTimeout(() => {
+      if (messagesContainerRef.current) {
+        messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+      }
+    }, 100);
+  }, []);
+
+  React.useEffect(() => {
+    scrollToBottom();
+  }, [messages, scrollToBottom]);
+
+  // Hide pulse after first open & check AI status
+  React.useEffect(() => {
+    if (open) {
+      setShowPulse(false);
+      // Check if AI is enabled and get shop info
+      fetch('/api/chatbot')
+        .then(res => res.json())
+        .then(data => {
+          setAiEnabled(data.aiEnabled || false);
+          setShopInfo(data.shopInfo || null);
+        })
+        .catch(() => setAiEnabled(false));
+    }
+  }, [open]);
+
+  const generateId = () => `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+  // Build conversation history for context
+  const getConversationHistory = () => {
+    return messages.slice(-6).map(msg => ({
+      role: msg.sender === 'user' ? 'user' : 'assistant',
+      content: msg.text,
+    }));
+  };
+
+  const handleSend = async (customMessage?: string) => {
+    const msgToSend = customMessage || input.trim();
+    if (!msgToSend) return;
+    
+    const userMsg: ChatMessage = {
+      id: generateId(),
+      sender: 'user',
+      text: msgToSend,
+      timestamp: new Date(),
+    };
+    
+    setMessages((prev) => [...prev, userMsg]);
+    setInput('');
+    setLoading(true);
+    
+    try {
+      const res = await fetch('/api/chatbot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          message: msgToSend,
+          conversationHistory: getConversationHistory(),
+        }),
+      });
+      const data = await res.json();
+      
+      const botMsg: ChatMessage = {
+        id: generateId(),
+        sender: 'bot',
+        text: data.answer,
+        timestamp: new Date(),
+        suggestions: data.suggestions,
+        relatedQuestions: data.relatedQuestions,
+        source: data.source,
+        confidence: data.confidence,
+        productImages: data.productImages, // รูปภาพสินค้าที่เกี่ยวข้อง
+        modelUsed: data.modelUsed, // ชื่อโมเดล AI ที่ใช้
+      };
+      
+      setMessages((prev) => [...prev, botMsg]);
+    } catch (e) {
+      const errorMsg: ChatMessage = {
+        id: generateId(),
+        sender: 'bot',
+        text: '❌ เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้งค่ะ',
+        timestamp: new Date(),
+        suggestions: QUICK_QUESTIONS,
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Enter = ส่งข้อความ, Shift+Enter = ขึ้นบรรทัดใหม่
+    if (e.key === 'Enter' && !e.shiftKey && !loading) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  const handleQuickQuestion = (question: string) => {
+    handleSend(question);
+  };
+
+  const handleClearChat = () => {
+    setMessages([]);
+    // Clear session storage safely
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem(CHAT_STORAGE_KEY);
+    }
+  };
+
+  // Copy message to clipboard
+  const handleCopyMessage = async (messageId: string, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedMessageId(messageId);
+      setTimeout(() => setCopiedMessageId(null), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
+  // Toggle fullscreen mode
+  const toggleFullscreen = () => {
+    setIsFullscreen(!isFullscreen);
+  };
+
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+  };
+
+  // Parse and render markdown tables
+  const parseMarkdownTable = (text: string): { isTable: boolean; rows: string[][] } => {
+    const lines = text.trim().split('\n');
+    if (lines.length < 2) return { isTable: false, rows: [] };
+    
+    // Check if it looks like a markdown table
+    const hasHeaders = lines[0].includes('|');
+    const hasSeparator = lines[1] && /^\|?[\s\-:|]+\|?$/.test(lines[1]);
+    
+    if (!hasHeaders || !hasSeparator) return { isTable: false, rows: [] };
+    
+    const rows: string[][] = [];
+    for (let i = 0; i < lines.length; i++) {
+      if (i === 1) continue; // Skip separator line
+      const line = lines[i].trim();
+      if (line.startsWith('|') || line.includes('|')) {
+        const cells = line.split('|')
+          .map(cell => cell.trim())
+          .filter((cell, idx, arr) => idx !== 0 || cell !== ''); // Remove empty first cell
+        if (cells[cells.length - 1] === '') cells.pop(); // Remove empty last cell
+        if (cells.length > 0) rows.push(cells);
+      }
+    }
+    
+    return { isTable: rows.length >= 2, rows };
+  };
+
+  // Render markdown table as HTML table
+  const renderTable = (rows: string[][]) => {
+    if (rows.length === 0) return null;
+    const [header, ...body] = rows;
+    
+    return (
+      <Box 
+        component="table" 
+        sx={{ 
+          width: '100%',
+          borderCollapse: 'collapse',
+          my: 1.5,
+          fontSize: 13,
+          '& th, & td': {
+            border: '1px solid rgba(255,255,255,0.15)',
+            px: 1.5,
+            py: 0.75,
+            textAlign: 'left',
+          },
+          '& th': {
+            bgcolor: 'rgba(99, 102, 241, 0.2)',
+            fontWeight: 600,
+            color: '#a5b4fc',
+          },
+          '& td': {
+            bgcolor: 'rgba(255,255,255,0.03)',
+          },
+          '& tr:hover td': {
+            bgcolor: 'rgba(255,255,255,0.06)',
+          },
+        }}
+      >
+        <thead>
+          <tr>
+            {header.map((cell, i) => (
+              <th key={i}>{renderInlineMarkdown(cell)}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {body.map((row, i) => (
+            <tr key={i}>
+              {row.map((cell, j) => (
+                <td key={j}>{renderInlineMarkdown(cell)}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </Box>
+    );
+  };
+
+  // Render inline markdown (bold, italic, links, bullet points, etc)
+  const renderInlineMarkdown = (text: string): React.ReactNode => {
+    // Split by line breaks first
+    const lines = text.split('\n');
+    
+    return lines.map((line, lineIdx) => {
+      // Check if it's a bullet point
+      const bulletMatch = line.match(/^[\s]*[•\-\*]\s*(.*)/);
+      if (bulletMatch) {
+        return (
+          <Box key={lineIdx} sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.75, my: 0.25 }}>
+            <Box component="span" sx={{ color: '#a5b4fc', flexShrink: 0 }}>•</Box>
+            <span>{renderTextSegment(bulletMatch[1])}</span>
+          </Box>
+        );
+      }
+      
+      // Check if it's a numbered list
+      const numberedMatch = line.match(/^[\s]*(\d+)[.\)]\s*(.*)/);
+      if (numberedMatch) {
+        return (
+          <Box key={lineIdx} sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.75, my: 0.25 }}>
+            <Box component="span" sx={{ color: '#a5b4fc', flexShrink: 0, minWidth: 16 }}>{numberedMatch[1]}.</Box>
+            <span>{renderTextSegment(numberedMatch[2])}</span>
+          </Box>
+        );
+      }
+      
+      // Regular line
+      return (
+        <React.Fragment key={lineIdx}>
+          {renderTextSegment(line)}
+          {lineIdx < lines.length - 1 && <br />}
+        </React.Fragment>
+      );
+    });
+  };
+  
+  // Render text segment with bold, italic, links
+  const renderTextSegment = (text: string): React.ReactNode => {
+    // Handle bold **text** and links [text](url)
+    const parts = text.split(/(\*\*.*?\*\*|\[.*?\]\(.*?\)|`.*?`)/g);
+    return parts.map((part, i) => {
+      // Bold
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={i} style={{ color: '#e0e7ff' }}>{part.slice(2, -2)}</strong>;
+      }
+      // Link
+      const linkMatch = part.match(/\[(.*?)\]\((.*?)\)/);
+      if (linkMatch) {
+        return (
+          <Box 
+            key={i} 
+            component="a" 
+            href={linkMatch[2]} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            sx={{ color: '#818cf8', textDecoration: 'underline', '&:hover': { color: '#a5b4fc' } }}
+          >
+            {linkMatch[1]}
+          </Box>
+        );
+      }
+      // Inline code
+      if (part.startsWith('`') && part.endsWith('`')) {
+        return (
+          <Box 
+            key={i} 
+            component="code" 
+            sx={{ 
+              bgcolor: 'rgba(255,255,255,0.1)', 
+              px: 0.5, 
+              py: 0.125, 
+              borderRadius: 0.5, 
+              fontSize: '0.9em',
+              fontFamily: 'monospace',
+            }}
+          >
+            {part.slice(1, -1)}
+          </Box>
+        );
+      }
+      return part;
+    });
+  };
+
+  // Main render function for message text
+  const renderText = (text: string) => {
+    // Check if text contains a markdown table
+    const tableMatch = text.match(/(\|[^\n]+\|\n\|[\s\-:|]+\|\n(?:\|[^\n]+\|\n?)+)/);
+    
+    if (tableMatch) {
+      const tableText = tableMatch[1];
+      const beforeTable = text.substring(0, tableMatch.index);
+      const afterTable = text.substring((tableMatch.index || 0) + tableText.length);
+      
+      const { isTable, rows } = parseMarkdownTable(tableText);
+      
+      if (isTable) {
+        return (
+          <>
+            {beforeTable && <span>{renderInlineMarkdown(beforeTable)}</span>}
+            {renderTable(rows)}
+            {afterTable && <span>{renderInlineMarkdown(afterTable)}</span>}
+          </>
+        );
+      }
+    }
+    
+    // No table, just render inline markdown
+    return renderInlineMarkdown(text);
+  };
+
+  return (
+    <>
+      {/* Floating Chat Button - Apple Liquid Glass */}
+      <Box
+        sx={{
+          position: 'fixed',
+          bottom: { xs: 80, sm: 24 }, // ขึ้นมาบนมือถือเพื่อไม่บัง
+          right: { xs: 16, sm: 24 },
+          zIndex: 1200,
+        }}
+      >
+        <Box sx={{ position: 'relative' }}>
+          {showPulse && (
+            <Box
+              sx={{
+                position: 'absolute',
+                inset: -4,
+                borderRadius: 2,
+                background: 'rgba(99, 102, 241, 0.25)',
+                animation: 'pulse 2s infinite',
+                '@keyframes pulse': {
+                  '0%': { transform: 'scale(1)', opacity: 0.4 },
+                  '50%': { transform: 'scale(1.15)', opacity: 0.15 },
+                  '100%': { transform: 'scale(1)', opacity: 0.4 },
+                },
+              }}
+            />
+          )}
+          <Button
+            variant="contained"
+            sx={{
+              borderRadius: 2.5,
+              minWidth: 0,
+              width: 56,
+              height: 56,
+              // Liquid Glass effect
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.05) 100%)',
+              backdropFilter: 'blur(16px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(16px) saturate(180%)',
+              border: '1px solid rgba(255,255,255,0.25)',
+              boxShadow: '0 8px 24px rgba(99, 102, 241, 0.25)',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                transform: 'scale(1.05)',
+                boxShadow: '0 10px 30px rgba(99, 102, 241, 0.35)',
+                background: 'linear-gradient(135deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.08) 100%)',
+              },
+            }}
+            onClick={() => setOpen(true)}
+            aria-label="เปิดแชตบอต"
+          >
+            <SmartToyIcon sx={{ fontSize: 26, color: '#6366f1' }} />
+          </Button>
+        </Box>
+      </Box>
+
+      {/* Chat Dialog - Apple Liquid Glass Design */}
+      <Dialog 
+        open={open} 
+        onClose={() => setOpen(false)} 
+        maxWidth={isFullscreen ? false : "sm"}
+        fullWidth
+        fullScreen={isFullscreen}
+        PaperProps={{
+          sx: {
+            borderRadius: isFullscreen ? 0 : 2.5,
+            overflow: 'hidden',
+            maxHeight: isFullscreen ? '100vh' : '85vh',
+            // Liquid Glass background
+            background: 'linear-gradient(180deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.03) 100%)',
+            backdropFilter: 'blur(32px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(32px) saturate(180%)',
+            border: isFullscreen ? 'none' : '1px solid rgba(255,255,255,0.15)',
+            boxShadow: isFullscreen ? 'none' : '0 20px 40px rgba(0, 0, 0, 0.4)',
+          }
+        }}
+      >
+        {/* Header with Logo - Liquid Glass */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            px: 2.5,
+            py: 2,
+            // Liquid Glass header
+            background: 'linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 100%)',
+            borderBottom: '1px solid rgba(255,255,255,0.1)',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            {/* Logo Container - Glass effect */}
+            <Box
+              sx={{
+                width: 44,
+                height: 44,
+                borderRadius: 1.5,
+                background: 'linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 100%)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden',
+              }}
+            >
+              <Box
+                component="img"
+                src="/logo.png"
+                alt="SCC Shop"
+                sx={{
+                  width: 36,
+                  height: 36,
+                  objectFit: 'contain',
+                  filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
+                }}
+                onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            </Box>
+            <Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                <Typography sx={{ 
+                  fontWeight: 600, 
+                  fontSize: 17, 
+                  color: 'rgba(255,255,255,0.95)',
+                  textShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                }}>
+                  SCC Shop
+                </Typography>
+                {aiEnabled && (
+                  <Box sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0.25,
+                    fontSize: 9,
+                    px: 0.6,
+                    py: 0.2,
+                    borderRadius: 0.75,
+                    background: 'rgba(16, 185, 129, 0.2)',
+                    border: '1px solid rgba(16, 185, 129, 0.35)',
+                    color: '#6ee7b7',
+                    fontWeight: 600,
+                  }}>
+                    <AutoAwesomeIcon sx={{ fontSize: 9 }} />
+                    AI
+                  </Box>
+                )}
+              </Box>
+              <Typography sx={{ 
+                fontSize: 12, 
+                color: 'rgba(255,255,255,0.6)', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 0.5 
+              }}>
+                {loading ? (
+                  <>
+                    <Box component="span" sx={{ 
+                      animation: 'shimmer 1.5s infinite',
+                      '@keyframes shimmer': {
+                        '0%, 100%': { opacity: 1 },
+                        '50%': { opacity: 0.4 },
+                      }
+                    }}>✨</Box>
+                    กำลังคิด...
+                  </>
+                ) : (
+                  <>
+                    <Box component="span" sx={{ 
+                      width: 6, 
+                      height: 6, 
+                      borderRadius: '50%', 
+                      bgcolor: '#4ade80',
+                      boxShadow: '0 0 6px #4ade80',
+                    }} />
+                    ออนไลน์
+                  </>
+                )}
+              </Typography>
+            </Box>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 0.5 }}>
+            <IconButton 
+              size="small" 
+              onClick={handleClearChat}
+              sx={{ 
+                color: 'rgba(255,255,255,0.6)', 
+                transition: 'all 0.2s',
+                '&:hover': { 
+                  color: 'rgba(255,255,255,0.9)', 
+                  bgcolor: 'rgba(255,255,255,0.1)',
+                  transform: 'rotate(180deg)',
+                } 
+              }}
+              title="ล้างแชท"
+            >
+              <RefreshIcon fontSize="small" />
+            </IconButton>
+            <IconButton 
+              size="small" 
+              onClick={toggleFullscreen}
+              sx={{ 
+                color: 'rgba(255,255,255,0.6)', 
+                display: { xs: 'flex', sm: 'flex' },
+                '&:hover': { 
+                  color: 'rgba(255,255,255,0.9)', 
+                  bgcolor: 'rgba(255,255,255,0.1)' 
+                } 
+              }}
+              title={isFullscreen ? "ย่อหน้าต่าง" : "ขยายเต็มจอ"}
+            >
+              {isFullscreen ? <FullscreenExitIcon fontSize="small" /> : <FullscreenIcon fontSize="small" />}
+            </IconButton>
+            <IconButton 
+              size="small" 
+              onClick={() => setOpen(false)}
+              sx={{ 
+                color: 'rgba(255,255,255,0.6)', 
+                '&:hover': { 
+                  color: 'rgba(255,255,255,0.9)', 
+                  bgcolor: 'rgba(255,255,255,0.1)' 
+                } 
+              }}
+            >
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          </Box>
+        </Box>
+
+        {/* Messages Area - Frosted Glass */}
+        <DialogContent 
+          ref={messagesContainerRef}
+          sx={{ 
+            background: 'linear-gradient(180deg, rgba(15,23,42,0.8) 0%, rgba(30,41,59,0.9) 100%)',
+            minHeight: isFullscreen ? 'calc(100vh - 180px)' : 350,
+            maxHeight: isFullscreen ? 'calc(100vh - 180px)' : 400,
+            overflowY: 'auto',
+            p: 2,
+            scrollBehavior: 'smooth',
+            '&::-webkit-scrollbar': { width: 4 },
+            '&::-webkit-scrollbar-track': { bgcolor: 'transparent' },
+            '&::-webkit-scrollbar-thumb': { 
+              bgcolor: 'rgba(255,255,255,0.15)', 
+              borderRadius: 2,
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' },
+            },
+          }}
+        >
+          {/* Welcome Message - Liquid Glass */}
+          {messages.length === 0 && (
+            <Box sx={{ textAlign: 'center', py: 3 }}>
+              {/* Logo in Welcome */}
+              <Box
+                sx={{
+                  width: 72,
+                  height: 72,
+                  borderRadius: 2,
+                  background: 'linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.04) 100%)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  boxShadow: '0 6px 20px rgba(99, 102, 241, 0.15)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  mx: 'auto',
+                  mb: 2,
+                  overflow: 'hidden',
+                }}
+              >
+                <Box
+                  component="img"
+                  src="/logo.png"
+                  alt="SCC Shop"
+                  sx={{
+                    width: 52,
+                    height: 52,
+                    objectFit: 'contain',
+                    filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))',
+                  }}
+                  onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              </Box>
+              
+              <Typography sx={{ 
+                color: 'rgba(255,255,255,0.95)', 
+                fontWeight: 600, 
+                fontSize: 18,
+                mb: 0.5,
+              }}>
+                สวัสดีค่ะ! 👋
+              </Typography>
+              
+              {aiEnabled && (
+                <Box sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 0.5,
+                  fontSize: 11,
+                  px: 1,
+                  py: 0.4,
+                  borderRadius: 1,
+                  background: 'rgba(99, 102, 241, 0.15)',
+                  border: '1px solid rgba(99, 102, 241, 0.25)',
+                  color: 'rgba(165, 180, 252, 0.95)',
+                  fontWeight: 500,
+                  mb: 1.5,
+                }}>
+                  <AutoAwesomeIcon sx={{ fontSize: 12 }} />
+                  ขับเคลื่อนด้วย Gemini AI
+                </Box>
+              )}
+              
+              <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, mb: 2 }}>
+                ถามเกี่ยวกับสินค้า ราคา ไซซ์ ได้เลยค่ะ
+              </Typography>
+
+              {/* Shop Stats */}
+              {shopInfo && typeof shopInfo.totalProducts === 'number' && shopInfo.totalProducts > 0 && (
+                <Box sx={{ 
+                  display: 'flex', 
+                  justifyContent: 'center', 
+                  gap: 1, 
+                  mb: 2.5,
+                  flexWrap: 'wrap',
+                }}>
+                  <Box sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0.5,
+                    fontSize: 11,
+                    color: 'rgba(165, 180, 252, 0.9)',
+                    background: 'rgba(99, 102, 241, 0.15)',
+                    border: '1px solid rgba(99, 102, 241, 0.25)',
+                    px: 1.25,
+                    py: 0.4,
+                    borderRadius: 1,
+                  }}>
+                    <StorefrontIcon sx={{ fontSize: 13 }} />
+                    {shopInfo.totalProducts} สินค้า
+                  </Box>
+                  {typeof shopInfo.availableProducts === 'number' && shopInfo.availableProducts > 0 && (
+                    <Box sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 0.5,
+                      fontSize: 11,
+                      color: 'rgba(110, 231, 183, 0.9)',
+                      background: 'rgba(16, 185, 129, 0.15)',
+                      border: '1px solid rgba(16, 185, 129, 0.25)',
+                      px: 1.25,
+                      py: 0.4,
+                      borderRadius: 1,
+                    }}>
+                      ✓ {shopInfo.availableProducts} พร้อมขาย
+                    </Box>
+                  )}
+                  {shopInfo.priceRange && shopInfo.priceRange.max > 0 && (
+                    <Box sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 0.5,
+                      fontSize: 11,
+                      color: 'rgba(251, 191, 36, 0.9)',
+                      background: 'rgba(251, 191, 36, 0.15)',
+                      border: '1px solid rgba(251, 191, 36, 0.25)',
+                      px: 1.25,
+                      py: 0.4,
+                      borderRadius: 1,
+                    }}>
+                      💰 {shopInfo.priceRange.min === shopInfo.priceRange.max 
+                        ? `${shopInfo.priceRange.min}฿`
+                        : `${shopInfo.priceRange.min}-${shopInfo.priceRange.max}฿`}
+                    </Box>
+                  )}
+                </Box>
+              )}
+              
+              {/* Quick Questions */}
+              <Typography sx={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, mb: 1.5, textAlign: 'left' }}>
+                ลองถาม:
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                {QUICK_QUESTIONS.map((q, i) => (
+                  <Chip
+                    key={i}
+                    label={q}
+                    onClick={() => handleQuickQuestion(q)}
+                    sx={{
+                      background: 'rgba(255,255,255,0.08)',
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      color: 'rgba(255,255,255,0.8)',
+                      fontSize: 12,
+                      height: 30,
+                      borderRadius: 1.5,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      '&:hover': {
+                        background: 'rgba(255,255,255,0.12)',
+                        borderColor: 'rgba(255,255,255,0.2)',
+                      },
+                    }}
+                  />
+                ))}
+              </Box>
+            </Box>
+          )}
+
+          {/* Chat Messages - Liquid Glass Bubbles */}
+          {messages.map((msg) => (
+            <Box 
+              key={msg.id} 
+              sx={{ 
+                display: 'flex', 
+                mb: 2.5, 
+                flexDirection: msg.sender === 'user' ? 'row-reverse' : 'row', 
+                alignItems: 'flex-end',
+                animation: 'messageSlide 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                '@keyframes messageSlide': {
+                  from: { 
+                    opacity: 0, 
+                    transform: msg.sender === 'user' ? 'translateX(20px)' : 'translateX(-20px)',
+                  },
+                  to: { opacity: 1, transform: 'translateX(0)' },
+                },
+              }}
+            >
+              {/* Avatar - แสดงรูปโปรไฟล์ Google สำหรับผู้ใช้ */}
+              <Avatar 
+                src={msg.sender === 'user' && userSession?.image ? userSession.image : undefined}
+                sx={{ 
+                  background: msg.sender === 'user' 
+                    ? 'rgba(99, 102, 241, 0.5)'
+                    : 'rgba(255,255,255,0.1)',
+                  border: msg.sender === 'user'
+                    ? '1px solid rgba(139, 92, 246, 0.4)'
+                    : '1px solid rgba(255,255,255,0.12)',
+                  width: 32, 
+                  height: 32, 
+                  fontSize: 14,
+                  flexShrink: 0,
+                }}
+              >
+                {msg.sender === 'user' ? (
+                  userSession?.image ? null : <User size={16} />
+                ) : (
+                  <SmartToyIcon sx={{ fontSize: 18, color: '#a5b4fc' }} />
+                )}
+              </Avatar>
+              <Box sx={{ mx: 1.5, maxWidth: '80%' }}>
+                {/* Product Images - แสดงรูปภาพสินค้าที่เกี่ยวข้อง */}
+                {msg.sender === 'bot' && msg.productImages && msg.productImages.length > 0 && (
+                  <Box sx={{ 
+                    display: 'flex', 
+                    gap: 1, 
+                    mb: 1.5, 
+                    flexWrap: 'wrap',
+                    justifyContent: 'flex-start',
+                  }}>
+                    {msg.productImages.map((product, idx) => (
+                      <Box
+                        key={idx}
+                        sx={{
+                          position: 'relative',
+                          width: 80,
+                          height: 80,
+                          borderRadius: 1.5,
+                          overflow: 'hidden',
+                          border: '1px solid rgba(255,255,255,0.15)',
+                          background: 'rgba(255,255,255,0.05)',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <Box
+                          component="img"
+                          src={product.image}
+                          alt={product.name}
+                          sx={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                          }}
+                          onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                        <Box
+                          sx={{
+                            position: 'absolute',
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            background: 'linear-gradient(transparent, rgba(0,0,0,0.7))',
+                            px: 0.5,
+                            py: 0.25,
+                          }}
+                        >
+                          <Typography
+                            sx={{
+                              fontSize: 8,
+                              color: 'white',
+                              textAlign: 'center',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {product.name}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    ))}
+                  </Box>
+                )}
+                {/* Message Bubble */}
+                <Box
+                  sx={{
+                    background: msg.sender === 'user' 
+                      ? 'rgba(99, 102, 241, 0.35)'
+                      : 'rgba(255,255,255,0.08)',
+                    border: msg.sender === 'user'
+                      ? '1px solid rgba(139, 92, 246, 0.35)'
+                      : '1px solid rgba(255,255,255,0.1)',
+                    color: 'rgba(255,255,255,0.95)',
+                    px: 1.75,
+                    py: 1.25,
+                    borderRadius: msg.sender === 'user' 
+                      ? '12px 12px 4px 12px' 
+                      : '12px 12px 12px 4px',
+                    fontSize: 14,
+                    lineHeight: 1.6,
+                    whiteSpace: 'pre-wrap',
+                  }}
+                >
+                  {renderText(msg.text)}
+                </Box>
+                {/* Message Meta - Time & Source */}
+                <Box sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: 0.75,
+                  fontSize: 10, 
+                  color: 'rgba(255,255,255,0.4)', 
+                  mt: 0.75,
+                  textAlign: msg.sender === 'user' ? 'right' : 'left',
+                  flexDirection: msg.sender === 'user' ? 'row-reverse' : 'row',
+                }}>
+                  <span>{formatTime(msg.timestamp)}</span>
+                  {msg.sender === 'bot' && msg.source === 'ai' && (
+                    <Box 
+                      sx={{
+                        fontSize: 9,
+                        px: 0.5,
+                        py: 0.15,
+                        borderRadius: 0.5,
+                        bgcolor: 'rgba(16, 185, 129, 0.2)',
+                        color: '#6ee7b7',
+                        cursor: 'help',
+                      }}
+                      title={msg.modelUsed ? `Powered by ${msg.modelUsed}` : 'AI'}
+                    >
+                      ✨ {msg.modelUsed ? msg.modelUsed.replace('gemini-', '') : 'AI'}
+                    </Box>
+                  )}
+                  {msg.sender === 'bot' && msg.source === 'faq' && (
+                    <Box sx={{
+                      fontSize: 9,
+                      px: 0.5,
+                      py: 0.15,
+                      borderRadius: 0.5,
+                      bgcolor: 'rgba(99, 102, 241, 0.2)',
+                      color: '#a5b4fc',
+                    }}>
+                      📚 FAQ
+                    </Box>
+                  )}
+                  {/* Copy Button */}
+                  {msg.sender === 'bot' && (
+                    <IconButton
+                      size="small"
+                      onClick={() => handleCopyMessage(msg.id, msg.text)}
+                      sx={{
+                        p: 0.25,
+                        color: copiedMessageId === msg.id ? '#4ade80' : 'rgba(255,255,255,0.4)',
+                        '&:hover': { color: 'rgba(255,255,255,0.8)', bgcolor: 'transparent' },
+                      }}
+                      title="คัดลอก"
+                    >
+                      {copiedMessageId === msg.id ? (
+                        <CheckIcon sx={{ fontSize: 12 }} />
+                      ) : (
+                        <ContentCopyIcon sx={{ fontSize: 12 }} />
+                      )}
+                    </IconButton>
+                  )}
+                </Box>
+
+                {/* Suggestions */}
+                {msg.sender === 'bot' && msg.suggestions && msg.suggestions.length > 0 && (
+                  <Box sx={{ mt: 1.5, display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                    {msg.suggestions.map((s, i) => (
+                      <Chip
+                        key={i}
+                        label={s}
+                        size="small"
+                        onClick={() => handleQuickQuestion(s)}
+                        sx={{
+                          background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)',
+                          color: 'rgba(165, 180, 252, 0.9)',
+                          border: '1px solid rgba(255,255,255,0.15)',
+                          fontSize: 11,
+                          height: 28,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          '&:hover': { 
+                            background: 'rgba(255,255,255,0.1)',
+                            borderColor: 'rgba(255,255,255,0.2)',
+                          },
+                        }}
+                      />
+                    ))}
+                  </Box>
+                )}
+
+                {/* Related Questions - Glass Style */}
+                {msg.sender === 'bot' && msg.relatedQuestions && msg.relatedQuestions.length > 0 && (
+                  <Box sx={{ mt: 1.5 }}>
+                    <Typography sx={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', mb: 0.75 }}>
+                      คำถามที่เกี่ยวข้อง:
+                    </Typography>
+                    {msg.relatedQuestions.map((q, i) => (
+                      <Box 
+                        key={i}
+                        onClick={() => handleQuickQuestion(q)}
+                        sx={{ 
+                          color: 'rgba(165, 180, 252, 0.8)', 
+                          fontSize: 12, 
+                          cursor: 'pointer',
+                          py: 0.25,
+                          transition: 'all 0.2s',
+                          '&:hover': { 
+                            color: 'rgba(165, 180, 252, 1)',
+                            transform: 'translateX(4px)',
+                          },
+                        }}
+                      >
+                        → {q}
+                      </Box>
+                    ))}
+                  </Box>
+                )}
+              </Box>
+            </Box>
+          ))}
+
+          {/* Typing Indicator */}
+          {loading && (
+            <Box sx={{ display: 'flex', alignItems: 'flex-end', mb: 2 }}>
+              <Avatar 
+                sx={{ 
+                  background: 'rgba(255,255,255,0.1)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  width: 32, 
+                  height: 32,
+                }}
+              >
+                <SmartToyIcon sx={{ fontSize: 18, color: '#a5b4fc' }} />
+              </Avatar>
+              <Box
+                sx={{
+                  background: 'rgba(255,255,255,0.08)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  px: 2,
+                  py: 1.25,
+                  borderRadius: '12px 12px 12px 4px',
+                  mx: 1.5,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.5,
+                }}
+              >
+                {[0, 1, 2].map((i) => (
+                  <Box
+                    key={i}
+                    sx={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: '50%',
+                      bgcolor: '#a5b4fc',
+                      animation: 'bounce 1.4s infinite',
+                      animationDelay: `${i * 0.16}s`,
+                      '@keyframes bounce': {
+                        '0%, 80%, 100%': { transform: 'translateY(0)' },
+                        '40%': { transform: 'translateY(-5px)' },
+                      },
+                    }}
+                  />
+                ))}
+              </Box>
+            </Box>
+          )}
+
+          <div ref={messagesEndRef} />
+        </DialogContent>
+
+        {/* Input Area */}
+        <Box sx={{ 
+          p: 1.5, 
+          background: 'rgba(255,255,255,0.05)',
+          borderTop: '1px solid rgba(255,255,255,0.08)',
+        }}>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <TextField
+              autoFocus
+              fullWidth
+              size="small"
+              multiline
+              minRows={1}
+              maxRows={4}
+              placeholder="พิมพ์คำถามของคุณ... (Shift+Enter = ขึ้นบรรทัดใหม่)"
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              disabled={loading}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  background: 'rgba(255,255,255,0.05)',
+                  borderRadius: 1.5,
+                  alignItems: 'flex-end',
+                  color: 'rgba(255,255,255,0.95)',
+                  '& fieldset': { 
+                    borderColor: 'rgba(255,255,255,0.1)',
+                  },
+                  '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.2)' },
+                  '&.Mui-focused fieldset': { 
+                    borderColor: 'rgba(99, 102, 241, 0.5)',
+                  },
+                },
+                '& .MuiOutlinedInput-input': {
+                  '&::placeholder': { color: 'rgba(255,255,255,0.4)', opacity: 1 },
+                },
+              }}
+            />
+            {/* Send Button */}
+            <Button
+              variant="contained"
+              onClick={() => handleSend()}
+              disabled={loading || !input.trim()}
+              sx={{
+                minWidth: 44,
+                borderRadius: 1.5,
+                bgcolor: 'rgba(99, 102, 241, 0.5)',
+                border: '1px solid rgba(139, 92, 246, 0.35)',
+                transition: 'all 0.2s',
+                '&:hover': {
+                  bgcolor: 'rgba(99, 102, 241, 0.65)',
+                },
+                '&:disabled': {
+                  bgcolor: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  color: 'rgba(255,255,255,0.3)',
+                },
+              }}
+            >
+              <SendIcon fontSize="small" />
+            </Button>
+          </Box>
+          <Typography sx={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', mt: 1, textAlign: 'center' }}>
+            🚀 Powered by Gemini 2.5 Flash • ระบบ AI ที่ฉลาดที่สุด
+          </Typography>
+        </Box>
+      </Dialog>
+    </>
+  );
+}
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -707,6 +1941,7 @@ export default function HomePage() {
     }
   }, []);
 
+
   // Use realtime subscriptions for user's orders
   const userEmail = session?.user?.email;
   const { isConnected: realtimeConnected, connectionError: realtimeError } = useRealtimeOrdersByEmail(
@@ -716,6 +1951,9 @@ export default function HomePage() {
   );
 
   // Fallback: Refresh on visibility change (in case realtime disconnects)
+
+  // --- Chatbot button ---
+  // Render at the end of the page
   useEffect(() => {
     const handleVisibility = () => {
       if (!document.hidden && !realtimeConnected) {
@@ -894,7 +2132,7 @@ export default function HomePage() {
     const quantity = clampQty(productOptions.quantity);
 
     return {
-      id: `${selectedProduct.id}-${Date.now()}`,
+      id: `${selectedProduct.id}-${productOptions.size}-${normalizedCustomName}-${productOptions.customNumber}-${productOptions.isLongSleeve}`,
       productId: selectedProduct.id,
       productName: selectedProduct.name,
       size: productOptions.size,
@@ -5939,6 +7177,9 @@ export default function HomePage() {
           </Button>
         </Box>
       </Dialog>
+
+      {/* Chatbot */}
+      <ShirtChatBot />
     </Box>
   );
 }
