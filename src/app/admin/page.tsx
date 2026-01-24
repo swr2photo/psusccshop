@@ -289,7 +289,7 @@ const saveAdminCache = (payload: { config: ShopConfig; orders?: AdminOrder[]; lo
         amount: o.amount,
         // Include slip metadata (without base64) for hasSlip check
         slip: o.slip ? {
-          hasData: o.slip.hasData,
+          hasData: Boolean(o.slip.base64 || o.slip.imageUrl),
           imageUrl: o.slip.imageUrl,
           uploadedAt: o.slip.uploadedAt,
         } : undefined,
@@ -2288,8 +2288,8 @@ export default function AdminPage(): JSX.Element {
         setDynamicAdminEmails(nextConfig.adminEmails || []);
         setOrders(prev => {
           // Compare by ref, status, and slip presence to detect real changes
-          const prevKey = prev.map(o => `${o.ref}:${o.status}:${o.slip?.hasData || o.slip?.imageUrl ? '1' : '0'}`).join(',');
-          const nextKey = normalizedOrders.map(o => `${o.ref}:${o.status}:${o.slip?.hasData || o.slip?.imageUrl ? '1' : '0'}`).join(',');
+          const prevKey = prev.map(o => `${o.ref}:${o.status}:${o.slip?.base64 || o.slip?.imageUrl ? '1' : '0'}`).join(',');
+          const nextKey = normalizedOrders.map(o => `${o.ref}:${o.status}:${o.slip?.base64 || o.slip?.imageUrl ? '1' : '0'}`).join(',');
           return prevKey === nextKey ? prev : normalizedOrders;
         });
         setLogs(prev => {
