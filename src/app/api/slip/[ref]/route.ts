@@ -51,8 +51,11 @@ export async function GET(
       return NextResponse.json({ status: 'error', message: 'order data missing' }, { status: 404 });
     }
 
-    const slip = order?.slip;
-    if (!slip || !slip.base64) {
+    // Support both 'slip' and 'slipData' field names (backward compatibility)
+    const slip = order?.slip || order?.slipData;
+    // Support both imageUrl (from SlipOK S3) and base64
+    const hasSlipImage = slip && (slip.imageUrl || slip.base64);
+    if (!hasSlipImage) {
       return new NextResponse(
         `<!DOCTYPE html>
         <html>
@@ -68,15 +71,25 @@ export async function GET(
       );
     }
 
-    // Build the data URI
-    const mime = slip.mime || 'image/png';
-    const base64 = slip.base64.startsWith('data:') 
-      ? slip.base64 
-      : `data:${mime};base64,${slip.base64}`;
+    // Build the image source - prefer imageUrl from SlipOK, fallback to base64
+    let imageSrc: string;
+    if (slip.imageUrl) {
+      // Use SlipOK S3 URL directly
+      imageSrc = slip.imageUrl;
+    } else {
+      // Fallback to base64
+      const mime = slip.mime || 'image/png';
+      imageSrc = slip.base64.startsWith('data:') 
+        ? slip.base64 
+        : `data:${mime};base64,${slip.base64}`;
+    }
     
     const uploadedAt = slip.uploadedAt ? new Date(slip.uploadedAt).toLocaleString('th-TH') : '-';
-    const verified = slip.slipCheck?.success ? 'ผ่านการตรวจสอบ' : 'รอตรวจสอบ';
-    const slipData = slip.slipCheck?.data;
+    // Support both 'slipCheck.success' (old format) and 'verified' (new format)
+    const isVerified = slip.verified === true || slip.slipCheck?.success === true;
+    const verified = isVerified ? 'ผ่านการตรวจสอบ' : 'รอตรวจสอบ';
+    // Support both 'slipCheck.data' (old format) and 'slipData' (new format from SlipOK)
+    const slipData = slip.slipData || slip.slipCheck?.data;
     
     // Return HTML page with slip image
     const html = `<!DOCTYPE html>
@@ -203,21 +216,21 @@ export async function GET(
       </div>
       <div class="info-card">
         <div class="label">สถานะ</div>
-        <div class="value ${slip.slipCheck?.success ? 'verified' : 'pending'}">${verified}</div>
+        <div class="value ${isVerified ? 'verified' : 'pending'}">${verified}</div>
       </div>
     </div>
     
     <div class="slip-container">
-      <img src="${base64}" alt="สลิปโอนเงิน" class="slip-image" />
+      <img src="${imageSrc}" alt="สลิปโอนเงิน" class="slip-image" />
     </div>
     
     ${slipData ? `
     <div class="slip-data">
       <h3>📋 ข้อมูลจากสลิป</h3>
-      ${slipData.sendingBank ? `<div class="row"><span class="label">ธนาคารผู้โอน</span><span class="value">${slipData.sendingBank}</span></div>` : ''}
-      ${slipData.receivingBank ? `<div class="row"><span class="label">ธนาคารผู้รับ</span><span class="value">${slipData.receivingBank}</span></div>` : ''}
-      ${slipData.sender?.displayName ? `<div class="row"><span class="label">ชื่อผู้โอน</span><span class="value">${slipData.sender.displayName}</span></div>` : ''}
-      ${slipData.receiver?.displayName ? `<div class="row"><span class="label">ชื่อผู้รับ</span><span class="value">${slipData.receiver.displayName}</span></div>` : ''}
+      ${slipData.sendingBank || slipData.senderBank ? `<div class="row"><span class="label">ธนาคารผู้โอน</span><span class="value">${slipData.sendingBank || slipData.senderBank}</span></div>` : ''}
+      ${slipData.receivingBank || slipData.receiverBank ? `<div class="row"><span class="label">ธนาคารผู้รับ</span><span class="value">${slipData.receivingBank || slipData.receiverBank}</span></div>` : ''}
+      ${slipData.sender?.displayName || slipData.senderName ? `<div class="row"><span class="label">ชื่อผู้โอน</span><span class="value">${slipData.sender?.displayName || slipData.senderName}</span></div>` : ''}
+      ${slipData.receiver?.displayName || slipData.receiverName ? `<div class="row"><span class="label">ชื่อผู้รับ</span><span class="value">${slipData.receiver?.displayName || slipData.receiverName}</span></div>` : ''}
       ${slipData.amount ? `<div class="row"><span class="label">จำนวนเงิน</span><span class="value">฿${Number(slipData.amount).toLocaleString()}</span></div>` : ''}
       ${slipData.transDate ? `<div class="row"><span class="label">วันที่โอน</span><span class="value">${slipData.transDate}</span></div>` : ''}
       ${slipData.transTime ? `<div class="row"><span class="label">เวลา</span><span class="value">${slipData.transTime}</span></div>` : ''}

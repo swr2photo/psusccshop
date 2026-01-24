@@ -290,11 +290,30 @@ export async function putJson(key: string, data: any): Promise<void> {
       if (!ref) throw new Error('Invalid order key');
       
       const dbOrder = transformLegacyToDBOrder(data);
-      const { error } = await db
-        .from('orders')
-        .upsert(dbOrder, { onConflict: 'ref' });
       
-      if (error) throw error;
+      // Check if order already exists
+      const { data: existing } = await db
+        .from('orders')
+        .select('ref')
+        .eq('ref', ref)
+        .single();
+      
+      if (existing) {
+        // Update existing order - only update provided fields
+        const { error } = await db
+          .from('orders')
+          .update(dbOrder)
+          .eq('ref', ref);
+        
+        if (error) throw error;
+      } else {
+        // Insert new order
+        const { error } = await db
+          .from('orders')
+          .insert(dbOrder);
+        
+        if (error) throw error;
+      }
       return;
     }
     
@@ -530,6 +549,8 @@ function transformDBOrderToLegacy(dbOrder: any): any {
     totalAmount: dbOrder.total_amount,
     amount: dbOrder.total_amount,
     notes: dbOrder.notes,
+    // Map slip_data to both 'slip' and 'slipData' for backward compatibility
+    slip: dbOrder.slip_data,
     slipData: dbOrder.slip_data,
     paymentVerifiedAt: dbOrder.payment_verified_at,
     paymentMethod: dbOrder.payment_method,
@@ -554,8 +575,9 @@ function transformLegacyToDBOrder(legacyOrder: any): any {
     cart: legacyOrder.cart || [],
     total_amount: legacyOrder.totalAmount || legacyOrder.amount || 0,
     notes: legacyOrder.notes || null,
-    slip_data: legacyOrder.slipData || null,
-    payment_verified_at: legacyOrder.paymentVerifiedAt || null,
+    // Support both 'slip' (from payment verify) and 'slipData' fields
+    slip_data: legacyOrder.slip || legacyOrder.slipData || null,
+    payment_verified_at: legacyOrder.paymentVerifiedAt || legacyOrder.verifiedAt || null,
     payment_method: legacyOrder.paymentMethod || null,
     updated_at: new Date().toISOString(),
   };
@@ -598,8 +620,10 @@ function transformDBEmailLogToLegacy(dbLog: any): any {
 }
 
 function transformLegacyToDBEmailLog(data: any): any {
+  // Ensure id is always present - generate one if missing
+  const id = data.id || `email-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   return {
-    id: data.id,
+    id,
     order_ref: data.orderRef || null,
     to_email: data.to || '',
     from_email: data.from || '',

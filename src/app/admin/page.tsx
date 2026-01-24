@@ -153,8 +153,26 @@ interface AdminOrder {
   slip?: {
     uploadedAt: string;
     base64?: string;
+    imageUrl?: string;  // URL from SlipOK S3
     fileName?: string;
     mime?: string;
+    slipData?: {
+      transRef?: string;
+      transDate?: string;
+      transTime?: string;
+      amount?: number;
+      // ข้อมูลผู้โอน (sender) - คนที่โอนเงิน
+      senderName?: string;        // ชื่อหลัก (ใช้ fullName ถ้ามี)
+      senderFullName?: string;    // ชื่อเต็มภาษาไทย
+      senderDisplayName?: string; // ชื่อย่อ (Mr. Justin M)
+      senderBank?: string;
+      senderAccount?: string;
+      // ข้อมูลผู้รับ (receiver) - บัญชีร้านค้า
+      receiverName?: string;
+      receiverDisplayName?: string;
+      receiverBank?: string;
+      receiverAccount?: string;
+    };
   };
   cart?: CartItemAdmin[];
   items?: CartItemAdmin[]; // Legacy field name for cart
@@ -269,6 +287,12 @@ const saveAdminCache = (payload: { config: ShopConfig; orders?: AdminOrder[]; lo
         status: o.status,
         name: o.name,
         amount: o.amount,
+        // Include slip metadata (without base64) for hasSlip check
+        slip: o.slip ? {
+          hasData: o.slip.hasData,
+          imageUrl: o.slip.imageUrl,
+          uploadedAt: o.slip.uploadedAt,
+        } : undefined,
       })),
       logs: [],
     };
@@ -2263,9 +2287,9 @@ export default function AdminPage(): JSX.Element {
         // Sync dynamic admin emails from config
         setDynamicAdminEmails(nextConfig.adminEmails || []);
         setOrders(prev => {
-          // Compare by ref and status to detect real changes
-          const prevKey = prev.map(o => `${o.ref}:${o.status}`).join(',');
-          const nextKey = normalizedOrders.map(o => `${o.ref}:${o.status}`).join(',');
+          // Compare by ref, status, and slip presence to detect real changes
+          const prevKey = prev.map(o => `${o.ref}:${o.status}:${o.slip?.hasData || o.slip?.imageUrl ? '1' : '0'}`).join(',');
+          const nextKey = normalizedOrders.map(o => `${o.ref}:${o.status}:${o.slip?.hasData || o.slip?.imageUrl ? '1' : '0'}`).join(',');
           return prevKey === nextKey ? prev : normalizedOrders;
         });
         setLogs(prev => {
@@ -2368,7 +2392,8 @@ export default function AdminPage(): JSX.Element {
 
   // Open slip viewer
   const openSlipViewer = (order: AdminOrder) => {
-    setSlipViewerData({ ref: order.ref, slip: order.slip || order.raw?.slip });
+    const slip = order.slip || order.raw?.slip;
+    setSlipViewerData({ ref: order.ref, slip });
     setSlipViewerOpen(true);
   };
 
@@ -4398,7 +4423,8 @@ export default function AdminPage(): JSX.Element {
             const isProcessing = orderProcessingRef === order.ref;
             const isSelected = selectedOrders.has(order.ref);
             const slipData = order.slip || order.raw?.slip;
-            const hasSlip = !!(slipData && slipData.base64);
+            // Support both imageUrl (from SlipOK S3) and base64
+            const hasSlip = !!(slipData && (slipData.imageUrl || slipData.base64));
             // Short status labels
             const shortStatus: Record<string, string> = {
               'WAITING_PAYMENT': 'รอจ่าย',
@@ -6335,14 +6361,21 @@ export default function AdminPage(): JSX.Element {
           </IconButton>
         </DialogTitle>
         <DialogContent sx={{ p: 3 }}>
-          {slipViewerData?.slip?.base64 ? (
+          {(slipViewerData?.slip?.imageUrl || slipViewerData?.slip?.base64) ? (
             <Box sx={{ textAlign: 'center' }}>
               <Box
                 component="img"
-                src={slipViewerData.slip.base64.startsWith('data:') 
-                  ? slipViewerData.slip.base64 
-                  : `data:${slipViewerData.slip.mime || 'image/png'};base64,${slipViewerData.slip.base64}`}
+                src={slipViewerData.slip.imageUrl 
+                  ? slipViewerData.slip.imageUrl
+                  : slipViewerData.slip.base64?.startsWith('data:') 
+                    ? slipViewerData.slip.base64 
+                    : `data:${slipViewerData.slip.mime || 'image/png'};base64,${slipViewerData.slip.base64}`}
                 alt="สลิปการโอนเงิน"
+                onError={(e) => {
+                  console.error('[SlipViewer] Image load error:', slipViewerData.slip?.imageUrl);
+                  // Try to show a fallback message
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
                 sx={{
                   maxWidth: '100%',
                   maxHeight: '70vh',
@@ -6350,10 +6383,65 @@ export default function AdminPage(): JSX.Element {
                   boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
                 }}
               />
+              {/* Show imageUrl link if image fails to load */}
+              {slipViewerData.slip.imageUrl && (
+                <Button 
+                  variant="outlined" 
+                  size="small"
+                  href={slipViewerData.slip.imageUrl}
+                  target="_blank"
+                  sx={{ mt: 2, color: '#6366f1', borderColor: '#6366f1' }}
+                >
+                  เปิดรูปภาพในแท็บใหม่
+                </Button>
+              )}
               {slipViewerData.slip.uploadedAt && (
                 <Typography sx={{ mt: 2, color: '#94a3b8', fontSize: '0.85rem' }}>
                   อัพโหลดเมื่อ: {new Date(slipViewerData.slip.uploadedAt).toLocaleString('th-TH')}
                 </Typography>
+              )}
+              {slipViewerData.slip.slipData && (
+                <Box sx={{ mt: 2, p: 2, bgcolor: 'rgba(16,185,129,0.1)', borderRadius: '12px', textAlign: 'left' }}>
+                  <Typography sx={{ color: '#10b981', fontWeight: 600, mb: 1 }}>📋 ข้อมูลจากสลิป</Typography>
+                  {slipViewerData.slip.slipData.amount && (
+                    <Typography sx={{ color: '#f1f5f9', fontSize: '0.9rem' }}>💰 จำนวนเงิน: ฿{Number(slipViewerData.slip.slipData.amount).toLocaleString()}</Typography>
+                  )}
+                  {/* ข้อมูลผู้โอน - แสดงทั้งชื่อเต็มและชื่อย่อ */}
+                  {(slipViewerData.slip.slipData.senderName || slipViewerData.slip.slipData.senderFullName || slipViewerData.slip.slipData.senderDisplayName) && (
+                    <Box sx={{ mt: 1 }}>
+                      <Typography sx={{ color: '#94a3b8', fontSize: '0.85rem' }}>
+                        👤 ผู้โอน: {slipViewerData.slip.slipData.senderFullName || slipViewerData.slip.slipData.senderName || slipViewerData.slip.slipData.senderDisplayName}
+                      </Typography>
+                      {slipViewerData.slip.slipData.senderDisplayName && slipViewerData.slip.slipData.senderFullName && (
+                        <Typography sx={{ color: '#64748b', fontSize: '0.75rem', ml: 3 }}>
+                          ({slipViewerData.slip.slipData.senderDisplayName})
+                        </Typography>
+                      )}
+                      {slipViewerData.slip.slipData.senderBank && (
+                        <Typography sx={{ color: '#64748b', fontSize: '0.75rem', ml: 3 }}>
+                          🏦 {slipViewerData.slip.slipData.senderBank}
+                        </Typography>
+                      )}
+                    </Box>
+                  )}
+                  {slipViewerData.slip.slipData.transRef && (
+                    <Typography sx={{ color: '#94a3b8', fontSize: '0.85rem', mt: 1 }}>🔢 เลขอ้างอิง: {slipViewerData.slip.slipData.transRef}</Typography>
+                  )}
+                  {slipViewerData.slip.slipData.transDate && slipViewerData.slip.slipData.transTime && (
+                    <Typography sx={{ color: '#64748b', fontSize: '0.75rem', ml: 3 }}>
+                      📅 {slipViewerData.slip.slipData.transDate} {slipViewerData.slip.slipData.transTime}
+                    </Typography>
+                  )}
+                  {/* ข้อมูลผู้รับ (ร้านค้า) */}
+                  {slipViewerData.slip.slipData.receiverName && (
+                    <Box sx={{ mt: 1, pt: 1, borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
+                      <Typography sx={{ color: '#64748b', fontSize: '0.75rem' }}>
+                        📥 ผู้รับ: {slipViewerData.slip.slipData.receiverName} 
+                        {slipViewerData.slip.slipData.receiverBank && ` (${slipViewerData.slip.slipData.receiverBank})`}
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
               )}
             </Box>
           ) : (
@@ -6362,6 +6450,17 @@ export default function AdminPage(): JSX.Element {
               <Typography sx={{ color: '#94a3b8' }}>
                 ไม่พบข้อมูลรูปภาพสลิป
               </Typography>
+              {slipViewerData?.ref && (
+                <Button
+                  variant="outlined"
+                  size="small"
+                  href={`/api/slip/${slipViewerData.ref}`}
+                  target="_blank"
+                  sx={{ mt: 2, color: '#6366f1', borderColor: '#6366f1' }}
+                >
+                  เปิดหน้าดูสลิป
+                </Button>
+              )}
             </Box>
           )}
         </DialogContent>

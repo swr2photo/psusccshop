@@ -339,14 +339,18 @@ export function sanitizeOrderForAdmin(order: any): any {
   
   const result = { ...order };
   
-  // Remove raw base64 but keep metadata
+  // Remove raw base64 but keep metadata and imageUrl
   if (result.slip) {
     result.slip = {
       uploadedAt: result.slip.uploadedAt,
       mime: result.slip.mime,
       fileName: result.slip.fileName,
-      hasData: !!result.slip.base64,
-      // Remove actual base64 data
+      hasData: !!(result.slip.base64 || result.slip.imageUrl),
+      // Keep imageUrl for SlipOK S3 images (URL is safe to expose)
+      imageUrl: result.slip.imageUrl,
+      // Keep slipData for verification details
+      slipData: result.slip.slipData,
+      // Remove actual base64 data (large, sensitive)
     };
   }
   

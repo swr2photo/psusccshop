@@ -98,6 +98,9 @@ interface SlipOKResponse {
     amount: number;
     sendingBank: string;
     receivingBank: string;
+    // SlipOK may return image URL
+    imageUrl?: string;
+    slipUrl?: string;
   };
 }
 
@@ -107,6 +110,7 @@ interface SlipVerifyResult {
   message: string;
   code?: number;
   slipData?: SlipOKResponse['data'];
+  slipImageUrl?: string; // URL รูปสลิปจาก SlipOK S3
 }
 
 // ============== ERROR CODE MESSAGES ==============
@@ -166,20 +170,30 @@ const checkSlipWithSlipOK = async (
     });
 
     const result: SlipOKResponse = await response.json();
+    
+    // Log full response for debugging (to find image URL field)
+    console.log(`[payment-verify] SlipOK response:`, JSON.stringify(result, null, 2));
 
     // ✅ Success case
     if (response.ok && result.success && result.data?.success) {
       const slipAmount = result.data.amount;
       const senderName = result.data.sender?.displayName || result.data.sender?.name || 'ไม่ทราบ';
       const receiverName = result.data.receiver?.displayName || result.data.receiver?.name || 'ไม่ทราบ';
+      
+      // Try to get slip image URL from response (SlipOK stores images in S3)
+      const slipImageUrl = result.data.imageUrl || result.data.slipUrl || (result as any).imageUrl || (result as any).slipUrl;
 
       console.log(`[payment-verify] ✅ Slip verified: ${slipAmount} THB from ${senderName} to ${receiverName}`);
+      if (slipImageUrl) {
+        console.log(`[payment-verify] 📸 Slip image URL: ${slipImageUrl}`);
+      }
 
       return {
         success: true,
         verified: true,
         message: 'สลิปถูกต้อง',
         slipData: result.data,
+        slipImageUrl,
       };
     }
 
@@ -308,22 +322,41 @@ export async function POST(req: NextRequest) {
     }
 
     // ✅ สลิปผ่าน - บันทึกข้อมูล
-    const slipInfo = {
+    // ถ้ามี URL จาก SlipOK ให้เก็บ URL แทน base64 เพื่อประหยัดพื้นที่
+    const hasSlipImageUrl = !!slipCheck.slipImageUrl;
+    
+    // ดึงชื่อผู้โอน - ลำดับความสำคัญ:
+    // 1. sender.name (ชื่อเต็มภาษาไทย เช่น "วีรชาติ แก้วขำ")
+    // 2. sender.displayName (ชื่อย่อ เช่น "Mr. Justin M")
+    const senderFullName = slipCheck.slipData?.sender?.name || '';
+    const senderDisplayName = slipCheck.slipData?.sender?.displayName || '';
+    // ใช้ชื่อเต็มถ้ามี ไม่งั้นใช้ displayName
+    const senderName = senderFullName || senderDisplayName;
+    
+    const slipInfo: Record<string, any> = {
       uploadedAt: new Date().toISOString(),
       mime: mime || 'image/png',
       fileName: name || `SLIP_${ref}.png`,
-      base64,
       verified: slipCheck.verified,
-      // เก็บข้อมูลจาก SlipOK
+      // เก็บ URL จาก SlipOK S3 ถ้ามี
+      imageUrl: slipCheck.slipImageUrl || null,
+      // เก็บ base64 เฉพาะถ้าไม่มี URL (fallback)
+      base64: hasSlipImageUrl ? undefined : base64,
+      // เก็บข้อมูลจาก SlipOK - ปรับปรุงให้แม่นยำขึ้น
       slipData: slipCheck.slipData ? {
         transRef: slipCheck.slipData.transRef,
         transDate: slipCheck.slipData.transDate,
         transTime: slipCheck.slipData.transTime,
         amount: slipCheck.slipData.amount,
-        senderName: slipCheck.slipData.sender?.displayName || slipCheck.slipData.sender?.name,
+        // ข้อมูลผู้โอน (sender) - คนที่โอนเงิน
+        senderName: senderName, // ใช้ชื่อเต็มเป็นหลัก
+        senderFullName: senderFullName, // ชื่อเต็มภาษาไทย
+        senderDisplayName: senderDisplayName, // ชื่อย่อ (Mr. Justin M)
         senderAccount: slipCheck.slipData.sender?.account?.value,
         senderBank: slipCheck.slipData.sendingBank,
-        receiverName: slipCheck.slipData.receiver?.displayName || slipCheck.slipData.receiver?.name,
+        // ข้อมูลผู้รับ (receiver) - บัญชีร้านค้า
+        receiverName: slipCheck.slipData.receiver?.name || slipCheck.slipData.receiver?.displayName,
+        receiverDisplayName: slipCheck.slipData.receiver?.displayName,
         receiverAccount: slipCheck.slipData.receiver?.account?.value,
         receiverBank: slipCheck.slipData.receivingBank,
       } : null,
@@ -388,7 +421,8 @@ export async function POST(req: NextRequest) {
         ref,
         expectedAmount,
         paidAmount: slipCheck.slipData?.amount || expectedAmount,
-        senderName: slipCheck.slipData?.sender?.displayName,
+        senderName: senderName, // ใช้ชื่อเต็มที่ดึงไว้แล้ว
+        senderDisplayName: senderDisplayName, // ชื่อย่อ (Mr. Justin M)
         transRef: slipCheck.slipData?.transRef,
       },
     });
