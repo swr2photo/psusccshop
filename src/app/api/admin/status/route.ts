@@ -6,6 +6,47 @@ import { sendOrderStatusEmail } from '@/lib/email';
 import { ShopConfig } from '@/lib/config';
 import crypto from 'crypto';
 
+// Helper to save user log server-side
+const userLogKey = (id: string) => `user-logs/${id}.json`;
+interface LogEntry {
+  id: string;
+  email: string;
+  name?: string;
+  action: string;
+  details?: string;
+  metadata?: Record<string, any>;
+  ip?: string;
+  userAgent?: string;
+  timestamp: string;
+}
+const saveUserLogServer = async (params: {
+  email: string;
+  name?: string;
+  action: string;
+  details?: string;
+  metadata?: Record<string, any>;
+  ip?: string;
+  userAgent?: string;
+}) => {
+  try {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const entry: LogEntry = {
+      id,
+      email: params.email,
+      name: params.name,
+      action: params.action,
+      details: params.details,
+      metadata: params.metadata,
+      ip: params.ip,
+      userAgent: params.userAgent,
+      timestamp: new Date().toISOString(),
+    };
+    await putJson(userLogKey(id), entry);
+  } catch (e) {
+    console.error('[Admin Status] Failed to save user log:', e);
+  }
+};
+
 // Helper to generate email index key
 const normalizeEmail = (email?: string | null) => (email || '').trim().toLowerCase();
 const emailIndexKey = (email: string) => {
@@ -101,9 +142,39 @@ export async function POST(req: NextRequest) {
           // Don't fail the request if email fails
         }
       }
+      
+      // Log admin action
+      const userAgent = req.headers.get('user-agent') || undefined;
+      const clientIP = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 
+                       req.headers.get('x-real-ip') || undefined;
+      const statusLabels: Record<string, string> = {
+        'PENDING': 'รอดำเนินการ',
+        'PAID': 'ชำระเงินแล้ว',
+        'PROCESSING': 'กำลังดำเนินการ',
+        'READY': 'พร้อมรับสินค้า',
+        'SHIPPED': 'จัดส่งแล้ว',
+        'COMPLETED': 'เสร็จสิ้น',
+        'CANCELLED': 'ยกเลิก',
+      };
+      await saveUserLogServer({
+        email: authResult.email,
+        action: 'admin_change_status',
+        details: `เปลี่ยนสถานะ ${ref}: ${previousStatus} → ${status} (${statusLabels[status] || status})`,
+        metadata: {
+          ref,
+          previousStatus,
+          newStatus: status,
+          cancelReason: body.cancelReason,
+          trackingNumber: body.trackingNumber,
+          sendEmail,
+        },
+        ip: clientIP,
+        userAgent,
+      });
     }
     // Auto sync to Google Sheets
     triggerSheetSync().catch(() => {});
+    
     return NextResponse.json({ status: 'success' });
   } catch (error: any) {
     return NextResponse.json({ status: 'error', message: error?.message || 'update failed' }, { status: 500 });

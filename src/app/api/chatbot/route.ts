@@ -30,9 +30,15 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { message, conversationHistory } = body;
+    const { message, conversationHistory, image } = body;
     
-    if (!message || typeof message !== 'string') {
+    // Log if image is received
+    if (image) {
+      console.log(`[Chatbot API] Received image: ${typeof image}, length: ${image?.length || 0}`);
+    }
+    
+    // Allow empty message if image is provided
+    if ((!message || typeof message !== 'string') && !image) {
       return NextResponse.json({ 
         answer: 'กรุณาพิมพ์คำถามเกี่ยวกับสินค้าหรือบริการของร้านค่ะ 😊', 
         source: 'validation',
@@ -40,8 +46,8 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // Limit message length
-    const trimmedMessage = message.trim().slice(0, 1000); // Allow longer questions
+    // Limit message length - use default message if only image is sent
+    const trimmedMessage = (message || 'ช่วยดูรูปนี้ให้หน่อยค่ะ').trim().slice(0, 1000);
     
     if (trimmedMessage.length < 2) {
       return NextResponse.json({ 
@@ -60,8 +66,8 @@ export async function POST(req: NextRequest) {
       }));
     }
 
-    // Process with AI
-    const result = await processChat(trimmedMessage, history);
+    // Process with AI (include image if provided)
+    const result = await processChat(trimmedMessage, history, image);
     
     return NextResponse.json({
       answer: result.answer,

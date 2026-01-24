@@ -3,6 +3,48 @@ import { S3Client, PutObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s
 import { requireAuth } from '@/lib/auth';
 import { checkCombinedRateLimit, RATE_LIMITS, getRateLimitHeaders } from '@/lib/rate-limit';
 import { encodeImageUrl } from '@/lib/sanitize';
+import { putJson } from '@/lib/filebase';
+
+// Helper to save user log server-side
+const userLogKey = (id: string) => `user-logs/${id}.json`;
+interface LogEntry {
+  id: string;
+  email: string;
+  name?: string;
+  action: string;
+  details?: string;
+  metadata?: Record<string, any>;
+  ip?: string;
+  userAgent?: string;
+  timestamp: string;
+}
+const saveUserLogServer = async (params: {
+  email: string;
+  name?: string;
+  action: string;
+  details?: string;
+  metadata?: Record<string, any>;
+  ip?: string;
+  userAgent?: string;
+}) => {
+  try {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const entry: LogEntry = {
+      id,
+      email: params.email,
+      name: params.name,
+      action: params.action,
+      details: params.details,
+      metadata: params.metadata,
+      ip: params.ip,
+      userAgent: params.userAgent,
+      timestamp: new Date().toISOString(),
+    };
+    await putJson(userLogKey(id), entry);
+  } catch (e) {
+    console.error('[Upload] Failed to save user log:', e);
+  }
+};
 
 const endpoint = process.env.FILEBASE_ENDPOINT || 'https://s3.filebase.com';
 const region = process.env.FILEBASE_REGION || 'us-east-1';
@@ -134,6 +176,24 @@ export async function POST(req: NextRequest) {
     }
 
     const url = getPublicUrl(cid);
+
+    // Log upload action
+    const userAgent = req.headers.get('user-agent') || undefined;
+    const clientIP = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 
+                     req.headers.get('x-real-ip') || undefined;
+    await saveUserLogServer({
+      email: authResult.email,
+      name: authResult.name || undefined,
+      action: 'upload_image',
+      details: `อัปโหลดรูปภาพ (${(buffer.length / 1024).toFixed(1)} KB)`,
+      metadata: {
+        filename: filename || 'image.png',
+        size: buffer.length,
+        contentType,
+      },
+      ip: clientIP,
+      userAgent,
+    });
 
     // ⚠️ SECURITY: Encode URL to hide real IPFS path
     return NextResponse.json({

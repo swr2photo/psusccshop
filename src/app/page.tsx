@@ -12,16 +12,46 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import CheckIcon from '@mui/icons-material/Check';
 import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
+import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
+import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
+import PaidOutlinedIcon from '@mui/icons-material/PaidOutlined';
+import StraightenOutlinedIcon from '@mui/icons-material/StraightenOutlined';
+import LocalShippingOutlinedIcon from '@mui/icons-material/LocalShippingOutlined';
+import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined';
+import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined';
+import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
+import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
+import VerifiedIcon from '@mui/icons-material/Verified';
+import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined';
+import WavingHandIcon from '@mui/icons-material/WavingHand';
+import ReplyIcon from '@mui/icons-material/Reply';
+import EditIcon from '@mui/icons-material/Edit';
 
 // ==================== CHATBOT COMPONENT (Enhanced with Logo & AI) ====================
-const QUICK_QUESTIONS = [
-  '🛒 วิธีสั่งซื้อ',
-  '💰 ราคาสินค้า',
-  '📏 ไซซ์และขนาด',
-  '📦 การจัดส่ง',
-  '💳 วิธีชำระเงิน',
-  '❓ ติดต่อร้าน',
+const QUICK_QUESTIONS_DATA = [
+  { icon: 'cart', label: 'วิธีสั่งซื้อ' },
+  { icon: 'price', label: 'ราคาสินค้า' },
+  { icon: 'size', label: 'ไซซ์และขนาด' },
+  { icon: 'shipping', label: 'การจัดส่ง' },
+  { icon: 'payment', label: 'วิธีชำระเงิน' },
+  { icon: 'help', label: 'ติดต่อร้าน' },
 ];
+
+// Helper to render quick question icon
+const QuickQuestionIcon = ({ type, size = 14 }: { type: string; size?: number }) => {
+  const sx = { fontSize: size, opacity: 0.85 };
+  switch (type) {
+    case 'cart': return <ShoppingCartOutlinedIcon sx={sx} />;
+    case 'price': return <PaidOutlinedIcon sx={sx} />;
+    case 'size': return <StraightenOutlinedIcon sx={sx} />;
+    case 'shipping': return <LocalShippingOutlinedIcon sx={sx} />;
+    case 'payment': return <AccountBalanceWalletOutlinedIcon sx={sx} />;
+    case 'help': return <HelpOutlineOutlinedIcon sx={sx} />;
+    default: return null;
+  }
+};
+
+const QUICK_QUESTIONS = QUICK_QUESTIONS_DATA.map(q => q.label);
 
 interface ChatMessage {
   id: string;
@@ -34,11 +64,14 @@ interface ChatMessage {
   confidence?: number;
   productImages?: { name: string; image: string; }[];
   modelUsed?: string; // ชื่อโมเดล AI ที่ใช้
+  replyTo?: { id: string; text: string; sender: 'user' | 'bot' }; // ข้อความที่ตอบกลับ
+  isEdited?: boolean; // ข้อความถูกแก้ไข
 }
 
 // Session storage key for chat history (encrypted)
 const CHAT_STORAGE_KEY = 'scc_chat_history';
 const CHAT_SESSION_ID_KEY = 'scc_chat_session_id';
+const CHAT_PERSISTENT_KEY = 'scc_chat_persistent'; // LocalStorage for logged-in users
 
 function ShirtChatBot() {
   const [open, setOpen] = React.useState(false);
@@ -55,6 +88,14 @@ function ShirtChatBot() {
     availableProducts?: number;
     priceRange?: { min: number; max: number };
   } | null>(null);
+  // New states for enhanced features
+  const [lightboxImage, setLightboxImage] = React.useState<string | null>(null);
+  const [uploadedImage, setUploadedImage] = React.useState<{ base64: string; preview: string } | null>(null);
+  const [isUploading, setIsUploading] = React.useState(false);
+  const [replyToMessage, setReplyToMessage] = React.useState<{ id: string; text: string; sender: 'user' | 'bot' } | null>(null);
+  const [editingMessage, setEditingMessage] = React.useState<{ id: string; text: string } | null>(null);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
   const messagesContainerRef = React.useRef<HTMLDivElement>(null);
 
@@ -69,29 +110,51 @@ function ShirtChatBot() {
     return sessionId;
   }, []);
 
-  // Save chat history securely (session-only, no sensitive data)
-  const saveChatHistory = React.useCallback((msgs: ChatMessage[]) => {
+  // Save chat history securely (localStorage for logged-in, sessionStorage for guests)
+  const saveChatHistory = React.useCallback((msgs: ChatMessage[], email?: string) => {
     if (typeof window === 'undefined') return;
     try {
-      // Only save last 20 messages, sanitize data
-      const sanitizedMsgs = msgs.slice(-20).map(m => ({
+      // Only save last 50 messages for logged-in users, 20 for guests
+      const maxMessages = email ? 50 : 20;
+      const sanitizedMsgs = msgs.slice(-maxMessages).map(m => ({
         id: m.id,
         sender: m.sender,
-        text: m.text.slice(0, 2000), // Limit text length
+        text: m.text.slice(0, 2000),
         timestamp: m.timestamp.toISOString(),
         source: m.source,
+        productImages: m.productImages,
       }));
-      sessionStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(sanitizedMsgs));
+      
+      if (email) {
+        // Logged-in users: save to localStorage with email hash
+        const key = `${CHAT_PERSISTENT_KEY}_${btoa(email).slice(0, 16)}`;
+        localStorage.setItem(key, JSON.stringify(sanitizedMsgs));
+      } else {
+        // Guests: save to sessionStorage
+        sessionStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(sanitizedMsgs));
+      }
     } catch (e) {
       console.warn('Failed to save chat history');
     }
   }, []);
 
-  // Load chat history from session storage
-  const loadChatHistory = React.useCallback(() => {
+  // Load chat history from storage
+  const loadChatHistory = React.useCallback((email?: string) => {
     if (typeof window === 'undefined') return [];
     try {
-      const saved = sessionStorage.getItem(CHAT_STORAGE_KEY);
+      let saved: string | null = null;
+      
+      if (email) {
+        // Try localStorage first for logged-in users
+        const key = `${CHAT_PERSISTENT_KEY}_${btoa(email).slice(0, 16)}`;
+        saved = localStorage.getItem(key);
+      }
+      
+      // Fallback to sessionStorage
+      if (!saved) {
+        saved = sessionStorage.getItem(CHAT_STORAGE_KEY);
+      }
+      
       if (saved) {
         const parsed = JSON.parse(saved);
         return parsed.map((m: any) => ({
@@ -116,23 +179,34 @@ function ShirtChatBot() {
             email: data.user.email,
             image: data.user.image,
           });
+          // Load chat history for logged-in user
+          const savedMessages = loadChatHistory(data.user.email);
+          if (savedMessages.length > 0) {
+            setMessages(savedMessages);
+          }
+        } else {
+          // Load chat history for guest
+          const savedMessages = loadChatHistory();
+          if (savedMessages.length > 0) {
+            setMessages(savedMessages);
+          }
         }
       })
-      .catch(() => {});
-    
-    // Load saved chat history
-    const savedMessages = loadChatHistory();
-    if (savedMessages.length > 0) {
-      setMessages(savedMessages);
-    }
+      .catch(() => {
+        // Load guest chat history on error
+        const savedMessages = loadChatHistory();
+        if (savedMessages.length > 0) {
+          setMessages(savedMessages);
+        }
+      });
   }, [loadChatHistory]);
 
   // Save messages when they change
   React.useEffect(() => {
     if (messages.length > 0) {
-      saveChatHistory(messages);
+      saveChatHistory(messages, userSession?.email);
     }
-  }, [messages, saveChatHistory]);
+  }, [messages, saveChatHistory, userSession?.email]);
 
   // Auto scroll to bottom with delay to ensure DOM is updated
   const scrollToBottom = React.useCallback(() => {
@@ -172,27 +246,133 @@ function ShirtChatBot() {
     }));
   };
 
+  // Handle reply to a message
+  const handleReply = (msg: ChatMessage) => {
+    setEditingMessage(null); // Clear edit mode if any
+    setReplyToMessage({
+      id: msg.id,
+      text: msg.text.slice(0, 100) + (msg.text.length > 100 ? '...' : ''),
+      sender: msg.sender,
+    });
+    inputRef.current?.focus();
+  };
+
+  // Handle edit message - only for user messages
+  const handleEditMessage = (msg: ChatMessage) => {
+    if (msg.sender !== 'user') return;
+    setReplyToMessage(null); // Clear reply mode if any
+    setEditingMessage({
+      id: msg.id,
+      text: msg.text.replace(/^\[รูปภาพ\]\s*/, ''), // Remove image prefix if any
+    });
+    setInput(msg.text.replace(/^\[รูปภาพ\]\s*/, ''));
+    inputRef.current?.focus();
+  };
+
+  // Cancel edit mode
+  const cancelEditMode = () => {
+    setEditingMessage(null);
+    setInput('');
+  };
+
   const handleSend = async (customMessage?: string) => {
     const msgToSend = customMessage || input.trim();
     if (!msgToSend) return;
+    
+    // If editing, update the existing message and regenerate bot response
+    if (editingMessage) {
+      // Find the index of the message being edited
+      const editIndex = messages.findIndex(m => m.id === editingMessage.id);
+      if (editIndex === -1) {
+        setEditingMessage(null);
+        return;
+      }
+      
+      // Update the user message and remove all messages after it
+      const updatedMessages = messages.slice(0, editIndex);
+      const updatedUserMsg: ChatMessage = {
+        ...messages[editIndex],
+        text: msgToSend,
+        isEdited: true,
+        timestamp: new Date(),
+      };
+      updatedMessages.push(updatedUserMsg);
+      
+      setMessages(updatedMessages);
+      setInput('');
+      setEditingMessage(null);
+      setLoading(true);
+      
+      try {
+        // Get conversation history up to the edited message
+        const historyForEdit = updatedMessages.slice(-6).map(msg => ({
+          role: msg.sender === 'user' ? 'user' : 'assistant',
+          content: msg.text,
+        }));
+        
+        const res = await fetch('/api/chatbot', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            message: msgToSend,
+            conversationHistory: historyForEdit,
+          }),
+        });
+        const data = await res.json();
+        
+        const botMsg: ChatMessage = {
+          id: generateId(),
+          sender: 'bot',
+          text: data.answer,
+          timestamp: new Date(),
+          suggestions: data.suggestions,
+          relatedQuestions: data.relatedQuestions,
+          source: data.source,
+          confidence: data.confidence,
+          productImages: data.productImages,
+          modelUsed: data.modelUsed,
+        };
+        
+        setMessages((prev) => [...prev, botMsg]);
+      } catch (e) {
+        const errorMsg: ChatMessage = {
+          id: generateId(),
+          sender: 'bot',
+          text: 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้งค่ะ',
+          timestamp: new Date(),
+          suggestions: QUICK_QUESTIONS,
+        };
+        setMessages((prev) => [...prev, errorMsg]);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
     
     const userMsg: ChatMessage = {
       id: generateId(),
       sender: 'user',
       text: msgToSend,
       timestamp: new Date(),
+      replyTo: replyToMessage || undefined,
     };
     
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
+    setReplyToMessage(null); // Clear reply after sending
     setLoading(true);
     
     try {
+      // Include reply context in the message if replying
+      const contextMessage = replyToMessage 
+        ? `(ตอบกลับ: "${replyToMessage.text}") ${msgToSend}`
+        : msgToSend;
+      
       const res = await fetch('/api/chatbot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          message: msgToSend,
+          message: contextMessage,
           conversationHistory: getConversationHistory(),
         }),
       });
@@ -216,7 +396,7 @@ function ShirtChatBot() {
       const errorMsg: ChatMessage = {
         id: generateId(),
         sender: 'bot',
-        text: '❌ เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้งค่ะ',
+        text: 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้งค่ะ',
         timestamp: new Date(),
         suggestions: QUICK_QUESTIONS,
       };
@@ -232,17 +412,139 @@ function ShirtChatBot() {
       e.preventDefault();
       handleSend();
     }
+    // Escape = ยกเลิกโหมดแก้ไข/ตอบกลับ
+    if (e.key === 'Escape') {
+      if (editingMessage) {
+        cancelEditMode();
+      } else if (replyToMessage) {
+        setReplyToMessage(null);
+      }
+    }
   };
 
   const handleQuickQuestion = (question: string) => {
-    handleSend(question);
+    // Set input first so user sees the question, then send
+    setInput(question);
+    // Small delay to show the question in input before sending
+    setTimeout(() => {
+      handleSend(question);
+    }, 50);
   };
 
   const handleClearChat = () => {
     setMessages([]);
-    // Clear session storage safely
+    setUploadedImage(null);
+    // Clear storage
     if (typeof window !== 'undefined') {
       sessionStorage.removeItem(CHAT_STORAGE_KEY);
+      if (userSession?.email) {
+        const key = `${CHAT_PERSISTENT_KEY}_${btoa(userSession.email).slice(0, 16)}`;
+        localStorage.removeItem(key);
+      }
+    }
+  };
+
+  // Handle image upload for visual questions
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    // Validate file type and size
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      alert('รองรับเฉพาะไฟล์รูปภาพ (PNG, JPG, WEBP)');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('ไฟล์ต้องมีขนาดไม่เกิน 5MB');
+      return;
+    }
+    
+    setIsUploading(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const base64 = event.target?.result as string;
+        setUploadedImage({ base64, preview: base64 });
+        setIsUploading(false);
+      };
+      reader.onerror = () => {
+        alert('ไม่สามารถอ่านไฟล์ได้');
+        setIsUploading(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      console.error('Upload error:', err);
+      setIsUploading(false);
+    }
+    
+    // Reset file input
+    if (e.target) e.target.value = '';
+  };
+
+  // Send message with image
+  const handleSendWithImage = async () => {
+    if (!uploadedImage && !input.trim()) return;
+    
+    const msgText = input.trim() || 'ช่วยดูรูปนี้หน่อยค่ะ';
+    const userMsg: ChatMessage = {
+      id: generateId(),
+      sender: 'user',
+      text: uploadedImage ? `[รูปภาพ] ${msgText}` : msgText,
+      timestamp: new Date(),
+      productImages: uploadedImage ? [{ name: 'รูปที่อัปโหลด', image: uploadedImage.preview }] : undefined,
+      replyTo: replyToMessage || undefined,
+    };
+    
+    setMessages((prev) => [...prev, userMsg]);
+    setInput('');
+    const imageToSend = uploadedImage?.base64;
+    setUploadedImage(null);
+    setReplyToMessage(null); // Clear reply after sending
+    setLoading(true);
+    
+    try {
+      // Include reply context in the message if replying
+      const contextMessage = replyToMessage 
+        ? `(ตอบกลับ: "${replyToMessage.text}") ${msgText}`
+        : msgText;
+      
+      const res = await fetch('/api/chatbot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          message: contextMessage,
+          conversationHistory: getConversationHistory(),
+          image: imageToSend, // Send image to API
+        }),
+      });
+      const data = await res.json();
+      
+      const botMsg: ChatMessage = {
+        id: generateId(),
+        sender: 'bot',
+        text: data.answer,
+        timestamp: new Date(),
+        suggestions: data.suggestions,
+        relatedQuestions: data.relatedQuestions,
+        source: data.source,
+        confidence: data.confidence,
+        productImages: data.productImages,
+        modelUsed: data.modelUsed,
+      };
+      
+      setMessages((prev) => [...prev, botMsg]);
+    } catch (e) {
+      const errorMsg: ChatMessage = {
+        id: generateId(),
+        sender: 'bot',
+        text: 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้งค่ะ',
+        timestamp: new Date(),
+        suggestions: QUICK_QUESTIONS,
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -460,57 +762,121 @@ function ShirtChatBot() {
 
   return (
     <>
-      {/* Floating Chat Button - Apple Liquid Glass */}
+      {/* Floating Chat Button - Modern Gradient Design */}
       <Box
         sx={{
           position: 'fixed',
-          bottom: { xs: 80, sm: 24 }, // ขึ้นมาบนมือถือเพื่อไม่บัง
+          bottom: { xs: 100, sm: 90 },
           right: { xs: 16, sm: 24 },
           zIndex: 1200,
         }}
       >
         <Box sx={{ position: 'relative' }}>
+          {/* Animated ring effect */}
           {showPulse && (
-            <Box
-              sx={{
-                position: 'absolute',
-                inset: -4,
-                borderRadius: 2,
-                background: 'rgba(99, 102, 241, 0.25)',
-                animation: 'pulse 2s infinite',
-                '@keyframes pulse': {
-                  '0%': { transform: 'scale(1)', opacity: 0.4 },
-                  '50%': { transform: 'scale(1.15)', opacity: 0.15 },
-                  '100%': { transform: 'scale(1)', opacity: 0.4 },
-                },
-              }}
-            />
+            <>
+              <Box
+                sx={{
+                  position: 'absolute',
+                  inset: -6,
+                  borderRadius: '50%',
+                  border: '2px solid rgba(99, 102, 241, 0.4)',
+                  animation: 'ringPulse 2.5s ease-out infinite',
+                  '@keyframes ringPulse': {
+                    '0%': { transform: 'scale(1)', opacity: 0.8 },
+                    '100%': { transform: 'scale(1.4)', opacity: 0 },
+                  },
+                }}
+              />
+              <Box
+                sx={{
+                  position: 'absolute',
+                  inset: -6,
+                  borderRadius: '50%',
+                  border: '2px solid rgba(139, 92, 246, 0.4)',
+                  animation: 'ringPulse 2.5s ease-out infinite 0.5s',
+                }}
+              />
+            </>
           )}
+          
+          {/* Main button */}
           <Button
             variant="contained"
             sx={{
-              borderRadius: 2.5,
+              borderRadius: '50%',
               minWidth: 0,
-              width: 56,
-              height: 56,
-              // Liquid Glass effect
-              background: 'linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0.05) 100%)',
-              backdropFilter: 'blur(16px) saturate(180%)',
-              WebkitBackdropFilter: 'blur(16px) saturate(180%)',
-              border: '1px solid rgba(255,255,255,0.25)',
-              boxShadow: '0 8px 24px rgba(99, 102, 241, 0.25)',
-              transition: 'all 0.3s ease',
+              width: 60,
+              height: 60,
+              padding: 0,
+              background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%)',
+              backgroundSize: '200% 200%',
+              animation: 'gradientMove 4s ease infinite',
+              '@keyframes gradientMove': {
+                '0%': { backgroundPosition: '0% 50%' },
+                '50%': { backgroundPosition: '100% 50%' },
+                '100%': { backgroundPosition: '0% 50%' },
+              },
+              boxShadow: '0 8px 32px rgba(99, 102, 241, 0.4), 0 4px 12px rgba(139, 92, 246, 0.3)',
+              border: '2px solid rgba(255,255,255,0.2)',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              overflow: 'hidden',
+              '&::before': {
+                content: '""',
+                position: 'absolute',
+                top: 0,
+                left: '-100%',
+                width: '100%',
+                height: '100%',
+                background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)',
+                transition: 'left 0.5s ease',
+              },
               '&:hover': {
-                transform: 'scale(1.05)',
-                boxShadow: '0 10px 30px rgba(99, 102, 241, 0.35)',
-                background: 'linear-gradient(135deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.08) 100%)',
+                transform: 'scale(1.1) translateY(-4px)',
+                boxShadow: '0 12px 40px rgba(99, 102, 241, 0.5), 0 6px 16px rgba(139, 92, 246, 0.4)',
+                '&::before': {
+                  left: '100%',
+                },
+              },
+              '&:active': {
+                transform: 'scale(0.95)',
               },
             }}
             onClick={() => setOpen(true)}
             aria-label="เปิดแชตบอต"
           >
-            <SmartToyIcon sx={{ fontSize: 26, color: '#6366f1' }} />
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                animation: 'float 3s ease-in-out infinite',
+                '@keyframes float': {
+                  '0%, 100%': { transform: 'translateY(0)' },
+                  '50%': { transform: 'translateY(-3px)' },
+                },
+              }}
+            >
+              <SmartToyIcon sx={{ fontSize: 28, color: '#fff', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))' }} />
+            </Box>
           </Button>
+          
+          {/* Badge indicator */}
+          {messages.length > 0 && (
+            <Box
+              sx={{
+                position: 'absolute',
+                top: -2,
+                right: -2,
+                width: 14,
+                height: 14,
+                borderRadius: '50%',
+                bgcolor: '#22c55e',
+                border: '2px solid #0f172a',
+                boxShadow: '0 2px 8px rgba(34, 197, 94, 0.5)',
+              }}
+            />
+          )}
         </Box>
       </Box>
 
@@ -617,13 +983,15 @@ function ShirtChatBot() {
               }}>
                 {loading ? (
                   <>
-                    <Box component="span" sx={{ 
+                    <AutoAwesomeIcon sx={{ 
+                      fontSize: 14,
+                      color: '#a5b4fc',
                       animation: 'shimmer 1.5s infinite',
                       '@keyframes shimmer': {
                         '0%, 100%': { opacity: 1 },
                         '50%': { opacity: 0.4 },
                       }
-                    }}>✨</Box>
+                    }} />
                     กำลังคิด...
                   </>
                 ) : (
@@ -694,10 +1062,11 @@ function ShirtChatBot() {
           ref={messagesContainerRef}
           sx={{ 
             background: 'linear-gradient(180deg, rgba(15,23,42,0.8) 0%, rgba(30,41,59,0.9) 100%)',
-            minHeight: isFullscreen ? 'calc(100vh - 180px)' : 350,
-            maxHeight: isFullscreen ? 'calc(100vh - 180px)' : 400,
+            minHeight: isFullscreen ? 'calc(100vh - 160px)' : 320,
+            maxHeight: isFullscreen ? 'calc(100vh - 160px)' : 380,
             overflowY: 'auto',
-            p: 2,
+            px: 2,
+            py: 2.5,
             scrollBehavior: 'smooth',
             '&::-webkit-scrollbar': { width: 4 },
             '&::-webkit-scrollbar-track': { bgcolor: 'transparent' },
@@ -749,8 +1118,12 @@ function ShirtChatBot() {
                 fontWeight: 600, 
                 fontSize: 18,
                 mb: 0.5,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 0.75,
               }}>
-                สวัสดีค่ะ! 👋
+                สวัสดีค่ะ! <WavingHandIcon sx={{ fontSize: 20, color: '#fbbf24' }} />
               </Typography>
               
               {aiEnabled && (
@@ -814,7 +1187,7 @@ function ShirtChatBot() {
                       py: 0.4,
                       borderRadius: 1,
                     }}>
-                      ✓ {shopInfo.availableProducts} พร้อมขาย
+                      <VerifiedIcon sx={{ fontSize: 12 }} /> {shopInfo.availableProducts} พร้อมขาย
                     </Box>
                   )}
                   {shopInfo.priceRange && shopInfo.priceRange.max > 0 && (
@@ -830,7 +1203,7 @@ function ShirtChatBot() {
                       py: 0.4,
                       borderRadius: 1,
                     }}>
-                      💰 {shopInfo.priceRange.min === shopInfo.priceRange.max 
+                      <PaidOutlinedIcon sx={{ fontSize: 12 }} /> {shopInfo.priceRange.min === shopInfo.priceRange.max 
                         ? `${shopInfo.priceRange.min}฿`
                         : `${shopInfo.priceRange.min}-${shopInfo.priceRange.max}฿`}
                     </Box>
@@ -842,21 +1215,27 @@ function ShirtChatBot() {
               <Typography sx={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, mb: 1.5, textAlign: 'left' }}>
                 ลองถาม:
               </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
-                {QUICK_QUESTIONS.map((q, i) => (
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, justifyContent: 'center' }}>
+                {QUICK_QUESTIONS_DATA.map((q, i) => (
                   <Chip
                     key={i}
-                    label={q}
-                    onClick={() => handleQuickQuestion(q)}
+                    icon={<QuickQuestionIcon type={q.icon} />}
+                    label={q.label}
+                    onClick={() => handleQuickQuestion(q.label)}
                     sx={{
                       background: 'rgba(255,255,255,0.08)',
                       border: '1px solid rgba(255,255,255,0.12)',
                       color: 'rgba(255,255,255,0.8)',
                       fontSize: 12,
-                      height: 30,
+                      height: 32,
                       borderRadius: 1.5,
                       cursor: 'pointer',
                       transition: 'all 0.2s ease',
+                      pl: 0.5,
+                      '& .MuiChip-icon': {
+                        color: 'rgba(165, 180, 252, 0.9)',
+                        marginLeft: '6px',
+                      },
                       '&:hover': {
                         background: 'rgba(255,255,255,0.12)',
                         borderColor: 'rgba(255,255,255,0.2)',
@@ -874,9 +1253,9 @@ function ShirtChatBot() {
               key={msg.id} 
               sx={{ 
                 display: 'flex', 
-                mb: 2.5, 
+                mb: 2, 
                 flexDirection: msg.sender === 'user' ? 'row-reverse' : 'row', 
-                alignItems: 'flex-end',
+                alignItems: 'flex-start',
                 animation: 'messageSlide 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                 '@keyframes messageSlide': {
                   from: { 
@@ -897,40 +1276,52 @@ function ShirtChatBot() {
                   border: msg.sender === 'user'
                     ? '1px solid rgba(139, 92, 246, 0.4)'
                     : '1px solid rgba(255,255,255,0.12)',
-                  width: 32, 
-                  height: 32, 
+                  width: 30, 
+                  height: 30, 
                   fontSize: 14,
                   flexShrink: 0,
+                  mt: 0.5,
                 }}
               >
                 {msg.sender === 'user' ? (
-                  userSession?.image ? null : <User size={16} />
+                  userSession?.image ? null : <PersonOutlineIcon sx={{ fontSize: 16 }} />
                 ) : (
-                  <SmartToyIcon sx={{ fontSize: 18, color: '#a5b4fc' }} />
+                  <SmartToyIcon sx={{ fontSize: 16, color: '#a5b4fc' }} />
                 )}
               </Avatar>
-              <Box sx={{ mx: 1.5, maxWidth: '80%' }}>
-                {/* Product Images - แสดงรูปภาพสินค้าที่เกี่ยวข้อง */}
-                {msg.sender === 'bot' && msg.productImages && msg.productImages.length > 0 && (
+              <Box sx={{ mx: 1.25, maxWidth: '78%' }}>
+                {/* Product Images - แสดงรูปภาพแบบ Thumbnail กดขยายได้ */}
+                {msg.productImages && msg.productImages.length > 0 && (
                   <Box sx={{ 
                     display: 'flex', 
                     gap: 1, 
-                    mb: 1.5, 
+                    mb: 1, 
                     flexWrap: 'wrap',
-                    justifyContent: 'flex-start',
+                    justifyContent: msg.sender === 'user' ? 'flex-end' : 'flex-start',
                   }}>
                     {msg.productImages.map((product, idx) => (
                       <Box
                         key={idx}
+                        onClick={() => setLightboxImage(product.image)}
                         sx={{
                           position: 'relative',
-                          width: 80,
-                          height: 80,
+                          width: 72,
+                          height: 72,
                           borderRadius: 1.5,
                           overflow: 'hidden',
                           border: '1px solid rgba(255,255,255,0.15)',
                           background: 'rgba(255,255,255,0.05)',
                           flexShrink: 0,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          '&:hover': {
+                            transform: 'scale(1.05)',
+                            borderColor: 'rgba(99, 102, 241, 0.5)',
+                            boxShadow: '0 4px 12px rgba(99, 102, 241, 0.25)',
+                          },
+                          '&:hover .zoom-icon': {
+                            opacity: 1,
+                          },
                         }}
                       >
                         <Box
@@ -946,6 +1337,23 @@ function ShirtChatBot() {
                             e.currentTarget.style.display = 'none';
                           }}
                         />
+                        {/* Zoom icon overlay */}
+                        <Box
+                          className="zoom-icon"
+                          sx={{
+                            position: 'absolute',
+                            top: '50%',
+                            left: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            opacity: 0,
+                            transition: 'opacity 0.2s',
+                            background: 'rgba(0,0,0,0.5)',
+                            borderRadius: '50%',
+                            p: 0.5,
+                          }}
+                        >
+                          <FullscreenIcon sx={{ fontSize: 16, color: 'white' }} />
+                        </Box>
                         <Box
                           sx={{
                             position: 'absolute',
@@ -974,8 +1382,65 @@ function ShirtChatBot() {
                     ))}
                   </Box>
                 )}
+                
+                {/* Reply Reference - Show what message is being replied to */}
+                {msg.replyTo && (
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 0.5,
+                      mb: 0.5,
+                      px: 1,
+                      py: 0.5,
+                      borderRadius: 1,
+                      bgcolor: msg.sender === 'user' 
+                        ? 'rgba(139, 92, 246, 0.2)'
+                        : 'rgba(255,255,255,0.05)',
+                      borderLeft: msg.replyTo.sender === 'user' 
+                        ? '2px solid rgba(139, 92, 246, 0.6)'
+                        : '2px solid rgba(165, 180, 252, 0.6)',
+                      fontSize: 11,
+                      color: 'rgba(255,255,255,0.6)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      '&:hover': {
+                        bgcolor: msg.sender === 'user' 
+                          ? 'rgba(139, 92, 246, 0.3)'
+                          : 'rgba(255,255,255,0.08)',
+                      },
+                    }}
+                    onClick={() => {
+                      // Scroll to the original message
+                      const el = document.getElementById(msg.replyTo!.id);
+                      if (el) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        el.style.transition = 'background 0.3s';
+                        el.style.background = 'rgba(99, 102, 241, 0.3)';
+                        setTimeout(() => {
+                          el.style.background = '';
+                        }, 1500);
+                      }
+                    }}
+                  >
+                    <ReplyIcon sx={{ fontSize: 12, transform: 'scaleX(-1)' }} />
+                    <Box sx={{ 
+                      overflow: 'hidden', 
+                      textOverflow: 'ellipsis', 
+                      whiteSpace: 'nowrap',
+                      flex: 1,
+                    }}>
+                      <Box component="span" sx={{ fontWeight: 500, mr: 0.5 }}>
+                        {msg.replyTo.sender === 'user' ? 'คุณ' : 'Bot'}:
+                      </Box>
+                      {msg.replyTo.text}
+                    </Box>
+                  </Box>
+                )}
+                
                 {/* Message Bubble */}
                 <Box
+                  id={msg.id}
                   sx={{
                     background: msg.sender === 'user' 
                       ? 'rgba(99, 102, 241, 0.35)'
@@ -984,14 +1449,16 @@ function ShirtChatBot() {
                       ? '1px solid rgba(139, 92, 246, 0.35)'
                       : '1px solid rgba(255,255,255,0.1)',
                     color: 'rgba(255,255,255,0.95)',
-                    px: 1.75,
-                    py: 1.25,
+                    px: 1.5,
+                    py: 1,
                     borderRadius: msg.sender === 'user' 
-                      ? '12px 12px 4px 12px' 
-                      : '12px 12px 12px 4px',
-                    fontSize: 14,
-                    lineHeight: 1.6,
+                      ? '14px 14px 4px 14px' 
+                      : '14px 14px 14px 4px',
+                    fontSize: 13,
+                    lineHeight: 1.55,
                     whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                    transition: 'background 0.3s',
                   }}
                 >
                   {renderText(msg.text)}
@@ -1000,42 +1467,86 @@ function ShirtChatBot() {
                 <Box sx={{ 
                   display: 'flex', 
                   alignItems: 'center', 
-                  gap: 0.75,
+                  gap: 0.5,
                   fontSize: 10, 
                   color: 'rgba(255,255,255,0.4)', 
-                  mt: 0.75,
+                  mt: 0.5,
                   textAlign: msg.sender === 'user' ? 'right' : 'left',
                   flexDirection: msg.sender === 'user' ? 'row-reverse' : 'row',
                 }}>
                   <span>{formatTime(msg.timestamp)}</span>
+                  {/* Edited indicator */}
+                  {msg.isEdited && (
+                    <Box sx={{
+                      fontSize: 9,
+                      color: 'rgba(255,255,255,0.4)',
+                      fontStyle: 'italic',
+                    }}>
+                      (แก้ไขแล้ว)
+                    </Box>
+                  )}
                   {msg.sender === 'bot' && msg.source === 'ai' && (
                     <Box 
                       sx={{
                         fontSize: 9,
-                        px: 0.5,
-                        py: 0.15,
+                        px: 0.6,
+                        py: 0.2,
                         borderRadius: 0.5,
                         bgcolor: 'rgba(16, 185, 129, 0.2)',
                         color: '#6ee7b7',
                         cursor: 'help',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 0.25,
                       }}
                       title={msg.modelUsed ? `Powered by ${msg.modelUsed}` : 'AI'}
                     >
-                      ✨ {msg.modelUsed ? msg.modelUsed.replace('gemini-', '') : 'AI'}
+                      <AutoAwesomeIcon sx={{ fontSize: 10 }} /> {msg.modelUsed ? msg.modelUsed.replace('gemini-', '') : 'AI'}
                     </Box>
                   )}
                   {msg.sender === 'bot' && msg.source === 'faq' && (
                     <Box sx={{
                       fontSize: 9,
-                      px: 0.5,
-                      py: 0.15,
+                      px: 0.6,
+                      py: 0.2,
                       borderRadius: 0.5,
                       bgcolor: 'rgba(99, 102, 241, 0.2)',
                       color: '#a5b4fc',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 0.25,
                     }}>
-                      📚 FAQ
+                      <MenuBookOutlinedIcon sx={{ fontSize: 10 }} /> FAQ
                     </Box>
                   )}
+                  {/* Edit Button - Only for user messages */}
+                  {msg.sender === 'user' && (
+                    <IconButton
+                      size="small"
+                      onClick={() => handleEditMessage(msg)}
+                      sx={{
+                        p: 0.25,
+                        color: 'rgba(255,255,255,0.4)',
+                        '&:hover': { color: '#fbbf24', bgcolor: 'transparent' },
+                      }}
+                      title="แก้ไขข้อความ"
+                    >
+                      <EditIcon sx={{ fontSize: 12 }} />
+                    </IconButton>
+                  )}
+                  {/* Reply Button */}
+                  <IconButton
+                    size="small"
+                    onClick={() => handleReply(msg)}
+                    sx={{
+                      p: 0.25,
+                      color: 'rgba(255,255,255,0.4)',
+                      '&:hover': { color: '#a5b4fc', bgcolor: 'transparent' },
+                    }}
+                    title="ตอบกลับ"
+                  >
+                    <ReplyIcon sx={{ fontSize: 12, transform: 'scaleX(-1)' }} />
+                  </IconButton>
                   {/* Copy Button */}
                   {msg.sender === 'bot' && (
                     <IconButton
@@ -1165,57 +1676,260 @@ function ShirtChatBot() {
           <div ref={messagesEndRef} />
         </DialogContent>
 
-        {/* Input Area */}
-        <Box sx={{ 
-          p: 1.5, 
-          background: 'rgba(255,255,255,0.05)',
-          borderTop: '1px solid rgba(255,255,255,0.08)',
-        }}>
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <TextField
-              autoFocus
-              fullWidth
+        {/* Reply Preview - Above input area */}
+        {replyToMessage && (
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              mx: 1.5,
+              mt: 0.75,
+              px: 1.5,
+              py: 0.5,
+              borderRadius: 1.5,
+              bgcolor: 'rgba(99, 102, 241, 0.15)',
+              borderLeft: '3px solid rgba(99, 102, 241, 0.6)',
+            }}
+          >
+            <ReplyIcon sx={{ fontSize: 14, color: '#a5b4fc', transform: 'scaleX(-1)' }} />
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography sx={{ 
+                fontSize: 11, 
+                color: 'rgba(255,255,255,0.7)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}>
+                <Box component="span" sx={{ color: '#a5b4fc', fontWeight: 500, mr: 0.5 }}>
+                  ตอบกลับ {replyToMessage.sender === 'user' ? 'คุณ' : 'Bot'}:
+                </Box>
+                {replyToMessage.text}
+              </Typography>
+            </Box>
+            <IconButton
               size="small"
-              multiline
-              minRows={1}
-              maxRows={4}
-              placeholder="พิมพ์คำถามของคุณ... (Shift+Enter = ขึ้นบรรทัดใหม่)"
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              disabled={loading}
+              onClick={() => setReplyToMessage(null)}
+              sx={{ 
+                p: 0.25,
+                color: 'rgba(255,255,255,0.5)',
+                '&:hover': { color: 'rgba(255,255,255,0.8)' },
+              }}
+            >
+              <CloseIcon sx={{ fontSize: 14 }} />
+            </IconButton>
+          </Box>
+        )}
+
+        {/* Edit Preview - Above input area */}
+        {editingMessage && (
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              mx: 1.5,
+              mt: 0.75,
+              px: 1.5,
+              py: 0.5,
+              borderRadius: 1.5,
+              bgcolor: 'rgba(251, 191, 36, 0.15)',
+              borderLeft: '3px solid rgba(251, 191, 36, 0.6)',
+            }}
+          >
+            <EditIcon sx={{ fontSize: 14, color: '#fbbf24' }} />
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography sx={{ 
+                fontSize: 11, 
+                color: 'rgba(255,255,255,0.7)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}>
+                <Box component="span" sx={{ color: '#fbbf24', fontWeight: 500, mr: 0.5 }}>
+                  แก้ไขข้อความ
+                </Box>
+                {editingMessage.text.slice(0, 50) + (editingMessage.text.length > 50 ? '...' : '')}
+              </Typography>
+            </Box>
+            <IconButton
+              size="small"
+              onClick={cancelEditMode}
+              sx={{ 
+                p: 0.25,
+                color: 'rgba(255,255,255,0.5)',
+                '&:hover': { color: 'rgba(255,255,255,0.8)' },
+              }}
+            >
+              <CloseIcon sx={{ fontSize: 14 }} />
+            </IconButton>
+          </Box>
+        )}
+
+        {/* Input Area - Compact */}
+        <Box sx={{ 
+          px: 1.5,
+          pt: (replyToMessage || editingMessage) ? 0.5 : 1,
+          pb: 1.25,
+          background: 'rgba(255,255,255,0.05)',
+          borderTop: (replyToMessage || editingMessage) ? 'none' : '1px solid rgba(255,255,255,0.08)',
+        }}>
+          <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'flex-end' }}>
+            {/* Hidden file input */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleImageUpload}
+              accept="image/png,image/jpeg,image/jpg,image/webp"
+              style={{ display: 'none' }}
+            />
+            
+            {/* Upload Image Button */}
+            <IconButton
+              onClick={() => fileInputRef.current?.click()}
+              disabled={loading || isUploading}
               sx={{
-                '& .MuiOutlinedInput-root': {
-                  background: 'rgba(255,255,255,0.05)',
-                  borderRadius: 1.5,
-                  alignItems: 'flex-end',
-                  color: 'rgba(255,255,255,0.95)',
-                  '& fieldset': { 
-                    borderColor: 'rgba(255,255,255,0.1)',
-                  },
-                  '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.2)' },
-                  '&.Mui-focused fieldset': { 
-                    borderColor: 'rgba(99, 102, 241, 0.5)',
-                  },
+                width: 40,
+                height: 40,
+                borderRadius: 1.5,
+                bgcolor: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                color: 'rgba(255,255,255,0.6)',
+                flexShrink: 0,
+                transition: 'all 0.2s',
+                '&:hover': {
+                  bgcolor: 'rgba(255,255,255,0.1)',
+                  color: 'rgba(255,255,255,0.9)',
                 },
-                '& .MuiOutlinedInput-input': {
-                  '&::placeholder': { color: 'rgba(255,255,255,0.4)', opacity: 1 },
+                '&:disabled': {
+                  color: 'rgba(255,255,255,0.3)',
                 },
               }}
-            />
+              title="อัปโหลดรูปภาพ"
+            >
+              {isUploading ? (
+                <CircularProgress size={18} sx={{ color: 'rgba(255,255,255,0.5)' }} />
+              ) : (
+                <AddPhotoAlternateIcon sx={{ fontSize: 20 }} />
+              )}
+            </IconButton>
+            
+            {/* Input Container with Image Preview inside */}
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'flex-end',
+                gap: 1,
+                background: 'rgba(255,255,255,0.05)',
+                borderRadius: 1.5,
+                border: '1px solid rgba(255,255,255,0.1)',
+                px: 1,
+                py: 0.5,
+                transition: 'all 0.2s',
+                '&:focus-within': {
+                  borderColor: 'rgba(99, 102, 241, 0.5)',
+                },
+                '&:hover': {
+                  borderColor: 'rgba(255,255,255,0.2)',
+                },
+              }}
+            >
+              {/* Uploaded Image Preview inside input */}
+              {uploadedImage && (
+                <Box
+                  sx={{
+                    position: 'relative',
+                    flexShrink: 0,
+                    mb: 0.5,
+                  }}
+                >
+                  <Box
+                    component="img"
+                    src={uploadedImage.preview}
+                    alt="Preview"
+                    sx={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 1,
+                      objectFit: 'cover',
+                      border: '1px solid rgba(99, 102, 241, 0.4)',
+                    }}
+                  />
+                  <IconButton
+                    size="small"
+                    onClick={() => setUploadedImage(null)}
+                    sx={{ 
+                      position: 'absolute',
+                      top: -5,
+                      right: -5,
+                      width: 16,
+                      height: 16,
+                      p: 0,
+                      bgcolor: 'rgba(239, 68, 68, 0.9)',
+                      color: 'white',
+                      '&:hover': {
+                        bgcolor: 'rgba(220, 38, 38, 1)',
+                      },
+                    }}
+                  >
+                    <CloseIcon sx={{ fontSize: 10 }} />
+                  </IconButton>
+                </Box>
+              )}
+              
+              <TextField
+                inputRef={inputRef}
+                autoFocus
+                fullWidth
+                size="small"
+                multiline
+                minRows={1}
+                maxRows={3}
+                placeholder={editingMessage ? "แก้ไขข้อความ..." : uploadedImage ? "พิมพ์คำถามเกี่ยวกับรูป..." : "พิมพ์คำถามของคุณ..."}
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey && !loading) {
+                    e.preventDefault();
+                    uploadedImage ? handleSendWithImage() : handleSend();
+                  }
+                }}
+                disabled={loading}
+                sx={{
+                  flex: 1,
+                  '& .MuiOutlinedInput-root': {
+                    background: 'transparent',
+                    color: 'rgba(255,255,255,0.95)',
+                    fontSize: 14,
+                    '& fieldset': { 
+                      border: 'none',
+                    },
+                  },
+                  '& .MuiOutlinedInput-input': {
+                    py: 0.75,
+                    px: 0,
+                    '&::placeholder': { color: 'rgba(255,255,255,0.4)', opacity: 1 },
+                  },
+                }}
+              />
+            </Box>
+            
             {/* Send Button */}
             <Button
               variant="contained"
-              onClick={() => handleSend()}
-              disabled={loading || !input.trim()}
+              onClick={() => uploadedImage ? handleSendWithImage() : handleSend()}
+              disabled={loading || (!input.trim() && !uploadedImage)}
               sx={{
-                minWidth: 44,
+                minWidth: 40,
+                height: 40,
                 borderRadius: 1.5,
-                bgcolor: 'rgba(99, 102, 241, 0.5)',
-                border: '1px solid rgba(139, 92, 246, 0.35)',
+                flexShrink: 0,
+                bgcolor: uploadedImage ? 'rgba(16, 185, 129, 0.5)' : 'rgba(99, 102, 241, 0.5)',
+                border: uploadedImage ? '1px solid rgba(16, 185, 129, 0.35)' : '1px solid rgba(139, 92, 246, 0.35)',
                 transition: 'all 0.2s',
                 '&:hover': {
-                  bgcolor: 'rgba(99, 102, 241, 0.65)',
+                  bgcolor: uploadedImage ? 'rgba(16, 185, 129, 0.65)' : 'rgba(99, 102, 241, 0.65)',
                 },
                 '&:disabled': {
                   bgcolor: 'rgba(255,255,255,0.05)',
@@ -1224,13 +1938,77 @@ function ShirtChatBot() {
                 },
               }}
             >
-              <SendIcon fontSize="small" />
+              <SendIcon sx={{ fontSize: 18 }} />
             </Button>
           </Box>
-          <Typography sx={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', mt: 1, textAlign: 'center' }}>
-            🚀 Powered by Gemini 2.5 Flash • ระบบ AI ที่ฉลาดที่สุด
+          <Typography sx={{ 
+            fontSize: 9, 
+            color: 'rgba(255,255,255,0.3)', 
+            mt: 0.5, 
+            textAlign: 'center',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 0.5,
+            flexWrap: 'wrap',
+          }}>
+            {userSession && (
+              <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+                <PersonOutlineIcon sx={{ fontSize: 10 }} />
+                {userSession.name || userSession.email}
+                <Box component="span" sx={{ mx: 0.5 }}>•</Box>
+              </Box>
+            )}
+            <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+              <AutoAwesomeIcon sx={{ fontSize: 10 }} /> Gemini AI
+            </Box>
+            <Box component="span" sx={{ mx: 0.5 }}>•</Box>
+            <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+              <ImageOutlinedIcon sx={{ fontSize: 10 }} /> รองรับรูปภาพ
+            </Box>
           </Typography>
         </Box>
+      </Dialog>
+
+      {/* Image Lightbox */}
+      <Dialog
+        open={!!lightboxImage}
+        onClose={() => setLightboxImage(null)}
+        maxWidth="lg"
+        PaperProps={{
+          sx: {
+            background: 'rgba(0,0,0,0.95)',
+            borderRadius: 2,
+            overflow: 'hidden',
+          }
+        }}
+      >
+        <IconButton
+          onClick={() => setLightboxImage(null)}
+          sx={{
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            color: 'white',
+            bgcolor: 'rgba(0,0,0,0.5)',
+            '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' },
+            zIndex: 1,
+          }}
+        >
+          <CloseIcon />
+        </IconButton>
+        {lightboxImage && (
+          <Box
+            component="img"
+            src={lightboxImage}
+            alt="Full size"
+            sx={{
+              maxWidth: '90vw',
+              maxHeight: '90vh',
+              objectFit: 'contain',
+            }}
+          />
+        )}
       </Dialog>
     </>
   );
@@ -1288,6 +2066,7 @@ import {
   LogIn,
   LogOut,
   Menu,
+  Megaphone,
   Minus,
   Package,
   Plus,
@@ -1535,6 +2314,9 @@ export default function HomePage() {
   const [announcements, setAnnouncements] = useState<ShopConfig['announcements']>([]);
   const [announcementHistory, setAnnouncementHistory] = useState<ShopConfig['announcementHistory']>([]);
   const [showAnnouncementHistory, setShowAnnouncementHistory] = useState(false);
+  const [showAnnouncementPopup, setShowAnnouncementPopup] = useState(true); // For floating popup
+  const [currentAnnouncementIndex, setCurrentAnnouncementIndex] = useState(0); // For cycling announcements
+  const [showAnnouncementImage, setShowAnnouncementImage] = useState(false); // For image lightbox
   const [isShopOpen, setIsShopOpen] = useState(true);
   const configFetchInFlight = useRef(false);
   const configPollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -1879,7 +2661,28 @@ export default function HomePage() {
     if (selectedProduct) setActiveImageIndex(0);
   }, [selectedProduct]);
 
-  // � Auto-close product dialog when shop becomes closed
+  // 🔔 Auto-cycle through announcements
+  useEffect(() => {
+    const enabledAnnouncements = announcements?.filter(a => a.enabled) || [];
+    if (enabledAnnouncements.length <= 1) return;
+    
+    const interval = setInterval(() => {
+      setCurrentAnnouncementIndex(prev => (prev + 1) % enabledAnnouncements.length);
+    }, 8000); // Change every 8 seconds
+    
+    return () => clearInterval(interval);
+  }, [announcements]);
+
+  // 🔔 Check if announcement was dismissed in this session
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const dismissed = sessionStorage.getItem('announcementDismissed');
+    if (dismissed === 'true') {
+      setShowAnnouncementPopup(false);
+    }
+  }, []);
+
+  // 🔴 Auto-close product dialog when shop becomes closed
   useEffect(() => {
     if (!isShopOpen && productDialogOpen) {
       setProductDialogOpen(false);
@@ -3750,8 +4553,11 @@ export default function HomePage() {
     );
   }
 
+  // Check if there are enabled announcements for padding adjustment
+  const hasEnabledAnnouncements = announcements?.filter(a => a.enabled).length > 0;
+
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#0f172a', pb: { xs: 9, md: 0 } }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#0f172a', pb: { xs: 9, md: 0 }, pt: hasEnabledAnnouncements ? { xs: '44px', sm: '40px' } : 0 }}>
       <AppBar
         position="sticky"
         elevation={0}
@@ -3965,20 +4771,38 @@ export default function HomePage() {
         customMessage={config?.closedMessage}
       />
 
-      {/* Multiple Announcements Banner */}
-      {announcements && announcements.filter(a => a.enabled).length > 0 && (
-        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-          {announcements.filter(a => a.enabled).map((ann, idx) => (
+      {/* Top Announcement Banner - Always visible when announcements exist */}
+      {(() => {
+        const enabledAnnouncements = announcements?.filter(a => a.enabled) || [];
+        if (enabledAnnouncements.length === 0) return null;
+        const currentAnn = enabledAnnouncements[currentAnnouncementIndex % enabledAnnouncements.length];
+        if (!currentAnn) return null;
+        
+        const baseColor = getAnnouncementColor(currentAnn.color);
+        
+        return (
+          <Box
+            sx={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              zIndex: 1300, // Above everything including navbar
+              animation: 'slideInFromTop 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
+              '@keyframes slideInFromTop': {
+                from: { transform: 'translateY(-100%)', opacity: 0 },
+                to: { transform: 'translateY(0)', opacity: 1 },
+              },
+            }}
+          >
             <Box
-              key={ann.id || idx}
               sx={{
-                background: `linear-gradient(135deg, ${getAnnouncementColor(ann.color)} 0%, ${getAnnouncementColor(ann.color)}cc 50%, ${getAnnouncementColor(ann.color)}99 100%)`,
-                borderBottom: '1px solid rgba(255,255,255,0.1)',
                 position: 'relative',
                 overflow: 'hidden',
+                boxShadow: `0 4px 20px ${baseColor}40, 0 2px 8px rgba(0,0,0,0.3)`,
               }}
             >
-              {/* Background decoration */}
+              {/* Animated gradient background */}
               <Box
                 sx={{
                   position: 'absolute',
@@ -3986,135 +4810,165 @@ export default function HomePage() {
                   left: 0,
                   right: 0,
                   bottom: 0,
-                  background: `
-                    radial-gradient(circle at 0% 0%, rgba(255,255,255,0.15) 0%, transparent 50%),
-                    radial-gradient(circle at 100% 100%, rgba(255,255,255,0.1) 0%, transparent 50%)
-                  `,
-                  pointerEvents: 'none',
+                  background: `linear-gradient(-45deg, ${baseColor}, ${baseColor}dd, ${baseColor}bb, ${baseColor})`,
+                  backgroundSize: '400% 400%',
+                  animation: 'gradientShift 8s ease infinite',
+                  '@keyframes gradientShift': {
+                    '0%': { backgroundPosition: '0% 50%' },
+                    '50%': { backgroundPosition: '100% 50%' },
+                    '100%': { backgroundPosition: '0% 50%' },
+                  },
+                }}
+              />
+              
+              {/* Shimmer effect */}
+              <Box
+                sx={{
+                  position: 'absolute',
+                  top: 0,
+                  left: '-100%',
+                  right: 0,
+                  bottom: 0,
+                  background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)',
+                  animation: 'shimmer 3s ease-in-out infinite',
+                  '@keyframes shimmer': {
+                    '0%': { left: '-100%' },
+                    '100%': { left: '100%' },
+                  },
                 }}
               />
 
-              <Container maxWidth="lg" sx={{ py: { xs: 1.5, sm: 2 }, position: 'relative', zIndex: 1 }}>
-                <Box sx={{ 
-                  display: 'flex', 
-                  flexDirection: { xs: 'column', md: 'row' },
-                  alignItems: 'center', 
-                  gap: { xs: 1.5, md: 2 },
-                }}>
-                  {/* Image */}
-                  {ann.imageUrl && (
-                    <OptimizedImage
-                      src={ann.imageUrl}
-                      alt="Announcement"
-                      width={150}
-                      height={100}
-                      objectFit="cover"
-                      priority
-                      borderRadius="12px"
-                      style={{
-                        width: '100%',
-                        maxWidth: isMobile ? 250 : 150,
-                        maxHeight: isMobile ? 120 : 100,
-                        boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
-                        border: '2px solid rgba(255,255,255,0.2)',
-                        flexShrink: 0,
-                      }}
-                    />
-                  )}
-
-                  {/* Content */}
-                  <Box sx={{ flex: 1, textAlign: { xs: 'center', md: 'left' }, minWidth: 0 }}>
-                    {/* Badge */}
-                    <Box sx={{ 
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 0.5,
-                      px: 1.5,
-                      py: 0.25,
-                      mb: 0.75,
-                      borderRadius: '16px',
-                      bgcolor: 'rgba(255,255,255,0.2)',
-                    }}>
-                      <Box sx={{ 
-                        width: 6, 
-                        height: 6, 
-                        borderRadius: '50%', 
-                        bgcolor: '#fff',
-                        animation: 'pulse 2s ease-in-out infinite',
-                        '@keyframes pulse': {
-                          '0%, 100%': { opacity: 1 },
-                          '50%': { opacity: 0.4 },
-                        },
-                      }} />
-                      <Typography sx={{ color: '#fff', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase' }}>
-                        ประกาศ
-                      </Typography>
-                    </Box>
-
-                    {ann.message && (
-                      <Typography
-                        sx={{
-                          color: '#fff',
-                          fontSize: { xs: '0.9rem', sm: '0.95rem' },
-                          fontWeight: 500,
-                          lineHeight: 1.6,
-                          whiteSpace: 'pre-wrap',
-                          textShadow: '0 1px 2px rgba(0,0,0,0.1)',
-                        }}
-                      >
-                        {ann.message}
-                      </Typography>
-                    )}
-
-                    {/* Footer */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: { xs: 'center', md: 'flex-start' }, gap: 1, mt: 1 }}>
-                      {ann.showLogo !== false && (
-                        <Box component="img" src="/logo.png" alt="Logo" sx={{ width: 20, height: 20, borderRadius: '4px' }} onError={(e: any) => { e.target.style.display = 'none'; }} />
-                      )}
-                      <Typography sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.7rem', fontWeight: 500 }}>
-                        {ann.displayName || (ann.postedBy === 'ระบบ' ? 'PSU SCC Shop' : 'แอดมิน')}
-                      </Typography>
-                      {ann.postedAt && (
-                        <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.65rem' }}>
-                          • {new Date(ann.postedAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
-                        </Typography>
-                      )}
-                    </Box>
-                  </Box>
-                </Box>
-              </Container>
-            </Box>
-          ))}
-          
-          {/* History button at bottom of announcements */}
-          {announcementHistory && announcementHistory.length > 0 && (
-            <Box sx={{ 
-              bgcolor: 'rgba(15, 23, 42, 0.95)', 
-              borderBottom: '1px solid rgba(255,255,255,0.1)',
-              py: 0.75,
-              textAlign: 'center',
-            }}>
-              <Button
-                size="small"
-                onClick={() => setShowAnnouncementHistory(true)}
-                sx={{
-                  color: '#94a3b8',
-                  fontSize: '0.7rem',
-                  px: 2,
-                  py: 0.5,
-                  borderRadius: '16px',
-                  bgcolor: 'rgba(255,255,255,0.05)',
-                  textTransform: 'none',
-                  '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' },
+              {/* Content */}
+              <Box 
+                sx={{ 
+                  position: 'relative', 
+                  zIndex: 1, 
+                  px: { xs: 2, sm: 3 },
+                  py: { xs: 1, sm: 1.25 },
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: { xs: 1.5, sm: 2 },
+                  flexWrap: 'wrap',
                 }}
-                startIcon={<History size={14} />}
               >
-                ดูประกาศย้อนหลัง ({announcementHistory.length})
-              </Button>
+                {/* Animated icon */}
+                <Box sx={{ 
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  animation: 'pulse 2s ease-in-out infinite',
+                  '@keyframes pulse': {
+                    '0%, 100%': { transform: 'scale(1)' },
+                    '50%': { transform: 'scale(1.05)' },
+                  },
+                }}>
+                  <Box sx={{ 
+                    width: 8, 
+                    height: 8, 
+                    borderRadius: '50%', 
+                    bgcolor: '#fff',
+                    boxShadow: '0 0 8px #fff, 0 0 16px #fff',
+                    animation: 'glow 2s ease-in-out infinite',
+                    '@keyframes glow': {
+                      '0%, 100%': { boxShadow: '0 0 4px #fff, 0 0 8px #fff', opacity: 1 },
+                      '50%': { boxShadow: '0 0 12px #fff, 0 0 24px #fff', opacity: 0.7 },
+                    },
+                  }} />
+                  <Megaphone size={18} color="white" />
+                </Box>
+
+                {/* Image thumbnail (if exists) */}
+                {currentAnn.imageUrl && (
+                  <Box
+                    onClick={() => setShowAnnouncementImage(true)}
+                    sx={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: '8px',
+                      overflow: 'hidden',
+                      border: '2px solid rgba(255,255,255,0.4)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      flexShrink: 0,
+                      '&:hover': {
+                        transform: 'scale(1.1)',
+                        border: '2px solid rgba(255,255,255,0.8)',
+                      },
+                    }}
+                  >
+                    <OptimizedImage
+                      src={currentAnn.imageUrl}
+                      alt="Announcement"
+                      width={32}
+                      height={32}
+                      objectFit="cover"
+                    />
+                  </Box>
+                )}
+
+                {/* Message */}
+                <Typography
+                  onClick={currentAnn.imageUrl ? () => setShowAnnouncementImage(true) : undefined}
+                  sx={{
+                    color: '#fff',
+                    fontSize: { xs: '0.85rem', sm: '0.95rem' },
+                    fontWeight: 600,
+                    textAlign: 'center',
+                    textShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                    maxWidth: { xs: '100%', sm: '70%' },
+                    whiteSpace: { xs: 'normal', sm: 'nowrap' },
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    cursor: currentAnn.imageUrl ? 'pointer' : 'default',
+                    '&:hover': currentAnn.imageUrl ? { textDecoration: 'underline' } : {},
+                  }}
+                >
+                  {currentAnn.message || 'ประกาศจากทีมงาน'}
+                </Typography>
+
+                {/* Navigation dots for multiple announcements */}
+                {enabledAnnouncements.length > 1 && (
+                  <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+                    {enabledAnnouncements.map((_, idx) => (
+                      <Box
+                        key={idx}
+                        onClick={() => setCurrentAnnouncementIndex(idx)}
+                        sx={{
+                          width: idx === currentAnnouncementIndex ? 14 : 6,
+                          height: 6,
+                          borderRadius: '3px',
+                          bgcolor: idx === currentAnnouncementIndex ? '#fff' : 'rgba(255,255,255,0.4)',
+                          cursor: 'pointer',
+                          transition: 'all 0.3s ease',
+                          '&:hover': { bgcolor: 'rgba(255,255,255,0.8)' },
+                        }}
+                      />
+                    ))}
+                  </Box>
+                )}
+
+                {/* History button */}
+                {announcementHistory && announcementHistory.length > 0 && (
+                  <IconButton
+                    size="small"
+                    onClick={() => setShowAnnouncementHistory(true)}
+                    sx={{
+                      color: 'rgba(255,255,255,0.9)',
+                      bgcolor: 'rgba(255,255,255,0.15)',
+                      width: 28,
+                      height: 28,
+                      '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' },
+                    }}
+                  >
+                    <History size={14} />
+                  </IconButton>
+                )}
+              </Box>
             </Box>
-          )}
-        </Box>
-      )}
+          </Box>
+        );
+      })()}
 
       {/* Announcement History Dialog */}
       <Dialog
@@ -4271,6 +5125,187 @@ export default function HomePage() {
             ปิด
           </Button>
         </DialogActions>
+      </Dialog>
+
+      {/* Announcement Image Lightbox */}
+      <Dialog
+        open={showAnnouncementImage}
+        onClose={() => setShowAnnouncementImage(false)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: 'rgba(10, 15, 26, 0.98)',
+            backdropFilter: 'blur(24px)',
+            borderRadius: '24px',
+            border: '1px solid rgba(255,255,255,0.1)',
+            overflow: 'hidden',
+            maxHeight: '90vh',
+          },
+        }}
+      >
+        {(() => {
+          const enabledAnnouncements = announcements?.filter(a => a.enabled) || [];
+          const currentAnn = enabledAnnouncements[currentAnnouncementIndex % enabledAnnouncements.length];
+          if (!currentAnn) return null;
+          
+          const baseColor = getAnnouncementColor(currentAnn.color);
+          
+          return (
+            <>
+              {/* Header */}
+              <Box
+                sx={{
+                  position: 'relative',
+                  p: 2,
+                  background: `linear-gradient(135deg, ${baseColor}30, ${baseColor}10)`,
+                  borderBottom: '1px solid rgba(255,255,255,0.1)',
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Box sx={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: '14px',
+                    background: `linear-gradient(135deg, ${baseColor}, ${baseColor}cc)`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: `0 4px 16px ${baseColor}40`,
+                  }}>
+                    <Megaphone size={22} color="#fff" />
+                  </Box>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography sx={{ fontWeight: 700, color: '#f1f5f9', fontSize: '1.1rem' }}>
+                      ประกาศ
+                    </Typography>
+                    {currentAnn.postedAt && (
+                      <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>
+                        {new Date(currentAnn.postedAt).toLocaleDateString('th-TH', { 
+                          day: 'numeric', 
+                          month: 'long', 
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </Typography>
+                    )}
+                  </Box>
+                  <IconButton 
+                    onClick={() => setShowAnnouncementImage(false)}
+                    sx={{ 
+                      color: '#94a3b8',
+                      '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' },
+                    }}
+                  >
+                    <X size={20} />
+                  </IconButton>
+                </Box>
+              </Box>
+
+              {/* Content */}
+              <DialogContent sx={{ p: 0 }}>
+                {/* Image */}
+                {currentAnn.imageUrl && (
+                  <Box
+                    sx={{
+                      position: 'relative',
+                      width: '100%',
+                      maxHeight: '60vh',
+                      overflow: 'hidden',
+                      bgcolor: '#000',
+                    }}
+                  >
+                    <OptimizedImage
+                      src={currentAnn.imageUrl}
+                      alt="Announcement Image"
+                      width="100%"
+                      height="auto"
+                      objectFit="contain"
+                      style={{ maxHeight: '60vh' }}
+                      priority
+                    />
+                  </Box>
+                )}
+
+                {/* Message */}
+                {currentAnn.message && (
+                  <Box sx={{ p: 3 }}>
+                    <Typography
+                      sx={{
+                        color: '#e2e8f0',
+                        fontSize: '1rem',
+                        lineHeight: 1.8,
+                        whiteSpace: 'pre-wrap',
+                      }}
+                    >
+                      {currentAnn.message}
+                    </Typography>
+                  </Box>
+                )}
+
+                {/* Footer */}
+                <Box 
+                  sx={{ 
+                    p: 2, 
+                    borderTop: '1px solid rgba(255,255,255,0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    bgcolor: 'rgba(30,41,59,0.5)',
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    {currentAnn.showLogo !== false && (
+                      <Box 
+                        component="img" 
+                        src="/logo.png" 
+                        alt="Logo" 
+                        sx={{ 
+                          width: 28, 
+                          height: 28, 
+                          borderRadius: '8px',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                        }} 
+                        onError={(e: any) => { e.target.style.display = 'none'; }} 
+                      />
+                    )}
+                    <Typography sx={{ color: '#94a3b8', fontSize: '0.85rem' }}>
+                      {currentAnn.displayName || (currentAnn.postedBy === 'ระบบ' ? 'PSU SCC Shop' : 'แอดมิน')}
+                    </Typography>
+                  </Box>
+
+                  {/* Navigation for multiple announcements */}
+                  {enabledAnnouncements.length > 1 && (
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                      <IconButton
+                        size="small"
+                        onClick={() => setCurrentAnnouncementIndex(prev => 
+                          prev === 0 ? enabledAnnouncements.length - 1 : prev - 1
+                        )}
+                        sx={{ color: '#94a3b8', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}
+                      >
+                        <ChevronLeft size={18} />
+                      </IconButton>
+                      <Typography sx={{ color: '#64748b', fontSize: '0.8rem', minWidth: 40, textAlign: 'center' }}>
+                        {currentAnnouncementIndex + 1} / {enabledAnnouncements.length}
+                      </Typography>
+                      <IconButton
+                        size="small"
+                        onClick={() => setCurrentAnnouncementIndex(prev => 
+                          (prev + 1) % enabledAnnouncements.length
+                        )}
+                        sx={{ color: '#94a3b8', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}
+                      >
+                        <ChevronRight size={18} />
+                      </IconButton>
+                    </Box>
+                  )}
+                </Box>
+              </DialogContent>
+            </>
+          );
+        })()}
       </Dialog>
 
       <Drawer

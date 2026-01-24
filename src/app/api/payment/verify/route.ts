@@ -6,6 +6,29 @@ import { triggerSheetSync } from '@/lib/sheet-sync';
 import { sendPaymentReceivedEmail } from '@/lib/email';
 import crypto from 'crypto';
 
+// Helper to save user log server-side
+async function saveUserLogServer(log: {
+  email: string;
+  name?: string;
+  action: string;
+  details?: string;
+  metadata?: Record<string, any>;
+  ip?: string;
+  userAgent?: string;
+}) {
+  try {
+    const id = `log-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const fullLog = {
+      ...log,
+      id,
+      timestamp: new Date().toISOString(),
+    };
+    await putJson(`user-logs/${id}.json`, fullLog);
+  } catch (e) {
+    console.warn("[payment-verify] Failed to save user log:", e);
+  }
+}
+
 // ============== EMAIL INDEX HELPER ==============
 
 const normalizeEmail = (email?: string | null) => (email || '').trim().toLowerCase();
@@ -333,6 +356,25 @@ export async function POST(req: NextRequest) {
         console.error('[payment-verify] Failed to send payment email:', emailError);
         // Don't fail if email fails
       }
+      
+      // Log user action - upload slip + verify payment
+      const userAgent = req.headers.get('user-agent') || undefined;
+      const clientIP = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 
+                       req.headers.get('x-real-ip') || undefined;
+      await saveUserLogServer({
+        email: customerEmail,
+        name: updated.customerName,
+        action: 'verify_payment',
+        details: `ชำระเงินสำเร็จ: ${ref} (${slipCheck.slipData?.amount || expectedAmount} บาท)`,
+        metadata: { 
+          ref, 
+          amount: slipCheck.slipData?.amount || expectedAmount,
+          transRef: slipCheck.slipData?.transRef,
+          senderName: slipCheck.slipData?.sender?.displayName,
+        },
+        ip: clientIP,
+        userAgent,
+      });
     }
 
     // ✅ Auto sync to Google Sheets

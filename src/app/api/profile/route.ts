@@ -5,6 +5,29 @@ import { requireAuth, normalizeEmail, isResourceOwner, isAdminEmail, getCurrentU
 
 const profileKey = (email: string) => `users/${crypto.createHash('sha256').update(email.toLowerCase()).digest('hex')}.json`;
 
+// Helper to save user log server-side
+async function saveUserLogServer(log: {
+  email: string;
+  name?: string;
+  action: string;
+  details?: string;
+  metadata?: Record<string, any>;
+  ip?: string;
+  userAgent?: string;
+}) {
+  try {
+    const id = `log-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const fullLog = {
+      ...log,
+      id,
+      timestamp: new Date().toISOString(),
+    };
+    await putJson(`user-logs/${id}.json`, fullLog);
+  } catch (e) {
+    console.warn("[Profile API] Failed to save user log:", e);
+  }
+}
+
 export async function GET(req: NextRequest) {
   // ตรวจสอบว่าเข้าสู่ระบบแล้ว
   const authResult = await requireAuth();
@@ -45,6 +68,26 @@ export async function POST(req: NextRequest) {
     }
 
     await putJson(profileKey(email), data);
+    
+    // Log profile update
+    const userAgent = req.headers.get('user-agent') || undefined;
+    const clientIP = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 
+                     req.headers.get('x-real-ip') || undefined;
+    await saveUserLogServer({
+      email,
+      name: data.name,
+      action: 'profile_update',
+      details: 'อัปเดตโปรไฟล์',
+      metadata: { 
+        hasName: !!data.name,
+        hasPhone: !!data.phone,
+        hasAddress: !!data.address,
+        hasInstagram: !!data.instagram,
+      },
+      ip: clientIP,
+      userAgent,
+    });
+    
     return NextResponse.json({ status: 'success', data: { profile: data } });
   } catch (error: any) {
     return NextResponse.json({

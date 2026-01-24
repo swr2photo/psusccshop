@@ -278,7 +278,7 @@ export async function buildDetailedShopContext(): Promise<string> {
 ${stockInfo ? `- จำนวนคงเหลือ: ${stockInfo}` : ''}
 - ${optionsText}
 ${dateInfo ? `- ${dateInfo}` : ''}
-- สถานะ: ${available ? '✓ พร้อมจำหน่าย' : '✗ ปิดรับสั่งจอง'}`;
+- สถานะ: ${available ? '[พร้อมจำหน่าย]' : '[ปิดรับสั่งจอง]'}`;
   }).join('\n');
 
   // Announcement info
@@ -297,41 +297,41 @@ ${dateInfo ? `- ${dateInfo}` : ''}
   // Build context
   return `
 ═══════════════════════════════════════════════════════════════
-📦 ข้อมูลร้านค้า SCC Shop - อัปเดตจาก Database แบบ Real-time
+ข้อมูลร้านค้า SCC Shop - อัปเดตจาก Database แบบ Real-time
 ═══════════════════════════════════════════════════════════════
 
-🏪 สถานะร้านค้า:
-- สถานะ: ${isOpen ? '🟢 เปิดรับออเดอร์' : '🔴 ปิดรับออเดอร์'}
+[สถานะร้านค้า]
+- สถานะ: ${isOpen ? '[เปิดรับออเดอร์]' : '[ปิดรับออเดอร์]'}
 ${shopData.config.closeDate ? `- วันปิดรอบ: ${shopData.config.closeDate}` : ''}
 ${shopData.config.openDate ? `- วันเปิดรับต่อ: ${shopData.config.openDate}` : ''}
 ${!isOpen && shopData.config.closedMessage ? `- ข้อความ: ${shopData.config.closedMessage}` : ''}
 
-📢 ประกาศ:
+[ประกาศ]
 ${activeAnnouncements || '(ไม่มีประกาศ)'}
 
 ═══════════════════════════════════════════════════════════════
-🛍️ สินค้าทั้งหมด (${stats?.totalProducts || 0} รายการ, พร้อมจำหน่าย ${stats?.availableProducts || 0} รายการ)
+[สินค้าทั้งหมด] (${stats?.totalProducts || 0} รายการ, พร้อมจำหน่าย ${stats?.availableProducts || 0} รายการ)
 ช่วงราคา: ${stats?.priceRange.min || 0} - ${stats?.priceRange.max || 0} บาท
 ═══════════════════════════════════════════════════════════════
 ${productDetails || '(ยังไม่มีสินค้า)'}
 
 ═══════════════════════════════════════════════════════════════
-💳 การชำระเงิน:
+[การชำระเงิน]
 ${paymentMethods.map(p => `• ${p}`).join('\n')}
 • กำหนดชำระ: ภายใน 24 ชั่วโมงหลังสั่งซื้อ
 • ยืนยันการชำระ: อัปโหลดสลิปในระบบ (ตรวจสอบอัตโนมัติ)
 
-📍 การรับสินค้า:
+[การรับสินค้า]
 • สถานที่: ชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ ม.อ. วิทยาเขตหาดใหญ่
 • วัน/เวลา: จะประกาศหลังปิดรอบสั่งซื้อ
 • สามารถให้ผู้อื่นรับแทนได้ (แจ้งชื่อและเลข Order)
 
-📋 นโยบาย:
+[นโยบาย]
 • ไม่รับเปลี่ยน/คืนสินค้า ยกเว้นสินค้ามีตำหนิจากการผลิต
 • ตรวจสอบไซซ์จากตารางไซซ์ก่อนสั่งซื้อ
 • ออเดอร์ที่ไม่ชำระเงินภายในกำหนดจะถูกยกเลิกอัตโนมัติ
 
-📞 ช่องทางติดต่อ:
+[ช่องทางติดต่อ]
 • Facebook: ชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ ม.อ.
 • Instagram: @psuscc
 • Email: psuscc@psusci.club
@@ -346,18 +346,18 @@ export async function buildShopContext(): Promise<string> {
 function getDefaultContext(): string {
   return `
 ═══════════════════════════════════════════════════════════════
-📦 ข้อมูลร้านค้า SCC Shop (ข้อมูลพื้นฐาน)
+ข้อมูลร้านค้า SCC Shop (ข้อมูลพื้นฐาน)
 ═══════════════════════════════════════════════════════════════
 
 ร้านค้าออนไลน์ของชุมนุมคอมพิวเตอร์ (Science Computer Club)
 คณะวิทยาศาสตร์ มหาวิทยาลัยสงขลานครินทร์
 
-🛍️ สินค้าหลัก:
+[สินค้าหลัก]
 • เสื้อ Jersey (เสื้อกีฬา) - เริ่มต้น 299 บาท
 • เสื้อ Crew (เสื้อยืดคอกลม) - เริ่มต้น 250 บาท
 • ไซซ์: XS, S, M, L, XL, 2XL, 3XL, 4XL, 5XL
 
-📞 ติดต่อ:
+[ติดต่อ]
 • Facebook: ชุมนุมคอมพิวเตอร์ ม.อ.
 • Instagram: @psuscc
 ═══════════════════════════════════════════════════════════════`;
@@ -420,69 +420,72 @@ export function getCurrentModelName(): string {
  */
 function getEnhancedSystemPrompt(shopContext: string, conversationHistory?: string): string {
   const modelName = GEMINI_MODELS[currentModelTier].name;
-  return `คุณคือ "SCC Bot" 🤖 ผู้ช่วย AI ขั้นสูงที่ทรงพลังที่สุดของร้าน SCC Shop
+  return `คุณคือ "SCC Bot" ผู้ช่วย AI ขั้นสูงที่ทรงพลังที่สุดของร้าน SCC Shop
 Powered by Google ${modelName} - Intelligent AI Model
 
 ══════════════════════════════════════════════════
-🚀 ความสามารถขั้นสูง (Ultra AI Features):
+ความสามารถขั้นสูง (Ultra AI Features):
 ══════════════════════════════════════════════════
-1. 🧠 **Deep Analysis** - วิเคราะห์คำถามหลายมิติ เข้าใจความต้องการที่ซ่อนอยู่
-2. 🎯 **Smart Recommendations** - แนะนำสินค้าที่เหมาะสมที่สุดตามบริบท
-3. 📊 **Auto Table Generation** - สร้างตารางเปรียบเทียบอัตโนมัติ
-4. 🧮 **Advanced Calculator** - คำนวณราคารวม, จำนวน, ส่วนลดได้แม่นยำ
-5. 💡 **Proactive Suggestions** - แนะนำข้อมูลที่เป็นประโยชน์เพิ่มเติม
-6. 🔄 **Context Awareness** - จดจำบริบทการสนทนาก่อนหน้า
-7. 🖼️ **Visual Intelligence** - รู้ว่าระบบแสดงรูปสินค้าได้อัตโนมัติ
-8. 🎨 **Rich Formatting** - จัดรูปแบบข้อความให้อ่านง่ายสวยงาม
-9. 🤝 **Empathetic Responses** - เข้าใจอารมณ์และตอบอย่างเป็นมิตร
-10. 🔍 **Cross-Reference** - ค้นหาและเปรียบเทียบข้อมูลหลายสินค้าพร้อมกัน
+1. Deep Analysis - วิเคราะห์คำถามหลายมิติ เข้าใจความต้องการที่ซ่อนอยู่
+2. Smart Recommendations - แนะนำสินค้าที่เหมาะสมที่สุดตามบริบท
+3. Auto Table Generation - สร้างตารางเปรียบเทียบอัตโนมัติ
+4. Advanced Calculator - คำนวณราคารวม, จำนวน, ส่วนลดได้แม่นยำ
+5. Proactive Suggestions - แนะนำข้อมูลที่เป็นประโยชน์เพิ่มเติม
+6. Context Awareness - จดจำบริบทการสนทนาก่อนหน้า
+7. Visual Intelligence - รู้ว่าระบบแสดงรูปสินค้าได้อัตโนมัติ
+8. Rich Formatting - จัดรูปแบบข้อความให้อ่านง่ายสวยงาม
+9. Empathetic Responses - เข้าใจอารมณ์และตอบอย่างเป็นมิตร
+10. Cross-Reference - ค้นหาและเปรียบเทียบข้อมูลหลายสินค้าพร้อมกัน
 
 ══════════════════════════════════════════════════
-🎯 บทบาทและความสามารถ (Enhanced AI):
+บทบาทและความสามารถ (Enhanced AI):
 ══════════════════════════════════════════════════
-1. 💡 วิเคราะห์คำถามอย่างละเอียด เข้าใจความต้องการที่แท้จริงของลูกค้า
-2. 📊 ใช้ตาราง Markdown เมื่อต้องแสดงข้อมูลเปรียบเทียบหรือรายละเอียดไซซ์/ราคา
-3. 🧮 คำนวณราคารวมให้อัตโนมัติ (รวมออปชั่น)
-4. 🎯 แนะนำสินค้าที่เหมาะสมตามความต้องการ
-5. 📝 สรุปข้อมูลให้เข้าใจง่าย
-6. 🔍 ตรวจสอบข้อมูลอย่างละเอียดก่อนตอบ
-7. 🖼️ **ระบบจะแสดงรูปสินค้าให้อัตโนมัติ** - ไม่ต้องบอกว่าส่งรูปไม่ได้
+1. วิเคราะห์คำถามอย่างละเอียด เข้าใจความต้องการที่แท้จริงของลูกค้า
+2. ใช้ตาราง Markdown เมื่อต้องแสดงข้อมูลเปรียบเทียบหรือรายละเอียดไซซ์/ราคา
+3. คำนวณราคารวมให้อัตโนมัติ (รวมออปชั่น)
+4. แนะนำสินค้าที่เหมาะสมตามความต้องการ
+5. สรุปข้อมูลให้เข้าใจง่าย
+6. ตรวจสอบข้อมูลอย่างละเอียดก่อนตอบ
+7. **ระบบจะแสดงรูปสินค้าให้อัตโนมัติ** - ไม่ต้องบอกว่าส่งรูปไม่ได้
 
 ══════════════════════════════════════════════════
-🧠 โหมดคิดวิเคราะห์อัจฉริยะ (Thinking Mode):
+โหมดคิดวิเคราะห์อัจฉริยะ (Thinking Mode):
 ══════════════════════════════════════════════════
 เมื่อได้รับคำถาม ให้คิดวิเคราะห์ดังนี้:
-1. 🔍 **Understand** - คำถามนี้ถามอะไร? ต้องการข้อมูลอะไรบ้าง?
-2. 📋 **Gather** - ดึงข้อมูลที่เกี่ยวข้องจากฐานข้อมูลร้าน
-3. 🧮 **Process** - ประมวลผล คำนวณ เปรียบเทียบ
-4. 💡 **Enhance** - เพิ่มคำแนะนำที่เป็นประโยชน์
-5. ✨ **Format** - จัดรูปแบบให้สวยงาม อ่านง่าย
+1. Understand - คำถามนี้ถามอะไร? ต้องการข้อมูลอะไรบ้าง?
+2. Gather - ดึงข้อมูลที่เกี่ยวข้องจากฐานข้อมูลร้าน
+3. Process - ประมวลผล คำนวณ เปรียบเทียบ
+4. Enhance - เพิ่มคำแนะนำที่เป็นประโยชน์
+5. Format - จัดรูปแบบให้สวยงาม อ่านง่าย
 
 ══════════════════════════════════════════════════
-🖼️ ความสามารถด้านรูปภาพ (สำคัญมาก!):
+ความสามารถด้านรูปภาพ (สำคัญมาก!):
 ══════════════════════════════════════════════════
-✅ ระบบนี้ **สามารถแสดงรูปสินค้าได้อัตโนมัติ** ไม่ต้องพูดถึงการส่งรูป
-✅ เมื่อลูกค้าถามเกี่ยวกับสินค้า รูปจะแสดงอัตโนมัติเหนือข้อความตอบ
-❌ **ห้ามพูดว่า "ไม่สามารถส่งรูปสินค้าให้ได้" หรือ "ไม่มีรูปให้ดู"**
-❌ **ห้ามขอโทษเรื่องรูปภาพ** - ระบบจัดการให้แล้ว
-✅ ถ้าลูกค้าขอดูรูป → ตอบว่า "รูปสินค้าแสดงด้านบนค่ะ 👆" หรือแนะนำสินค้าตามปกติ
+- ระบบนี้ **สามารถแสดงรูปสินค้าได้อัตโนมัติ** ไม่ต้องพูดถึงการส่งรูป
+- เมื่อลูกค้าถามเกี่ยวกับสินค้า รูปจะแสดงอัตโนมัติเหนือข้อความตอบ
+- **ห้ามพูดว่า "ไม่สามารถส่งรูปสินค้าให้ได้" หรือ "ไม่มีรูปให้ดู"**
+- **ห้ามขอโทษเรื่องรูปภาพ** - ระบบจัดการให้แล้ว
+- ถ้าลูกค้าขอดูรูป ให้ตอบว่า "รูปสินค้าแสดงด้านบนค่ะ" หรือแนะนำสินค้าตามปกติ
 
 ══════════════════════════════════════════════════
-📌 กฎสำคัญ (ต้องปฏิบัติตาม):
+กฎสำคัญ (ต้องปฏิบัติตาม):
 ══════════════════════════════════════════════════
-1. ✅ ตอบเป็นภาษาไทยเสมอ สุภาพ เป็นกันเอง ใช้คำลงท้าย "ค่ะ" หรือ "นะคะ"
-2. ✅ อ้างอิงข้อมูลจริงจากข้อมูลร้านค้าที่ให้มาเท่านั้น ห้ามแต่งเติม
-3. ✅ ถ้าถามราคา/ไซซ์ → ตอบตามข้อมูลจริงจาก Database
-4. ✅ ถ้าถามละเอียด → ตอบละเอียดพร้อมตาราง ถ้าถามสั้น → ตอบกระชับ
-5. ✅ ใช้ emoji ให้เหมาะสม (👕💰📦📏💳🖼️ ฯลฯ)
-6. ✅ Format ข้อความให้อ่านง่าย ใช้ bullet points และตารางเมื่อเหมาะสม
-7. ❌ ห้ามตอบเรื่องนอกเหนือจากร้านค้า/สินค้า/บริการ
-8. ⚠️ ก่อนตอบว่า "ไม่มีข้อมูล" ต้องตรวจสอบข้อมูลร้านค้าด้านล่างให้ดีก่อน
-9. ✅ ถ้าไม่แน่ใจจริงๆ → แนะนำติดต่อ Facebook/Instagram
-10. ✅ ข้อมูลไซซ์และราคาอยู่ในส่วน "ไซซ์และราคา" ของแต่ละสินค้า ดูให้ดี
+1. ตอบเป็นภาษาไทยเสมอ สุภาพ เป็นกันเอง ใช้คำลงท้าย "ค่ะ" หรือ "นะคะ"
+2. อ้างอิงข้อมูลจริงจากข้อมูลร้านค้าที่ให้มาเท่านั้น ห้ามแต่งเติม
+3. ถ้าถามราคา/ไซซ์ ให้ตอบตามข้อมูลจริงจาก Database
+4. ถ้าถามละเอียด ให้ตอบละเอียดพร้อมตาราง ถ้าถามสั้น ให้ตอบกระชับ
+5. **ห้ามใช้ emoji ในการตอบ** - ใช้ข้อความธรรมดาเท่านั้น
+6. Format ข้อความให้อ่านง่าย ใช้ bullet points และตารางเมื่อเหมาะสม
+7. ห้ามตอบเรื่องนอกเหนือจากร้านค้า/สินค้า/บริการ
+8. ก่อนตอบว่า "ไม่มีข้อมูล" ต้องตรวจสอบข้อมูลร้านค้าด้านล่างให้ดีก่อน
+9. ถ้าไม่แน่ใจจริงๆ ให้แนะนำติดต่อ Facebook/Instagram
+10. ข้อมูลไซซ์และราคาอยู่ในส่วน "ไซซ์และราคา" ของแต่ละสินค้า ดูให้ดี
+11. ห้ามอธิบายวิธีขึ้นบรรทัดใหม่ (เช่น ห้ามพูดถึง \\n หรือ line break)
+12. ห้ามอธิบายการ format ข้อความ (เช่น ห้ามพูดถึง markdown syntax)
+13. ถ้าลูกค้าส่งรูปมา ให้วิเคราะห์รูปและตอบคำถามเกี่ยวกับรูปนั้น
 
 ══════════════════════════════════════════════════
-📊 การใช้ตาราง Markdown (สำคัญ!):
+การใช้ตาราง Markdown (สำคัญ!):
 ══════════════════════════════════════════════════
 เมื่อต้องแสดงข้อมูลไซซ์/ราคา หรือเปรียบเทียบ ให้ใช้ตาราง Markdown format:
 
@@ -492,13 +495,13 @@ Powered by Google ${modelName} - Intelligent AI Model
 | 2XL-10XL | 349฿ |
 
 ══════════════════════════════════════════════════
-📝 รูปแบบการตอบตามประเภทคำถาม:
+รูปแบบการตอบตามประเภทคำถาม:
 ══════════════════════════════════════════════════
 
-🔹 **ถามราคา/ไซซ์** → ใช้ตารางแสดงราคาแต่ละไซซ์ พร้อมออปชั่นเพิ่มเติม (ถ้ามี)
+[ถามราคา/ไซซ์] - ใช้ตารางแสดงราคาแต่ละไซซ์ พร้อมออปชั่นเพิ่มเติม (ถ้ามี)
 
-🔹 **ถามคำนวณราคา** → แสดงตารางคำนวณราคารวม
-   ⚠️ สำคัญ: สกรีนชื่อและเบอร์ ฟรี! มีเฉพาะแขนยาวที่คิดค่าเพิ่ม
+[ถามคำนวณราคา] - แสดงตารางคำนวณราคารวม
+   สำคัญ: สกรีนชื่อและเบอร์ ฟรี! มีเฉพาะแขนยาวที่คิดค่าเพิ่ม
    ตัวอย่าง (ถ้ามีออปชั่นแขนยาว):
    | รายการ | ราคา |
    |--------|------|
@@ -507,52 +510,58 @@ Powered by Google ${modelName} - Intelligent AI Model
    | แขนยาว | +30฿ |
    | **รวมทั้งหมด** | **349฿** |
 
-🔹 **ถามเปรียบเทียบ** → ทำตารางเปรียบเทียบสินค้า
+[ถามเปรียบเทียบ] - ทำตารางเปรียบเทียบสินค้า
 
-🔹 **ถามสินค้า** → อธิบายรายละเอียด จุดเด่น พร้อมตารางราคา
+[ถามสินค้า] - อธิบายรายละเอียด จุดเด่น พร้อมตารางราคา
 
-🔹 **ถามวิธีสั่งซื้อ** → แสดงขั้นตอนเป็นข้อๆ
+[ถามวิธีสั่งซื้อ] - แสดงขั้นตอนเป็นข้อๆ
 
-⚠️⚠️⚠️ กฎสำคัญมาก: 
+[ส่งรูปมาถาม] - วิเคราะห์รูปภาพและตอบตามที่ลูกค้าถาม เช่น เปรียบเทียบกับสินค้าในร้าน ดูไซซ์ ฯลฯ
+
+กฎสำคัญมาก: 
 - **สกรีนชื่อ และ สกรีนเบอร์ = ฟรี! ไม่มีค่าใช้จ่ายเพิ่ม**
 - **เฉพาะแขนยาว เท่านั้นที่คิดค่าเพิ่ม** (ดูราคาจากข้อมูลสินค้า)
 - ราคาออปชั่นต้องดูจากข้อมูลสินค้าที่ให้มาเท่านั้น
 - ถ้าสินค้าไม่มีออปชั่นเหล่านี้เปิดใช้งาน (ดูจาก "ไม่มีออปชั่นเพิ่มเติม") ห้ามบอกว่ามีออปชั่นเพิ่มเติม
 - ใช้ราคาจากข้อมูล Database ด้านล่างเท่านั้น
+- **ห้ามอธิบายการใช้ \\n หรือขึ้นบรรทัดใหม่ในคำตอบ**
 
 ══════════════════════════════════════════════════
-🧠 เทคนิคการตอบอย่างฉลาด:
+เทคนิคการตอบอย่างฉลาด:
 ══════════════════════════════════════════════════
 1. วิเคราะห์คำถามให้เข้าใจความหมายที่แท้จริง
 2. ถ้าคำถามไม่ชัดเจน ถามกลับเพื่อให้ข้อมูลที่ตรงความต้องการ
 3. แนะนำข้อมูลเพิ่มเติมที่เป็นประโยชน์
 4. ถ้าถามหลายอย่าง ตอบครบทุกข้อ
 5. สรุปสั้นๆ ท้ายคำตอบถ้าตอบยาว
+6. **ตอบเนื้อหาเท่านั้น ไม่อธิบายการ format หรือ syntax**
+7. **ห้ามใช้ emoji ในคำตอบ - ใช้ข้อความธรรมดาเท่านั้น**
 
 ${conversationHistory ? `
 ══════════════════════════════════════════════════
-💬 บริบทการสนทนาก่อนหน้า:
+บริบทการสนทนาก่อนหน้า:
 ══════════════════════════════════════════════════
 ${conversationHistory}
 ` : ''}
 
 ══════════════════════════════════════════════════
-🗃️ ข้อมูลร้านค้าจาก Database (Real-time):
+ข้อมูลร้านค้าจาก Database (Real-time):
 ══════════════════════════════════════════════════
 ${shopContext}
 
 ══════════════════════════════════════════════════
-🎤 คำถามจากลูกค้า:
+คำถามจากลูกค้า:
 ══════════════════════════════════════════════════`;
 }
 
 /**
- * เรียกใช้ Google Gemini API พร้อมระบบ Auto-Fallback
+ * เรียกใช้ Google Gemini API พร้อมระบบ Auto-Fallback (รองรับรูปภาพ)
  */
 async function callGeminiAPI(
   prompt: string, 
   shopContext: string,
-  conversationHistory?: ChatMessage[]
+  conversationHistory?: ChatMessage[],
+  imageBase64?: string
 ): Promise<string | null> {
   if (!GEMINI_API_KEY) {
     console.log('No Gemini API key configured');
@@ -562,7 +571,7 @@ async function callGeminiAPI(
   // Build conversation history string
   const historyStr = conversationHistory
     ?.slice(-10) // Last 10 messages for better context
-    ?.map(m => `${m.role === 'user' ? '👤 ลูกค้า' : '🤖 Bot'}: ${m.content}`)
+    ?.map(m => `${m.role === 'user' ? 'ลูกค้า' : 'Bot'}: ${m.content}`)
     ?.join('\n');
 
   // Try models in order: primary → fallback → lite
@@ -576,35 +585,70 @@ async function callGeminiAPI(
     const model = GEMINI_MODELS[tier];
     
     try {
-      console.log(`[AI] Trying ${model.name}...`);
+      console.log(`[AI] Trying ${model.name}...${imageBase64 ? ' (with image)' : ''}`);
+      
+      // Build user content parts - for multimodal requests
+      const userParts: any[] = [];
+      
+      // Add image FIRST if provided (Gemini works better with image before text)
+      if (imageBase64) {
+        // Extract mime type and base64 data from data URI
+        const matches = imageBase64.match(/^data:([^;]+);base64,(.+)$/);
+        if (matches) {
+          const mimeType = matches[1];
+          const data = matches[2];
+          console.log(`[AI] Adding image: ${mimeType}, ${data.length} chars`);
+          userParts.push({
+            inlineData: {
+              mimeType,
+              data,
+            }
+          });
+        } else {
+          console.warn(`[AI] Invalid image format, expected data URI`);
+        }
+      }
+      
+      // Add user message
+      const userMessage = imageBase64 
+        ? `${prompt}\n\nกรุณาวิเคราะห์รูปภาพที่ส่งมาและตอบคำถามเกี่ยวกับรูปนี้ด้วยค่ะ`
+        : prompt;
+      userParts.push({ text: userMessage });
+      
+      // Build request body with system instruction
+      const requestBody: any = {
+        systemInstruction: {
+          parts: [{ text: getEnhancedSystemPrompt(shopContext, historyStr) }]
+        },
+        contents: [
+          {
+            role: 'user',
+            parts: userParts,
+          }
+        ],
+        generationConfig: model.config,
+        safetySettings: [
+          { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+          { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+          { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+          { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+        ],
+      };
+      
+      console.log(`[AI] Request body keys:`, Object.keys(requestBody));
+      console.log(`[AI] User parts count:`, userParts.length, userParts.map(p => p.inlineData ? 'image' : 'text'));
       
       const response = await fetch(`${model.url}?key=${GEMINI_API_KEY}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                { text: getEnhancedSystemPrompt(shopContext, historyStr) },
-                { text: prompt }
-              ]
-            }
-          ],
-          generationConfig: model.config,
-          safetySettings: [
-            { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-            { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-            { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-            { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-          ],
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`[AI] ${model.name} error:`, response.status, errorText);
+        console.error(`[AI] ${model.name} error:`, response.status, errorText.slice(0, 500));
         
         // Check for rate limit (429) or quota exceeded
         if (response.status === 429 || errorText.includes('quota') || errorText.includes('RESOURCE_EXHAUSTED')) {
@@ -627,6 +671,8 @@ async function callGeminiAPI(
       }
 
       const data = await response.json();
+      console.log(`[AI] Response from ${model.name}:`, JSON.stringify(data).slice(0, 300));
+      
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
       
       if (text) {
@@ -640,8 +686,10 @@ async function callGeminiAPI(
           console.log(`[AI] Upgraded to ${model.name}`);
         }
         
-        console.log(`[AI] Success with ${model.name}`);
+        console.log(`[AI] Success with ${model.name}${imageBase64 ? ' (processed image)' : ''}`);
         return text;
+      } else {
+        console.warn(`[AI] ${model.name} returned empty text. Data:`, JSON.stringify(data).slice(0, 500));
       }
     } catch (error) {
       console.error(`[AI] ${model.name} exception:`, error);
@@ -657,17 +705,18 @@ async function callGeminiAPI(
 // ==================== Main Chat Function ====================
 
 /**
- * ประมวลผลข้อความจากผู้ใช้ (ปรับปรุงใหม่)
+ * ประมวลผลข้อความจากผู้ใช้ (ปรับปรุงใหม่ - รองรับรูปภาพ)
  */
 export async function processChat(
   message: string,
-  conversationHistory?: ChatMessage[]
+  conversationHistory?: ChatMessage[],
+  imageBase64?: string
 ): Promise<ChatResponse> {
   const trimmedMessage = message.trim();
   
-  if (!trimmedMessage) {
+  if (!trimmedMessage && !imageBase64) {
     return {
-      answer: 'กรุณาพิมพ์คำถามค่ะ 😊',
+      answer: 'กรุณาพิมพ์คำถามค่ะ',
       source: 'fallback',
       suggestions: QUICK_QUESTIONS,
     };
@@ -758,9 +807,10 @@ export async function processChat(
   const isSpecificProductQuestion = detectSpecificProductQuestion(trimmedMessage);
   const hasMultipleTopics = detectMultipleTopics(trimmedMessage);
   const isProductQuery = isProductRelatedQuery(trimmedMessage);
+  const hasImage = !!imageBase64;
 
-  // Use AI for: detailed questions, specific product queries, multi-topic, or long questions
-  const shouldUseAI = isDetailedQuestion || isSpecificProductQuestion || hasMultipleTopics || trimmedMessage.length > 25;
+  // Use AI for: detailed questions, specific product queries, multi-topic, long questions, or when image is provided
+  const shouldUseAI = isDetailedQuestion || isSpecificProductQuestion || hasMultipleTopics || trimmedMessage.length > 25 || hasImage;
   
   // Find related product images for product-related questions - ALWAYS try for product queries
   const productImages = (isSpecificProductQuestion || isPriceQuestion || isProductQuery) 
@@ -770,7 +820,7 @@ export async function processChat(
   if (shouldUseAI) {
     try {
       const shopContext = await buildDetailedShopContext();
-      const aiResponse = await callGeminiAPI(trimmedMessage, shopContext, conversationHistory);
+      const aiResponse = await callGeminiAPI(trimmedMessage, shopContext, conversationHistory, imageBase64);
       
       if (aiResponse) {
         // Clean up response
@@ -793,8 +843,8 @@ export async function processChat(
   const faqResult = findShirtFAQ(trimmedMessage);
   const confidence = faqResult ? calculateConfidence(trimmedMessage, faqResult) : 0;
   
-  // High confidence FAQ match
-  if (faqResult && confidence > 0.7 && !isDetailedQuestion) {
+  // High confidence FAQ match (but not if image is provided)
+  if (faqResult && confidence > 0.7 && !isDetailedQuestion && !hasImage) {
     return {
       answer: faqResult.answer,
       source: 'faq',
@@ -807,7 +857,7 @@ export async function processChat(
   // Fallback to AI for any question
   try {
     const shopContext = await buildDetailedShopContext();
-    const aiResponse = await callGeminiAPI(trimmedMessage, shopContext, conversationHistory);
+    const aiResponse = await callGeminiAPI(trimmedMessage, shopContext, conversationHistory, imageBase64);
     
     if (aiResponse) {
       return {
@@ -834,7 +884,7 @@ export async function processChat(
 
   // Final fallback
   return {
-    answer: '🤔 ขออภัยค่ะ ไม่เข้าใจคำถามนี้\n\nลองถามเกี่ยวกับ:\n• 👕 สินค้าและราคา\n• 🛒 วิธีสั่งซื้อ\n• 💳 การชำระเงิน\n• 📦 การรับสินค้า\n\nหรือติดต่อทีมงานทาง Facebook/Instagram ได้เลยค่ะ 💬',
+    answer: 'ขออภัยค่ะ ไม่เข้าใจคำถามนี้\n\nลองถามเกี่ยวกับ:\n• สินค้าและราคา\n• วิธีสั่งซื้อ\n• การชำระเงิน\n• การรับสินค้า\n\nหรือติดต่อทีมงานทาง Facebook/Instagram ได้เลยค่ะ',
     source: 'fallback',
     suggestions: QUICK_QUESTIONS,
   };
@@ -957,13 +1007,13 @@ function getSuggestionsForResponse(message: string): string[] {
   const q = message.toLowerCase();
   
   if (q.includes('ราคา') || q.includes('เท่าไหร่')) {
-    return ['📏 ดูไซซ์', '🛒 วิธีสั่งซื้อ', '💳 วิธีชำระเงิน'];
+    return ['ดูไซซ์', 'วิธีสั่งซื้อ', 'วิธีชำระเงิน'];
   }
   if (q.includes('ไซซ์') || q.includes('size')) {
-    return ['💰 ราคาเท่าไหร่', '👕 เปรียบเทียบรุ่น'];
+    return ['ราคาเท่าไหร่', 'เปรียบเทียบรุ่น'];
   }
   if (q.includes('สั่ง') || q.includes('ซื้อ')) {
-    return ['💳 ชำระเงินยังไง', '📦 รับสินค้าที่ไหน'];
+    return ['ชำระเงินยังไง', 'รับสินค้าที่ไหน'];
   }
   
   return [];

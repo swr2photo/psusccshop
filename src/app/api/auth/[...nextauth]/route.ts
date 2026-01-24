@@ -2,6 +2,30 @@
 import NextAuth, { NextAuthOptions, Session } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import { JWT } from "next-auth/jwt";
+import { putJson } from "@/lib/filebase";
+
+// Helper to save user log server-side
+async function saveUserLogServer(log: {
+  email: string;
+  name?: string;
+  action: string;
+  details?: string;
+  metadata?: Record<string, any>;
+  ip?: string;
+  userAgent?: string;
+}) {
+  try {
+    const id = `log-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const fullLog = {
+      ...log,
+      id,
+      timestamp: new Date().toISOString(),
+    };
+    await putJson(`user-logs/${id}.json`, fullLog);
+  } catch (e) {
+    console.warn("[NextAuth] Failed to save user log:", e);
+  }
+}
 
 // ==================== TYPE EXTENSIONS ====================
 declare module "next-auth" {
@@ -163,18 +187,50 @@ export const authOptions: NextAuthOptions = {
         provider: account?.provider,
         timestamp: new Date().toISOString(),
       });
+      
+      // Save to user logs
+      if (user.email) {
+        await saveUserLogServer({
+          email: user.email,
+          name: user.name || undefined,
+          action: 'login',
+          details: `เข้าสู่ระบบด้วย ${account?.provider || 'Google'}`,
+          metadata: { provider: account?.provider },
+        });
+      }
     },
     async signOut({ token }) {
       console.log("[NextAuth] User signed out:", {
         email: (token as any)?.email,
         timestamp: new Date().toISOString(),
       });
+      
+      // Save to user logs
+      const email = (token as any)?.email;
+      if (email) {
+        await saveUserLogServer({
+          email,
+          action: 'logout',
+          details: 'ออกจากระบบ',
+        });
+      }
     },
     async createUser({ user }) {
       console.log("[NextAuth] New user created:", {
         email: user.email,
         timestamp: new Date().toISOString(),
       });
+      
+      // Save to user logs
+      if (user.email) {
+        await saveUserLogServer({
+          email: user.email,
+          name: user.name || undefined,
+          action: 'login',
+          details: 'สมัครสมาชิกใหม่ด้วย Google',
+          metadata: { isNewUser: true },
+        });
+      }
     },
     async session({ session }) {
       // Log session access (be careful with frequency)

@@ -8,6 +8,29 @@ import { verifyTurnstileToken, getClientIP } from '@/lib/cloudflare';
 import { checkCombinedRateLimit, RATE_LIMITS, getRateLimitHeaders } from '@/lib/rate-limit';
 import { sendOrderConfirmationEmail } from '@/lib/email';
 
+// Helper to save user log server-side
+async function saveUserLogServer(log: {
+  email: string;
+  name?: string;
+  action: string;
+  details?: string;
+  metadata?: Record<string, any>;
+  ip?: string;
+  userAgent?: string;
+}) {
+  try {
+    const id = `log-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const fullLog = {
+      ...log,
+      id,
+      timestamp: new Date().toISOString(),
+    };
+    await putJson(`user-logs/${id}.json`, fullLog);
+  } catch (e) {
+    console.warn("[Orders API] Failed to save user log:", e);
+  }
+}
+
 const orderKey = (ref: string, date: Date) => {
   const yyyy = date.getFullYear();
   const mm = String(date.getMonth() + 1).padStart(2, '0');
@@ -133,6 +156,24 @@ export async function POST(req: NextRequest) {
         console.error('[Orders API] Failed to send confirmation email:', emailError);
         // Don't fail the request if email fails
       }
+    }
+    
+    // Log user action
+    if (order.customerEmail) {
+      const userAgent = req.headers.get('user-agent') || undefined;
+      await saveUserLogServer({
+        email: order.customerEmail,
+        name: order.customerName,
+        action: 'place_order',
+        details: `สั่งซื้อสินค้า: ${ref}`,
+        metadata: { 
+          ref, 
+          totalAmount: order.totalAmount,
+          itemCount: order.cart?.length || 0,
+        },
+        ip: clientIP,
+        userAgent,
+      });
     }
     
     // Auto sync to Google Sheets

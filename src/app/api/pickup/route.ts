@@ -4,6 +4,47 @@ import { requireAuth, requireAdmin, isAdminEmail } from '@/lib/auth';
 import { sanitizeUtf8Input } from '@/lib/sanitize';
 import crypto from 'crypto';
 
+// Helper to save user log server-side
+const userLogKey = (id: string) => `user-logs/${id}.json`;
+interface LogEntry {
+  id: string;
+  email: string;
+  name?: string;
+  action: string;
+  details?: string;
+  metadata?: Record<string, any>;
+  ip?: string;
+  userAgent?: string;
+  timestamp: string;
+}
+const saveUserLogServer = async (params: {
+  email: string;
+  name?: string;
+  action: string;
+  details?: string;
+  metadata?: Record<string, any>;
+  ip?: string;
+  userAgent?: string;
+}) => {
+  try {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const entry: LogEntry = {
+      id,
+      email: params.email,
+      name: params.name,
+      action: params.action,
+      details: params.details,
+      metadata: params.metadata,
+      ip: params.ip,
+      userAgent: params.userAgent,
+      timestamp: new Date().toISOString(),
+    };
+    await putJson(userLogKey(id), entry);
+  } catch (e) {
+    console.error('[Pickup] Failed to save user log:', e);
+  }
+};
+
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -209,6 +250,25 @@ export async function POST(req: NextRequest) {
         await updateIndexEntry(customerEmail, updatedOrder);
       }
 
+      // Log pickup action
+      const userAgent = req.headers.get('user-agent') || undefined;
+      const clientIP = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 
+                       req.headers.get('x-real-ip') || undefined;
+      await saveUserLogServer({
+        email: authResult.email,
+        action: 'admin_pickup_confirm',
+        details: `ยืนยันรับสินค้า ${ref} (${order.customerName || 'ไม่ระบุชื่อ'})`,
+        metadata: {
+          ref,
+          customerEmail,
+          customerName: order.customerName || order.name,
+          condition: condition || 'complete',
+          notes,
+        },
+        ip: clientIP,
+        userAgent,
+      });
+
       return NextResponse.json({
         status: 'success',
         message: 'Order marked as picked up',
@@ -233,6 +293,19 @@ export async function POST(req: NextRequest) {
       };
 
       await putJson(targetKey, updatedOrder);
+
+      // Log pickup cancel action
+      const userAgent = req.headers.get('user-agent') || undefined;
+      const clientIP = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 
+                       req.headers.get('x-real-ip') || undefined;
+      await saveUserLogServer({
+        email: authResult.email,
+        action: 'admin_pickup_cancel',
+        details: `ยกเลิกการรับสินค้า ${ref}`,
+        metadata: { ref, customerEmail: order.customerEmail || order.email },
+        ip: clientIP,
+        userAgent,
+      });
 
       return NextResponse.json({
         status: 'success',

@@ -90,8 +90,10 @@ interface Props {
 }
 
 const actionLabels: Record<string, { label: string; color: string; icon: ReactElement }> = {
+  // User actions
   login: { label: 'เข้าสู่ระบบ', color: '#10b981', icon: <Login sx={{ fontSize: 16 }} /> },
   logout: { label: 'ออกจากระบบ', color: '#64748b', icon: <Logout sx={{ fontSize: 16 }} /> },
+  new_user: { label: 'ผู้ใช้ใหม่', color: '#8b5cf6', icon: <Person sx={{ fontSize: 16 }} /> },
   view_product: { label: 'ดูสินค้า', color: '#6366f1', icon: <Visibility sx={{ fontSize: 16 }} /> },
   add_to_cart: { label: 'เพิ่มตะกร้า', color: '#f59e0b', icon: <ShoppingCart sx={{ fontSize: 16 }} /> },
   remove_from_cart: { label: 'ลบตะกร้า', color: '#ef4444', icon: <ShoppingCart sx={{ fontSize: 16 }} /> },
@@ -100,8 +102,14 @@ const actionLabels: Record<string, { label: string; color: string; icon: ReactEl
   verify_payment: { label: 'ยืนยันชำระเงิน', color: '#10b981', icon: <Payment sx={{ fontSize: 16 }} /> },
   view_order: { label: 'ดูออเดอร์', color: '#8b5cf6', icon: <Receipt sx={{ fontSize: 16 }} /> },
   profile_update: { label: 'อัปเดตโปรไฟล์', color: '#f472b6', icon: <Person sx={{ fontSize: 16 }} /> },
+  upload_image: { label: 'อัปโหลดรูป', color: '#0ea5e9', icon: <Visibility sx={{ fontSize: 16 }} /> },
   page_view: { label: 'เยี่ยมชมหน้า', color: '#64748b', icon: <Visibility sx={{ fontSize: 16 }} /> },
   error: { label: 'เกิดข้อผิดพลาด', color: '#ef4444', icon: <Error sx={{ fontSize: 16 }} /> },
+  // Admin actions
+  admin_change_status: { label: 'แอดมินเปลี่ยนสถานะ', color: '#f59e0b', icon: <Receipt sx={{ fontSize: 16 }} /> },
+  admin_pickup_confirm: { label: 'แอดมินยืนยันรับสินค้า', color: '#10b981', icon: <Receipt sx={{ fontSize: 16 }} /> },
+  admin_pickup_cancel: { label: 'แอดมินยกเลิกรับสินค้า', color: '#ef4444', icon: <Receipt sx={{ fontSize: 16 }} /> },
+  admin_config_change: { label: 'แอดมินแก้ไขตั้งค่า', color: '#8b5cf6', icon: <Computer sx={{ fontSize: 16 }} /> },
 };
 
 export default function UserLogsView({ showToast }: Props) {
