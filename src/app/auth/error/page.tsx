@@ -112,6 +112,16 @@ const AUTH_ERRORS: Record<string, AuthErrorInfo> = {
     canRetry: false,
   },
   
+  // WebView/UserAgent Errors (Google 403)
+  disallowed_useragent: {
+    title: 'ไม่รองรับการเข้าสู่ระบบจากแอปนี้',
+    description: 'Google ไม่อนุญาตให้เข้าสู่ระบบผ่าน WebView ในแอป (เช่น LINE, Facebook, Instagram)',
+    icon: ShieldAlert,
+    color: '#f59e0b',
+    suggestion: 'กรุณาเปิดลิงก์ในเบราว์เซอร์หลัก เช่น Chrome หรือ Safari โดยกดปุ่ม ⋮ หรือ ... แล้วเลือก "เปิดในเบราว์เซอร์"',
+    canRetry: false,
+  },
+  
   // Network/Connection Errors
   fetch_failed: {
     title: 'การเชื่อมต่อล้มเหลว',

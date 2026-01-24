@@ -2061,6 +2061,7 @@ import {
   Info,
   ChevronLeft,
   ChevronRight,
+  Copy,
   History,
   Home,
   LogIn,
@@ -4362,6 +4363,16 @@ export default function HomePage() {
   }
 
   if (status === 'unauthenticated') {
+    // Detect if running in WebView (LINE, Facebook, Instagram, etc.)
+    const isWebView = typeof window !== 'undefined' && (
+      /FBAN|FBAV|Instagram|Line\/|KAKAOTALK|Snapchat|Twitter/i.test(navigator.userAgent) ||
+      /WebView|wv/i.test(navigator.userAgent) ||
+      (window as any).ReactNativeWebView !== undefined
+    );
+    
+    // Get current URL for copy
+    const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
+    
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#0f172a' }}>
         <AppBar
@@ -4377,6 +4388,61 @@ export default function HomePage() {
 
         <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 3 }}>
           <Container maxWidth="sm">
+            {/* WebView Warning Banner */}
+            {isWebView && (
+              <Box
+                sx={{
+                  mb: 3,
+                  p: 2.5,
+                  borderRadius: '16px',
+                  background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(239, 68, 68, 0.1) 100%)',
+                  border: '1px solid rgba(245, 158, 11, 0.3)',
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+                  <Box sx={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: '12px',
+                    bgcolor: 'rgba(245, 158, 11, 0.2)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}>
+                    <AlertTriangle size={22} color="#f59e0b" />
+                  </Box>
+                  <Box>
+                    <Typography sx={{ color: '#fbbf24', fontWeight: 700, fontSize: '0.95rem', mb: 0.5 }}>
+                      แนะนำให้เปิดในเบราว์เซอร์
+                    </Typography>
+                    <Typography sx={{ color: '#94a3b8', fontSize: '0.8rem', lineHeight: 1.6 }}>
+                      Google ไม่รองรับการเข้าสู่ระบบจากแอปนี้โดยตรง 
+                      กรุณากดปุ่ม <strong>⋮</strong> หรือ <strong>...</strong> แล้วเลือก 
+                      <strong> "เปิดในเบราว์เซอร์"</strong> หรือ <strong>"Open in Browser"</strong>
+                    </Typography>
+                    <Button
+                      size="small"
+                      onClick={() => {
+                        navigator.clipboard?.writeText(currentUrl);
+                        alert('คัดลอกลิงก์แล้ว! กรุณาวางในเบราว์เซอร์');
+                      }}
+                      sx={{
+                        mt: 1.5,
+                        color: '#fbbf24',
+                        fontSize: '0.75rem',
+                        textTransform: 'none',
+                        '&:hover': { bgcolor: 'rgba(245, 158, 11, 0.1)' },
+                      }}
+                      startIcon={<Copy size={14} />}
+                    >
+                      คัดลอกลิงก์
+                    </Button>
+                  </Box>
+                </Box>
+              </Box>
+            )}
+            
             <Card 
               sx={{ 
                 bgcolor: 'rgba(30, 41, 59, 0.8)', 
