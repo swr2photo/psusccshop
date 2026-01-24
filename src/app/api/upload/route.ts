@@ -183,7 +183,7 @@ export async function POST(req: NextRequest) {
                      req.headers.get('x-real-ip') || undefined;
     await saveUserLogServer({
       email: authResult.email,
-      name: authResult.name || undefined,
+      name: undefined,
       action: 'upload_image',
       details: `อัปโหลดรูปภาพ (${(buffer.length / 1024).toFixed(1)} KB)`,
       metadata: {

@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
     
     await saveUserLogServer({
       email: authResult.email,
-      name: authResult.name || undefined,
+      name: undefined,
       action: 'admin_config_change',
       details: `แก้ไขการตั้งค่าร้าน${changes.length ? ': ' + changes.join(', ') : ''}`,
       metadata: {

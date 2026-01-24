@@ -4554,7 +4554,7 @@ export default function HomePage() {
   }
 
   // Check if there are enabled announcements for padding adjustment
-  const hasEnabledAnnouncements = announcements?.filter(a => a.enabled).length > 0;
+  const hasEnabledAnnouncements = (announcements?.filter(a => a.enabled)?.length ?? 0) > 0;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#0f172a', pb: { xs: 9, md: 0 }, pt: hasEnabledAnnouncements ? { xs: '44px', sm: '40px' } : 0 }}>
