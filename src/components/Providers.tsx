@@ -116,6 +116,7 @@ function ScreenshotProtectionProvider({ children }: { children: React.ReactNode 
 
 // Liquid glass dark theme
 const darkTheme = createTheme({
+  cssVariables: true, // Required for MUI v7 with Next.js webpack
   palette: {
     mode: 'dark',
     primary: {

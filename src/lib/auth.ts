@@ -6,6 +6,9 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { NextResponse } from 'next/server';
 import { getJson } from '@/lib/filebase';
 
+// Re-export authOptions for convenience
+export { authOptions };
+
 // Admin emails list - reads from environment variable first, then fallback to hardcoded list
 const ADMIN_EMAILS_ENV = process.env.NEXT_PUBLIC_ADMIN_EMAILS || process.env.ADMIN_EMAILS || '';
 const ADMIN_EMAILS_HARDCODED = [

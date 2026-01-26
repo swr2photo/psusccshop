@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cleanupOldData, logSecurityEvent } from '@/lib/supabase';
 import { cleanupExpiredRateLimits } from '@/lib/rate-limit-supabase';
 import { autoRotateExpiringKeys, cleanupOldKeys } from '@/lib/api-key-rotation';
+import { cleanupOldChatImages } from '@/lib/support-chat';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -117,6 +118,27 @@ export async function GET(req: NextRequest) {
     } catch (error) {
       console.error('[Cron Cleanup] API key cleanup error:', error);
       results.tasks.apiKeyCleanup = {
+        status: 'error',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+
+    // ==================== 5. CLEANUP OLD CHAT IMAGES ====================
+    try {
+      console.log('[Cron Cleanup] Cleaning old chat images (7+ days)...');
+      
+      const chatImageCleanup = await cleanupOldChatImages(7); // Images older than 7 days
+      
+      results.tasks.chatImageCleanup = {
+        status: 'success',
+        deletedImages: chatImageCleanup.deletedImages,
+        cleanedChats: chatImageCleanup.cleanedChats,
+      };
+      
+      console.log(`[Cron Cleanup] Chat images cleanup: ${chatImageCleanup.deletedImages} images from ${chatImageCleanup.cleanedChats} chats`);
+    } catch (error) {
+      console.error('[Cron Cleanup] Chat image cleanup error:', error);
+      results.tasks.chatImageCleanup = {
         status: 'error',
         error: error instanceof Error ? error.message : 'Unknown error',
       };

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, CSSProperties, memo } from 'react';
+import { useState, useRef, useEffect, CSSProperties, memo, useCallback } from 'react';
 import { Box, Skeleton } from '@mui/material';
 
 interface OptimizedImageProps {
@@ -18,14 +18,19 @@ interface OptimizedImageProps {
   onError?: () => void;
   borderRadius?: number | string;
   aspectRatio?: string;
+  // New props to prevent flickering
+  disableFade?: boolean; // Skip fade animation
+  keepMounted?: boolean; // Keep image loaded even when hidden
 }
 
 // Default blur placeholder (1x1 transparent base64)
 const DEFAULT_BLUR = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 
-// Image cache for preloaded images
+// Image cache for preloaded images - persists across remounts
 const imageCache = new Map<string, HTMLImageElement>();
 const loadingImages = new Map<string, Promise<HTMLImageElement>>();
+// Track which images have been successfully loaded (survives component remounts)
+const loadedImageUrls = new Set<string>();
 
 /**
  * Preload an image and cache it
@@ -35,6 +40,7 @@ export function preloadImage(src: string): Promise<HTMLImageElement> {
   
   // Return cached image
   if (imageCache.has(src)) {
+    loadedImageUrls.add(src); // Mark as loaded
     return Promise.resolve(imageCache.get(src)!);
   }
   
@@ -51,6 +57,7 @@ export function preloadImage(src: string): Promise<HTMLImageElement> {
     
     img.onload = () => {
       imageCache.set(src, img);
+      loadedImageUrls.add(src); // Mark as loaded
       loadingImages.delete(src);
       resolve(img);
     };
@@ -65,6 +72,13 @@ export function preloadImage(src: string): Promise<HTMLImageElement> {
   
   loadingImages.set(src, promise);
   return promise;
+}
+
+/**
+ * Check if an image was already loaded (survives component remounts)
+ */
+export function wasImageLoaded(src: string): boolean {
+  return loadedImageUrls.has(src) || imageCache.has(src);
 }
 
 /**
@@ -96,8 +110,9 @@ export function clearImageCache(): void {
  * - Native browser lazy loading as fallback
  * - Blur/skeleton placeholder during load
  * - Automatic caching and preloading
- * - Smooth fade-in animation
+ * - Smooth fade-in animation (can be disabled)
  * - Error handling with retry
+ * - Anti-flicker: remembers loaded images across remounts
  */
 function OptimizedImageComponent({
   src,
@@ -114,10 +129,14 @@ function OptimizedImageComponent({
   onError,
   borderRadius,
   aspectRatio,
+  disableFade = false,
+  keepMounted = false,
 }: OptimizedImageProps) {
-  const [loaded, setLoaded] = useState(false);
+  // Check if this image was already loaded before (prevents flicker on remount)
+  const wasLoaded = wasImageLoaded(src);
+  const [loaded, setLoaded] = useState(wasLoaded);
   const [error, setError] = useState(false);
-  const [isInView, setIsInView] = useState(priority);
+  const [isInView, setIsInView] = useState(priority || wasLoaded);
   const imgRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -182,17 +201,21 @@ function OptimizedImageComponent({
     ...style,
   };
 
+  // Determine if we should use fade animation
+  // Skip fade if: image was already loaded before, or disableFade is true
+  const skipFade = disableFade || wasLoaded;
+  
   const imageStyles: CSSProperties = {
     width: '100%',
     height: '100%',
     objectFit,
-    opacity: loaded ? 1 : 0,
-    transition: 'opacity 0.3s ease-out',
+    opacity: loaded ? 1 : (skipFade ? 1 : 0),
+    transition: skipFade ? 'none' : 'opacity 0.3s ease-out',
     display: 'block',
   };
 
-  // Show skeleton placeholder
-  if (!isInView) {
+  // Show skeleton placeholder (skip if already loaded before to prevent flicker)
+  if (!isInView && !wasLoaded) {
     return (
       <Box
         ref={containerRef}
@@ -258,8 +281,8 @@ function OptimizedImageComponent({
       className={className}
       sx={containerStyles}
     >
-      {/* Placeholder while loading */}
-      {!loaded && (
+      {/* Placeholder while loading (skip if already loaded to prevent flicker) */}
+      {!loaded && !skipFade && (
         <>
           {placeholder === 'skeleton' && (
             <Skeleton
@@ -308,8 +331,19 @@ function OptimizedImageComponent({
   );
 }
 
-// Memoize to prevent unnecessary re-renders
-const OptimizedImage = memo(OptimizedImageComponent);
+// Memoize to prevent unnecessary re-renders with stable comparison
+const OptimizedImage = memo(OptimizedImageComponent, (prevProps, nextProps) => {
+  // Only re-render if these props actually change
+  return (
+    prevProps.src === nextProps.src &&
+    prevProps.alt === nextProps.alt &&
+    prevProps.width === nextProps.width &&
+    prevProps.height === nextProps.height &&
+    prevProps.objectFit === nextProps.objectFit &&
+    prevProps.priority === nextProps.priority &&
+    prevProps.borderRadius === nextProps.borderRadius
+  );
+});
 
 export default OptimizedImage;
 
@@ -326,6 +360,7 @@ interface OptimizedBackgroundProps {
   fallbackColor?: string;
   overlay?: string;
   blur?: number;
+  disableFade?: boolean;
 }
 
 export const OptimizedBackground = memo(function OptimizedBackgroundComponent({
@@ -338,10 +373,16 @@ export const OptimizedBackground = memo(function OptimizedBackgroundComponent({
   fallbackColor = 'rgba(15,23,42,0.8)',
   overlay,
   blur = 0,
+  disableFade = false,
 }: OptimizedBackgroundProps) {
-  const [loaded, setLoaded] = useState(false);
-  const [isInView, setIsInView] = useState(priority);
+  // Check if already loaded before (anti-flicker)
+  const wasLoaded = src ? wasImageLoaded(src) : false;
+  const [loaded, setLoaded] = useState(wasLoaded);
+  const [isInView, setIsInView] = useState(priority || wasLoaded);
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Skip fade animation if already loaded
+  const skipFade = disableFade || wasLoaded;
 
   // Intersection Observer for lazy loading (with fallback for older browsers)
   useEffect(() => {
@@ -375,12 +416,12 @@ export const OptimizedBackground = memo(function OptimizedBackgroundComponent({
 
   // Preload image when in view
   useEffect(() => {
-    if (isInView && src) {
+    if (isInView && src && !loaded) {
       preloadImage(src)
         .then(() => setLoaded(true))
         .catch(() => {});
     }
-  }, [isInView, src]);
+  }, [isInView, src, loaded]);
 
   return (
     <Box
@@ -396,19 +437,19 @@ export const OptimizedBackground = memo(function OptimizedBackgroundComponent({
         sx={{
           position: 'absolute',
           inset: 0,
-          backgroundImage: loaded && src ? `url(${src})` : undefined,
-          backgroundColor: !loaded || !src ? fallbackColor : undefined,
+          backgroundImage: (loaded || wasLoaded) && src ? `url(${src})` : undefined,
+          backgroundColor: (!loaded && !wasLoaded) || !src ? fallbackColor : undefined,
           backgroundSize: objectFit,
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
           filter: blur > 0 ? `blur(${blur}px)` : undefined,
-          transition: 'opacity 0.4s ease-out',
-          opacity: loaded ? 1 : 0.5,
+          transition: skipFade ? 'none' : 'opacity 0.4s ease-out',
+          opacity: loaded || skipFade ? 1 : 0.5,
         }}
       />
       
-      {/* Loading shimmer */}
-      {!loaded && src && (
+      {/* Loading shimmer (skip if already loaded) */}
+      {!loaded && !skipFade && src && (
         <Box
           sx={{
             position: 'absolute',

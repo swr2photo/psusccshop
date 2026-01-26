@@ -1,7 +1,32 @@
-import { Facebook, Instagram, Mail, Shield } from 'lucide-react';
+'use client';
+
+import { Facebook, Instagram, Mail, Shield, Info } from 'lucide-react';
 import Link from 'next/link';
+import { useState } from 'react';
+
+// Build info from environment (set at build time)
+const BUILD_VERSION = process.env.NEXT_PUBLIC_BUILD_VERSION || 'dev';
+const BUILD_TIME = process.env.NEXT_PUBLIC_BUILD_TIME || new Date().toISOString();
 
 export default function Footer() {
+  const [showBuildInfo, setShowBuildInfo] = useState(false);
+  
+  // Format build time for display
+  const formatBuildTime = (iso: string) => {
+    try {
+      const date = new Date(iso);
+      return date.toLocaleString('th-TH', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Asia/Bangkok'
+      });
+    } catch {
+      return iso;
+    }
+  };
   return (
     <footer className="bg-slate-900 border-t border-slate-800 text-slate-400 py-10 mt-auto">
       <div className="max-w-6xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -60,6 +85,26 @@ export default function Footer() {
           <p className="text-xs opacity-50">
             © {new Date().getFullYear()} PSUSCCSHOP. All rights reserved.
           </p>
+        </div>
+      </div>
+      
+      {/* Build Version */}
+      <div className="max-w-6xl mx-auto px-6 mt-6 pt-4 border-t border-slate-800/50">
+        <div className="flex items-center justify-center gap-2 text-xs">
+          <button
+            onClick={() => setShowBuildInfo(!showBuildInfo)}
+            className="flex items-center gap-1.5 text-slate-500 hover:text-slate-400 transition-colors"
+            title="ข้อมูลเวอร์ชัน"
+          >
+            <Info size={12} />
+            <span className="font-mono">{BUILD_VERSION}</span>
+          </button>
+          
+          {showBuildInfo && (
+            <span className="text-slate-600 font-mono animate-fade-in">
+              • อัปเดต: {formatBuildTime(BUILD_TIME)}
+            </span>
+          )}
         </div>
       </div>
     </footer>

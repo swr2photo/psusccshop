@@ -114,10 +114,12 @@ import {
   ErrorOutline,
   CheckCircleOutline,
   ReportProblem,
+  SupportAgent,
 } from '@mui/icons-material';
 
 import { isAdmin, isSuperAdmin, setDynamicAdminEmails, SUPER_ADMIN_EMAIL, Product, ShopConfig, SIZES } from '@/lib/config';
 import { deleteOrderAdmin, getAdminData, saveShopConfig, syncOrdersSheet, updateOrderAdmin, updateOrderStatusAPI } from '@/lib/api-client';
+import SupportChatPanel from '@/components/admin/SupportChatPanel';
 import EmailManagement from '@/components/admin/EmailManagement';
 import UserLogsView from '@/components/admin/UserLogsView';
 
@@ -6154,11 +6156,12 @@ export default function AdminPage(): JSX.Element {
               { icon: <ShoppingCart sx={{ fontSize: 20 }} />, label: 'จัดการสินค้า', idx: 1, color: '#fbbf24', show: canManageProducts },
               { icon: <Receipt sx={{ fontSize: 20 }} />, label: 'ออเดอร์', idx: 2, color: '#34d399', badge: pendingCount, show: canManageOrders },
               { icon: <QrCodeScanner sx={{ fontSize: 20 }} />, label: 'รับสินค้า', idx: 3, color: '#06b6d4', show: canManagePickup },
-              { icon: <NotificationsActive sx={{ fontSize: 20 }} />, label: 'ประกาศ', idx: 4, color: '#f472b6', show: canManageAnnouncement },
-              { icon: <Settings sx={{ fontSize: 20 }} />, label: 'ตั้งค่าร้าน', idx: 5, color: '#60a5fa', show: canManageShop || canManageSheet || isSuperAdminUser },
-              { icon: <Send sx={{ fontSize: 20 }} />, label: 'ส่งอีเมล', idx: 6, color: '#10b981', show: canManageOrders },
-              { icon: <Groups sx={{ fontSize: 20 }} />, label: 'ประวัติผู้ใช้', idx: 7, color: '#f97316', show: isSuperAdminUser },
-              { icon: <History sx={{ fontSize: 20 }} />, label: 'ประวัติระบบ', idx: 8, color: '#94a3b8', show: isSuperAdminUser },
+              { icon: <SupportAgent sx={{ fontSize: 20 }} />, label: 'แชทสนับสนุน', idx: 4, color: '#ec4899', show: canManageOrders },
+              { icon: <NotificationsActive sx={{ fontSize: 20 }} />, label: 'ประกาศ', idx: 5, color: '#f472b6', show: canManageAnnouncement },
+              { icon: <Settings sx={{ fontSize: 20 }} />, label: 'ตั้งค่าร้าน', idx: 6, color: '#60a5fa', show: canManageShop || canManageSheet || isSuperAdminUser },
+              { icon: <Send sx={{ fontSize: 20 }} />, label: 'ส่งอีเมล', idx: 7, color: '#10b981', show: canManageOrders },
+              { icon: <Groups sx={{ fontSize: 20 }} />, label: 'ประวัติผู้ใช้', idx: 8, color: '#f97316', show: isSuperAdminUser },
+              { icon: <History sx={{ fontSize: 20 }} />, label: 'ประวัติระบบ', idx: 9, color: '#94a3b8', show: isSuperAdminUser },
             ].filter(item => item.show).map((item) => {
               const isActive = activeTab === item.idx;
               return (
@@ -6293,7 +6296,8 @@ export default function AdminPage(): JSX.Element {
           )}
           {activeTab === 2 && (canManageOrders ? OrdersView() : <NoPermissionView permission="จัดการออเดอร์" />)}
           {activeTab === 3 && (canManagePickup ? PickupView() : <NoPermissionView permission="จัดการรับสินค้า" />)}
-          {activeTab === 4 && (
+          {activeTab === 4 && (canManageOrders ? <SupportChatPanel /> : <NoPermissionView permission="แชทสนับสนุน" />)}
+          {activeTab === 5 && (
             canManageAnnouncement ? (
               <AnnouncementsView
                 config={config}
@@ -6306,7 +6310,7 @@ export default function AdminPage(): JSX.Element {
               <NoPermissionView permission="จัดการประกาศ" />
             )
           )}
-          {activeTab === 5 && (
+          {activeTab === 6 && (
             <SettingsView
               localConfig={settingsLocalConfig}
               hasChanges={settingsHasChanges}
@@ -6324,9 +6328,9 @@ export default function AdminPage(): JSX.Element {
               onImageUpload={handleAnnouncementImageUpload}
             />
           )}
-          {activeTab === 6 && (canManageOrders ? <EmailManagement showToast={showToast} /> : <NoPermissionView permission="ส่งอีเมล" />)}
-          {activeTab === 7 && (isSuperAdminUser ? <UserLogsView showToast={showToast} /> : <NoPermissionView permission="ดูประวัติผู้ใช้" />)}
-          {activeTab === 8 && (isSuperAdminUser ? <LogsView /> : <NoPermissionView permission="ดูประวัติระบบ" />)}
+          {activeTab === 7 && (canManageOrders ? <EmailManagement showToast={showToast} /> : <NoPermissionView permission="ส่งอีเมล" />)}
+          {activeTab === 8 && (isSuperAdminUser ? <UserLogsView showToast={showToast} /> : <NoPermissionView permission="ดูประวัติผู้ใช้" />)}
+          {activeTab === 9 && (isSuperAdminUser ? <LogsView /> : <NoPermissionView permission="ดูประวัติระบบ" />)}
         </Box>
       </Box>
 

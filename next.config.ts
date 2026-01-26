@@ -1,6 +1,15 @@
 import type { NextConfig } from "next";
 
+// Generate build version from timestamp
+const buildTime = new Date().toISOString();
+const buildVersion = `v1.0.${Math.floor(Date.now() / 1000).toString().slice(-6)}`;
+
 const nextConfig: NextConfig = {
+  // Expose build info to client
+  env: {
+    NEXT_PUBLIC_BUILD_TIME: buildTime,
+    NEXT_PUBLIC_BUILD_VERSION: buildVersion,
+  },
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
