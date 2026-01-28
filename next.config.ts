@@ -5,6 +5,8 @@ const buildTime = new Date().toISOString();
 const buildVersion = `v1.0.${Math.floor(Date.now() / 1000).toString().slice(-6)}`;
 
 const nextConfig: NextConfig = {
+  // Enable standalone output for Docker
+  output: 'standalone',
   // Expose build info to client
   env: {
     NEXT_PUBLIC_BUILD_TIME: buildTime,

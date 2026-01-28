@@ -1,11 +1,11 @@
 # Railway Configuration
-# Deploy two services: web app and cron worker
+# Use Dockerfile for faster builds
 
 [build]
-builder = "NIXPACKS"
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "npm run start"
 healthcheckPath = "/"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
