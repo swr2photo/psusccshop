@@ -1,11 +1,18 @@
 // src/app/api/gas/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth } from '@/lib/auth';
 
 const GAS_URL = process.env.GAS_SCRIPT_URL || 
   'https://script.google.com/macros/s/AKfycbw3x3ceiC_KDlFrnP07gvlMof8uGvBsxQiHXKyxMiWCjCN_1BBeCsbuvnwv9OPi1Bmm/exec';
 
 export async function GET(request: NextRequest) {
+  // ตรวจสอบว่าเข้าสู่ระบบแล้ว
+  const authResult = await requireAuth();
+  if (authResult instanceof NextResponse) {
+    return authResult;
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const action = searchParams.get('action');
@@ -70,6 +77,12 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  // ตรวจสอบว่าเข้าสู่ระบบแล้ว
+  const authResult = await requireAuth();
+  if (authResult instanceof NextResponse) {
+    return authResult;
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const action = searchParams.get('action');

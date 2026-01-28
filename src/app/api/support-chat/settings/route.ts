@@ -33,7 +33,7 @@ export async function GET() {
     const session = await getServerSession(authOptions);
     
     if (!session?.user?.email || !isAdminEmail(session.user.email)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json('Unauthorized', { status: 401 });
     }
     
     const db = getSupabaseAdmin();
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions);
     
     if (!session?.user?.email || !isAdminEmail(session.user.email)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json('Unauthorized', { status: 401 });
     }
     
     const settings = await request.json();

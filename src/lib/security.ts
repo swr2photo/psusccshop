@@ -1,10 +1,14 @@
 // src/lib/security.ts
 // Advanced security utilities for protection against common attacks
+// Maximum security implementation
 
 import { NextRequest } from 'next/server';
 import crypto from 'crypto';
 
 // ==================== SECURITY CONSTANTS ====================
+
+// Environment check
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
 // Blocked patterns for SQL Injection, XSS, Path Traversal, etc.
 const MALICIOUS_PATTERNS = [
@@ -12,26 +16,41 @@ const MALICIOUS_PATTERNS = [
   /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|ALTER|CREATE|TRUNCATE|EXEC|EXECUTE)\b)/gi,
   /('|\"|;|--|\*|\/\*|\*\/|\\x00|\\x1a)/g,
   /(\bOR\b|\bAND\b)\s+\d+\s*=\s*\d+/gi,
+  /\bSLEEP\s*\(/gi,
+  /\bBENCHMARK\s*\(/gi,
+  /\bWAITFOR\s+DELAY/gi,
+  /\bLOAD_FILE\s*\(/gi,
+  /\bINTO\s+OUTFILE/gi,
+  /\bINTO\s+DUMPFILE/gi,
   
   // XSS patterns
   /<script[^>]*>[\s\S]*?<\/script>/gi,
   /javascript:/gi,
-  /on(click|load|error|mouseover|mouseout|keydown|keyup|submit|focus|blur)=/gi,
+  /on(click|load|error|mouseover|mouseout|keydown|keyup|submit|focus|blur|change|input|dblclick|contextmenu|wheel|drag|drop|copy|paste|cut)=/gi,
   /<iframe[^>]*>/gi,
   /<object[^>]*>/gi,
   /<embed[^>]*>/gi,
+  /<link[^>]*>/gi,
+  /<meta[^>]*>/gi,
+  /<base[^>]*>/gi,
+  /<form[^>]*>/gi,
   /data:text\/html/gi,
   /vbscript:/gi,
+  /expression\s*\(/gi,
+  /url\s*\(/gi,
   
   // Path Traversal patterns
   /\.\.[\/\\]/g,
   /%2e%2e[%2f%5c]/gi,
   /\.\.%c0%af/gi,
   /\.\.%c1%9c/gi,
+  /%252e%252e/gi,
   
   // Command Injection patterns
-  /[;&|`$()]/g,
+  /[;&|`$]/g,
   /\$\{.*\}/g,
+  /\$\(.*\)/g,
+  /`.*`/g,
   
   // LDAP Injection patterns
   /[()\\*]/g,
@@ -40,6 +59,21 @@ const MALICIOUS_PATTERNS = [
   /<!DOCTYPE[^>]*>/gi,
   /<!ENTITY[^>]*>/gi,
   /<!\[CDATA\[/gi,
+  /SYSTEM\s+["'][^"']*["']/gi,
+  
+  // Template Injection
+  /\{\{.*\}\}/g,
+  /\{%.*%\}/g,
+  /<%.*%>/g,
+  
+  // NoSQL Injection
+  /\$where/gi,
+  /\$regex/gi,
+  /\$gt/gi,
+  /\$lt/gi,
+  /\$ne/gi,
+  /\$or/gi,
+  /\$and/gi,
 ];
 
 // Allowed characters for different input types

@@ -11,9 +11,22 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 // Secret key for cron authentication
-const CRON_SECRET = process.env.CRON_SECRET || 'psusccshop-cron-2026';
+const CRON_SECRET = process.env.CRON_SECRET;
+
+if (!CRON_SECRET) {
+  console.error('[Cron] CRON_SECRET environment variable is required!');
+}
 
 export async function GET(req: NextRequest) {
+  // ตรวจสอบว่าตั้งค่า CRON_SECRET แล้ว
+  if (!CRON_SECRET) {
+    console.error('[Cron] CRON_SECRET not configured');
+    return NextResponse.json(
+      { status: 'error', message: 'Server configuration error' },
+      { status: 500 }
+    );
+  }
+
   // ตรวจสอบ authorization
   const authHeader = req.headers.get('authorization');
   const cronSecretFromHeader = authHeader?.replace('Bearer ', '');

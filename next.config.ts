@@ -42,23 +42,25 @@ const nextConfig: NextConfig = {
     {
       source: '/(.*)',
       headers: [
-        // Content Security Policy - Strict
+        // Content Security Policy - Maximum Strict
         {
           key: 'Content-Security-Policy',
           value: [
             "default-src 'self';",
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://static.cloudflareinsights.com;",
+            "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://static.cloudflareinsights.com;",
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;",
-            "img-src 'self' data: blob: https://*.filebase.io https://*.filebase.com https://lh3.googleusercontent.com https://ui-avatars.com https://*.amazonaws.com;",
+            "img-src 'self' data: blob: https://*.filebase.io https://*.filebase.com https://lh3.googleusercontent.com https://ui-avatars.com;",
             "font-src 'self' https://fonts.gstatic.com;",
-            "connect-src 'self' https://*.filebase.com https://*.filebase.io https://api.resend.com https://challenges.cloudflare.com https://fastly.jsdelivr.net https://*.supabase.co wss://*.supabase.co;",
-            "media-src 'self' data: blob:;",
+            "connect-src 'self' https://*.filebase.com https://*.filebase.io https://api.resend.com https://challenges.cloudflare.com https://*.supabase.co wss://*.supabase.co;",
+            "media-src 'self';",
             "frame-src https://challenges.cloudflare.com;",
             "frame-ancestors 'none';",
             "object-src 'none';",
             "base-uri 'self';",
             "form-action 'self';",
             "upgrade-insecure-requests;",
+            "block-all-mixed-content;",
+            "require-trusted-types-for 'script';",
           ].join(' '),
         },
         // Prevent Clickjacking
@@ -76,20 +78,35 @@ const nextConfig: NextConfig = {
           key: 'X-XSS-Protection',
           value: '1; mode=block',
         },
-        // Referrer Policy
+        // Referrer Policy - No referrer to external
         {
           key: 'Referrer-Policy',
-          value: 'strict-origin-when-cross-origin',
+          value: 'no-referrer',
         },
-        // Permissions Policy - Allow camera for QR scanning
+        // Permissions Policy - Restrict all
         {
           key: 'Permissions-Policy',
-          value: 'camera=(self), microphone=(), geolocation=(), interest-cohort=(), payment=(self), usb=()',
+          value: 'camera=(self), microphone=(), geolocation=(), interest-cohort=(), payment=(self), usb=(), accelerometer=(), gyroscope=(), magnetometer=(), autoplay=(), encrypted-media=(self), fullscreen=(self)',
         },
         // Prevent DNS prefetching to avoid information leakage
         {
           key: 'X-DNS-Prefetch-Control',
           value: 'off',
+        },
+        // Cross-Origin Embedder Policy
+        {
+          key: 'Cross-Origin-Embedder-Policy',
+          value: 'credentialless',
+        },
+        // Cross-Origin Opener Policy
+        {
+          key: 'Cross-Origin-Opener-Policy',
+          value: 'same-origin',
+        },
+        // Cross-Origin Resource Policy
+        {
+          key: 'Cross-Origin-Resource-Policy',
+          value: 'same-origin',
         },
         // Download options - prevent execution of downloads
         {

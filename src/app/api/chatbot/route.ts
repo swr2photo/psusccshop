@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { processChat, buildDetailedShopContext, getShopData, ChatMessage, getCurrentModelName } from '@/lib/ai-chatbot';
 import { QUICK_QUESTIONS, SHIRT_FAQ } from '@/lib/shirt-faq';
 import { checkCombinedRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
+import { requireAuth } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

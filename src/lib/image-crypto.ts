@@ -10,13 +10,17 @@ import crypto from 'crypto';
  * Secret key for AES-256 encryption (must be 32 bytes)
  * ใช้ HMAC-SHA256 เพื่อ derive key ที่มีความยาวถูกต้อง
  */
-const MASTER_SECRET = process.env.IMAGE_CRYPTO_SECRET || 'psusccshop-image-secure-2026-!@#$%^&*()';
+const MASTER_SECRET = process.env.IMAGE_CRYPTO_SECRET;
+if (!MASTER_SECRET && typeof window === 'undefined') {
+  console.warn('[SECURITY] IMAGE_CRYPTO_SECRET is not set! Using insecure fallback.');
+}
+const EFFECTIVE_SECRET = MASTER_SECRET || 'psusccshop-image-secure-2026-!@#$%^&*()';
 
 /**
  * Derive a 32-byte key from master secret
  */
 function deriveKey(): Buffer {
-  return crypto.createHash('sha256').update(MASTER_SECRET).digest();
+  return crypto.createHash('sha256').update(EFFECTIVE_SECRET).digest();
 }
 
 /**
@@ -148,7 +152,11 @@ export function decryptImageUrl(token: string, maxAgeHours: number = 0): string 
  * XOR-based decryption for backward compatibility with old URLs
  * จะถูกลบในอนาคต
  */
-const LEGACY_SECRET = process.env.IMAGE_PROXY_SECRET || 'psusccshop-image-proxy-2026';
+const LEGACY_SECRET = process.env.IMAGE_PROXY_SECRET;
+if (!LEGACY_SECRET && typeof window === 'undefined') {
+  console.warn('[SECURITY] IMAGE_PROXY_SECRET is not set! Legacy URLs may not work.');
+}
+const EFFECTIVE_LEGACY_SECRET = LEGACY_SECRET || 'psusccshop-image-proxy-2026';
 
 export function decryptLegacyUrl(id: string): string | null {
   if (!id) return null;
@@ -161,7 +169,7 @@ export function decryptLegacyUrl(id: string): string | null {
     
     // Decode and XOR with legacy secret key
     const decoded = Buffer.from(base64, 'base64').map((byte, i) => 
-      byte ^ LEGACY_SECRET.charCodeAt(i % LEGACY_SECRET.length)
+      byte ^ EFFECTIVE_LEGACY_SECRET.charCodeAt(i % EFFECTIVE_LEGACY_SECRET.length)
     );
     
     const url = Buffer.from(decoded).toString('utf-8');

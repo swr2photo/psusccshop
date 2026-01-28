@@ -3,6 +3,7 @@ import { smartDecryptUrl, encryptImageUrl } from '@/lib/image-crypto';
 import { S3Client, GetObjectCommand, PutObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { Readable } from 'stream';
 import crypto from 'crypto';
+import { requireAuth } from '@/lib/auth';
 
 // Ensure Node runtime for fetch
 export const runtime = 'nodejs';

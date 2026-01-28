@@ -23,7 +23,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     const session = await getServerSession(authOptions);
     
     if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json('Unauthorized', { status: 401 });
     }
     
     const chat = await getChatSession(sessionId);
