@@ -52,6 +52,8 @@ export interface SecurityAuditLog {
   requestPath: string;
   requestMethod: string;
   requestId?: string;
+  blocked?: boolean;
+  threatScore?: number;
   details: Record<string, any>;
   metadata?: Record<string, any>;
 }
@@ -155,6 +157,8 @@ export async function logSecurityEvent(
     requestPath?: string;
     requestMethod?: string;
     requestId?: string;
+    blocked?: boolean;
+    threatScore?: number;
     details?: Record<string, any>;
     metadata?: Record<string, any>;
     immediate?: boolean; // Write immediately instead of buffering
@@ -169,6 +173,8 @@ export async function logSecurityEvent(
     requestPath = '/',
     requestMethod = 'GET',
     requestId,
+    blocked = false,
+    threatScore,
     details = {},
     metadata,
     immediate = false,
@@ -188,6 +194,8 @@ export async function logSecurityEvent(
     requestPath,
     requestMethod,
     requestId,
+    blocked,
+    threatScore,
     details: sanitizeDetails(details),
     metadata,
   };
@@ -388,6 +396,206 @@ export async function getSecurityStats(hours: number = 24): Promise<{
   return stats;
 }
 
+// ==================== QUERY INTERFACE FOR API ====================
+
+export interface AuditLogQuery {
+  eventTypes?: SecurityEventType[];
+  severity?: SecuritySeverity[];
+  startDate?: string;
+  endDate?: string;
+  ip?: string;
+  userEmail?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export async function getSecurityAuditLogs(query: AuditLogQuery): Promise<{
+  logs: SecurityAuditLog[];
+  total: number;
+}> {
+  try {
+    const db = getSupabaseAdmin();
+    if (!db) return { logs: [], total: 0 };
+    
+    let dbQuery = db
+      .from('security_audit_logs')
+      .select('*', { count: 'exact' })
+      .order('timestamp', { ascending: false });
+    
+    if (query.eventTypes?.length) {
+      dbQuery = dbQuery.in('event_type', query.eventTypes);
+    }
+    if (query.severity?.length) {
+      dbQuery = dbQuery.in('severity', query.severity);
+    }
+    if (query.startDate) {
+      dbQuery = dbQuery.gte('timestamp', query.startDate);
+    }
+    if (query.endDate) {
+      dbQuery = dbQuery.lte('timestamp', query.endDate);
+    }
+    if (query.ip) {
+      dbQuery = dbQuery.eq('ip_hash', hashSensitiveData(query.ip));
+    }
+    if (query.userEmail) {
+      dbQuery = dbQuery.eq('email_hash', hashSensitiveData(query.userEmail));
+    }
+    
+    dbQuery = dbQuery.range(query.offset || 0, (query.offset || 0) + (query.limit || 100) - 1);
+    
+    const { data, error, count } = await dbQuery;
+    
+    if (error) throw error;
+    
+    const logs = (data || []).map(row => ({
+      id: row.id,
+      timestamp: row.timestamp,
+      eventType: row.event_type,
+      severity: row.severity,
+      ipAddress: row.ip_address || '',
+      ipHash: row.ip_hash,
+      userAgent: row.user_agent,
+      userId: row.user_id,
+      userEmail: row.user_email,
+      emailHash: row.email_hash,
+      requestPath: row.request_path,
+      requestMethod: row.request_method,
+      requestId: row.request_id,
+      details: row.details,
+      metadata: row.metadata,
+    }));
+    
+    return { logs, total: count || logs.length };
+  } catch (error) {
+    console.error('[Security Audit] Query failed:', error);
+    return { logs: [], total: 0 };
+  }
+}
+
+export async function getSecurityMetrics(startDate?: string, endDate?: string): Promise<{
+  totalEvents: number;
+  bySeverity: Record<SecuritySeverity, number>;
+  byType: Record<string, number>;
+  topIPs: { ipHash: string; count: number }[];
+  criticalCount: number;
+  highCount: number;
+  blockedCount: number;
+}> {
+  const start = startDate || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const end = endDate || new Date().toISOString();
+  
+  const { logs } = await getSecurityAuditLogs({
+    startDate: start,
+    endDate: end,
+    limit: 10000,
+  });
+  
+  const stats = {
+    totalEvents: logs.length,
+    bySeverity: { low: 0, medium: 0, high: 0, critical: 0 } as Record<SecuritySeverity, number>,
+    byType: {} as Record<string, number>,
+    topIPs: [] as { ipHash: string; count: number }[],
+    criticalCount: 0,
+    highCount: 0,
+    blockedCount: 0,
+  };
+  
+  const ipCounts = new Map<string, number>();
+  
+  for (const log of logs) {
+    stats.bySeverity[log.severity]++;
+    stats.byType[log.eventType] = (stats.byType[log.eventType] || 0) + 1;
+    if (log.ipHash) {
+      ipCounts.set(log.ipHash, (ipCounts.get(log.ipHash) || 0) + 1);
+    }
+    if (log.severity === 'critical') stats.criticalCount++;
+    if (log.severity === 'high') stats.highCount++;
+    if (log.details?.blocked) stats.blockedCount++;
+  }
+  
+  stats.topIPs = Array.from(ipCounts.entries())
+    .map(([ipHash, count]) => ({ ipHash, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+  
+  return stats;
+}
+
+export interface SecurityAlert {
+  id: string;
+  timestamp: string;
+  eventType: SecurityEventType;
+  severity: SecuritySeverity;
+  message: string;
+  details: Record<string, any>;
+}
+
+export async function getSecurityAlerts(limit: number = 50): Promise<SecurityAlert[]> {
+  const { logs } = await getSecurityAuditLogs({
+    severity: ['critical', 'high'],
+    limit,
+  });
+  
+  return logs.map(log => ({
+    id: log.id,
+    timestamp: log.timestamp,
+    eventType: log.eventType,
+    severity: log.severity,
+    message: getAlertMessage(log),
+    details: log.details,
+  }));
+}
+
+function getAlertMessage(log: SecurityAuditLog): string {
+  const messages: Record<string, string> = {
+    brute_force_detected: `Brute force attack detected from IP ${log.ipHash?.substring(0, 8)}***`,
+    injection_attempt: `SQL/NoSQL injection attempt blocked`,
+    xss_attempt: `XSS attack attempt blocked`,
+    csrf_violation: `CSRF violation detected`,
+    security_scan_detected: `Security scanner activity detected`,
+    access_denied: `Unauthorized access attempt to ${log.requestPath}`,
+    rate_limit_exceeded: `Rate limit exceeded by ${log.ipHash?.substring(0, 8)}***`,
+    suspicious_activity: `Suspicious activity detected`,
+    auth_failed: `Authentication failed multiple times`,
+  };
+  
+  return messages[log.eventType] || `Security event: ${log.eventType}`;
+}
+
+export async function checkActiveThreats(): Promise<{
+  hasActiveThreats: boolean;
+  threatLevel: 'none' | 'low' | 'medium' | 'high' | 'critical';
+  activeThreats: number;
+  recentCritical: number;
+  recentHigh: number;
+}> {
+  // Check last hour for active threats
+  const startDate = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  
+  const { logs } = await getSecurityAuditLogs({
+    startDate,
+    severity: ['critical', 'high'],
+    limit: 1000,
+  });
+  
+  const criticalCount = logs.filter(l => l.severity === 'critical').length;
+  const highCount = logs.filter(l => l.severity === 'high').length;
+  
+  let threatLevel: 'none' | 'low' | 'medium' | 'high' | 'critical' = 'none';
+  if (criticalCount >= 5) threatLevel = 'critical';
+  else if (criticalCount >= 1 || highCount >= 10) threatLevel = 'high';
+  else if (highCount >= 5) threatLevel = 'medium';
+  else if (highCount >= 1) threatLevel = 'low';
+  
+  return {
+    hasActiveThreats: criticalCount > 0 || highCount > 0,
+    threatLevel,
+    activeThreats: criticalCount + highCount,
+    recentCritical: criticalCount,
+    recentHigh: highCount,
+  };
+}
+
 // ==================== CLEANUP ====================
 
 export async function cleanupOldLogs(daysToKeep: number = 90): Promise<number> {
@@ -411,3 +619,6 @@ export async function cleanupOldLogs(daysToKeep: number = 90): Promise<number> {
     return 0;
   }
 }
+
+// Alias for backward compatibility
+export const cleanupOldAuditLogs = cleanupOldLogs;

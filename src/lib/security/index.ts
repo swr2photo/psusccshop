@@ -57,15 +57,15 @@ export {
   getSecurityAlerts,
   checkActiveThreats,
   cleanupOldAuditLogs,
-  hashForAudit,
-  flushEvents,
-  RETENTION_DAYS,
+  getSecurityLogs,
+  getSecurityStats,
+  cleanupOldLogs,
   
   // Types
   type SecurityEventType,
   type SecuritySeverity,
-  type SecurityEvent,
-  type SecurityMetrics,
+  type SecurityAuditLog,
+  type SecurityAlert,
   type AuditLogQuery,
 } from '../security-audit';
 
