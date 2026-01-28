@@ -6095,6 +6095,8 @@ export default function AdminPage(): JSX.Element {
               height: { xs: '100%', md: '100%' },
               backdropFilter: 'blur(20px)',
               pt: { xs: 2, md: 0 },
+              display: 'flex',
+              flexDirection: 'column',
             }
           }}
           variant={isDesktop ? 'permanent' : 'temporary'}
@@ -6106,7 +6108,14 @@ export default function AdminPage(): JSX.Element {
           anchor="left"
         >
           {/* Sidebar Content */}
-          <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1, height: '100%' }}>
+          <Box sx={{ 
+            p: 2, 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: 1, 
+            flex: 1,
+            overflow: 'hidden',
+          }}>
             {/* Mobile Header with Close Button */}
             {!isDesktop && (
               <Box sx={{ 
@@ -6116,6 +6125,7 @@ export default function AdminPage(): JSX.Element {
                 mb: 2,
                 pb: 2,
                 borderBottom: `1px solid ${ADMIN_THEME.border}`,
+                flexShrink: 0,
               }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                   <Box sx={{
@@ -6150,7 +6160,23 @@ export default function AdminPage(): JSX.Element {
               </Box>
             )}
             
-            {/* Navigation Items */}
+            {/* Navigation Items - Scrollable */}
+            <Box sx={{
+              flex: 1,
+              overflow: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 1,
+              pb: 2,
+              // Custom scrollbar
+              '&::-webkit-scrollbar': { width: 6 },
+              '&::-webkit-scrollbar-track': { bgcolor: 'transparent' },
+              '&::-webkit-scrollbar-thumb': { 
+                bgcolor: 'rgba(255,255,255,0.1)', 
+                borderRadius: 3,
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' },
+              },
+            }}>
             {[
               { icon: <Dashboard sx={{ fontSize: 20 }} />, label: 'แดชบอร์ด', idx: 0, color: '#a5b4fc', show: true },
               { icon: <ShoppingCart sx={{ fontSize: 20 }} />, label: 'จัดการสินค้า', idx: 1, color: '#fbbf24', show: canManageProducts },
@@ -6223,10 +6249,11 @@ export default function AdminPage(): JSX.Element {
                 </Box>
               );
             })}
+            </Box>
           </Box>
 
           {/* Sidebar Footer */}
-          <Box sx={{ mt: 'auto', p: 2, borderTop: `1px solid ${ADMIN_THEME.border}` }}>
+          <Box sx={{ p: 2, borderTop: `1px solid ${ADMIN_THEME.border}`, flexShrink: 0 }}>
             <Box sx={{
               p: 2,
               borderRadius: '14px',
