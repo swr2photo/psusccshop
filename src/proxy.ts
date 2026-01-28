@@ -254,7 +254,25 @@ export default function proxy(request: NextRequest) {
   }
   
   // Add request ID for tracing
-  response.headers.set('X-Request-ID', `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`);
+  const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+  response.headers.set('X-Request-ID', requestId);
+  
+  // Add additional security headers
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('X-Frame-Options', 'DENY');
+  response.headers.set('X-XSS-Protection', '1; mode=block');
+  
+  // Prevent caching of API responses
+  if (pathname.startsWith('/api/')) {
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    response.headers.set('Pragma', 'no-cache');
+    response.headers.set('Expires', '0');
+  }
+  
+  // Log suspicious activity
+  if (isSuspiciousUserAgent(userAgent)) {
+    console.warn(`[Security] Suspicious request: ${ip} - ${userAgent?.slice(0, 100)} - ${pathname}`);
+  }
   
   return response;
 }
