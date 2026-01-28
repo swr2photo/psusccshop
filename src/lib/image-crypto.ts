@@ -210,7 +210,7 @@ export function smartDecryptUrl(token: string, maxAgeHours: number = 0): string 
  */
 export function generateSignature(data: string): string {
   return crypto
-    .createHmac('sha256', MASTER_SECRET)
+    .createHmac('sha256', EFFECTIVE_SECRET)
     .update(data)
     .digest('hex')
     .substring(0, 16);
