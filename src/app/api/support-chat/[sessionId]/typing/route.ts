@@ -27,6 +27,12 @@ export async function POST(request: NextRequest, { params }: Params) {
     const isAdmin = isAdminEmail(session.user.email);
     
     const db = getSupabaseAdmin();
+    if (!db) {
+      return NextResponse.json(
+        { error: 'Database not configured' },
+        { status: 500 }
+      );
+    }
     
     // Update typing status in database
     const field = isAdmin ? 'admin_typing' : 'customer_typing';
@@ -62,6 +68,12 @@ export async function GET(request: NextRequest, { params }: Params) {
     }
     
     const db = getSupabaseAdmin();
+    if (!db) {
+      return NextResponse.json(
+        { error: 'Database not configured' },
+        { status: 500 }
+      );
+    }
     
     const { data, error } = await db
       .from('support_chats')

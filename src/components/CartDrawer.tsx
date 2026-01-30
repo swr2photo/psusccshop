@@ -19,6 +19,7 @@ import {
   Minus,
   Plus,
   ShoppingCart,
+  Truck,
   X,
 } from 'lucide-react';
 import OptimizedImage from '@/components/OptimizedImage';
@@ -28,12 +29,14 @@ import {
   type CartItem,
 } from '@/lib/shop-constants';
 import { ShopConfig, Product } from '@/lib/config';
+import { ShippingConfig } from '@/lib/shipping';
 
 interface CartDrawerProps {
   open: boolean;
   onClose: () => void;
   cart: CartItem[];
   config: ShopConfig | null;
+  shippingConfig?: ShippingConfig | null;
   isShopOpen: boolean;
   onClearCart: () => void;
   onUpdateQuantity: (itemId: string, quantity: number) => void;
@@ -56,6 +59,7 @@ export default function CartDrawer(props: CartDrawerProps) {
     onClose,
     cart,
     config,
+    shippingConfig,
     isShopOpen,
     onClearCart,
     onUpdateQuantity,
@@ -70,6 +74,17 @@ export default function CartDrawer(props: CartDrawerProps) {
     onSetEditingCartItem,
     onUpdateCartItem,
   } = props;
+
+  // Get enabled shipping options info
+  const enabledShippingOptions = shippingConfig?.options?.filter(o => o.enabled) || [];
+  const lowestShippingFee = enabledShippingOptions.length > 0
+    ? Math.min(...enabledShippingOptions.map(o => o.baseFee))
+    : null;
+  const freeShippingMinimum = shippingConfig?.globalFreeShippingMinimum 
+    || (enabledShippingOptions.find(o => o.freeShippingMinimum)?.freeShippingMinimum);
+  const cartTotal = getTotalPrice();
+  const remainingForFreeShipping = freeShippingMinimum ? Math.max(0, freeShippingMinimum - cartTotal) : null;
+  const hasFreeShipping = freeShippingMinimum && cartTotal >= freeShippingMinimum;
 
   return (
     <>
@@ -325,6 +340,48 @@ export default function CartDrawer(props: CartDrawerProps) {
             backdropFilter: 'blur(20px)',
             paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
           }}>
+            {/* Shipping Info */}
+            {enabledShippingOptions.length > 0 && (
+              <Box sx={{
+                p: 1.5,
+                mb: 2,
+                borderRadius: '12px',
+                bgcolor: 'rgba(251,146,60,0.08)',
+                border: '1px solid rgba(251,146,60,0.2)',
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                  <Truck size={16} style={{ color: '#fb923c' }} />
+                  <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#fb923c' }}>
+                    ค่าจัดส่ง
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
+                  {lowestShippingFee !== null && lowestShippingFee > 0 && (
+                    <Typography sx={{ fontSize: '0.75rem', color: '#fdba74' }}>
+                      เริ่มต้น ฿{lowestShippingFee.toLocaleString()}
+                    </Typography>
+                  )}
+                  {hasFreeShipping ? (
+                    <Box sx={{ 
+                      px: 1, 
+                      py: 0.2, 
+                      borderRadius: '6px', 
+                      bgcolor: 'rgba(34,197,94,0.15)', 
+                      border: '1px solid rgba(34,197,94,0.3)' 
+                    }}>
+                      <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#22c55e' }}>
+                        🎉 ส่งฟรี!
+                      </Typography>
+                    </Box>
+                  ) : remainingForFreeShipping && remainingForFreeShipping > 0 ? (
+                    <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                      อีก ฿{remainingForFreeShipping.toLocaleString()} ส่งฟรี
+                    </Typography>
+                  ) : null}
+                </Box>
+              </Box>
+            )}
+
             <Box sx={{
               p: 2,
               mb: 2,
@@ -334,10 +391,15 @@ export default function CartDrawer(props: CartDrawerProps) {
             }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Box>
-                  <Typography sx={{ fontSize: '0.75rem', color: '#64748b', mb: 0.3 }}>ยอดรวมทั้งหมด</Typography>
+                  <Typography sx={{ fontSize: '0.75rem', color: '#64748b', mb: 0.3 }}>ยอดรวมสินค้า</Typography>
                   <Typography sx={{ fontSize: '1.6rem', fontWeight: 900, color: '#10b981' }}>
                     ฿{getTotalPrice().toLocaleString()}
                   </Typography>
+                  {!hasFreeShipping && lowestShippingFee !== null && lowestShippingFee > 0 && (
+                    <Typography sx={{ fontSize: '0.7rem', color: '#64748b' }}>
+                      + ค่าส่ง (คำนวณตอนยืนยัน)
+                    </Typography>
+                  )}
                 </Box>
                 <Box sx={{ textAlign: 'right' }}>
                   <Typography sx={{ fontSize: '0.7rem', color: '#64748b' }}>{cart.length} รายการ</Typography>

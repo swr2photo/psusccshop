@@ -13,8 +13,10 @@ import {
 import {
   CheckCircle,
   Clock,
+  ExternalLink,
   MapPin,
   Package,
+  Truck,
   X,
   XCircle,
 } from 'lucide-react';
@@ -28,6 +30,8 @@ import {
   type OrderHistory,
 } from '@/lib/shop-constants';
 import { ShopConfig } from '@/lib/config';
+import { SHIPPING_PROVIDERS, getTrackingUrl, getTrack123Url, type ShippingProvider } from '@/lib/shipping';
+import TrackingTimeline from './TrackingTimeline';
 
 interface HistoryFilter {
   key: string;
@@ -41,8 +45,8 @@ interface OrderHistoryDrawerProps {
   loadingHistory: boolean;
   loadingHistoryMore: boolean;
   historyHasMore: boolean;
-  historyFilter: 'ALL' | 'WAITING_PAYMENT' | 'COMPLETED' | 'RECEIVED' | 'CANCELLED';
-  onFilterChange: (filter: 'ALL' | 'WAITING_PAYMENT' | 'COMPLETED' | 'RECEIVED' | 'CANCELLED') => void;
+  historyFilter: 'ALL' | 'WAITING_PAYMENT' | 'COMPLETED' | 'SHIPPED' | 'RECEIVED' | 'CANCELLED';
+  onFilterChange: (filter: 'ALL' | 'WAITING_PAYMENT' | 'COMPLETED' | 'SHIPPED' | 'RECEIVED' | 'CANCELLED') => void;
   onLoadMore: () => void;
   onOpenPayment: (ref: string) => void;
   onCancelOrder: (ref: string) => void;
@@ -57,6 +61,7 @@ const historyFilters: HistoryFilter[] = [
   { key: 'ALL', label: 'ทั้งหมด' },
   { key: 'WAITING_PAYMENT', label: 'รอชำระ' },
   { key: 'COMPLETED', label: 'สำเร็จ' },
+  { key: 'SHIPPED', label: 'กำลังจัดส่ง' },
   { key: 'RECEIVED', label: 'รับแล้ว' },
   { key: 'CANCELLED', label: 'ยกเลิก' },
 ];
@@ -284,7 +289,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
 
               return (
                 <Box
-                  key={idx}
+                  key={order.ref || idx}
                   sx={{
                     p: { xs: 2, sm: 2.5 },
                     borderRadius: '18px',
@@ -422,8 +427,8 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                     );
                   })()}
 
-                  {/* QR Code for Pickup */}
-                  {['READY', 'SHIPPED', 'PAID'].includes(statusKey) && (
+                  {/* QR Code for Pickup - Only show when NOT shipped with tracking */}
+                  {['READY', 'SHIPPED', 'PAID'].includes(statusKey) && !order.trackingNumber && (
                     <Box sx={{
                       mt: 2,
                       p: 2,
@@ -496,6 +501,17 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                       <Typography sx={{ fontSize: '0.7rem', color: '#64748b', textAlign: 'center', mt: 1 }}>
                         กดเพื่อแสดง QR Code สำหรับรับสินค้า
                       </Typography>
+                    </Box>
+                  )}
+
+                  {/* Tracking Info for Shipped Orders */}
+                  {order.trackingNumber && order.shippingProvider && (
+                    <Box sx={{ mt: 2 }}>
+                      <TrackingTimeline
+                        trackingNumber={order.trackingNumber}
+                        shippingProvider={order.shippingProvider as ShippingProvider}
+                        compact
+                      />
                     </Box>
                   )}
 

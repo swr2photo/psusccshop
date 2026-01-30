@@ -44,11 +44,12 @@ export const CANCELABLE_STATUSES = ['PENDING', 'WAITING_PAYMENT', 'AWAITING_PAYM
 
 export const normalizeStatus = (status: string) => (status || '').trim().toUpperCase();
 
-export const getStatusCategory = (status: string): 'WAITING_PAYMENT' | 'COMPLETED' | 'RECEIVED' | 'CANCELLED' | 'OTHER' => {
+export const getStatusCategory = (status: string): 'WAITING_PAYMENT' | 'COMPLETED' | 'SHIPPED' | 'RECEIVED' | 'CANCELLED' | 'OTHER' => {
   const key = normalizeStatus(status);
   if (['WAITING_PAYMENT', 'AWAITING_PAYMENT', 'UNPAID', 'DRAFT', 'PENDING'].includes(key)) return 'WAITING_PAYMENT';
   if (['PAID', 'VERIFYING', 'WAITING_SLIP'].includes(key)) return 'COMPLETED';
-  if (['READY', 'SHIPPED', 'COMPLETED'].includes(key)) return 'RECEIVED';
+  if (['SHIPPED'].includes(key)) return 'SHIPPED';
+  if (['READY', 'COMPLETED', 'RECEIVED'].includes(key)) return 'RECEIVED';
   if (['CANCELLED', 'REFUNDED', 'REJECTED', 'FAILED'].includes(key)) return 'CANCELLED';
   return 'OTHER';
 };
@@ -196,6 +197,10 @@ export type OrderHistory = {
   total?: number;
   items?: OrderHistoryItem[];
   cart?: OrderHistoryItem[]; // For backwards compatibility
+  // Tracking info for shipped orders
+  trackingNumber?: string;
+  shippingProvider?: string;
+  shippingMethod?: string;
 };
 
 export type LeanProduct = {

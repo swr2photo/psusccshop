@@ -3,6 +3,15 @@
 
 import { getSupabaseAdmin } from './supabase';
 
+// Helper function to get admin client with null check
+function getDb() {
+  const db = getSupabaseAdmin();
+  if (!db) {
+    throw new Error('Supabase admin client not available. Check SUPABASE_SERVICE_ROLE_KEY configuration.');
+  }
+  return db;
+}
+
 // ==================== TYPES ====================
 
 export type ChatStatus = 'pending' | 'active' | 'closed';
@@ -58,7 +67,7 @@ export async function createChatSession(
   initialMessage?: string,
   customerAvatar?: string
 ): Promise<ChatSession> {
-  const db = getSupabaseAdmin();
+  const db = getDb();
   
   // Generate a unique session ID
   const sessionId = `chat_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -98,7 +107,7 @@ export async function createChatSession(
  * Get a chat session by ID
  */
 export async function getChatSession(sessionId: string): Promise<ChatSession | null> {
-  const db = getSupabaseAdmin();
+  const db = getDb();
   
   const { data, error } = await db
     .from('support_chats')
@@ -114,7 +123,7 @@ export async function getChatSession(sessionId: string): Promise<ChatSession | n
  * Get chat session with messages
  */
 export async function getChatSessionWithMessages(sessionId: string): Promise<ChatSessionWithMessages | null> {
-  const db = getSupabaseAdmin();
+  const db = getDb();
   
   // Get session
   const { data: session, error: sessionError } = await db
@@ -145,7 +154,7 @@ export async function getChatSessionWithMessages(sessionId: string): Promise<Cha
  * Get all pending chat sessions (for admin)
  */
 export async function getPendingChats(): Promise<ChatSession[]> {
-  const db = getSupabaseAdmin();
+  const db = getDb();
   
   const { data, error } = await db
     .from('support_chats')
@@ -161,7 +170,7 @@ export async function getPendingChats(): Promise<ChatSession[]> {
  * Get all active chat sessions (for admin)
  */
 export async function getActiveChats(adminEmail?: string): Promise<ChatSession[]> {
-  const db = getSupabaseAdmin();
+  const db = getDb();
   
   let query = db
     .from('support_chats')
@@ -183,7 +192,7 @@ export async function getActiveChats(adminEmail?: string): Promise<ChatSession[]
  * Get all chats (for admin panel)
  */
 export async function getAllChats(status?: ChatStatus, limit = 50): Promise<ChatSession[]> {
-  const db = getSupabaseAdmin();
+  const db = getDb();
   
   let query = db
     .from('support_chats')
@@ -205,7 +214,7 @@ export async function getAllChats(status?: ChatStatus, limit = 50): Promise<Chat
  * Get customer's chat sessions
  */
 export async function getCustomerChats(customerEmail: string): Promise<ChatSession[]> {
-  const db = getSupabaseAdmin();
+  const db = getDb();
   
   const { data, error } = await db
     .from('support_chats')
@@ -222,7 +231,7 @@ export async function getCustomerChats(customerEmail: string): Promise<ChatSessi
  * Get customer's active chat session (if any)
  */
 export async function getCustomerActiveChat(customerEmail: string): Promise<ChatSession | null> {
-  const db = getSupabaseAdmin();
+  const db = getDb();
   
   const { data, error } = await db
     .from('support_chats')
@@ -245,7 +254,7 @@ export async function acceptChatSession(
   adminEmail: string, 
   adminName: string
 ): Promise<ChatSession> {
-  const db = getSupabaseAdmin();
+  const db = getDb();
   
   const { data, error } = await db
     .from('support_chats')
@@ -278,7 +287,7 @@ export async function acceptChatSession(
  * Close a chat session
  */
 export async function closeChatSession(sessionId: string): Promise<ChatSession> {
-  const db = getSupabaseAdmin();
+  const db = getDb();
   
   const { data, error } = await db
     .from('support_chats')
@@ -316,7 +325,7 @@ export async function rateChatSession(
   rating: number, 
   comment?: string
 ): Promise<ChatSession> {
-  const db = getSupabaseAdmin();
+  const db = getDb();
   
   const { data, error } = await db
     .from('support_chats')
@@ -344,7 +353,7 @@ export async function addChatMessage(
   message?: string,
   senderAvatar?: string
 ): Promise<ChatMessage> {
-  const db = getSupabaseAdmin();
+  const db = getDb();
   
   const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
   const now = new Date().toISOString();
@@ -413,7 +422,7 @@ export async function getChatMessages(
   limit = 100,
   afterTimestamp?: string
 ): Promise<ChatMessage[]> {
-  const db = getSupabaseAdmin();
+  const db = getDb();
   
   let query = db
     .from('support_messages')
@@ -439,7 +448,7 @@ export async function markMessagesAsRead(
   sessionId: string, 
   reader: 'customer' | 'admin'
 ): Promise<void> {
-  const db = getSupabaseAdmin();
+  const db = getDb();
   
   // Mark messages as read with timestamp
   const senderToMark = reader === 'customer' ? 'admin' : 'customer';
@@ -472,7 +481,7 @@ export async function getChatStatistics(): Promise<{
   todayCount: number;
   avgRating: number;
 }> {
-  const db = getSupabaseAdmin();
+  const db = getDb();
   
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -523,7 +532,7 @@ export async function unsendChatMessage(
   messageId: string,
   userEmail: string
 ): Promise<{ success: boolean; error?: string }> {
-  const db = getSupabaseAdmin();
+  const db = getDb();
   
   // Get the message to verify ownership
   const { data: message, error: msgError } = await db
@@ -578,7 +587,7 @@ export async function unsendChatMessage(
  * Cleanup old chat images (delete images from closed chats older than 7 days)
  */
 export async function cleanupOldChatImages(daysOld = 7): Promise<{ deletedImages: number; cleanedChats: number }> {
-  const db = getSupabaseAdmin();
+  const db = getDb();
   
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - daysOld);

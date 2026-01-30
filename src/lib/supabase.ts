@@ -41,6 +41,13 @@ export const getSupabaseAdmin = () => {
   }
   
   if (!_supabaseAdmin && supabaseServiceKey) {
+    // Validate service key format (should be JWT)
+    if (!supabaseServiceKey.startsWith('eyJ')) {
+      console.error('[supabase] Invalid SUPABASE_SERVICE_ROLE_KEY format. Should be a JWT token starting with "eyJ"');
+      console.error('[supabase] Get the correct key from: https://supabase.com/dashboard/project/YOUR_PROJECT/settings/api');
+      return null;
+    }
+    
     _supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
         autoRefreshToken: false,
@@ -48,7 +55,12 @@ export const getSupabaseAdmin = () => {
       },
     });
   }
-  return _supabaseAdmin || supabase;
+  
+  if (!_supabaseAdmin) {
+    console.warn('[supabase] Admin client not available. SUPABASE_SERVICE_ROLE_KEY may not be set.');
+  }
+  
+  return _supabaseAdmin;
 };
 
 // ==================== DATABASE TYPES ====================
@@ -144,6 +156,7 @@ export interface DBDataRequest {
  */
 export async function getJson<T = any>(key: string): Promise<T | null> {
   const db = getSupabaseAdmin();
+  if (!db) throw new Error('Database not available');
   
   try {
     // Route based on key pattern
@@ -275,6 +288,7 @@ export async function getJson<T = any>(key: string): Promise<T | null> {
  */
 export async function putJson(key: string, data: any): Promise<void> {
   const db = getSupabaseAdmin();
+  if (!db) throw new Error('Database not available');
   
   try {
     // Route based on key pattern
@@ -407,6 +421,7 @@ export async function putJson(key: string, data: any): Promise<void> {
  */
 export async function listKeys(prefix: string): Promise<string[]> {
   const db = getSupabaseAdmin();
+  if (!db) throw new Error('Database not available');
   
   try {
     if (prefix.startsWith('orders/') && !prefix.includes('index')) {
@@ -477,6 +492,7 @@ export async function listKeys(prefix: string): Promise<string[]> {
  */
 export async function deleteObject(key: string): Promise<void> {
   const db = getSupabaseAdmin();
+  if (!db) throw new Error('Database not available');
   
   try {
     if (key.startsWith('orders/')) {
@@ -554,6 +570,13 @@ function transformDBOrderToLegacy(dbOrder: any): any {
     slipData: dbOrder.slip_data,
     paymentVerifiedAt: dbOrder.payment_verified_at,
     paymentMethod: dbOrder.payment_method,
+    // Tracking fields
+    trackingNumber: dbOrder.tracking_number,
+    shippingProvider: dbOrder.shipping_provider,
+    trackingStatus: dbOrder.tracking_status,
+    trackingLastChecked: dbOrder.tracking_last_checked,
+    shippedAt: dbOrder.shipped_at,
+    receivedAt: dbOrder.received_at,
     createdAt: dbOrder.created_at,
     updatedAt: dbOrder.updated_at,
     _key: `orders/${new Date(dbOrder.created_at).getFullYear()}-${String(new Date(dbOrder.created_at).getMonth() + 1).padStart(2, '0')}/${dbOrder.ref}.json`,
@@ -579,6 +602,13 @@ function transformLegacyToDBOrder(legacyOrder: any): any {
     slip_data: legacyOrder.slip || legacyOrder.slipData || null,
     payment_verified_at: legacyOrder.paymentVerifiedAt || legacyOrder.verifiedAt || null,
     payment_method: legacyOrder.paymentMethod || null,
+    // Tracking fields
+    tracking_number: legacyOrder.trackingNumber || null,
+    shipping_provider: legacyOrder.shippingProvider || null,
+    tracking_status: legacyOrder.trackingStatus || null,
+    tracking_last_checked: legacyOrder.trackingLastChecked || null,
+    shipped_at: legacyOrder.shippedAt || null,
+    received_at: legacyOrder.receivedAt || null,
     updated_at: new Date().toISOString(),
   };
 }
@@ -675,6 +705,7 @@ export async function getOrdersByEmail(
   options: { limit?: number; offset?: number; status?: string[] } = {}
 ): Promise<{ orders: any[]; total: number }> {
   const db = getSupabaseAdmin();
+  if (!db) throw new Error('Database not available');
   const { limit = 50, offset = 0, status } = options;
   const hash = emailHash(email);
   
@@ -706,6 +737,7 @@ export async function getAllOrders(
   options: { limit?: number; offset?: number; status?: string[]; search?: string } = {}
 ): Promise<{ orders: any[]; total: number }> {
   const db = getSupabaseAdmin();
+  if (!db) throw new Error('Database not available');
   const { limit = 100, offset = 0, status, search } = options;
   
   let query = db
@@ -737,6 +769,7 @@ export async function getAllOrders(
  */
 export async function getOrderByRef(ref: string): Promise<any | null> {
   const db = getSupabaseAdmin();
+  if (!db) throw new Error('Database not available');
   
   const { data, error } = await db
     .from('orders')
@@ -753,6 +786,7 @@ export async function getOrderByRef(ref: string): Promise<any | null> {
  */
 export async function updateOrderByRef(ref: string, updates: Partial<any>): Promise<any> {
   const db = getSupabaseAdmin();
+  if (!db) throw new Error('Database not available');
   
   const dbUpdates: any = { updated_at: new Date().toISOString() };
   
@@ -767,6 +801,13 @@ export async function updateOrderByRef(ref: string, updates: Partial<any>): Prom
   if (updates.slipData !== undefined) dbUpdates.slip_data = updates.slipData;
   if (updates.paymentVerifiedAt !== undefined) dbUpdates.payment_verified_at = updates.paymentVerifiedAt;
   if (updates.paymentMethod !== undefined) dbUpdates.payment_method = updates.paymentMethod;
+  // Tracking fields
+  if (updates.trackingNumber !== undefined) dbUpdates.tracking_number = updates.trackingNumber;
+  if (updates.shippingProvider !== undefined) dbUpdates.shipping_provider = updates.shippingProvider;
+  if (updates.trackingStatus !== undefined) dbUpdates.tracking_status = updates.trackingStatus;
+  if (updates.trackingLastChecked !== undefined) dbUpdates.tracking_last_checked = updates.trackingLastChecked;
+  if (updates.shippedAt !== undefined) dbUpdates.shipped_at = updates.shippedAt;
+  if (updates.receivedAt !== undefined) dbUpdates.received_at = updates.receivedAt;
   
   const { data, error } = await db
     .from('orders')
@@ -784,6 +825,7 @@ export async function updateOrderByRef(ref: string, updates: Partial<any>): Prom
  */
 export async function getExpiredUnpaidOrders(expiryHours: number = 24): Promise<any[]> {
   const db = getSupabaseAdmin();
+  if (!db) throw new Error('Database not available');
   const expiryDate = new Date(Date.now() - expiryHours * 60 * 60 * 1000).toISOString();
   
   const { data, error } = await db
@@ -824,6 +866,7 @@ export async function logSecurityEvent(event: {
 }): Promise<void> {
   try {
     const db = getSupabaseAdmin();
+    if (!db) return; // Don't throw for audit logging
     await db.from('security_audit_log').insert({
       event_type: event.eventType,
       user_email: event.userEmail,
@@ -847,6 +890,7 @@ export async function getSecurityAuditLogs(options: {
   userEmail?: string;
 } = {}): Promise<{ logs: any[]; total: number }> {
   const db = getSupabaseAdmin();
+  if (!db) throw new Error('Database not available');
   const { limit = 100, offset = 0, eventType, userEmail } = options;
   
   let query = db
@@ -882,6 +926,7 @@ export async function cleanupOldData(retentionDays: number = 365): Promise<{
   deletedAudit: number;
 }> {
   const db = getSupabaseAdmin();
+  if (!db) throw new Error('Database not available');
   
   const { data, error } = await db.rpc('cleanup_old_data', { retention_days: retentionDays });
   
@@ -908,6 +953,7 @@ export async function uploadImageToStorage(
   contentType: string
 ): Promise<{ url: string; path: string }> {
   const db = getSupabaseAdmin();
+  if (!db) throw new Error('Database not available');
   
   // Generate unique path: images/YYYY-MM/timestamp_random.ext
   const now = new Date();
@@ -946,6 +992,7 @@ export async function uploadImageToStorage(
  */
 export async function deleteImageFromStorage(path: string): Promise<boolean> {
   const db = getSupabaseAdmin();
+  if (!db) return false;
   
   const { error } = await db.storage
     .from(STORAGE_BUCKET)

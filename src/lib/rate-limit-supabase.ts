@@ -80,6 +80,10 @@ export async function checkRateLimitSupabase(
   
   try {
     const db = getSupabaseAdmin();
+    if (!db) {
+      // Fallback to in-memory if DB not available
+      return checkRateLimitLocal(identifier, config);
+    }
     
     // Get or create rate limit entry
     const { data: existing } = await db
@@ -207,6 +211,7 @@ export function getRateLimitHeaders(result: RateLimitResult): Record<string, str
 export async function cleanupExpiredRateLimits(): Promise<number> {
   try {
     const db = getSupabaseAdmin();
+    if (!db) return 0;
     const { data, error } = await db
       .from('rate_limits')
       .delete()
@@ -226,6 +231,7 @@ export async function cleanupExpiredRateLimits(): Promise<number> {
  */
 export async function blockIP(ip: string, reason: string, durationHours: number = 24): Promise<void> {
   const db = getSupabaseAdmin();
+  if (!db) throw new Error('Database not available');
   const expiresAt = new Date(Date.now() + durationHours * 60 * 60 * 1000);
   
   await db.from('blocked_ips').upsert({
@@ -244,6 +250,7 @@ export async function blockIP(ip: string, reason: string, durationHours: number 
 export async function isIPBlocked(ip: string): Promise<boolean> {
   try {
     const db = getSupabaseAdmin();
+    if (!db) return false;
     const { data } = await db
       .from('blocked_ips')
       .select('*')
@@ -262,6 +269,7 @@ export async function isIPBlocked(ip: string): Promise<boolean> {
  */
 export async function unblockIP(ip: string): Promise<void> {
   const db = getSupabaseAdmin();
+  if (!db) throw new Error('Database not available');
   await db.from('blocked_ips').delete().eq('ip_address', ip);
 }
 
@@ -275,6 +283,7 @@ export async function getBlockedIPs(): Promise<Array<{
   expiresAt: string;
 }>> {
   const db = getSupabaseAdmin();
+  if (!db) return [];
   const { data } = await db
     .from('blocked_ips')
     .select('*')

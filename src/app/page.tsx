@@ -1980,9 +1980,11 @@ import { ShopStatusBanner, getProductStatus, getShopStatus, SHOP_STATUS_CONFIG, 
 import OptimizedImage, { preloadImages, OptimizedBackground } from '@/components/OptimizedImage';
 import CartDrawer from '@/components/CartDrawer';
 import OrderHistoryDrawer from '@/components/OrderHistoryDrawer';
+import CheckoutDialog from '@/components/CheckoutDialog';
 import LoadingScreen from '@/components/LoadingScreen';
 import SupportChatWidget from '@/components/SupportChatWidget';
 import { Product, ShopConfig } from '@/lib/config';
+import { ShippingConfig } from '@/lib/shipping';
 import { useRealtimeOrdersByEmail } from '@/hooks/useRealtimeOrders';
 import {
   cancelOrder,
@@ -2205,6 +2207,7 @@ export default function HomePage() {
   const [chatbotOpen, setChatbotOpen] = useState(false);
 
   const [config, setConfig] = useState<ShopConfig | null>(null);
+  const [shippingConfig, setShippingConfig] = useState<ShippingConfig | null>(null);
   const [announcements, setAnnouncements] = useState<ShopConfig['announcements']>([]);
   const [announcementHistory, setAnnouncementHistory] = useState<ShopConfig['announcementHistory']>([]);
   const [showAnnouncementHistory, setShowAnnouncementHistory] = useState(false);
@@ -2260,7 +2263,7 @@ export default function HomePage() {
   const [loadingHistoryMore, setLoadingHistoryMore] = useState(false);
   const [historyCursor, setHistoryCursor] = useState<string | null>(null);
   const [historyHasMore, setHistoryHasMore] = useState(false);
-  const [historyFilter, setHistoryFilter] = useState<'ALL' | 'WAITING_PAYMENT' | 'COMPLETED' | 'RECEIVED' | 'CANCELLED'>('ALL');
+  const [historyFilter, setHistoryFilter] = useState<'ALL' | 'WAITING_PAYMENT' | 'COMPLETED' | 'SHIPPED' | 'RECEIVED' | 'CANCELLED'>('ALL');
   const [cancellingRef, setCancellingRef] = useState<string | null>(null);
   const [confirmCancelRef, setConfirmCancelRef] = useState<string | null>(null);
   const [showSizeChart, setShowSizeChart] = useState(false);
@@ -2436,6 +2439,17 @@ export default function HomePage() {
         }
       } else {
         console.error('Failed to load config:', res.message || res.error);
+      }
+      
+      // Fetch shipping config for cart display
+      try {
+        const shippingRes = await fetch('/api/shipping/options');
+        if (shippingRes.ok) {
+          const shippingData = await shippingRes.json();
+          setShippingConfig(shippingData);
+        }
+      } catch (shippingErr) {
+        console.error('Failed to load shipping config:', shippingErr);
       }
     } catch (error) {
       console.error('Failed to load config:', error);
@@ -3939,7 +3953,11 @@ export default function HomePage() {
     return true;
   };
 
-  const submitOrder = async () => {
+  const submitOrder = async (options?: {
+    shippingOptionId?: string;
+    paymentOptionId?: string;
+    shippingFee?: number;
+  }) => {
     // Block submission if shop is closed
     if (!isShopOpen) {
       showToast('warning', 'ร้านค้าปิดชั่วคราว ไม่สามารถสั่งซื้อได้');
@@ -3959,6 +3977,11 @@ export default function HomePage() {
       return;
     }
 
+    // Calculate total with shipping fee
+    const subtotal = getTotalPrice();
+    const shippingFee = options?.shippingFee || 0;
+    const totalAmount = subtotal + shippingFee;
+
     try {
       setProcessing(true);
       const res = await submitOrderApi({
@@ -3968,8 +3991,12 @@ export default function HomePage() {
         customerAddress: orderData.address,
         customerInstagram: orderData.instagram,
         cart: cart,
-        totalAmount: getTotalPrice(),
+        totalAmount: totalAmount,
         turnstileToken,
+        // Include shipping and payment options
+        ...(options?.shippingOptionId && { shippingOptionId: options.shippingOptionId }),
+        ...(options?.paymentOptionId && { paymentOptionId: options.paymentOptionId }),
+        ...(shippingFee > 0 && { shippingFee }),
       });
 
       if (res.status === 'success') {
@@ -3981,7 +4008,7 @@ export default function HomePage() {
             ref: res.ref,
             status: 'PENDING',
             date: new Date().toISOString(),
-            total: getTotalPrice(),
+            total: totalAmount,
             items: cart.map((item) => ({
               productId: item.productId,
               name: item.productName,
@@ -3993,7 +4020,11 @@ export default function HomePage() {
               subtotal: item.unitPrice * item.quantity,
             })),
           };
-          setOrderHistory((prev) => [newOrder, ...prev]);
+          // Only add if not already present (avoid duplicates from realtime)
+          setOrderHistory((prev) => {
+            if (prev.some((o) => o.ref === newOrder.ref)) return prev;
+            return [newOrder, ...prev];
+          });
         }
         
         setCart([]);
@@ -4056,7 +4087,23 @@ export default function HomePage() {
             };
           });
           
-          setOrderHistory((prev) => (append ? [...prev, ...history] : history));
+          // Deduplicate orders by ref
+          setOrderHistory((prev) => {
+            if (append) {
+              // When appending, only add orders not already present
+              const existingRefs = new Set(prev.map(o => o.ref));
+              const newOrders = history.filter((o: any) => !existingRefs.has(o.ref));
+              return [...prev, ...newOrders];
+            } else {
+              // When replacing, deduplicate the new list itself
+              const seen = new Set<string>();
+              return history.filter((o: any) => {
+                if (seen.has(o.ref)) return false;
+                seen.add(o.ref);
+                return true;
+              });
+            }
+          });
           setHistoryHasMore(hasMore);
           setHistoryCursor(nextCursor);
         } else {
@@ -5945,6 +5992,7 @@ export default function HomePage() {
         onClose={() => setShowCart(false)}
         cart={cart}
         config={config}
+        shippingConfig={shippingConfig}
         isShopOpen={isShopOpen}
         onClearCart={() => {
           if (confirm('ล้างตะกร้าทั้งหมด?')) {
@@ -6140,297 +6188,21 @@ export default function HomePage() {
         </Box>
       </Dialog>
 
-      <Dialog
+      {/* Checkout Dialog with Shipping & Payment Selection */}
+      <CheckoutDialog
         open={showOrderDialog}
         onClose={() => setShowOrderDialog(false)}
-        maxWidth="sm"
-        fullWidth
-        fullScreen={isMobile}
-        PaperProps={{
-          sx: {
-            width: { xs: '100%', sm: '92%', md: '720px' },
-            maxWidth: 'calc(100% - 24px)',
-            bgcolor: '#0a0f1a',
-            color: '#f1f5f9',
-            borderRadius: isMobile ? 0 : '20px',
-            border: isMobile ? 'none' : '1px solid rgba(255,255,255,0.1)',
-          },
-        }}
-      >
-        <DialogTitle sx={{ 
-          background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', 
-          color: 'white',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1.5,
-        }}>
-          <ShoppingCart size={22} />
-          <Box>
-            <Typography sx={{ fontWeight: 700, fontSize: '1.1rem' }}>ยืนยันการสั่งซื้อ</Typography>
-            <Typography sx={{ fontSize: '0.75rem', opacity: 0.85 }}>{cart.length} รายการ</Typography>
-          </Box>
-        </DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 3, bgcolor: '#0a0f1a' }}>
-          {/* Order Summary with Product Images */}
-          <Box sx={{ 
-            p: 2, 
-            borderRadius: '18px',
-            bgcolor: 'rgba(30,41,59,0.6)',
-            border: '1px solid rgba(255,255,255,0.06)',
-          }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-              <Package size={18} color="#94a3b8" />
-              <Typography sx={{ fontWeight: 700, color: '#f1f5f9', fontSize: '0.95rem' }}>
-                สรุปคำสั่งซื้อ
-              </Typography>
-            </Box>
-            <Box sx={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              gap: 1.5,
-              maxHeight: 280,
-              overflow: 'auto',
-            }}>
-              {cart.map((item) => {
-                const productInfo = config?.products?.find(p => p.id === item.productId);
-                const productImage = productInfo?.images?.[0];
-                
-                return (
-                  <Box key={item.id} sx={{ 
-                    display: 'flex', 
-                    gap: 1.5,
-                    p: 1.5,
-                    borderRadius: '14px',
-                    bgcolor: 'rgba(15,23,42,0.6)',
-                    border: '1px solid rgba(255,255,255,0.04)',
-                  }}>
-                    {/* Product Image */}
-                    <Box sx={{
-                      width: 60,
-                      height: 60,
-                      borderRadius: '12px',
-                      bgcolor: '#0b1224',
-                      backgroundImage: productImage ? `url(${productImage})` : undefined,
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center',
-                      flexShrink: 0,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      border: '1px solid rgba(255,255,255,0.06)',
-                    }}>
-                      {!productImage && (
-                        <Package size={22} style={{ color: '#475569' }} />
-                      )}
-                    </Box>
-                    {/* Product Details */}
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography sx={{ 
-                        fontSize: '0.85rem', 
-                        fontWeight: 600, 
-                        color: '#e2e8f0',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        mb: 0.5,
-                      }}>
-                        {item.productName}
-                      </Typography>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 0.8 }}>
-                        <Box sx={{
-                          px: 0.7,
-                          py: 0.15,
-                          borderRadius: '5px',
-                          bgcolor: 'rgba(99,102,241,0.15)',
-                          fontSize: '0.68rem',
-                          fontWeight: 600,
-                          color: '#a5b4fc',
-                        }}>
-                          Size: {item.size}
-                        </Box>
-                        <Box sx={{
-                          px: 0.7,
-                          py: 0.15,
-                          borderRadius: '5px',
-                          bgcolor: 'rgba(255,255,255,0.08)',
-                          fontSize: '0.68rem',
-                          fontWeight: 600,
-                          color: '#94a3b8',
-                        }}>
-                          x{item.quantity}
-                        </Box>
-                        {item.options.isLongSleeve && (
-                          <Box sx={{
-                            px: 0.7,
-                            py: 0.15,
-                            borderRadius: '5px',
-                            bgcolor: 'rgba(245,158,11,0.15)',
-                            fontSize: '0.68rem',
-                            fontWeight: 600,
-                            color: '#fbbf24',
-                          }}>
-                            แขนยาว
-                          </Box>
-                        )}
-                        {item.options.customName && (
-                          <Box sx={{
-                            px: 0.7,
-                            py: 0.15,
-                            borderRadius: '5px',
-                            bgcolor: 'rgba(16,185,129,0.15)',
-                            fontSize: '0.68rem',
-                            fontWeight: 600,
-                            color: '#34d399',
-                          }}>
-                            {item.options.customName}
-                          </Box>
-                        )}
-                        {item.options.customNumber && (
-                          <Box sx={{
-                            px: 0.7,
-                            py: 0.15,
-                            borderRadius: '5px',
-                            bgcolor: 'rgba(168,85,247,0.15)',
-                            fontSize: '0.68rem',
-                            fontWeight: 600,
-                            color: '#c084fc',
-                          }}>
-                            #{item.options.customNumber}
-                          </Box>
-                        )}
-                      </Box>
-                      <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: '#10b981' }}>
-                        ฿{(item.unitPrice * item.quantity).toLocaleString()}
-                      </Typography>
-                    </Box>
-                  </Box>
-                );
-              })}
-            </Box>
-            <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.08)' }} />
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography sx={{ fontWeight: 700, color: '#f1f5f9', fontSize: '1rem' }}>ยอดรวมทั้งหมด</Typography>
-              <Typography sx={{ fontWeight: 900, color: '#10b981', fontSize: '1.3rem' }}>
-                ฿{getTotalPrice().toLocaleString()}
-              </Typography>
-            </Box>
-          </Box>
-
-          {/* Recipient Info */}
-          <Box sx={{ 
-            p: 2, 
-            borderRadius: '18px',
-            bgcolor: 'rgba(99,102,241,0.08)', 
-            border: '1px solid rgba(99,102,241,0.2)',
-          }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <User size={18} color="#a5b4fc" />
-                <Typography sx={{ fontWeight: 700, color: '#f1f5f9', fontSize: '0.95rem' }}>ข้อมูลผู้รับสินค้า</Typography>
-              </Box>
-              <Button 
-                size="small" 
-                onClick={() => { setShowProfileModal(true); setPendingCheckout(true); }} 
-                sx={{ 
-                  borderRadius: '8px',
-                  px: 1.5,
-                  bgcolor: 'rgba(99,102,241,0.15)',
-                  color: '#a5b4fc', 
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
-                  '&:hover': { bgcolor: 'rgba(99,102,241,0.25)' },
-                }}
-              >
-                แก้ไข
-              </Button>
-            </Box>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-              <Typography sx={{ color: '#e2e8f0', fontSize: '0.9rem' }}>
-                <Box component="span" sx={{ color: '#64748b', mr: 1 }}>ชื่อ:</Box>{orderData.name || '—'}
-              </Typography>
-              <Typography sx={{ color: '#e2e8f0', fontSize: '0.9rem' }}>
-                <Box component="span" sx={{ color: '#64748b', mr: 1 }}>โทร:</Box>{orderData.phone || '—'}
-              </Typography>
-              <Typography sx={{ color: '#e2e8f0', fontSize: '0.9rem' }}>
-                <Box component="span" sx={{ color: '#64748b', mr: 1 }}>IG:</Box>{orderData.instagram || '—'}
-              </Typography>
-            </Box>
-            {!profileComplete && (
-              <Box sx={{ 
-                mt: 1.5, 
-                p: 1, 
-                borderRadius: '8px',
-                bgcolor: 'rgba(249,115,22,0.1)',
-                border: '1px solid rgba(249,115,22,0.3)',
-              }}>
-                <Typography sx={{ color: '#fb923c', fontSize: '0.8rem', fontWeight: 600 }}>
-                  กรุณาบันทึกโปรไฟล์ (ชื่อไทย, เบอร์, IG) ก่อนยืนยัน
-                </Typography>
-              </Box>
-            )}
-          </Box>
-
-          {/* Turnstile Bot Protection */}
-          <Box sx={{ 
-            display: 'flex', 
-            justifyContent: 'center', 
-            pt: 1,
-          }}>
-            <TurnstileWidget
-              onSuccess={(token) => setTurnstileToken(token)}
-              onExpire={() => setTurnstileToken('')}
-              onError={() => setTurnstileToken('')}
-              theme="dark"
-              size="normal"
-              action="order"
-            />
-          </Box>
-        </DialogContent>
-        <DialogActions sx={{ 
-          p: 2, 
-          gap: 1, 
-          borderTop: '1px solid rgba(255,255,255,0.08)',
-          bgcolor: '#0a0f1a',
-        }}>
-          <Button
-            onClick={() => setShowOrderDialog(false)}
-            sx={{ 
-              flex: 1,
-              py: 1.3,
-              color: '#94a3b8', 
-              borderRadius: '12px',
-              fontSize: '0.9rem',
-              '&:hover': { bgcolor: 'rgba(255,255,255,0.05)' },
-            }}
-          >
-            ยกเลิก
-          </Button>
-          <Button
-            onClick={submitOrder}
-            variant="contained"
-            disabled={!profileComplete || processing}
-            sx={{
-              flex: 1.5,
-              py: 1.3,
-              borderRadius: '12px',
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              fontWeight: 700,
-              fontSize: '0.95rem',
-              boxShadow: '0 8px 24px rgba(16, 185, 129, 0.35)',
-              '&:hover': { 
-                background: 'linear-gradient(135deg, #0ea472 0%, #047857 100%)', 
-                boxShadow: '0 12px 30px rgba(16, 185, 129, 0.45)' 
-              },
-              '&:disabled': {
-                background: 'rgba(100,116,139,0.3)',
-                color: '#64748b',
-              },
-            }}
-          >
-            {processing ? 'กำลังดำเนินการ...' : 'ยืนยันการสั่งซื้อ'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        cart={cart}
+        orderData={orderData}
+        profileComplete={profileComplete}
+        processing={processing}
+        turnstileToken={turnstileToken}
+        setTurnstileToken={setTurnstileToken}
+        onSubmitOrder={submitOrder}
+        onEditProfile={() => { setShowProfileModal(true); setPendingCheckout(true); }}
+        products={config?.products}
+        isMobile={isMobile}
+      />
 
       <Dialog
         open={!!confirmCancelRef}

@@ -46,13 +46,14 @@ const nextConfig: NextConfig = {
     {
       source: '/(.*)',
       headers: [
-        // Content Security Policy - Strict (with unsafe-eval for dev mode hot reload)
+        // Content Security Policy - Relaxed for Next.js compatibility
+        // Note: Next.js requires 'unsafe-eval' and 'unsafe-inline' for hydration and HMR
         {
           key: 'Content-Security-Policy',
           value: [
             "default-src 'self';",
-            // Add 'unsafe-eval' for development (Next.js React Refresh needs it)
-            `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''} https://challenges.cloudflare.com https://static.cloudflareinsights.com;`,
+            // 'unsafe-eval' needed for Next.js (both dev HMR and production hydration in some cases)
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://static.cloudflareinsights.com;",
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;",
             "img-src 'self' data: blob: https://*.filebase.io https://*.filebase.com https://lh3.googleusercontent.com https://ui-avatars.com https://*.supabase.co;",
             "font-src 'self' https://fonts.gstatic.com;",

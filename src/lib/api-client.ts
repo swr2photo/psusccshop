@@ -421,6 +421,10 @@ export async function submitOrder(data: {
   cart: any[];
   totalAmount: number;
   turnstileToken?: string;
+  // Shipping and payment options
+  shippingOptionId?: string;
+  paymentOptionId?: string;
+  shippingFee?: number;
 }): Promise<APIResponse> {
   return fetchJson('/api/orders', { method: 'POST', body: data });
 }

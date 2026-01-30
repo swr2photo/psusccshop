@@ -71,6 +71,9 @@ export async function createAPIKey(options: {
   type?: 'admin' | 'user' | 'cron' | 'webhook';
 }): Promise<{ key: string; keyId: string }> {
   const db = getSupabaseAdmin();
+  if (!db) {
+    throw new Error('Database not available');
+  }
   
   const key = generateAPIKey(options.type || 'user');
   const keyHash = hashAPIKey(key);
@@ -113,6 +116,9 @@ export async function validateAPIKey(key: string): Promise<APIKeyValidation> {
   }
   
   const db = getSupabaseAdmin();
+  if (!db) {
+    return { valid: false, error: 'Database not available' };
+  }
   const keyHash = hashAPIKey(key);
   
   const { data, error } = await db
@@ -153,6 +159,9 @@ export async function validateAPIKey(key: string): Promise<APIKeyValidation> {
  */
 export async function rotateAPIKey(keyId: string, rotatedBy: string): Promise<{ newKey: string; newKeyId: string }> {
   const db = getSupabaseAdmin();
+  if (!db) {
+    throw new Error('Database not available');
+  }
   
   // Get existing key info
   const { data: existingKey, error: fetchError } = await db
@@ -215,6 +224,9 @@ export async function rotateAPIKey(keyId: string, rotatedBy: string): Promise<{ 
  */
 export async function revokeAPIKey(keyId: string, revokedBy: string, reason?: string): Promise<void> {
   const db = getSupabaseAdmin();
+  if (!db) {
+    throw new Error('Database not available');
+  }
   
   await db
     .from('api_keys')
@@ -242,6 +254,9 @@ export async function listAPIKeys(options: {
   createdBy?: string;
 } = {}): Promise<Omit<APIKey, 'keyHash'>[]> {
   const db = getSupabaseAdmin();
+  if (!db) {
+    throw new Error('Database not available');
+  }
   
   let query = db
     .from('api_keys')
@@ -281,6 +296,9 @@ export async function listAPIKeys(options: {
  */
 export async function getExpiringKeys(withinDays: number = 7): Promise<Omit<APIKey, 'keyHash'>[]> {
   const db = getSupabaseAdmin();
+  if (!db) {
+    throw new Error('Database not available');
+  }
   const futureDate = new Date(Date.now() + withinDays * 24 * 60 * 60 * 1000);
   
   const { data, error } = await db
@@ -335,6 +353,9 @@ export async function autoRotateExpiringKeys(withinDays: number = 3): Promise<nu
  */
 export async function cleanupOldKeys(retentionDays: number = 90): Promise<number> {
   const db = getSupabaseAdmin();
+  if (!db) {
+    throw new Error('Database not available');
+  }
   const cutoffDate = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
   
   const { data, error } = await db

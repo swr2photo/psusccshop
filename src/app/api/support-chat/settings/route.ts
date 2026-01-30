@@ -37,6 +37,12 @@ export async function GET() {
     }
     
     const db = getSupabaseAdmin();
+    if (!db) {
+      return NextResponse.json(
+        { error: 'Database not configured' },
+        { status: 500 }
+      );
+    }
     
     // Use 'config' table instead of 'app_settings' (matches existing schema)
     const { data, error } = await db
@@ -73,6 +79,12 @@ export async function POST(request: NextRequest) {
     const settings = await request.json();
     
     const db = getSupabaseAdmin();
+    if (!db) {
+      return NextResponse.json(
+        { error: 'Database not configured' },
+        { status: 500 }
+      );
+    }
     
     // Upsert settings using 'config' table (matches existing schema)
     const { error } = await db

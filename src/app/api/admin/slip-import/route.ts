@@ -34,6 +34,9 @@ export async function GET(request: NextRequest) {
     }
 
     const db = getSupabaseAdmin();
+    if (!db) {
+      return NextResponse.json('Database not available', { status: 500 });
+    }
     
     // ดึง orders ที่เป็น PAID แต่ไม่มี slip_data หรือ slip_data ไม่มี imageUrl/base64
     const { data: orders, error } = await db
@@ -105,6 +108,9 @@ export async function POST(request: NextRequest) {
     }
 
     const db = getSupabaseAdmin();
+    if (!db) {
+      return NextResponse.json({ error: 'Database not available' }, { status: 500 });
+    }
     
     // ดึง orders ทั้งหมดที่เป็น PAID
     const { data: orders, error: fetchError } = await db
@@ -241,6 +247,10 @@ export async function PUT(request: NextRequest) {
     }
 
     const db = getSupabaseAdmin();
+    if (!db) {
+      return NextResponse.json({ error: 'Database not available' }, { status: 500 });
+    }
+    
     const results: {
       success: string[];
       errors: { orderRef: string; error: string }[];

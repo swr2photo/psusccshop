@@ -64,10 +64,10 @@ CREATE POLICY "Service role full access on key_value_store" ON key_value_store
 -- ==================== ANON/PUBLIC POLICIES ====================
 -- จำกัดการเข้าถึงสำหรับ anonymous users (client-side)
 
--- Config: อ่านได้เฉพาะ public config (shop-settings)
+-- Config: อ่านได้เฉพาะ public config
 CREATE POLICY "Anyone can read public config" ON config
   FOR SELECT TO anon, authenticated
-  USING (key IN ('shop-settings'));
+  USING (key IN ('shop-settings', 'shipping_config', 'payment_config'));
 
 -- Orders: ไม่อนุญาต anon เข้าถึงโดยตรง (ต้องผ่าน API)
 -- การจัดการ orders ทำผ่าน server-side API เท่านั้น

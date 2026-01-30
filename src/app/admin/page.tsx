@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { JSX } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { Scanner } from '@yudiel/react-qr-scanner';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Swal from 'sweetalert2';
 import { useRealtimeAdminOrders } from '@/hooks/useRealtimeOrders';
 import {
@@ -122,6 +122,9 @@ import { deleteOrderAdmin, getAdminData, saveShopConfig, syncOrdersSheet, update
 import SupportChatPanel from '@/components/admin/SupportChatPanel';
 import EmailManagement from '@/components/admin/EmailManagement';
 import UserLogsView from '@/components/admin/UserLogsView';
+import ShippingSettings from '@/components/admin/ShippingSettings';
+import PaymentSettings from '@/components/admin/PaymentSettings';
+import TrackingManagement from '@/components/admin/TrackingManagement';
 
 // ============== TYPES ==============
 interface AdminDataResponse {
@@ -2137,7 +2140,47 @@ export default function AdminPage(): JSX.Element {
   const { data: session, status } = useSession();
   const router = useRouter();
 
-  const [activeTab, setActiveTab] = useState<number>(0);
+  // Tab-to-hash mapping for URL persistence
+  const TAB_HASH_MAP: Record<number, string> = {
+    0: 'dashboard',
+    1: 'products',
+    2: 'orders',
+    3: 'pickup',
+    4: 'support',
+    5: 'announce',
+    6: 'settings',
+    7: 'email',
+    8: 'user-logs',
+    9: 'logs',
+    10: 'shipping',
+    11: 'payment',
+    12: 'tracking',
+  };
+  const HASH_TAB_MAP: Record<string, number> = Object.fromEntries(
+    Object.entries(TAB_HASH_MAP).map(([k, v]) => [v, Number(k)])
+  );
+
+  // Read initial tab from URL hash
+  const getInitialTab = (): number => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash.replace('#', '');
+      if (hash && HASH_TAB_MAP[hash] !== undefined) {
+        return HASH_TAB_MAP[hash];
+      }
+    }
+    return 0;
+  };
+
+  const [activeTab, setActiveTabState] = useState<number>(getInitialTab);
+  
+  // Custom setActiveTab that also updates URL hash
+  const setActiveTab = useCallback((tab: number) => {
+    setActiveTabState(tab);
+    const hash = TAB_HASH_MAP[tab];
+    if (hash && typeof window !== 'undefined') {
+      window.history.replaceState(null, '', `#${hash}`);
+    }
+  }, []);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -3239,6 +3282,8 @@ export default function AdminPage(): JSX.Element {
   const [pickupCondition, setPickupCondition] = useState<'complete' | 'partial' | 'damaged'>('complete');
   const [pickupNotes, setPickupNotes] = useState('');
   const [pickupScanMode, setPickupScanMode] = useState(false);
+  const [scannerError, setScannerError] = useState<string | null>(null);
+  const [manualInput, setManualInput] = useState('');
   const pickupSearchRef = useRef<HTMLInputElement>(null);
 
   // Search orders for pickup
@@ -3741,7 +3786,7 @@ export default function AdminPage(): JSX.Element {
         {/* QR Scanner Dialog */}
         <Dialog
           open={pickupScanMode}
-          onClose={() => setPickupScanMode(false)}
+          onClose={() => { setPickupScanMode(false); setScannerError(null); setManualInput(''); }}
           maxWidth="sm"
           fullWidth
           PaperProps={{
@@ -3767,7 +3812,7 @@ export default function AdminPage(): JSX.Element {
               </Typography>
             </Box>
             <IconButton 
-              onClick={() => setPickupScanMode(false)} 
+              onClick={() => { setPickupScanMode(false); setScannerError(null); setManualInput(''); }} 
               size="small"
               sx={{ color: '#94a3b8' }}
             >
@@ -3783,29 +3828,80 @@ export default function AdminPage(): JSX.Element {
                   borderRadius: '12px',
                   overflow: 'hidden',
                   bgcolor: '#000',
+                  minHeight: 300,
                 }}>
-                  <Scanner
-                    onScan={(result) => {
-                      if (result && result.length > 0) {
-                        const text = result[0].rawValue;
-                        handleQrScan(text);
-                      }
-                    }}
-                    onError={(error) => {
-                      console.error('QR Scanner error:', error);
-                    }}
-                    formats={['qr_code']}
-                    components={{
-                      torch: false,
-                      finder: true,
-                    }}
-                    styles={{
-                      container: {
-                        width: '100%',
-                        aspectRatio: '1',
-                      },
-                    }}
-                  />
+                  {scannerError ? (
+                    <Box sx={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      height: 300,
+                      p: 3,
+                      textAlign: 'center',
+                    }}>
+                      <CameraAlt sx={{ fontSize: 48, color: '#ef4444', mb: 2 }} />
+                      <Typography sx={{ color: '#ef4444', fontWeight: 600, mb: 1 }}>
+                        ไม่สามารถเข้าถึงกล้องได้
+                      </Typography>
+                      <Typography sx={{ color: '#94a3b8', fontSize: '0.85rem', mb: 2 }}>
+                        {scannerError}
+                      </Typography>
+                      <Button
+                        onClick={() => {
+                          setScannerError(null);
+                          setPickupScanMode(false);
+                          setTimeout(() => setPickupScanMode(true), 100);
+                        }}
+                        sx={{
+                          bgcolor: 'rgba(6, 182, 212, 0.15)',
+                          color: '#06b6d4',
+                          '&:hover': { bgcolor: 'rgba(6, 182, 212, 0.25)' },
+                        }}
+                      >
+                        ลองใหม่
+                      </Button>
+                    </Box>
+                  ) : (
+                    <Scanner
+                      onScan={(result) => {
+                        if (result && result.length > 0) {
+                          const text = result[0].rawValue;
+                          handleQrScan(text);
+                        }
+                      }}
+                      onError={(error: Error | unknown) => {
+                        console.error('QR Scanner error:', error);
+                        const errorMsg = error instanceof Error ? error.message : String(error);
+                        if (errorMsg?.includes('permission') || errorMsg?.includes('Permission')) {
+                          setScannerError('กรุณาอนุญาตการเข้าถึงกล้องในการตั้งค่าเบราว์เซอร์');
+                        } else if (errorMsg?.includes('NotFound') || errorMsg?.includes('not found')) {
+                          setScannerError('ไม่พบกล้องในอุปกรณ์นี้');
+                        } else if (errorMsg?.includes('NotReadable') || errorMsg?.includes('in use')) {
+                          setScannerError('กล้องกำลังถูกใช้งานโดยแอปอื่น');
+                        } else {
+                          setScannerError('ไม่สามารถเปิดกล้องได้ กรุณาใช้ช่องพิมพ์ด้านล่าง');
+                        }
+                      }}
+                      formats={['qr_code']}
+                      components={{
+                        torch: false,
+                        finder: true,
+                      }}
+                      constraints={{
+                        facingMode: 'environment',
+                      }}
+                      styles={{
+                        container: {
+                          width: '100%',
+                          aspectRatio: '1',
+                        },
+                        video: {
+                          objectFit: 'cover',
+                        },
+                      }}
+                    />
+                  )}
                 </Box>
 
                 {/* Manual Input Fallback */}
@@ -3816,7 +3912,7 @@ export default function AdminPage(): JSX.Element {
                   border: '1px solid rgba(255,255,255,0.08)',
                 }}>
                   <Typography sx={{ fontSize: '0.8rem', color: '#94a3b8', mb: 1.5, textAlign: 'center' }}>
-                    หากกล้องไม่ทำงาน ให้พิมพ์เลข Order ด้านล่าง
+                    {scannerError ? 'พิมพ์เลข Order ด้านล่าง' : 'หากกล้องไม่ทำงาน ให้พิมพ์เลข Order ด้านล่าง'}
                   </Typography>
                   <Box sx={{ display: 'flex', gap: 1 }}>
                     <TextField
@@ -3825,12 +3921,12 @@ export default function AdminPage(): JSX.Element {
                       fullWidth
                       size="small"
                       autoComplete="off"
+                      value={manualInput}
+                      onChange={(e) => setManualInput(e.target.value)}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          const input = e.target as HTMLInputElement;
-                          if (input.value.trim()) {
-                            handleQrScan(input.value.trim());
-                          }
+                        if (e.key === 'Enter' && manualInput.trim()) {
+                          handleQrScan(manualInput.trim());
+                          setManualInput('');
                         }
                       }}
                       sx={{
@@ -3842,12 +3938,13 @@ export default function AdminPage(): JSX.Element {
                       }}
                     />
                     <Button
-                      onClick={(e) => {
-                        const input = (e.currentTarget.parentElement?.querySelector('input') as HTMLInputElement);
-                        if (input?.value.trim()) {
-                          handleQrScan(input.value.trim());
+                      onClick={() => {
+                        if (manualInput.trim()) {
+                          handleQrScan(manualInput.trim());
+                          setManualInput('');
                         }
                       }}
+                      disabled={!manualInput.trim()}
                       sx={{
                         ...gradientButtonSx,
                         minWidth: 48,
@@ -6182,9 +6279,12 @@ export default function AdminPage(): JSX.Element {
               { icon: <ShoppingCart sx={{ fontSize: 20 }} />, label: 'จัดการสินค้า', idx: 1, color: '#fbbf24', show: canManageProducts },
               { icon: <Receipt sx={{ fontSize: 20 }} />, label: 'ออเดอร์', idx: 2, color: '#34d399', badge: pendingCount, show: canManageOrders },
               { icon: <QrCodeScanner sx={{ fontSize: 20 }} />, label: 'รับสินค้า', idx: 3, color: '#06b6d4', show: canManagePickup },
+              { icon: <LocalShipping sx={{ fontSize: 20 }} />, label: 'ติดตามพัสดุ', idx: 12, color: '#fb923c', show: canManageOrders },
               { icon: <SupportAgent sx={{ fontSize: 20 }} />, label: 'แชทสนับสนุน', idx: 4, color: '#ec4899', show: canManageOrders },
               { icon: <NotificationsActive sx={{ fontSize: 20 }} />, label: 'ประกาศ', idx: 5, color: '#f472b6', show: canManageAnnouncement },
               { icon: <Settings sx={{ fontSize: 20 }} />, label: 'ตั้งค่าร้าน', idx: 6, color: '#60a5fa', show: canManageShop || canManageSheet || isSuperAdminUser },
+              { icon: <LocalShipping sx={{ fontSize: 20 }} />, label: 'ตั้งค่าจัดส่ง', idx: 10, color: '#a78bfa', show: isSuperAdminUser },
+              { icon: <AttachMoney sx={{ fontSize: 20 }} />, label: 'ตั้งค่าชำระเงิน', idx: 11, color: '#22d3ee', show: isSuperAdminUser },
               { icon: <Send sx={{ fontSize: 20 }} />, label: 'ส่งอีเมล', idx: 7, color: '#10b981', show: canManageOrders },
               { icon: <Groups sx={{ fontSize: 20 }} />, label: 'ประวัติผู้ใช้', idx: 8, color: '#f97316', show: isSuperAdminUser },
               { icon: <History sx={{ fontSize: 20 }} />, label: 'ประวัติระบบ', idx: 9, color: '#94a3b8', show: isSuperAdminUser },
@@ -6358,6 +6458,9 @@ export default function AdminPage(): JSX.Element {
           {activeTab === 7 && (canManageOrders ? <EmailManagement showToast={showToast} /> : <NoPermissionView permission="ส่งอีเมล" />)}
           {activeTab === 8 && (isSuperAdminUser ? <UserLogsView showToast={showToast} /> : <NoPermissionView permission="ดูประวัติผู้ใช้" />)}
           {activeTab === 9 && (isSuperAdminUser ? <LogsView /> : <NoPermissionView permission="ดูประวัติระบบ" />)}
+          {activeTab === 10 && (isSuperAdminUser ? <ShippingSettings onSave={() => showToast('success', 'บันทึกการตั้งค่าจัดส่งแล้ว')} /> : <NoPermissionView permission="ตั้งค่าจัดส่ง" />)}
+          {activeTab === 11 && (isSuperAdminUser ? <PaymentSettings onSave={() => showToast('success', 'บันทึกการตั้งค่าชำระเงินแล้ว')} /> : <NoPermissionView permission="ตั้งค่าชำระเงิน" />)}
+          {activeTab === 12 && (canManageOrders ? <TrackingManagement showToast={showToast} /> : <NoPermissionView permission="ติดตามพัสดุ" />)}
         </Box>
       </Box>
 

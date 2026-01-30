@@ -37,6 +37,12 @@ const cronJobs: CronJob[] = [
     endpoint: '/api/cron/cleanup',
     description: 'ลบข้อมูลเก่า, auto-rotate API keys',
   },
+  {
+    name: 'update-tracking',
+    schedule: '0 */2 * * *', // ทุก 2 ชั่วโมง
+    endpoint: '/api/cron/update-tracking',
+    description: 'อัปเดตสถานะออเดอร์ตามระบบขนส่ง',
+  },
 ];
 
 async function runCronJob(job: CronJob): Promise<void> {

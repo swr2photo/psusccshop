@@ -302,6 +302,10 @@ interface PublicOrder {
   notes?: string;
   verifiedAt?: string;
   hasSlip?: boolean;
+  // Tracking info for shipped orders
+  trackingNumber?: string;
+  shippingProvider?: string;
+  shippingMethod?: string;
 }
 
 /**
@@ -328,6 +332,10 @@ export function sanitizeOrderForUser(order: any): PublicOrder | null {
     notes: order.notes,
     verifiedAt: order.verifiedAt,
     hasSlip: !!(order.slip && order.slip.base64),
+    // Include tracking info for shipped orders
+    trackingNumber: order.trackingNumber,
+    shippingProvider: order.shippingProvider,
+    shippingMethod: order.shippingMethod,
   };
 }
 
