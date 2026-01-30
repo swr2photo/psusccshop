@@ -38,12 +38,14 @@ export async function GET() {
     
     const db = getSupabaseAdmin();
     
+    // Use 'config' table instead of 'app_settings' (matches existing schema)
     const { data, error } = await db
-      .from('app_settings')
+      .from('config')
       .select('value')
       .eq('key', 'support_chat_settings')
       .single();
     
+    // PGRST116 = row not found, which is OK (use defaults)
     if (error && error.code !== 'PGRST116') throw error;
     
     return NextResponse.json({ 
@@ -72,9 +74,9 @@ export async function POST(request: NextRequest) {
     
     const db = getSupabaseAdmin();
     
-    // Upsert settings
+    // Upsert settings using 'config' table (matches existing schema)
     const { error } = await db
-      .from('app_settings')
+      .from('config')
       .upsert({
         key: 'support_chat_settings',
         value: { ...DEFAULT_SETTINGS, ...settings },

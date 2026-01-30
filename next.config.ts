@@ -19,6 +19,8 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 's3.filebase.com' },
       { protocol: 'https', hostname: '**.s3.filebase.com' },
       { protocol: 'https', hostname: 'ipfs.filebase.io' },
+      // Supabase Storage
+      { protocol: 'https', hostname: '**.supabase.co' },
     ],
   },
   // Security: Hide server info
@@ -44,14 +46,15 @@ const nextConfig: NextConfig = {
     {
       source: '/(.*)',
       headers: [
-        // Content Security Policy - Maximum Strict
+        // Content Security Policy - Strict (with unsafe-eval for dev mode hot reload)
         {
           key: 'Content-Security-Policy',
           value: [
             "default-src 'self';",
-            "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://static.cloudflareinsights.com;",
+            // Add 'unsafe-eval' for development (Next.js React Refresh needs it)
+            `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''} https://challenges.cloudflare.com https://static.cloudflareinsights.com;`,
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;",
-            "img-src 'self' data: blob: https://*.filebase.io https://*.filebase.com https://lh3.googleusercontent.com https://ui-avatars.com;",
+            "img-src 'self' data: blob: https://*.filebase.io https://*.filebase.com https://lh3.googleusercontent.com https://ui-avatars.com https://*.supabase.co;",
             "font-src 'self' https://fonts.gstatic.com;",
             "connect-src 'self' https://*.filebase.com https://*.filebase.io https://api.resend.com https://challenges.cloudflare.com https://*.supabase.co wss://*.supabase.co;",
             "media-src 'self';",
@@ -62,7 +65,6 @@ const nextConfig: NextConfig = {
             "form-action 'self';",
             "upgrade-insecure-requests;",
             "block-all-mixed-content;",
-            "require-trusted-types-for 'script';",
           ].join(' '),
         },
         // Prevent Clickjacking

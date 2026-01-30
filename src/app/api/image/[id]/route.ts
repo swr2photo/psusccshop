@@ -200,7 +200,21 @@ export async function GET(
     const imageUrl = smartDecryptUrl(id);
     
     if (!imageUrl) {
-      return NextResponse.json({ error: 'Invalid image ID' }, { status: 400 });
+      // Return a 1x1 transparent PNG placeholder instead of error
+      // This prevents broken image icons while maintaining security
+      console.warn('[Image Proxy] Could not decrypt image token, returning placeholder');
+      const transparentPng = Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+        'base64'
+      );
+      return new NextResponse(transparentPng, {
+        status: 200,
+        headers: {
+          'Content-Type': 'image/png',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'X-Image-Status': 'placeholder',
+        },
+      });
     }
 
     // Validate URL is from allowed domains

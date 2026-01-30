@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { S3Client, PutObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { requireAuth } from '@/lib/auth';
 import { checkCombinedRateLimit, RATE_LIMITS, getRateLimitHeaders } from '@/lib/rate-limit';
-import { encodeImageUrl } from '@/lib/sanitize';
-import { putJson } from '@/lib/filebase';
+import { putJson, uploadImageToStorage, isSupabaseStorageUrl } from '@/lib/supabase';
 
 // Helper to save user log server-side
 const userLogKey = (id: string) => `user-logs/${id}.json`;
@@ -40,23 +38,11 @@ const saveUserLogServer = async (params: {
       userAgent: params.userAgent,
       timestamp: new Date().toISOString(),
     };
-    await putJson(userLogKey(id), entry);
+    await putJson(`user-logs/${id}.json`, entry);
   } catch (e) {
     console.error('[Upload] Failed to save user log:', e);
   }
 };
-
-const endpoint = process.env.FILEBASE_ENDPOINT || 'https://s3.filebase.com';
-const region = process.env.FILEBASE_REGION || 'us-east-1';
-const bucket = process.env.FILEBASE_BUCKET;
-const accessKeyId = process.env.FILEBASE_ACCESS_KEY;
-const secretAccessKey = process.env.FILEBASE_SECRET_KEY;
-
-const client = new S3Client({
-  region,
-  endpoint,
-  credentials: accessKeyId && secretAccessKey ? { accessKeyId, secretAccessKey } : undefined,
-});
 
 // Generate unique filename
 const generateFileName = (originalName: string) => {
@@ -64,22 +50,6 @@ const generateFileName = (originalName: string) => {
   const timestamp = Date.now();
   const random = Math.random().toString(36).substring(2, 8);
   return `img_${timestamp}_${random}.${ext}`;
-};
-
-// Get CID from Filebase using HeadObject
-const getCID = async (key: string): Promise<string | null> => {
-  try {
-    const head = await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
-    // Filebase returns CID in x-amz-meta-cid header (accessible via Metadata)
-    return head.Metadata?.cid || null;
-  } catch {
-    return null;
-  }
-};
-
-// Get public URL using IPFS gateway
-const getPublicUrl = (cid: string) => {
-  return `https://ipfs.filebase.io/ipfs/${cid}`;
 };
 
 export async function POST(req: NextRequest) {
@@ -105,10 +75,6 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    if (!bucket) {
-      return NextResponse.json({ status: 'error', message: 'Storage not configured' }, { status: 500 });
-    }
-
     const body = await req.json();
     const { base64, filename, mime } = body;
 
@@ -150,32 +116,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: 'error', message: 'Invalid image file' }, { status: 400 });
     }
 
-    // Generate key and upload
+    // Generate filename and upload to Supabase Storage
     const fileName = generateFileName(filename || 'image.png');
-    const key = `images/${fileName}`;
-
-    await client.send(
-      new PutObjectCommand({
-        Bucket: bucket,
-        Key: key,
-        Body: buffer,
-        ContentType: contentType,
-        ACL: 'public-read',
-      })
-    );
-
-    // Get CID from Filebase (IPFS)
-    const cid = await getCID(key);
-    if (!cid) {
-      // Fallback to S3 URL if CID not available - encode to hide real URL
-      const fallbackUrl = `https://${bucket}.s3.filebase.com/${key}`;
-      return NextResponse.json({
-        status: 'success',
-        data: { url: encodeImageUrl(fallbackUrl), key, size: buffer.length },
-      });
-    }
-
-    const url = getPublicUrl(cid);
+    
+    // Upload to Supabase Storage (returns permanent public URL)
+    const { url, path } = await uploadImageToStorage(buffer, fileName, contentType);
 
     // Log upload action
     const userAgent = req.headers.get('user-agent') || undefined;
@@ -190,15 +135,16 @@ export async function POST(req: NextRequest) {
         filename: filename || 'image.png',
         size: buffer.length,
         contentType,
+        path,
       },
       ip: clientIP,
       userAgent,
     });
 
-    // ⚠️ SECURITY: Encode URL to hide real IPFS path
+    // Return public URL directly (no encryption needed, permanent URL)
     return NextResponse.json({
       status: 'success',
-      data: { url: encodeImageUrl(url), key, cid, size: buffer.length },
+      data: { url, path, size: buffer.length },
     });
   } catch (error: any) {
     console.error('[upload] error', error);
@@ -211,11 +157,13 @@ export async function POST(req: NextRequest) {
 
 // Handle multiple images upload
 export async function PUT(req: NextRequest) {
-  try {
-    if (!bucket) {
-      return NextResponse.json({ status: 'error', message: 'Storage not configured' }, { status: 500 });
-    }
+  // ต้องเข้าสู่ระบบก่อนถึงจะ upload ได้
+  const authResult = await requireAuth();
+  if (authResult instanceof NextResponse) {
+    return authResult;
+  }
 
+  try {
     const body = await req.json();
     const { images } = body; // Array of { base64, filename, mime }
 
@@ -224,21 +172,27 @@ export async function PUT(req: NextRequest) {
     }
 
     const MAX_SIZE = 5 * 1024 * 1024;
-    const results: { url: string; key: string; originalIndex: number }[] = [];
+    const results: { url: string; path: string; originalIndex: number }[] = [];
     const errors: { index: number; message: string }[] = [];
 
     for (let i = 0; i < images.length; i++) {
       const { base64, filename, mime } = images[i];
       
-      // Skip if already a proxy URL (encoded)
-      if (typeof base64 === 'string' && base64.startsWith('/api/image/')) {
-        results.push({ url: base64, key: '', originalIndex: i });
+      // Skip if already a Supabase Storage URL or other permanent URL
+      if (typeof base64 === 'string' && isSupabaseStorageUrl(base64)) {
+        results.push({ url: base64, path: '', originalIndex: i });
         continue;
       }
       
-      // Skip if already a URL (not base64) - but encode it
+      // Skip if already a URL (not base64) - keep as-is
       if (typeof base64 === 'string' && (base64.startsWith('http://') || base64.startsWith('https://'))) {
-        results.push({ url: encodeImageUrl(base64), key: '', originalIndex: i });
+        results.push({ url: base64, path: '', originalIndex: i });
+        continue;
+      }
+      
+      // Skip if it's an encrypted proxy URL
+      if (typeof base64 === 'string' && base64.startsWith('/api/image/')) {
+        results.push({ url: base64, path: '', originalIndex: i });
         continue;
       }
 
@@ -257,24 +211,11 @@ export async function PUT(req: NextRequest) {
         }
 
         const fileName = generateFileName(filename || 'image.png');
-        const key = `images/${fileName}`;
         const contentType = mime || 'image/png';
 
-        await client.send(
-          new PutObjectCommand({
-            Bucket: bucket,
-            Key: key,
-            Body: buffer,
-            ContentType: contentType,
-            ACL: 'public-read',
-          })
-        );
-
-        // Get CID for IPFS URL
-        const cid = await getCID(key);
-        const rawUrl = cid ? getPublicUrl(cid) : `https://${bucket}.s3.filebase.com/${key}`;
-        // ⚠️ SECURITY: Encode URL to hide real storage path
-        results.push({ url: encodeImageUrl(rawUrl), key, originalIndex: i });
+        // Upload to Supabase Storage
+        const { url, path } = await uploadImageToStorage(buffer, fileName, contentType);
+        results.push({ url, path, originalIndex: i });
       } catch (err: any) {
         errors.push({ index: i, message: err?.message || 'Upload failed' });
       }

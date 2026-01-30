@@ -893,3 +893,84 @@ export async function cleanupOldData(retentionDays: number = 365): Promise<{
     deletedAudit: data?.[0]?.deleted_audit || 0,
   };
 }
+
+// ==================== SUPABASE STORAGE FOR IMAGES ====================
+
+const STORAGE_BUCKET = 'images';
+
+/**
+ * Upload image to Supabase Storage
+ * Returns public URL that never expires
+ */
+export async function uploadImageToStorage(
+  buffer: Buffer,
+  filename: string,
+  contentType: string
+): Promise<{ url: string; path: string }> {
+  const db = getSupabaseAdmin();
+  
+  // Generate unique path: images/YYYY-MM/timestamp_random.ext
+  const now = new Date();
+  const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const ext = filename.split('.').pop()?.toLowerCase() || 'png';
+  const uniqueName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
+  const path = `${yearMonth}/${uniqueName}`;
+  
+  // Upload to Supabase Storage
+  const { data, error } = await db.storage
+    .from(STORAGE_BUCKET)
+    .upload(path, buffer, {
+      contentType,
+      cacheControl: '31536000', // 1 year cache
+      upsert: false,
+    });
+  
+  if (error) {
+    console.error('[Supabase Storage] Upload error:', error);
+    throw new Error(`Failed to upload image: ${error.message}`);
+  }
+  
+  // Get public URL (permanent, no expiration)
+  const { data: urlData } = db.storage
+    .from(STORAGE_BUCKET)
+    .getPublicUrl(path);
+  
+  return {
+    url: urlData.publicUrl,
+    path: data.path,
+  };
+}
+
+/**
+ * Delete image from Supabase Storage
+ */
+export async function deleteImageFromStorage(path: string): Promise<boolean> {
+  const db = getSupabaseAdmin();
+  
+  const { error } = await db.storage
+    .from(STORAGE_BUCKET)
+    .remove([path]);
+  
+  if (error) {
+    console.error('[Supabase Storage] Delete error:', error);
+    return false;
+  }
+  
+  return true;
+}
+
+/**
+ * Get public URL for an image path
+ */
+export function getImagePublicUrl(path: string): string {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  return `${supabaseUrl}/storage/v1/object/public/${STORAGE_BUCKET}/${path}`;
+}
+
+/**
+ * Check if URL is a Supabase Storage URL
+ */
+export function isSupabaseStorageUrl(url: string): boolean {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  return url.includes(`${supabaseUrl}/storage/`) || url.includes('supabase.co/storage/');
+}

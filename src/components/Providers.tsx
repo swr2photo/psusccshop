@@ -133,8 +133,9 @@ const darkTheme = createTheme({
     error: { main: '#ef4444' },
     warning: { main: '#f59e0b' },
     background: {
-      default: 'transparent',
-      paper: 'rgba(255,255,255,0.06)',
+      // Use actual color values instead of 'transparent' for CSS vars compatibility
+      default: '#0f172a',
+      paper: '#1e293b',
     },
     text: {
       primary: '#f8fafc',
