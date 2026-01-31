@@ -195,12 +195,14 @@ export type OrderHistory = {
   status: string;
   date: string;
   total?: number;
+  shippingFee?: number; // ค่าจัดส่ง - ถ้า > 0 แสดงว่าเป็นออเดอร์จัดส่ง
   items?: OrderHistoryItem[];
   cart?: OrderHistoryItem[]; // For backwards compatibility
   // Tracking info for shipped orders
   trackingNumber?: string;
   shippingProvider?: string;
   shippingMethod?: string;
+  shippingOption?: string; // pickup, delivery, thailand_post_ems, etc.
 };
 
 export type LeanProduct = {

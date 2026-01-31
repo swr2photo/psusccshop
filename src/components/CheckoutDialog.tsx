@@ -244,13 +244,16 @@ export default function CheckoutDialog({
 
   const handleSubmit = () => {
     onSubmitOrder({
-      shippingOptionId: selectedShipping || undefined,
-      paymentOptionId: selectedPayment || undefined,
+      // Use empty string check: if empty string, use 'pickup' as default
+      shippingOptionId: selectedShipping || 'pickup',
+      paymentOptionId: selectedPayment || 'bank_transfer',
       shippingFee,
     });
   };
 
-  const canSubmit = profileComplete && turnstileToken && cart.length > 0 && !processing && !addressMissing;
+  // Require shipping selection for submit
+  const hasShippingSelection = Boolean(selectedShipping);
+  const canSubmit = profileComplete && turnstileToken && cart.length > 0 && !processing && !addressMissing && hasShippingSelection && !loadingConfig;
 
   return (
     <Dialog

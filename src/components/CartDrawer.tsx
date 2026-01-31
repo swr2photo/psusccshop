@@ -28,7 +28,7 @@ import {
   normalizeDigits99,
   type CartItem,
 } from '@/lib/shop-constants';
-import { ShopConfig, Product } from '@/lib/config';
+import { ShopConfig, Product, SIZES } from '@/lib/config';
 import { ShippingConfig } from '@/lib/shipping';
 
 interface CartDrawerProps {
@@ -509,8 +509,16 @@ export default function CartDrawer(props: CartDrawerProps) {
       >
         {editingCartItem && (() => {
           const product = config?.products?.find(p => p.id === editingCartItem.productId);
-          const availableSizes = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL', '7XL', '8XL', '9XL', '10XL'];
-          const displaySizes = product?.sizePricing ? Object.keys(product.sizePricing) : availableSizes;
+          const sizeKeys = product?.sizePricing ? Object.keys(product.sizePricing) : SIZES;
+          // Sort sizes from small to large using SIZES order
+          const displaySizes = sizeKeys.sort((a, b) => {
+            const indexA = SIZES.indexOf(a);
+            const indexB = SIZES.indexOf(b);
+            if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+            if (indexA !== -1) return -1;
+            if (indexB !== -1) return 1;
+            return a.localeCompare(b);
+          });
           
           return (
             <>

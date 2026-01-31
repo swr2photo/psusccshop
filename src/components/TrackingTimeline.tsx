@@ -20,6 +20,7 @@ import {
   Refresh,
   ExpandMore,
   ExpandLess,
+  OpenInNew,
 } from '@mui/icons-material';
 import { 
   TrackingInfo, 
@@ -154,6 +155,7 @@ export default function TrackingTimeline({
 
   // Error state
   if (error) {
+    const trackingUrl = SHIPPING_PROVIDERS[shippingProvider]?.trackingUrlTemplate?.replace('{tracking}', trackingNumber) || '';
     return (
       <Box sx={{ p: 2, bgcolor: 'rgba(239, 68, 68, 0.1)', borderRadius: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -174,6 +176,44 @@ export default function TrackingTimeline({
         <Typography sx={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, mt: 1 }}>
           หมายเลขพัสดุ: {trackingNumber}
         </Typography>
+        
+        {/* Fallback link to courier website */}
+        {trackingUrl && (
+          <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+            <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, mb: 1 }}>
+              ไม่สามารถโหลดข้อมูลได้? ตรวจสอบสถานะโดยตรงที่เว็บขนส่ง:
+            </Typography>
+            <Box
+              component="a"
+              href={trackingUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 1,
+                px: 2,
+                py: 1,
+                borderRadius: '10px',
+                bgcolor: 'rgba(59, 130, 246, 0.15)',
+                border: '1px solid rgba(59, 130, 246, 0.3)',
+                color: '#60a5fa',
+                fontSize: 13,
+                fontWeight: 600,
+                textDecoration: 'none',
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  bgcolor: 'rgba(59, 130, 246, 0.25)',
+                  borderColor: 'rgba(59, 130, 246, 0.5)',
+                },
+              }}
+            >
+              <ShippingIcon sx={{ fontSize: 18 }} />
+              ตรวจสอบที่ {SHIPPING_PROVIDERS[shippingProvider]?.nameThai || 'ขนส่ง'}
+              <OpenInNew sx={{ fontSize: 14 }} />
+            </Box>
+          </Box>
+        )}
       </Box>
     );
   }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getJson, putJson, listKeys } from '@/lib/filebase';
+import { getJson, putJson, listKeys, getOrderByRef, getAllOrders, getSupabaseAdmin } from '@/lib/filebase';
 import { requireAuth, requireAdmin, isAdminEmail } from '@/lib/auth';
 import { sanitizeUtf8Input } from '@/lib/sanitize';
 import crypto from 'crypto';
@@ -86,55 +86,90 @@ export async function GET(req: NextRequest) {
   const isAdmin = isAdminEmail(authResult.email);
 
   try {
-    // Admin search by ref/name/email
+    // Admin search by ref/name/email - use Supabase directly for speed
     if (isAdmin && search) {
-      const searchTerm = search.toLowerCase().trim();
-      const keys = await listKeys('orders/');
+      const searchTerm = search.trim();
+      const searchLower = searchTerm.toLowerCase();
       const results: any[] = [];
       
-      for (const key of keys) {
-        const order = await getJson<any>(key);
-        if (!order) continue;
+      // Try exact ref match first (fastest)
+      const exactOrder = await getOrderByRef(searchTerm);
+      if (exactOrder) {
+        results.push({
+          ref: exactOrder.ref,
+          name: exactOrder.customerName || exactOrder.name,
+          email: exactOrder.customerEmail || exactOrder.email,
+          status: exactOrder.status,
+          amount: exactOrder.totalAmount || exactOrder.amount,
+          cart: exactOrder.cart || exactOrder.items || [],
+          pickup: exactOrder.pickup,
+          date: exactOrder.date,
+        });
+        return NextResponse.json({ status: 'success', data: results });
+      }
+      
+      // If not exact match, search with Supabase ilike
+      const db = getSupabaseAdmin();
+      if (db) {
+        const { data: orders, error } = await db
+          .from('orders')
+          .select('*')
+          .or(`ref.ilike.%${searchTerm}%,customer_name.ilike.%${searchTerm}%,customer_email.ilike.%${searchTerm}%`)
+          .limit(50);
         
-        const matchRef = order.ref?.toLowerCase().includes(searchTerm);
-        const matchName = order.customerName?.toLowerCase().includes(searchTerm) ||
-                         order.name?.toLowerCase().includes(searchTerm);
-        const matchEmail = order.customerEmail?.toLowerCase().includes(searchTerm) ||
-                          order.email?.toLowerCase().includes(searchTerm);
-        
-        if (matchRef || matchName || matchEmail) {
-          results.push({
-            ref: order.ref,
-            name: order.customerName || order.name,
-            email: order.customerEmail || order.email,
-            status: order.status,
-            amount: order.totalAmount || order.amount,
-            cart: order.cart || order.items || [],
-            pickup: order.pickup,
-            date: order.date,
-          });
+        if (!error && orders) {
+          for (const order of orders) {
+            results.push({
+              ref: order.ref,
+              name: order.customer_name,
+              email: order.customer_email,
+              status: order.status,
+              amount: order.total_amount,
+              cart: order.cart || [],
+              pickup: order.pickup,
+              date: order.created_at,
+            });
+          }
         }
-        
-        // Limit results
-        if (results.length >= 50) break;
+      }
+      
+      // Fallback to old method if no results
+      if (results.length === 0) {
+        const keys = await listKeys('orders/');
+        for (const key of keys) {
+          const order = await getJson<any>(key);
+          if (!order) continue;
+          
+          const matchRef = order.ref?.toLowerCase().includes(searchLower);
+          const matchName = order.customerName?.toLowerCase().includes(searchLower) ||
+                           order.name?.toLowerCase().includes(searchLower);
+          const matchEmail = order.customerEmail?.toLowerCase().includes(searchLower) ||
+                            order.email?.toLowerCase().includes(searchLower);
+          
+          if (matchRef || matchName || matchEmail) {
+            results.push({
+              ref: order.ref,
+              name: order.customerName || order.name,
+              email: order.customerEmail || order.email,
+              status: order.status,
+              amount: order.totalAmount || order.amount,
+              cart: order.cart || order.items || [],
+              pickup: order.pickup,
+              date: order.date,
+            });
+          }
+          
+          if (results.length >= 50) break;
+        }
       }
       
       return NextResponse.json({ status: 'success', data: results });
     }
 
-    // Get single order pickup status
+    // Get single order pickup status - use getOrderByRef for speed
     if (ref) {
-      const keys = await listKeys('orders/');
-      const targetKey = keys.find(k => k.endsWith(`${ref}.json`));
+      const order = await getOrderByRef(ref);
       
-      if (!targetKey) {
-        return NextResponse.json(
-          { status: 'error', message: 'Order not found' },
-          { status: 404 }
-        );
-      }
-      
-      const order = await getJson<any>(targetKey);
       if (!order) {
         return NextResponse.json(
           { status: 'error', message: 'Order not found' },

@@ -161,24 +161,70 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
       const data = await res.json();
       
       if (data.status === 'success' && data.data?.orders) {
-        // Get all orders that are PAID, READY, or SHIPPED (shipping-related) and NOT pickup
-        const ordersWithShipping = data.data.orders.filter((o: any) => 
-          ['SHIPPED', 'READY', 'PAID'].includes(o.status) && o.shippingOption !== 'pickup'
-        ).map((o: any) => ({
-          ref: o.ref,
-          customerName: o.customerName || o.name,
-          name: o.name,
-          email: o.email || o.customerEmail || '',
-          phone: o.customerPhone || o.phone || '',
-          address: o.customerAddress || o.address || '',
-          status: o.status,
-          trackingNumber: o.trackingNumber,
-          shippingProvider: o.shippingProvider,
-          date: o.date,
-          cart: o.cart,
-          total: o.total || o.totalAmount || o.amount,
-          shippingOption: o.shippingOption,
-        }));
+        // Get all orders that are PAID, READY, or SHIPPED
+        // Show orders that need shipping (exclude pickup orders)
+        const ordersWithShipping = data.data.orders.filter((o: any) => {
+          // Must be in relevant status
+          if (!['SHIPPED', 'READY', 'PAID'].includes(o.status)) return false;
+          
+          // Check shipping option
+          const shippingOpt = (o.shippingOption || o.shippingOptionId || '').toLowerCase();
+          
+          // Exclude pickup orders
+          const isPickup = shippingOpt === 'pickup' || 
+                          shippingOpt.includes('รับเอง') ||
+                          shippingOpt.includes('รับหน้าร้าน') ||
+                          shippingOpt.includes('pick up');
+          
+          if (isPickup) return false;
+          
+          // If has explicit shipping option (not pickup), include it
+          if (shippingOpt && !isPickup) return true;
+          
+          // Check if total > cart subtotal (has shipping fee) - likely delivery
+          const cart = o.cart || [];
+          const cartSubtotal = cart.reduce((sum: number, item: any) => {
+            const price = Number(item?.unitPrice ?? item?.price ?? 0);
+            const qty = Number(item?.quantity ?? item?.qty ?? 1);
+            return sum + (price * qty);
+          }, 0);
+          const totalAmount = Number(o.totalAmount ?? o.amount ?? 0);
+          const hasShippingFee = totalAmount > cartSubtotal;
+          
+          // Include if has shipping fee (legacy delivery orders)
+          return hasShippingFee;
+        }).map((o: any) => {
+          // Detect delivery_legacy from fee difference
+          let shippingOpt = o.shippingOption || o.shippingOptionId || '';
+          if (!shippingOpt) {
+            const cart = o.cart || [];
+            const cartSubtotal = cart.reduce((sum: number, item: any) => {
+              const price = Number(item?.unitPrice ?? item?.price ?? 0);
+              const qty = Number(item?.quantity ?? item?.qty ?? 1);
+              return sum + (price * qty);
+            }, 0);
+            const totalAmount = Number(o.totalAmount ?? o.amount ?? 0);
+            if (totalAmount > cartSubtotal) {
+              shippingOpt = 'delivery_legacy';
+            }
+          }
+          
+          return {
+            ref: o.ref,
+            customerName: o.customerName || o.name,
+            name: o.name,
+            email: o.email || o.customerEmail || '',
+            phone: o.customerPhone || o.phone || '',
+            address: o.customerAddress || o.address || '',
+            status: o.status,
+            trackingNumber: o.trackingNumber,
+            shippingProvider: o.shippingProvider,
+            date: o.date,
+            cart: o.cart,
+            total: o.total || o.totalAmount || o.amount,
+            shippingOption: shippingOpt,
+          };
+        });
         setAllOrders(ordersWithShipping);
       }
     } catch (error) {
@@ -664,6 +710,7 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
                       <TableCell sx={{ bgcolor: '#1e293b', color: '#94a3b8', borderColor: 'rgba(255,255,255,0.1)' }}>ออเดอร์</TableCell>
                       <TableCell sx={{ bgcolor: '#1e293b', color: '#94a3b8', borderColor: 'rgba(255,255,255,0.1)' }}>ลูกค้า</TableCell>
                       <TableCell sx={{ bgcolor: '#1e293b', color: '#94a3b8', borderColor: 'rgba(255,255,255,0.1)' }}>ที่อยู่</TableCell>
+                      <TableCell sx={{ bgcolor: '#1e293b', color: '#94a3b8', borderColor: 'rgba(255,255,255,0.1)' }}>ตัวเลือกจัดส่ง</TableCell>
                       <TableCell sx={{ bgcolor: '#1e293b', color: '#94a3b8', borderColor: 'rgba(255,255,255,0.1)' }}>เลขพัสดุ</TableCell>
                       <TableCell sx={{ bgcolor: '#1e293b', color: '#94a3b8', borderColor: 'rgba(255,255,255,0.1)' }} align="right">จัดการ</TableCell>
                     </TableRow>
@@ -730,6 +777,98 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
                               {order.address || '-'}
                             </Typography>
                           </Tooltip>
+                        </TableCell>
+                        <TableCell sx={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.3 }}>
+                            {order.shippingOption === 'pickup' ? (
+                              <Chip
+                                label="รับหน้าร้าน"
+                                size="small"
+                                icon={<Home sx={{ fontSize: 14 }} />}
+                                sx={{
+                                  height: 22,
+                                  fontSize: '0.7rem',
+                                  bgcolor: 'rgba(16, 185, 129, 0.2)',
+                                  color: '#10b981',
+                                  '& .MuiChip-icon': { color: '#10b981' },
+                                }}
+                              />
+                            ) : order.shippingOption === 'delivery_legacy' ? (
+                              <Chip
+                                label="จัดส่ง (เดิม)"
+                                size="small"
+                                icon={<LocalShipping sx={{ fontSize: 14 }} />}
+                                sx={{
+                                  height: 22,
+                                  fontSize: '0.7rem',
+                                  bgcolor: 'rgba(251, 191, 36, 0.2)',
+                                  color: '#fbbf24',
+                                  '& .MuiChip-icon': { color: '#fbbf24' },
+                                }}
+                              />
+                            ) : order.shippingOption === 'thailand_post_ems' ? (
+                              <Chip
+                                label="EMS ไปรษณีย์ไทย"
+                                size="small"
+                                icon={<LocalShipping sx={{ fontSize: 14 }} />}
+                                sx={{
+                                  height: 22,
+                                  fontSize: '0.7rem',
+                                  bgcolor: 'rgba(96, 165, 250, 0.2)',
+                                  color: '#60a5fa',
+                                  '& .MuiChip-icon': { color: '#60a5fa' },
+                                }}
+                              />
+                            ) : order.shippingProvider ? (
+                              <Chip
+                                label={SHIPPING_PROVIDERS[order.shippingProvider]?.nameThai || order.shippingProvider}
+                                size="small"
+                                icon={<LocalShipping sx={{ fontSize: 14 }} />}
+                                sx={{
+                                  height: 22,
+                                  fontSize: '0.7rem',
+                                  bgcolor: 'rgba(96, 165, 250, 0.2)',
+                                  color: '#60a5fa',
+                                  '& .MuiChip-icon': { color: '#60a5fa' },
+                                }}
+                              />
+                            ) : order.shippingOption ? (
+                              <Chip
+                                label={
+                                  order.shippingOption === 'thailand_post_registered' ? 'ลงทะเบียน ไปรษณีย์ไทย' :
+                                  order.shippingOption === 'kerry' ? 'Kerry Express' :
+                                  order.shippingOption === 'flash' ? 'Flash Express' :
+                                  order.shippingOption === 'jandt' ? 'J&T Express' :
+                                  order.shippingOption === 'ninja_van' ? 'Ninja Van' :
+                                  order.shippingOption === 'best' ? 'BEST Express' :
+                                  order.shippingOption === 'scg' ? 'SCG Express' :
+                                  order.shippingOption
+                                }
+                                size="small"
+                                icon={<LocalShipping sx={{ fontSize: 14 }} />}
+                                sx={{
+                                  height: 22,
+                                  fontSize: '0.7rem',
+                                  bgcolor: 'rgba(96, 165, 250, 0.2)',
+                                  color: '#60a5fa',
+                                  '& .MuiChip-icon': { color: '#60a5fa' },
+                                }}
+                              />
+                            ) : (
+                              <Chip
+                                label="จัดส่ง"
+                                size="small"
+                                icon={<LocalShipping sx={{ fontSize: 14 }} />}
+                                sx={{
+                                  height: 22,
+                                  fontSize: '0.7rem',
+                                  bgcolor: 'rgba(148, 163, 184, 0.2)',
+                                  color: '#94a3b8',
+                                  '& .MuiChip-icon': { color: '#94a3b8' },
+                                }}
+                              />
+                            )}
+                          </Box>
                         </TableCell>
                         <TableCell sx={{ borderColor: 'rgba(255,255,255,0.05)' }}>
                           {order.trackingNumber ? (

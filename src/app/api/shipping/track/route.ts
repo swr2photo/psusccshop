@@ -1,9 +1,10 @@
 // src/app/api/shipping/track/route.ts
-// Shipping tracking API endpoint via Track123
+// Shipping tracking API endpoint via Track123 with Thailand Post fallback
 
 import { NextRequest, NextResponse } from 'next/server';
 import { 
-  trackShipment, 
+  trackShipment,
+  trackShipmentWithFallback,
   trackMultipleShipments,
   getTrackingUrl,
   getTrack123Url,
@@ -19,12 +20,13 @@ interface TrackRequest {
   trackingNumber?: string;
   trackingNumbers?: string[]; // For batch tracking
   courierCode?: string; // Optional Track123 courier code
+  useFallback?: boolean; // Use Thailand Post fallback API
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body: TrackRequest = await request.json();
-    const { provider, trackingNumber, trackingNumbers, courierCode } = body;
+    const { provider, trackingNumber, trackingNumbers, courierCode, useFallback = true } = body;
 
     // Batch tracking mode
     if (trackingNumbers && Array.isArray(trackingNumbers) && trackingNumbers.length > 0) {
@@ -65,12 +67,18 @@ export async function POST(request: NextRequest) {
     // Clean tracking number
     const cleanedTrackingNumber = trackingNumber.trim().toUpperCase();
 
-    // Track shipment via Track123
-    const trackingInfo = await trackShipment(
-      provider || 'custom', 
-      cleanedTrackingNumber,
-      courierCode
-    );
+    // Track shipment - use fallback for Thailand Post if enabled
+    const trackingInfo = useFallback
+      ? await trackShipmentWithFallback(
+          provider || 'custom', 
+          cleanedTrackingNumber,
+          courierCode
+        )
+      : await trackShipment(
+          provider || 'custom', 
+          cleanedTrackingNumber,
+          courierCode
+        );
 
     if (!trackingInfo) {
       // Provide fallback with tracking URLs

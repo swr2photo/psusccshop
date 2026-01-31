@@ -1983,7 +1983,7 @@ import OrderHistoryDrawer from '@/components/OrderHistoryDrawer';
 import CheckoutDialog from '@/components/CheckoutDialog';
 import LoadingScreen from '@/components/LoadingScreen';
 import SupportChatWidget from '@/components/SupportChatWidget';
-import { Product, ShopConfig } from '@/lib/config';
+import { Product, ShopConfig, SIZES } from '@/lib/config';
 import { ShippingConfig } from '@/lib/shipping';
 import { useRealtimeOrdersByEmail } from '@/hooks/useRealtimeOrders';
 import {
@@ -2152,6 +2152,11 @@ type OrderHistory = {
   total?: number;
   items?: OrderHistoryItem[];
   cart?: OrderHistoryItem[]; // For backwards compatibility
+  // Shipping info for proper QR code display
+  shippingFee?: number;
+  shippingOption?: string;
+  trackingNumber?: string;
+  shippingProvider?: string;
 };
 
 type Interval = ReturnType<typeof setInterval>;
@@ -2617,6 +2622,28 @@ export default function HomePage() {
 
   const handleOrderChange = useCallback((change: { type: string; order: any; oldOrder?: any }) => {
     console.log('[Realtime] Order change received:', change.type);
+    
+    // Helper to calculate shipping fee from realtime data
+    const calculateShippingFee = (order: any): number | undefined => {
+      if (order.shipping_fee !== undefined && order.shipping_fee !== null) return order.shipping_fee;
+      if (order.shippingFee !== undefined && order.shippingFee !== null) return order.shippingFee;
+      
+      const cart = order.cart || order.items || [];
+      const cartSubtotal = cart.reduce((sum: number, item: any) => {
+        const price = item.unitPrice || item.price || 0;
+        const qty = item.quantity || 1;
+        return sum + (price * qty);
+      }, 0);
+      const totalAmount = order.total_amount || order.totalAmount || order.amount || 0;
+      const calculatedFee = totalAmount - cartSubtotal;
+      
+      // Only return if it's a reasonable shipping fee
+      if (calculatedFee > 0 && calculatedFee < 200) {
+        return calculatedFee;
+      }
+      return undefined;
+    };
+    
     if (change.type === 'UPDATE' && change.order) {
       // Update order in history if it exists
       setOrderHistory((prev) => {
@@ -2630,6 +2657,11 @@ export default function HomePage() {
             total: change.order.total_amount,
             cart: change.order.cart || [],
             date: change.order.date || change.order.created_at,
+            // Include shipping info for proper QR code display
+            shippingFee: calculateShippingFee(change.order),
+            shippingOption: change.order.shipping_option || change.order.shippingOption,
+            trackingNumber: change.order.tracking_number || change.order.trackingNumber,
+            shippingProvider: change.order.shipping_provider || change.order.shippingProvider,
           };
           return updated;
         }
@@ -2643,6 +2675,10 @@ export default function HomePage() {
         status: change.order.status,
         total: change.order.total_amount,
         cart: change.order.cart || [],
+        shippingFee: calculateShippingFee(change.order),
+        shippingOption: change.order.shipping_option || change.order.shippingOption,
+        trackingNumber: change.order.tracking_number || change.order.trackingNumber,
+        shippingProvider: change.order.shipping_provider || change.order.shippingProvider,
       };
       setOrderHistory((prev) => {
         // Check if already exists
@@ -3000,32 +3036,24 @@ export default function HomePage() {
               }}>
                 {selectedProduct.name}
               </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.75 }}>
-                <Box sx={{
-                  px: 1.5,
-                  py: 0.4,
-                  borderRadius: '8px',
-                  background: 'linear-gradient(135deg, rgba(99,102,241,0.2) 0%, rgba(139,92,246,0.15) 100%)',
-                  border: '1px solid rgba(99,102,241,0.35)',
-                }}>
-                  <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: '#a5b4fc', letterSpacing: '0.02em' }}>
-                    {TYPE_LABELS[selectedProduct.type] || selectedProduct.type}
-                  </Typography>
+              {/* Custom Tags from config - only show if customTags is defined */}
+              {selectedProduct.customTags && selectedProduct.customTags.length > 0 && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.75, flexWrap: 'wrap' }}>
+                  {selectedProduct.customTags.map((tag, idx) => (
+                    <Box key={idx} sx={{
+                      px: 1,
+                      py: 0.3,
+                      borderRadius: '6px',
+                      bgcolor: (tag as any).bgColor || `${tag.color}20`,
+                      border: `1px solid ${(tag as any).borderColor || `${tag.color}40`}`,
+                    }}>
+                      <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: tag.color }}>
+                        {tag.text}
+                      </Typography>
+                    </Box>
+                  ))}
                 </Box>
-                {selectedProduct.options?.hasLongSleeve && (
-                  <Box sx={{
-                    px: 1,
-                    py: 0.3,
-                    borderRadius: '6px',
-                    bgcolor: 'rgba(245,158,11,0.15)',
-                    border: '1px solid rgba(245,158,11,0.3)',
-                  }}>
-                    <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: '#fbbf24' }}>
-                      แขนยาว
-                    </Typography>
-                  </Box>
-                )}
-              </Box>
+              )}
             </Box>
 
             <IconButton 
@@ -3304,29 +3332,154 @@ export default function HomePage() {
             )}
           </Box>
 
-          {/* Description - Enhanced */}
+          {/* Description - Enhanced Premium Design */}
           {selectedProduct.description && (
             <Box sx={{
-              p: 2.5,
+              p: 0,
               mb: 3,
-              borderRadius: '18px',
-              background: 'linear-gradient(135deg, rgba(30,41,59,0.4) 0%, rgba(30,41,59,0.2) 100%)',
-              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: '20px',
+              background: 'linear-gradient(145deg, rgba(15,23,42,0.8) 0%, rgba(30,41,59,0.6) 100%)',
+              border: '1px solid rgba(99,102,241,0.2)',
               position: 'relative',
               overflow: 'hidden',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)',
             }}>
+              {/* Header */}
+              <Box sx={{
+                px: 2.5,
+                py: 1.5,
+                background: 'linear-gradient(90deg, rgba(99,102,241,0.15) 0%, rgba(139,92,246,0.1) 100%)',
+                borderBottom: '1px solid rgba(99,102,241,0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+              }}>
+                <Box sx={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: '8px',
+                  background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 2px 8px rgba(99,102,241,0.4)',
+                }}>
+                  <Info size={14} color="#fff" />
+                </Box>
+                <Typography sx={{ 
+                  fontSize: '0.85rem', 
+                  fontWeight: 700, 
+                  color: '#e2e8f0',
+                  letterSpacing: '0.02em',
+                }}>
+                  รายละเอียดสินค้า
+                </Typography>
+              </Box>
+              
+              {/* Content */}
+              <Box sx={{ p: 2.5 }}>
+                {selectedProduct.description.split('\n').map((line, idx) => {
+                  const trimmedLine = line.trim();
+                  if (!trimmedLine) return <Box key={idx} sx={{ height: 12 }} />;
+                  
+                  // Check if line contains a colon (label: value format)
+                  const colonIndex = trimmedLine.indexOf(':');
+                  if (colonIndex > 0 && colonIndex < 30) {
+                    const label = trimmedLine.substring(0, colonIndex);
+                    const value = trimmedLine.substring(colonIndex + 1).trim();
+                    return (
+                      <Box key={idx} sx={{ 
+                        display: 'flex', 
+                        flexWrap: 'wrap',
+                        gap: 0.5,
+                        mb: 1.2,
+                        alignItems: 'flex-start',
+                      }}>
+                        <Box sx={{
+                          px: 1,
+                          py: 0.3,
+                          borderRadius: '6px',
+                          background: 'linear-gradient(135deg, rgba(99,102,241,0.2) 0%, rgba(139,92,246,0.15) 100%)',
+                          border: '1px solid rgba(99,102,241,0.3)',
+                        }}>
+                          <Typography sx={{ 
+                            fontSize: '0.78rem', 
+                            fontWeight: 600, 
+                            color: '#a5b4fc',
+                          }}>
+                            {label}
+                          </Typography>
+                        </Box>
+                        <Typography sx={{ 
+                          fontSize: '0.88rem', 
+                          color: '#cbd5e1', 
+                          lineHeight: 1.6,
+                          flex: 1,
+                          pt: 0.2,
+                        }}>
+                          {value}
+                        </Typography>
+                      </Box>
+                    );
+                  }
+                  
+                  // Check if line starts with emoji or bullet
+                  const startsWithEmoji = /^[\u{1F300}-\u{1F9FF}]/u.test(trimmedLine);
+                  const startsWithBullet = /^[•●○◆◇▪▫★☆✓✔✗✘→➤►]/u.test(trimmedLine);
+                  
+                  if (startsWithEmoji || startsWithBullet) {
+                    return (
+                      <Box key={idx} sx={{ 
+                        display: 'flex', 
+                        alignItems: 'flex-start',
+                        gap: 1,
+                        mb: 1,
+                        pl: 0.5,
+                      }}>
+                        <Box sx={{
+                          width: 6,
+                          height: 6,
+                          borderRadius: '50%',
+                          bgcolor: '#8b5cf6',
+                          mt: 0.8,
+                          flexShrink: 0,
+                        }} />
+                        <Typography sx={{ 
+                          fontSize: '0.88rem', 
+                          color: '#cbd5e1', 
+                          lineHeight: 1.6,
+                        }}>
+                          {trimmedLine}
+                        </Typography>
+                      </Box>
+                    );
+                  }
+                  
+                  // Regular text
+                  return (
+                    <Typography key={idx} sx={{ 
+                      fontSize: '0.88rem', 
+                      color: '#cbd5e1', 
+                      lineHeight: 1.7,
+                      mb: 1,
+                    }}>
+                      {trimmedLine}
+                    </Typography>
+                  );
+                })}
+              </Box>
+              
+              {/* Decorative corner */}
               <Box sx={{
                 position: 'absolute',
-                top: 0,
-                left: 0,
-                width: 4,
-                height: '100%',
-                background: 'linear-gradient(180deg, #6366f1 0%, #8b5cf6 100%)',
-                borderRadius: '4px 0 0 4px',
+                top: -30,
+                right: -30,
+                width: 80,
+                height: 80,
+                borderRadius: '50%',
+                background: 'radial-gradient(circle, rgba(139,92,246,0.15) 0%, transparent 70%)',
+                pointerEvents: 'none',
               }} />
-              <Typography sx={{ fontSize: '0.92rem', color: '#b8c5d6', lineHeight: 1.7, pl: 1.5 }}>
-                {selectedProduct.description}
-              </Typography>
             </Box>
           )}
 
@@ -3984,6 +4137,7 @@ export default function HomePage() {
 
     try {
       setProcessing(true);
+      
       const res = await submitOrderApi({
         customerName: orderData.name,
         customerEmail: orderData.email,
@@ -3993,10 +4147,10 @@ export default function HomePage() {
         cart: cart,
         totalAmount: totalAmount,
         turnstileToken,
-        // Include shipping and payment options
-        ...(options?.shippingOptionId && { shippingOptionId: options.shippingOptionId }),
-        ...(options?.paymentOptionId && { paymentOptionId: options.paymentOptionId }),
-        ...(shippingFee > 0 && { shippingFee }),
+        // Include shipping and payment options - always include if defined
+        shippingOptionId: options?.shippingOptionId,
+        paymentOptionId: options?.paymentOptionId,
+        shippingFee: options?.shippingFee,
       });
 
       if (res.status === 'success') {
@@ -4187,7 +4341,19 @@ export default function HomePage() {
   const displaySizes = useMemo(() => {
     if (!selectedProduct) return [] as string[];
     const sizeKeys = Object.keys(selectedProduct.sizePricing || {});
-    return sizeKeys.length > 0 ? sizeKeys : ['ฟรีไซส์'];
+    if (sizeKeys.length === 0) return ['ฟรีไซส์'];
+    // Sort sizes according to standard size order (XS, S, M, L, XL, etc.)
+    return sizeKeys.sort((a, b) => {
+      const indexA = SIZES.indexOf(a);
+      const indexB = SIZES.indexOf(b);
+      // If both sizes are in SIZES array, sort by their index
+      if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+      // If only one is in SIZES, prioritize it
+      if (indexA !== -1) return -1;
+      if (indexB !== -1) return 1;
+      // Otherwise sort alphabetically
+      return a.localeCompare(b);
+    });
   }, [selectedProduct]);
 
   const sizeChartRows = useMemo(() => {
@@ -5641,30 +5807,31 @@ export default function HomePage() {
                                 flexDirection: 'column', 
                                 gap: 0.5 
                               }}>
-                                {product.options?.hasLongSleeve && (
+                                {/* Countdown timer if has endDate */}
+                                {product.endDate && new Date(product.endDate) > new Date() && (
                                   <Box sx={{
                                     px: 0.8,
-                                    py: 0.3,
+                                    py: 0.4,
                                     borderRadius: '6px',
-                                    bgcolor: 'rgba(245,158,11,0.9)',
-                                    fontSize: '0.6rem',
+                                    bgcolor: 'rgba(239,68,68,0.9)',
+                                    fontSize: '0.58rem',
                                     fontWeight: 700,
                                     color: 'white',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 0.5,
                                   }}>
-                                    แขนยาว
-                                  </Box>
-                                )}
-                                {product.options?.hasCustomName && (
-                                  <Box sx={{
-                                    px: 0.8,
-                                    py: 0.3,
-                                    borderRadius: '6px',
-                                    bgcolor: 'rgba(16,185,129,0.9)',
-                                    fontSize: '0.6rem',
-                                    fontWeight: 700,
-                                    color: 'white',
-                                  }}>
-                                    สกรีนชื่อ
+                                    <Clock size={10} />
+                                    {(() => {
+                                      const end = new Date(product.endDate!);
+                                      const now = new Date();
+                                      const diff = end.getTime() - now.getTime();
+                                      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                                      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                                      if (days > 0) return `เหลือ ${days} วัน`;
+                                      if (hours > 0) return `เหลือ ${hours} ชม.`;
+                                      return 'ใกล้ปิด!';
+                                    })()}
                                   </Box>
                                 )}
                               </Box>
@@ -5728,56 +5895,65 @@ export default function HomePage() {
                               {product.description || TYPE_LABELS[product.type] || product.type}
                             </Typography>
 
-                            {/* Product Features/Options Badges */}
-                            <Box sx={{ 
-                              display: 'flex', 
-                              flexWrap: 'wrap', 
-                              gap: 0.5, 
-                              mb: 1,
-                            }}>
-                              {product.options?.hasLongSleeve && (
-                                <Box sx={{
-                                  px: 0.8,
-                                  py: 0.2,
-                                  borderRadius: '6px',
-                                  bgcolor: 'rgba(245,158,11,0.15)',
-                                  border: '1px solid rgba(245,158,11,0.3)',
-                                  fontSize: '0.6rem',
-                                  fontWeight: 600,
-                                  color: '#fbbf24',
+                            {/* Product Tags - from customTags or auto-generated */}
+                            {(() => {
+                              // Use customTags if defined, otherwise auto-generate from options
+                              const tags = product.customTags && product.customTags.length > 0 
+                                ? product.customTags 
+                                : [
+                                    // Auto-generate from endDate
+                                    ...(product.endDate && new Date(product.endDate) > new Date() ? [{
+                                      text: `ถึง ${new Date(product.endDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}`,
+                                      color: '#f87171',
+                                      bgColor: 'rgba(239,68,68,0.15)',
+                                      borderColor: 'rgba(239,68,68,0.3)',
+                                      icon: 'clock'
+                                    }] : []),
+                                    // Auto-generate from options
+                                    ...(product.options?.hasCustomName ? [{
+                                      text: 'สกรีนชื่อได้',
+                                      color: '#34d399',
+                                      bgColor: 'rgba(16,185,129,0.15)',
+                                      borderColor: 'rgba(16,185,129,0.3)'
+                                    }] : []),
+                                    ...(product.options?.hasCustomNumber ? [{
+                                      text: 'สกรีนเบอร์ได้',
+                                      color: '#a5b4fc',
+                                      bgColor: 'rgba(99,102,241,0.15)',
+                                      borderColor: 'rgba(99,102,241,0.3)'
+                                    }] : []),
+                                  ];
+                              
+                              if (tags.length === 0) return null;
+                              
+                              return (
+                                <Box sx={{ 
+                                  display: 'flex', 
+                                  flexWrap: 'wrap', 
+                                  gap: 0.5, 
+                                  mb: 1,
                                 }}>
-                                  มีแขนยาว
+                                  {tags.map((tag, idx) => (
+                                    <Box key={idx} sx={{
+                                      px: 0.8,
+                                      py: 0.2,
+                                      borderRadius: '6px',
+                                      bgcolor: (tag as any).bgColor || `${tag.color}20`,
+                                      border: `1px solid ${(tag as any).borderColor || `${tag.color}40`}`,
+                                      fontSize: '0.6rem',
+                                      fontWeight: 600,
+                                      color: tag.color,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: 0.3,
+                                    }}>
+                                      {(tag as any).icon === 'clock' && <Clock size={10} />}
+                                      {tag.text}
+                                    </Box>
+                                  ))}
                                 </Box>
-                              )}
-                              {product.options?.hasCustomName && (
-                                <Box sx={{
-                                  px: 0.8,
-                                  py: 0.2,
-                                  borderRadius: '6px',
-                                  bgcolor: 'rgba(16,185,129,0.15)',
-                                  border: '1px solid rgba(16,185,129,0.3)',
-                                  fontSize: '0.6rem',
-                                  fontWeight: 600,
-                                  color: '#34d399',
-                                }}>
-                                  สกรีนชื่อได้
-                                </Box>
-                              )}
-                              {product.options?.hasCustomNumber && (
-                                <Box sx={{
-                                  px: 0.8,
-                                  py: 0.2,
-                                  borderRadius: '6px',
-                                  bgcolor: 'rgba(99,102,241,0.15)',
-                                  border: '1px solid rgba(99,102,241,0.3)',
-                                  fontSize: '0.6rem',
-                                  fontWeight: 600,
-                                  color: '#a5b4fc',
-                                }}>
-                                  สกรีนเบอร์ได้
-                                </Box>
-                              )}
-                            </Box>
+                              );
+                            })()}
                             
                             {/* Status/Action Button */}
                             <Box sx={{ mt: 'auto' }}>

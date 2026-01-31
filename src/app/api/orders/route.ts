@@ -142,6 +142,7 @@ export async function POST(req: NextRequest) {
       status: 'WAITING_PAYMENT',
       ...sanitizedBody,
     };
+    
     const key = orderKey(ref, now);
     await putJson(key, order);
     if (order.customerEmail) {

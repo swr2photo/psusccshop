@@ -570,6 +570,8 @@ function transformDBOrderToLegacy(dbOrder: any): any {
     slipData: dbOrder.slip_data,
     paymentVerifiedAt: dbOrder.payment_verified_at,
     paymentMethod: dbOrder.payment_method,
+    // Shipping option (pickup, delivery, etc.)
+    shippingOption: dbOrder.shipping_option,
     // Tracking fields
     trackingNumber: dbOrder.tracking_number,
     shippingProvider: dbOrder.shipping_provider,
@@ -585,6 +587,8 @@ function transformDBOrderToLegacy(dbOrder: any): any {
 
 function transformLegacyToDBOrder(legacyOrder: any): any {
   const email = legacyOrder.customerEmail || legacyOrder.email || '';
+  const shippingOpt = legacyOrder.shippingOption || legacyOrder.shippingOptionId || null;
+  
   return {
     ref: legacyOrder.ref,
     date: legacyOrder.date,
@@ -602,6 +606,8 @@ function transformLegacyToDBOrder(legacyOrder: any): any {
     slip_data: legacyOrder.slip || legacyOrder.slipData || null,
     payment_verified_at: legacyOrder.paymentVerifiedAt || legacyOrder.verifiedAt || null,
     payment_method: legacyOrder.paymentMethod || null,
+    // Shipping option (support both shippingOption and shippingOptionId from frontend)
+    shipping_option: shippingOpt,
     // Tracking fields
     tracking_number: legacyOrder.trackingNumber || null,
     shipping_provider: legacyOrder.shippingProvider || null,
@@ -801,6 +807,9 @@ export async function updateOrderByRef(ref: string, updates: Partial<any>): Prom
   if (updates.slipData !== undefined) dbUpdates.slip_data = updates.slipData;
   if (updates.paymentVerifiedAt !== undefined) dbUpdates.payment_verified_at = updates.paymentVerifiedAt;
   if (updates.paymentMethod !== undefined) dbUpdates.payment_method = updates.paymentMethod;
+  // Shipping option
+  if (updates.shippingOption !== undefined) dbUpdates.shipping_option = updates.shippingOption;
+  if (updates.shippingOptionId !== undefined) dbUpdates.shipping_option = updates.shippingOptionId;
   // Tracking fields
   if (updates.trackingNumber !== undefined) dbUpdates.tracking_number = updates.trackingNumber;
   if (updates.shippingProvider !== undefined) dbUpdates.shipping_provider = updates.shippingProvider;

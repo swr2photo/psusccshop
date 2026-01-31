@@ -24,6 +24,12 @@ export interface Product {
     hasLongSleeve: boolean;
     longSleevePrice?: number; // ราคาเพิ่มสำหรับแขนยาว (default 50)
   };
+  /** Custom tags to display on product card */
+  customTags?: Array<{
+    text: string;
+    color: string; // hex color e.g. '#10b981'
+    bgColor?: string; // optional background color
+  }>;
   /** Per-product pickup settings */
   pickup?: {
     /** Whether pickup is enabled for this product */

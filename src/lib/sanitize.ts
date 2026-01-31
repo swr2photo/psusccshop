@@ -306,6 +306,9 @@ interface PublicOrder {
   trackingNumber?: string;
   shippingProvider?: string;
   shippingMethod?: string;
+  // Shipping info
+  shippingFee?: number;
+  shippingOption?: string;
 }
 
 /**
@@ -314,6 +317,23 @@ interface PublicOrder {
  */
 export function sanitizeOrderForUser(order: any): PublicOrder | null {
   if (!order) return null;
+  
+  // Calculate shipping fee from total - cart subtotal if not explicitly set
+  let shippingFee = order.shippingFee || order.shipping_fee;
+  if (shippingFee === undefined || shippingFee === null) {
+    const cart = order.cart || order.items || [];
+    const cartSubtotal = cart.reduce((sum: number, item: any) => {
+      const price = item.unitPrice || item.price || 0;
+      const qty = item.quantity || 1;
+      return sum + (price * qty);
+    }, 0);
+    const totalAmount = order.totalAmount || order.total_amount || order.amount || 0;
+    const calculatedFee = totalAmount - cartSubtotal;
+    // Only set shipping fee if it's a positive value (difference indicates shipping)
+    if (calculatedFee > 0 && calculatedFee < 200) { // Reasonable shipping fee range
+      shippingFee = calculatedFee;
+    }
+  }
   
   return {
     ref: order.ref,
@@ -336,6 +356,9 @@ export function sanitizeOrderForUser(order: any): PublicOrder | null {
     trackingNumber: order.trackingNumber,
     shippingProvider: order.shippingProvider,
     shippingMethod: order.shippingMethod,
+    // Include shipping info (calculated if not explicitly set)
+    shippingFee: shippingFee,
+    shippingOption: order.shippingOption || order.shipping_option,
   };
 }
 

@@ -3,10 +3,10 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { JSX } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
-import { Scanner } from '@yudiel/react-qr-scanner';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Swal from 'sweetalert2';
 import { useRealtimeAdminOrders } from '@/hooks/useRealtimeOrders';
+
 import {
   Box,
   AppBar,
@@ -115,6 +115,8 @@ import {
   CheckCircleOutline,
   ReportProblem,
   SupportAgent,
+  HelpOutline,
+  LocalOffer,
 } from '@mui/icons-material';
 
 import { isAdmin, isSuperAdmin, setDynamicAdminEmails, SUPER_ADMIN_EMAIL, Product, ShopConfig, SIZES } from '@/lib/config';
@@ -123,6 +125,7 @@ import SupportChatPanel from '@/components/admin/SupportChatPanel';
 import EmailManagement from '@/components/admin/EmailManagement';
 import UserLogsView from '@/components/admin/UserLogsView';
 import ShippingSettings from '@/components/admin/ShippingSettings';
+import { SHIPPING_PROVIDERS, type ShippingProvider } from '@/lib/shipping';
 import PaymentSettings from '@/components/admin/PaymentSettings';
 import TrackingManagement from '@/components/admin/TrackingManagement';
 
@@ -151,6 +154,8 @@ interface AdminOrder {
   ref: string;
   name: string;
   email: string;
+  phone?: string;
+  address?: string;
   amount: number;
   status: string;
   date?: string;
@@ -181,6 +186,10 @@ interface AdminOrder {
   };
   cart?: CartItemAdmin[];
   items?: CartItemAdmin[]; // Legacy field name for cart
+  // Shipping info
+  shippingOption?: string;
+  shippingProvider?: string;
+  trackingNumber?: string;
 }
 
 interface Toast {
@@ -247,16 +256,39 @@ const normalizeOrder = (order: any): AdminOrder => {
       return sum + (price * qty);
     }, 0);
   }
+  
+  // Calculate cart subtotal to detect shipping fee
+  const cartSubtotal = Array.isArray(cart) ? cart.reduce((sum: number, item: any) => {
+    const price = Number(item?.unitPrice ?? item?.price ?? 0);
+    const qty = Number(item?.quantity ?? item?.qty ?? 1);
+    return sum + (price * qty);
+  }, 0) : 0;
+  
+  // Detect shipping option - if total > cart subtotal, likely has shipping
+  let shippingOpt = order?.shippingOption || order?.shippingOptionId || order?.shipping_option || '';
+  const shippingFeeDiff = amount - cartSubtotal;
+  
+  // If no shipping option but has fee difference, it's likely EMS/delivery
+  if (!shippingOpt && shippingFeeDiff > 0) {
+    shippingOpt = 'delivery_legacy'; // Mark as legacy delivery (with fee)
+  }
+  
   return {
     ref,
     name: order?.customerName || order?.Name || order?.name || '',
     email: order?.customerEmail || order?.Email || order?.email || '',
+    phone: order?.customerPhone || order?.phone || '',
+    address: order?.customerAddress || order?.address || '',
     amount,
     status: normalizeStatusKey(order?.status || order?.Status),
     date: order?.date || order?.Timestamp || order?.timestamp || order?.createdAt || order?.created_at,
     raw: order || {},
     slip: order?.slip,
     cart,
+    // Shipping info - support both shippingOption and shippingOptionId
+    shippingOption: shippingOpt,
+    shippingProvider: order?.shippingProvider || order?.shipping_provider || '',
+    trackingNumber: order?.trackingNumber || order?.tracking_number || '',
   };
 };
 
@@ -3283,8 +3315,188 @@ export default function AdminPage(): JSX.Element {
   const [pickupNotes, setPickupNotes] = useState('');
   const [pickupScanMode, setPickupScanMode] = useState(false);
   const [scannerError, setScannerError] = useState<string | null>(null);
+  const [scannerReady, setScannerReady] = useState(false);
   const [manualInput, setManualInput] = useState('');
+  const [isProcessingScan, setIsProcessingScan] = useState(false);
   const pickupSearchRef = useRef<HTMLInputElement>(null);
+  const qrScannerRef = useRef<any>(null);
+  const isProcessingScanRef = useRef(false);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    isProcessingScanRef.current = isProcessingScan;
+  }, [isProcessingScan]);
+
+  // Initialize ZXing scanner when scan mode is opened
+  useEffect(() => {
+    if (!pickupScanMode) return;
+    
+    let mounted = true;
+    let controls: any = null;
+    
+    const initScanner = async () => {
+      // Wait for DOM to be ready
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      const videoElement = document.getElementById('qr-video') as HTMLVideoElement;
+      if (!videoElement) {
+        console.log('Video element not found');
+        if (!mounted) return;
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+      
+      try {
+        // Dynamic import ZXing
+        const { BrowserQRCodeReader } = await import('@zxing/browser');
+        
+        if (!mounted) return;
+        
+        const codeReader = new BrowserQRCodeReader();
+        
+        console.log('Starting ZXing QR scanner...');
+        
+        // Get the video element
+        const video = document.getElementById('qr-video') as HTMLVideoElement;
+        if (!video) {
+          throw new Error('Video element not found');
+        }
+        
+        // Use decodeFromConstraints for better control
+        controls = await codeReader.decodeFromConstraints(
+          {
+            video: {
+              facingMode: { ideal: 'environment' },
+              width: { ideal: 1280, min: 640 },
+              height: { ideal: 720, min: 480 }
+            },
+            audio: false
+          },
+          video,
+          (result: any, error: any) => {
+            if (!mounted) return;
+            
+            if (result) {
+              const decodedText = result.getText();
+              console.log('QR Code scanned:', decodedText);
+              
+              if (decodedText && decodedText.trim() && !isProcessingScanRef.current) {
+                isProcessingScanRef.current = true;
+                setIsProcessingScan(true);
+                
+                const text = decodedText.trim();
+                console.log('Processing scan:', text);
+                
+                // Extract order ref from QR code
+                // Handle formats: ORDER:REF, URL/REF, or just REF
+                let orderRef = text;
+                
+                // Remove ORDER: prefix if present
+                if (orderRef.toUpperCase().startsWith('ORDER:')) {
+                  orderRef = orderRef.substring(6);
+                }
+                
+                // Handle URL format
+                if (orderRef.includes('/')) {
+                  const parts = orderRef.split('/');
+                  orderRef = parts[parts.length - 1];
+                }
+                
+                // Remove query parameters
+                if (orderRef.includes('?')) {
+                  orderRef = orderRef.split('?')[0];
+                }
+                
+                // Clean up whitespace
+                orderRef = orderRef.trim();
+                
+                console.log('Extracted orderRef:', orderRef);
+                
+                // Search for the order
+                fetch(`/api/pickup?search=${encodeURIComponent(orderRef)}`)
+                  .then(res => res.json())
+                  .then(data => {
+                    if (data.status === 'success' && data.data && data.data.length > 0) {
+                      const order = data.data[0];
+                      setPickupSelectedOrder(order);
+                      setPickupScanMode(false);
+                      showToast('success', `พบออเดอร์: ${order.ref}`);
+                    } else {
+                      showToast('error', `ไม่พบออเดอร์: ${orderRef}`);
+                    }
+                  })
+                  .catch(() => {
+                    showToast('error', 'เกิดข้อผิดพลาดในการค้นหา');
+                  })
+                  .finally(() => {
+                    isProcessingScanRef.current = false;
+                    setIsProcessingScan(false);
+                  });
+              }
+            }
+          }
+        );
+        
+        qrScannerRef.current = controls;
+        
+        if (mounted) {
+          setScannerReady(true);
+          setScannerError(null);
+        }
+      } catch (err: any) {
+        console.error('Failed to start scanner:', err);
+        if (!mounted) return;
+        
+        const errorMsg = err?.message || err?.name || String(err);
+        console.log('Error details:', errorMsg, err?.name);
+        
+        if (err?.name === 'NotAllowedError' || errorMsg.includes('Permission') || errorMsg.includes('permission')) {
+          setScannerError('กรุณาอนุญาตการเข้าถึงกล้องในการตั้งค่าเบราว์เซอร์');
+        } else if (err?.name === 'NotFoundError' || errorMsg.includes('NotFound') || errorMsg.includes('not found')) {
+          setScannerError('ไม่พบกล้องในอุปกรณ์นี้');
+        } else if (err?.name === 'NotReadableError' || errorMsg.includes('NotReadable') || errorMsg.includes('Could not start')) {
+          setScannerError('ไม่สามารถเข้าถึงกล้องได้ กรุณาปิดแอปอื่นที่ใช้กล้อง หรือรีเฟรชหน้าเว็บ');
+        } else if (err?.name === 'OverconstrainedError') {
+          setScannerError('กล้องไม่รองรับการตั้งค่าที่ต้องการ');
+        } else {
+          setScannerError(`ไม่สามารถเปิดกล้องได้: ${errorMsg}`);
+        }
+        setScannerReady(false);
+      }
+    };
+    
+    initScanner();
+    
+    // Cleanup on unmount or when scan mode closes
+    return () => {
+      mounted = false;
+      console.log('Cleaning up scanner...');
+      
+      // Stop ZXing controls
+      if (qrScannerRef.current) {
+        try {
+          if (typeof qrScannerRef.current.stop === 'function') {
+            qrScannerRef.current.stop();
+          }
+        } catch (e) {
+          console.log('Error stopping scanner:', e);
+        }
+        qrScannerRef.current = null;
+      }
+      
+      // Also stop video element stream directly
+      const videoEl = document.getElementById('qr-video') as HTMLVideoElement;
+      if (videoEl) {
+        if (videoEl.srcObject) {
+          const stream = videoEl.srcObject as MediaStream;
+          stream.getTracks().forEach(track => track.stop());
+          videoEl.srcObject = null;
+        }
+        videoEl.pause();
+      }
+      
+      setScannerReady(false);
+    };
+  }, [pickupScanMode, showToast]);
 
   // Search orders for pickup
   const searchPickupOrders = useCallback(async (term: string) => {
@@ -3350,10 +3562,16 @@ export default function AdminPage(): JSX.Element {
 
   // Handle QR scan result - search and open confirmation popup immediately
   const handleQrScan = useCallback(async (scannedData: string) => {
+    // Prevent multiple rapid scans
+    if (isProcessingScan) return;
+    
     // Expected format: ORDER:REF or just REF
     const ref = scannedData.replace('ORDER:', '').trim();
     if (!ref) return;
     
+    console.log('QR Scanned:', ref); // Debug log
+    
+    setIsProcessingScan(true);
     setPickupScanMode(false);
     setPickupSearch(ref);
     
@@ -3382,9 +3600,13 @@ export default function AdminPage(): JSX.Element {
         showToast('error', `ไม่พบคำสั่งซื้อ: ${ref}`);
       }
     } catch (err) {
+      console.error('Pickup search error:', err);
       showToast('error', 'เกิดข้อผิดพลาดในการค้นหา');
+    } finally {
+      // Reset after a delay to allow for another scan
+      setTimeout(() => setIsProcessingScan(false), 1500);
     }
-  }, [showToast]);
+  }, [showToast, isProcessingScan]);
 
   // Memoize pickup data outside PickupView to avoid conditional hook calls
   const readyForPickup = useMemo(() => 
@@ -3786,7 +4008,7 @@ export default function AdminPage(): JSX.Element {
         {/* QR Scanner Dialog */}
         <Dialog
           open={pickupScanMode}
-          onClose={() => { setPickupScanMode(false); setScannerError(null); setManualInput(''); }}
+          onClose={() => { setPickupScanMode(false); setScannerError(null); setScannerReady(false); setManualInput(''); setIsProcessingScan(false); }}
           maxWidth="sm"
           fullWidth
           PaperProps={{
@@ -3810,25 +4032,27 @@ export default function AdminPage(): JSX.Element {
               <Typography sx={{ fontWeight: 700, color: '#f1f5f9' }}>
                 สแกน QR Code
               </Typography>
+              {isProcessingScan && (
+                <CircularProgress size={16} sx={{ color: '#06b6d4', ml: 1 }} />
+              )}
             </Box>
             <IconButton 
-              onClick={() => { setPickupScanMode(false); setScannerError(null); setManualInput(''); }} 
+              onClick={() => { setPickupScanMode(false); setScannerError(null); setScannerReady(false); setManualInput(''); setIsProcessingScan(false); }} 
               size="small"
               sx={{ color: '#94a3b8' }}
             >
               <Close />
             </IconButton>
           </DialogTitle>
-          <DialogContent sx={{ p: 2 }}>
+          <DialogContent sx={{ p: 0 }}>
             {pickupScanMode && (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column' }}>
                 {/* Camera Scanner */}
                 <Box sx={{ 
                   position: 'relative',
-                  borderRadius: '12px',
                   overflow: 'hidden',
                   bgcolor: '#000',
-                  minHeight: 300,
+                  minHeight: scannerError ? 'auto' : 320,
                 }}>
                   {scannerError ? (
                     <Box sx={{
@@ -3836,24 +4060,28 @@ export default function AdminPage(): JSX.Element {
                       flexDirection: 'column',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      height: 300,
                       p: 3,
                       textAlign: 'center',
+                      bgcolor: 'rgba(239, 68, 68, 0.08)',
+                      minHeight: 200,
                     }}>
-                      <CameraAlt sx={{ fontSize: 48, color: '#ef4444', mb: 2 }} />
-                      <Typography sx={{ color: '#ef4444', fontWeight: 600, mb: 1 }}>
-                        ไม่สามารถเข้าถึงกล้องได้
+                      <CameraAlt sx={{ fontSize: 48, color: '#ef4444', mb: 1.5 }} />
+                      <Typography sx={{ color: '#ef4444', fontWeight: 600, fontSize: '1rem', mb: 0.5 }}>
+                        ไม่สามารถใช้กล้องได้
                       </Typography>
-                      <Typography sx={{ color: '#94a3b8', fontSize: '0.85rem', mb: 2 }}>
+                      <Typography sx={{ color: '#94a3b8', fontSize: '0.75rem', mb: 1 }}>
                         {scannerError}
                       </Typography>
                       <Button
+                        size="small"
                         onClick={() => {
                           setScannerError(null);
+                          setScannerReady(false);
                           setPickupScanMode(false);
                           setTimeout(() => setPickupScanMode(true), 100);
                         }}
                         sx={{
+                          fontSize: '0.75rem',
                           bgcolor: 'rgba(6, 182, 212, 0.15)',
                           color: '#06b6d4',
                           '&:hover': { bgcolor: 'rgba(6, 182, 212, 0.25)' },
@@ -3863,56 +4091,162 @@ export default function AdminPage(): JSX.Element {
                       </Button>
                     </Box>
                   ) : (
-                    <Scanner
-                      onScan={(result) => {
-                        if (result && result.length > 0) {
-                          const text = result[0].rawValue;
-                          handleQrScan(text);
-                        }
-                      }}
-                      onError={(error: Error | unknown) => {
-                        console.error('QR Scanner error:', error);
-                        const errorMsg = error instanceof Error ? error.message : String(error);
-                        if (errorMsg?.includes('permission') || errorMsg?.includes('Permission')) {
-                          setScannerError('กรุณาอนุญาตการเข้าถึงกล้องในการตั้งค่าเบราว์เซอร์');
-                        } else if (errorMsg?.includes('NotFound') || errorMsg?.includes('not found')) {
-                          setScannerError('ไม่พบกล้องในอุปกรณ์นี้');
-                        } else if (errorMsg?.includes('NotReadable') || errorMsg?.includes('in use')) {
-                          setScannerError('กล้องกำลังถูกใช้งานโดยแอปอื่น');
-                        } else {
-                          setScannerError('ไม่สามารถเปิดกล้องได้ กรุณาใช้ช่องพิมพ์ด้านล่าง');
-                        }
-                      }}
-                      formats={['qr_code']}
-                      components={{
-                        torch: false,
-                        finder: true,
-                      }}
-                      constraints={{
-                        facingMode: 'environment',
-                      }}
-                      styles={{
-                        container: {
+                    <>
+                      {/* Custom scanner frame overlay */}
+                      <Box sx={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        width: 250,
+                        height: 250,
+                        zIndex: 20,
+                        pointerEvents: 'none',
+                      }}>
+                        {/* Corner borders */}
+                        <Box sx={{
+                          position: 'absolute',
+                          top: 0, left: 0,
+                          width: 50, height: 50,
+                          borderTop: '4px solid #06b6d4',
+                          borderLeft: '4px solid #06b6d4',
+                          borderRadius: '8px 0 0 0',
+                        }} />
+                        <Box sx={{
+                          position: 'absolute',
+                          top: 0, right: 0,
+                          width: 50, height: 50,
+                          borderTop: '4px solid #06b6d4',
+                          borderRight: '4px solid #06b6d4',
+                          borderRadius: '0 8px 0 0',
+                        }} />
+                        <Box sx={{
+                          position: 'absolute',
+                          bottom: 0, left: 0,
+                          width: 50, height: 50,
+                          borderBottom: '4px solid #06b6d4',
+                          borderLeft: '4px solid #06b6d4',
+                          borderRadius: '0 0 0 8px',
+                        }} />
+                        <Box sx={{
+                          position: 'absolute',
+                          bottom: 0, right: 0,
+                          width: 50, height: 50,
+                          borderBottom: '4px solid #06b6d4',
+                          borderRight: '4px solid #06b6d4',
+                          borderRadius: '0 0 8px 0',
+                        }} />
+                        {/* Scanning line animation */}
+                        <Box sx={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 10,
+                          right: 10,
+                          height: 2,
+                          background: 'linear-gradient(90deg, transparent, #06b6d4, transparent)',
+                          animation: 'scanLine 2s ease-in-out infinite',
+                          '@keyframes scanLine': {
+                            '0%': { top: 0 },
+                            '50%': { top: 'calc(100% - 2px)' },
+                            '100%': { top: 0 },
+                          },
+                        }} />
+                      </Box>
+
+                      {/* Loading indicator while scanner initializes */}
+                      {!scannerReady && (
+                        <Box sx={{ 
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          display: 'flex', 
+                          flexDirection: 'column',
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          bgcolor: 'rgba(15, 23, 42, 0.95)',
+                          zIndex: 30,
+                        }}>
+                          <Box sx={{ 
+                            width: 80, 
+                            height: 80, 
+                            borderRadius: '50%',
+                            bgcolor: 'rgba(6, 182, 212, 0.1)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            mb: 2,
+                          }}>
+                            <CameraAlt sx={{ fontSize: 36, color: '#06b6d4' }} />
+                          </Box>
+                          <CircularProgress size={24} sx={{ color: '#06b6d4', mb: 1.5 }} />
+                          <Typography sx={{ color: '#f1f5f9', fontSize: '0.9rem', fontWeight: 600 }}>
+                            กำลังเปิดกล้อง...
+                          </Typography>
+                          <Typography sx={{ color: '#64748b', fontSize: '0.75rem', mt: 0.5 }}>
+                            กรุณารอสักครู่
+                          </Typography>
+                        </Box>
+                      )}
+
+                      {/* ZXing video element for QR scanning */}
+                      <video 
+                        id="qr-video" 
+                        style={{
                           width: '100%',
-                          aspectRatio: '1',
-                        },
-                        video: {
+                          maxHeight: '320px',
                           objectFit: 'cover',
-                        },
-                      }}
-                    />
+                          borderRadius: '8px',
+                        }}
+                        playsInline
+                        muted
+                      />
+
+                      {/* Hint text at bottom */}
+                      {scannerReady && (
+                        <Box sx={{
+                          position: 'absolute',
+                          bottom: 16,
+                          left: 0,
+                          right: 0,
+                          textAlign: 'center',
+                          zIndex: 20,
+                        }}>
+                          <Typography sx={{
+                            color: '#fff',
+                            fontSize: '0.8rem',
+                            fontWeight: 500,
+                            textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+                            px: 2,
+                            py: 0.5,
+                            bgcolor: 'rgba(0,0,0,0.5)',
+                            borderRadius: '20px',
+                            display: 'inline-block',
+                          }}>
+                            📷 วาง QR Code ในกรอบ
+                          </Typography>
+                        </Box>
+                      )}
+                    </>
                   )}
                 </Box>
 
                 {/* Manual Input Fallback */}
                 <Box sx={{ 
                   p: 2, 
-                  borderRadius: '12px', 
-                  bgcolor: 'rgba(255,255,255,0.03)',
-                  border: '1px solid rgba(255,255,255,0.08)',
+                  bgcolor: scannerError ? 'rgba(6, 182, 212, 0.08)' : 'rgba(255,255,255,0.02)',
+                  borderTop: '1px solid rgba(255,255,255,0.08)',
                 }}>
-                  <Typography sx={{ fontSize: '0.8rem', color: '#94a3b8', mb: 1.5, textAlign: 'center' }}>
-                    {scannerError ? 'พิมพ์เลข Order ด้านล่าง' : 'หากกล้องไม่ทำงาน ให้พิมพ์เลข Order ด้านล่าง'}
+                  <Typography sx={{ 
+                    fontSize: scannerError ? '0.9rem' : '0.8rem', 
+                    color: scannerError ? '#06b6d4' : '#94a3b8', 
+                    fontWeight: scannerError ? 600 : 400,
+                    mb: 1.5, 
+                    textAlign: 'center' 
+                  }}>
+                    {scannerError ? '🔍 พิมพ์เลข Order เพื่อค้นหา' : 
+                     'หากกล้องไม่ทำงาน ให้พิมพ์เลข Order ด้านล่าง'}
                   </Typography>
                   <Box sx={{ display: 'flex', gap: 1 }}>
                     <TextField
@@ -3921,6 +4255,7 @@ export default function AdminPage(): JSX.Element {
                       fullWidth
                       size="small"
                       autoComplete="off"
+                      autoFocus={!!scannerError}
                       value={manualInput}
                       onChange={(e) => setManualInput(e.target.value)}
                       onKeyDown={(e) => {
@@ -4642,6 +4977,129 @@ export default function AdminPage(): JSX.Element {
                         {order.email || '-'}
                       </Typography>
                     </Box>
+                  </Box>
+
+                  {/* Shipping Info - Always show shipping type */}
+                  <Box sx={{ 
+                    display: 'flex', 
+                    flexWrap: 'wrap',
+                    gap: 0.8,
+                    mb: 1.5,
+                    p: 1,
+                    borderRadius: '10px',
+                    bgcolor: 'rgba(59, 130, 246, 0.08)',
+                    border: '1px solid rgba(59, 130, 246, 0.2)',
+                  }}>
+                    {/* Shipping Option */}
+                    {order.shippingOption === 'pickup' || (order.shippingOption || '').toLowerCase().includes('รับ') ? (
+                      <Chip
+                        size="small"
+                        icon={<Inventory sx={{ fontSize: 14 }} />}
+                        label={order.shippingOption === 'pickup' ? 'รับหน้าร้าน' : order.shippingOption}
+                        sx={{
+                          height: 24,
+                          fontSize: '0.72rem',
+                          bgcolor: 'rgba(16, 185, 129, 0.15)',
+                          color: '#10b981',
+                          border: '1px solid rgba(16, 185, 129, 0.3)',
+                          '& .MuiChip-icon': { color: '#10b981' },
+                        }}
+                      />
+                    ) : order.shippingOption === 'delivery_legacy' ? (
+                      <Chip
+                        size="small"
+                        icon={<LocalShipping sx={{ fontSize: 14 }} />}
+                        label="จัดส่ง (เดิม)"
+                        sx={{
+                          height: 24,
+                          fontSize: '0.72rem',
+                          bgcolor: 'rgba(251, 191, 36, 0.15)',
+                          color: '#fbbf24',
+                          border: '1px solid rgba(251, 191, 36, 0.3)',
+                          '& .MuiChip-icon': { color: '#fbbf24' },
+                        }}
+                      />
+                    ) : order.shippingProvider ? (
+                      <Chip
+                        size="small"
+                        icon={<LocalShipping sx={{ fontSize: 14 }} />}
+                        label={(SHIPPING_PROVIDERS as Record<string, any>)[order.shippingProvider]?.nameThai || order.shippingProvider}
+                        sx={{
+                          height: 24,
+                          fontSize: '0.72rem',
+                          bgcolor: 'rgba(96, 165, 250, 0.15)',
+                          color: '#60a5fa',
+                          border: '1px solid rgba(96, 165, 250, 0.3)',
+                          '& .MuiChip-icon': { color: '#60a5fa' },
+                        }}
+                      />
+                    ) : order.shippingOption ? (
+                      <Chip
+                        size="small"
+                        icon={<LocalShipping sx={{ fontSize: 14 }} />}
+                        label={order.shippingOption === 'thailand_post_ems' ? 'EMS ไปรษณีย์ไทย' : order.shippingOption}
+                        sx={{
+                          height: 24,
+                          fontSize: '0.72rem',
+                          bgcolor: 'rgba(251, 191, 36, 0.15)',
+                          color: '#fbbf24',
+                          border: '1px solid rgba(251, 191, 36, 0.3)',
+                          '& .MuiChip-icon': { color: '#fbbf24' },
+                        }}
+                      />
+                    ) : (
+                      <Chip
+                        size="small"
+                        icon={<Inventory sx={{ fontSize: 14 }} />}
+                        label="รับหน้าร้าน (เดิม)"
+                        sx={{
+                          height: 24,
+                          fontSize: '0.72rem',
+                          bgcolor: 'rgba(148, 163, 184, 0.15)',
+                          color: '#94a3b8',
+                          border: '1px solid rgba(148, 163, 184, 0.3)',
+                          '& .MuiChip-icon': { color: '#94a3b8' },
+                        }}
+                      />
+                    )}
+                    {/* Tracking Number */}
+                    {order.trackingNumber && (
+                      <Chip
+                        size="small"
+                        label={`เลขพัสดุ: ${order.trackingNumber}`}
+                        sx={{
+                          height: 24,
+                          fontSize: '0.72rem',
+                          bgcolor: 'rgba(34, 211, 238, 0.15)',
+                          color: '#22d3ee',
+                          border: '1px solid rgba(34, 211, 238, 0.3)',
+                          fontFamily: 'monospace',
+                        }}
+                      />
+                    )}
+                    {/* Address preview */}
+                    {order.address && (
+                      <Box sx={{ 
+                        width: '100%', 
+                        mt: 0.5, 
+                        display: 'flex', 
+                        alignItems: 'flex-start', 
+                        gap: 0.5 
+                      }}>
+                        <Receipt sx={{ fontSize: 14, color: '#64748b', mt: 0.2, flexShrink: 0 }} />
+                        <Typography sx={{ 
+                          fontSize: '0.72rem', 
+                          color: '#94a3b8',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                        }}>
+                          {order.address}
+                        </Typography>
+                      </Box>
+                    )}
                   </Box>
 
                   {/* Cart Items Preview - Compact */}
@@ -7067,7 +7525,8 @@ function ProductsView({ config, searchTerm, setSearchTerm, saveFullConfig, showT
       startDate: '',
       endDate: '',
       isActive: true,
-      options: { hasCustomName: false, hasCustomNumber: false, hasLongSleeve: false, longSleevePrice: 50 }
+      options: { hasCustomName: false, hasCustomNumber: false, hasLongSleeve: false, longSleevePrice: 50 },
+      customTags: []
     };
     setEditingProduct(newP);
   };
@@ -7636,13 +8095,18 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any
         </Select>
 
         <TextField
-          label="Description"
+          label="Description (รองรับการเว้นบรรทัด)"
           multiline
-          rows={3}
+          rows={4}
           value={product.description}
           onChange={(e) => onChange({...product, description: e.target.value})}
           fullWidth
           sx={inputSx}
+          placeholder="เช่น:
+เสื้อ Jersey รุ่นใหม่
+เนื้อผ้า: Cool Elite
+ดีไซน์: แขนสั้นและยาว"
+          helperText="กด Enter เพื่อเว้นบรรทัดใหม่"
         />
 
         <TextField
@@ -7908,6 +8372,123 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any
               />
             </Box>
           )}
+        </Box>
+
+        {/* Custom Tags Section */}
+        <Box sx={{ bgcolor: ADMIN_THEME.glassSoft, p: 2, borderRadius: 1, border: `1px solid ${ADMIN_THEME.border}` }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1.5, color: ADMIN_THEME.text, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <LocalOffer fontSize="small" />
+            แท้กสินค้า (Custom Tags)
+          </Typography>
+          <Typography variant="caption" sx={{ color: ADMIN_THEME.muted, display: 'block', mb: 2 }}>
+            ตั้งค่าแท้กที่จะแสดงบนการ์ดสินค้า หากไม่ตั้งค่าจะใช้แท้กอัตโนมัติจาก options
+          </Typography>
+          
+          {/* Tag List */}
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+            {((product.customTags || []) as Array<{ text: string; color: string; bgColor?: string }>).map((tag, idx) => (
+              <Chip
+                key={idx}
+                label={tag.text}
+                onDelete={() => {
+                  const newTags = [...(product.customTags || [])];
+                  newTags.splice(idx, 1);
+                  onChange({ ...product, customTags: newTags });
+                }}
+                sx={{
+                  bgcolor: tag.bgColor || `${tag.color}20`,
+                  color: tag.color,
+                  border: `1px solid ${tag.color}40`,
+                  '& .MuiChip-deleteIcon': { color: tag.color },
+                }}
+              />
+            ))}
+            {(!product.customTags || product.customTags.length === 0) && (
+              <Typography variant="caption" sx={{ color: ADMIN_THEME.muted, fontStyle: 'italic' }}>
+                ยังไม่มีแท้ก (ใช้แท้กอัตโนมัติ)
+              </Typography>
+            )}
+          </Box>
+
+          {/* Add New Tag */}
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+            <TextField
+              label="ข้อความแท้ก"
+              size="small"
+              placeholder="เช่น สินค้ามาใหม่"
+              sx={{ ...inputSx, flex: 1, minWidth: 150 }}
+              inputProps={{ id: 'new-tag-text' }}
+            />
+            <TextField
+              label="สี"
+              size="small"
+              type="color"
+              defaultValue="#10b981"
+              sx={{ ...inputSx, width: 80 }}
+              inputProps={{ id: 'new-tag-color' }}
+            />
+            <Button
+              variant="contained"
+              size="small"
+              onClick={() => {
+                const textEl = document.getElementById('new-tag-text') as HTMLInputElement;
+                const colorEl = document.getElementById('new-tag-color') as HTMLInputElement;
+                if (textEl?.value?.trim()) {
+                  const newTag = {
+                    text: textEl.value.trim(),
+                    color: colorEl?.value || '#10b981',
+                    bgColor: `${colorEl?.value || '#10b981'}20`,
+                  };
+                  onChange({
+                    ...product,
+                    customTags: [...(product.customTags || []), newTag]
+                  });
+                  textEl.value = '';
+                }
+              }}
+              sx={{ bgcolor: ADMIN_THEME.primary, minWidth: 80 }}
+            >
+              เพิ่ม
+            </Button>
+          </Box>
+          
+          {/* Quick Add Preset Tags */}
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="caption" sx={{ color: ADMIN_THEME.muted, mb: 1, display: 'block' }}>
+              แท้กยอดนิยม:
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+              {[
+                { text: 'สินค้ามาใหม่', color: '#f59e0b' },
+                { text: 'ขายดี', color: '#ef4444' },
+                { text: 'Limited', color: '#8b5cf6' },
+                { text: 'Pre-order', color: '#3b82f6' },
+                { text: 'พร้อมส่ง', color: '#10b981' },
+              ].map((preset) => {
+                const isAdded = ((product.customTags || []) as Array<{ text: string }>).some(t => t.text === preset.text);
+                return (
+                <Chip
+                  key={preset.text}
+                  label={preset.text}
+                  size="small"
+                  onClick={() => {
+                    if (isAdded) return;
+                    onChange({
+                      ...product,
+                      customTags: [...(product.customTags || []), { ...preset, bgColor: `${preset.color}20` }]
+                    });
+                  }}
+                  sx={{
+                    cursor: 'pointer',
+                    bgcolor: isAdded ? `${preset.color}30` : 'transparent',
+                    color: preset.color,
+                    border: `1px dashed ${preset.color}60`,
+                    '&:hover': { bgcolor: `${preset.color}20` },
+                  }}
+                />
+              );})}
+            </Box>
+          </Box>
         </Box>
 
         <FormControlLabel

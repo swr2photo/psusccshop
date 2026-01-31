@@ -148,30 +148,9 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
               <Package size={20} color="white" />
             </Box>
             <Box sx={{ flex: 1 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Typography sx={{ fontSize: '1.1rem', fontWeight: 700, color: '#f1f5f9' }}>
-                  คำสั่งซื้อของฉัน
-                </Typography>
-                {realtimeConnected && (
-                  <Chip
-                    size="small"
-                    label="LIVE"
-                    sx={{
-                      height: 18,
-                      fontSize: '0.6rem',
-                      fontWeight: 700,
-                      bgcolor: 'rgba(34, 197, 94, 0.2)',
-                      color: '#22c55e',
-                      border: '1px solid rgba(34, 197, 94, 0.3)',
-                      animation: 'pulse 2s infinite',
-                      '@keyframes pulse': {
-                        '0%, 100%': { opacity: 1 },
-                        '50%': { opacity: 0.6 },
-                      },
-                    }}
-                  />
-                )}
-              </Box>
+              <Typography sx={{ fontSize: '1.1rem', fontWeight: 700, color: '#f1f5f9' }}>
+                คำสั่งซื้อของฉัน
+              </Typography>
               <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>
                 {orderHistory.length} รายการ
               </Typography>
@@ -337,7 +316,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                     if (orderItems.length === 0) return null;
                     
                     return (
-                      <Box sx={{ mb: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                      <Box sx={{ mb: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                         {orderItems.slice(0, 3).map((item: any, itemIdx: number) => {
                           const productInfo = config?.products?.find((p) => p.id === item.productId);
                           const productImage = productInfo?.images?.[0];
@@ -354,16 +333,16 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                               sx={{
                                 display: 'flex',
                                 gap: 1.5,
-                                p: 1.2,
-                                borderRadius: '12px',
+                                p: 1.5,
+                                borderRadius: '14px',
                                 bgcolor: 'rgba(15,23,42,0.5)',
-                                border: '1px solid rgba(255,255,255,0.04)',
+                                border: '1px solid rgba(255,255,255,0.06)',
                               }}
                             >
                               <Box sx={{
-                                width: 56,
-                                height: 56,
-                                borderRadius: '10px',
+                                width: 60,
+                                height: 60,
+                                borderRadius: '12px',
                                 bgcolor: '#0b1224',
                                 backgroundImage: productImage ? `url(${productImage})` : undefined,
                                 backgroundSize: 'cover',
@@ -376,43 +355,96 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                               }}>
                                 {!productImage && <Package size={20} style={{ color: '#475569' }} />}
                               </Box>
-                              <Box sx={{ flex: 1, minWidth: 0 }}>
+                              <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                                {/* Product Name */}
                                 <Typography sx={{
-                                  fontSize: '0.82rem',
-                                  fontWeight: 600,
+                                  fontSize: '0.85rem',
+                                  fontWeight: 700,
                                   color: '#e2e8f0',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                  mb: 0.3,
+                                  lineHeight: 1.3,
                                 }}>
                                   {itemName}
                                 </Typography>
-                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 0.5 }}>
+                                
+                                {/* Size & Quantity Row */}
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                   {item.size && (
-                                    <Box sx={{ px: 0.7, py: 0.15, borderRadius: '4px', bgcolor: 'rgba(99,102,241,0.15)', fontSize: '0.65rem', fontWeight: 600, color: '#a5b4fc' }}>
-                                      Size: {item.size}
+                                    <Box sx={{ 
+                                      px: 1, 
+                                      py: 0.3, 
+                                      borderRadius: '6px', 
+                                      bgcolor: 'rgba(99,102,241,0.15)', 
+                                      fontSize: '0.72rem', 
+                                      fontWeight: 600, 
+                                      color: '#a5b4fc' 
+                                    }}>
+                                      ไซส์ {item.size}
                                     </Box>
                                   )}
-                                  {itemIsLongSleeve && (
-                                    <Box sx={{ px: 0.7, py: 0.15, borderRadius: '4px', bgcolor: 'rgba(245,158,11,0.15)', fontSize: '0.65rem', fontWeight: 600, color: '#fbbf24' }}>
-                                      แขนยาว
-                                    </Box>
-                                  )}
-                                  {itemCustomName && (
-                                    <Box sx={{ px: 0.7, py: 0.15, borderRadius: '4px', bgcolor: 'rgba(16,185,129,0.15)', fontSize: '0.65rem', fontWeight: 600, color: '#34d399' }}>
-                                      {itemCustomName}
-                                    </Box>
-                                  )}
-                                  {itemCustomNumber && (
-                                    <Box sx={{ px: 0.7, py: 0.15, borderRadius: '4px', bgcolor: 'rgba(236,72,153,0.15)', fontSize: '0.65rem', fontWeight: 600, color: '#f472b6' }}>
-                                      #{itemCustomNumber}
-                                    </Box>
-                                  )}
+                                  <Typography sx={{ fontSize: '0.72rem', color: '#64748b' }}>
+                                    จำนวน {itemQty} ชิ้น
+                                  </Typography>
                                 </Box>
-                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                  <Typography sx={{ fontSize: '0.7rem', color: '#64748b' }}>x{itemQty}</Typography>
-                                  <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#10b981' }}>฿{itemSubtotal.toLocaleString()}</Typography>
+                                
+                                {/* Custom Options Row */}
+                                {(itemIsLongSleeve || itemCustomName || itemCustomNumber) && (
+                                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.6 }}>
+                                    {itemIsLongSleeve && (
+                                      <Box sx={{ 
+                                        px: 0.8, 
+                                        py: 0.2, 
+                                        borderRadius: '5px', 
+                                        bgcolor: 'rgba(245,158,11,0.15)', 
+                                        fontSize: '0.68rem', 
+                                        fontWeight: 600, 
+                                        color: '#fbbf24' 
+                                      }}>
+                                        ✨ แขนยาว
+                                      </Box>
+                                    )}
+                                    {itemCustomName && (
+                                      <Box sx={{ 
+                                        px: 0.8, 
+                                        py: 0.2, 
+                                        borderRadius: '5px', 
+                                        bgcolor: 'rgba(16,185,129,0.15)', 
+                                        fontSize: '0.68rem', 
+                                        fontWeight: 600, 
+                                        color: '#34d399' 
+                                      }}>
+                                        ชื่อ: {itemCustomName}
+                                      </Box>
+                                    )}
+                                    {itemCustomNumber && (
+                                      <Box sx={{ 
+                                        px: 0.8, 
+                                        py: 0.2, 
+                                        borderRadius: '5px', 
+                                        bgcolor: 'rgba(236,72,153,0.15)', 
+                                        fontSize: '0.68rem', 
+                                        fontWeight: 600, 
+                                        color: '#f472b6' 
+                                      }}>
+                                        เบอร์ #{itemCustomNumber}
+                                      </Box>
+                                    )}
+                                  </Box>
+                                )}
+                                
+                                {/* Price Row */}
+                                <Box sx={{ 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  justifyContent: 'space-between',
+                                  pt: 0.5,
+                                  borderTop: '1px solid rgba(255,255,255,0.06)',
+                                }}>
+                                  <Typography sx={{ fontSize: '0.72rem', color: '#64748b' }}>
+                                    ราคาต่อชิ้น ฿{(itemSubtotal / itemQty).toLocaleString()}
+                                  </Typography>
+                                  <Typography sx={{ fontSize: '0.88rem', fontWeight: 700, color: '#10b981' }}>
+                                    ฿{itemSubtotal.toLocaleString()}
+                                  </Typography>
                                 </Box>
                               </Box>
                             </Box>
@@ -427,8 +459,9 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                     );
                   })()}
 
-                  {/* QR Code for Pickup - Only show when NOT shipped with tracking */}
-                  {['READY', 'SHIPPED', 'PAID'].includes(statusKey) && !order.trackingNumber && (
+                  {/* QR Code for Pickup - Only show when pickup (not delivery) and NOT shipped with tracking */}
+                  {['READY', 'SHIPPED', 'PAID'].includes(statusKey) && !order.trackingNumber && 
+                   ((!order.shippingOption && !order.shippingFee) || order.shippingOption === 'pickup' || order.shippingOption?.toLowerCase().includes('รับ')) && (
                     <Box sx={{
                       mt: 2,
                       p: 2,
@@ -500,6 +533,57 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                       </Button>
                       <Typography sx={{ fontSize: '0.7rem', color: '#64748b', textAlign: 'center', mt: 1 }}>
                         กดเพื่อแสดง QR Code สำหรับรับสินค้า
+                      </Typography>
+                    </Box>
+                  )}
+
+                  {/* Delivery Status - Show for delivery orders (not pickup) that haven't shipped yet */}
+                  {['READY', 'PAID'].includes(statusKey) && !order.trackingNumber && 
+                   ((order.shippingOption && order.shippingOption !== 'pickup' && !order.shippingOption.toLowerCase().includes('รับ')) || 
+                    (!order.shippingOption && order.shippingFee && order.shippingFee > 0)) && (
+                    <Box sx={{
+                      mt: 2,
+                      p: 2,
+                      borderRadius: '16px',
+                      background: 'linear-gradient(135deg, rgba(99,102,241,0.1) 0%, rgba(139,92,246,0.1) 100%)',
+                      border: '1px solid rgba(99,102,241,0.3)',
+                    }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                        <Box sx={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: '10px',
+                          background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}>
+                          <Truck size={18} color="#fff" />
+                        </Box>
+                        <Box>
+                          <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#a5b4fc' }}>
+                            เตรียมจัดส่ง
+                          </Typography>
+                          <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                            รอทางร้านจัดส่งสินค้า
+                          </Typography>
+                        </Box>
+                      </Box>
+                      <Box sx={{ 
+                        p: 1.5, 
+                        borderRadius: '10px', 
+                        bgcolor: 'rgba(99,102,241,0.08)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                      }}>
+                        <Package size={16} color="#a5b4fc" />
+                        <Typography sx={{ fontSize: '0.78rem', color: '#cbd5e1' }}>
+                          ออเดอร์ของคุณเข้าระบบแล้ว กำลังเตรียมของและจะจัดส่งเร็วๆนี้
+                        </Typography>
+                      </Box>
+                      <Typography sx={{ fontSize: '0.68rem', color: '#64748b', textAlign: 'center', mt: 1.5 }}>
+                        เมื่อจัดส่งแล้วจะแจ้งเลขพัสดุให้ทราบ
                       </Typography>
                     </Box>
                   )}
