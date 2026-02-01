@@ -5715,7 +5715,7 @@ export default function AdminPage(): JSX.Element {
                         label="ชื่อติดเสื้อ (ภาษาอังกฤษ)"
                         value={item.options?.customName || ''}
                         onChange={(e) => {
-                          const newOptions = { ...item.options, customName: e.target.value.replace(/[^a-zA-Z\s]/g, '').toUpperCase().slice(0, 7) };
+                          const newOptions = { ...item.options, customName: e.target.value.replace(/[^\x20-\x7E]/g, '').toUpperCase().slice(0, 7) };
                           updateCartItem(idx, { options: newOptions });
                         }}
                         size="small"

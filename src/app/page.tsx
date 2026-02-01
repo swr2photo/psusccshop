@@ -2186,7 +2186,7 @@ const isProductCurrentlyOpen = (product: { isActive?: boolean; startDate?: strin
   if (end && now > end) return false;
   return true;
 };
-const normalizeEngName = (value: string) => value.replace(/[^a-zA-Z\s]/g, '').toUpperCase().slice(0, 7).trim();
+const normalizeEngName = (value: string) => value.replace(/[^\x20-\x7E]/g, '').toUpperCase().slice(0, 7).trim();
 const normalizeDigits99 = (value: string) => {
   const digits = value.replace(/\D/g, '');
   if (!digits) return '';

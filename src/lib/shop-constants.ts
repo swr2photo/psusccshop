@@ -122,7 +122,7 @@ export const isProductCurrentlyOpen = (product: { isActive?: boolean; startDate?
   return true;
 };
 
-export const normalizeEngName = (value: string) => value.replace(/[^a-zA-Z\s]/g, '').toUpperCase().slice(0, 7).trim();
+export const normalizeEngName = (value: string) => value.replace(/[^\x20-\x7E]/g, '').toUpperCase().slice(0, 7).trim();
 
 export const normalizeDigits99 = (value: string) => {
   const digits = value.replace(/\D/g, '');
