@@ -1,0 +1,38 @@
+{
+  "name": "SCC Shop - ร้านค้าชุมนุมคอมพิวเตอร์",
+  "short_name": "SCC Shop",
+  "description": "ร้านค้าในชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ มหาวิทยาลัยสงขลานครินทร์",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#060914",
+  "theme_color": "#5ac8fa",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "th",
+  "dir": "ltr",
+  "categories": ["shopping", "education"],
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "ดูสินค้า",
+      "short_name": "สินค้า",
+      "description": "ดูสินค้าทั้งหมด",
+      "url": "/?section=products",
+      "icons": []
+    }
+  ]
+}

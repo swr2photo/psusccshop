@@ -6,6 +6,21 @@ import { useSession, signIn, signOut } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Swal from 'sweetalert2';
 import { useRealtimeAdminOrders } from '@/hooks/useRealtimeOrders';
+import { 
+  useAdminData, 
+  useUpdateOrderStatus, 
+  useUpdateConfig, 
+  useBatchUpdateStatus,
+  useDeleteOrder,
+  useUpdateOrder,
+  useSyncSheet,
+  updateOrderInCache,
+  removeOrderFromCache,
+  invalidateAdminData,
+  saveAdminCacheSWR,
+  loadAdminCacheSWR,
+} from '@/hooks/useAdminData';
+import { useAdminDataSWR, useOptimisticOrderUpdate, useOptimisticBatchUpdate } from '@/hooks/useAdminDataSWR';
 
 import {
   Box,
@@ -124,7 +139,7 @@ import {
 } from '@mui/icons-material';
 
 import { isAdmin, isSuperAdmin, setDynamicAdminEmails, SUPER_ADMIN_EMAIL, Product, ShopConfig, SIZES } from '@/lib/config';
-import { deleteOrderAdmin, getAdminData, saveShopConfig, syncOrdersSheet, updateOrderAdmin, updateOrderStatusAPI } from '@/lib/api-client';
+import { deleteOrderAdmin, saveShopConfig, syncOrdersSheet, updateOrderAdmin, updateOrderStatusAPI } from '@/lib/api-client';
 import SupportChatPanel from '@/components/admin/SupportChatPanel';
 import EmailManagement from '@/components/admin/EmailManagement';
 import UserLogsView from '@/components/admin/UserLogsView';
@@ -311,8 +326,8 @@ const loadAdminCache = (): { config: ShopConfig; orders: AdminOrder[]; logs: any
 const saveAdminCache = (payload: { config: ShopConfig; orders?: AdminOrder[]; logs?: any[][] }) => {
   if (typeof window === 'undefined' || ADMIN_CACHE_DISABLED) return;
   try {
-    // Very minimal cache - only essential data
-    const minimalCache = {
+    // Save more complete data for instant loading
+    const cacheData = {
       config: {
         isOpen: payload.config?.isOpen ?? false,
         sheetId: payload.config?.sheetId || '',
@@ -320,14 +335,24 @@ const saveAdminCache = (payload: { config: ShopConfig; orders?: AdminOrder[]; lo
         vendorSheetId: payload.config?.vendorSheetId || '',
         vendorSheetUrl: payload.config?.vendorSheetUrl || '',
         announcements: payload.config?.announcements || [],
-        // Skip products entirely to save space
-        products: [],
+        adminEmails: payload.config?.adminEmails || [],
+        products: (payload.config?.products || []).slice(0, 20).map(p => ({
+          id: p.id,
+          name: p.name,
+          category: p.category,
+          subType: p.subType,
+          basePrice: p.basePrice,
+          isActive: p.isActive,
+        })),
       },
-      orders: (payload.orders || []).slice(0, 10).map(o => ({ 
+      orders: (payload.orders || []).slice(0, 50).map(o => ({ 
         ref: o.ref, 
         status: o.status,
         name: o.name,
+        email: o.email,
         amount: o.amount,
+        date: o.date,
+        cart: o.cart,
         // Include slip metadata (without base64) for hasSlip check
         slip: o.slip ? {
           hasData: Boolean(o.slip.base64 || o.slip.imageUrl),
@@ -335,11 +360,12 @@ const saveAdminCache = (payload: { config: ShopConfig; orders?: AdminOrder[]; lo
           uploadedAt: o.slip.uploadedAt,
         } : undefined,
       })),
-      logs: [],
+      logs: (payload.logs || []).slice(0, 20),
+      timestamp: Date.now(),
     };
     
     try {
-      window.localStorage.setItem(ADMIN_CACHE_KEY, JSON.stringify(minimalCache));
+      window.localStorage.setItem(ADMIN_CACHE_KEY, JSON.stringify(cacheData));
     } catch (err: any) {
       // If still fails, just disable cache
       console.warn('Admin cache disabled');
@@ -2385,80 +2411,83 @@ export default function AdminPage(): JSX.Element {
     });
   }, [session?.user?.email, config, orders]);
 
-  // 📥 Fetch Data (Filebase via internal API)
-  const fetchData = useCallback(async (opts?: { silent?: boolean }) => {
-    const silent = opts?.silent;
-    if (fetchInFlightRef.current) return;
-    fetchInFlightRef.current = true;
-    if (!silent) setLoading(true);
-    try {
-      const res = await getAdminData(session?.user?.email || '');
-      if (res.status === 'success') {
-        const data = (res.data as AdminDataResponse) || (res as any);
-        const normalizedOrders = Array.isArray(data?.orders) ? data.orders.map(normalizeOrder).filter((o) => o.ref) : [];
-        const nextConfig = data?.config || DEFAULT_CONFIG;
-        let nextLogs = data?.logs || [];
-        if ((!nextLogs || nextLogs.length === 0) && normalizedOrders.length > 0) {
-          // Build lightweight log view from orders when backend logs are absent
-          nextLogs = normalizedOrders.slice(0, 50).map((o) => [
-            o.date || new Date().toISOString(),
-            o.email || o.name || 'system',
-            'ORDER',
-            `${o.ref} : ${o.status}`
-          ]);
-        }
-        
-        // Only update state if data actually changed to prevent flickering
-        setConfig(prev => {
-          const prevJson = JSON.stringify(prev);
-          const nextJson = JSON.stringify(nextConfig);
-          return prevJson === nextJson ? prev : nextConfig;
-        });
-        // Sync dynamic admin emails from config
-        setDynamicAdminEmails(nextConfig.adminEmails || []);
-        setOrders(prev => {
-          // Compare by ref, status, and slip presence to detect real changes
-          const prevKey = prev.map(o => `${o.ref}:${o.status}:${o.slip?.base64 || o.slip?.imageUrl ? '1' : '0'}`).join(',');
-          const nextKey = normalizedOrders.map(o => `${o.ref}:${o.status}:${o.slip?.base64 || o.slip?.imageUrl ? '1' : '0'}`).join(',');
-          return prevKey === nextKey ? prev : normalizedOrders;
-        });
-        setLogs(prev => {
-          if (prev.length === nextLogs.length && prev.length > 0) {
-            // Simple check - if same length and first item matches, skip update
-            const prevFirst = JSON.stringify(prev[0]);
-            const nextFirst = JSON.stringify(nextLogs[0]);
-            if (prevFirst === nextFirst) return prev;
-          }
-          return nextLogs;
-        });
-        if (!silent) {
-          setLastSavedTime(new Date());
-          addLog('SYNC_FILEBASE', 'ดึงข้อมูลล่าสุด', { config: nextConfig, orders: normalizedOrders });
-        }
-        saveAdminCache({ config: nextConfig, orders: normalizedOrders, logs: nextLogs });
-        return;
+  // 📥 SWR Data Handler - processes data from SWR hook
+  const handleSWRDataReceived = useCallback((data: { orders: any[]; config: any; logs: any[] }) => {
+    const normalizedOrders = Array.isArray(data.orders) 
+      ? data.orders.map(normalizeOrder).filter((o) => o.ref) 
+      : [];
+    const nextConfig = data.config || DEFAULT_CONFIG;
+    let nextLogs = data.logs || [];
+    
+    if ((!nextLogs || nextLogs.length === 0) && normalizedOrders.length > 0) {
+      nextLogs = normalizedOrders.slice(0, 50).map((o) => [
+        o.date || new Date().toISOString(),
+        o.email || o.name || 'system',
+        'ORDER',
+        `${o.ref} : ${o.status}`
+      ]);
+    }
+    
+    // Only update state if data actually changed to prevent flickering
+    setConfig(prev => {
+      const prevJson = JSON.stringify(prev);
+      const nextJson = JSON.stringify(nextConfig);
+      return prevJson === nextJson ? prev : nextConfig;
+    });
+    setDynamicAdminEmails(nextConfig.adminEmails || []);
+    setOrders(prev => {
+      const prevKey = prev.map(o => `${o.ref}:${o.status}:${o.slip?.base64 || o.slip?.imageUrl ? '1' : '0'}`).join(',');
+      const nextKey = normalizedOrders.map(o => `${o.ref}:${o.status}:${o.slip?.base64 || o.slip?.imageUrl ? '1' : '0'}`).join(',');
+      return prevKey === nextKey ? prev : normalizedOrders;
+    });
+    setLogs(prev => {
+      if (prev.length === nextLogs.length && prev.length > 0) {
+        const prevFirst = JSON.stringify(prev[0]);
+        const nextFirst = JSON.stringify(nextLogs[0]);
+        if (prevFirst === nextFirst) return prev;
       }
+      return nextLogs;
+    });
+    
+    setLastSavedTime(new Date());
+    saveAdminCache({ config: nextConfig, orders: normalizedOrders, logs: nextLogs });
+  }, []);
 
-      throw new Error(res.message || 'โหลดข้อมูลไม่สำเร็จ');
-    } catch (error: any) {
-      console.error('❌ Fetch error:', error);
+  // 📥 SWR Hook for Admin Data (replaces manual fetchData)
+  const { 
+    isLoading: swrLoading, 
+    isRefreshing: swrRefreshing,
+    refresh: swrRefresh,
+    invalidate: swrInvalidate,
+  } = useAdminDataSWR({
+    enabled: status === 'authenticated',
+    onDataReceived: handleSWRDataReceived,
+    onError: (error) => {
+      const isNetworkError = error?.message?.includes('Failed to fetch') || 
+                            error?.message?.includes('NETWORK_ERROR');
+      if (isNetworkError) {
+        console.warn('[Admin SWR] Network error - using cached data');
+      } else {
+        console.error('[Admin SWR] Error:', error);
+      }
+      // Load from local cache as fallback
       const cached = loadAdminCache();
       if (cached) {
         setConfig(cached.config);
         setOrders((cached.orders || []).map(normalizeOrder));
         setLogs(cached.logs || []);
-        if (!silent) showToast('warning', 'แสดงข้อมูลจากแคช (เชื่อม Filebase ไม่สำเร็จ)');
-      } else if (!silent) {
-        setConfig(DEFAULT_CONFIG);
-        setOrders([]);
-        setLogs([]);
-        showToast('error', error?.message || 'โหลดข้อมูลไม่สำเร็จ');
       }
-    } finally {
-      if (!silent) setLoading(false);
-      fetchInFlightRef.current = false;
-    }
-  }, [session?.user?.email, showToast]);
+    },
+    onLoadingChange: (loading) => {
+      setLoading(loading);
+    },
+    realtimeConnected: false, // Will be updated by realtime hook below
+  });
+
+  // 📥 Fetch Data wrapper (for compatibility with existing code)
+  const fetchData = useCallback(async (opts?: { silent?: boolean }) => {
+    await swrRefresh(opts);
+  }, [swrRefresh]);
 
   // Batch update order statuses
   const handleBatchUpdateStatus = async () => {
@@ -2874,15 +2903,23 @@ export default function AdminPage(): JSX.Element {
     }
   };
 
-  // 🔐 Authentication Check - Load data first, then check authorization
+  // 🔐 Authentication Check - Load cache immediately (SWR handles fresh fetch)
   useEffect(() => {
     if (status === 'loading') return;
 
     if (status === 'authenticated') {
-      // Always fetch data first - authorization check happens after config loads
-      fetchData();
+      // Load cache immediately for instant UI - SWR will fetch fresh data automatically
+      const cached = loadAdminCache();
+      if (cached) {
+        setConfig(cached.config || DEFAULT_CONFIG);
+        setOrders((cached.orders || []).map(normalizeOrder));
+        setLogs(cached.logs || []);
+        setLoading(false); // Show cached data immediately
+        console.log('[Admin] Loaded from cache:', cached.orders?.length || 0, 'orders');
+      }
+      // Note: SWR hook above handles fetching fresh data automatically
     }
-  }, [status, fetchData]);
+  }, [status]);
 
   // Check authorization after config loads (includes dynamic admin list)
   useEffect(() => {
@@ -2910,7 +2947,7 @@ export default function AdminPage(): JSX.Element {
   // ⚠️ Pause polling when order editor is open to prevent flickering
   // ℹ️ Now uses Supabase Realtime as primary, polling as fallback
   
-  // Handle realtime order changes
+  // Handle realtime order changes - immediate UI update
   const handleRealtimeOrderChange = useCallback((change: { type: string; order: any; oldOrder?: any }) => {
     console.log('[Admin Realtime] Order change:', change.type, change.order?.ref);
     
@@ -2919,73 +2956,71 @@ export default function AdminPage(): JSX.Element {
         const existingIndex = prev.findIndex((o) => o.ref === change.order.ref);
         if (existingIndex >= 0) {
           const updated = [...prev];
-          // Convert DB format to AdminOrder format
+          const existing = updated[existingIndex];
+          // Convert DB format to AdminOrder format - full update
           updated[existingIndex] = {
-            ...updated[existingIndex],
-            status: change.order.status,
-            amount: change.order.total_amount ?? updated[existingIndex].amount,
-            cart: change.order.cart || updated[existingIndex].cart,
-            date: change.order.date || change.order.created_at || updated[existingIndex].date,
-            slip: change.order.slip_data ?? updated[existingIndex].slip,
+            ...existing,
+            status: change.order.status ?? existing.status,
+            amount: change.order.total_amount ?? change.order.amount ?? existing.amount,
+            cart: change.order.cart || existing.cart,
+            date: change.order.date || change.order.created_at || existing.date,
+            name: change.order.customer_name ?? change.order.name ?? existing.name,
+            email: change.order.customer_email ?? change.order.email ?? existing.email,
+            slip: change.order.slip_data ?? change.order.slip ?? existing.slip,
+            trackingNumber: change.order.tracking_number ?? change.order.trackingNumber ?? existing.trackingNumber,
+            raw: { ...existing.raw, ...change.order },
           };
+          // Save to cache immediately
+          saveAdminCache({ config, orders: updated, logs });
           return updated;
         }
         return prev;
       });
     } else if (change.type === 'INSERT' && change.order) {
-      // Add new order to list
+      // Add new order to list immediately
       const newOrder: AdminOrder = {
         ref: change.order.ref,
         date: change.order.date || change.order.created_at,
         status: change.order.status,
-        amount: change.order.total_amount ?? 0,
-        name: change.order.customer_name || '',
-        email: change.order.customer_email || '',
+        amount: change.order.total_amount ?? change.order.amount ?? 0,
+        name: change.order.customer_name ?? change.order.name ?? '',
+        email: change.order.customer_email ?? change.order.email ?? '',
         cart: change.order.cart || [],
-        slip: change.order.slip_data,
+        slip: change.order.slip_data ?? change.order.slip,
+        trackingNumber: change.order.tracking_number ?? change.order.trackingNumber ?? '',
         raw: change.order,
       };
       setOrders((prev) => {
         // Check if already exists
         if (prev.some((o) => o.ref === newOrder.ref)) return prev;
-        return [newOrder, ...prev];
+        const updated = [newOrder, ...prev];
+        // Save to cache immediately
+        saveAdminCache({ config, orders: updated, logs });
+        return updated;
       });
     } else if (change.type === 'DELETE' && change.oldOrder) {
-      setOrders((prev) => prev.filter((o) => o.ref !== change.oldOrder.ref));
+      setOrders((prev) => {
+        const updated = prev.filter((o) => o.ref !== change.oldOrder.ref);
+        saveAdminCache({ config, orders: updated, logs });
+        return updated;
+      });
     }
-  }, []);
+  }, [config, logs]);
 
   // Use realtime subscriptions for admin
   const { isConnected: realtimeConnected } = useRealtimeAdminOrders(handleRealtimeOrderChange);
 
+  // SWR handles polling automatically via refreshInterval
+  // This effect is kept only for editor pause logic
   useEffect(() => {
     if (status !== 'authenticated') return;
-    if (orderEditor.open) return; // Don't poll while editing
-
-    // If realtime is connected, use longer polling interval as fallback
-    if (realtimeConnected) {
-      // Still poll occasionally to catch any missed updates
-      const intervalMs = 60000; // 60s fallback polling when realtime is active
-      const tick = async () => {
-        await fetchData({ silent: true });
-      };
-      pollingRef.current = setInterval(tick, intervalMs);
-      return () => {
-        if (pollingRef.current) clearInterval(pollingRef.current);
-      };
+    
+    // When order editor opens, pause SWR refresh by invalidating
+    // When it closes, SWR will automatically resume
+    if (orderEditor.open) {
+      console.log('[Admin] Order editor open - SWR will pause');
     }
-
-    // Fallback: regular polling when realtime is not available
-    const intervalMs = 10000; // 10s polling
-    const tick = async () => {
-      await fetchData({ silent: true });
-    };
-
-    pollingRef.current = setInterval(tick, intervalMs);
-    return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current);
-    };
-  }, [status, fetchData, orderEditor.open, realtimeConnected]);
+  }, [status, orderEditor.open]);
 
   // Sync settings local config with main config (only when no unsaved changes)
   useEffect(() => {
@@ -3091,9 +3126,37 @@ export default function AdminPage(): JSX.Element {
             <WavingHand sx={{ fontSize: 24, color: '#fbbf24' }} />
             ยินดีต้อนรับ, {session?.user?.name?.split(' ')[0] || 'Admin'}
           </Typography>
-          <Typography sx={{ fontSize: '0.9rem', color: '#94a3b8' }}>
-            จัดการร้านค้าและออเดอร์ของคุณได้ที่นี่ • อัพเดทล่าสุด: {lastSavedTime?.toLocaleTimeString('th-TH') || 'กำลังโหลด...'}
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+            <Typography sx={{ fontSize: '0.9rem', color: '#94a3b8' }}>
+              จัดการร้านค้าและออเดอร์ของคุณได้ที่นี่ • อัพเดทล่าสุด: {lastSavedTime?.toLocaleTimeString('th-TH') || 'กำลังโหลด...'}
+            </Typography>
+            {/* Realtime Status Indicator */}
+            <Box sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 0.5, 
+              px: 1.5, 
+              py: 0.5, 
+              borderRadius: '20px',
+              bgcolor: realtimeConnected ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)',
+              border: `1px solid ${realtimeConnected ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)'}`,
+            }}>
+              <Box sx={{ 
+                width: 8, 
+                height: 8, 
+                borderRadius: '50%', 
+                bgcolor: realtimeConnected ? '#10b981' : '#f59e0b',
+                animation: realtimeConnected ? 'pulse 2s infinite' : 'none',
+                '@keyframes pulse': {
+                  '0%, 100%': { opacity: 1 },
+                  '50%': { opacity: 0.5 },
+                },
+              }} />
+              <Typography sx={{ fontSize: '0.7rem', color: realtimeConnected ? '#10b981' : '#f59e0b', fontWeight: 600 }}>
+                {realtimeConnected ? '🔴 Live' : '⏳ Polling'}
+              </Typography>
+            </Box>
+          </Box>
         </Box>
 
         {/* Stats Grid - Modern Cards */}
@@ -3263,6 +3326,129 @@ export default function AdminPage(): JSX.Element {
             </Box>
           </Box>
         </Box>
+
+        {/* Factory Production Summary - Size & Sleeve breakdown for PAID orders */}
+        {(() => {
+          const paidOrders = orders.filter(o => o.status === 'PAID');
+          const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL', '7XL', '8XL', '9XL', '10XL'];
+          const getSizeIndex = (size: string) => {
+            const idx = sizeOrder.findIndex(s => size?.toUpperCase()?.includes(s));
+            return idx === -1 ? 999 : idx;
+          };
+
+          const sizeCount: Record<string, number> = {};
+          const sizeLongSleeveCount: Record<string, number> = {};
+          const sizeShortSleeveCount: Record<string, number> = {};
+          let totalItems = 0;
+
+          paidOrders.forEach((o) => {
+            const items = o?.items || o?.cart || [];
+            items.forEach((item: any) => {
+              const size = item.size || 'ไม่ระบุ';
+              const qty = Number(item.quantity ?? 1) || 1;
+              const isLongSleeve = item.options?.isLongSleeve || item.isLongSleeve || false;
+
+              totalItems += qty;
+              sizeCount[size] = (sizeCount[size] || 0) + qty;
+              if (isLongSleeve) {
+                sizeLongSleeveCount[size] = (sizeLongSleeveCount[size] || 0) + qty;
+              } else {
+                sizeShortSleeveCount[size] = (sizeShortSleeveCount[size] || 0) + qty;
+              }
+            });
+          });
+
+          const sortedSizes = Object.keys(sizeCount).sort((a, b) => getSizeIndex(a) - getSizeIndex(b));
+          const totalShortSleeve = Object.values(sizeShortSleeveCount).reduce((a, b) => a + b, 0);
+          const totalLongSleeve = Object.values(sizeLongSleeveCount).reduce((a, b) => a + b, 0);
+
+          return (
+            <Box sx={{ ...glassCardSx, p: 3 }}>
+              <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#f1f5f9', mb: 2.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <LocalMall sx={{ fontSize: 20, color: '#f472b6' }} />
+                🏭 สรุปการผลิต (ออเดอร์ชำระแล้ว)
+              </Typography>
+              
+              {/* Summary Stats */}
+              <Box sx={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(3, 1fr)', 
+                gap: 2, 
+                mb: 3,
+                p: 2,
+                borderRadius: '12px',
+                bgcolor: 'rgba(99,102,241,0.1)',
+                border: '1px solid rgba(99,102,241,0.2)',
+              }}>
+                <Box sx={{ textAlign: 'center' }}>
+                  <Typography sx={{ fontSize: '1.5rem', fontWeight: 900, color: '#f1f5f9' }}>{paidOrders.length}</Typography>
+                  <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8' }}>📦 ออเดอร์</Typography>
+                </Box>
+                <Box sx={{ textAlign: 'center' }}>
+                  <Typography sx={{ fontSize: '1.5rem', fontWeight: 900, color: '#22d3ee' }}>{totalItems}</Typography>
+                  <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8' }}>👕 ตัวทั้งหมด</Typography>
+                </Box>
+                <Box sx={{ textAlign: 'center' }}>
+                  <Typography sx={{ fontSize: '1.5rem', fontWeight: 900, color: '#a78bfa' }}>{sortedSizes.length}</Typography>
+                  <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8' }}>📐 ไซส์</Typography>
+                </Box>
+              </Box>
+
+              {/* Size Breakdown Table */}
+              {sortedSizes.length > 0 ? (
+                <Box sx={{ overflowX: 'auto' }}>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ color: '#64748b', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>ไซส์</TableCell>
+                        <TableCell align="center" sx={{ color: '#64748b', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>⚪ แขนสั้น</TableCell>
+                        <TableCell align="center" sx={{ color: '#64748b', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>🔵 แขนยาว</TableCell>
+                        <TableCell align="center" sx={{ color: '#64748b', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>รวม</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {sortedSizes.map((size) => (
+                        <TableRow key={size} sx={{ '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' } }}>
+                          <TableCell sx={{ borderColor: ADMIN_THEME.border }}>
+                            <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#f1f5f9' }}>{size}</Typography>
+                          </TableCell>
+                          <TableCell align="center" sx={{ borderColor: ADMIN_THEME.border }}>
+                            <Typography sx={{ fontSize: '0.85rem', color: '#94a3b8' }}>{sizeShortSleeveCount[size] || 0}</Typography>
+                          </TableCell>
+                          <TableCell align="center" sx={{ borderColor: ADMIN_THEME.border }}>
+                            <Typography sx={{ fontSize: '0.85rem', color: '#60a5fa' }}>{sizeLongSleeveCount[size] || 0}</Typography>
+                          </TableCell>
+                          <TableCell align="center" sx={{ borderColor: ADMIN_THEME.border }}>
+                            <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#10b981' }}>{sizeCount[size]}</Typography>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {/* Total Row */}
+                      <TableRow sx={{ bgcolor: 'rgba(99,102,241,0.1)' }}>
+                        <TableCell sx={{ borderColor: ADMIN_THEME.border }}>
+                          <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#a5b4fc' }}>🎯 รวมทั้งหมด</Typography>
+                        </TableCell>
+                        <TableCell align="center" sx={{ borderColor: ADMIN_THEME.border }}>
+                          <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#f1f5f9' }}>{totalShortSleeve}</Typography>
+                        </TableCell>
+                        <TableCell align="center" sx={{ borderColor: ADMIN_THEME.border }}>
+                          <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#60a5fa' }}>{totalLongSleeve}</Typography>
+                        </TableCell>
+                        <TableCell align="center" sx={{ borderColor: ADMIN_THEME.border }}>
+                          <Typography sx={{ fontSize: '1rem', fontWeight: 900, color: '#10b981' }}>{totalItems}</Typography>
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </Box>
+              ) : (
+                <Typography sx={{ fontSize: '0.85rem', color: '#64748b', textAlign: 'center', py: 3 }}>
+                  ยังไม่มีออเดอร์ที่ชำระแล้ว
+                </Typography>
+              )}
+            </Box>
+          );
+        })()}
 
         {/* Recent Orders - Modern Table */}
         <Box sx={{ ...glassCardSx, p: 0 }}>

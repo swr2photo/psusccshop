@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -64,6 +64,11 @@ import {
   TRACKING_STATUS_THAI,
   ShippingProvider,
 } from '@/lib/shipping';
+import {
+  useShippingOrders,
+  useUpdateTracking,
+  useTrackShipment,
+} from '@/hooks/useShippingOrders';
 
 interface TrackingManagementProps {
   showToast?: (type: 'success' | 'error' | 'warning' | 'info', message: string) => void;
@@ -122,6 +127,27 @@ const CARRIER_LABEL_URLS: Record<string, string> = {
 };
 
 export default function TrackingManagement({ showToast }: TrackingManagementProps) {
+  // ============== SWR HOOKS ==============
+  const { 
+    orders: allOrders, 
+    isLoading: loadingOrders, 
+    refresh: refreshOrders,
+    error: ordersError 
+  } = useShippingOrders();
+  
+  const { 
+    updateTracking, 
+    deleteTracking: deleteTrackingMutation, 
+    isUpdating: saving 
+  } = useUpdateTracking();
+  
+  const { 
+    trackShipment, 
+    isTracking: loadingTracking, 
+    error: trackingErrorObj,
+    resetError: resetTrackingError 
+  } = useTrackShipment();
+  
   // Tab state
   const [activeTab, setActiveTab] = useState(0);
   
@@ -129,12 +155,9 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
   const [searchTrackingNumber, setSearchTrackingNumber] = useState('');
   const [searchProvider, setSearchProvider] = useState<ShippingProvider | ''>('');
   const [trackingResult, setTrackingResult] = useState<TrackingInfo | null>(null);
-  const [loadingTracking, setLoadingTracking] = useState(false);
   const [trackingError, setTrackingError] = useState<string | null>(null);
 
-  // State for orders
-  const [allOrders, setAllOrders] = useState<Order[]>([]);
-  const [loadingOrders, setLoadingOrders] = useState(true);
+  // State for orders search/filter
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'shipped'>('pending');
 
@@ -142,102 +165,23 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [editTrackingNumber, setEditTrackingNumber] = useState('');
   const [editProvider, setEditProvider] = useState<ShippingProvider>('thailand_post');
-  const [saving, setSaving] = useState(false);
 
   // State for bulk actions
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
   const [bulkTrackingInput, setBulkTrackingInput] = useState('');
   const [bulkProvider, setBulkProvider] = useState<ShippingProvider>('thailand_post');
-
-  // Load orders
-  useEffect(() => {
-    loadOrders();
-  }, []);
-
-  const loadOrders = async () => {
-    try {
-      setLoadingOrders(true);
-      const res = await fetch('/api/admin/data');
-      const data = await res.json();
-      
-      if (data.status === 'success' && data.data?.orders) {
-        // Get all orders that are PAID, READY, or SHIPPED
-        // Show orders that need shipping (exclude pickup orders)
-        const ordersWithShipping = data.data.orders.filter((o: any) => {
-          // Must be in relevant status
-          if (!['SHIPPED', 'READY', 'PAID'].includes(o.status)) return false;
-          
-          // Check shipping option
-          const shippingOpt = (o.shippingOption || o.shippingOptionId || '').toLowerCase();
-          
-          // Exclude pickup orders
-          const isPickup = shippingOpt === 'pickup' || 
-                          shippingOpt.includes('รับเอง') ||
-                          shippingOpt.includes('รับหน้าร้าน') ||
-                          shippingOpt.includes('pick up');
-          
-          if (isPickup) return false;
-          
-          // If has explicit shipping option (not pickup), include it
-          if (shippingOpt && !isPickup) return true;
-          
-          // Check if total > cart subtotal (has shipping fee) - likely delivery
-          const cart = o.cart || [];
-          const cartSubtotal = cart.reduce((sum: number, item: any) => {
-            const price = Number(item?.unitPrice ?? item?.price ?? 0);
-            const qty = Number(item?.quantity ?? item?.qty ?? 1);
-            return sum + (price * qty);
-          }, 0);
-          const totalAmount = Number(o.totalAmount ?? o.amount ?? 0);
-          const hasShippingFee = totalAmount > cartSubtotal;
-          
-          // Include if has shipping fee (legacy delivery orders)
-          return hasShippingFee;
-        }).map((o: any) => {
-          // Detect delivery_legacy from fee difference
-          let shippingOpt = o.shippingOption || o.shippingOptionId || '';
-          if (!shippingOpt) {
-            const cart = o.cart || [];
-            const cartSubtotal = cart.reduce((sum: number, item: any) => {
-              const price = Number(item?.unitPrice ?? item?.price ?? 0);
-              const qty = Number(item?.quantity ?? item?.qty ?? 1);
-              return sum + (price * qty);
-            }, 0);
-            const totalAmount = Number(o.totalAmount ?? o.amount ?? 0);
-            if (totalAmount > cartSubtotal) {
-              shippingOpt = 'delivery_legacy';
-            }
-          }
-          
-          return {
-            ref: o.ref,
-            customerName: o.customerName || o.name,
-            name: o.name,
-            email: o.email || o.customerEmail || '',
-            phone: o.customerPhone || o.phone || '',
-            address: o.customerAddress || o.address || '',
-            status: o.status,
-            trackingNumber: o.trackingNumber,
-            shippingProvider: o.shippingProvider,
-            date: o.date,
-            cart: o.cart,
-            total: o.total || o.totalAmount || o.amount,
-            shippingOption: shippingOpt,
-          };
-        });
-        setAllOrders(ordersWithShipping);
-      }
-    } catch (error) {
-      console.error('Failed to load orders:', error);
-      showToast?.('error', 'ไม่สามารถโหลดรายการออเดอร์');
-    } finally {
-      setLoadingOrders(false);
+  
+  // Show error toast when orders fail to load
+  const loadOrders = useCallback(() => {
+    refreshOrders();
+    if (ordersError) {
+      showToast?.('warning', 'ไม่สามารถโหลดข้อมูลได้');
     }
-  };
+  }, [refreshOrders, ordersError, showToast]);
 
   // Filtered orders
-  const filteredOrders = useMemo(() => {
-    return allOrders.filter(order => {
+  const filteredOrders = useMemo((): Order[] => {
+    return (allOrders as Order[]).filter((order: Order) => {
       // Filter by status
       if (filterStatus === 'pending' && order.trackingNumber) return false;
       if (filterStatus === 'shipped' && !order.trackingNumber) return false;
@@ -257,115 +201,74 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
   }, [allOrders, filterStatus, searchQuery]);
 
   // Orders pending shipping (no tracking number)
-  const pendingOrders = useMemo(() => 
-    allOrders.filter(o => !o.trackingNumber),
+  const pendingOrders = useMemo((): Order[] => 
+    (allOrders as Order[]).filter((o: Order) => !o.trackingNumber),
     [allOrders]
   );
 
   // Orders already shipped (has tracking number)
-  const shippedOrders = useMemo(() => 
-    allOrders.filter(o => o.trackingNumber),
+  const shippedOrders = useMemo((): Order[] => 
+    (allOrders as Order[]).filter((o: Order) => !!o.trackingNumber),
     [allOrders]
   );
 
-  // Track shipment
+  // Track shipment using SWR
   const handleTrack = async () => {
     if (!searchTrackingNumber.trim()) {
       setTrackingError('กรุณาใส่เลขพัสดุ');
       return;
     }
 
-    setLoadingTracking(true);
     setTrackingError(null);
     setTrackingResult(null);
+    resetTrackingError();
 
     try {
-      const res = await fetch('/api/shipping/track', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          provider: searchProvider || undefined,
-          trackingNumber: searchTrackingNumber.trim(),
-        }),
-      });
-
-      const data = await res.json();
-      if (data.success && data.data) {
-        setTrackingResult(data.data);
-      } else {
-        setTrackingError(data.error || 'ไม่สามารถดึงข้อมูลการติดตามได้');
-      }
-    } catch (error) {
-      setTrackingError('เกิดข้อผิดพลาดในการติดต่อระบบ');
-    } finally {
-      setLoadingTracking(false);
+      const result = await trackShipment(
+        searchTrackingNumber.trim(),
+        searchProvider || undefined
+      );
+      setTrackingResult(result);
+    } catch (error: any) {
+      setTrackingError(error.message || 'ไม่สามารถดึงข้อมูลการติดตามได้');
     }
   };
 
-  // Update order tracking number
+  // Update order tracking number using SWR
   const handleSaveTracking = async () => {
     if (!editingOrder) return;
 
-    setSaving(true);
     try {
-      const res = await fetch('/api/admin/status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ref: editingOrder.ref,
-          status: 'SHIPPED',
-          trackingNumber: editTrackingNumber.trim() || null,
-          shippingProvider: editTrackingNumber.trim() ? editProvider : null,
-        }),
-      });
-
-      const data = await res.json();
-      if (data.status === 'success') {
-        showToast?.('success', editTrackingNumber.trim() 
-          ? `บันทึกเลขพัสดุสำหรับ ${editingOrder.ref} แล้ว`
-          : `ลบเลขพัสดุสำหรับ ${editingOrder.ref} แล้ว`
-        );
-        setEditingOrder(null);
-        loadOrders();
-      } else {
-        showToast?.('error', data.message || 'ไม่สามารถบันทึกได้');
-      }
-    } catch (error) {
-      showToast?.('error', 'เกิดข้อผิดพลาด');
-    } finally {
-      setSaving(false);
+      await updateTracking(
+        editingOrder.ref,
+        editTrackingNumber.trim() || null,
+        editTrackingNumber.trim() ? editProvider : null,
+        'SHIPPED'
+      );
+      
+      showToast?.('success', editTrackingNumber.trim() 
+        ? `บันทึกเลขพัสดุสำหรับ ${editingOrder.ref} แล้ว`
+        : `ลบเลขพัสดุสำหรับ ${editingOrder.ref} แล้ว`
+      );
+      setEditingOrder(null);
+    } catch (error: any) {
+      showToast?.('error', error.message || 'ไม่สามารถบันทึกได้');
     }
   };
 
-  // Delete tracking number
+  // Delete tracking number using SWR
   const handleDeleteTracking = async (order: Order) => {
     if (!confirm(`ต้องการลบเลขพัสดุของ ${order.ref} ใช่หรือไม่?`)) return;
 
     try {
-      const res = await fetch('/api/admin/status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ref: order.ref,
-          status: 'PAID', // Revert to PAID status
-          trackingNumber: null,
-          shippingProvider: null,
-        }),
-      });
-
-      const data = await res.json();
-      if (data.status === 'success') {
-        showToast?.('success', `ลบเลขพัสดุสำหรับ ${order.ref} แล้ว`);
-        loadOrders();
-      } else {
-        showToast?.('error', data.message || 'ไม่สามารถลบได้');
-      }
-    } catch (error) {
-      showToast?.('error', 'เกิดข้อผิดพลาด');
+      await deleteTrackingMutation(order.ref);
+      showToast?.('success', `ลบเลขพัสดุสำหรับ ${order.ref} แล้ว`);
+    } catch (error: any) {
+      showToast?.('error', error.message || 'ไม่สามารถลบได้');
     }
   };
 
-  // Bulk add tracking (format: REF:TRACKING per line)
+  // Bulk add tracking (format: REF:TRACKING per line) using SWR
   const handleBulkAddTracking = async () => {
     const lines = bulkTrackingInput.trim().split('\n').filter(l => l.trim());
     if (lines.length === 0) {
@@ -383,23 +286,8 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
       const [ref, trackingNumber] = parts;
       
       try {
-        const res = await fetch('/api/admin/status', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ref,
-            status: 'SHIPPED',
-            trackingNumber,
-            shippingProvider: bulkProvider,
-          }),
-        });
-
-        const data = await res.json();
-        if (data.status === 'success') {
-          success++;
-        } else {
-          failed++;
-        }
+        await updateTracking(ref, trackingNumber, bulkProvider, 'SHIPPED');
+        success++;
       } catch {
         failed++;
       }
@@ -411,7 +299,6 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
     
     if (success > 0) {
       setBulkTrackingInput('');
-      loadOrders();
     }
   };
 

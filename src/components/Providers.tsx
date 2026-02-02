@@ -9,6 +9,8 @@ import { NotificationProvider } from './NotificationContext';
 import ToastContainer from './ToastContainer';
 import CookieConsentBanner from './CookieConsentBanner';
 import { useScreenshotProtection } from '@/hooks';
+import { SWRProvider } from '@/hooks/useSWRConfig';
+import { TanStackQueryProvider } from '@/hooks/useTanStackQuery';
 
 // Error Boundary for catching client-side errors (especially on older browsers)
 interface ErrorBoundaryState {
@@ -247,16 +249,20 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ErrorBoundary>
       <SessionProvider>
-        <ThemeProvider theme={darkTheme}>
-          <CssBaseline />
-          <NotificationProvider>
-            <ScreenshotProtectionProvider>
-              {children}
-            </ScreenshotProtectionProvider>
-            <ToastContainer />
-            <CookieConsentBanner />
-          </NotificationProvider>
-        </ThemeProvider>
+        <TanStackQueryProvider>
+          <SWRProvider>
+            <ThemeProvider theme={darkTheme}>
+              <CssBaseline />
+              <NotificationProvider>
+                <ScreenshotProtectionProvider>
+                  {children}
+                </ScreenshotProtectionProvider>
+                <ToastContainer />
+                <CookieConsentBanner />
+              </NotificationProvider>
+            </ThemeProvider>
+          </SWRProvider>
+        </TanStackQueryProvider>
       </SessionProvider>
     </ErrorBoundary>
   );

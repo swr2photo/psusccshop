@@ -73,7 +73,7 @@ const buildFactoryExport = (orders: any[]) => {
     return idx === -1 ? 999 : idx;
   };
 
-  // Collect all items with full details
+  // Collect all items with full details - EXPAND by quantity for production counting
   const allItems: any[] = [];
   const sizeCount: Record<string, number> = {};
   const sizeLongSleeveCount: Record<string, number> = {};
@@ -94,20 +94,27 @@ const buildFactoryExport = (orders: any[]) => {
         sizeShortSleeveCount[size] = (sizeShortSleeveCount[size] || 0) + qty;
       }
 
-      allItems.push({
-        orderRef: o?.ref || '',
-        orderDate: o?.date || o?.createdAt || '',
-        customerName: o?.customerName || o?.name || '',
-        customerPhone: o?.customerPhone || o?.phone || '',
-        productName: item.productName || item.name || item.productId || '',
-        size,
-        qty,
-        isLongSleeve,
-        customName: item.options?.customName || item.customName || '',
-        customNumber: item.options?.customNumber || item.customNumber || '',
-        unitPrice: item.unitPrice || 0,
-        subtotal: (item.unitPrice || 0) * qty,
-      });
+      // EXPAND: Create separate row for each unit when quantity > 1
+      // This helps factory count individual items for production
+      for (let i = 0; i < qty; i++) {
+        allItems.push({
+          orderRef: o?.ref || '',
+          orderDate: o?.date || o?.createdAt || '',
+          customerName: o?.customerName || o?.name || '',
+          customerPhone: o?.customerPhone || o?.phone || '',
+          customerAddress: o?.customerAddress || o?.address || '',
+          productName: item.productName || item.name || item.productId || '',
+          size,
+          qty: 1,
+          originalQty: qty,
+          itemIndex: qty > 1 ? `(${i + 1}/${qty})` : '',
+          isLongSleeve,
+          customName: item.options?.customName || item.customName || '',
+          customNumber: item.options?.customNumber || item.customNumber || '',
+          unitPrice: item.unitPrice || 0,
+          subtotal: item.unitPrice || 0,
+        });
+      }
     });
   });
 
@@ -127,12 +134,14 @@ const buildFactoryExport = (orders: any[]) => {
     '🔢 เบอร์สกรีน',
     '👤 ชื่อลูกค้า',
     '📞 เบอร์โทร',
+    '📍 ที่อยู่',
     '📦 สินค้า',
+    '🔢 ตัวที่',
     '🔖 Ref',
     '📅 วันที่สั่ง',
   ];
 
-  // Build data rows
+  // Build data rows - each row = 1 physical item for factory production
   const rows = allItems.map((item, index) => [
     index + 1,
     item.size,
@@ -141,7 +150,9 @@ const buildFactoryExport = (orders: any[]) => {
     item.customNumber || '-',
     item.customerName,
     item.customerPhone,
+    item.customerAddress || '-',
     item.productName,
+    item.itemIndex || '-',
     item.orderRef,
     item.orderDate ? new Date(item.orderDate).toLocaleDateString('th-TH') : '',
   ]);
@@ -323,7 +334,7 @@ export async function POST(req: NextRequest) {
     
     await sheets.spreadsheets.values.update({
       spreadsheetId: sheetId,
-      range: `${FACTORY_EXPORT_TITLE}!A1:J${factoryValues.length}`,
+      range: `${FACTORY_EXPORT_TITLE}!A1:L${factoryValues.length}`,
       valueInputOption: 'RAW',
       requestBody: { values: factoryValues },
     });

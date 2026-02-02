@@ -382,27 +382,54 @@ const apiClient = new APIClient();
 type FetchOptions = Omit<RequestInit, 'body'> & { body?: any };
 
 async function fetchJson<T = any>(path: string, opts?: FetchOptions): Promise<APIResponse<T>> {
-  const { body, headers, ...rest } = opts || {};
-  const init: RequestInit = {
-    method: rest.method || 'GET',
-    headers: { 'Content-Type': 'application/json', ...(headers || {}) },
-    cache: 'no-store', // ป้องกัน browser cache เพื่อให้ได้ข้อมูลล่าสุดเสมอ
-    ...rest,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  };
+  try {
+    const { body, headers, ...rest } = opts || {};
+    const init: RequestInit = {
+      method: rest.method || 'GET',
+      headers: { 'Content-Type': 'application/json', ...(headers || {}) },
+      cache: 'no-store', // ป้องกัน browser cache เพื่อให้ได้ข้อมูลล่าสุดเสมอ
+      ...rest,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    };
 
-  const res = await fetch(path, init);
-  const contentType = res.headers.get('content-type') || '';
-  if (!res.ok) {
-    // Try to get error message from text
-    const text = await res.text();
-    throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
+    const res = await fetch(path, init);
+    const contentType = res.headers.get('content-type') || '';
+    if (!res.ok) {
+      // Try to get error message from text
+      const text = await res.text();
+      return {
+        status: 'error',
+        message: `HTTP ${res.status}: ${text.slice(0, 200)}`,
+        error: { code: 'HTTP_ERROR', status: res.status }
+      } as APIResponse<T>;
+    }
+    if (!contentType.includes('application/json')) {
+      const text = await res.text();
+      return {
+        status: 'error',
+        message: 'Server did not return JSON: ' + text.slice(0, 200),
+        error: { code: 'INVALID_RESPONSE' }
+      } as APIResponse<T>;
+    }
+    return await res.json();
+  } catch (error) {
+    // Handle network errors (offline, server down, etc.)
+    if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+      console.warn('[API] Network error - offline or server unreachable');
+      return {
+        status: 'error',
+        message: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ - กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต',
+        error: { code: 'NETWORK_ERROR', offline: !navigator.onLine }
+      } as APIResponse<T>;
+    }
+    
+    console.error('[API] Fetch error:', error);
+    return {
+      status: 'error',
+      message: error instanceof Error ? error.message : 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ',
+      error: { code: 'FETCH_ERROR' }
+    } as APIResponse<T>;
   }
-  if (!contentType.includes('application/json')) {
-    const text = await res.text();
-    throw new Error('Server did not return JSON: ' + text.slice(0, 200));
-  }
-  return await res.json();
 }
 
 // ============== SPECIFIC API FUNCTIONS ==============

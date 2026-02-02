@@ -2919,7 +2919,7 @@ export default function HomePage() {
 
   // Use realtime subscriptions for user's orders
   const userEmail = session?.user?.email;
-  const { isConnected: realtimeConnected, connectionError: realtimeError } = useRealtimeOrdersByEmail(
+  const { isConnected: realtimeConnected, error: realtimeError } = useRealtimeOrdersByEmail(
     userEmail,
     handleOrderChange,
     handleConfigChange
