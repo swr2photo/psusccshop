@@ -49,6 +49,12 @@ import {
   ArrowBack as ArrowBackIcon,
   DoneAll as DoneAllIcon,
   Done as DoneIcon,
+  Receipt as ReceiptIcon,
+  Search as SearchIcon,
+  Visibility as ViewIcon,
+  Edit as EditIcon,
+  ShoppingBag as ShoppingBagIcon,
+  ZoomIn as ZoomInIcon,
 } from '@mui/icons-material';
 
 const ADMIN_THEME = {
@@ -140,6 +146,15 @@ export default function SupportChatPanel() {
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const prevMessageCountRef = useRef<number>(0);
   const isUserScrollingRef = useRef<boolean>(false);
+  
+  // New states for order lookup and image lightbox
+  const [orderLookupOpen, setOrderLookupOpen] = useState(false);
+  const [orderSearchRef, setOrderSearchRef] = useState('');
+  const [foundOrder, setFoundOrder] = useState<any>(null);
+  const [searchingOrder, setSearchingOrder] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [customerOrders, setCustomerOrders] = useState<any[]>([]);
+  const [loadingCustomerOrders, setLoadingCustomerOrders] = useState(false);
 
   const scrollToBottom = useCallback((force = false) => {
     if (!isUserScrollingRef.current || force) {
@@ -394,7 +409,93 @@ export default function SupportChatPanel() {
       const textPart = msg.replace(imageMatch[0], '').trim();
       return { text: textPart, imageUrl };
     }
-    return { text: msg, imageUrl: null };
+    // Check for order reference
+    const orderMatch = msg.match(/\[ORDER_REF:([^\]]+)\]/);
+    if (orderMatch) {
+      const orderRef = orderMatch[1];
+      const textPart = msg.replace(orderMatch[0], '').trim();
+      return { text: textPart, imageUrl: null, orderRef };
+    }
+    return { text: msg, imageUrl: null, orderRef: null };
+  };
+
+  // Search for order by ref
+  const handleSearchOrder = async () => {
+    if (!orderSearchRef.trim()) return;
+    setSearchingOrder(true);
+    setFoundOrder(null);
+    try {
+      const res = await fetch(`/api/admin/orders?ref=${encodeURIComponent(orderSearchRef.trim())}`);
+      const data = await res.json();
+      if (data.status === 'success' && data.data) {
+        setFoundOrder(data.data);
+      } else {
+        setFoundOrder({ notFound: true });
+      }
+    } catch (error) {
+      console.error('Error searching order:', error);
+      setFoundOrder({ error: true });
+    } finally {
+      setSearchingOrder(false);
+    }
+  };
+
+  // Fetch customer's orders
+  const fetchCustomerOrders = async (email: string) => {
+    if (!email) return;
+    setLoadingCustomerOrders(true);
+    try {
+      const res = await fetch(`/api/admin/orders?email=${encodeURIComponent(email)}&limit=10`);
+      const data = await res.json();
+      if (data.status === 'success' && Array.isArray(data.data)) {
+        setCustomerOrders(data.data);
+      } else {
+        setCustomerOrders([]);
+      }
+    } catch (error) {
+      console.error('Error fetching customer orders:', error);
+      setCustomerOrders([]);
+    } finally {
+      setLoadingCustomerOrders(false);
+    }
+  };
+
+  // Send order reference to chat
+  const handleSendOrderToChat = async (order: any) => {
+    if (!selectedChat || selectedChat.status !== 'active') return;
+    const orderMsg = `📦 *ออเดอร์ #${order.ref}*
+💰 ยอด: ฿${order.totalAmount?.toLocaleString() || order.amount?.toLocaleString() || 0}
+📅 วันที่: ${new Date(order.date || order.createdAt).toLocaleDateString('th-TH')}
+🏷️ สถานะ: ${getOrderStatusLabel(order.status)}
+[ORDER_REF:${order.ref}]`;
+    
+    setSending(true);
+    try {
+      await fetch('/api/support-chat/' + selectedChat.id + '/message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: orderMsg }),
+      });
+      await fetchChatDetails(selectedChat.id);
+    } catch (error) {
+      console.error('Error sending order ref:', error);
+    } finally {
+      setSending(false);
+      setOrderLookupOpen(false);
+    }
+  };
+
+  const getOrderStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      'PENDING': '⏳ รอดำเนินการ',
+      'PAID': '✅ ชำระแล้ว',
+      'PROCESSING': '🔄 กำลังดำเนินการ',
+      'READY': '📦 พร้อมรับ',
+      'SHIPPED': '🚚 จัดส่งแล้ว',
+      'COMPLETED': '✓ เสร็จสิ้น',
+      'CANCELLED': '❌ ยกเลิก',
+    };
+    return labels[status?.toUpperCase()] || status;
   };
 
   return (
@@ -407,6 +508,252 @@ export default function SupportChatPanel() {
           40% { transform: scale(1); }
         }
       `}</style>
+
+      {/* Image Lightbox */}
+      {lightboxImage && (
+        <Box
+          onClick={() => setLightboxImage(null)}
+          sx={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            bgcolor: 'rgba(0,0,0,0.95)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'zoom-out',
+          }}
+        >
+          <IconButton
+            onClick={() => setLightboxImage(null)}
+            sx={{
+              position: 'absolute',
+              top: 16,
+              right: 16,
+              color: 'white',
+              bgcolor: 'rgba(255,255,255,0.15)',
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' },
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
+          <IconButton
+            onClick={(e) => { e.stopPropagation(); window.open(lightboxImage, '_blank'); }}
+            sx={{
+              position: 'absolute',
+              top: 16,
+              right: 64,
+              color: 'white',
+              bgcolor: 'rgba(255,255,255,0.15)',
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' },
+            }}
+            title="เปิดในแท็บใหม่"
+          >
+            <ZoomInIcon />
+          </IconButton>
+          <Box
+            component="img"
+            src={lightboxImage}
+            alt="รูปภาพขยาย"
+            onClick={(e) => e.stopPropagation()}
+            sx={{
+              maxWidth: '95vw',
+              maxHeight: '90vh',
+              objectFit: 'contain',
+              borderRadius: 2,
+              cursor: 'default',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.5)',
+            }}
+          />
+          <Typography sx={{
+            position: 'absolute',
+            bottom: 24,
+            color: 'rgba(255,255,255,0.6)',
+            fontSize: '0.8rem',
+          }}>
+            คลิกที่ใดก็ได้เพื่อปิด
+          </Typography>
+        </Box>
+      )}
+
+      {/* Order Lookup Dialog */}
+      <Dialog 
+        open={orderLookupOpen} 
+        onClose={() => setOrderLookupOpen(false)} 
+        maxWidth="sm" 
+        fullWidth
+        PaperProps={{ sx: { bgcolor: ADMIN_THEME.bgCard, color: ADMIN_THEME.text } }}
+      >
+        <DialogTitle sx={{ borderBottom: '1px solid ' + ADMIN_THEME.border, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <ReceiptIcon sx={{ color: '#6366f1' }} />
+          ค้นหาออเดอร์ / ดูประวัติลูกค้า
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          {/* Search by Order Ref */}
+          <Typography sx={{ fontSize: '0.85rem', color: ADMIN_THEME.textMuted, mb: 1 }}>
+            ค้นหาจากหมายเลขออเดอร์
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1, mb: 3 }}>
+            <TextField
+              fullWidth
+              size="small"
+              placeholder="เช่น ABC123"
+              value={orderSearchRef}
+              onChange={(e) => setOrderSearchRef(e.target.value)}
+              onKeyPress={(e) => { if (e.key === 'Enter') handleSearchOrder(); }}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  color: ADMIN_THEME.text,
+                  '& fieldset': { borderColor: ADMIN_THEME.border },
+                  '&:hover fieldset': { borderColor: '#6366f1' },
+                },
+              }}
+            />
+            <Button
+              variant="contained"
+              onClick={handleSearchOrder}
+              disabled={searchingOrder || !orderSearchRef.trim()}
+              sx={{ bgcolor: '#6366f1', '&:hover': { bgcolor: '#4f46e5' }, minWidth: 80 }}
+            >
+              {searchingOrder ? <CircularProgress size={20} color="inherit" /> : <SearchIcon />}
+            </Button>
+          </Box>
+          
+          {/* Search Result */}
+          {foundOrder && (
+            <Paper sx={{ p: 2, mb: 3, bgcolor: '#0f172a', borderRadius: 2 }}>
+              {foundOrder.notFound ? (
+                <Typography sx={{ color: '#f87171', textAlign: 'center' }}>
+                  ไม่พบออเดอร์ "{orderSearchRef}"
+                </Typography>
+              ) : foundOrder.error ? (
+                <Typography sx={{ color: '#f87171', textAlign: 'center' }}>
+                  เกิดข้อผิดพลาดในการค้นหา
+                </Typography>
+              ) : (
+                <Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                    <Box sx={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 1.5,
+                      bgcolor: '#6366f1',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'white',
+                      fontWeight: 700,
+                      fontSize: '0.75rem',
+                    }}>
+                      #{foundOrder.ref?.slice(-3)}
+                    </Box>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography sx={{ fontWeight: 600, color: ADMIN_THEME.text }}>
+                        ออเดอร์ #{foundOrder.ref}
+                      </Typography>
+                      <Typography sx={{ fontSize: '0.75rem', color: ADMIN_THEME.textMuted }}>
+                        {foundOrder.customerName || foundOrder.name} · {foundOrder.customerEmail || foundOrder.email}
+                      </Typography>
+                    </Box>
+                    <Chip
+                      size="small"
+                      label={getOrderStatusLabel(foundOrder.status)}
+                      sx={{
+                        bgcolor: foundOrder.status === 'PAID' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(251, 191, 36, 0.2)',
+                        color: foundOrder.status === 'PAID' ? '#22c55e' : '#fbbf24',
+                        fontSize: '0.7rem',
+                      }}
+                    />
+                  </Box>
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', fontSize: '0.8rem', color: ADMIN_THEME.textMuted, mb: 2 }}>
+                    <span>💰 ฿{foundOrder.totalAmount?.toLocaleString() || foundOrder.amount?.toLocaleString()}</span>
+                    <span>📅 {new Date(foundOrder.date || foundOrder.createdAt).toLocaleDateString('th-TH')}</span>
+                  </Box>
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<ViewIcon />}
+                      onClick={() => window.open(`/admin?tab=orders&ref=${foundOrder.ref}`, '_blank')}
+                      sx={{ borderColor: ADMIN_THEME.border, color: ADMIN_THEME.text, fontSize: '0.75rem' }}
+                    >
+                      ดูรายละเอียด
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      startIcon={<SendIcon />}
+                      onClick={() => handleSendOrderToChat(foundOrder)}
+                      disabled={!selectedChat || selectedChat.status !== 'active'}
+                      sx={{ bgcolor: '#22c55e', '&:hover': { bgcolor: '#16a34a' }, fontSize: '0.75rem' }}
+                    >
+                      ส่งในแชท
+                    </Button>
+                  </Box>
+                </Box>
+              )}
+            </Paper>
+          )}
+
+          {/* Customer's Order History */}
+          {selectedChat && (
+            <>
+              <Divider sx={{ borderColor: ADMIN_THEME.border, my: 2 }} />
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+                <Typography sx={{ fontSize: '0.85rem', color: ADMIN_THEME.textMuted }}>
+                  ประวัติออเดอร์ของ {selectedChat.customer_name}
+                </Typography>
+                <Button
+                  size="small"
+                  onClick={() => fetchCustomerOrders(selectedChat.customer_email)}
+                  disabled={loadingCustomerOrders}
+                  sx={{ color: '#6366f1', fontSize: '0.75rem' }}
+                >
+                  {loadingCustomerOrders ? <CircularProgress size={16} /> : <RefreshIcon sx={{ fontSize: 16 }} />}
+                </Button>
+              </Box>
+              <Box sx={{ maxHeight: 200, overflowY: 'auto' }}>
+                {customerOrders.length === 0 ? (
+                  <Typography sx={{ color: ADMIN_THEME.textMuted, fontSize: '0.8rem', textAlign: 'center', py: 2 }}>
+                    {loadingCustomerOrders ? 'กำลังโหลด...' : 'กดปุ่มรีเฟรชเพื่อโหลดประวัติ'}
+                  </Typography>
+                ) : (
+                  customerOrders.map((order) => (
+                    <Paper
+                      key={order.ref}
+                      sx={{
+                        p: 1.5,
+                        mb: 1,
+                        bgcolor: '#0f172a',
+                        borderRadius: 1.5,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        cursor: 'pointer',
+                        '&:hover': { bgcolor: 'rgba(99, 102, 241, 0.1)' },
+                      }}
+                      onClick={() => handleSendOrderToChat(order)}
+                    >
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: ADMIN_THEME.text }}>
+                          #{order.ref} · ฿{order.totalAmount?.toLocaleString() || order.amount?.toLocaleString()}
+                        </Typography>
+                        <Typography sx={{ fontSize: '0.7rem', color: ADMIN_THEME.textMuted }}>
+                          {new Date(order.date || order.createdAt).toLocaleDateString('th-TH')} · {order.status}
+                        </Typography>
+                      </Box>
+                      <SendIcon sx={{ fontSize: 16, color: '#6366f1' }} />
+                    </Paper>
+                  ))
+                )}
+              </Box>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ borderTop: '1px solid ' + ADMIN_THEME.border, p: 2 }}>
+          <Button onClick={() => setOrderLookupOpen(false)} sx={{ color: ADMIN_THEME.textMuted }}>ปิด</Button>
+        </DialogActions>
+      </Dialog>
 
       <Box sx={{ display: 'flex', height: isMobile ? 'calc(100vh - 120px)' : 'calc(100vh - 200px)', minHeight: 400 }}>
         {/* Chat List Panel */}
@@ -551,6 +898,23 @@ export default function SupportChatPanel() {
                     {selectedChat.subject}
                   </Typography>
                 </Box>
+                {/* Order Lookup Button */}
+                <IconButton
+                  onClick={() => {
+                    setOrderLookupOpen(true);
+                    setFoundOrder(null);
+                    setOrderSearchRef('');
+                    fetchCustomerOrders(selectedChat.customer_email);
+                  }}
+                  sx={{ 
+                    color: '#22c55e',
+                    bgcolor: 'rgba(34, 197, 94, 0.1)',
+                    '&:hover': { bgcolor: 'rgba(34, 197, 94, 0.2)' },
+                  }}
+                  title="ค้นหาออเดอร์"
+                >
+                  <ReceiptIcon sx={{ fontSize: 20 }} />
+                </IconButton>
                 {selectedChat.status === 'pending' && (
                   <Button variant="contained" size="small" startIcon={<AcceptIcon />} onClick={() => handleAcceptChat(selectedChat.id)}
                     sx={{ bgcolor: '#22c55e', '&:hover': { bgcolor: '#16a34a' }, fontSize: '0.75rem', py: 0.5 }}>
@@ -605,10 +969,64 @@ export default function SupportChatPanel() {
                               borderBottomLeftRadius: msg.sender === 'customer' ? 4 : 16,
                             }}>
                               {text && <Typography sx={{ fontSize: '0.85rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.4 }}>{text}</Typography>}
+                              {/* Order Reference Card */}
+                              {parseMessage(msg.message).orderRef && (
+                                <Box
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOrderSearchRef(parseMessage(msg.message).orderRef || '');
+                                    setOrderLookupOpen(true);
+                                    handleSearchOrder();
+                                  }}
+                                  sx={{
+                                    mt: text ? 1 : 0,
+                                    p: 1.5,
+                                    bgcolor: msg.sender === 'admin' ? 'rgba(255,255,255,0.15)' : '#0f172a',
+                                    borderRadius: 1.5,
+                                    border: '1px solid',
+                                    borderColor: msg.sender === 'admin' ? 'rgba(255,255,255,0.2)' : ADMIN_THEME.border,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                    '&:hover': { 
+                                      bgcolor: msg.sender === 'admin' ? 'rgba(255,255,255,0.25)' : 'rgba(99, 102, 241, 0.1)',
+                                    },
+                                  }}
+                                >
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Box sx={{
+                                      width: 32,
+                                      height: 32,
+                                      borderRadius: 1,
+                                      bgcolor: '#22c55e',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                    }}>
+                                      <ReceiptIcon sx={{ fontSize: 18, color: 'white' }} />
+                                    </Box>
+                                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                                      <Typography sx={{ 
+                                        fontSize: '0.8rem', 
+                                        fontWeight: 600,
+                                        color: msg.sender === 'admin' ? 'white' : ADMIN_THEME.text,
+                                      }}>
+                                        ออเดอร์ #{parseMessage(msg.message).orderRef}
+                                      </Typography>
+                                      <Typography sx={{ 
+                                        fontSize: '0.7rem',
+                                        color: msg.sender === 'admin' ? 'rgba(255,255,255,0.8)' : ADMIN_THEME.textMuted,
+                                      }}>
+                                        คลิกเพื่อดูรายละเอียด
+                                      </Typography>
+                                    </Box>
+                                    <ViewIcon sx={{ fontSize: 16, color: msg.sender === 'admin' ? 'rgba(255,255,255,0.6)' : ADMIN_THEME.textMuted }} />
+                                  </Box>
+                                </Box>
+                              )}
                               {imageUrl && (
                                 <Box component="img" src={imageUrl} alt="รูปภาพ" loading="lazy"
-                                  sx={{ width: '100%', maxWidth: { xs: 160, sm: 200 }, height: 'auto', maxHeight: { xs: 140, sm: 180 }, objectFit: 'cover', borderRadius: 1.5, mt: text ? 1 : 0, cursor: 'pointer' }}
-                                  onClick={() => window.open(imageUrl, '_blank')} />
+                                  sx={{ width: '100%', maxWidth: { xs: 160, sm: 200 }, height: 'auto', maxHeight: { xs: 140, sm: 180 }, objectFit: 'cover', borderRadius: 1.5, mt: text ? 1 : 0, cursor: 'zoom-in', transition: 'transform 0.2s', '&:hover': { transform: 'scale(1.02)' } }}
+                                  onClick={(e) => { e.stopPropagation(); setLightboxImage(imageUrl); }} />
                               )}
                             </Paper>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.25, justifyContent: msg.sender === 'admin' ? 'flex-end' : 'flex-start', flexWrap: 'wrap' }}>

@@ -59,6 +59,7 @@ export const getStatusColor = (status: string): string => STATUS_COLORS[normaliz
 
 // ==================== TYPE LABELS ====================
 export const TYPE_LABELS: Record<string, string> = {
+  // Legacy types
   CREW: 'เสื้อ Crew',
   HOODIE: 'ฮู้ดดี้',
   SHIRT: 'เสื้อเชิ้ต',
@@ -68,6 +69,27 @@ export const TYPE_LABELS: Record<string, string> = {
   CAP: 'หมวก',
   ACCESSORY: 'ของที่ระลึก',
   OTHER: 'อื่นๆ',
+  // New types
+  JERSEY: 'เสื้อกีฬา',
+  STICKER: 'สติกเกอร์',
+  KEYCHAIN: 'พวงกุญแจ',
+  MUG: 'แก้ว',
+  BADGE: 'เข็มกลัด/ตรา',
+  POSTER: 'โปสเตอร์',
+  NOTEBOOK: 'สมุด',
+  CAMP_REGISTRATION: 'ค่าสมัครค่าย',
+  EVENT_TICKET: 'ตั๋วเข้างาน',
+  CUSTOM: 'กำหนดเอง',
+};
+
+// ==================== CATEGORY HELPERS ====================
+export const CATEGORY_COLORS: Record<string, string> = {
+  APPAREL: '#6366f1',
+  MERCHANDISE: '#10b981',
+  CAMP_FEE: '#f59e0b',
+  EVENT: '#ec4899',
+  SERVICE: '#8b5cf6',
+  OTHER: '#64748b',
 };
 
 // ==================== SIZE CONSTANTS ====================

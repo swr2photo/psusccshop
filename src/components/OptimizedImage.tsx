@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, CSSProperties, memo, useCallback } from 'react';
-import { Box, Skeleton } from '@mui/material';
+import { Box, Skeleton, CircularProgress } from '@mui/material';
 
 interface OptimizedImageProps {
   src: string;
@@ -12,7 +12,7 @@ interface OptimizedImageProps {
   style?: CSSProperties;
   objectFit?: 'cover' | 'contain' | 'fill' | 'none' | 'scale-down';
   priority?: boolean;
-  placeholder?: 'blur' | 'skeleton' | 'none';
+  placeholder?: 'blur' | 'skeleton' | 'shimmer' | 'none';
   blurDataURL?: string;
   onLoad?: () => void;
   onError?: () => void;
@@ -21,6 +21,7 @@ interface OptimizedImageProps {
   // New props to prevent flickering
   disableFade?: boolean; // Skip fade animation
   keepMounted?: boolean; // Keep image loaded even when hidden
+  showLoadingIndicator?: boolean; // Show circular progress on top
 }
 
 // Default blur placeholder (1x1 transparent base64)
@@ -123,7 +124,7 @@ function OptimizedImageComponent({
   style = {},
   objectFit = 'cover',
   priority = false,
-  placeholder = 'skeleton',
+  placeholder = 'shimmer',
   blurDataURL,
   onLoad,
   onError,
@@ -131,6 +132,7 @@ function OptimizedImageComponent({
   aspectRatio,
   disableFade = false,
   keepMounted = false,
+  showLoadingIndicator = false,
 }: OptimizedImageProps) {
   // Check if this image was already loaded before (prevents flicker on remount)
   const wasLoaded = wasImageLoaded(src);
@@ -222,17 +224,39 @@ function OptimizedImageComponent({
         className={className}
         sx={containerStyles}
       >
-        {placeholder === 'skeleton' && (
-          <Skeleton
-            variant="rectangular"
-            animation="wave"
+        {(placeholder === 'skeleton' || placeholder === 'shimmer') && (
+          <Box
             sx={{
               position: 'absolute',
               inset: 0,
-              bgcolor: 'rgba(255,255,255,0.05)',
+              bgcolor: 'rgba(30,41,59,0.8)',
               borderRadius,
+              overflow: 'hidden',
+              '&::after': placeholder === 'shimmer' ? {
+                content: '""',
+                position: 'absolute',
+                inset: 0,
+                background: 'linear-gradient(90deg, transparent 0%, rgba(99,102,241,0.15) 50%, transparent 100%)',
+                animation: 'shimmer 1.5s infinite',
+                '@keyframes shimmer': {
+                  '0%': { transform: 'translateX(-100%)' },
+                  '100%': { transform: 'translateX(100%)' },
+                },
+              } : {},
             }}
-          />
+          >
+            {/* Image placeholder icon */}
+            <Box sx={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              color: 'rgba(99,102,241,0.3)',
+              fontSize: '2rem',
+            }}>
+              🖼️
+            </Box>
+          </Box>
         )}
         {placeholder === 'blur' && (
           <Box
@@ -254,23 +278,52 @@ function OptimizedImageComponent({
     );
   }
 
-  // Error state
+  // Error state with retry option
   if (error) {
     return (
       <Box
         ref={containerRef}
         className={className}
+        onClick={() => {
+          setError(false);
+          setLoaded(false);
+        }}
         sx={{
           ...containerStyles,
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          bgcolor: 'rgba(255,255,255,0.03)',
+          gap: 1,
+          bgcolor: 'rgba(30,41,59,0.8)',
           color: '#64748b',
           fontSize: '0.75rem',
+          cursor: 'pointer',
+          transition: 'all 0.2s ease',
+          '&:hover': {
+            bgcolor: 'rgba(30,41,59,0.9)',
+            color: '#94a3b8',
+          },
         }}
       >
-        ไม่สามารถโหลดรูปได้
+        <Box sx={{ 
+          fontSize: '1.5rem', 
+          opacity: 0.6,
+          animation: 'shake 0.5s ease-in-out',
+          '@keyframes shake': {
+            '0%, 100%': { transform: 'translateX(0)' },
+            '25%': { transform: 'translateX(-2px)' },
+            '75%': { transform: 'translateX(2px)' },
+          },
+        }}>
+          ⚠️
+        </Box>
+        <Box sx={{ textAlign: 'center', px: 1 }}>
+          โหลดรูปไม่สำเร็จ
+          <Box component="span" sx={{ display: 'block', fontSize: '0.65rem', color: '#6366f1', mt: 0.5 }}>
+            แตะเพื่อลองใหม่
+          </Box>
+        </Box>
       </Box>
     );
   }
@@ -281,20 +334,69 @@ function OptimizedImageComponent({
       className={className}
       sx={containerStyles}
     >
-      {/* Placeholder while loading (skip if already loaded to prevent flicker) */}
+      {/* Enhanced placeholder while loading (skip if already loaded to prevent flicker) */}
       {!loaded && !skipFade && (
         <>
-          {placeholder === 'skeleton' && (
-            <Skeleton
-              variant="rectangular"
-              animation="wave"
+          {(placeholder === 'skeleton' || placeholder === 'shimmer') && (
+            <Box
               sx={{
                 position: 'absolute',
                 inset: 0,
-                bgcolor: 'rgba(255,255,255,0.05)',
+                bgcolor: 'rgba(30,41,59,0.8)',
                 borderRadius,
+                overflow: 'hidden',
+                '&::after': placeholder === 'shimmer' ? {
+                  content: '""',
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'linear-gradient(90deg, transparent 0%, rgba(99,102,241,0.2) 50%, transparent 100%)',
+                  animation: 'shimmer 1.5s infinite',
+                  '@keyframes shimmer': {
+                    '0%': { transform: 'translateX(-100%)' },
+                    '100%': { transform: 'translateX(100%)' },
+                  },
+                } : {},
               }}
-            />
+            >
+              {/* Centered loading indicator */}
+              {showLoadingIndicator && (
+                <Box sx={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                }}>
+                  <CircularProgress 
+                    size={32} 
+                    thickness={3}
+                    sx={{ 
+                      color: '#6366f1',
+                      '& .MuiCircularProgress-circle': {
+                        strokeLinecap: 'round',
+                      },
+                    }} 
+                  />
+                </Box>
+              )}
+              {/* Image placeholder icon when no loading indicator */}
+              {!showLoadingIndicator && (
+                <Box sx={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  color: 'rgba(99,102,241,0.4)',
+                  fontSize: '2rem',
+                  animation: 'pulse 2s ease-in-out infinite',
+                  '@keyframes pulse': {
+                    '0%, 100%': { opacity: 0.4 },
+                    '50%': { opacity: 0.8 },
+                  },
+                }}>
+                  🖼️
+                </Box>
+              )}
+            </Box>
           )}
           {placeholder === 'blur' && blurDataURL && (
             <Box

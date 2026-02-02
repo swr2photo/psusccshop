@@ -2,13 +2,22 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { ProductCategory, ProductSubType, ProductVariant, ProductCustomField } from '@/lib/config';
 
-// ✅ แก้ไข: เพิ่ม 'OTHER' เข้าไปใน type
+// ✅ รองรับหลายหมวดหมู่สินค้า
 export interface Product {
   id: string;
   name: string;
   type: 'JERSEY' | 'CREW' | 'OTHER'; 
+  /** หมวดหมู่หลัก */
+  category?: ProductCategory;
+  /** ประเภทย่อย */
+  subType?: ProductSubType;
   price: number;
+  /** ตัวเลือกสินค้า (สำหรับของที่ระลึก) */
+  variants?: ProductVariant[];
+  /** ฟิลด์เพิ่มเติม (สำหรับค่าย) */
+  customFields?: ProductCustomField[];
 }
 
 // Interface ของสินค้าในตะกร้า
@@ -19,6 +28,10 @@ export interface CartItem extends Product {
   customName?: string;       // เฉพาะ Jersey
   customNumber?: string;     // เฉพาะ Jersey
   total: number;             // ราคารวม
+  /** ตัวเลือกสินค้าที่เลือก (สำหรับของที่ระลึก) */
+  selectedVariant?: ProductVariant;
+  /** ข้อมูลเพิ่มเติมจากฟิลด์กำหนดเอง */
+  customFieldValues?: Record<string, string | number>;
 }
 
 interface CartState {

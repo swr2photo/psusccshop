@@ -389,9 +389,11 @@ export default function CheckoutDialog({
                         {item.productName}
                       </Typography>
                       <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.5 }}>
-                        <Box sx={{ px: 0.6, py: 0.1, borderRadius: '4px', bgcolor: 'rgba(99,102,241,0.15)', fontSize: '0.65rem', color: '#a5b4fc' }}>
-                          {item.size}
-                        </Box>
+                        {item.size && item.size !== '-' && (
+                          <Box sx={{ px: 0.6, py: 0.1, borderRadius: '4px', bgcolor: 'rgba(99,102,241,0.15)', fontSize: '0.65rem', color: '#a5b4fc' }}>
+                            {item.size}
+                          </Box>
+                        )}
                         <Box sx={{ px: 0.6, py: 0.1, borderRadius: '4px', bgcolor: 'rgba(255,255,255,0.08)', fontSize: '0.65rem', color: '#94a3b8' }}>
                           x{item.quantity}
                         </Box>

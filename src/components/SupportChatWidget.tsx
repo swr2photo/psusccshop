@@ -44,6 +44,8 @@ import {
   Reply as ReplyIcon,
   ZoomIn as ZoomInIcon,
   ZoomOut as ZoomOutIcon,
+  Receipt as ReceiptIcon,
+  ShoppingBag as ShoppingBagIcon,
 } from '@mui/icons-material';
 
 // ชื่อแอดมินที่แสดง (สามารถตั้งค่าได้)
@@ -115,6 +117,9 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
   const [unsending, setUnsending] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [replyToMessage, setReplyToMessage] = useState<{ id: string; text: string; sender: string } | null>(null);
+  const [orderHistory, setOrderHistory] = useState<any[]>([]);
+  const [showOrderPicker, setShowOrderPicker] = useState(false);
+  const [loadingOrders, setLoadingOrders] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -597,20 +602,96 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
     return `${diffDays} วันที่แล้ว`;
   };
 
-  // Parse message to extract image URL
+  // Parse message to extract image URL and order ref
   const parseMessage = (msg: string) => {
     // Support both full URLs and /api/image/ paths
     const imageMatch = msg.match(/\[รูปภาพ: (\/api\/image\/[^\]]+|https?:\/\/[^\]]+)\]/);
+    const orderMatch = msg.match(/\[ORDER_REF:([^\]]+)\]/);
+    
+    let text = msg;
+    let imageUrl = null;
+    let orderRef = null;
+    
     if (imageMatch) {
-      const imageUrl = imageMatch[1];
-      const textPart = msg.replace(imageMatch[0], '').trim();
-      return { text: textPart, imageUrl };
+      imageUrl = imageMatch[1];
+      text = text.replace(imageMatch[0], '').trim();
     }
-    return { text: msg, imageUrl: null };
+    if (orderMatch) {
+      orderRef = orderMatch[1];
+      text = text.replace(orderMatch[0], '').trim();
+    }
+    
+    return { text, imageUrl, orderRef };
   };
 
   // Get user avatar
   const getUserAvatar = () => session?.user?.image || null;
+
+  // Fetch user's order history for attaching to chat
+  const fetchOrderHistory = useCallback(async () => {
+    if (!session?.user?.email) return;
+    setLoadingOrders(true);
+    try {
+      const res = await fetch('/api/orders');
+      const data = await res.json();
+      if (data.status === 'success' && data.data) {
+        // API returns { data: { history: [...], hasMore, total } }
+        const orders = Array.isArray(data.data) ? data.data : (data.data.history || []);
+        setOrderHistory(orders.slice(0, 20)); // Limit to 20 orders
+      }
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+    } finally {
+      setLoadingOrders(false);
+    }
+  }, [session?.user?.email]);
+
+  // Send order reference in chat
+  const handleSendOrderRef = async (order: any) => {
+    if (!chat || chat.status === 'closed') return;
+    
+    const orderMsg = `📦 *ออเดอร์ #${order.ref}*
+💰 ยอด: ฿${order.totalAmount?.toLocaleString() || order.amount?.toLocaleString() || 0}
+📅 วันที่: ${new Date(order.date || order.createdAt).toLocaleDateString('th-TH')}
+🏷️ สถานะ: ${getStatusLabel(order.status)}
+[ORDER_REF:${order.ref}]`;
+    
+    setSending(true);
+    try {
+      const res = await fetch(`/api/support-chat/${chat.id}/message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: orderMsg }),
+      });
+      
+      if (res.ok) {
+        const chatRes = await fetch(`/api/support-chat/${chat.id}`);
+        const chatData = await chatRes.json();
+        if (chatData.chat) {
+          setChat(chatData.chat);
+        }
+      }
+    } catch (error) {
+      console.error('Error sending order ref:', error);
+    } finally {
+      setSending(false);
+      setShowOrderPicker(false);
+    }
+  };
+
+  // Get status label in Thai
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      'PENDING': '⏳ รอดำเนินการ',
+      'PAID': '✅ ชำระแล้ว',
+      'PROCESSING': '🔄 กำลังดำเนินการ',
+      'READY': '📦 พร้อมรับ',
+      'SHIPPED': '🚚 จัดส่งแล้ว',
+      'COMPLETED': '✓ เสร็จสิ้น',
+      'CANCELLED': '❌ ยกเลิก',
+    };
+    return labels[status?.toUpperCase()] || status;
+  };
 
   // Show loading spinner while checking auth
   if (authStatus === 'loading') return null;
@@ -784,7 +865,7 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
         )}
       </Menu>
 
-      {/* Image Lightbox */}
+      {/* Image Lightbox - Enhanced Fullscreen */}
       {lightboxImage && (
         <Box
           onClick={() => setLightboxImage(null)}
@@ -804,6 +885,7 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
             },
           }}
         >
+          {/* Close button */}
           <IconButton
             onClick={() => setLightboxImage(null)}
             sx={{
@@ -811,38 +893,195 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
               top: 16,
               right: 16,
               color: 'white',
-              bgcolor: 'rgba(255,255,255,0.1)',
-              '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' },
+              bgcolor: 'rgba(255,255,255,0.15)',
+              backdropFilter: 'blur(8px)',
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' },
+              zIndex: 10,
             }}
           >
             <CloseIcon />
           </IconButton>
+          
+          {/* Zoom controls */}
+          <Box sx={{
+            position: 'absolute',
+            bottom: 80,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            display: 'flex',
+            gap: 1,
+            bgcolor: 'rgba(255,255,255,0.15)',
+            backdropFilter: 'blur(8px)',
+            borderRadius: 3,
+            p: 0.5,
+            zIndex: 10,
+          }}>
+            <IconButton
+              onClick={(e) => { e.stopPropagation(); window.open(lightboxImage, '_blank'); }}
+              sx={{ color: 'white', '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' } }}
+              title="เปิดในแท็บใหม่"
+            >
+              <ZoomInIcon />
+            </IconButton>
+          </Box>
+          
+          {/* Image */}
           <Box
             component="img"
             src={lightboxImage}
             alt="รูปภาพขยาย"
             onClick={(e) => e.stopPropagation()}
             sx={{
-              maxWidth: '90vw',
+              maxWidth: '95vw',
               maxHeight: '90vh',
               objectFit: 'contain',
               borderRadius: 2,
               cursor: 'default',
               boxShadow: '0 25px 50px rgba(0,0,0,0.5)',
+              animation: 'scaleIn 0.2s ease',
+              '@keyframes scaleIn': {
+                '0%': { transform: 'scale(0.9)', opacity: 0 },
+                '100%': { transform: 'scale(1)', opacity: 1 },
+              },
             }}
           />
           <Typography
             sx={{
               position: 'absolute',
-              bottom: 20,
+              bottom: 24,
               left: '50%',
               transform: 'translateX(-50%)',
               color: 'rgba(255,255,255,0.6)',
               fontSize: '0.8rem',
             }}
           >
-            คลิกที่ใดก็ได้เพื่อปิด
+            คลิกที่ใดก็ได้เพื่อปิด หรือกด ESC
           </Typography>
+        </Box>
+      )}
+
+      {/* Order Picker Dialog */}
+      {showOrderPicker && (
+        <Box
+          onClick={() => setShowOrderPicker(false)}
+          sx={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9998,
+            bgcolor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'flex-end',
+            justifyContent: 'center',
+            animation: 'fadeIn 0.2s ease',
+          }}
+        >
+          <Paper
+            onClick={(e) => e.stopPropagation()}
+            sx={{
+              width: { xs: '100%', sm: 400 },
+              maxHeight: '70vh',
+              borderRadius: { xs: '16px 16px 0 0', sm: 3 },
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              animation: 'slideUp 0.3s ease',
+              '@keyframes slideUp': {
+                '0%': { transform: 'translateY(100%)' },
+                '100%': { transform: 'translateY(0)' },
+              },
+            }}
+          >
+            {/* Header */}
+            <Box sx={{ 
+              p: 2, 
+              borderBottom: '1px solid #e2e8f0',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+            }}>
+              <ReceiptIcon sx={{ color: '#6366f1' }} />
+              <Typography sx={{ fontWeight: 700, color: '#1e293b', flex: 1 }}>
+                เลือกออเดอร์ที่ต้องการแนบ
+              </Typography>
+              <IconButton size="small" onClick={() => setShowOrderPicker(false)}>
+                <CloseIcon />
+              </IconButton>
+            </Box>
+            
+            {/* Order List */}
+            <Box sx={{ flex: 1, overflowY: 'auto', p: 1 }}>
+              {loadingOrders ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                  <CircularProgress size={32} sx={{ color: '#6366f1' }} />
+                </Box>
+              ) : orderHistory.length === 0 ? (
+                <Box sx={{ textAlign: 'center', py: 4 }}>
+                  <ShoppingBagIcon sx={{ fontSize: 48, color: '#94a3b8', mb: 1 }} />
+                  <Typography sx={{ color: '#64748b' }}>ไม่พบประวัติการสั่งซื้อ</Typography>
+                </Box>
+              ) : (
+                orderHistory.map((order) => (
+                  <Paper
+                    key={order.ref}
+                    onClick={() => handleSendOrderRef(order)}
+                    sx={{
+                      p: 1.5,
+                      mb: 1,
+                      cursor: 'pointer',
+                      bgcolor: '#f8fafc',
+                      borderRadius: 2,
+                      border: '1px solid #e2e8f0',
+                      transition: 'all 0.2s',
+                      '&:hover': { 
+                        bgcolor: '#f1f5f9',
+                        borderColor: '#6366f1',
+                        transform: 'translateX(4px)',
+                      },
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box sx={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 1.5,
+                        bgcolor: '#6366f1',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'white',
+                        fontWeight: 700,
+                        fontSize: '0.8rem',
+                      }}>
+                        #{order.ref?.slice(-3) || '???'}
+                      </Box>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography sx={{ fontWeight: 600, color: '#1e293b', fontSize: '0.85rem' }}>
+                          ออเดอร์ #{order.ref}
+                        </Typography>
+                        <Typography sx={{ color: '#64748b', fontSize: '0.75rem' }}>
+                          ฿{order.totalAmount?.toLocaleString() || order.amount?.toLocaleString() || 0} · {new Date(order.date || order.createdAt).toLocaleDateString('th-TH')}
+                        </Typography>
+                      </Box>
+                      <Chip
+                        size="small"
+                        label={getStatusLabel(order.status).replace(/[^\u0E00-\u0E7F\u0020-\u007E]/g, '').trim()}
+                        sx={{
+                          height: 22,
+                          fontSize: '0.65rem',
+                          bgcolor: order.status === 'PAID' ? '#dcfce7' : 
+                                   order.status === 'COMPLETED' ? '#dbeafe' :
+                                   order.status === 'CANCELLED' ? '#fee2e2' : '#fef3c7',
+                          color: order.status === 'PAID' ? '#166534' :
+                                 order.status === 'COMPLETED' ? '#1e40af' :
+                                 order.status === 'CANCELLED' ? '#991b1b' : '#92400e',
+                        }}
+                      />
+                    </Box>
+                  </Paper>
+                ))
+              )}
+            </Box>
+          </Paper>
         </Box>
       )}
 
@@ -1466,6 +1705,48 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                                     {text}
                                   </Typography>
                                 )}
+                                {/* Order Reference Card */}
+                                {parseMessage(msg.message).orderRef && (
+                                  <Box
+                                    sx={{
+                                      mt: text ? 0.75 : 0,
+                                      p: 1.5,
+                                      bgcolor: msg.sender === 'customer' ? 'rgba(255,255,255,0.15)' : '#f1f5f9',
+                                      borderRadius: 1.5,
+                                      border: '1px solid',
+                                      borderColor: msg.sender === 'customer' ? 'rgba(255,255,255,0.2)' : '#e2e8f0',
+                                    }}
+                                  >
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                      <Box sx={{
+                                        width: 32,
+                                        height: 32,
+                                        borderRadius: 1,
+                                        bgcolor: '#6366f1',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                      }}>
+                                        <ReceiptIcon sx={{ fontSize: 18, color: 'white' }} />
+                                      </Box>
+                                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                                        <Typography sx={{ 
+                                          fontSize: '0.8rem', 
+                                          fontWeight: 600,
+                                          color: msg.sender === 'customer' ? 'white' : '#1e293b',
+                                        }}>
+                                          ออเดอร์ #{parseMessage(msg.message).orderRef}
+                                        </Typography>
+                                        <Typography sx={{ 
+                                          fontSize: '0.7rem',
+                                          color: msg.sender === 'customer' ? 'rgba(255,255,255,0.8)' : '#64748b',
+                                        }}>
+                                          คลิกเพื่อดูรายละเอียด
+                                        </Typography>
+                                      </Box>
+                                    </Box>
+                                  </Box>
+                                )}
                                 {imageUrl && (
                                   <Box
                                     component="img"
@@ -1683,6 +1964,26 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                       }}
                     >
                       <ImageIcon />
+                    </IconButton>
+                    
+                    {/* Order Attach Button */}
+                    <IconButton
+                      onClick={() => {
+                        fetchOrderHistory();
+                        setShowOrderPicker(true);
+                      }}
+                      sx={{ 
+                        color: '#22c55e',
+                        bgcolor: 'rgba(34, 197, 94, 0.08)',
+                        '&:hover': { 
+                          bgcolor: 'rgba(34, 197, 94, 0.15)',
+                          transform: 'scale(1.05)',
+                        },
+                        transition: 'all 0.2s',
+                      }}
+                      title="แนบออเดอร์"
+                    >
+                      <ReceiptIcon />
                     </IconButton>
                     
                     <TextField

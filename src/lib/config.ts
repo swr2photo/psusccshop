@@ -4,17 +4,123 @@
  * Centralized configuration and types
  */
 
+// ==================== PRODUCT CATEGORIES ====================
+
+/** หมวดหมู่หลักที่กำหนดไว้ล่วงหน้า */
+export const PREDEFINED_CATEGORIES = ['APPAREL', 'MERCHANDISE', 'CAMP_FEE', 'EVENT', 'SERVICE', 'OTHER'] as const;
+
+/** หมวดหมู่หลักของสินค้า - รองรับค่าที่กำหนดเองได้ */
+export type ProductCategory = typeof PREDEFINED_CATEGORIES[number] | string;
+
+/** ประเภทย่อยที่กำหนดไว้ล่วงหน้า */
+export const PREDEFINED_SUBTYPES = [
+  // Apparel
+  'JERSEY', 'CREW', 'HOODIE', 'TSHIRT', 'POLO', 'JACKET', 'CAP',
+  // Merchandise
+  'STICKER', 'KEYCHAIN', 'MUG', 'BADGE', 'POSTER', 'NOTEBOOK',
+  // Camp/Event
+  'CAMP_REGISTRATION', 'EVENT_TICKET',
+  // Other
+  'CUSTOM', 'OTHER'
+] as const;
+
+/** ประเภทย่อยของสินค้า - รองรับค่าที่กำหนดเองได้ */
+export type ProductSubType = typeof PREDEFINED_SUBTYPES[number] | string;
+
+/** Category labels in Thai */
+export const CATEGORY_LABELS: Record<string, string> = {
+  APPAREL: 'เสื้อผ้า',
+  MERCHANDISE: 'ของที่ระลึก',
+  CAMP_FEE: 'ค่าสมัครค่าย',
+  EVENT: 'กิจกรรม/อีเวนต์',
+  SERVICE: 'บริการ',
+  OTHER: 'อื่นๆ',
+};
+
+/** SubType labels in Thai */
+export const SUBTYPE_LABELS: Record<string, string> = {
+  // Apparel
+  JERSEY: 'เสื้อกีฬา',
+  CREW: 'เสื้อ Crew',
+  HOODIE: 'ฮู้ดดี้',
+  TSHIRT: 'เสื้อยืด',
+  POLO: 'เสื้อโปโล',
+  JACKET: 'แจ็กเก็ต',
+  CAP: 'หมวก',
+  // Merchandise
+  STICKER: 'สติกเกอร์',
+  KEYCHAIN: 'พวงกุญแจ',
+  MUG: 'แก้ว',
+  BADGE: 'เข็มกลัด/ตรา',
+  POSTER: 'โปสเตอร์',
+  NOTEBOOK: 'สมุด',
+  // Camp/Event
+  CAMP_REGISTRATION: 'ค่าสมัครค่าย',
+  EVENT_TICKET: 'ตั๋วเข้างาน',
+  // Other
+  CUSTOM: 'กำหนดเอง',
+  OTHER: 'อื่นๆ',
+};
+
+/** Category icons */
+export const CATEGORY_ICONS: Record<string, string> = {
+  APPAREL: '👕',
+  MERCHANDISE: '🎁',
+  CAMP_FEE: '🏕️',
+  EVENT: '🎫',
+  SERVICE: '🛠️',
+  OTHER: '📦',
+};
+
+/** Get subtypes for a category */
+export const CATEGORY_SUBTYPES: Record<string, string[]> = {
+  APPAREL: ['JERSEY', 'CREW', 'HOODIE', 'TSHIRT', 'POLO', 'JACKET', 'CAP'],
+  MERCHANDISE: ['STICKER', 'KEYCHAIN', 'MUG', 'BADGE', 'POSTER', 'NOTEBOOK'],
+  CAMP_FEE: ['CAMP_REGISTRATION'],
+  EVENT: ['EVENT_TICKET'],
+  SERVICE: ['CUSTOM'],
+  OTHER: ['OTHER'],
+};
+
+/** Helper: Get category label (returns custom value if not in predefined list) */
+export const getCategoryLabel = (category: string): string => {
+  return CATEGORY_LABELS[category] || category;
+};
+
+/** Helper: Get subtype label (returns custom value if not in predefined list) */
+export const getSubTypeLabel = (subType: string): string => {
+  return SUBTYPE_LABELS[subType] || subType;
+};
+
+/** Helper: Get category icon (returns default if not in predefined list) */
+export const getCategoryIcon = (category: string): string => {
+  return CATEGORY_ICONS[category] || '📦';
+};
+
 // ==================== TYPES ====================
 
 export interface Product {
   id: string;
   name: string;
   description?: string;
+  /** หมวดหมู่หลัก - ใช้สำหรับกรองและแสดงผล */
+  category?: ProductCategory;
+  /** Legacy type - backward compatible */
   type: 'JERSEY' | 'CREW' | 'OTHER';
+  /** ประเภทย่อยของสินค้า */
+  subType?: ProductSubType;
   images?: string[];
   coverImage?: string;
+  /** ราคาพื้นฐาน */
   basePrice: number;
+  /** ราคาตามขนาด (สำหรับเสื้อ) */
   sizePricing?: { [key: string]: number };
+  /** ตัวเลือกสินค้าแบบกำหนดเอง (สำหรับของที่ระลึก/ค่ายฯ) */
+  variants?: ProductVariant[];
+  /** จำนวนสินค้าในสต็อค (null = ไม่จำกัด) */
+  stock?: number | null;
+  /** จำนวนสูงสุดต่อออเดอร์ */
+  maxPerOrder?: number;
   startDate?: string;
   endDate?: string;
   isActive?: boolean;
@@ -22,30 +128,78 @@ export interface Product {
     hasCustomName: boolean;
     hasCustomNumber: boolean;
     hasLongSleeve: boolean;
-    longSleevePrice?: number; // ราคาเพิ่มสำหรับแขนยาว (default 50)
+    longSleevePrice?: number;
+    /** ต้องเลือกขนาดหรือไม่ */
+    requiresSize?: boolean;
+    /** ฟิลด์ที่ต้องกรอกเพิ่มเติม (สำหรับค่ายฯ) */
+    customFields?: ProductCustomField[];
   };
   /** Custom tags to display on product card */
   customTags?: Array<{
     text: string;
-    color: string; // hex color e.g. '#10b981'
-    bgColor?: string; // optional background color
+    color: string;
+    bgColor?: string;
   }>;
   /** Per-product pickup settings */
   pickup?: {
-    /** Whether pickup is enabled for this product */
     enabled: boolean;
-    /** Pickup location for this product */
     location?: string;
-    /** Pickup date/time start */
     startDate?: string;
-    /** Pickup date/time end */
     endDate?: string;
-    /** Additional notes */
     notes?: string;
-    /** Last updated by */
     updatedBy?: string;
-    /** Last update time */
     updatedAt?: string;
+  };
+  /** สำหรับค่าย - ข้อมูลเพิ่มเติม */
+  campInfo?: {
+    campName?: string;
+    campDate?: string;
+    location?: string;
+    organizer?: string;
+    maxParticipants?: number;
+    currentParticipants?: number;
+    requirements?: string;
+  };
+  /** สำหรับอีเวนต์ */
+  eventInfo?: {
+    eventName?: string;
+    eventDate?: string;
+    venue?: string;
+    organizer?: string;
+  };
+  /** ลำดับการแสดงผล */
+  sortOrder?: number;
+  /** วันที่สร้าง */
+  createdAt?: string;
+  /** วันที่อัปเดตล่าสุด */
+  updatedAt?: string;
+}
+
+/** ตัวเลือกสินค้า (สำหรับของที่ระลึก) */
+export interface ProductVariant {
+  id: string;
+  name: string;
+  price: number;
+  /** รูปภาพของตัวเลือก */
+  image?: string;
+  /** จำนวนในสต็อค */
+  stock?: number | null;
+  /** เปิดใช้งาน */
+  isActive?: boolean;
+}
+
+/** ฟิลด์ที่กำหนดเอง (สำหรับค่าสมัครค่าย) */
+export interface ProductCustomField {
+  id: string;
+  label: string;
+  type: 'text' | 'number' | 'select' | 'date' | 'email' | 'phone';
+  required: boolean;
+  placeholder?: string;
+  options?: string[]; // สำหรับ type: 'select'
+  validation?: {
+    minLength?: number;
+    maxLength?: number;
+    pattern?: string;
   };
 }
 
@@ -234,7 +388,36 @@ export const isAdmin = (email: string | null): boolean => {
 export const SIZES = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL', '7XL', '8XL', '9XL', '10XL'];
 export const ORDER_STATUSES = ['PENDING', 'PAID', 'READY', 'SHIPPED', 'COMPLETED', 'CANCELLED'];
 export const PRODUCT_TYPES = ['JERSEY', 'CREW', 'OTHER'];
+export const PRODUCT_CATEGORIES: ProductCategory[] = ['APPAREL', 'MERCHANDISE', 'CAMP_FEE', 'EVENT', 'SERVICE', 'OTHER'];
 export const ANNOUNCEMENT_COLORS = ['blue', 'red', 'green', 'orange'];
+
+/** Helper: Get category from legacy type */
+export const getCategoryFromType = (type: string): ProductCategory => {
+  switch (type) {
+    case 'JERSEY':
+    case 'CREW':
+      return 'APPAREL';
+    default:
+      return 'OTHER';
+  }
+};
+
+/** Helper: Check if product requires size selection */
+export const productRequiresSize = (product: Product): boolean => {
+  if (product.options?.requiresSize === false) return false;
+  const category = product.category || getCategoryFromType(product.type);
+  return category === 'APPAREL';
+};
+
+/** Helper: Check if product is a camp registration */
+export const isCampProduct = (product: Product): boolean => {
+  return product.category === 'CAMP_FEE' || product.subType === 'CAMP_REGISTRATION';
+};
+
+/** Helper: Check if product is an event ticket */
+export const isEventProduct = (product: Product): boolean => {
+  return product.category === 'EVENT' || product.subType === 'EVENT_TICKET';
+};
 
 // ==================== VALIDATION ====================
 

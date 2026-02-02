@@ -38,6 +38,8 @@ import {
   Avatar,
   Chip,
   FormControlLabel,
+  FormControl,
+  InputLabel,
   Checkbox,
   CircularProgress,
   Typography,
@@ -47,6 +49,7 @@ import {
   IconButton,
   useMediaQuery,
   Tooltip,
+  Autocomplete,
 } from '@mui/material';
 
 import {
@@ -82,6 +85,7 @@ import {
   CalendarToday,
   Image as ImageIcon,
   Visibility,
+  VisibilityOff,
   CheckBox,
   CheckBoxOutlineBlank,
   Update,
@@ -349,6 +353,55 @@ const saveAdminCache = (payload: { config: ShopConfig; orders?: AdminOrder[]; lo
 
 const ORDER_STATUSES = ['WAITING_PAYMENT', 'PENDING', 'PAID', 'READY', 'SHIPPED', 'COMPLETED', 'CANCELLED'];
 const PRODUCT_TYPES = ['JERSEY', 'CREW', 'OTHER'];
+
+// New category system
+const PRODUCT_CATEGORIES = ['APPAREL', 'MERCHANDISE', 'CAMP_FEE', 'EVENT', 'SERVICE', 'OTHER'] as const;
+const PRODUCT_SUBTYPES: Record<string, string[]> = {
+  APPAREL: ['JERSEY', 'CREW', 'HOODIE', 'TSHIRT', 'POLO', 'JACKET', 'CAP'],
+  MERCHANDISE: ['STICKER', 'KEYCHAIN', 'MUG', 'BADGE', 'POSTER', 'NOTEBOOK'],
+  CAMP_FEE: ['CAMP_REGISTRATION'],
+  EVENT: ['EVENT_TICKET'],
+  SERVICE: ['CUSTOM'],
+  OTHER: ['OTHER'],
+};
+
+const CATEGORY_LABELS: Record<string, string> = {
+  APPAREL: 'เสื้อผ้า',
+  MERCHANDISE: 'ของที่ระลึก',
+  CAMP_FEE: 'ค่าสมัครค่าย',
+  EVENT: 'กิจกรรม/อีเวนต์',
+  SERVICE: 'บริการ',
+  OTHER: 'อื่นๆ',
+};
+
+const SUBTYPE_LABELS: Record<string, string> = {
+  JERSEY: 'เสื้อกีฬา',
+  CREW: 'เสื้อ Crew',
+  HOODIE: 'ฮู้ดดี้',
+  TSHIRT: 'เสื้อยืด',
+  POLO: 'เสื้อโปโล',
+  JACKET: 'แจ็กเก็ต',
+  CAP: 'หมวก',
+  STICKER: 'สติกเกอร์',
+  KEYCHAIN: 'พวงกุญแจ',
+  MUG: 'แก้ว',
+  BADGE: 'เข็มกลัด/ตรา',
+  POSTER: 'โปสเตอร์',
+  NOTEBOOK: 'สมุด',
+  CAMP_REGISTRATION: 'ค่าสมัครค่าย',
+  EVENT_TICKET: 'ตั๋วเข้างาน',
+  CUSTOM: 'กำหนดเอง',
+  OTHER: 'อื่นๆ',
+};
+
+const CATEGORY_ICONS: Record<string, string> = {
+  APPAREL: '👕',
+  MERCHANDISE: '🎁',
+  CAMP_FEE: '🏕️',
+  EVENT: '🎫',
+  SERVICE: '🛠️',
+  OTHER: '📦',
+};
 
 // ============== NEW MODERN THEME ==============
 const ADMIN_THEME = {
@@ -7959,7 +8012,46 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any
   const [newSizeKey, setNewSizeKey] = useState('');
   const [newSizePrice, setNewSizePrice] = useState<number | ''>('');
   const [coverUploadLoading, setCoverUploadLoading] = useState(false);
+  // Variants state for non-apparel products
+  const [newVariantName, setNewVariantName] = useState('');
+  const [newVariantPrice, setNewVariantPrice] = useState<number | ''>('');
+  const [newVariantStock, setNewVariantStock] = useState<number | ''>('');
   const MAX_IMAGE_SIZE = 3 * 1024 * 1024; // ~3MB
+  
+  // Helper: Check if product needs variants instead of sizes
+  const needsVariants = () => {
+    const category = (product as any).category;
+    return category && category !== 'APPAREL';
+  };
+  
+  // Variant handlers
+  const handleAddVariant = () => {
+    if (!newVariantName.trim()) return;
+    const newVariant = {
+      id: `var_${Date.now()}`,
+      name: newVariantName.trim(),
+      price: typeof newVariantPrice === 'number' ? newVariantPrice : product.basePrice || 0,
+      stock: typeof newVariantStock === 'number' ? newVariantStock : null,
+      isActive: true,
+    };
+    const variants = [...((product as any).variants || []), newVariant];
+    onChange({ ...product, variants } as any);
+    setNewVariantName('');
+    setNewVariantPrice('');
+    setNewVariantStock('');
+  };
+  
+  const handleUpdateVariant = (variantId: string, field: string, value: any) => {
+    const variants = ((product as any).variants || []).map((v: any) =>
+      v.id === variantId ? { ...v, [field]: value } : v
+    );
+    onChange({ ...product, variants } as any);
+  };
+  
+  const handleRemoveVariant = (variantId: string) => {
+    const variants = ((product as any).variants || []).filter((v: any) => v.id !== variantId);
+    onChange({ ...product, variants } as any);
+  };
 
   const handleDialogClose = (_event?: unknown, reason?: 'backdropClick' | 'escapeKeyDown') => {
     if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
@@ -8015,10 +8107,9 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any
     onChange({ ...product, images: merged, coverImage: nextCover });
   };
 
-  const handleRemoveImage = (index: number) => {
-    const nextImages = [...(product.images || [])];
-    const removed = nextImages.splice(index, 1)[0];
-    const nextCover = removed === product.coverImage ? (nextImages[0] || '') : (product.coverImage || '');
+  const handleRemoveImage = (imgUrl: string) => {
+    const nextImages = (product.images || []).filter((img: string) => img !== imgUrl);
+    const nextCover = imgUrl === product.coverImage ? (nextImages[0] || '') : (product.coverImage || '');
     onChange({ ...product, images: nextImages, coverImage: nextCover });
   };
 
@@ -8083,16 +8174,100 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any
           sx={inputSx}
         />
 
-        <Select
-          value={product.type}
-          onChange={(e) => onChange({...product, type: e.target.value})}
-          fullWidth
-          sx={inputSx}
-        >
-          {PRODUCT_TYPES.map(t => (
-            <MenuItem key={t} value={t}>{t}</MenuItem>
-          ))}
-        </Select>
+        {/* Category Selection */}
+        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+          <Autocomplete
+            freeSolo
+            options={PRODUCT_CATEGORIES as unknown as string[]}
+            value={(product as any).category || 'OTHER'}
+            onChange={(_e, newValue) => {
+              const newCategory = newValue || 'OTHER';
+              const subTypes = PRODUCT_SUBTYPES[newCategory] || ['OTHER'];
+              onChange({
+                ...product, 
+                category: newCategory,
+                subType: subTypes[0] || 'OTHER',
+                // Legacy type compatibility
+                type: newCategory === 'APPAREL' ? (product.type || 'CREW') : 'OTHER',
+              } as any);
+            }}
+            onInputChange={(_e, newInputValue) => {
+              if (newInputValue && !PRODUCT_CATEGORIES.includes(newInputValue as any)) {
+                onChange({
+                  ...product, 
+                  category: newInputValue,
+                  type: 'OTHER',
+                } as any);
+              }
+            }}
+            getOptionLabel={(option) => {
+              const icon = CATEGORY_ICONS[option] || '📦';
+              const label = CATEGORY_LABELS[option] || option;
+              return `${icon} ${label}`;
+            }}
+            renderOption={(props, option) => (
+              <li {...props} key={option}>
+                {CATEGORY_ICONS[option] || '📦'} {CATEGORY_LABELS[option] || option}
+              </li>
+            )}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="หมวดหมู่"
+                placeholder="เลือกหรือพิมพ์เอง"
+                sx={inputSx}
+              />
+            )}
+            sx={{ '& .MuiOutlinedInput-root': inputSx['& .MuiOutlinedInput-root'] }}
+          />
+
+          <Autocomplete
+            freeSolo
+            options={[
+              ...(PRODUCT_SUBTYPES[(product as any).category || 'OTHER'] || ['OTHER']),
+              // Add common custom options
+              'ของขวัญ', 'ชุดกีฬา', 'อุปกรณ์', 'เครื่องเขียน', 'กระเป๋า', 'รองเท้า', 'หมวก', 'ผ้าพันคอ'
+            ]}
+            value={(product as any).subType || product.type || 'OTHER'}
+            onChange={(_e, newValue) => {
+              const newSubType = newValue || 'OTHER';
+              onChange({
+                ...product, 
+                subType: newSubType,
+                // Legacy type compatibility - keep JERSEY/CREW/OTHER
+                type: ['JERSEY', 'CREW'].includes(newSubType) ? newSubType : 'OTHER',
+              } as any);
+            }}
+            onInputChange={(_e, newInputValue) => {
+              if (newInputValue) {
+                onChange({
+                  ...product, 
+                  subType: newInputValue,
+                  type: ['JERSEY', 'CREW'].includes(newInputValue) ? newInputValue : 'OTHER',
+                } as any);
+              }
+            }}
+            getOptionLabel={(option) => SUBTYPE_LABELS[option] || option}
+            renderOption={(props, option) => (
+              <li {...props} key={option}>
+                {SUBTYPE_LABELS[option] || option}
+              </li>
+            )}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="ประเภทย่อย"
+                placeholder="เลือกหรือพิมพ์เอง"
+                sx={inputSx}
+                helperText="พิมพ์ชื่อประเภทเองได้"
+              />
+            )}
+            sx={{ '& .MuiOutlinedInput-root': inputSx['& .MuiOutlinedInput-root'] }}
+          />
+        </Box>
+
+        {/* Legacy type for backward compatibility (hidden) */}
+        <input type="hidden" value={product.type} />
 
         <TextField
           label="Description (รองรับการเว้นบรรทัด)"
@@ -8109,6 +8284,150 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any
           helperText="กด Enter เพื่อเว้นบรรทัดใหม่"
         />
 
+        {/* Camp/Event specific fields */}
+        {((product as any).category === 'CAMP_FEE' || (product as any).subType === 'CAMP_REGISTRATION') && (
+          <Box sx={{ bgcolor: 'rgba(245,158,11,0.1)', p: 2, borderRadius: 1, border: '1px solid rgba(245,158,11,0.3)', display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: '#fbbf24', display: 'flex', alignItems: 'center', gap: 1 }}>
+              🏕️ ข้อมูลค่าย
+            </Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+              <TextField
+                label="ชื่อค่าย"
+                value={(product as any).campInfo?.campName || ''}
+                onChange={(e) => onChange({...product, campInfo: { ...(product as any).campInfo, campName: e.target.value }} as any)}
+                fullWidth
+                sx={inputSx}
+              />
+              <TextField
+                label="วันที่จัดค่าย"
+                type="date"
+                value={(product as any).campInfo?.campDate || ''}
+                onChange={(e) => onChange({...product, campInfo: { ...(product as any).campInfo, campDate: e.target.value }} as any)}
+                fullWidth
+                sx={inputSx}
+                InputLabelProps={{ shrink: true }}
+              />
+              <TextField
+                label="สถานที่"
+                value={(product as any).campInfo?.location || ''}
+                onChange={(e) => onChange({...product, campInfo: { ...(product as any).campInfo, location: e.target.value }} as any)}
+                fullWidth
+                sx={inputSx}
+              />
+              <TextField
+                label="ผู้จัด"
+                value={(product as any).campInfo?.organizer || ''}
+                onChange={(e) => onChange({...product, campInfo: { ...(product as any).campInfo, organizer: e.target.value }} as any)}
+                fullWidth
+                sx={inputSx}
+              />
+              <TextField
+                label="จำนวนรับสูงสุด"
+                type="number"
+                value={(product as any).campInfo?.maxParticipants || ''}
+                onChange={(e) => onChange({...product, campInfo: { ...(product as any).campInfo, maxParticipants: Number(e.target.value) || 0 }} as any)}
+                fullWidth
+                sx={inputSx}
+              />
+              <TextField
+                label="เงื่อนไข/ข้อกำหนด"
+                value={(product as any).campInfo?.requirements || ''}
+                onChange={(e) => onChange({...product, campInfo: { ...(product as any).campInfo, requirements: e.target.value }} as any)}
+                fullWidth
+                sx={inputSx}
+                multiline
+                rows={2}
+              />
+            </Box>
+          </Box>
+        )}
+
+        {((product as any).category === 'EVENT' || (product as any).subType === 'EVENT_TICKET') && (
+          <Box sx={{ bgcolor: 'rgba(236,72,153,0.1)', p: 2, borderRadius: 1, border: '1px solid rgba(236,72,153,0.3)', display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: '#f472b6', display: 'flex', alignItems: 'center', gap: 1 }}>
+              🎫 ข้อมูลอีเวนต์
+            </Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+              <TextField
+                label="ชื่ออีเวนต์"
+                value={(product as any).eventInfo?.eventName || ''}
+                onChange={(e) => onChange({...product, eventInfo: { ...(product as any).eventInfo, eventName: e.target.value }} as any)}
+                fullWidth
+                sx={inputSx}
+              />
+              <TextField
+                label="วันที่จัดงาน"
+                type="datetime-local"
+                value={(product as any).eventInfo?.eventDate || ''}
+                onChange={(e) => onChange({...product, eventInfo: { ...(product as any).eventInfo, eventDate: e.target.value }} as any)}
+                fullWidth
+                sx={inputSx}
+                InputLabelProps={{ shrink: true }}
+              />
+              <TextField
+                label="สถานที่"
+                value={(product as any).eventInfo?.venue || ''}
+                onChange={(e) => onChange({...product, eventInfo: { ...(product as any).eventInfo, venue: e.target.value }} as any)}
+                fullWidth
+                sx={inputSx}
+              />
+              <TextField
+                label="ผู้จัด"
+                value={(product as any).eventInfo?.organizer || ''}
+                onChange={(e) => onChange({...product, eventInfo: { ...(product as any).eventInfo, organizer: e.target.value }} as any)}
+                fullWidth
+                sx={inputSx}
+              />
+            </Box>
+          </Box>
+        )}
+
+        {/* Product options - only for APPAREL */}
+        {((product as any).category === 'APPAREL' || !((product as any).category)) && (
+          <Box sx={{ bgcolor: ADMIN_THEME.glassSoft, p: 2, borderRadius: 1, border: `1px solid ${ADMIN_THEME.border}`, display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: ADMIN_THEME.text, mb: 0.5 }}>
+              ⚙️ ตัวเลือกเสื้อ
+            </Typography>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={product.options?.requiresSize !== false}
+                  onChange={(e) => onChange({...product, options: { ...product.options, requiresSize: e.target.checked }} as any)}
+                />
+              }
+              label="ต้องเลือกไซส์"
+              sx={{ color: ADMIN_THEME.text }}
+            />
+          </Box>
+        )}
+
+        {/* Stock management */}
+        <Box sx={{ bgcolor: ADMIN_THEME.glassSoft, p: 2, borderRadius: 1, border: `1px solid ${ADMIN_THEME.border}`, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: ADMIN_THEME.text }}>
+            📦 จำนวนสินค้า
+          </Typography>
+          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+            <TextField
+              label="จำนวนในสต็อก (ปล่อยว่าง = ไม่จำกัด)"
+              type="number"
+              value={(product as any).stock ?? ''}
+              onChange={(e) => onChange({...product, stock: e.target.value === '' ? null : Number(e.target.value)} as any)}
+              fullWidth
+              inputProps={{ min: 0 }}
+              sx={inputSx}
+            />
+            <TextField
+              label="จำนวนสูงสุดต่อออเดอร์"
+              type="number"
+              value={(product as any).maxPerOrder || ''}
+              onChange={(e) => onChange({...product, maxPerOrder: e.target.value === '' ? null : Number(e.target.value)} as any)}
+              fullWidth
+              inputProps={{ min: 1 }}
+              sx={inputSx}
+            />
+          </Box>
+        </Box>
+
         <TextField
           label="Base Price (฿)"
           type="number"
@@ -8119,6 +8438,8 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any
           sx={inputSx}
         />
 
+        {/* Size pricing - only show for APPAREL */}
+        {((product as any).category === 'APPAREL' || !((product as any).category)) && (product as any).options?.requiresSize !== false && (
         <Box sx={{ bgcolor: ADMIN_THEME.glassSoft, p: 2, borderRadius: 1, border: `1px solid ${ADMIN_THEME.border}`, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: ADMIN_THEME.text }}>ราคาต่อไซส์</Typography>
@@ -8179,6 +8500,176 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any
             <Button onClick={handleAddSize} variant="contained" sx={gradientButtonSx} startIcon={<Add />}>เพิ่มไซส์</Button>
           </Box>
         </Box>
+        )}
+
+        {/* Variants Section - for non-APPAREL products */}
+        {needsVariants() && (
+          <Box sx={{ bgcolor: 'rgba(139,92,246,0.1)', p: 2, borderRadius: 1, border: '1px solid rgba(139,92,246,0.3)', display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: '#a78bfa', display: 'flex', alignItems: 'center', gap: 1 }}>
+                🎨 ตัวเลือกสินค้า (Variants)
+              </Typography>
+              <Typography variant="caption" sx={{ color: ADMIN_THEME.muted }}>
+                สำหรับสินค้าที่มีหลายแบบ/ราคา
+              </Typography>
+            </Box>
+            
+            <Typography variant="caption" sx={{ color: ADMIN_THEME.muted, mb: 1 }}>
+              เพิ่มตัวเลือกเช่น ขนาด S/M/L, สีต่างๆ, รุ่นต่างๆ พร้อมกำหนดราคาและจำนวนแยกได้
+            </Typography>
+
+            {/* Existing Variants List */}
+            {((product as any).variants || []).length > 0 && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {((product as any).variants || []).map((variant: any) => (
+                  <Box key={variant.id} sx={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: { xs: '1fr', sm: '2fr 1fr 1fr auto' }, 
+                    gap: 1, 
+                    alignItems: 'center',
+                    p: 1.5,
+                    bgcolor: 'rgba(255,255,255,0.05)',
+                    borderRadius: 1,
+                    border: `1px solid ${ADMIN_THEME.border}`,
+                  }}>
+                    <TextField
+                      label="ชื่อตัวเลือก"
+                      value={variant.name}
+                      onChange={(e) => handleUpdateVariant(variant.id, 'name', e.target.value)}
+                      size="small"
+                      sx={inputSx}
+                    />
+                    <TextField
+                      label="ราคา (฿)"
+                      type="number"
+                      value={variant.price}
+                      onChange={(e) => handleUpdateVariant(variant.id, 'price', Number(e.target.value))}
+                      size="small"
+                      inputProps={{ min: 0 }}
+                      sx={inputSx}
+                    />
+                    <TextField
+                      label="จำนวน"
+                      type="number"
+                      value={variant.stock ?? ''}
+                      onChange={(e) => handleUpdateVariant(variant.id, 'stock', e.target.value === '' ? null : Number(e.target.value))}
+                      size="small"
+                      inputProps={{ min: 0 }}
+                      placeholder="ไม่จำกัด"
+                      sx={inputSx}
+                    />
+                    <Box sx={{ display: 'flex', gap: 0.5 }}>
+                      <IconButton 
+                        size="small"
+                        onClick={() => handleUpdateVariant(variant.id, 'isActive', !variant.isActive)}
+                        sx={{ color: variant.isActive ? '#22c55e' : '#64748b' }}
+                      >
+                        {variant.isActive ? <Visibility fontSize="small" /> : <VisibilityOff fontSize="small" />}
+                      </IconButton>
+                      <IconButton 
+                        size="small"
+                        onClick={() => handleRemoveVariant(variant.id)} 
+                        sx={{ color: '#f87171' }}
+                      >
+                        <Delete fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  </Box>
+                ))}
+              </Box>
+            )}
+
+            {/* Add New Variant */}
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '2fr 1fr 1fr auto' }, gap: 1, mt: 1 }}>
+              <TextField
+                label="ชื่อตัวเลือกใหม่"
+                value={newVariantName}
+                onChange={(e) => setNewVariantName(e.target.value)}
+                size="small"
+                placeholder="เช่น ขนาด S, สีแดง, รุ่น A"
+                sx={inputSx}
+              />
+              <TextField
+                label="ราคา (฿)"
+                type="number"
+                value={newVariantPrice}
+                onChange={(e) => setNewVariantPrice(e.target.value === '' ? '' : Number(e.target.value))}
+                size="small"
+                inputProps={{ min: 0 }}
+                placeholder={`${product.basePrice || 0}`}
+                sx={inputSx}
+              />
+              <TextField
+                label="จำนวน"
+                type="number"
+                value={newVariantStock}
+                onChange={(e) => setNewVariantStock(e.target.value === '' ? '' : Number(e.target.value))}
+                size="small"
+                inputProps={{ min: 0 }}
+                placeholder="ไม่จำกัด"
+                sx={inputSx}
+              />
+              <Button 
+                onClick={handleAddVariant} 
+                variant="contained" 
+                size="small"
+                startIcon={<Add />}
+                sx={{ 
+                  background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
+                  minWidth: 100,
+                }}
+              >
+                เพิ่ม
+              </Button>
+            </Box>
+
+            {/* Quick Add Common Variants */}
+            <Box sx={{ mt: 1 }}>
+              <Typography variant="caption" sx={{ color: ADMIN_THEME.muted, mb: 1, display: 'block' }}>
+                เพิ่มตัวเลือกด่วน:
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                {[
+                  { name: 'ขนาด S', price: product.basePrice },
+                  { name: 'ขนาด M', price: product.basePrice },
+                  { name: 'ขนาด L', price: product.basePrice },
+                  { name: 'สีดำ', price: product.basePrice },
+                  { name: 'สีขาว', price: product.basePrice },
+                  { name: 'ปกติ', price: product.basePrice },
+                  { name: 'พิเศษ', price: Math.round((product.basePrice || 0) * 1.2) },
+                ].map((preset) => {
+                  const exists = ((product as any).variants || []).some((v: any) => v.name === preset.name);
+                  return (
+                    <Chip
+                      key={preset.name}
+                      label={preset.name}
+                      size="small"
+                      onClick={() => {
+                        if (exists) return;
+                        const newVariant = {
+                          id: `var_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                          name: preset.name,
+                          price: preset.price || 0,
+                          stock: null,
+                          isActive: true,
+                        };
+                        onChange({ ...product, variants: [...((product as any).variants || []), newVariant] } as any);
+                      }}
+                      sx={{
+                        cursor: exists ? 'default' : 'pointer',
+                        bgcolor: exists ? 'rgba(139,92,246,0.3)' : 'transparent',
+                        color: '#a78bfa',
+                        border: '1px dashed rgba(139,92,246,0.5)',
+                        opacity: exists ? 0.5 : 1,
+                        '&:hover': { bgcolor: exists ? undefined : 'rgba(139,92,246,0.15)' },
+                      }}
+                    />
+                  );
+                })}
+              </Box>
+            </Box>
+          </Box>
+        )}
 
         {/* Schedule Section */}
         <Box sx={{ bgcolor: ADMIN_THEME.glassSoft, p: 2, borderRadius: 1, border: `1px solid ${ADMIN_THEME.border}`, display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -8309,7 +8800,15 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any
           </Typography>
 
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)' }, gap: 1.5 }}>
-            {(product.images || []).map((img: string, idx: number) => {
+            {(() => {
+              const images = product.images || [];
+              const coverImage = product.coverImage;
+              // เรียงให้ coverImage ขึ้นก่อน
+              const sortedImages = coverImage && images.includes(coverImage)
+                ? [coverImage, ...images.filter((img: string) => img !== coverImage)]
+                : images;
+              return sortedImages;
+            })().map((img: string, idx: number) => {
               const isCover = product.coverImage === img;
               return (
                 <Box key={idx} sx={{ position: 'relative', borderRadius: 1.5, overflow: 'hidden', border: `1px solid ${isCover ? '#6366f1' : ADMIN_THEME.border}`, boxShadow: isCover ? '0 0 0 2px rgba(99,102,241,0.35)' : 'none' }}>
@@ -8321,7 +8820,7 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any
                     <Button size="small" variant="contained" onClick={() => handleSetCover(img)} sx={{ background: 'rgba(99,102,241,0.9)', color: '#fff', textTransform: 'none' }}>
                       ตั้งเป็นปก
                     </Button>
-                    <Button size="small" variant="outlined" onClick={() => handleRemoveImage(idx)} sx={{ color: '#fff', borderColor: 'rgba(255,255,255,0.4)', textTransform: 'none' }}>
+                    <Button size="small" variant="outlined" onClick={() => handleRemoveImage(img)} sx={{ color: '#fff', borderColor: 'rgba(255,255,255,0.4)', textTransform: 'none' }}>
                       ลบรูป
                     </Button>
                   </Box>

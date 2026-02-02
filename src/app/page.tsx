@@ -1983,7 +1983,16 @@ import OrderHistoryDrawer from '@/components/OrderHistoryDrawer';
 import CheckoutDialog from '@/components/CheckoutDialog';
 import LoadingScreen from '@/components/LoadingScreen';
 import SupportChatWidget from '@/components/SupportChatWidget';
-import { Product, ShopConfig, SIZES } from '@/lib/config';
+import { 
+  Product, 
+  ShopConfig, 
+  SIZES, 
+  CATEGORY_LABELS as CONFIG_CATEGORY_LABELS, 
+  CATEGORY_ICONS as CONFIG_CATEGORY_ICONS,
+  getCategoryLabel,
+  getSubTypeLabel,
+  getCategoryIcon,
+} from '@/lib/config';
 import { ShippingConfig } from '@/lib/shipping';
 import { useRealtimeOrdersByEmail } from '@/hooks/useRealtimeOrders';
 import {
@@ -2045,6 +2054,7 @@ const getStatusCategory = (status: string): 'WAITING_PAYMENT' | 'COMPLETED' | 'R
 };
 
 const TYPE_LABELS: Record<string, string> = {
+  // Legacy types
   CREW: 'เสื้อ Crew',
   HOODIE: 'ฮู้ดดี้',
   SHIRT: 'เสื้อเชิ้ต',
@@ -2054,6 +2064,62 @@ const TYPE_LABELS: Record<string, string> = {
   CAP: 'หมวก',
   ACCESSORY: 'ของที่ระลึก',
   OTHER: 'อื่นๆ',
+  // New types
+  JERSEY: 'เสื้อกีฬา',
+  STICKER: 'สติกเกอร์',
+  KEYCHAIN: 'พวงกุญแจ',
+  MUG: 'แก้ว',
+  BADGE: 'เข็มกลัด/ตรา',
+  POSTER: 'โปสเตอร์',
+  NOTEBOOK: 'สมุด',
+  CAMP_REGISTRATION: 'ค่าสมัครค่าย',
+  EVENT_TICKET: 'ตั๋วเข้างาน',
+  CUSTOM: 'กำหนดเอง',
+};
+
+// Category labels for new category system - use from config, extend with fallback
+const CATEGORY_LABELS: Record<string, string> = {
+  ...CONFIG_CATEGORY_LABELS,
+};
+
+// Category icons - use from config, extend with fallback
+const CATEGORY_ICONS: Record<string, string> = {
+  ...CONFIG_CATEGORY_ICONS,
+};
+
+// Helper: Get category from legacy type
+const getCategoryFromType = (type: string): string => {
+  switch (type) {
+    case 'JERSEY':
+    case 'CREW':
+    case 'HOODIE':
+    case 'TSHIRT':
+    case 'POLO':
+    case 'JACKET':
+    case 'CAP':
+      return 'APPAREL';
+    case 'STICKER':
+    case 'KEYCHAIN':
+    case 'MUG':
+    case 'BADGE':
+    case 'POSTER':
+    case 'NOTEBOOK':
+    case 'ACCESSORY':
+      return 'MERCHANDISE';
+    case 'CAMP_REGISTRATION':
+      return 'CAMP_FEE';
+    case 'EVENT_TICKET':
+      return 'EVENT';
+    default:
+      return 'OTHER';
+  }
+};
+
+// Helper: Check if product requires size selection
+const productRequiresSize = (product: Product): boolean => {
+  if (product.options?.requiresSize === false) return false;
+  const category = (product as any).category || getCategoryFromType(product.type);
+  return category === 'APPAREL';
 };
 
 const SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL', '7XL', '8XL', '9XL', '10XL'] as const;
@@ -2123,6 +2189,8 @@ type CartItem = {
     customName?: string;
     customNumber?: string;
     isLongSleeve?: boolean;
+    variantId?: string;
+    variantName?: string;
   };
 };
 
@@ -2213,6 +2281,166 @@ export default function HomePage() {
 
   const [config, setConfig] = useState<ShopConfig | null>(null);
   const [shippingConfig, setShippingConfig] = useState<ShippingConfig | null>(null);
+  
+  // ==================== DEV MODE TEST PRODUCTS ====================
+  const isDev = process.env.NODE_ENV === 'development';
+  const devTestProducts: Product[] = isDev ? [
+    // เสื้อผ้า - APPAREL
+    {
+      id: 'dev-jersey-1',
+      name: '[DEV] เสื้อกีฬา SCC 2026',
+      description: 'เสื้อกีฬารุ่นใหม่ล่าสุด\nเนื้อผ้า Cool Elite\nระบายอากาศดี',
+      category: 'APPAREL',
+      subType: 'JERSEY',
+      type: 'JERSEY',
+      basePrice: 350,
+      sizePricing: { 'S': 350, 'M': 350, 'L': 350, 'XL': 370, '2XL': 390 },
+      isActive: true,
+      options: { hasCustomName: true, hasCustomNumber: true, hasLongSleeve: true, longSleevePrice: 50 },
+      images: ['https://placehold.co/400x400/6366f1/white?text=Jersey+SCC'],
+      coverImage: 'https://placehold.co/400x400/6366f1/white?text=Jersey+SCC',
+    },
+    {
+      id: 'dev-crew-1',
+      name: '[DEV] เสื้อ Crew Neck รุ่น Classic',
+      description: 'เสื้อ Crew Neck สไตล์คลาสสิค',
+      category: 'APPAREL',
+      subType: 'CREW',
+      type: 'CREW',
+      basePrice: 299,
+      sizePricing: { 'S': 299, 'M': 299, 'L': 299, 'XL': 319 },
+      isActive: true,
+      options: { hasCustomName: true, hasCustomNumber: false, hasLongSleeve: false },
+      images: ['https://placehold.co/400x400/10b981/white?text=Crew+Neck'],
+    },
+    // ของที่ระลึก - MERCHANDISE (with variants)
+    {
+      id: 'dev-merch-1',
+      name: '[DEV] แก้วน้ำ SCC Limited',
+      description: 'แก้วน้ำเก็บความเย็น 24 ชม.\nขนาด 600ml',
+      category: 'MERCHANDISE',
+      subType: 'MUG',
+      type: 'OTHER',
+      basePrice: 250,
+      isActive: true,
+      variants: [
+        { id: 'var-black', name: 'สีดำ', price: 250, stock: 50, isActive: true },
+        { id: 'var-white', name: 'สีขาว', price: 250, stock: 30, isActive: true },
+        { id: 'var-blue', name: 'สีน้ำเงิน', price: 280, stock: 20, isActive: true },
+        { id: 'var-gold', name: 'สีทอง (Limited)', price: 350, stock: 5, isActive: true },
+      ],
+      images: ['https://placehold.co/400x400/f59e0b/white?text=Mug+Limited'],
+    },
+    {
+      id: 'dev-merch-2',
+      name: '[DEV] พวงกุญแจ SCC',
+      description: 'พวงกุญแจโลหะ พร้อมสายคล้อง',
+      category: 'MERCHANDISE',
+      subType: 'KEYCHAIN',
+      type: 'OTHER',
+      basePrice: 79,
+      isActive: true,
+      variants: [
+        { id: 'var-silver', name: 'สีเงิน', price: 79, stock: 100, isActive: true },
+        { id: 'var-rose-gold', name: 'สี Rose Gold', price: 99, stock: 50, isActive: true },
+      ],
+      images: ['https://placehold.co/400x400/ec4899/white?text=Keychain'],
+    },
+    {
+      id: 'dev-merch-3',
+      name: '[DEV] สติกเกอร์ SCC Set',
+      description: 'เซ็ตสติกเกอร์ 10 ชิ้น\nกันน้ำ กันแดด',
+      category: 'MERCHANDISE',
+      subType: 'STICKER',
+      type: 'OTHER',
+      basePrice: 50,
+      isActive: true,
+      images: ['https://placehold.co/400x400/8b5cf6/white?text=Sticker+Set'],
+    },
+    // ค่าสมัครค่าย - CAMP_FEE
+    {
+      id: 'dev-camp-1',
+      name: '[DEV] ค่ายอาสา SCC รุ่น 15',
+      description: 'ค่ายอาสาพัฒนาชุมชน\nรวมอาหาร ที่พัก และเสื้อค่าย',
+      category: 'CAMP_FEE',
+      subType: 'CAMP_REGISTRATION',
+      type: 'OTHER',
+      basePrice: 1500,
+      isActive: true,
+      campInfo: {
+        campName: 'ค่ายอาสา SCC รุ่น 15',
+        campDate: '2026-03-15',
+        location: 'โรงเรียนบ้านห้วยน้ำใส จ.พังงา',
+        organizer: 'ชมรม SCC',
+        maxParticipants: 50,
+        currentParticipants: 32,
+        requirements: 'นิสิตชั้นปี 1-4',
+      },
+      variants: [
+        { id: 'var-full', name: 'สมาชิกเต็มรูปแบบ', price: 1500, stock: 18, isActive: true },
+        { id: 'var-day', name: 'สมาชิกรายวัน', price: 500, stock: 10, isActive: true },
+        { id: 'var-staff', name: 'ทีมงาน (ไม่มีค่าใช้จ่าย)', price: 0, stock: 5, isActive: true },
+      ],
+      images: ['https://placehold.co/400x400/22c55e/white?text=Camp+15'],
+    },
+    // กิจกรรม - EVENT
+    {
+      id: 'dev-event-1',
+      name: '[DEV] บัตรงาน SCC Night',
+      description: 'งานเลี้ยงสังสรรค์ประจำปี\nรวมอาหารและเครื่องดื่ม',
+      category: 'EVENT',
+      subType: 'EVENT_TICKET',
+      type: 'OTHER',
+      basePrice: 200,
+      isActive: true,
+      eventInfo: {
+        eventName: 'SCC Night 2026',
+        eventDate: '2026-04-20T18:00',
+        venue: 'หอประชุมใหญ่ มหาวิทยาลัย',
+        organizer: 'สโมสรนิสิต SCC',
+      },
+      variants: [
+        { id: 'var-standard', name: 'บัตรทั่วไป', price: 200, stock: 100, isActive: true },
+        { id: 'var-vip', name: 'บัตร VIP (โต๊ะหน้า)', price: 500, stock: 20, isActive: true },
+        { id: 'var-couple', name: 'บัตรคู่ (2 ที่นั่ง)', price: 350, stock: 30, isActive: true },
+      ],
+      images: ['https://placehold.co/400x400/ef4444/white?text=SCC+Night'],
+    },
+    // หมวดหมู่กำหนดเอง - Custom Category
+    {
+      id: 'dev-custom-1',
+      name: '[DEV] อุปกรณ์กีฬา SCC',
+      description: 'ลูกฟุตบอล มาตรฐาน FIFA',
+      category: 'อุปกรณ์กีฬา', // Custom category
+      subType: 'ลูกฟุตบอล', // Custom subType
+      type: 'OTHER',
+      basePrice: 890,
+      isActive: true,
+      variants: [
+        { id: 'var-size5', name: 'ขนาด 5 (มาตรฐาน)', price: 890, stock: 15, isActive: true },
+        { id: 'var-size4', name: 'ขนาด 4 (เยาวชน)', price: 690, stock: 10, isActive: true },
+      ],
+      images: ['https://placehold.co/400x400/3b82f6/white?text=Football'],
+    },
+    {
+      id: 'dev-custom-2',
+      name: '[DEV] กระเป๋า SCC Bag',
+      description: 'กระเป๋าสะพายข้าง\nกันน้ำ ทนทาน',
+      category: 'กระเป๋า', // Custom category
+      subType: 'กระเป๋าสะพายข้าง', // Custom subType
+      type: 'OTHER',
+      basePrice: 450,
+      isActive: true,
+      variants: [
+        { id: 'var-small', name: 'ขนาดเล็ก', price: 350, stock: 25, isActive: true },
+        { id: 'var-medium', name: 'ขนาดกลาง', price: 450, stock: 20, isActive: true },
+        { id: 'var-large', name: 'ขนาดใหญ่', price: 550, stock: 15, isActive: true },
+      ],
+      images: ['https://placehold.co/400x400/06b6d4/white?text=SCC+Bag'],
+    },
+  ] : [];
+  // ==================== END DEV TEST PRODUCTS ====================
+  
   const [announcements, setAnnouncements] = useState<ShopConfig['announcements']>([]);
   const [announcementHistory, setAnnouncementHistory] = useState<ShopConfig['announcementHistory']>([]);
   const [showAnnouncementHistory, setShowAnnouncementHistory] = useState(false);
@@ -2837,7 +3065,14 @@ export default function HomePage() {
       return null;
     }
     
-    if (!selectedProduct || !productOptions.size) {
+    // Check if this product requires size selection
+    const needsSize = productRequiresSize(selectedProduct as Product);
+    
+    // Check if product has variants (non-apparel)
+    const hasVariants = !needsSize && (selectedProduct as any)?.variants && (selectedProduct as any).variants.length > 0;
+    
+    // For variant products, size field stores variant id
+    if (!selectedProduct || (needsSize && !productOptions.size) || (hasVariants && !productOptions.size)) {
       // Scroll to size selector and show visual feedback
       sizeSelectorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       setTimeout(() => {
@@ -2871,7 +3106,23 @@ export default function HomePage() {
       return null;
     }
 
-    const basePrice = selectedProduct.sizePricing?.[productOptions.size] ?? selectedProduct.basePrice;
+    // Handle variants - find selected variant and use its price
+    let sizeToUse = needsSize ? productOptions.size : '-';
+    let basePrice = needsSize 
+      ? (selectedProduct.sizePricing?.[productOptions.size] ?? selectedProduct.basePrice)
+      : selectedProduct.basePrice;
+    
+    // If product has variants, get variant name and price
+    let variantName = '';
+    if (hasVariants) {
+      const selectedVariant = ((selectedProduct as any).variants || []).find((v: any) => v.id === productOptions.size);
+      if (selectedVariant) {
+        variantName = selectedVariant.name;
+        sizeToUse = selectedVariant.name; // Show variant name instead of id
+        basePrice = selectedVariant.price || selectedProduct.basePrice;
+      }
+    }
+    
     const longSleeveFee = selectedProduct.options?.hasLongSleeve && productOptions.isLongSleeve 
       ? (selectedProduct.options?.longSleevePrice ?? 50) 
       : 0;
@@ -2882,13 +3133,15 @@ export default function HomePage() {
       id: `${selectedProduct.id}-${productOptions.size}-${normalizedCustomName}-${productOptions.customNumber}-${productOptions.isLongSleeve}`,
       productId: selectedProduct.id,
       productName: selectedProduct.name,
-      size: productOptions.size,
+      size: sizeToUse,
       quantity,
       unitPrice,
       options: {
         customName: normalizedCustomName,
         customNumber: productOptions.customNumber,
         isLongSleeve: productOptions.isLongSleeve,
+        variantId: hasVariants ? productOptions.size : undefined,
+        variantName: variantName || undefined,
       },
     };
   };
@@ -2990,7 +3243,23 @@ export default function HomePage() {
   // Calculate current price for product dialog
   const getCurrentPrice = useCallback(() => {
     if (!selectedProduct) return 0;
-    const basePrice = selectedProduct.sizePricing?.[productOptions.size] ?? selectedProduct.basePrice;
+    
+    // Check if product has variants (non-apparel)
+    const hasVariants = !productRequiresSize(selectedProduct) && (selectedProduct as any)?.variants && (selectedProduct as any).variants.length > 0;
+    
+    let basePrice = selectedProduct.basePrice;
+    
+    if (hasVariants && productOptions.size) {
+      // For variants, size field stores variant id
+      const selectedVariant = ((selectedProduct as any).variants || []).find((v: any) => v.id === productOptions.size);
+      if (selectedVariant) {
+        basePrice = selectedVariant.price || selectedProduct.basePrice;
+      }
+    } else if (productRequiresSize(selectedProduct)) {
+      // For apparel, use size pricing
+      basePrice = selectedProduct.sizePricing?.[productOptions.size] ?? selectedProduct.basePrice;
+    }
+    
     const longSleeveFee = selectedProduct.options?.hasLongSleeve && productOptions.isLongSleeve 
       ? (selectedProduct.options?.longSleevePrice ?? 50) 
       : 0;
@@ -3154,7 +3423,7 @@ export default function HomePage() {
           <Box sx={{ mb: 3.5 }}>
             {productImages.length > 0 ? (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {/* Main Image */}
+                {/* Main Image with loading state */}
                 <Box sx={{ 
                   position: 'relative', 
                   borderRadius: '24px', 
@@ -3162,18 +3431,20 @@ export default function HomePage() {
                   bgcolor: 'rgba(30,41,59,0.6)',
                   border: '1px solid rgba(255,255,255,0.1)',
                   boxShadow: '0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)',
+                  height: { xs: 300, sm: 380, md: 440 },
                 }}>
-                  <Box
-                    component="img"
+                  <OptimizedImage
                     src={productImages[activeImageIndex] || productImages[0]}
                     alt={`${selectedProduct.name} - รูปที่ ${activeImageIndex + 1}`}
-                    loading="lazy"
-                    sx={{ 
-                      width: '100%', 
-                      height: { xs: 300, sm: 380, md: 440 }, 
-                      objectFit: 'cover', 
-                      display: 'block',
-                      transition: 'transform 0.3s ease',
+                    width="100%"
+                    height="100%"
+                    objectFit="cover"
+                    priority={true}
+                    placeholder="shimmer"
+                    showLoadingIndicator={true}
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
                     }}
                   />
                   {/* Gradient overlay at bottom */}
@@ -3185,6 +3456,7 @@ export default function HomePage() {
                     height: 80,
                     background: 'linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.6) 100%)',
                     pointerEvents: 'none',
+                    zIndex: 1,
                   }} />
                   {totalImages > 1 && (
                     <>
@@ -3199,6 +3471,7 @@ export default function HomePage() {
                           backdropFilter: 'blur(8px)',
                           color: 'white', 
                           border: '1px solid rgba(255,255,255,0.1)',
+                          zIndex: 2,
                           '&:hover': { bgcolor: 'rgba(0,0,0,0.8)', transform: 'translateY(-50%) scale(1.05)' },
                           transition: 'all 0.2s ease',
                           width: 44,
@@ -3218,6 +3491,7 @@ export default function HomePage() {
                           backdropFilter: 'blur(8px)',
                           color: 'white', 
                           border: '1px solid rgba(255,255,255,0.1)',
+                          zIndex: 2,
                           '&:hover': { bgcolor: 'rgba(0,0,0,0.8)', transform: 'translateY(-50%) scale(1.05)' },
                           transition: 'all 0.2s ease',
                           width: 44,
@@ -3235,6 +3509,7 @@ export default function HomePage() {
                         py: 0.75,
                         borderRadius: '24px',
                         bgcolor: 'rgba(0,0,0,0.65)',
+                        zIndex: 2,
                         backdropFilter: 'blur(12px)',
                         border: '1px solid rgba(255,255,255,0.1)',
                         display: 'flex',
@@ -3483,7 +3758,116 @@ export default function HomePage() {
             </Box>
           )}
 
-          {/* Size Chart & Selection - Enhanced Modern Design */}
+          {/* Camp Info - for camp registration products */}
+          {(selectedProduct as any).campInfo && (
+            <Box sx={{
+              p: { xs: 2.5, sm: 3 },
+              mb: 2.5,
+              borderRadius: '20px',
+              background: 'linear-gradient(135deg, rgba(245,158,11,0.15) 0%, rgba(245,158,11,0.05) 100%)',
+              border: '1px solid rgba(245,158,11,0.3)',
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                <span style={{ fontSize: '1.5rem' }}>🏕️</span>
+                <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#fbbf24' }}>
+                  ข้อมูลค่าย
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+                {(selectedProduct as any).campInfo.campName && (
+                  <Box>
+                    <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8' }}>ชื่อค่าย</Typography>
+                    <Typography sx={{ fontSize: '0.9rem', color: '#f1f5f9', fontWeight: 600 }}>
+                      {(selectedProduct as any).campInfo.campName}
+                    </Typography>
+                  </Box>
+                )}
+                {(selectedProduct as any).campInfo.campDate && (
+                  <Box>
+                    <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8' }}>วันที่จัดค่าย</Typography>
+                    <Typography sx={{ fontSize: '0.9rem', color: '#f1f5f9', fontWeight: 600 }}>
+                      {new Date((selectedProduct as any).campInfo.campDate).toLocaleDateString('th-TH', { 
+                        day: 'numeric', month: 'long', year: 'numeric' 
+                      })}
+                    </Typography>
+                  </Box>
+                )}
+                {(selectedProduct as any).campInfo.location && (
+                  <Box>
+                    <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8' }}>สถานที่</Typography>
+                    <Typography sx={{ fontSize: '0.9rem', color: '#f1f5f9', fontWeight: 600 }}>
+                      {(selectedProduct as any).campInfo.location}
+                    </Typography>
+                  </Box>
+                )}
+                {(selectedProduct as any).campInfo.organizer && (
+                  <Box>
+                    <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8' }}>ผู้จัด</Typography>
+                    <Typography sx={{ fontSize: '0.9rem', color: '#f1f5f9', fontWeight: 600 }}>
+                      {(selectedProduct as any).campInfo.organizer}
+                    </Typography>
+                  </Box>
+                )}
+                {(selectedProduct as any).campInfo.maxParticipants > 0 && (
+                  <Box sx={{ gridColumn: 'span 2' }}>
+                    <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8' }}>จำนวนรับ</Typography>
+                    <Typography sx={{ fontSize: '0.9rem', color: '#f1f5f9', fontWeight: 600 }}>
+                      {(selectedProduct as any).campInfo.currentParticipants || 0} / {(selectedProduct as any).campInfo.maxParticipants} คน
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+            </Box>
+          )}
+
+          {/* Event Info - for event ticket products */}
+          {(selectedProduct as any).eventInfo && (
+            <Box sx={{
+              p: { xs: 2.5, sm: 3 },
+              mb: 2.5,
+              borderRadius: '20px',
+              background: 'linear-gradient(135deg, rgba(236,72,153,0.15) 0%, rgba(236,72,153,0.05) 100%)',
+              border: '1px solid rgba(236,72,153,0.3)',
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                <span style={{ fontSize: '1.5rem' }}>🎫</span>
+                <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#f472b6' }}>
+                  ข้อมูลอีเวนต์
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+                {(selectedProduct as any).eventInfo.eventName && (
+                  <Box sx={{ gridColumn: 'span 2' }}>
+                    <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8' }}>ชื่ออีเวนต์</Typography>
+                    <Typography sx={{ fontSize: '0.9rem', color: '#f1f5f9', fontWeight: 600 }}>
+                      {(selectedProduct as any).eventInfo.eventName}
+                    </Typography>
+                  </Box>
+                )}
+                {(selectedProduct as any).eventInfo.eventDate && (
+                  <Box>
+                    <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8' }}>วันเวลา</Typography>
+                    <Typography sx={{ fontSize: '0.9rem', color: '#f1f5f9', fontWeight: 600 }}>
+                      {new Date((selectedProduct as any).eventInfo.eventDate).toLocaleDateString('th-TH', { 
+                        day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                      })}
+                    </Typography>
+                  </Box>
+                )}
+                {(selectedProduct as any).eventInfo.venue && (
+                  <Box>
+                    <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8' }}>สถานที่</Typography>
+                    <Typography sx={{ fontSize: '0.9rem', color: '#f1f5f9', fontWeight: 600 }}>
+                      {(selectedProduct as any).eventInfo.venue}
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+            </Box>
+          )}
+
+          {/* Size Chart & Selection - Only show for products that need size */}
+          {productRequiresSize(selectedProduct) && (
           <Box sx={{
             p: { xs: 2.5, sm: 3 },
             mb: 2.5,
@@ -3696,6 +4080,99 @@ export default function HomePage() {
               })}
             </Box>
           </Box>
+          )}
+
+          {/* Variants Selection - for non-apparel products */}
+          {!productRequiresSize(selectedProduct) && (selectedProduct as any).variants && (selectedProduct as any).variants.length > 0 && (
+            <Box sx={{
+              p: { xs: 2.5, sm: 3 },
+              mb: 2.5,
+              borderRadius: '20px',
+              background: 'linear-gradient(135deg, rgba(139,92,246,0.15) 0%, rgba(139,92,246,0.05) 100%)',
+              border: '1px solid rgba(139,92,246,0.3)',
+            }}>
+              <Box ref={sizeSelectorRef} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                <Box sx={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: '10px',
+                  bgcolor: 'rgba(139,92,246,0.2)',
+                  display: 'grid',
+                  placeItems: 'center',
+                }}>
+                  <span style={{ fontSize: '1.1rem' }}>🎨</span>
+                </Box>
+                <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: '#c4b5fd' }}>
+                  เลือกตัวเลือก
+                </Typography>
+              </Box>
+
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                {((selectedProduct as any).variants || [])
+                  .filter((v: any) => v.isActive !== false)
+                  .map((variant: any) => {
+                    const active = productOptions.size === variant.id;
+                    const isOutOfStock = variant.stock !== null && variant.stock !== undefined && variant.stock <= 0;
+                    return (
+                      <Box
+                        key={variant.id}
+                        onClick={() => {
+                          if (isOutOfStock) return;
+                          setProductOptions({ ...productOptions, size: variant.id });
+                        }}
+                        sx={{
+                          px: 2,
+                          py: 1.5,
+                          borderRadius: '12px',
+                          border: active ? '2px solid #8b5cf6' : '1px solid rgba(255,255,255,0.1)',
+                          bgcolor: active ? 'rgba(139,92,246,0.15)' : isOutOfStock ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.03)',
+                          cursor: isOutOfStock ? 'not-allowed' : 'pointer',
+                          opacity: isOutOfStock ? 0.5 : 1,
+                          transition: 'all 0.2s ease',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          minWidth: 90,
+                          position: 'relative',
+                          '&:hover': !isOutOfStock ? { 
+                            borderColor: active ? '#8b5cf6' : 'rgba(139,92,246,0.5)',
+                            bgcolor: active ? 'rgba(139,92,246,0.2)' : 'rgba(139,92,246,0.08)',
+                          } : {},
+                        }}
+                      >
+                        {isOutOfStock && (
+                          <Box sx={{
+                            position: 'absolute',
+                            top: -8,
+                            right: -8,
+                            px: 0.8,
+                            py: 0.2,
+                            bgcolor: '#ef4444',
+                            borderRadius: '6px',
+                            fontSize: '0.6rem',
+                            fontWeight: 700,
+                            color: 'white',
+                          }}>
+                            หมด
+                          </Box>
+                        )}
+                        <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: active ? '#c4b5fd' : '#e2e8f0' }}>
+                          {variant.name}
+                        </Typography>
+                        <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: active ? '#a78bfa' : '#64748b' }}>
+                          ฿{(variant.price || selectedProduct.basePrice).toLocaleString()}
+                        </Typography>
+                        {variant.stock !== null && variant.stock !== undefined && variant.stock > 0 && (
+                          <Typography sx={{ fontSize: '0.6rem', color: '#94a3b8', mt: 0.3 }}>
+                            เหลือ {variant.stock}
+                          </Typography>
+                        )}
+                      </Box>
+                    );
+                  })}
+              </Box>
+            </Box>
+          )}
 
           {/* Additional Options */}
           {(selectedProduct.options?.hasCustomName || selectedProduct.options?.hasCustomNumber || selectedProduct.options?.hasLongSleeve) && (
@@ -4336,7 +4813,15 @@ export default function HomePage() {
   };
 
 
-  const productImages = useMemo(() => (selectedProduct?.images || []).filter(Boolean), [selectedProduct]);
+  const productImages = useMemo(() => {
+    const images = (selectedProduct?.images || []).filter(Boolean);
+    const coverImage = selectedProduct?.coverImage;
+    if (coverImage && images.includes(coverImage)) {
+      // เรียงให้ coverImage ขึ้นก่อน
+      return [coverImage, ...images.filter(img => img !== coverImage)];
+    }
+    return images;
+  }, [selectedProduct]);
   const totalImages = productImages.length;
   const displaySizes = useMemo(() => {
     if (!selectedProduct) return [] as string[];
@@ -4365,28 +4850,34 @@ export default function HomePage() {
   }, [displaySizes, selectedProduct]);
 
   // All products (including non-active for showing status badges)
+  // Group by category first, then subType/type
+  // In dev mode, merge test products with real products
   const allGroupedProducts = useMemo(() => {
-    const items = config?.products || [];
+    const realProducts = config?.products || [];
+    const items = isDev ? [...devTestProducts, ...realProducts] : realProducts;
     const map: Record<string, Product[]> = {};
     items.forEach((p) => {
-      const key = p.type || 'OTHER';
-      if (!map[key]) map[key] = [];
-      map[key].push(p);
+      // Use category if available, otherwise infer from type
+      const category = (p as any).category || getCategoryFromType(p.type);
+      if (!map[category]) map[category] = [];
+      map[category].push(p);
     });
     return map;
-  }, [config?.products]);
+  }, [config?.products, isDev, devTestProducts]);
 
   // Only active products (for counting and filtering)
   const groupedProducts = useMemo(() => {
-    const items = (config?.products || []).filter((p) => isProductCurrentlyOpen(p));
+    const realProducts = config?.products || [];
+    const items = isDev ? [...devTestProducts, ...realProducts] : realProducts;
+    const activeItems = items.filter((p) => isProductCurrentlyOpen(p));
     const map: Record<string, Product[]> = {};
-    items.forEach((p) => {
-      const key = p.type || 'OTHER';
-      if (!map[key]) map[key] = [];
-      map[key].push(p);
+    activeItems.forEach((p) => {
+      const category = (p as any).category || getCategoryFromType(p.type);
+      if (!map[category]) map[category] = [];
+      map[category].push(p);
     });
     return map;
-  }, [config?.products]);
+  }, [config?.products, isDev, devTestProducts]);
 
   const totalProductCount = useMemo(() => Object.values(allGroupedProducts).reduce((acc, items) => acc + items.length, 0), [allGroupedProducts]);
   const activeProductCount = useMemo(() => Object.values(groupedProducts).reduce((acc, items) => acc + items.length, 0), [groupedProducts]);
@@ -4405,8 +4896,13 @@ export default function HomePage() {
 
   const categoryMeta = useMemo(
     () => [
-      { key: 'ALL', label: 'ทั้งหมด', count: totalProductCount },
-      ...Object.entries(allGroupedProducts).map(([key, items]) => ({ key, label: TYPE_LABELS[key] || key || 'อื่นๆ', count: items.length })),
+      { key: 'ALL', label: 'ทั้งหมด', count: totalProductCount, icon: '🛒' },
+      ...Object.entries(allGroupedProducts).map(([key, items]) => ({ 
+        key, 
+        label: getCategoryLabel(key) || TYPE_LABELS[key] || key || 'อื่นๆ', 
+        count: items.length,
+        icon: getCategoryIcon(key),
+      })),
     ],
     [totalProductCount, allGroupedProducts]
   );
@@ -5593,6 +6089,7 @@ export default function HomePage() {
                             },
                           }}
                         >
+                          <span style={{ fontSize: '0.9rem' }}>{(cat as any).icon || '📦'}</span>
                           {cat.label}
                           <Box sx={{
                             px: 0.7,
@@ -5648,17 +6145,21 @@ export default function HomePage() {
             )}
 
             {config?.products && Object.keys(filteredGroupedProducts).length > 0 ? (
-              Object.entries(filteredGroupedProducts).map(([type, items]) => (
-                <Box key={type} sx={{ mb: 4 }}>
+              Object.entries(filteredGroupedProducts).map(([category, items]) => (
+                <Box key={category} sx={{ mb: 4 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
                     <Box sx={{
                       px: 1.5,
                       py: 0.6,
                       borderRadius: '10px',
                       background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 0.75,
                     }}>
+                      <span style={{ fontSize: '0.9rem' }}>{getCategoryIcon(category)}</span>
                       <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: 'white' }}>
-                        {TYPE_LABELS[type] || type || 'อื่นๆ'}
+                        {getCategoryLabel(category) || TYPE_LABELS[category] || category || 'อื่นๆ'}
                       </Typography>
                     </Box>
                     <Typography sx={{ fontSize: '0.85rem', color: '#64748b' }}>
@@ -5714,16 +6215,17 @@ export default function HomePage() {
                             bgcolor: '#0b1224',
                             overflow: 'hidden',
                           }}>
-                            {/* Optimized product image with lazy loading */}
-                            {product.images?.[0] ? (
+                            {/* Optimized product image with lazy loading - ใช้ coverImage ก่อน */}
+                            {(product.coverImage || product.images?.[0]) ? (
                               <OptimizedImage
-                                src={product.images[0]}
+                                src={product.coverImage ?? (product.images && product.images[0]) ?? ''}
                                 alt={product.name}
                                 width="100%"
                                 height="100%"
                                 objectFit="cover"
                                 priority={productIdx < 4} // First 4 products load eagerly
-                                placeholder="skeleton"
+                                placeholder="shimmer"
+                                showLoadingIndicator={productIdx < 4}
                                 style={{
                                   position: 'absolute',
                                   inset: 0,

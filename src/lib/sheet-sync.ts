@@ -104,44 +104,135 @@ const buildRows = (orders: any[], baseUrl: string) => {
   });
 };
 
+// Flatten items for factory export + size summary - Beautiful format for production
+// IMPORTANT: This should only receive PAID orders
 const buildFactoryExport = (orders: any[]) => {
-  const header = ['ลำดับ', 'ชื่อ', 'เบอร์เสื้อ', 'ชื่อบนเสื้อ', 'ไซซ์', 'แขนยาว', 'ไซซ์กางเกง (ถ้ามี)', 'เบอร์กางเกง (ถ้ามี)', 'หมายเหตุ', 'คณะ/กลุ่ม', 'เรียงลำดับ', 'สำรอง', 'Size', 'จำนวนรวม'];
-  const rows: any[] = [];
-  const sizeCount: Record<string, number> = {};
+  // Define size order for sorting
+  const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL', '7XL', '8XL', '9XL', '10XL'];
+  const getSizeIndex = (size: string) => {
+    const idx = sizeOrder.findIndex(s => size?.toUpperCase()?.includes(s));
+    return idx === -1 ? 999 : idx;
+  };
 
+  // Collect all items with full details
+  const allItems: any[] = [];
+  const sizeCount: Record<string, number> = {};
+  const sizeLongSleeveCount: Record<string, number> = {};
+  const sizeShortSleeveCount: Record<string, number> = {};
+  
   orders.forEach((o) => {
     const items = o?.items || o?.cart || o?.raw?.items || [];
     items.forEach((item: any) => {
-      const size = item.size || '';
+      const size = item.size || 'ไม่ระบุ';
       const qty = Number(item.quantity ?? 1) || 1;
+      const isLongSleeve = item.options?.isLongSleeve || item.isLongSleeve || false;
+      
+      // Count totals
       sizeCount[size] = (sizeCount[size] || 0) + qty;
+      if (isLongSleeve) {
+        sizeLongSleeveCount[size] = (sizeLongSleeveCount[size] || 0) + qty;
+      } else {
+        sizeShortSleeveCount[size] = (sizeShortSleeveCount[size] || 0) + qty;
+      }
 
-      rows.push([
-        rows.length + 1,
-        o?.customerName || o?.name || '',
-        item.options?.customNumber || item.customNumber || '',
-        item.options?.customName || item.customName || '',
-        size,
-        item.options?.isLongSleeve ? 'แขนยาว' : '',
-        '',
-        '',
-        o?.notes || o?.remark || '',
-        '',
-        '',
-        '',
+      allItems.push({
+        orderRef: o?.ref || '',
+        orderDate: o?.date || o?.createdAt || '',
+        customerName: o?.customerName || o?.name || '',
+        customerPhone: o?.customerPhone || o?.phone || '',
+        productName: item.productName || item.name || item.productId || '',
         size,
         qty,
-      ]);
+        isLongSleeve,
+        customName: item.options?.customName || item.customName || '',
+        customNumber: item.options?.customNumber || item.customNumber || '',
+        unitPrice: item.unitPrice || 0,
+        subtotal: (item.unitPrice || 0) * qty,
+      });
     });
   });
 
-  const summaryHeader = ['Size', 'จำนวนรวม'];
-  const summaryRows = Object.entries(sizeCount)
-    .filter(([size]) => size)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([size, qty]) => [size, qty]);
+  // Sort items by size then by customer name
+  allItems.sort((a, b) => {
+    const sizeCompare = getSizeIndex(a.size) - getSizeIndex(b.size);
+    if (sizeCompare !== 0) return sizeCompare;
+    return (a.customerName || '').localeCompare(b.customerName || '');
+  });
 
-  return [header, ...rows, [], summaryHeader, ...summaryRows];
+  // Build header row - production friendly
+  const header = [
+    '📋 ลำดับ',
+    '👕 ไซซ์',
+    '📏 แขน',
+    '✨ ชื่อสกรีน',
+    '🔢 เบอร์สกรีน',
+    '👤 ชื่อลูกค้า',
+    '📞 เบอร์โทร',
+    '📦 สินค้า',
+    '🔖 Ref',
+    '📅 วันที่สั่ง',
+  ];
+
+  // Build data rows
+  const rows = allItems.map((item, index) => [
+    index + 1,
+    item.size,
+    item.isLongSleeve ? '🔵 แขนยาว' : '⚪ แขนสั้น',
+    item.customName || '-',
+    item.customNumber || '-',
+    item.customerName,
+    item.customerPhone,
+    item.productName,
+    item.orderRef,
+    item.orderDate ? new Date(item.orderDate).toLocaleDateString('th-TH') : '',
+  ]);
+
+  // Build size summary with totals - sorted properly
+  const sortedSizes = Object.keys(sizeCount).sort((a, b) => getSizeIndex(a) - getSizeIndex(b));
+  
+  const summaryHeader = ['📊 สรุปตามไซซ์', '', '', ''];
+  const summarySubHeader = ['ไซซ์', 'แขนสั้น', 'แขนยาว', 'รวม'];
+  const summaryRows = sortedSizes.map(size => [
+    size,
+    sizeShortSleeveCount[size] || 0,
+    sizeLongSleeveCount[size] || 0,
+    sizeCount[size] || 0,
+  ]);
+
+  // Calculate grand totals
+  const totalShortSleeve = Object.values(sizeShortSleeveCount).reduce((a, b) => a + b, 0);
+  const totalLongSleeve = Object.values(sizeLongSleeveCount).reduce((a, b) => a + b, 0);
+  const grandTotal = totalShortSleeve + totalLongSleeve;
+
+  const totalRow = ['🎯 รวมทั้งหมด', totalShortSleeve, totalLongSleeve, grandTotal];
+
+  // Build stats row
+  const statsRow = [
+    `📦 จำนวนคำสั่งซื้อที่ชำระแล้ว: ${orders.length} รายการ`,
+    `📊 จำนวนชิ้นทั้งหมด: ${grandTotal} ชิ้น`,
+    `⏰ อัปเดตล่าสุด: ${new Date().toLocaleString('th-TH')}`,
+    '',
+  ];
+
+  // Combine all sections with spacing
+  const values = [
+    // Stats section
+    ['🏭 รายงานการผลิต - Factory Export'],
+    statsRow,
+    [],
+    // Main data
+    header,
+    ...rows,
+    [],
+    [],
+    // Summary section
+    summaryHeader,
+    summarySubHeader,
+    ...summaryRows,
+    totalRow,
+  ];
+
+  return values;
 };
 
 const buildVendorRows = (orders: any[]) => {
@@ -227,14 +318,24 @@ async function performSync(baseUrl?: string): Promise<void> {
     requestBody: { values },
   });
 
-  // Sync factory export
-  const factoryValues = buildFactoryExport(orders);
+  // Factory export tab - ONLY PAID orders (important for production tracking)
+  const paidOrders = orders.filter((o) => o?.status === 'PAID');
+  const factoryValues = buildFactoryExport(paidOrders);
+  
+  // Clear the factory sheet first to avoid stale data when orders get cancelled
+  await sheets.spreadsheets.values.clear({
+    spreadsheetId: sheetId,
+    range: `${FACTORY_EXPORT_TITLE}!A:Z`,
+  });
+  
   await sheets.spreadsheets.values.update({
     spreadsheetId: sheetId,
-    range: `${FACTORY_EXPORT_TITLE}!A1:N${factoryValues.length}`,
+    range: `${FACTORY_EXPORT_TITLE}!A1:J${factoryValues.length}`,
     valueInputOption: 'RAW',
     requestBody: { values: factoryValues },
   });
+
+  console.log(`[sheet-sync] Factory export - ${paidOrders.length} PAID orders synced`);
 
   // Sync vendor sheet if configured
   if (vendorSheetId) {
