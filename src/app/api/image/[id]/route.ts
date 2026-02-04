@@ -174,12 +174,15 @@ export async function GET(
           process.env.NEXTAUTH_URL ? new URL(process.env.NEXTAUTH_URL).host : null,
         ].filter(Boolean) as string[];
         
-        // Also allow GitHub Codespaces and common dev environments
-        const isDevEnvironment = 
+        // Also allow GitHub Codespaces, Railway, and common dev/deploy environments
+        const isAllowedEnvironment = 
           refererUrl.host.includes('github.dev') ||
           refererUrl.host.includes('gitpod.io') ||
           refererUrl.host.includes('codespaces') ||
           refererUrl.host.includes('vercel.app') ||
+          refererUrl.host.includes('railway.app') ||
+          refererUrl.host.includes('psuscc') ||
+          refererUrl.host.includes('sccshop') ||
           refererUrl.host.includes('localhost') ||
           refererUrl.host.includes('127.0.0.1');
         
@@ -187,7 +190,7 @@ export async function GET(
           refererUrl.host === h || refererUrl.host.endsWith(`.${h}`)
         );
         
-        if (!isAllowedHost && !isDevEnvironment) {
+        if (!isAllowedHost && !isAllowedEnvironment) {
           console.warn('[Image Proxy] Blocked hotlink from:', referer);
           return new NextResponse(null, { status: 403 });
         }
