@@ -9168,10 +9168,10 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any
               key={opt.key}
               control={
                 <Checkbox
-                  checked={(product.options as any)[opt.key]}
+                  checked={(product.options as any)?.[opt.key] ?? false}
                   onChange={(e) => onChange({
                     ...product,
-                    options: {...product.options, [opt.key]: e.target.checked}
+                    options: {...(product.options || {}), [opt.key]: e.target.checked}
                   })}
                 />
               }
