@@ -2296,6 +2296,10 @@ export default function AdminPage(): JSX.Element {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  // Connection status tracking
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const connectionRetryCount = useRef(0);
   const [searchTerm, setSearchTerm] = useState('');
   const toastTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
@@ -2453,7 +2457,7 @@ export default function AdminPage(): JSX.Element {
     saveAdminCache({ config: nextConfig, orders: normalizedOrders, logs: nextLogs });
   }, []);
 
-  // 📥 SWR Hook for Admin Data (replaces manual fetchData)
+  // 📥 SWR Hook for Admin Data (replaces manual fetchData) - NO CACHE for realtime data
   const { 
     isLoading: swrLoading, 
     isRefreshing: swrRefreshing,
@@ -2461,15 +2465,36 @@ export default function AdminPage(): JSX.Element {
     invalidate: swrInvalidate,
   } = useAdminDataSWR({
     enabled: status === 'authenticated',
-    onDataReceived: handleSWRDataReceived,
+    onDataReceived: (data) => {
+      // Clear connection error on successful fetch
+      setConnectionError(null);
+      connectionRetryCount.current = 0;
+      handleSWRDataReceived(data);
+    },
     onError: (error) => {
+      connectionRetryCount.current += 1;
       const isNetworkError = error?.message?.includes('Failed to fetch') || 
-                            error?.message?.includes('NETWORK_ERROR');
-      if (isNetworkError) {
-        console.warn('[Admin SWR] Network error - using cached data');
+                            error?.message?.includes('NETWORK_ERROR') ||
+                            error?.message?.includes('NetworkError') ||
+                            error?.message?.includes('fetch');
+      const isServerError = error?.status >= 500 || error?.message?.includes('500');
+      const isDBError = error?.message?.includes('database') || 
+                       error?.message?.includes('supabase') ||
+                       error?.message?.includes('connection');
+      
+      // Set appropriate error message for user
+      if (!navigator.onLine) {
+        setConnectionError('ไม่มีการเชื่อมต่ออินเทอร์เน็ต กรุณาตรวจสอบเครือข่ายของคุณ');
+      } else if (isServerError || isDBError) {
+        setConnectionError('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ ระบบกำลังพยายามเชื่อมต่อใหม่...');
+      } else if (isNetworkError) {
+        setConnectionError('เกิดปัญหาในการเชื่อมต่อเครือข่าย กรุณารอสักครู่...');
       } else {
-        console.error('[Admin SWR] Error:', error);
+        setConnectionError(`เกิดข้อผิดพลาด: ${error?.message || 'Unknown error'}`);
       }
+      
+      console.warn('[Admin SWR] Connection error:', error);
+      
       // Load from local cache as fallback
       const cached = loadAdminCache();
       if (cached) {
@@ -2482,6 +2507,8 @@ export default function AdminPage(): JSX.Element {
       setLoading(loading);
     },
     realtimeConnected: false, // Will be updated by realtime hook below
+    // Force no cache - always fetch fresh data for admin
+    noCache: true,
   });
 
   // 📥 Fetch Data wrapper (for compatibility with existing code)
@@ -3008,7 +3035,43 @@ export default function AdminPage(): JSX.Element {
   }, [config, logs]);
 
   // Use realtime subscriptions for admin
-  const { isConnected: realtimeConnected } = useRealtimeAdminOrders(handleRealtimeOrderChange);
+  const { isConnected: realtimeConnected, connectionState, error: realtimeError } = useRealtimeAdminOrders(handleRealtimeOrderChange);
+
+  // Track online/offline status and connection health
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      setConnectionError(null);
+      connectionRetryCount.current = 0;
+      // Refresh data when back online
+      swrRefresh({ silent: true });
+    };
+    
+    const handleOffline = () => {
+      setIsOnline(false);
+      setConnectionError('ไม่มีการเชื่อมต่ออินเทอร์เน็ต กรุณาตรวจสอบเครือข่ายของคุณ');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [swrRefresh]);
+
+  // Update connection error from realtime hook
+  useEffect(() => {
+    if (realtimeError && connectionState === 'error') {
+      // Only set if we don't already have a more specific error
+      if (!connectionError) {
+        setConnectionError('การเชื่อมต่อ Realtime ขัดข้อง กำลังพยายามเชื่อมต่อใหม่...');
+      }
+    } else if (realtimeConnected && connectionError?.includes('Realtime')) {
+      setConnectionError(null);
+    }
+  }, [realtimeConnected, connectionState, realtimeError, connectionError]);
 
   // SWR handles polling automatically via refreshInterval
   // This effect is kept only for editor pause logic
@@ -3152,9 +3215,6 @@ export default function AdminPage(): JSX.Element {
                   '50%': { opacity: 0.5 },
                 },
               }} />
-              <Typography sx={{ fontSize: '0.7rem', color: realtimeConnected ? '#10b981' : '#f59e0b', fontWeight: 600 }}>
-                {realtimeConnected ? '🔴 Live' : '⏳ Polling'}
-              </Typography>
             </Box>
           </Box>
         </Box>
@@ -6749,6 +6809,87 @@ export default function AdminPage(): JSX.Element {
               },
             }}
           />
+        </Box>
+      )}
+
+      {/* Connection Error Banner - Shows when server/db connection fails */}
+      {(connectionError || !isOnline) && (
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 10000,
+            background: !isOnline 
+              ? 'linear-gradient(90deg, #dc2626 0%, #b91c1c 100%)' 
+              : 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)',
+            color: '#fff',
+            px: 3,
+            py: 1.5,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 2,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+            animation: 'slideDown 0.3s ease-out',
+            '@keyframes slideDown': {
+              '0%': { transform: 'translateY(-100%)' },
+              '100%': { transform: 'translateY(0)' },
+            },
+          }}
+        >
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 1.5,
+          }}>
+            {!isOnline ? (
+              <ErrorOutline sx={{ fontSize: 22 }} />
+            ) : (
+              <ReportProblem sx={{ fontSize: 22 }} />
+            )}
+            <Typography sx={{ fontSize: '0.9rem', fontWeight: 600 }}>
+              {connectionError || 'ไม่มีการเชื่อมต่ออินเทอร์เน็ต'}
+            </Typography>
+          </Box>
+          
+          {/* Retry Button */}
+          <Button
+            size="small"
+            onClick={() => {
+              setConnectionError(null);
+              swrRefresh();
+            }}
+            sx={{
+              bgcolor: 'rgba(255,255,255,0.2)',
+              color: '#fff',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              px: 2,
+              py: 0.5,
+              borderRadius: '8px',
+              textTransform: 'none',
+              '&:hover': {
+                bgcolor: 'rgba(255,255,255,0.3)',
+              },
+            }}
+          >
+            <Refresh sx={{ fontSize: 16, mr: 0.5 }} />
+            ลองใหม่
+          </Button>
+          
+          {/* Dismiss Button */}
+          <IconButton
+            size="small"
+            onClick={() => setConnectionError(null)}
+            sx={{
+              color: 'rgba(255,255,255,0.8)',
+              '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.1)' },
+            }}
+          >
+            <Close sx={{ fontSize: 18 }} />
+          </IconButton>
         </Box>
       )}
 

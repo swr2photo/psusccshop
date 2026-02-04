@@ -28,6 +28,8 @@ interface UseAdminDataSWROptions {
   onError?: (error: any) => void;
   onLoadingChange?: (loading: boolean) => void;
   realtimeConnected?: boolean;
+  // Force no caching - always fetch fresh data
+  noCache?: boolean;
 }
 
 /**
@@ -39,6 +41,7 @@ interface UseAdminDataSWROptions {
  * - Network reconnection handling
  * - Deduplication of requests
  * - Error handling with fallback
+ * - Optional no-cache mode for real-time admin data
  */
 export function useAdminDataSWR(options: UseAdminDataSWROptions) {
   const { 
@@ -47,6 +50,7 @@ export function useAdminDataSWR(options: UseAdminDataSWROptions) {
     onError, 
     onLoadingChange,
     realtimeConnected = false,
+    noCache = false,
   } = options;
 
   const initialLoadDone = useRef(false);
@@ -67,6 +71,12 @@ export function useAdminDataSWR(options: UseAdminDataSWROptions) {
     onLoadingChangeRef.current = onLoadingChange;
   }, [onLoadingChange]);
 
+  // Custom fetcher with cache-busting for noCache mode
+  const adminFetcher = useCallback(async (url: string) => {
+    const fetchUrl = noCache ? `${url}${url.includes('?') ? '&' : '?'}_t=${Date.now()}` : url;
+    return fetcher(fetchUrl);
+  }, [noCache]);
+
   // SWR fetch with configuration
   const { 
     data, 
@@ -76,24 +86,24 @@ export function useAdminDataSWR(options: UseAdminDataSWROptions) {
     mutate 
   } = useSWR<AdminDataRaw>(
     enabled ? CACHE_KEYS.ADMIN_DATA : null,
-    fetcher,
+    adminFetcher,
     {
-      // Revalidation settings
+      // Revalidation settings - always fresh for admin
       revalidateOnFocus: true,
       revalidateOnReconnect: true,
       revalidateIfStale: true,
       
-      // Longer interval when realtime is active
-      refreshInterval: realtimeConnected ? 120000 : 30000, // 2min with realtime, 30s without
+      // Shorter interval for real-time feel, even shorter with noCache
+      refreshInterval: noCache ? 10000 : (realtimeConnected ? 120000 : 30000), // 10s with noCache, 2min with realtime, 30s default
       
-      // Deduplication
-      dedupingInterval: 5000,
+      // Minimal deduplication for noCache mode - allow more frequent fetches
+      dedupingInterval: noCache ? 1000 : 5000, // 1s vs 5s
       
       // Error handling
       errorRetryCount: 3,
-      errorRetryInterval: 5000,
+      errorRetryInterval: 3000, // Faster retry
       
-      // Keep showing stale data while revalidating
+      // Keep showing stale data while revalidating (useful for smooth UX)
       keepPreviousData: true,
       
       // Don't suspend - we handle loading state manually
