@@ -77,7 +77,7 @@ const AUTH_ERRORS: Record<string, AuthErrorInfo> = {
     title: 'กรุณาเข้าสู่ระบบ',
     description: 'คุณต้องเข้าสู่ระบบก่อนเข้าถึงหน้านี้',
     icon: KeyRound,
-    color: '#6366f1',
+    color: '#2563eb',
     suggestion: 'กรุณาเข้าสู่ระบบด้วย Google Account ของคุณ',
     canRetry: true,
   },
@@ -195,7 +195,7 @@ function AuthErrorContent() {
             width: 400,
             height: 400,
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%)',
+            background: 'radial-gradient(circle, rgba(37,99,235,0.15) 0%, transparent 70%)',
             filter: 'blur(60px)',
             animation: 'pulse 5s ease-in-out infinite reverse',
           }}
@@ -238,7 +238,7 @@ function AuthErrorContent() {
             variant="h4"
             sx={{
               fontWeight: 700,
-              color: '#f1f5f9',
+              color: 'var(--foreground)',
               mb: 1.5,
               fontSize: { xs: '1.5rem', sm: '1.75rem' },
             }}
@@ -249,7 +249,7 @@ function AuthErrorContent() {
           {/* Error Description */}
           <Typography
             sx={{
-              color: '#94a3b8',
+              color: 'var(--text-muted)',
               mb: 2,
               fontSize: '1rem',
               lineHeight: 1.6,
@@ -285,13 +285,13 @@ function AuthErrorContent() {
             sx={{
               p: 2,
               borderRadius: '12px',
-              bgcolor: 'rgba(99,102,241,0.1)',
-              border: '1px solid rgba(99,102,241,0.2)',
+              bgcolor: 'rgba(37,99,235,0.1)',
+              border: '1px solid rgba(37,99,235,0.2)',
               mb: 4,
             }}
           >
-            <Typography sx={{ fontSize: '0.9rem', color: '#a5b4fc' }}>
-              💡 {errorInfo.suggestion}
+            <Typography sx={{ fontSize: '0.9rem', color: '#93c5fd' }}>
+              {errorInfo.suggestion}
             </Typography>
           </Box>
 
@@ -306,15 +306,15 @@ function AuthErrorContent() {
                   px: 3,
                   py: 1.5,
                   borderRadius: '12px',
-                  background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                  background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
                   textTransform: 'none',
                   fontWeight: 600,
                   fontSize: '0.95rem',
-                  boxShadow: '0 4px 20px rgba(99,102,241,0.3)',
+                  boxShadow: '0 4px 20px rgba(37,99,235,0.3)',
                   '&:hover': {
-                    background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
+                    background: 'linear-gradient(135deg, #1d4ed8 0%, #7c3aed 100%)',
                     transform: 'translateY(-2px)',
-                    boxShadow: '0 6px 30px rgba(99,102,241,0.4)',
+                    boxShadow: '0 6px 30px rgba(37,99,235,0.4)',
                   },
                   transition: 'all 0.2s ease',
                 }}
@@ -332,7 +332,7 @@ function AuthErrorContent() {
                 py: 1.5,
                 borderRadius: '12px',
                 borderColor: 'rgba(255,255,255,0.2)',
-                color: '#e2e8f0',
+                color: 'var(--foreground)',
                 textTransform: 'none',
                 fontWeight: 600,
                 fontSize: '0.95rem',
@@ -354,7 +354,7 @@ function AuthErrorContent() {
                 component="a"
                 href="mailto:psuscc@psusci.club"
                 sx={{
-                  color: '#6366f1',
+                  color: '#2563eb',
                   textDecoration: 'none',
                   '&:hover': { textDecoration: 'underline' },
                 }}
@@ -404,7 +404,7 @@ export default function AuthErrorPage() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            bgcolor: '#0a0f1a',
+            bgcolor: 'var(--background)',
           }}
         >
           <Typography sx={{ color: '#64748b' }}>กำลังโหลด...</Typography>

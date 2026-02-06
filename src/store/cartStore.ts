@@ -4,7 +4,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { ProductCategory, ProductSubType, ProductVariant, ProductCustomField } from '@/lib/config';
 
-// ✅ รองรับหลายหมวดหมู่สินค้า
+// รองรับหลายหมวดหมู่สินค้า
 export interface Product {
   id: string;
   name: string;

@@ -27,19 +27,19 @@ import {
   DialogActions,
 } from '@mui/material';
 import {
-  LocalShipping,
-  Add,
-  Delete,
-  Edit,
+  Truck as LocalShipping,
+  Plus as Add,
+  Trash2 as Delete,
+  Pencil as Edit,
   Save,
-  ExpandMore,
-  ExpandLess,
-  ContentCopy,
-  OpenInNew,
+  ChevronDown as ExpandMore,
+  ChevronUp as ExpandLess,
+  Copy as ContentCopy,
+  ExternalLink as OpenInNew,
   Settings,
-  Inventory,
+  Package as Inventory,
   Store,
-} from '@mui/icons-material';
+} from 'lucide-react';
 import {
   ShippingConfig,
   ShippingOption,
@@ -66,13 +66,13 @@ const inputSx = {
       borderColor: 'rgba(255, 255, 255, 0.2)',
     },
     '&.Mui-focused fieldset': {
-      borderColor: '#8b5cf6',
+      borderColor: '#1e40af',
     },
   },
   '& .MuiInputLabel-root': {
     color: 'rgba(255, 255, 255, 0.6)',
     '&.Mui-focused': {
-      color: '#8b5cf6',
+      color: '#1e40af',
     },
   },
   '& .MuiInputBase-input': {
@@ -188,7 +188,7 @@ export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
       {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <LocalShipping sx={{ fontSize: 28, color: '#8b5cf6' }} />
+          <LocalShipping size={28} color="#1e40af" />
           <Typography variant="h5" fontWeight="bold">
             ตั้งค่าการจัดส่ง
           </Typography>
@@ -199,7 +199,7 @@ export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
           onClick={saveConfig}
           disabled={saving}
           sx={{
-            bgcolor: '#8b5cf6',
+            bgcolor: '#1e40af',
             '&:hover': { bgcolor: '#7c3aed' },
           }}
         >
@@ -228,7 +228,7 @@ export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
       }}>
         <CardContent>
           <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Settings sx={{ fontSize: 20 }} />
+            <Settings size={20} />
             ตั้งค่าทั่วไป
           </Typography>
           
@@ -312,17 +312,17 @@ export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
       {/* Track123 API Info */}
       <Card sx={{ 
         mb: 3, 
-        bgcolor: 'rgba(139, 92, 246, 0.1)', 
-        border: '1px solid rgba(139, 92, 246, 0.3)',
+        bgcolor: 'rgba(30, 64, 175, 0.1)', 
+        border: '1px solid rgba(30, 64, 175, 0.3)',
         borderRadius: '12px',
       }}>
         <CardContent>
           <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1, color: '#a78bfa' }}>
-            <OpenInNew sx={{ fontSize: 20 }} />
+            <OpenInNew size={20} />
             Track123 API (ระบบติดตามพัสดุ)
           </Typography>
           
-          <Typography variant="body2" sx={{ mb: 2, color: '#94a3b8' }}>
+          <Typography variant="body2" sx={{ mb: 2, color: 'var(--text-muted)' }}>
             ระบบใช้ Track123 API สำหรับติดตามพัสดุจากทุกขนส่ง รองรับการติดตามแบบ batch และ webhook
           </Typography>
           
@@ -351,7 +351,7 @@ export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
               <Chip 
                 label="+1700 carriers" 
                 size="small"
-                sx={{ bgcolor: 'rgba(139, 92, 246, 0.2)', color: '#a78bfa' }}
+                sx={{ bgcolor: 'rgba(30, 64, 175, 0.2)', color: '#a78bfa' }}
               />
             </Box>
             
@@ -363,9 +363,9 @@ export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
                 href="https://member.track123.com/api"
                 target="_blank"
                 sx={{
-                  borderColor: 'rgba(139, 92, 246, 0.5)',
+                  borderColor: 'rgba(30, 64, 175, 0.5)',
                   color: '#a78bfa',
-                  '&:hover': { borderColor: '#8b5cf6', bgcolor: 'rgba(139, 92, 246, 0.1)' },
+                  '&:hover': { borderColor: '#1e40af', bgcolor: 'rgba(30, 64, 175, 0.1)' },
                 }}
               >
                 ดู API Key
@@ -378,8 +378,8 @@ export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
                 target="_blank"
                 sx={{
                   borderColor: 'rgba(255,255,255,0.2)',
-                  color: '#94a3b8',
-                  '&:hover': { borderColor: '#8b5cf6' },
+                  color: 'var(--text-muted)',
+                  '&:hover': { borderColor: '#1e40af' },
                 }}
               >
                 API Docs
@@ -404,7 +404,7 @@ export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
         <CardContent>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
             <Typography variant="subtitle1" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Inventory sx={{ fontSize: 20 }} />
+              <Inventory size={20} />
               ตัวเลือกการจัดส่ง
             </Typography>
             <Button
@@ -413,9 +413,9 @@ export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
               startIcon={<Add />}
               onClick={() => setAddDialogOpen(true)}
               sx={{
-                borderColor: '#8b5cf6',
-                color: '#8b5cf6',
-                '&:hover': { borderColor: '#7c3aed', bgcolor: 'rgba(139, 92, 246, 0.1)' },
+                borderColor: '#1e40af',
+                color: '#1e40af',
+                '&:hover': { borderColor: '#7c3aed', bgcolor: 'rgba(30, 64, 175, 0.1)' },
               }}
             >
               เพิ่ม
@@ -468,8 +468,8 @@ function ShippingOptionCard({
 
   return (
     <Card sx={{
-      bgcolor: option.enabled ? 'rgba(139, 92, 246, 0.1)' : 'rgba(255, 255, 255, 0.02)',
-      border: `1px solid ${option.enabled ? 'rgba(139, 92, 246, 0.3)' : 'rgba(255, 255, 255, 0.08)'}`,
+      bgcolor: option.enabled ? 'rgba(30, 64, 175, 0.1)' : 'rgba(255, 255, 255, 0.02)',
+      border: `1px solid ${option.enabled ? 'rgba(30, 64, 175, 0.3)' : 'rgba(255, 255, 255, 0.08)'}`,
       borderRadius: '10px',
       transition: 'all 0.2s',
     }}>
@@ -611,7 +611,7 @@ function ShippingOptionCard({
                             size="small"
                             onClick={() => window.open(option.trackingUrlTemplate?.replace('{tracking}', 'TEST123'), '_blank')}
                           >
-                            <OpenInNew sx={{ fontSize: 18 }} />
+                            <OpenInNew size={18} />
                           </IconButton>
                         </Tooltip>
                       </InputAdornment>
@@ -729,7 +729,7 @@ function AddShippingOptionDialog({
         <Button 
           onClick={handleAdd} 
           variant="contained"
-          sx={{ bgcolor: '#8b5cf6', '&:hover': { bgcolor: '#7c3aed' } }}
+          sx={{ bgcolor: '#1e40af', '&:hover': { bgcolor: '#7c3aed' } }}
         >
           เพิ่ม
         </Button>

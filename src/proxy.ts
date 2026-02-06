@@ -262,8 +262,8 @@ export default function proxy(request: NextRequest) {
   response.headers.set('X-Frame-Options', 'DENY');
   response.headers.set('X-XSS-Protection', '1; mode=block');
   
-  // Prevent caching of API responses
-  if (pathname.startsWith('/api/')) {
+  // Prevent caching of API responses (except image proxy which has its own cache headers)
+  if (pathname.startsWith('/api/') && !pathname.startsWith('/api/image/')) {
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     response.headers.set('Pragma', 'no-cache');
     response.headers.set('Expires', '0');

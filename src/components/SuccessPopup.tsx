@@ -142,7 +142,7 @@ export default function SuccessPopup({
             sx={{
               fontSize: '1.5rem',
               fontWeight: 800,
-              color: '#f1f5f9',
+              color: 'var(--foreground)',
               mt: 1,
             }}
           >
@@ -154,7 +154,7 @@ export default function SuccessPopup({
             <Typography
               sx={{
                 fontSize: '1rem',
-                color: '#94a3b8',
+                color: 'var(--text-muted)',
                 lineHeight: 1.5,
               }}
             >

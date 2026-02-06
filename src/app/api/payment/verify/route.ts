@@ -150,7 +150,7 @@ const checkSlipWithSlipOK = async (
     // เปิด log: true เพื่อเช็คสลิปซ้ำและบัญชีผู้รับ
     const payload: Record<string, any> = {
       files: base64,
-      log: true, // ✅ เปิดเพื่อเช็คสลิปซ้ำ + บัญชีผู้รับ
+      log: true, // เปิดเพื่อเช็คสลิปซ้ำ + บัญชีผู้รับ
     };
 
     // เพิ่มยอดเงินเพื่อเช็คความถูกต้อง
@@ -174,7 +174,7 @@ const checkSlipWithSlipOK = async (
     // Log full response for debugging (to find image URL field)
     console.log(`[payment-verify] SlipOK response:`, JSON.stringify(result, null, 2));
 
-    // ✅ Success case
+    // Success case
     if (response.ok && result.success && result.data?.success) {
       const slipAmount = result.data.amount;
       const senderName = result.data.sender?.displayName || result.data.sender?.name || 'ไม่ทราบ';
@@ -183,9 +183,9 @@ const checkSlipWithSlipOK = async (
       // Try to get slip image URL from response (SlipOK stores images in S3)
       const slipImageUrl = result.data.imageUrl || result.data.slipUrl || (result as any).imageUrl || (result as any).slipUrl;
 
-      console.log(`[payment-verify] ✅ Slip verified: ${slipAmount} THB from ${senderName} to ${receiverName}`);
+      console.log(`[payment-verify] Slip verified: ${slipAmount} THB from ${senderName} to ${receiverName}`);
       if (slipImageUrl) {
-        console.log(`[payment-verify] 📸 Slip image URL: ${slipImageUrl}`);
+        console.log(`[payment-verify] Slip image URL: ${slipImageUrl}`);
       }
 
       return {
@@ -197,21 +197,21 @@ const checkSlipWithSlipOK = async (
       };
     }
 
-    // ❌ Error case - get error code
+    // Error case - get error code
     const errorCode = result.code || 0;
     const errorMessage = SLIPOK_ERROR_MESSAGES[errorCode] || result.message || 'สลิปไม่ผ่านการตรวจสอบ';
 
     // Special handling for specific error codes
     if (errorCode === 1012) {
-      console.warn(`[payment-verify] ⚠️ Duplicate slip detected!`);
+      console.warn(`[payment-verify] Duplicate slip detected!`);
     } else if (errorCode === 1013) {
       const actualAmount = result.data?.amount;
-      console.warn(`[payment-verify] ⚠️ Amount mismatch: expected ${expectedAmount}, got ${actualAmount}`);
+      console.warn(`[payment-verify] Amount mismatch: expected ${expectedAmount}, got ${actualAmount}`);
     } else if (errorCode === 1014) {
-      console.warn(`[payment-verify] ⚠️ Wrong receiver account!`);
+      console.warn(`[payment-verify] Wrong receiver account!`);
     }
 
-    console.log(`[payment-verify] ❌ Slip rejected: code=${errorCode}, message=${errorMessage}`);
+    console.log(`[payment-verify] Slip rejected: code=${errorCode}, message=${errorMessage}`);
 
     return {
       success: false,
@@ -293,10 +293,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: 'error', message: 'ยอดเงินไม่ถูกต้อง กรุณาติดต่อแอดมิน' }, { status: 400 });
     }
 
-    // ✅ เรียก SlipOK API พร้อมเช็คสลิปซ้ำ + ยอดเงิน + บัญชีผู้รับ
+    // เรียก SlipOK API พร้อมเช็คสลิปซ้ำ + ยอดเงิน + บัญชีผู้รับ
     const slipCheck = await checkSlipWithSlipOK(base64, expectedAmount);
 
-    // ❌ ถ้าสลิปไม่ผ่าน
+    // ถ้าสลิปไม่ผ่าน
     if (!slipCheck.success) {
       const errorCode = slipCheck.code;
       let userMessage = slipCheck.message;
@@ -321,7 +321,7 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
-    // ✅ สลิปผ่าน - บันทึกข้อมูล
+    // สลิปผ่าน - บันทึกข้อมูล
     // ถ้ามี URL จาก SlipOK ให้เก็บ URL แทน base64 เพื่อประหยัดพื้นที่
     const hasSlipImageUrl = !!slipCheck.slipImageUrl;
     
@@ -370,18 +370,18 @@ export async function POST(req: NextRequest) {
       paidAmount: slipCheck.slipData?.amount || expectedAmount,
     };
 
-    // ✅ บันทึก order ที่อัปเดตแล้ว
+    // บันทึก order ที่อัปเดตแล้ว
     await putJson(key, updated);
 
-    // ✅ อัปเดต index สำหรับ user เพื่อให้ history เห็นสถานะใหม่ทันที
+    // อัปเดต index สำหรับ user เพื่อให้ history เห็นสถานะใหม่ทันที
     const customerEmail = updated.customerEmail || updated.email;
     if (customerEmail) {
       await updateEmailIndex(customerEmail, updated);
     }
 
-    console.log(`[payment-verify] ✅ Order ${ref} marked as PAID and index updated`);
+    console.log(`[payment-verify] Order ${ref} marked as PAID and index updated`);
 
-    // ✅ Send payment received email
+    // Send payment received email
     if (customerEmail) {
       try {
         await sendPaymentReceivedEmail(updated);
@@ -410,7 +410,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ✅ Auto sync to Google Sheets
+    // Auto sync to Google Sheets
     triggerSheetSync().catch(() => {});
 
     // ส่งข้อมูลกลับ

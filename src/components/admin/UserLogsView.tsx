@@ -31,35 +31,35 @@ import {
 } from '@mui/material';
 import {
   Search,
-  Refresh,
-  ExpandMore,
-  ExpandLess,
-  Login,
-  Logout,
+  RotateCcw as Refresh,
+  ChevronDown as ExpandMore,
+  ChevronUp as ExpandLess,
+  LogIn as Login,
+  LogOut as Logout,
   ShoppingCart,
   Receipt,
-  Payment,
-  Visibility,
-  Person,
-  Error,
-  FilterList,
-  AccessTime,
+  Wallet as Payment,
+  Eye as Visibility,
+  User as Person,
+  AlertCircle as Error,
+  Filter as FilterList,
+  Clock as AccessTime,
   TrendingUp,
-  Groups,
-  Computer,
-} from '@mui/icons-material';
+  Users as Groups,
+  Monitor as Computer,
+} from 'lucide-react';
 
 // Theme
 const THEME = {
-  bg: '#0a0f1a',
-  bgCard: 'rgba(15,23,42,0.7)',
-  glass: 'rgba(30,41,59,0.6)',
-  glassSoft: 'rgba(30,41,59,0.4)',
-  text: '#f1f5f9',
-  textSecondary: '#94a3b8',
-  muted: '#64748b',
-  border: 'rgba(255,255,255,0.08)',
-  primary: '#6366f1',
+  bg: 'var(--background)',
+  bgCard: 'var(--glass-bg)',
+  glass: 'var(--glass-bg)',
+  glassSoft: 'var(--glass-bg)',
+  text: 'var(--foreground)',
+  textSecondary: 'var(--text-muted)',
+  muted: 'var(--text-muted)',
+  border: 'var(--glass-border)',
+  primary: '#2563eb',
   success: '#10b981',
   warning: '#f59e0b',
   error: '#ef4444',
@@ -91,25 +91,25 @@ interface Props {
 
 const actionLabels: Record<string, { label: string; color: string; icon: ReactElement }> = {
   // User actions
-  login: { label: 'เข้าสู่ระบบ', color: '#10b981', icon: <Login sx={{ fontSize: 16 }} /> },
-  logout: { label: 'ออกจากระบบ', color: '#64748b', icon: <Logout sx={{ fontSize: 16 }} /> },
-  new_user: { label: 'ผู้ใช้ใหม่', color: '#8b5cf6', icon: <Person sx={{ fontSize: 16 }} /> },
-  view_product: { label: 'ดูสินค้า', color: '#6366f1', icon: <Visibility sx={{ fontSize: 16 }} /> },
-  add_to_cart: { label: 'เพิ่มตะกร้า', color: '#f59e0b', icon: <ShoppingCart sx={{ fontSize: 16 }} /> },
-  remove_from_cart: { label: 'ลบตะกร้า', color: '#ef4444', icon: <ShoppingCart sx={{ fontSize: 16 }} /> },
-  place_order: { label: 'สั่งซื้อ', color: '#10b981', icon: <Receipt sx={{ fontSize: 16 }} /> },
-  upload_slip: { label: 'อัปโหลดสลิป', color: '#0ea5e9', icon: <Payment sx={{ fontSize: 16 }} /> },
-  verify_payment: { label: 'ยืนยันชำระเงิน', color: '#10b981', icon: <Payment sx={{ fontSize: 16 }} /> },
-  view_order: { label: 'ดูออเดอร์', color: '#8b5cf6', icon: <Receipt sx={{ fontSize: 16 }} /> },
-  profile_update: { label: 'อัปเดตโปรไฟล์', color: '#f472b6', icon: <Person sx={{ fontSize: 16 }} /> },
-  upload_image: { label: 'อัปโหลดรูป', color: '#0ea5e9', icon: <Visibility sx={{ fontSize: 16 }} /> },
-  page_view: { label: 'เยี่ยมชมหน้า', color: '#64748b', icon: <Visibility sx={{ fontSize: 16 }} /> },
-  error: { label: 'เกิดข้อผิดพลาด', color: '#ef4444', icon: <Error sx={{ fontSize: 16 }} /> },
+  login: { label: 'เข้าสู่ระบบ', color: '#10b981', icon: <Login size={16} /> },
+  logout: { label: 'ออกจากระบบ', color: 'var(--text-muted)', icon: <Logout size={16} /> },
+  new_user: { label: 'ผู้ใช้ใหม่', color: '#1e40af', icon: <Person size={16} /> },
+  view_product: { label: 'ดูสินค้า', color: '#2563eb', icon: <Visibility size={16} /> },
+  add_to_cart: { label: 'เพิ่มตะกร้า', color: '#f59e0b', icon: <ShoppingCart size={16} /> },
+  remove_from_cart: { label: 'ลบตะกร้า', color: '#ef4444', icon: <ShoppingCart size={16} /> },
+  place_order: { label: 'สั่งซื้อ', color: '#10b981', icon: <Receipt size={16} /> },
+  upload_slip: { label: 'อัปโหลดสลิป', color: '#0ea5e9', icon: <Payment size={16} /> },
+  verify_payment: { label: 'ยืนยันชำระเงิน', color: '#10b981', icon: <Payment size={16} /> },
+  view_order: { label: 'ดูออเดอร์', color: '#1e40af', icon: <Receipt size={16} /> },
+  profile_update: { label: 'อัปเดตโปรไฟล์', color: '#f472b6', icon: <Person size={16} /> },
+  upload_image: { label: 'อัปโหลดรูป', color: '#0ea5e9', icon: <Visibility size={16} /> },
+  page_view: { label: 'เยี่ยมชมหน้า', color: 'var(--text-muted)', icon: <Visibility size={16} /> },
+  error: { label: 'เกิดข้อผิดพลาด', color: '#ef4444', icon: <Error size={16} /> },
   // Admin actions
-  admin_change_status: { label: 'แอดมินเปลี่ยนสถานะ', color: '#f59e0b', icon: <Receipt sx={{ fontSize: 16 }} /> },
-  admin_pickup_confirm: { label: 'แอดมินยืนยันรับสินค้า', color: '#10b981', icon: <Receipt sx={{ fontSize: 16 }} /> },
-  admin_pickup_cancel: { label: 'แอดมินยกเลิกรับสินค้า', color: '#ef4444', icon: <Receipt sx={{ fontSize: 16 }} /> },
-  admin_config_change: { label: 'แอดมินแก้ไขตั้งค่า', color: '#8b5cf6', icon: <Computer sx={{ fontSize: 16 }} /> },
+  admin_change_status: { label: 'แอดมินเปลี่ยนสถานะ', color: '#f59e0b', icon: <Receipt size={16} /> },
+  admin_pickup_confirm: { label: 'แอดมินยืนยันรับสินค้า', color: '#10b981', icon: <Receipt size={16} /> },
+  admin_pickup_cancel: { label: 'แอดมินยกเลิกรับสินค้า', color: '#ef4444', icon: <Receipt size={16} /> },
+  admin_config_change: { label: 'แอดมินแก้ไขตั้งค่า', color: '#1e40af', icon: <Computer size={16} /> },
 };
 
 export default function UserLogsView({ showToast }: Props) {
@@ -205,7 +205,7 @@ export default function UserLogsView({ showToast }: Props) {
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5, mb: 1.5 }}>
           <Box>
             <Typography sx={{ fontSize: { xs: '1rem', md: '1.3rem' }, fontWeight: 800, color: THEME.text }}>
-              👥 ประวัติผู้ใช้
+              ประวัติผู้ใช้
             </Typography>
             <Typography sx={{ color: THEME.textSecondary, fontSize: '0.75rem' }}>
               {filteredLogs.length}/{logs.length} รายการ
@@ -216,12 +216,12 @@ export default function UserLogsView({ showToast }: Props) {
             disabled={loading}
             size="small"
             sx={{
-              bgcolor: 'rgba(99,102,241,0.1)',
+              bgcolor: 'rgba(37,99,235,0.1)',
               border: `1px solid ${THEME.border}`,
               color: THEME.primary,
             }}
           >
-            {loading ? <CircularProgress size={18} sx={{ color: THEME.primary }} /> : <Refresh sx={{ fontSize: 18 }} />}
+            {loading ? <CircularProgress size={18} sx={{ color: THEME.primary }} /> : <Refresh size={18} />}
           </IconButton>
         </Box>
 
@@ -235,7 +235,7 @@ export default function UserLogsView({ showToast }: Props) {
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <Search sx={{ color: THEME.muted, fontSize: 18 }} />
+                  <Search size={18} color={THEME.muted} />
                 </InputAdornment>
               ),
             }}
@@ -293,7 +293,7 @@ export default function UserLogsView({ showToast }: Props) {
       ) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
           {paginatedLogs.map((log) => {
-            const actionInfo = actionLabels[log.action] || { label: log.action, color: THEME.muted, icon: <Visibility sx={{ fontSize: 14 }} /> };
+            const actionInfo = actionLabels[log.action] || { label: log.action, color: THEME.muted, icon: <Visibility size={14} /> };
             const isExpanded = expandedLog === log.id;
 
             return (
@@ -331,7 +331,7 @@ export default function UserLogsView({ showToast }: Props) {
                     {formatDate(log.timestamp)}
                   </Typography>
                   <IconButton size="small" sx={{ p: 0.3, color: THEME.muted }}>
-                    {isExpanded ? <ExpandLess sx={{ fontSize: 16 }} /> : <ExpandMore sx={{ fontSize: 16 }} />}
+                    {isExpanded ? <ExpandLess size={16} /> : <ExpandMore size={16} />}
                   </IconButton>
                 </Box>
 
@@ -429,7 +429,7 @@ function StatCard({ icon, label, value, color }: { icon: ReactElement; label: st
       p: 1,
       textAlign: 'center',
     }}>
-      <Box sx={{ color: color, mb: 0.3, '& svg': { fontSize: 18 } }}>
+      <Box sx={{ color: color, mb: 0.3, '& svg': { width: 18, height: 18 } }}>
         {icon}
       </Box>
       <Typography sx={{ color: THEME.text, fontWeight: 700, fontSize: '1rem' }}>

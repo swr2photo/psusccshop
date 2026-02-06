@@ -127,25 +127,25 @@ const buildFactoryExport = (orders: any[]) => {
 
   // Build header row - production friendly
   const header = [
-    '📋 ลำดับ',
-    '👕 ไซซ์',
-    '📏 แขน',
-    '✨ ชื่อสกรีน',
-    '🔢 เบอร์สกรีน',
-    '👤 ชื่อลูกค้า',
-    '📞 เบอร์โทร',
-    '📍 ที่อยู่',
-    '📦 สินค้า',
-    '🔢 ตัวที่',
-    '🔖 Ref',
-    '📅 วันที่สั่ง',
+    'ลำดับ',
+    'ไซซ์',
+    'แขน',
+    'ชื่อสกรีน',
+    'เบอร์สกรีน',
+    'ชื่อลูกค้า',
+    'เบอร์โทร',
+    'ที่อยู่',
+    'สินค้า',
+    'ตัวที่',
+    'Ref',
+    'วันที่สั่ง',
   ];
 
   // Build data rows - each row = 1 physical item for factory production
   const rows = allItems.map((item, index) => [
     index + 1,
     item.size,
-    item.isLongSleeve ? '🔵 แขนยาว' : '⚪ แขนสั้น',
+    item.isLongSleeve ? 'แขนยาว' : 'แขนสั้น',
     item.customName || '-',
     item.customNumber || '-',
     item.customerName,
@@ -160,7 +160,7 @@ const buildFactoryExport = (orders: any[]) => {
   // Build size summary with totals - sorted properly
   const sortedSizes = Object.keys(sizeCount).sort((a, b) => getSizeIndex(a) - getSizeIndex(b));
   
-  const summaryHeader = ['📊 สรุปตามไซซ์', '', '', ''];
+  const summaryHeader = ['สรุปตามไซซ์', '', '', ''];
   const summarySubHeader = ['ไซซ์', 'แขนสั้น', 'แขนยาว', 'รวม'];
   const summaryRows = sortedSizes.map(size => [
     size,
@@ -174,20 +174,20 @@ const buildFactoryExport = (orders: any[]) => {
   const totalLongSleeve = Object.values(sizeLongSleeveCount).reduce((a, b) => a + b, 0);
   const grandTotal = totalShortSleeve + totalLongSleeve;
 
-  const totalRow = ['🎯 รวมทั้งหมด', totalShortSleeve, totalLongSleeve, grandTotal];
+  const totalRow = ['รวมทั้งหมด', totalShortSleeve, totalLongSleeve, grandTotal];
 
   // Build stats row
   const statsRow = [
-    `📦 จำนวนคำสั่งซื้อที่ชำระแล้ว: ${orders.length} รายการ`,
-    `📊 จำนวนชิ้นทั้งหมด: ${grandTotal} ชิ้น`,
-    `⏰ อัปเดตล่าสุด: ${new Date().toLocaleString('th-TH')}`,
+    `จำนวนคำสั่งซื้อที่ชำระแล้ว: ${orders.length} รายการ`,
+    `จำนวนชิ้นทั้งหมด: ${grandTotal} ชิ้น`,
+    `อัปเดตล่าสุด: ${new Date().toLocaleString('th-TH')}`,
     '',
   ];
 
   // Combine all sections with spacing
   const values = [
     // Stats section
-    ['🏭 รายงานการผลิต - Factory Export'],
+    ['รายงานการผลิต - Factory Export'],
     statsRow,
     [],
     // Main data

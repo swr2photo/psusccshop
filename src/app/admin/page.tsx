@@ -68,75 +68,75 @@ import {
 } from '@mui/material';
 
 import {
-  Dashboard,
+  LayoutDashboard as Dashboard,
   ShoppingCart,
   Receipt,
   Settings,
   History,
-  Logout,
+  LogOut as Logout,
   Lock,
-  Refresh,
-  Add,
-  Delete,
-  Edit,
-  Close,
+  RotateCcw as Refresh,
+  Plus as Add,
+  Trash2 as Delete,
+  Pencil as Edit,
+  X as Close,
   Search,
   Store,
-  AttachMoney,
-  DateRange,
-  Notifications,
-  Bolt,
-  CheckCircle,
-  LocalShipping,
+  DollarSign as AttachMoney,
+  CalendarRange as DateRange,
+  Bell as Notifications,
+  Zap as Bolt,
+  CircleCheck as CheckCircle,
+  Truck as LocalShipping,
   Save,
-  Edit as EditIconMUI,
+  Pencil as EditIconMUI,
   Check,
-  FormatLineSpacing,
-  Clear,
-  WavingHand,
-  Inventory,
-  Person,
-  Email,
-  CalendarToday,
+  AlignJustify as FormatLineSpacing,
+  XCircle as Clear,
+  Hand as WavingHand,
+  Package as Inventory,
+  User as Person,
+  Mail as Email,
+  Calendar as CalendarToday,
   Image as ImageIcon,
-  Visibility,
-  VisibilityOff,
-  CheckBox,
-  CheckBoxOutlineBlank,
-  Update,
-  Celebration,
-  ElectricBolt,
-  Whatshot,
-  Campaign,
-  AccessTime,
-  FiberManualRecord,
-  Warning,
-  Description,
-  HistoryEdu,
+  Eye as Visibility,
+  EyeOff as VisibilityOff,
+  CheckSquare as CheckBox,
+  Square as CheckBoxOutlineBlank,
+  RefreshCw as Update,
+  PartyPopper as Celebration,
+  Zap as ElectricBolt,
+  Flame as Whatshot,
+  Megaphone as Campaign,
+  Clock as AccessTime,
+  Circle as FiberManualRecord,
+  AlertTriangle as Warning,
+  FileText as Description,
+  BookOpen as HistoryEdu,
   ShoppingBag,
-  ExpandMore,
-  ExpandLess,
-  PersonAdd,
-  AdminPanelSettings,
+  ChevronDown as ExpandMore,
+  ChevronUp as ExpandLess,
+  UserPlus as PersonAdd,
+  ShieldCheck as AdminPanelSettings,
   Shield,
-  Announcement,
-  NotificationsActive,
-  ToggleOn,
-  ToggleOff,
-  ContentCopy,
+  Megaphone as Announcement,
+  BellRing as NotificationsActive,
+  ToggleRight as ToggleOn,
+  ToggleLeft as ToggleOff,
+  Copy as ContentCopy,
   Send,
-  Groups,
+  Users as Groups,
   Archive,
-  QrCodeScanner,
-  LocalMall,
-  CameraAlt,
-  ErrorOutline,
-  CheckCircleOutline,
-  ReportProblem,
-  SupportAgent,
-  HelpOutline,
-  LocalOffer,
-} from '@mui/icons-material';
+  QrCode as QrCodeScanner,
+  ShoppingBag as LocalMall,
+  Camera as CameraAlt,
+  AlertCircle as ErrorOutline,
+  CircleCheckBig as CheckCircleOutline,
+  AlertTriangle as ReportProblem,
+  Headphones as SupportAgent,
+  HelpCircle as HelpOutline,
+  Tag as LocalOffer,
+} from 'lucide-react';
 
 import { isAdmin, isSuperAdmin, setDynamicAdminEmails, SUPER_ADMIN_EMAIL, Product, ShopConfig, SIZES } from '@/lib/config';
 import { deleteOrderAdmin, saveShopConfig, syncOrdersSheet, updateOrderAdmin, updateOrderStatusAPI } from '@/lib/api-client';
@@ -432,24 +432,24 @@ const CATEGORY_ICONS: Record<string, string> = {
 // ============== NEW MODERN THEME ==============
 const ADMIN_THEME = {
   // Base colors
-  bg: '#0a0f1a',
-  bgCard: 'rgba(15,23,42,0.7)',
-  bgSidebar: 'rgba(10,15,26,0.95)',
-  bgHeader: 'rgba(15,23,42,0.85)',
+  bg: 'var(--background)',
+  bgCard: 'var(--glass-bg)',
+  bgSidebar: 'var(--surface)',
+  bgHeader: 'var(--glass-strong)',
   
   // Text colors
-  text: '#f1f5f9',
-  textSecondary: '#94a3b8',
-  muted: '#64748b',
+  text: 'var(--foreground)',
+  textSecondary: 'var(--text-muted)',
+  muted: 'var(--text-muted)',
   
   // Borders
-  border: 'rgba(255,255,255,0.08)',
+  border: 'var(--glass-border)',
   borderActive: 'rgba(99,102,241,0.5)',
   
   // Glass effects
-  glass: 'rgba(30,41,59,0.6)',
-  glassSoft: 'rgba(30,41,59,0.4)',
-  glassHover: 'rgba(30,41,59,0.8)',
+  glass: 'var(--glass-bg)',
+  glassSoft: 'var(--glass-bg)',
+  glassHover: 'var(--glass-strong)',
   
   // Gradients
   gradient: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
@@ -519,7 +519,7 @@ const gradientButtonSx = {
 };
 
 const secondaryButtonSx = {
-  bgcolor: 'rgba(255,255,255,0.05)',
+  bgcolor: 'var(--glass-bg)',
   color: ADMIN_THEME.textSecondary,
   borderRadius: '12px',
   border: `1px solid ${ADMIN_THEME.border}`,
@@ -528,14 +528,14 @@ const secondaryButtonSx = {
   px: 2.5,
   py: 1,
   '&:hover': { 
-    bgcolor: 'rgba(255,255,255,0.1)',
-    borderColor: 'rgba(255,255,255,0.2)',
+    bgcolor: 'var(--glass-bg)',
+    borderColor: 'var(--glass-border)',
   },
 };
 
 const tableSx = {
-  '& th, & td': { borderColor: 'rgba(255,255,255,0.12)', color: ADMIN_THEME.text },
-  '& thead th': { backgroundColor: 'rgba(255,255,255,0.08)', color: ADMIN_THEME.text },
+  '& th, & td': { borderColor: 'var(--glass-border)', color: ADMIN_THEME.text },
+  '& thead th': { backgroundColor: 'var(--glass-bg)', color: ADMIN_THEME.text },
 };
 
 // ============== SETTINGS COMPONENTS (Stable - defined outside to prevent remount) ==============
@@ -564,7 +564,7 @@ const SettingSection = ({ icon, title, children }: { icon: React.ReactNode; titl
       }}>
         {icon}
       </Box>
-      <Typography sx={{ fontSize: '1.1rem', fontWeight: 700, color: '#f1f5f9' }}>
+      <Typography sx={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--foreground)' }}>
         {title}
       </Typography>
     </Box>
@@ -582,9 +582,9 @@ const SettingToggleRow = ({ label, description, checked, onChange }: { label: st
     py: 0.5,
   }}>
     <Box>
-      <Typography sx={{ fontSize: '0.95rem', fontWeight: 500, color: '#e2e8f0' }}>{label}</Typography>
+      <Typography sx={{ fontSize: '0.95rem', fontWeight: 500, color: 'var(--foreground)' }}>{label}</Typography>
       {description && (
-        <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>{description}</Typography>
+        <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{description}</Typography>
       )}
     </Box>
     <Switch
@@ -683,11 +683,11 @@ const SettingsView = React.memo(function SettingsView({
       {/* Header with Save Button */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1, flexWrap: 'wrap', gap: 2 }}>
         <Box>
-          <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: '#f1f5f9', display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Settings sx={{ fontSize: 24 }} />
+          <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--foreground)', display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Settings size={24} />
             ตั้งค่าร้านค้า
           </Typography>
-          <Typography sx={{ fontSize: '0.85rem', color: '#64748b' }}>
+          <Typography sx={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
             {isSuperAdminUser ? 'จัดการการตั้งค่าทั้งหมดของร้าน' : 'จัดการประกาศและการตั้งค่าที่ได้รับอนุญาต'}
           </Typography>
         </Box>
@@ -743,7 +743,7 @@ const SettingsView = React.memo(function SettingsView({
         transition: 'opacity 0.2s, max-height 0.2s',
         mb: hasChanges ? 0 : -3,
       }}>
-        <Warning sx={{ fontSize: 24, color: '#fbbf24' }} />
+        <Warning size={24} color="#fbbf24" />
         <Typography sx={{ fontSize: '0.9rem', color: '#fbbf24' }}>
           มีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก กดปุ่ม "บันทึกการตั้งค่า" เพื่อยืนยัน
         </Typography>
@@ -751,7 +751,7 @@ const SettingsView = React.memo(function SettingsView({
 
       {/* Shop Status - Only for Super Admin or admins with permission */}
       {canManageShop && (
-        <SettingSection icon={<Store sx={{ fontSize: 20 }} />} title="สถานะร้านค้า">
+        <SettingSection icon={<Store size={20} />} title="สถานะร้านค้า">
           <SettingToggleRow
             label="เปิดรับออเดอร์"
             description={localConfig.isOpen ? 'ร้านเปิดให้บริการอยู่' : 'ปิดรับออเดอร์ชั่วคราว'}
@@ -771,7 +771,7 @@ const SettingsView = React.memo(function SettingsView({
             }}>
               <Box>
                 <Typography sx={{ fontSize: '0.85rem', color: '#f87171', mb: 1 }}>
-                  <CalendarToday sx={{ fontSize: 18, mr: 1, verticalAlign: 'middle' }} />
+                  <CalendarToday size={18} style={{ marginRight: 8, verticalAlign: 'middle' }} />
                   กำหนดวันเปิดร้านใหม่ (ถ้ามี)
                 </Typography>
                 <TextField
@@ -791,7 +791,7 @@ const SettingsView = React.memo(function SettingsView({
               </Box>
               <Box>
                 <Typography sx={{ fontSize: '0.85rem', color: '#f87171', mb: 1 }}>
-                  <Warning sx={{ fontSize: 18, mr: 1, verticalAlign: 'middle' }} />
+                  <Warning size={18} style={{ marginRight: 8, verticalAlign: 'middle' }} />
                   ข้อความแจ้งผู้ใช้ (ไม่บังคับ)
                 </Typography>
                 <TextField
@@ -823,7 +823,7 @@ const SettingsView = React.memo(function SettingsView({
               border: '1px solid rgba(245, 158, 11, 0.2)',
             }}>
               <Typography sx={{ fontSize: '0.85rem', color: '#fbbf24', mb: 1 }}>
-                <CalendarToday sx={{ fontSize: 18, mr: 1, verticalAlign: 'middle' }} />
+                <CalendarToday size={18} style={{ marginRight: 8, verticalAlign: 'middle' }} />
                 กำหนดวันปิดรับออเดอร์ (ไม่บังคับ)
               </Typography>
               <TextField
@@ -840,7 +840,7 @@ const SettingsView = React.memo(function SettingsView({
                   },
                 }}
               />
-              <Typography sx={{ fontSize: '0.75rem', color: '#94a3b8', mt: 1 }}>
+              <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', mt: 1 }}>
                 เมื่อถึงวันนี้ ระบบจะแสดงสถานะ "หมดเขตสั่งซื้อ" โดยอัตโนมัติ
               </Typography>
             </Box>
@@ -850,7 +850,7 @@ const SettingsView = React.memo(function SettingsView({
 
       {/* Payment System Toggle - Only for Super Admin or admins with shop permission */}
       {canManageShop && (
-        <SettingSection icon={<AttachMoney sx={{ fontSize: 20 }} />} title="ระบบชำระเงิน">
+        <SettingSection icon={<AttachMoney size={20} />} title="ระบบชำระเงิน">
           <SettingToggleRow
             label="เปิดรับชำระเงิน"
             description={localConfig.paymentEnabled !== false ? 'ผู้ใช้สามารถอัพโหลดสลิปได้' : 'ปิดรับชำระเงินชั่วคราว'}
@@ -866,7 +866,7 @@ const SettingsView = React.memo(function SettingsView({
               border: '1px solid rgba(249, 115, 22, 0.2)',
             }}>
               <Typography sx={{ fontSize: '0.85rem', color: '#fb923c', mb: 1.5 }}>
-                <Warning sx={{ fontSize: 20, mr: 1, verticalAlign: 'middle' }} />
+                <Warning size={20} style={{ marginRight: 8, verticalAlign: 'middle' }} />
                 ข้อความแจ้งผู้ใช้ (ไม่บังคับ)
               </Typography>
               <TextField
@@ -891,7 +891,7 @@ const SettingsView = React.memo(function SettingsView({
 
       {/* Google Sheet - Only for Super Admin or admins with permission */}
       {canManageSheet && (
-        <SettingSection icon={<Bolt sx={{ fontSize: 20 }} />} title="Google Sheet">
+        <SettingSection icon={<Bolt size={20} />} title="Google Sheet">
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <TextField
               label="Sheet ID"
@@ -950,7 +950,7 @@ const SettingsView = React.memo(function SettingsView({
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}>
-                  <Check sx={{ color: '#fff', fontSize: 20 }} />
+                  <Check size={20} color="#fff" />
                 </Box>
                 <Box sx={{ flex: 1 }}>
                   <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: '#10b981' }}>
@@ -963,9 +963,9 @@ const SettingsView = React.memo(function SettingsView({
                     rel="noreferrer"
                     sx={{ 
                       fontSize: '0.8rem', 
-                      color: '#64748b',
+                      color: 'var(--text-muted)',
                       textDecoration: 'underline',
-                      '&:hover': { color: '#94a3b8' },
+                      '&:hover': { color: 'var(--text-muted)' },
                     }}
                   >
                     เปิด Google Sheet
@@ -993,7 +993,7 @@ const SettingsView = React.memo(function SettingsView({
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}>
-                  <Check sx={{ color: '#fff', fontSize: 20 }} />
+                  <Check size={20} color="#fff" />
                 </Box>
                 <Box sx={{ flex: 1 }}>
                   <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: '#3b82f6' }}>
@@ -1006,9 +1006,9 @@ const SettingsView = React.memo(function SettingsView({
                     rel="noreferrer"
                     sx={{ 
                       fontSize: '0.8rem', 
-                      color: '#64748b',
+                      color: 'var(--text-muted)',
                       textDecoration: 'underline',
-                      '&:hover': { color: '#94a3b8' },
+                      '&:hover': { color: 'var(--text-muted)' },
                     }}
                   >
                     เปิด Vendor Sheet
@@ -1023,7 +1023,7 @@ const SettingsView = React.memo(function SettingsView({
                 disabled={sheetSyncing}
                 sx={{ ...gradientButtonSx, flex: 1, gap: 1 }}
               >
-                <Bolt sx={{ fontSize: 18 }} />
+                <Bolt size={18} />
                 {sheetSyncing ? 'กำลังซิงก์...' : localConfig.sheetId ? 'ซิงก์ทันที' : 'สร้าง Sheet ใหม่'}
               </Button>
             </Box>
@@ -1033,7 +1033,7 @@ const SettingsView = React.memo(function SettingsView({
 
       {/* Admin Management - Only visible to Super Admin */}
       {isSuperAdminUser && (
-        <SettingSection icon={<AdminPanelSettings sx={{ fontSize: 20 }} />} title="จัดการแอดมิน">
+        <SettingSection icon={<AdminPanelSettings size={20} />} title="จัดการแอดมิน">
           <Box sx={{ mb: 2 }}>
             <Box sx={{ 
               display: 'flex', 
@@ -1045,7 +1045,7 @@ const SettingsView = React.memo(function SettingsView({
               bgcolor: 'rgba(251, 191, 36, 0.1)',
               border: '1px solid rgba(251, 191, 36, 0.3)',
             }}>
-              <Shield sx={{ fontSize: 18, color: '#fbbf24' }} />
+              <Shield size={18} color="#fbbf24" />
               <Typography sx={{ fontSize: '0.8rem', color: '#fbbf24' }}>
                 เฉพาะบัญชีสูงสุดเท่านั้นที่สามารถจัดการแอดมินได้
               </Typography>
@@ -1071,10 +1071,10 @@ const SettingsView = React.memo(function SettingsView({
                 alignItems: 'center',
                 justifyContent: 'center',
               }}>
-                <Shield sx={{ fontSize: 20, color: '#fff' }} />
+                <Shield size={20} color="#fff" />
               </Box>
               <Box>
-                <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>บัญชีสูงสุด (Super Admin)</Typography>
+                <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>บัญชีสูงสุด (Super Admin)</Typography>
                 <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: '#34d399' }}>
                   {SUPER_ADMIN_EMAIL}
                 </Typography>
@@ -1127,13 +1127,13 @@ const SettingsView = React.memo(function SettingsView({
                   whiteSpace: 'nowrap',
                 }}
               >
-                <PersonAdd sx={{ fontSize: 18, mr: 0.5 }} />
+                <PersonAdd size={18} style={{ marginRight: 4 }} />
                 เพิ่ม
               </Button>
             </Box>
 
             {/* Admin List */}
-            <Typography sx={{ fontSize: '0.8rem', color: '#64748b', mb: 1 }}>
+            <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)', mb: 1 }}>
               รายชื่อแอดมิน ({(localConfig.adminEmails || []).length} คน)
             </Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
@@ -1145,7 +1145,7 @@ const SettingsView = React.memo(function SettingsView({
                   border: `1px solid ${ADMIN_THEME.border}`,
                   textAlign: 'center',
                 }}>
-                  <Typography sx={{ fontSize: '0.85rem', color: '#64748b' }}>
+                  <Typography sx={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                     ยังไม่มีแอดมินเพิ่มเติม
                   </Typography>
                 </Box>
@@ -1202,9 +1202,9 @@ const SettingsView = React.memo(function SettingsView({
                           alignItems: 'center',
                           justifyContent: 'center',
                         }}>
-                          <Person sx={{ fontSize: 18, color: '#a78bfa' }} />
+                          <Person size={18} color="#a78bfa" />
                         </Box>
-                        <Typography sx={{ flex: 1, fontSize: '0.9rem', color: '#e2e8f0', fontWeight: 600 }}>
+                        <Typography sx={{ flex: 1, fontSize: '0.9rem', color: 'var(--foreground)', fontWeight: 600 }}>
                           {adminEmail}
                         </Typography>
                         <IconButton
@@ -1225,13 +1225,13 @@ const SettingsView = React.memo(function SettingsView({
                             '&:hover': { bgcolor: 'rgba(239, 68, 68, 0.1)' },
                           }}
                         >
-                          <Delete sx={{ fontSize: 18 }} />
+                          <Delete size={18} />
                         </IconButton>
                       </Box>
                       
                       {/* Permissions */}
                       <Box sx={{ p: 1.5 }}>
-                        <Typography sx={{ fontSize: '0.75rem', color: '#64748b', mb: 1 }}>สิทธิ์การใช้งาน:</Typography>
+                        <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', mb: 1 }}>สิทธิ์การใช้งาน:</Typography>
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                           {[
                             { key: 'canManageShop', label: '🏪 เปิด/ปิดร้าน', color: '#10b981' },
@@ -1284,7 +1284,7 @@ const SettingsView = React.memo(function SettingsView({
 
       {/* Pickup Settings - Per Product Summary */}
       {canManageShop && (
-        <SettingSection icon={<QrCodeScanner sx={{ fontSize: 20 }} />} title="สถานะรับสินค้า">
+        <SettingSection icon={<QrCodeScanner size={20} />} title="สถานะรับสินค้า">
           {/* Summary of products with pickup enabled */}
           {(() => {
             const productsWithPickup = localConfig.products?.filter(p => p.pickup?.enabled) || [];
@@ -1301,10 +1301,7 @@ const SettingsView = React.memo(function SettingsView({
                   bgcolor: productsWithPickup.length > 0 ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.03)',
                   border: `1px solid ${productsWithPickup.length > 0 ? 'rgba(16,185,129,0.3)' : ADMIN_THEME.border}`,
                 }}>
-                  <LocalMall sx={{ 
-                    fontSize: 32, 
-                    color: productsWithPickup.length > 0 ? '#10b981' : ADMIN_THEME.muted 
-                  }} />
+                  <LocalMall size={32} color={productsWithPickup.length > 0 ? '#10b981' : ADMIN_THEME.muted} />
                   <Box sx={{ flex: 1 }}>
                     <Typography sx={{ fontWeight: 700, color: ADMIN_THEME.text }}>
                       {productsWithPickup.length > 0 
@@ -1332,7 +1329,7 @@ const SettingsView = React.memo(function SettingsView({
                           gap: 1.5,
                         }}
                       >
-                        <CheckCircle sx={{ fontSize: 18, color: '#10b981' }} />
+                        <CheckCircle size={18} color="#10b981" />
                         <Box sx={{ flex: 1, minWidth: 0 }}>
                           <Typography sx={{ 
                             fontWeight: 600, 
@@ -1350,7 +1347,7 @@ const SettingsView = React.memo(function SettingsView({
                             </Typography>
                           )}
                           {(p.pickup?.startDate || p.pickup?.endDate) && (
-                            <Typography sx={{ fontSize: '0.7rem', color: '#64748b' }}>
+                            <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                               📅 {p.pickup?.startDate ? new Date(p.pickup.startDate).toLocaleDateString('th-TH') : '...'} - {p.pickup?.endDate ? new Date(p.pickup.endDate).toLocaleDateString('th-TH') : '...'}
                             </Typography>
                           )}
@@ -1393,7 +1390,7 @@ const SettingsView = React.memo(function SettingsView({
             bgcolor: hasChanges ? '#f59e0b' : '#10b981',
             boxShadow: `0 0 12px ${hasChanges ? '#f59e0b' : '#10b981'}`,
           }} />
-          <Typography sx={{ fontSize: '0.85rem', color: '#94a3b8' }}>
+          <Typography sx={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
             {hasChanges ? 'มีการเปลี่ยนแปลงที่ยังไม่บันทึก' : 'บันทึกล่าสุด: ' + (lastSavedTime ? lastSavedTime.toLocaleString('th-TH') : '-')}
           </Typography>
         </Box>
@@ -1406,7 +1403,7 @@ const SettingsView = React.memo(function SettingsView({
             opacity: hasChanges ? 1 : 0.5,
           }}
         >
-          <Save sx={{ fontSize: 18, mr: 1 }} />
+          <Save size={18} style={{ marginRight: 8 }} />
           บันทึก
         </Button>
       </Box>
@@ -1475,8 +1472,8 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
       cancelButtonColor: '#64748b',
       confirmButtonText: 'ลบ',
       cancelButtonText: 'ยกเลิก',
-      background: '#1e293b',
-      color: '#f1f5f9',
+      background: 'var(--surface-2)',
+      color: 'var(--foreground)',
     });
 
     if (result.isConfirmed) {
@@ -1598,8 +1595,8 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
       cancelButtonColor: '#64748b',
       confirmButtonText: 'กู้คืน',
       cancelButtonText: 'ยกเลิก',
-      background: '#1e293b',
-      color: '#f1f5f9',
+      background: 'var(--surface-2)',
+      color: 'var(--foreground)',
     });
 
     if (result.isConfirmed) {
@@ -1648,8 +1645,8 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
       cancelButtonColor: '#64748b',
       confirmButtonText: 'ลบถาวร',
       cancelButtonText: 'ยกเลิก',
-      background: '#1e293b',
-      color: '#f1f5f9',
+      background: 'var(--surface-2)',
+      color: 'var(--foreground)',
     });
 
     if (result.isConfirmed) {
@@ -1674,11 +1671,11 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2 }}>
         <Box>
-          <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: '#f1f5f9', display: 'flex', alignItems: 'center', gap: 1 }}>
-            <NotificationsActive sx={{ fontSize: 28 }} />
+          <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--foreground)', display: 'flex', alignItems: 'center', gap: 1 }}>
+            <NotificationsActive size={28} />
             จัดการประกาศ
           </Typography>
-          <Typography sx={{ fontSize: '0.85rem', color: '#64748b' }}>
+          <Typography sx={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
             สร้าง แก้ไข และจัดการประกาศทั้งหมด • {announcements.length} รายการ ({activeCount} เปิดอยู่)
           </Typography>
         </Box>
@@ -1690,7 +1687,7 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
               gap: 1,
             }}
           >
-            <Archive sx={{ fontSize: 18 }} />
+            <Archive size={18} />
             ประวัติ ({history.length})
           </Button>
           <Button
@@ -1700,7 +1697,7 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
               gap: 1,
             }}
           >
-            <Add sx={{ fontSize: 20 }} />
+            <Add size={20} />
             สร้างประกาศใหม่
           </Button>
         </Box>
@@ -1713,15 +1710,15 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
           p: 6,
           textAlign: 'center',
         }}>
-          <Announcement sx={{ fontSize: 64, color: '#334155', mb: 2 }} />
-          <Typography sx={{ fontSize: '1.1rem', fontWeight: 600, color: '#94a3b8', mb: 1 }}>
+          <Announcement size={64} color="#334155" style={{ marginBottom: 16 }} />
+          <Typography sx={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-muted)', mb: 1 }}>
             ยังไม่มีประกาศ
           </Typography>
-          <Typography sx={{ fontSize: '0.85rem', color: '#64748b', mb: 3 }}>
+          <Typography sx={{ fontSize: '0.85rem', color: 'var(--text-muted)', mb: 3 }}>
             คลิกปุ่ม "สร้างประกาศใหม่" เพื่อเริ่มต้น
           </Typography>
           <Button onClick={handleAddNew} sx={gradientButtonSx}>
-            <Add sx={{ mr: 1 }} /> สร้างประกาศแรก
+            <Add style={{ marginRight: 8 }} /> สร้างประกาศแรก
           </Button>
         </Box>
       ) : (
@@ -1774,13 +1771,13 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
                       >
                         {ann.enabled ? '🟢 เปิดอยู่' : '⚪ ปิดอยู่'}
                       </Box>
-                      <Typography sx={{ fontSize: '0.7rem', color: '#64748b' }}>
+                      <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                         {new Date(ann.postedAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
                       </Typography>
                     </Box>
                     
                     <Typography sx={{ 
-                      color: '#e2e8f0', 
+                      color: 'var(--foreground)', 
                       fontSize: '0.9rem',
                       whiteSpace: 'pre-wrap',
                       overflow: 'hidden',
@@ -1793,7 +1790,7 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
                     </Typography>
 
                     {ann.displayName && (
-                      <Typography sx={{ fontSize: '0.75rem', color: '#64748b', mt: 0.5 }}>
+                      <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', mt: 0.5 }}>
                         ประกาศโดย: {ann.displayName}
                       </Typography>
                     )}
@@ -1820,7 +1817,7 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
                         onClick={() => handleEdit(ann)}
                         sx={{ color: '#3b82f6', '&:hover': { bgcolor: 'rgba(59, 130, 246, 0.1)' } }}
                       >
-                        <Edit sx={{ fontSize: 18 }} />
+                        <Edit size={18} />
                       </IconButton>
                     </Tooltip>
                     <Tooltip title="ลบ">
@@ -1830,7 +1827,7 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
                         disabled={saving}
                         sx={{ color: '#ef4444', '&:hover': { bgcolor: 'rgba(239, 68, 68, 0.1)' } }}
                       >
-                        <Delete sx={{ fontSize: 18 }} />
+                        <Delete size={18} />
                       </IconButton>
                     </Tooltip>
                   </Box>
@@ -1871,9 +1868,9 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
             alignItems: 'center',
             justifyContent: 'center',
           }}>
-            {announcements.find(a => a.id === editingAnn?.id) ? <Edit sx={{ color: '#fff' }} /> : <Add sx={{ color: '#fff' }} />}
+            {announcements.find(a => a.id === editingAnn?.id) ? <Edit color="#fff" /> : <Add color="#fff" />}
           </Box>
-          <Typography sx={{ fontWeight: 700, color: '#f1f5f9' }}>
+          <Typography sx={{ fontWeight: 700, color: 'var(--foreground)' }}>
             {announcements.find(a => a.id === editingAnn?.id) ? 'แก้ไขประกาศ' : 'สร้างประกาศใหม่'}
           </Typography>
         </DialogTitle>
@@ -1891,7 +1888,7 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
 
               {/* Type Selection */}
               <Box>
-                <Typography sx={{ fontSize: '0.8rem', color: '#64748b', mb: 1 }}>ประเภทประกาศ</Typography>
+                <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)', mb: 1 }}>ประเภทประกาศ</Typography>
                 <Box sx={{ display: 'flex', gap: 1 }}>
                   {[
                     { value: 'text', label: '📝 ข้อความ' },
@@ -1948,7 +1945,7 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
               {/* Image Upload */}
               {((editingAnn.type ?? 'text') === 'image' || editingAnn.type === 'both') && (
                 <Box>
-                  <Typography sx={{ fontSize: '0.8rem', color: '#64748b', mb: 1 }}>รูปภาพประกาศ</Typography>
+                  <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)', mb: 1 }}>รูปภาพประกาศ</Typography>
                   {editingAnn.imageUrl ? (
                     <Box sx={{ position: 'relative' }}>
                       <Box
@@ -1975,7 +1972,7 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
                         }}
                         size="small"
                       >
-                        <Delete sx={{ fontSize: 18 }} />
+                        <Delete size={18} />
                       </IconButton>
                     </Box>
                   ) : (
@@ -1995,7 +1992,7 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
                         <CircularProgress size={24} sx={{ color: '#8b5cf6' }} />
                       ) : (
                         <>
-                          <ImageIcon sx={{ fontSize: 24, mr: 1 }} />
+                          <ImageIcon size={24} style={{ marginRight: 8 }} />
                           คลิกเพื่ออัพโหลดรูปภาพ (สูงสุด 5MB)
                         </>
                       )}
@@ -2032,7 +2029,7 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
 
               {/* Color Picker */}
               <Box>
-                <Typography sx={{ fontSize: '0.8rem', color: '#64748b', mb: 1.5 }}>สีพื้นหลัง</Typography>
+                <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)', mb: 1.5 }}>สีพื้นหลัง</Typography>
                 <Box sx={{ 
                   height: 40, 
                   borderRadius: '12px', 
@@ -2053,7 +2050,7 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
                   gap: 0.75,
                   p: 1.5,
                   borderRadius: '12px',
-                  bgcolor: 'rgba(0,0,0,0.2)',
+                  bgcolor: 'var(--glass-bg)',
                   border: `1px solid ${ADMIN_THEME.border}`,
                 }}>
                   {PRESET_COLORS.map(color => (
@@ -2098,7 +2095,7 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
               {/* Preview */}
               {(editingAnn.message || editingAnn.imageUrl) && (
                 <Box sx={{ mt: 1 }}>
-                  <Typography sx={{ fontSize: '0.75rem', color: '#64748b', mb: 1 }}>ตัวอย่างการแสดงผล:</Typography>
+                  <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', mb: 1 }}>ตัวอย่างการแสดงผล:</Typography>
                   <Box sx={{ p: 2, borderRadius: '12px', bgcolor: editingAnn.color }}>
                     {editingAnn.imageUrl && (
                       <Box
@@ -2117,7 +2114,7 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
                       {editingAnn.showLogo && (
                         <Box component="img" src="/logo.png" alt="Logo" sx={{ width: 20, height: 20, borderRadius: '4px' }} onError={(e: any) => { e.target.style.display = 'none'; }} />
                       )}
-                      <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.7)' }}>
+                      <Typography sx={{ fontSize: '0.7rem', color: 'var(--foreground)' }}>
                         — {editingAnn.displayName || 'แอดมิน'}
                       </Typography>
                     </Box>
@@ -2137,7 +2134,7 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
             disabled={saving || (!editingAnn?.message && !editingAnn?.imageUrl)}
             sx={gradientButtonSx}
           >
-            {saving ? <CircularProgress size={20} sx={{ mr: 1 }} /> : <Save sx={{ mr: 1 }} />}
+            {saving ? <CircularProgress size={20} sx={{ mr: 1 }} /> : <Save style={{ marginRight: 8 }} />}
             บันทึก
           </Button>
         </DialogActions>
@@ -2174,19 +2171,19 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
             alignItems: 'center',
             justifyContent: 'center',
           }}>
-            <History sx={{ color: '#fff' }} />
+            <History color="#fff" />
           </Box>
           <Box>
-            <Typography sx={{ fontWeight: 700, color: '#f1f5f9' }}>ประวัติประกาศ</Typography>
-            <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>ประกาศที่ถูกลบไปแล้ว {history.length} รายการ</Typography>
+            <Typography sx={{ fontWeight: 700, color: 'var(--foreground)' }}>ประวัติประกาศ</Typography>
+            <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>ประกาศที่ถูกลบไปแล้ว {history.length} รายการ</Typography>
           </Box>
         </DialogTitle>
 
         <DialogContent sx={{ p: 0 }}>
           {history.length === 0 ? (
             <Box sx={{ p: 6, textAlign: 'center' }}>
-              <Archive sx={{ fontSize: 64, color: '#334155', mb: 2 }} />
-              <Typography sx={{ color: '#64748b' }}>ยังไม่มีประวัติประกาศ</Typography>
+              <Archive size={64} color="#334155" style={{ marginBottom: 16 }} />
+              <Typography sx={{ color: 'var(--text-muted)' }}>ยังไม่มีประวัติประกาศ</Typography>
             </Box>
           ) : (
             <Box sx={{ py: 2 }}>
@@ -2211,23 +2208,23 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
                     )}
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                        <Typography sx={{ fontSize: '0.7rem', color: '#64748b' }}>
+                        <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                           ลบเมื่อ: {item.deletedAt ? new Date(item.deletedAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-'}
                         </Typography>
                       </Box>
-                      <Typography sx={{ color: '#94a3b8', fontSize: '0.85rem', whiteSpace: 'pre-wrap', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                      <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem', whiteSpace: 'pre-wrap', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
                         {item.message || '(รูปภาพอย่างเดียว)'}
                       </Typography>
                     </Box>
                     <Box sx={{ display: 'flex', gap: 0.5 }}>
                       <Tooltip title="กู้คืน">
                         <IconButton size="small" onClick={() => handleRestoreFromHistory(item)} disabled={saving} sx={{ color: '#10b981' }}>
-                          <ContentCopy sx={{ fontSize: 18 }} />
+                          <ContentCopy size={18} />
                         </IconButton>
                       </Tooltip>
                       <Tooltip title="ลบถาวร">
                         <IconButton size="small" onClick={() => handleDeleteFromHistory(item)} disabled={saving} sx={{ color: '#ef4444' }}>
-                          <Delete sx={{ fontSize: 18 }} />
+                          <Delete size={18} />
                         </IconButton>
                       </Tooltip>
                     </Box>
@@ -2296,10 +2293,6 @@ export default function AdminPage(): JSX.Element {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
-  // Connection status tracking
-  const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [isOnline, setIsOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
-  const connectionRetryCount = useRef(0);
   const [searchTerm, setSearchTerm] = useState('');
   const toastTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
@@ -2457,7 +2450,7 @@ export default function AdminPage(): JSX.Element {
     saveAdminCache({ config: nextConfig, orders: normalizedOrders, logs: nextLogs });
   }, []);
 
-  // 📥 SWR Hook for Admin Data (replaces manual fetchData) - NO CACHE for realtime data
+  // 📥 SWR Hook for Admin Data (replaces manual fetchData)
   const { 
     isLoading: swrLoading, 
     isRefreshing: swrRefreshing,
@@ -2465,36 +2458,15 @@ export default function AdminPage(): JSX.Element {
     invalidate: swrInvalidate,
   } = useAdminDataSWR({
     enabled: status === 'authenticated',
-    onDataReceived: (data) => {
-      // Clear connection error on successful fetch
-      setConnectionError(null);
-      connectionRetryCount.current = 0;
-      handleSWRDataReceived(data);
-    },
+    onDataReceived: handleSWRDataReceived,
     onError: (error) => {
-      connectionRetryCount.current += 1;
       const isNetworkError = error?.message?.includes('Failed to fetch') || 
-                            error?.message?.includes('NETWORK_ERROR') ||
-                            error?.message?.includes('NetworkError') ||
-                            error?.message?.includes('fetch');
-      const isServerError = error?.status >= 500 || error?.message?.includes('500');
-      const isDBError = error?.message?.includes('database') || 
-                       error?.message?.includes('supabase') ||
-                       error?.message?.includes('connection');
-      
-      // Set appropriate error message for user
-      if (!navigator.onLine) {
-        setConnectionError('ไม่มีการเชื่อมต่ออินเทอร์เน็ต กรุณาตรวจสอบเครือข่ายของคุณ');
-      } else if (isServerError || isDBError) {
-        setConnectionError('ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ ระบบกำลังพยายามเชื่อมต่อใหม่...');
-      } else if (isNetworkError) {
-        setConnectionError('เกิดปัญหาในการเชื่อมต่อเครือข่าย กรุณารอสักครู่...');
+                            error?.message?.includes('NETWORK_ERROR');
+      if (isNetworkError) {
+        console.warn('[Admin SWR] Network error - using cached data');
       } else {
-        setConnectionError(`เกิดข้อผิดพลาด: ${error?.message || 'Unknown error'}`);
+        console.error('[Admin SWR] Error:', error);
       }
-      
-      console.warn('[Admin SWR] Connection error:', error);
-      
       // Load from local cache as fallback
       const cached = loadAdminCache();
       if (cached) {
@@ -2507,8 +2479,6 @@ export default function AdminPage(): JSX.Element {
       setLoading(loading);
     },
     realtimeConnected: false, // Will be updated by realtime hook below
-    // Force no cache - always fetch fresh data for admin
-    noCache: true,
   });
 
   // 📥 Fetch Data wrapper (for compatibility with existing code)
@@ -3035,43 +3005,7 @@ export default function AdminPage(): JSX.Element {
   }, [config, logs]);
 
   // Use realtime subscriptions for admin
-  const { isConnected: realtimeConnected, connectionState, error: realtimeError } = useRealtimeAdminOrders(handleRealtimeOrderChange);
-
-  // Track online/offline status and connection health
-  useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true);
-      setConnectionError(null);
-      connectionRetryCount.current = 0;
-      // Refresh data when back online
-      swrRefresh({ silent: true });
-    };
-    
-    const handleOffline = () => {
-      setIsOnline(false);
-      setConnectionError('ไม่มีการเชื่อมต่ออินเทอร์เน็ต กรุณาตรวจสอบเครือข่ายของคุณ');
-    };
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, [swrRefresh]);
-
-  // Update connection error from realtime hook
-  useEffect(() => {
-    if (realtimeError && connectionState === 'error') {
-      // Only set if we don't already have a more specific error
-      if (!connectionError) {
-        setConnectionError('การเชื่อมต่อ Realtime ขัดข้อง กำลังพยายามเชื่อมต่อใหม่...');
-      }
-    } else if (realtimeConnected && connectionError?.includes('Realtime')) {
-      setConnectionError(null);
-    }
-  }, [realtimeConnected, connectionState, realtimeError, connectionError]);
+  const { isConnected: realtimeConnected } = useRealtimeAdminOrders(handleRealtimeOrderChange);
 
   // SWR handles polling automatically via refreshInterval
   // This effect is kept only for editor pause logic
@@ -3117,15 +3051,15 @@ export default function AdminPage(): JSX.Element {
         justifyContent: 'center',
         mb: 3,
       }}>
-        <Lock sx={{ fontSize: 40, color: '#ef4444' }} />
+        <Lock size={40} color="#ef4444" />
       </Box>
-      <Typography sx={{ fontSize: '1.2rem', fontWeight: 700, color: '#f1f5f9', mb: 1 }}>
+      <Typography sx={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--foreground)', mb: 1 }}>
         ไม่มีสิทธิ์เข้าถึง
       </Typography>
-      <Typography sx={{ fontSize: '0.9rem', color: '#94a3b8', mb: 2 }}>
+      <Typography sx={{ fontSize: '0.9rem', color: 'var(--text-muted)', mb: 2 }}>
         คุณไม่มีสิทธิ์ในการ{permission}
       </Typography>
-      <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>
+      <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
         กรุณาติดต่อ Super Admin เพื่อขอสิทธิ์เพิ่มเติม
       </Typography>
     </Box>
@@ -3148,7 +3082,7 @@ export default function AdminPage(): JSX.Element {
         subtitle: `${validOrders.length} ออเดอร์`,
         gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
         iconBg: 'rgba(16,185,129,0.2)',
-        icon: <AttachMoney sx={{ fontSize: 28, color: '#34d399' }} />,
+        icon: <AttachMoney size={28} color="#34d399" />,
       },
       { 
         label: 'รอชำระเงิน', 
@@ -3156,7 +3090,7 @@ export default function AdminPage(): JSX.Element {
         subtitle: 'รายการ',
         gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
         iconBg: 'rgba(245,158,11,0.2)',
-        icon: <DateRange sx={{ fontSize: 28, color: '#fbbf24' }} />,
+        icon: <DateRange size={28} color="#fbbf24" />,
       },
       { 
         label: 'ชำระแล้ว', 
@@ -3164,7 +3098,7 @@ export default function AdminPage(): JSX.Element {
         subtitle: 'พร้อมจัดส่ง',
         gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
         iconBg: 'rgba(59,130,246,0.2)',
-        icon: <CheckCircle sx={{ fontSize: 28, color: '#60a5fa' }} />,
+        icon: <CheckCircle size={28} color="#60a5fa" />,
       },
       { 
         label: 'จัดส่งแล้ว', 
@@ -3172,7 +3106,7 @@ export default function AdminPage(): JSX.Element {
         subtitle: 'เสร็จสมบูรณ์',
         gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
         iconBg: 'rgba(139,92,246,0.2)',
-        icon: <LocalShipping sx={{ fontSize: 28, color: '#a78bfa' }} />,
+        icon: <LocalShipping size={28} color="#a78bfa" />,
       },
     ];
 
@@ -3185,12 +3119,12 @@ export default function AdminPage(): JSX.Element {
           background: 'linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(139,92,246,0.1) 100%)',
           border: '1px solid rgba(99,102,241,0.2)',
         }}>
-          <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: '#f1f5f9', mb: 0.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <WavingHand sx={{ fontSize: 24, color: '#fbbf24' }} />
+          <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--foreground)', mb: 0.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <WavingHand size={24} color="#fbbf24" />
             ยินดีต้อนรับ, {session?.user?.name?.split(' ')[0] || 'Admin'}
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-            <Typography sx={{ fontSize: '0.9rem', color: '#94a3b8' }}>
+            <Typography sx={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
               จัดการร้านค้าและออเดอร์ของคุณได้ที่นี่ • อัพเดทล่าสุด: {lastSavedTime?.toLocaleTimeString('th-TH') || 'กำลังโหลด...'}
             </Typography>
             {/* Realtime Status Indicator */}
@@ -3215,6 +3149,9 @@ export default function AdminPage(): JSX.Element {
                   '50%': { opacity: 0.5 },
                 },
               }} />
+              <Typography sx={{ fontSize: '0.7rem', color: realtimeConnected ? '#10b981' : '#f59e0b', fontWeight: 600 }}>
+                {realtimeConnected ? '🔴 Live' : '⏳ Polling'}
+              </Typography>
             </Box>
           </Box>
         </Box>
@@ -3269,13 +3206,13 @@ export default function AdminPage(): JSX.Element {
                 </Box>
               </Box>
               
-              <Typography sx={{ fontSize: '1.75rem', fontWeight: 900, color: '#f1f5f9', lineHeight: 1, mb: 0.5 }}>
+              <Typography sx={{ fontSize: '1.75rem', fontWeight: 900, color: 'var(--foreground)', lineHeight: 1, mb: 0.5 }}>
                 {stat.value}
               </Typography>
-              <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: '#94a3b8' }}>
+              <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>
                 {stat.label}
               </Typography>
-              <Typography sx={{ fontSize: '0.7rem', color: '#64748b', mt: 0.5 }}>
+              <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', mt: 0.5 }}>
                 {stat.subtitle}
               </Typography>
             </Box>
@@ -3290,8 +3227,8 @@ export default function AdminPage(): JSX.Element {
         }}>
           {/* Order Status Breakdown */}
           <Box sx={{ ...glassCardSx, p: 3 }}>
-            <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#f1f5f9', mb: 2.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Receipt sx={{ fontSize: 20, color: '#a5b4fc' }} />
+            <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--foreground)', mb: 2.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Receipt size={20} color="#a5b4fc" />
               สถานะออเดอร์
             </Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
@@ -3321,7 +3258,7 @@ export default function AdminPage(): JSX.Element {
                         {item.status.replace('_', ' ')}
                       </Typography>
                     </Box>
-                    <Box sx={{ flex: 1, height: 8, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
+                    <Box sx={{ flex: 1, height: 8, bgcolor: 'var(--glass-bg)', borderRadius: '4px', overflow: 'hidden' }}>
                       <Box sx={{ 
                         width: `${percent}%`, 
                         height: '100%', 
@@ -3341,8 +3278,8 @@ export default function AdminPage(): JSX.Element {
 
           {/* Quick Actions */}
           <Box sx={{ ...glassCardSx, p: 3 }}>
-            <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#f1f5f9', mb: 2.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Bolt sx={{ fontSize: 20, color: '#fbbf24' }} />
+            <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--foreground)', mb: 2.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Bolt size={20} color="#fbbf24" />
               Quick Actions
             </Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
@@ -3355,7 +3292,7 @@ export default function AdminPage(): JSX.Element {
                   gap: 1.5,
                 }}
               >
-                <ShoppingCart sx={{ fontSize: 20 }} />
+                <ShoppingCart size={20} />
                 จัดการสินค้า ({config.products?.length || 0} รายการ)
               </Button>
               <Button
@@ -3367,7 +3304,7 @@ export default function AdminPage(): JSX.Element {
                   gap: 1.5,
                 }}
               >
-                <Receipt sx={{ fontSize: 20 }} />
+                <Receipt size={20} />
                 ดูออเดอร์ทั้งหมด ({orders.length} รายการ)
               </Button>
               <Button
@@ -3380,7 +3317,7 @@ export default function AdminPage(): JSX.Element {
                   gap: 1.5,
                 }}
               >
-                <Bolt sx={{ fontSize: 20 }} />
+                <Bolt size={20} />
                 {sheetSyncing ? 'กำลังซิงก์...' : 'ซิงก์ Google Sheet'}
               </Button>
             </Box>
@@ -3424,8 +3361,8 @@ export default function AdminPage(): JSX.Element {
 
           return (
             <Box sx={{ ...glassCardSx, p: 3 }}>
-              <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#f1f5f9', mb: 2.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-                <LocalMall sx={{ fontSize: 20, color: '#f472b6' }} />
+              <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--foreground)', mb: 2.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <LocalMall size={20} color="#f472b6" />
                 🏭 สรุปการผลิต (ออเดอร์ชำระแล้ว)
               </Typography>
               
@@ -3441,16 +3378,16 @@ export default function AdminPage(): JSX.Element {
                 border: '1px solid rgba(99,102,241,0.2)',
               }}>
                 <Box sx={{ textAlign: 'center' }}>
-                  <Typography sx={{ fontSize: '1.5rem', fontWeight: 900, color: '#f1f5f9' }}>{paidOrders.length}</Typography>
-                  <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8' }}>📦 ออเดอร์</Typography>
+                  <Typography sx={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--foreground)' }}>{paidOrders.length}</Typography>
+                  <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>📦 ออเดอร์</Typography>
                 </Box>
                 <Box sx={{ textAlign: 'center' }}>
                   <Typography sx={{ fontSize: '1.5rem', fontWeight: 900, color: '#22d3ee' }}>{totalItems}</Typography>
-                  <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8' }}>👕 ตัวทั้งหมด</Typography>
+                  <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>👕 ตัวทั้งหมด</Typography>
                 </Box>
                 <Box sx={{ textAlign: 'center' }}>
                   <Typography sx={{ fontSize: '1.5rem', fontWeight: 900, color: '#a78bfa' }}>{sortedSizes.length}</Typography>
-                  <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8' }}>📐 ไซส์</Typography>
+                  <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>📐 ไซส์</Typography>
                 </Box>
               </Box>
 
@@ -3460,20 +3397,20 @@ export default function AdminPage(): JSX.Element {
                   <Table size="small">
                     <TableHead>
                       <TableRow>
-                        <TableCell sx={{ color: '#64748b', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>ไซส์</TableCell>
-                        <TableCell align="center" sx={{ color: '#64748b', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>⚪ แขนสั้น</TableCell>
-                        <TableCell align="center" sx={{ color: '#64748b', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>🔵 แขนยาว</TableCell>
-                        <TableCell align="center" sx={{ color: '#64748b', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>รวม</TableCell>
+                        <TableCell sx={{ color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>ไซส์</TableCell>
+                        <TableCell align="center" sx={{ color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>⚪ แขนสั้น</TableCell>
+                        <TableCell align="center" sx={{ color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>🔵 แขนยาว</TableCell>
+                        <TableCell align="center" sx={{ color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>รวม</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
                       {sortedSizes.map((size) => (
                         <TableRow key={size} sx={{ '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' } }}>
                           <TableCell sx={{ borderColor: ADMIN_THEME.border }}>
-                            <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#f1f5f9' }}>{size}</Typography>
+                            <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>{size}</Typography>
                           </TableCell>
                           <TableCell align="center" sx={{ borderColor: ADMIN_THEME.border }}>
-                            <Typography sx={{ fontSize: '0.85rem', color: '#94a3b8' }}>{sizeShortSleeveCount[size] || 0}</Typography>
+                            <Typography sx={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{sizeShortSleeveCount[size] || 0}</Typography>
                           </TableCell>
                           <TableCell align="center" sx={{ borderColor: ADMIN_THEME.border }}>
                             <Typography sx={{ fontSize: '0.85rem', color: '#60a5fa' }}>{sizeLongSleeveCount[size] || 0}</Typography>
@@ -3489,7 +3426,7 @@ export default function AdminPage(): JSX.Element {
                           <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#a5b4fc' }}>🎯 รวมทั้งหมด</Typography>
                         </TableCell>
                         <TableCell align="center" sx={{ borderColor: ADMIN_THEME.border }}>
-                          <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#f1f5f9' }}>{totalShortSleeve}</Typography>
+                          <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)' }}>{totalShortSleeve}</Typography>
                         </TableCell>
                         <TableCell align="center" sx={{ borderColor: ADMIN_THEME.border }}>
                           <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#60a5fa' }}>{totalLongSleeve}</Typography>
@@ -3502,7 +3439,7 @@ export default function AdminPage(): JSX.Element {
                   </Table>
                 </Box>
               ) : (
-                <Typography sx={{ fontSize: '0.85rem', color: '#64748b', textAlign: 'center', py: 3 }}>
+                <Typography sx={{ fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center', py: 3 }}>
                   ยังไม่มีออเดอร์ที่ชำระแล้ว
                 </Typography>
               )}
@@ -3520,8 +3457,8 @@ export default function AdminPage(): JSX.Element {
             alignItems: 'center',
             justifyContent: 'space-between',
           }}>
-            <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#f1f5f9', display: 'flex', alignItems: 'center', gap: 1 }}>
-              <LocalShipping sx={{ fontSize: 20, color: '#22d3ee' }} />
+            <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--foreground)', display: 'flex', alignItems: 'center', gap: 1 }}>
+              <LocalShipping size={20} color="#22d3ee" />
               ออเดอร์ล่าสุด
             </Typography>
             <Button
@@ -3536,11 +3473,11 @@ export default function AdminPage(): JSX.Element {
             <Table sx={{ minWidth: 600 }}>
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ color: '#64748b', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>REF</TableCell>
-                  <TableCell sx={{ color: '#64748b', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>ลูกค้า</TableCell>
-                  <TableCell align="right" sx={{ color: '#64748b', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>ยอด</TableCell>
-                  <TableCell sx={{ color: '#64748b', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>สถานะ</TableCell>
-                  <TableCell sx={{ color: '#64748b', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>วันที่</TableCell>
+                  <TableCell sx={{ color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>REF</TableCell>
+                  <TableCell sx={{ color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>ลูกค้า</TableCell>
+                  <TableCell align="right" sx={{ color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>ยอด</TableCell>
+                  <TableCell sx={{ color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>สถานะ</TableCell>
+                  <TableCell sx={{ color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>วันที่</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -3561,10 +3498,10 @@ export default function AdminPage(): JSX.Element {
                         </Typography>
                       </TableCell>
                       <TableCell sx={{ borderColor: ADMIN_THEME.border }}>
-                        <Typography sx={{ fontSize: '0.85rem', color: '#f1f5f9', fontWeight: 600 }}>
+                        <Typography sx={{ fontSize: '0.85rem', color: 'var(--foreground)', fontWeight: 600 }}>
                           {order.name || '—'}
                         </Typography>
-                        <Typography sx={{ fontSize: '0.7rem', color: '#64748b' }}>
+                        <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                           {order.email?.slice(0, 20) || ''}
                         </Typography>
                       </TableCell>
@@ -3588,7 +3525,7 @@ export default function AdminPage(): JSX.Element {
                         </Box>
                       </TableCell>
                       <TableCell sx={{ borderColor: ADMIN_THEME.border }}>
-                        <Typography sx={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                        <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                           {order.date ? new Date(order.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }) : '-'}
                         </Typography>
                       </TableCell>
@@ -3945,12 +3882,12 @@ export default function AdminPage(): JSX.Element {
             mb: 2,
           }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <QrCodeScanner sx={{ fontSize: { xs: 24, md: 32 }, color: '#06b6d4' }} />
+              <QrCodeScanner size={32} color="#06b6d4" />
               <Box>
-                <Typography sx={{ fontSize: { xs: '1.1rem', md: '1.5rem' }, fontWeight: 800, color: '#f1f5f9', lineHeight: 1.2 }}>
+                <Typography sx={{ fontSize: { xs: '1.1rem', md: '1.5rem' }, fontWeight: 800, color: 'var(--foreground)', lineHeight: 1.2 }}>
                   รับสินค้า
                 </Typography>
-                <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>
+                <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                   สแกน QR หรือค้นหาเพื่อยืนยันการรับ
                 </Typography>
               </Box>
@@ -3968,7 +3905,7 @@ export default function AdminPage(): JSX.Element {
                 alignItems: 'center',
                 gap: 0.8,
               }}>
-                <LocalMall sx={{ fontSize: 18, color: '#10b981' }} />
+                <LocalMall size={18} color="#10b981" />
                 <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#10b981' }}>
                   รอรับ: {readyForPickup.length}
                 </Typography>
@@ -3983,7 +3920,7 @@ export default function AdminPage(): JSX.Element {
                 alignItems: 'center',
                 gap: 0.8,
               }}>
-                <CheckCircleOutline sx={{ fontSize: 18, color: '#818cf8' }} />
+                <CheckCircleOutline size={18} color="#818cf8" />
                 <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#818cf8' }}>
                   วันนี้: {completedToday.length}
                 </Typography>
@@ -4008,7 +3945,7 @@ export default function AdminPage(): JSX.Element {
                 },
               }}
             >
-              <CameraAlt sx={{ fontSize: 22 }} />
+              <CameraAlt size={22} />
             </Button>
             <TextField
               inputRef={pickupSearchRef}
@@ -4027,17 +3964,17 @@ export default function AdminPage(): JSX.Element {
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <Search sx={{ color: '#64748b', fontSize: 20 }} />
+                    <Search size={20} color="#64748b" />
                   </InputAdornment>
                 ),
                 endAdornment: pickupSearching ? (
                   <InputAdornment position="end">
-                    <CircularProgress size={18} sx={{ color: '#64748b' }} />
+                    <CircularProgress size={18} sx={{ color: 'var(--text-muted)' }} />
                   </InputAdornment>
                 ) : pickupSearch ? (
                   <InputAdornment position="end">
                     <IconButton size="small" onClick={() => { setPickupSearch(''); setPickupSearchResults([]); }}>
-                      <Clear sx={{ fontSize: 18, color: '#64748b' }} />
+                      <Clear size={18} color="#64748b" />
                     </IconButton>
                   </InputAdornment>
                 ) : null,
@@ -4059,7 +3996,7 @@ export default function AdminPage(): JSX.Element {
                 px: { xs: 1, sm: 2 },
               }}
             >
-              <Search sx={{ fontSize: 20 }} />
+              <Search size={20} />
               <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' }, ml: 0.5 }}>ค้นหา</Box>
             </Button>
           </Box>
@@ -4068,7 +4005,7 @@ export default function AdminPage(): JSX.Element {
         {/* Search Results */}
         {pickupSearchResults.length > 0 && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-            <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: '#94a3b8' }}>
+            <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>
               พบ {pickupSearchResults.length} รายการ
             </Typography>
             
@@ -4100,7 +4037,7 @@ export default function AdminPage(): JSX.Element {
                         <Typography sx={{ 
                           fontSize: '1rem', 
                           fontWeight: 700, 
-                          color: '#f1f5f9',
+                          color: 'var(--foreground)',
                           fontFamily: 'monospace',
                         }}>
                           {order.ref}
@@ -4122,14 +4059,14 @@ export default function AdminPage(): JSX.Element {
                       {/* Customer Info */}
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.3 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
-                          <Person sx={{ fontSize: 14, color: '#a78bfa' }} />
-                          <Typography sx={{ fontSize: '0.85rem', color: '#f1f5f9' }}>
+                          <Person size={14} color="#a78bfa" />
+                          <Typography sx={{ fontSize: '0.85rem', color: 'var(--foreground)' }}>
                             {order.name}
                           </Typography>
                         </Box>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
-                          <Email sx={{ fontSize: 14, color: '#60a5fa' }} />
-                          <Typography sx={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                          <Email size={14} color="#60a5fa" />
+                          <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                             {order.email}
                           </Typography>
                         </Box>
@@ -4138,8 +4075,8 @@ export default function AdminPage(): JSX.Element {
                       {/* Cart Summary */}
                       {order.cart && order.cart.length > 0 && (
                         <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.8 }}>
-                          <ShoppingBag sx={{ fontSize: 14, color: '#818cf8' }} />
-                          <Typography sx={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                          <ShoppingBag size={14} color="#818cf8" />
+                          <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                             {order.cart.length} รายการ
                           </Typography>
                         </Box>
@@ -4158,7 +4095,7 @@ export default function AdminPage(): JSX.Element {
                             ✓ รับแล้วเมื่อ {new Date(order.pickup.pickedUpAt).toLocaleString('th-TH')}
                           </Typography>
                           {order.pickup.notes && (
-                            <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8', mt: 0.5 }}>
+                            <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', mt: 0.5 }}>
                               หมายเหตุ: {order.pickup.notes}
                             </Typography>
                           )}
@@ -4204,8 +4141,8 @@ export default function AdminPage(): JSX.Element {
         {/* Empty State */}
         {pickupSearch && pickupSearchResults.length === 0 && !pickupSearching && (
           <Box sx={{ ...glassCardSx, textAlign: 'center', py: 6 }}>
-            <Search sx={{ fontSize: 56, color: '#475569', mb: 2 }} />
-            <Typography sx={{ fontSize: '1.1rem', fontWeight: 600, color: '#64748b' }}>
+            <Search size={56} color="#475569" style={{ marginBottom: 16 }} />
+            <Typography sx={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-muted)' }}>
               ไม่พบออเดอร์
             </Typography>
             <Typography sx={{ fontSize: '0.85rem', color: '#475569' }}>
@@ -4217,8 +4154,8 @@ export default function AdminPage(): JSX.Element {
         {/* Recent Ready Orders */}
         {!pickupSearch && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-            <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: '#f1f5f9', display: 'flex', alignItems: 'center', gap: 1 }}>
-              <LocalMall sx={{ fontSize: 20, color: '#10b981' }} />
+            <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--foreground)', display: 'flex', alignItems: 'center', gap: 1 }}>
+              <LocalMall size={20} color="#10b981" />
               ออเดอร์พร้อมรับ ({readyForPickup.length})
             </Typography>
             
@@ -4261,13 +4198,13 @@ export default function AdminPage(): JSX.Element {
                         alignItems: 'center',
                         justifyContent: 'center',
                       }}>
-                        <LocalMall sx={{ fontSize: 20, color: statusTheme.text }} />
+                        <LocalMall size={20} color={statusTheme.text} />
                       </Box>
                       <Box>
-                        <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#f1f5f9' }}>
+                        <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>
                           {order.ref}
                         </Typography>
-                        <Typography sx={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                        <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                           {order.name}
                         </Typography>
                       </Box>
@@ -4295,8 +4232,8 @@ export default function AdminPage(): JSX.Element {
             
             {readyForPickup.length === 0 && (
               <Box sx={{ ...glassCardSx, textAlign: 'center', py: 4 }}>
-                <CheckCircleOutline sx={{ fontSize: 48, color: '#10b981', mb: 1 }} />
-                <Typography sx={{ fontSize: '0.95rem', color: '#94a3b8' }}>
+                <CheckCircleOutline size={48} color="#10b981" style={{ marginBottom: 8 }} />
+                <Typography sx={{ fontSize: '0.95rem', color: 'var(--text-muted)' }}>
                   ไม่มีออเดอร์รอรับ
                 </Typography>
               </Box>
@@ -4312,23 +4249,23 @@ export default function AdminPage(): JSX.Element {
           fullWidth
           PaperProps={{
             sx: {
-              bgcolor: '#0f172a',
+              bgcolor: 'var(--surface)',
               borderRadius: '20px',
-              border: '1px solid rgba(255,255,255,0.1)',
+              border: '1px solid var(--glass-border)',
               overflow: 'hidden',
             }
           }}
         >
           <DialogTitle sx={{ 
             bgcolor: 'rgba(6, 182, 212, 0.1)',
-            borderBottom: '1px solid rgba(255,255,255,0.05)',
+            borderBottom: '1px solid var(--glass-border)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
           }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <CameraAlt sx={{ color: '#06b6d4' }} />
-              <Typography sx={{ fontWeight: 700, color: '#f1f5f9' }}>
+              <CameraAlt color="#06b6d4" />
+              <Typography sx={{ fontWeight: 700, color: 'var(--foreground)' }}>
                 สแกน QR Code
               </Typography>
               {isProcessingScan && (
@@ -4338,7 +4275,7 @@ export default function AdminPage(): JSX.Element {
             <IconButton 
               onClick={() => { setPickupScanMode(false); setScannerError(null); setScannerReady(false); setManualInput(''); setIsProcessingScan(false); }} 
               size="small"
-              sx={{ color: '#94a3b8' }}
+              sx={{ color: 'var(--text-muted)' }}
             >
               <Close />
             </IconButton>
@@ -4364,11 +4301,11 @@ export default function AdminPage(): JSX.Element {
                       bgcolor: 'rgba(239, 68, 68, 0.08)',
                       minHeight: 200,
                     }}>
-                      <CameraAlt sx={{ fontSize: 48, color: '#ef4444', mb: 1.5 }} />
+                      <CameraAlt size={48} color="#ef4444" style={{ marginBottom: 12 }} />
                       <Typography sx={{ color: '#ef4444', fontWeight: 600, fontSize: '1rem', mb: 0.5 }}>
                         ไม่สามารถใช้กล้องได้
                       </Typography>
-                      <Typography sx={{ color: '#94a3b8', fontSize: '0.75rem', mb: 1 }}>
+                      <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.75rem', mb: 1 }}>
                         {scannerError}
                       </Typography>
                       <Button
@@ -4464,7 +4401,7 @@ export default function AdminPage(): JSX.Element {
                           flexDirection: 'column',
                           alignItems: 'center', 
                           justifyContent: 'center',
-                          bgcolor: 'rgba(15, 23, 42, 0.95)',
+                          bgcolor: 'var(--glass-strong)',
                           zIndex: 30,
                         }}>
                           <Box sx={{ 
@@ -4477,13 +4414,13 @@ export default function AdminPage(): JSX.Element {
                             justifyContent: 'center',
                             mb: 2,
                           }}>
-                            <CameraAlt sx={{ fontSize: 36, color: '#06b6d4' }} />
+                            <CameraAlt size={36} color="#06b6d4" />
                           </Box>
                           <CircularProgress size={24} sx={{ color: '#06b6d4', mb: 1.5 }} />
-                          <Typography sx={{ color: '#f1f5f9', fontSize: '0.9rem', fontWeight: 600 }}>
+                          <Typography sx={{ color: 'var(--foreground)', fontSize: '0.9rem', fontWeight: 600 }}>
                             กำลังเปิดกล้อง...
                           </Typography>
-                          <Typography sx={{ color: '#64748b', fontSize: '0.75rem', mt: 0.5 }}>
+                          <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.75rem', mt: 0.5 }}>
                             กรุณารอสักครู่
                           </Typography>
                         </Box>
@@ -4535,7 +4472,7 @@ export default function AdminPage(): JSX.Element {
                 <Box sx={{ 
                   p: 2, 
                   bgcolor: scannerError ? 'rgba(6, 182, 212, 0.08)' : 'rgba(255,255,255,0.02)',
-                  borderTop: '1px solid rgba(255,255,255,0.08)',
+                  borderTop: '1px solid var(--glass-border)',
                 }}>
                   <Typography sx={{ 
                     fontSize: scannerError ? '0.9rem' : '0.8rem', 
@@ -4585,7 +4522,7 @@ export default function AdminPage(): JSX.Element {
                         px: 1.5,
                       }}
                     >
-                      <Search sx={{ fontSize: 20 }} />
+                      <Search size={20} />
                     </Button>
                   </Box>
                 </Box>
@@ -4606,16 +4543,16 @@ export default function AdminPage(): JSX.Element {
       fullWidth
       PaperProps={{
         sx: {
-          bgcolor: '#0f172a',
+          bgcolor: 'var(--surface)',
           backgroundImage: 'linear-gradient(135deg, rgba(6, 182, 212, 0.05) 0%, rgba(16, 185, 129, 0.05) 100%)',
-          border: '1px solid rgba(255,255,255,0.08)',
+          border: '1px solid var(--glass-border)',
           borderRadius: '20px',
         },
       }}
     >
       {pickupSelectedOrder && (
         <>
-          <Box sx={{ p: 3, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <Box sx={{ p: 3, borderBottom: '1px solid var(--glass-border)' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                 <Box sx={{
@@ -4627,19 +4564,19 @@ export default function AdminPage(): JSX.Element {
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}>
-                  <QrCodeScanner sx={{ fontSize: 24, color: 'white' }} />
+                  <QrCodeScanner size={24} color="white" />
                 </Box>
                 <Box>
-                  <Typography sx={{ fontSize: '1.1rem', fontWeight: 700, color: '#f1f5f9' }}>
+                  <Typography sx={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--foreground)' }}>
                     ยืนยันการรับสินค้า
                   </Typography>
-                  <Typography sx={{ fontSize: '0.85rem', color: '#64748b', fontFamily: 'monospace' }}>
+                  <Typography sx={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
                     #{pickupSelectedOrder.ref}
                   </Typography>
                 </Box>
               </Box>
               <IconButton onClick={() => setPickupSelectedOrder(null)} disabled={pickupProcessing}>
-                <Close sx={{ color: '#64748b' }} />
+                <Close color="#64748b" />
               </IconButton>
             </Box>
           </Box>
@@ -4647,24 +4584,24 @@ export default function AdminPage(): JSX.Element {
           <DialogContent sx={{ p: 3 }}>
             {/* Customer Info */}
             <Box sx={{ mb: 3 }}>
-              <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', mb: 1 }}>
+              <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', mb: 1 }}>
                 ข้อมูลลูกค้า
               </Typography>
               <Box sx={{ 
                 p: 2, 
                 borderRadius: '12px', 
                 bgcolor: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.06)',
+                border: '1px solid var(--glass-border)',
               }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                  <Person sx={{ fontSize: 18, color: '#a78bfa' }} />
-                  <Typography sx={{ fontSize: '0.95rem', fontWeight: 600, color: '#f1f5f9' }}>
+                  <Person size={18} color="#a78bfa" />
+                  <Typography sx={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--foreground)' }}>
                     {pickupSelectedOrder.name}
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Email sx={{ fontSize: 18, color: '#60a5fa' }} />
-                  <Typography sx={{ fontSize: '0.85rem', color: '#94a3b8' }}>
+                  <Email size={18} color="#60a5fa" />
+                  <Typography sx={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                     {pickupSelectedOrder.email}
                   </Typography>
                 </Box>
@@ -4674,14 +4611,14 @@ export default function AdminPage(): JSX.Element {
             {/* Cart Items */}
             {((pickupSelectedOrder.cart && pickupSelectedOrder.cart.length > 0) || (pickupSelectedOrder.items && pickupSelectedOrder.items.length > 0)) && (
               <Box sx={{ mb: 3 }}>
-                <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', mb: 1 }}>
+                <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', mb: 1 }}>
                   รายการสินค้า ({(pickupSelectedOrder.cart || pickupSelectedOrder.items || []).length} รายการ)
                 </Typography>
                 <Box sx={{ 
                   maxHeight: 280, 
                   overflowY: 'auto',
                   borderRadius: '12px',
-                  border: '1px solid rgba(255,255,255,0.06)',
+                  border: '1px solid var(--glass-border)',
                 }}>
                   {(pickupSelectedOrder.cart || pickupSelectedOrder.items || []).map((item: any, idx: number) => (
                     <Box
@@ -4694,7 +4631,7 @@ export default function AdminPage(): JSX.Element {
                     >
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <Box sx={{ flex: 1 }}>
-                          <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#f1f5f9', mb: 0.5 }}>
+                          <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)', mb: 0.5 }}>
                             {item.productName || 'สินค้า'}
                           </Typography>
                           
@@ -4758,9 +4695,9 @@ export default function AdminPage(): JSX.Element {
                                   <Typography sx={{ 
                                     fontSize: '0.9rem', 
                                     fontWeight: 800, 
-                                    color: '#f1f5f9',
+                                    color: 'var(--foreground)',
                                     fontFamily: 'monospace',
-                                    bgcolor: 'rgba(255,255,255,0.1)',
+                                    bgcolor: 'var(--glass-bg)',
                                     px: 1,
                                     py: 0.3,
                                     borderRadius: '6px',
@@ -4817,7 +4754,7 @@ export default function AdminPage(): JSX.Element {
                   display: 'flex',
                   justifyContent: 'space-between',
                 }}>
-                  <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: '#f1f5f9' }}>รวมทั้งหมด</Typography>
+                  <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--foreground)' }}>รวมทั้งหมด</Typography>
                   <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#10b981' }}>
                     ฿{Number(pickupSelectedOrder.amount).toLocaleString()}
                   </Typography>
@@ -4827,7 +4764,7 @@ export default function AdminPage(): JSX.Element {
 
             {/* Pickup Condition */}
             <Box sx={{ mb: 3 }}>
-              <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', mb: 1 }}>
+              <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', mb: 1 }}>
                 สถานะสินค้า
               </Typography>
               <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
@@ -4848,7 +4785,7 @@ export default function AdminPage(): JSX.Element {
                       textAlign: 'center',
                       transition: 'all 0.2s ease',
                       bgcolor: pickupCondition === option.value ? `${option.color}20` : 'rgba(255,255,255,0.03)',
-                      border: `2px solid ${pickupCondition === option.value ? option.color : 'rgba(255,255,255,0.08)'}`,
+                      border: `2px solid ${pickupCondition === option.value ? option.color : 'var(--glass-border)'}`,
                       '&:hover': { bgcolor: `${option.color}15` },
                     }}
                   >
@@ -4863,7 +4800,7 @@ export default function AdminPage(): JSX.Element {
 
             {/* Notes */}
             <Box>
-              <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', mb: 1 }}>
+              <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', mb: 1 }}>
                 หมายเหตุ (ถ้ามี)
               </Typography>
               <TextField
@@ -4892,10 +4829,10 @@ export default function AdminPage(): JSX.Element {
                 flex: 1,
                 py: 1.2,
                 borderRadius: '12px',
-                bgcolor: 'rgba(255,255,255,0.05)',
-                color: '#94a3b8',
-                border: '1px solid rgba(255,255,255,0.1)',
-                '&:hover': { bgcolor: 'rgba(255,255,255,0.08)' },
+                bgcolor: 'var(--glass-bg)',
+                color: 'var(--text-muted)',
+                border: '1px solid var(--glass-border)',
+                '&:hover': { bgcolor: 'var(--glass-bg)' },
               }}
             >
               ยกเลิก
@@ -4918,7 +4855,7 @@ export default function AdminPage(): JSX.Element {
                 <CircularProgress size={20} sx={{ color: 'white' }} />
               ) : (
                 <>
-                  <CheckCircle sx={{ mr: 1 }} />
+                  <CheckCircle style={{ marginRight: 8 }} />
                   ยืนยันรับสินค้า
                 </>
               )}
@@ -4974,12 +4911,12 @@ export default function AdminPage(): JSX.Element {
             mb: 1.5,
           }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Inventory sx={{ fontSize: { xs: 22, md: 28 }, color: '#a5b4fc' }} />
+              <Inventory size={28} color="#a5b4fc" />
               <Box>
-                <Typography sx={{ fontSize: { xs: '1.1rem', md: '1.5rem' }, fontWeight: 800, color: '#f1f5f9', lineHeight: 1.2 }}>
+                <Typography sx={{ fontSize: { xs: '1.1rem', md: '1.5rem' }, fontWeight: 800, color: 'var(--foreground)', lineHeight: 1.2 }}>
                   ออเดอร์
                 </Typography>
-                <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>
+                <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                   {filteredOrders.length}/{orders.length} รายการ
                 </Typography>
               </Box>
@@ -4998,15 +4935,15 @@ export default function AdminPage(): JSX.Element {
                       gap: 0.5,
                     }}
                   >
-                    <Update sx={{ fontSize: 16 }} />
+                    <Update size={16} />
                     <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>อัปเดต</Box> ({selectedOrders.size})
                   </Button>
                   <IconButton
                     onClick={clearAllSelections}
                     size="small"
-                    sx={{ color: '#94a3b8', bgcolor: 'rgba(255,255,255,0.05)', border: `1px solid ${ADMIN_THEME.border}` }}
+                    sx={{ color: 'var(--text-muted)', bgcolor: 'var(--glass-bg)', border: `1px solid ${ADMIN_THEME.border}` }}
                   >
-                    <Clear sx={{ fontSize: 18 }} />
+                    <Clear size={18} />
                   </IconButton>
                 </>
               )}
@@ -5019,7 +4956,7 @@ export default function AdminPage(): JSX.Element {
                   size="small"
                   sx={{ color: '#60a5fa', bgcolor: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)' }}
                 >
-                  <Description sx={{ fontSize: 18 }} />
+                  <Description size={18} />
                 </IconButton>
               )}
               <IconButton
@@ -5028,14 +4965,14 @@ export default function AdminPage(): JSX.Element {
                 size="small"
                 sx={{ color: '#a5b4fc', bgcolor: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)' }}
               >
-                {sheetSyncing ? <CircularProgress size={18} sx={{ color: '#a5b4fc' }} /> : <Bolt sx={{ fontSize: 18 }} />}
+                {sheetSyncing ? <CircularProgress size={18} sx={{ color: '#a5b4fc' }} /> : <Bolt size={18} />}
               </IconButton>
               <IconButton 
                 onClick={() => fetchData()}
                 size="small"
-                sx={{ color: '#94a3b8', bgcolor: 'rgba(255,255,255,0.05)', border: `1px solid ${ADMIN_THEME.border}` }}
+                sx={{ color: 'var(--text-muted)', bgcolor: 'var(--glass-bg)', border: `1px solid ${ADMIN_THEME.border}` }}
               >
-                <Refresh sx={{ fontSize: 18 }} />
+                <Refresh size={18} />
               </IconButton>
             </Box>
           </Box>
@@ -5054,13 +4991,13 @@ export default function AdminPage(): JSX.Element {
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <Search sx={{ color: '#64748b', fontSize: 20 }} />
+                  <Search size={20} color="#64748b" />
                 </InputAdornment>
               ),
               endAdornment: searchTerm ? (
                 <InputAdornment position="end">
-                  <IconButton size="small" onClick={() => setSearchTerm('')} sx={{ color: '#64748b' }}>
-                    <Clear sx={{ fontSize: 18 }} />
+                  <IconButton size="small" onClick={() => setSearchTerm('')} sx={{ color: 'var(--text-muted)' }}>
+                    <Clear size={18} />
                   </IconButton>
                 </InputAdornment>
               ) : null,
@@ -5086,12 +5023,12 @@ export default function AdminPage(): JSX.Element {
             px: 0.5,
             '&::-webkit-scrollbar': { height: 3 },
             '&::-webkit-scrollbar-track': { bgcolor: 'transparent' },
-            '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(255,255,255,0.1)', borderRadius: 2 },
+            '&::-webkit-scrollbar-thumb': { bgcolor: 'var(--glass-bg)', borderRadius: 2 },
           }}>
             {['ALL', ...ORDER_STATUSES].map((status) => {
               const isActive = orderFilterStatus === status;
               const count = status === 'ALL' ? orders.length : orders.filter(o => o.status === status).length;
-              const theme = STATUS_THEME[status] || { bg: 'rgba(255,255,255,0.05)', text: '#94a3b8', border: ADMIN_THEME.border };
+              const theme = STATUS_THEME[status] || { bg: 'rgba(255,255,255,0.05)', text: 'var(--text-muted)', border: ADMIN_THEME.border };
               // Short labels for mobile
               const shortLabels: Record<string, string> = {
                 'ALL': 'ทั้งหมด',
@@ -5204,7 +5141,7 @@ export default function AdminPage(): JSX.Element {
                           p: 0.3,
                         }}
                       >
-                        {isSelected ? <CheckBox sx={{ fontSize: 20 }} /> : <CheckBoxOutlineBlank sx={{ fontSize: 20 }} />}
+                        {isSelected ? <CheckBox size={20} /> : <CheckBoxOutlineBlank size={20} />}
                       </IconButton>
                       <Typography sx={{
                         fontFamily: 'monospace',
@@ -5236,7 +5173,7 @@ export default function AdminPage(): JSX.Element {
                             p: 0.3,
                           }}
                         >
-                          <ImageIcon sx={{ fontSize: 16 }} />
+                          <ImageIcon size={16} />
                         </IconButton>
                       )}
                     </Box>
@@ -5259,16 +5196,16 @@ export default function AdminPage(): JSX.Element {
                     fontSize: '0.8rem',
                   }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
-                      <Person sx={{ fontSize: 16, color: '#a78bfa' }} />
-                      <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: '#f1f5f9' }}>
+                      <Person size={16} color="#a78bfa" />
+                      <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)' }}>
                         {order.name}
                       </Typography>
                     </Box>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, overflow: 'hidden' }}>
-                      <Email sx={{ fontSize: 16, color: '#60a5fa', flexShrink: 0 }} />
+                      <Email size={16} color="#60a5fa" style={{ flexShrink: 0 }} />
                       <Typography sx={{ 
                         fontSize: '0.8rem', 
-                        color: '#94a3b8',
+                        color: 'var(--text-muted)',
                         textOverflow: 'ellipsis',
                         overflow: 'hidden',
                         whiteSpace: 'nowrap',
@@ -5293,7 +5230,7 @@ export default function AdminPage(): JSX.Element {
                     {order.shippingOption === 'pickup' || (order.shippingOption || '').toLowerCase().includes('รับ') ? (
                       <Chip
                         size="small"
-                        icon={<Inventory sx={{ fontSize: 14 }} />}
+                        icon={<Inventory size={14} />}
                         label={order.shippingOption === 'pickup' ? 'รับหน้าร้าน' : order.shippingOption}
                         sx={{
                           height: 24,
@@ -5307,7 +5244,7 @@ export default function AdminPage(): JSX.Element {
                     ) : order.shippingOption === 'delivery_legacy' ? (
                       <Chip
                         size="small"
-                        icon={<LocalShipping sx={{ fontSize: 14 }} />}
+                        icon={<LocalShipping size={14} />}
                         label="จัดส่ง (เดิม)"
                         sx={{
                           height: 24,
@@ -5321,7 +5258,7 @@ export default function AdminPage(): JSX.Element {
                     ) : order.shippingProvider ? (
                       <Chip
                         size="small"
-                        icon={<LocalShipping sx={{ fontSize: 14 }} />}
+                        icon={<LocalShipping size={14} />}
                         label={(SHIPPING_PROVIDERS as Record<string, any>)[order.shippingProvider]?.nameThai || order.shippingProvider}
                         sx={{
                           height: 24,
@@ -5335,7 +5272,7 @@ export default function AdminPage(): JSX.Element {
                     ) : order.shippingOption ? (
                       <Chip
                         size="small"
-                        icon={<LocalShipping sx={{ fontSize: 14 }} />}
+                        icon={<LocalShipping size={14} />}
                         label={order.shippingOption === 'thailand_post_ems' ? 'EMS ไปรษณีย์ไทย' : order.shippingOption}
                         sx={{
                           height: 24,
@@ -5349,15 +5286,15 @@ export default function AdminPage(): JSX.Element {
                     ) : (
                       <Chip
                         size="small"
-                        icon={<Inventory sx={{ fontSize: 14 }} />}
+                        icon={<Inventory size={14} />}
                         label="รับหน้าร้าน (เดิม)"
                         sx={{
                           height: 24,
                           fontSize: '0.72rem',
                           bgcolor: 'rgba(148, 163, 184, 0.15)',
-                          color: '#94a3b8',
+                          color: 'var(--text-muted)',
                           border: '1px solid rgba(148, 163, 184, 0.3)',
-                          '& .MuiChip-icon': { color: '#94a3b8' },
+                          '& .MuiChip-icon': { color: 'var(--text-muted)' },
                         }}
                       />
                     )}
@@ -5385,10 +5322,10 @@ export default function AdminPage(): JSX.Element {
                         alignItems: 'flex-start', 
                         gap: 0.5 
                       }}>
-                        <Receipt sx={{ fontSize: 14, color: '#64748b', mt: 0.2, flexShrink: 0 }} />
+                        <Receipt size={14} color="#64748b" style={{ marginTop: 1.6, flexShrink: 0 }} />
                         <Typography sx={{ 
                           fontSize: '0.72rem', 
-                          color: '#94a3b8',
+                          color: 'var(--text-muted)',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           display: '-webkit-box',
@@ -5420,14 +5357,14 @@ export default function AdminPage(): JSX.Element {
                           '&:active': { transform: 'scale(0.98)' },
                         }}
                       >
-                        <ShoppingBag sx={{ fontSize: 16, color: '#818cf8' }} />
+                        <ShoppingBag size={16} color="#818cf8" />
                         <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#a5b4fc', flex: 1 }}>
                           {(order.cart || order.items || []).length} รายการ
                         </Typography>
                         {expandedOrders.has(order.ref) ? (
-                          <ExpandLess sx={{ fontSize: 18, color: '#818cf8' }} />
+                          <ExpandLess size={18} color="#818cf8" />
                         ) : (
-                          <ExpandMore sx={{ fontSize: 18, color: '#818cf8' }} />
+                          <ExpandMore size={18} color="#818cf8" />
                         )}
                       </Box>
                       
@@ -5465,7 +5402,7 @@ export default function AdminPage(): JSX.Element {
                                       height: 48,
                                       borderRadius: '8px',
                                       objectFit: 'cover',
-                                      border: '1px solid rgba(255,255,255,0.1)',
+                                      border: '1px solid var(--glass-border)',
                                     }}
                                   />
                                 ) : (
@@ -5478,7 +5415,7 @@ export default function AdminPage(): JSX.Element {
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                   }}>
-                                    <Inventory sx={{ fontSize: 20, color: '#818cf8' }} />
+                                    <Inventory size={20} color="#818cf8" />
                                   </Box>
                                 )}
                                 
@@ -5487,7 +5424,7 @@ export default function AdminPage(): JSX.Element {
                                   <Typography sx={{ 
                                     fontSize: '0.85rem', 
                                     fontWeight: 600, 
-                                    color: '#f1f5f9',
+                                    color: 'var(--foreground)',
                                     mb: 0.3,
                                   }}>
                                     {item.productName || product?.name || 'สินค้าไม่ระบุ'}
@@ -5546,7 +5483,7 @@ export default function AdminPage(): JSX.Element {
                                       />
                                     )}
                                   </Box>
-                                  <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>
+                                  <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                                     จำนวน: {item.quantity} ชิ้น × ฿{Number(item.unitPrice).toLocaleString()}
                                   </Typography>
                                 </Box>
@@ -5578,8 +5515,8 @@ export default function AdminPage(): JSX.Element {
                     pt: 1.5,
                     borderTop: `1px solid ${ADMIN_THEME.border}`,
                   }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: '#64748b' }}>
-                      <CalendarToday sx={{ fontSize: 12 }} />
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'var(--text-muted)' }}>
+                      <CalendarToday size={12} />
                       <Typography sx={{ fontSize: '0.7rem' }}>
                         {order.date ? new Date(order.date).toLocaleDateString('th-TH', { 
                           day: 'numeric', 
@@ -5608,7 +5545,7 @@ export default function AdminPage(): JSX.Element {
                           '& .MuiSelect-select': {
                             py: 0.5,
                             px: 1,
-                            color: '#e2e8f0',
+                            color: 'var(--foreground)',
                           },
                         }}
                       >
@@ -5635,7 +5572,7 @@ export default function AdminPage(): JSX.Element {
                             p: { xs: 0.6, sm: 0.8 },
                           }}
                         >
-                          <EditIconMUI sx={{ fontSize: 16 }} />
+                          <EditIconMUI size={16} />
                         </IconButton>
                         <Box sx={{ width: '1px', bgcolor: ADMIN_THEME.border }} />
                         <IconButton
@@ -5648,7 +5585,7 @@ export default function AdminPage(): JSX.Element {
                             p: { xs: 0.6, sm: 0.8 },
                           }}
                         >
-                          <Close sx={{ fontSize: 16 }} />
+                          <Close size={16} />
                         </IconButton>
                         <Box sx={{ width: '1px', bgcolor: ADMIN_THEME.border }} />
                         <IconButton
@@ -5661,7 +5598,7 @@ export default function AdminPage(): JSX.Element {
                             p: { xs: 0.6, sm: 0.8 },
                           }}
                         >
-                          <Delete sx={{ fontSize: 16 }} />
+                          <Delete size={16} />
                         </IconButton>
                       </Box>
                     </Box>
@@ -5677,8 +5614,8 @@ export default function AdminPage(): JSX.Element {
               textAlign: 'center', 
               py: 6,
             }}>
-              <Receipt sx={{ fontSize: 56, color: '#475569', mb: 2 }} />
-              <Typography sx={{ fontSize: '1.1rem', fontWeight: 600, color: '#64748b', mb: 0.5 }}>
+              <Receipt size={56} color="#475569" style={{ marginBottom: 16 }} />
+              <Typography sx={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-muted)', mb: 0.5 }}>
                 ไม่พบออเดอร์
               </Typography>
               <Typography sx={{ fontSize: '0.85rem', color: '#475569' }}>
@@ -5700,9 +5637,9 @@ export default function AdminPage(): JSX.Element {
       maxWidth="sm"
       PaperProps={{
         sx: {
-          bgcolor: '#0f172a',
+          bgcolor: 'var(--surface)',
           backgroundImage: 'linear-gradient(135deg, rgba(139, 92, 246, 0.03) 0%, rgba(16, 185, 129, 0.03) 100%)',
-          border: '1px solid rgba(255,255,255,0.08)',
+          border: '1px solid var(--glass-border)',
           borderRadius: '20px',
           overflow: 'hidden',
         }
@@ -5713,7 +5650,7 @@ export default function AdminPage(): JSX.Element {
         p: 3,
         pb: 2,
         background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%)',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        borderBottom: '1px solid var(--glass-border)',
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Box sx={{
@@ -5725,16 +5662,16 @@ export default function AdminPage(): JSX.Element {
             alignItems: 'center',
             justifyContent: 'center',
           }}>
-            <EditIconMUI sx={{ color: '#fff', fontSize: 24 }} />
+            <EditIconMUI size={24} color="#fff" />
           </Box>
           <Box>
-            <Typography sx={{ fontSize: '1.2rem', fontWeight: 700, color: '#f1f5f9' }}>
+            <Typography sx={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--foreground)' }}>
               แก้ไขออเดอร์
             </Typography>
             {orderEditor.ref && (
               <Typography sx={{ 
                 fontSize: '0.85rem', 
-                color: '#64748b',
+                color: 'var(--text-muted)',
                 fontFamily: 'monospace',
               }}>
                 #{orderEditor.ref}
@@ -5755,7 +5692,7 @@ export default function AdminPage(): JSX.Element {
           <Typography sx={{ 
             fontSize: '0.75rem', 
             fontWeight: 600, 
-            color: '#64748b', 
+            color: 'var(--text-muted)', 
             textTransform: 'uppercase',
             letterSpacing: '0.05em',
             mb: 1.5,
@@ -5800,7 +5737,7 @@ export default function AdminPage(): JSX.Element {
           <Typography sx={{ 
             fontSize: '0.75rem', 
             fontWeight: 600, 
-            color: '#64748b', 
+            color: 'var(--text-muted)', 
             textTransform: 'uppercase',
             letterSpacing: '0.05em',
             mb: 1.5,
@@ -5818,7 +5755,7 @@ export default function AdminPage(): JSX.Element {
               flexDirection: 'column',
               justifyContent: 'center',
             }}>
-              <Typography sx={{ fontSize: '0.7rem', color: '#64748b', mb: 0.5 }}>
+              <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', mb: 0.5 }}>
                 ยอดชำระ (คำนวณจากตะกร้า)
               </Typography>
               <Typography sx={{ fontSize: '1.25rem', fontWeight: 700, color: '#10b981' }}>
@@ -5855,7 +5792,7 @@ export default function AdminPage(): JSX.Element {
               <Typography sx={{ 
                 fontSize: '0.75rem', 
                 fontWeight: 600, 
-                color: '#64748b', 
+                color: 'var(--text-muted)', 
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em',
               }}>
@@ -5919,7 +5856,7 @@ export default function AdminPage(): JSX.Element {
                             height: 48,
                             borderRadius: '10px',
                             objectFit: 'cover',
-                            border: '1px solid rgba(255,255,255,0.1)',
+                            border: '1px solid var(--glass-border)',
                           }}
                         />
                       ) : (
@@ -5932,19 +5869,19 @@ export default function AdminPage(): JSX.Element {
                           alignItems: 'center',
                           justifyContent: 'center',
                         }}>
-                          <Inventory sx={{ fontSize: 20, color: '#818cf8' }} />
+                          <Inventory size={20} color="#818cf8" />
                         </Box>
                       )}
                       <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Typography sx={{ 
                           fontSize: '0.9rem', 
                           fontWeight: 700, 
-                          color: '#f1f5f9',
+                          color: 'var(--foreground)',
                           mb: 0.3,
                         }}>
                           {item.productName || product?.name || 'สินค้าไม่ระบุ'}
                         </Typography>
-                        <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>
+                        <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                           ราคาต่อชิ้น: ฿{Number(item.unitPrice).toLocaleString()}
                           {product && item.unitPrice !== calculateItemUnitPrice(item, product) && (
                             <span style={{ color: '#f59e0b', marginLeft: 8 }}>
@@ -5961,7 +5898,7 @@ export default function AdminPage(): JSX.Element {
                         }}
                         sx={{ color: '#ef4444', '&:hover': { bgcolor: 'rgba(239,68,68,0.1)' } }}
                       >
-                        <Delete sx={{ fontSize: 18 }} />
+                        <Delete size={18} />
                       </IconButton>
                     </Box>
                     
@@ -5976,9 +5913,9 @@ export default function AdminPage(): JSX.Element {
                         sx={{ 
                           bgcolor: 'rgba(255,255,255,0.03)',
                           borderRadius: '10px',
-                          color: '#e2e8f0',
+                          color: 'var(--foreground)',
                           '& .MuiOutlinedInput-notchedOutline': { borderColor: ADMIN_THEME.border },
-                          '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.2)' },
+                          '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'var(--glass-border)' },
                         }}
                       >
                         <MenuItem value="" disabled>ไซส์</MenuItem>
@@ -5994,7 +5931,7 @@ export default function AdminPage(): JSX.Element {
                         onChange={(e) => updateCartItem(idx, { quantity: Math.max(1, Number(e.target.value)) })}
                         size="small"
                         InputProps={{
-                          startAdornment: <Typography sx={{ color: '#64748b', mr: 1, fontSize: '0.8rem' }}>จำนวน</Typography>,
+                          startAdornment: <Typography sx={{ color: 'var(--text-muted)', mr: 1, fontSize: '0.8rem' }}>จำนวน</Typography>,
                           inputProps: { min: 1 }
                         }}
                         sx={{
@@ -6069,7 +6006,7 @@ export default function AdminPage(): JSX.Element {
                           '&:hover': { borderColor: item.options?.isLongSleeve ? '#f59e0b' : 'rgba(245,158,11,0.5)' },
                         }}
                       >
-                        <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: '#e2e8f0' }}>
+                        <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>
                           แขนยาว (+฿{config.products?.find(p => p.id === item.productId)?.options?.longSleevePrice ?? 50})
                         </Typography>
                         <Switch
@@ -6090,7 +6027,7 @@ export default function AdminPage(): JSX.Element {
                       justifyContent: 'space-between',
                       alignItems: 'center',
                     }}>
-                      <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>
+                      <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                         {item.quantity} × ฿{Number(item.unitPrice).toLocaleString()}
                       </Typography>
                       <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#10b981' }}>
@@ -6109,7 +6046,7 @@ export default function AdminPage(): JSX.Element {
           <Typography sx={{ 
             fontSize: '0.75rem', 
             fontWeight: 600, 
-            color: '#64748b', 
+            color: 'var(--text-muted)', 
             textTransform: 'uppercase',
             letterSpacing: '0.05em',
             mb: 1.5,
@@ -6175,7 +6112,7 @@ export default function AdminPage(): JSX.Element {
             gap: 1,
           }}
         >
-          <Save sx={{ fontSize: 18 }} />
+          <Save size={18} />
           {orderProcessingRef === orderEditor.ref ? 'กำลังบันทึก...' : 'บันทึกการเปลี่ยนแปลง'}
         </Button>
       </DialogActions>
@@ -6257,19 +6194,19 @@ export default function AdminPage(): JSX.Element {
     const getActionTheme = (action: string) => {
       switch (action) {
         case 'UPDATE_CONFIG': 
-        case 'SAVE_CONFIG': return { icon: <Settings sx={{ fontSize: 14 }} />, color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.15)' };
+        case 'SAVE_CONFIG': return { icon: <Settings size={14} />, color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.15)' };
         case 'UPDATE_STATUS': 
-        case 'BATCH_UPDATE_STATUS': return { icon: <Update sx={{ fontSize: 14 }} />, color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' };
-        case 'SEND_EMAIL': return { icon: <Email sx={{ fontSize: 14 }} />, color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' };
-        case 'SUBMIT_ORDER': return { icon: <ShoppingCart sx={{ fontSize: 14 }} />, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)' };
-        case 'SYNC_FILEBASE': return { icon: <Refresh sx={{ fontSize: 14 }} />, color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.15)' };
-        case 'SYNC_SHEET': return { icon: <Description sx={{ fontSize: 14 }} />, color: '#22c55e', bg: 'rgba(34, 197, 94, 0.15)' };
-        case 'EDIT_ORDER': return { icon: <Edit sx={{ fontSize: 14 }} />, color: '#eab308', bg: 'rgba(234, 179, 8, 0.15)' };
+        case 'BATCH_UPDATE_STATUS': return { icon: <Update size={14} />, color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.15)' };
+        case 'SEND_EMAIL': return { icon: <Email size={14} />, color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)' };
+        case 'SUBMIT_ORDER': return { icon: <ShoppingCart size={14} />, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)' };
+        case 'SYNC_FILEBASE': return { icon: <Refresh size={14} />, color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.15)' };
+        case 'SYNC_SHEET': return { icon: <Description size={14} />, color: '#22c55e', bg: 'rgba(34, 197, 94, 0.15)' };
+        case 'EDIT_ORDER': return { icon: <Edit size={14} />, color: '#eab308', bg: 'rgba(234, 179, 8, 0.15)' };
         case 'DELETE_ORDER': 
-        case 'CANCEL_ORDER': return { icon: <Delete sx={{ fontSize: 14 }} />, color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' };
+        case 'CANCEL_ORDER': return { icon: <Delete size={14} />, color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)' };
         case 'CREATE_PRODUCT':
-        case 'EDIT_PRODUCT': return { icon: <Inventory sx={{ fontSize: 14 }} />, color: '#f472b6', bg: 'rgba(244, 114, 182, 0.15)' };
-        default: return { icon: <Description sx={{ fontSize: 14 }} />, color: '#64748b', bg: 'rgba(100, 116, 139, 0.15)' };
+        case 'EDIT_PRODUCT': return { icon: <Inventory size={14} />, color: '#f472b6', bg: 'rgba(244, 114, 182, 0.15)' };
+        default: return { icon: <Description size={14} />, color: 'var(--text-muted)', bg: 'rgba(100, 116, 139, 0.15)' };
       }
     };
 
@@ -6286,11 +6223,11 @@ export default function AdminPage(): JSX.Element {
           px: { xs: 2, md: 3 },
         }}>
           <Box sx={{ mb: 1.5 }}>
-            <Typography sx={{ fontSize: { xs: '1.1rem', md: '1.5rem' }, fontWeight: 800, color: '#f1f5f9', display: 'flex', alignItems: 'center', gap: 1 }}>
-              <HistoryEdu sx={{ fontSize: { xs: 20, md: 24 } }} />
+            <Typography sx={{ fontSize: { xs: '1.1rem', md: '1.5rem' }, fontWeight: 800, color: 'var(--foreground)', display: 'flex', alignItems: 'center', gap: 1 }}>
+              <HistoryEdu size={24} />
               ประวัติระบบ
             </Typography>
-            <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>
+            <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
               {filteredLogs.length}/{logs.length} รายการ
             </Typography>
           </Box>
@@ -6302,7 +6239,7 @@ export default function AdminPage(): JSX.Element {
             overflowX: 'auto',
             pb: 0.5,
             '&::-webkit-scrollbar': { height: 3 },
-            '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(255,255,255,0.1)', borderRadius: 2 },
+            '&::-webkit-scrollbar-thumb': { bgcolor: 'var(--glass-bg)', borderRadius: 2 },
           }}>
             {[
               { value: 'ALL', label: 'ทั้งหมด' },
@@ -6341,7 +6278,7 @@ export default function AdminPage(): JSX.Element {
                     px: 0.5,
                     py: 0.1,
                     borderRadius: '6px',
-                    bgcolor: 'rgba(255,255,255,0.08)',
+                    bgcolor: 'var(--glass-bg)',
                     fontSize: '0.6rem',
                     fontWeight: 700,
                     color: isActive ? '#a78bfa' : '#64748b',
@@ -6398,7 +6335,7 @@ export default function AdminPage(): JSX.Element {
                     </Typography>
                     <Typography sx={{ 
                       fontSize: '0.65rem', 
-                      color: '#64748b',
+                      color: 'var(--text-muted)',
                     }}>
                       {log[0] ? new Date(log[0]).toLocaleString('th-TH', {
                         day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
@@ -6407,7 +6344,7 @@ export default function AdminPage(): JSX.Element {
                   </Box>
                   <Typography sx={{ 
                     fontSize: '0.75rem', 
-                    color: '#94a3b8',
+                    color: 'var(--text-muted)',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
@@ -6428,8 +6365,8 @@ export default function AdminPage(): JSX.Element {
               textAlign: 'center', 
               py: 4,
             }}>
-              <History sx={{ fontSize: 40, color: '#475569', mb: 1 }} />
-              <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: '#64748b' }}>
+              <History size={40} color="#475569" style={{ marginBottom: 8 }} />
+              <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-muted)' }}>
                 ไม่พบประวัติ
               </Typography>
             </Box>
@@ -6456,7 +6393,7 @@ export default function AdminPage(): JSX.Element {
           justifyContent: 'center',
           background: `radial-gradient(ellipse at top, rgba(99,102,241,0.15) 0%, transparent 50%),
                        radial-gradient(ellipse at bottom right, rgba(139,92,246,0.1) 0%, transparent 50%),
-                       linear-gradient(180deg, #0a0f1a 0%, #0f172a 50%, #0a0f1a 100%)`,
+                       var(--background)`,
           p: 2,
         }}
       >
@@ -6537,13 +6474,13 @@ export default function AdminPage(): JSX.Element {
                   boxShadow: '0 20px 40px rgba(139,92,246,0.3)',
                 }}
               >
-                <Store sx={{ fontSize: 40, color: '#fff' }} />
+                <Store size={40} color="#fff" />
               </Box>
               <Typography
                 sx={{
                   fontSize: '1.6rem',
                   fontWeight: 800,
-                  color: '#f1f5f9',
+                  color: 'var(--foreground)',
                   mb: 0.5,
                 }}
               >
@@ -6552,7 +6489,7 @@ export default function AdminPage(): JSX.Element {
               <Typography
                 sx={{
                   fontSize: '0.9rem',
-                  color: '#94a3b8',
+                  color: 'var(--text-muted)',
                 }}
               >
                 ระบบจัดการร้านค้า
@@ -6564,7 +6501,7 @@ export default function AdminPage(): JSX.Element {
               <Typography
                 sx={{
                   fontSize: '0.85rem',
-                  color: '#64748b',
+                  color: 'var(--text-muted)',
                   textAlign: 'center',
                   mb: 3,
                 }}
@@ -6624,9 +6561,9 @@ export default function AdminPage(): JSX.Element {
 
               {/* Divider */}
               <Box sx={{ display: 'flex', alignItems: 'center', my: 3 }}>
-                <Box sx={{ flex: 1, height: 1, bgcolor: 'rgba(255,255,255,0.08)' }} />
+                <Box sx={{ flex: 1, height: 1, bgcolor: 'var(--glass-bg)' }} />
                 <Typography sx={{ px: 2, fontSize: '0.75rem', color: '#475569' }}>หรือ</Typography>
-                <Box sx={{ flex: 1, height: 1, bgcolor: 'rgba(255,255,255,0.08)' }} />
+                <Box sx={{ flex: 1, height: 1, bgcolor: 'var(--glass-bg)' }} />
               </Box>
 
               {/* Back to Shop */}
@@ -6648,7 +6585,7 @@ export default function AdminPage(): JSX.Element {
                 px: 4,
                 py: 2,
                 borderTop: `1px solid ${ADMIN_THEME.border}`,
-                background: 'rgba(0,0,0,0.2)',
+                background: 'var(--glass-bg)',
               }}
             >
               <Typography
@@ -6658,7 +6595,7 @@ export default function AdminPage(): JSX.Element {
                   textAlign: 'center',
                 }}
               >
-                <Lock sx={{ fontSize: 16, mr: 0.5 }} />
+                <Lock size={16} style={{ marginRight: 4 }} />
                 เฉพาะผู้ดูแลระบบที่ได้รับอนุญาตเท่านั้น
               </Typography>
             </Box>
@@ -6692,11 +6629,11 @@ export default function AdminPage(): JSX.Element {
           flexDirection: 'column',
           gap: 3,
           background: `radial-gradient(ellipse at top, rgba(99,102,241,0.1) 0%, transparent 50%),
-                       linear-gradient(180deg, #0a0f1a 0%, #0f172a 50%, #0a0f1a 100%)`,
+                       var(--background)`,
         }}
       >
         <CircularProgress size={48} sx={{ color: '#8b5cf6' }} />
-        <Typography sx={{ fontSize: '0.9rem', color: '#64748b' }}>
+        <Typography sx={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
           กำลังตรวจสอบสิทธิ์...
         </Typography>
       </Box>
@@ -6715,7 +6652,7 @@ export default function AdminPage(): JSX.Element {
           flexDirection: 'column',
           gap: 3,
           background: `radial-gradient(ellipse at top, rgba(99,102,241,0.1) 0%, transparent 50%),
-                       linear-gradient(180deg, #0a0f1a 0%, #0f172a 50%, #0a0f1a 100%)`,
+                       var(--background)`,
         }}
       >
         {/* Animated Logo */}
@@ -6736,7 +6673,7 @@ export default function AdminPage(): JSX.Element {
             },
           }}
         >
-          <Store sx={{ fontSize: 40, color: '#fff' }} />
+          <Store size={40} color="#fff" />
         </Box>
         
         {/* Loading Spinner */}
@@ -6763,7 +6700,7 @@ export default function AdminPage(): JSX.Element {
           />
         </Box>
         
-        <Typography sx={{ color: '#64748b', fontSize: '0.9rem' }}>
+        <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
           กำลังตรวจสอบสิทธิ์...
         </Typography>
       </Box>
@@ -6778,7 +6715,7 @@ export default function AdminPage(): JSX.Element {
         minHeight: '100vh',
         background: `radial-gradient(ellipse at top, rgba(99,102,241,0.08) 0%, transparent 50%),
                      radial-gradient(ellipse at bottom right, rgba(6,182,212,0.06) 0%, transparent 50%),
-                     linear-gradient(180deg, #0a0f1a 0%, #0f172a 50%, #0a0f1a 100%)`,
+                     var(--background)`,
         color: ADMIN_THEME.text,
         position: 'relative',
       }}
@@ -6793,7 +6730,7 @@ export default function AdminPage(): JSX.Element {
             right: 0,
             zIndex: 9999,
             height: 3,
-            background: 'rgba(0,0,0,0.2)',
+            background: 'var(--glass-bg)',
             overflow: 'hidden',
           }}
         >
@@ -6809,87 +6746,6 @@ export default function AdminPage(): JSX.Element {
               },
             }}
           />
-        </Box>
-      )}
-
-      {/* Connection Error Banner - Shows when server/db connection fails */}
-      {(connectionError || !isOnline) && (
-        <Box
-          sx={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            zIndex: 10000,
-            background: !isOnline 
-              ? 'linear-gradient(90deg, #dc2626 0%, #b91c1c 100%)' 
-              : 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)',
-            color: '#fff',
-            px: 3,
-            py: 1.5,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 2,
-            boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-            animation: 'slideDown 0.3s ease-out',
-            '@keyframes slideDown': {
-              '0%': { transform: 'translateY(-100%)' },
-              '100%': { transform: 'translateY(0)' },
-            },
-          }}
-        >
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: 1.5,
-          }}>
-            {!isOnline ? (
-              <ErrorOutline sx={{ fontSize: 22 }} />
-            ) : (
-              <ReportProblem sx={{ fontSize: 22 }} />
-            )}
-            <Typography sx={{ fontSize: '0.9rem', fontWeight: 600 }}>
-              {connectionError || 'ไม่มีการเชื่อมต่ออินเทอร์เน็ต'}
-            </Typography>
-          </Box>
-          
-          {/* Retry Button */}
-          <Button
-            size="small"
-            onClick={() => {
-              setConnectionError(null);
-              swrRefresh();
-            }}
-            sx={{
-              bgcolor: 'rgba(255,255,255,0.2)',
-              color: '#fff',
-              fontSize: '0.8rem',
-              fontWeight: 600,
-              px: 2,
-              py: 0.5,
-              borderRadius: '8px',
-              textTransform: 'none',
-              '&:hover': {
-                bgcolor: 'rgba(255,255,255,0.3)',
-              },
-            }}
-          >
-            <Refresh sx={{ fontSize: 16, mr: 0.5 }} />
-            ลองใหม่
-          </Button>
-          
-          {/* Dismiss Button */}
-          <IconButton
-            size="small"
-            onClick={() => setConnectionError(null)}
-            sx={{
-              color: 'rgba(255,255,255,0.8)',
-              '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.1)' },
-            }}
-          >
-            <Close sx={{ fontSize: 18 }} />
-          </IconButton>
         </Box>
       )}
 
@@ -6914,8 +6770,8 @@ export default function AdminPage(): JSX.Element {
               sx={{ 
                 display: { xs: 'flex', md: 'none' },
                 color: ADMIN_THEME.textSecondary,
-                bgcolor: 'rgba(255,255,255,0.05)',
-                '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' },
+                bgcolor: 'var(--glass-bg)',
+                '&:hover': { bgcolor: 'var(--glass-bg)' },
               }}
             >
               <Dashboard />
@@ -6932,13 +6788,13 @@ export default function AdminPage(): JSX.Element {
                 placeItems: 'center',
                 boxShadow: '0 4px 14px rgba(99,102,241,0.3)',
               }}>
-                <Bolt sx={{ color: '#fff', fontSize: 22 }} />
+                <Bolt size={22} color="#fff" />
               </Box>
               <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
-                <Typography sx={{ fontSize: '1.1rem', fontWeight: 800, color: '#f1f5f9', lineHeight: 1.2 }}>
+                <Typography sx={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--foreground)', lineHeight: 1.2 }}>
                   Admin Panel
                 </Typography>
-                <Typography sx={{ fontSize: '0.7rem', color: '#64748b' }}>
+                <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                   PSUSCCSHOP
                 </Typography>
               </Box>
@@ -6990,21 +6846,21 @@ export default function AdminPage(): JSX.Element {
                 }} 
               />
               <Box sx={{ display: { xs: 'none', md: 'block' } }}>
-                <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: '#f1f5f9', lineHeight: 1.2 }}>
+                <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)', lineHeight: 1.2 }}>
                   {session?.user?.name?.split(' ')[0] || 'Admin'}
                 </Typography>
-                <Typography sx={{ fontSize: '0.65rem', color: '#64748b' }}>
+                <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
                   Administrator
                 </Typography>
               </Box>
               <IconButton 
                 onClick={() => signOut()}
                 sx={{ 
-                  color: '#94a3b8',
+                  color: 'var(--text-muted)',
                   '&:hover': { color: '#f87171', bgcolor: 'rgba(239,68,68,0.1)' },
                 }}
               >
-                <Logout sx={{ fontSize: 20 }} />
+                <Logout size={20} />
               </IconButton>
             </Box>
           </Box>
@@ -7071,13 +6927,13 @@ export default function AdminPage(): JSX.Element {
                     display: 'grid',
                     placeItems: 'center',
                   }}>
-                    <Bolt sx={{ color: '#fff', fontSize: 22 }} />
+                    <Bolt size={22} color="#fff" />
                   </Box>
                   <Box>
-                    <Typography sx={{ fontSize: '1rem', fontWeight: 800, color: '#f1f5f9' }}>
+                    <Typography sx={{ fontSize: '1rem', fontWeight: 800, color: 'var(--foreground)' }}>
                       Admin Panel
                     </Typography>
-                    <Typography sx={{ fontSize: '0.7rem', color: '#64748b' }}>
+                    <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                       เลือกเมนู
                     </Typography>
                   </Box>
@@ -7085,9 +6941,9 @@ export default function AdminPage(): JSX.Element {
                 <IconButton 
                   onClick={() => setSidebarOpen(false)}
                   sx={{ 
-                    color: '#94a3b8',
-                    bgcolor: 'rgba(255,255,255,0.05)',
-                    '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' },
+                    color: 'var(--text-muted)',
+                    bgcolor: 'var(--glass-bg)',
+                    '&:hover': { bgcolor: 'var(--glass-bg)' },
                   }}
                 >
                   <Close />
@@ -7107,25 +6963,25 @@ export default function AdminPage(): JSX.Element {
               '&::-webkit-scrollbar': { width: 6 },
               '&::-webkit-scrollbar-track': { bgcolor: 'transparent' },
               '&::-webkit-scrollbar-thumb': { 
-                bgcolor: 'rgba(255,255,255,0.1)', 
+                bgcolor: 'var(--glass-bg)', 
                 borderRadius: 3,
                 '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' },
               },
             }}>
             {[
-              { icon: <Dashboard sx={{ fontSize: 20 }} />, label: 'แดชบอร์ด', idx: 0, color: '#a5b4fc', show: true },
-              { icon: <ShoppingCart sx={{ fontSize: 20 }} />, label: 'จัดการสินค้า', idx: 1, color: '#fbbf24', show: canManageProducts },
-              { icon: <Receipt sx={{ fontSize: 20 }} />, label: 'ออเดอร์', idx: 2, color: '#34d399', badge: pendingCount, show: canManageOrders },
-              { icon: <QrCodeScanner sx={{ fontSize: 20 }} />, label: 'รับสินค้า', idx: 3, color: '#06b6d4', show: canManagePickup },
-              { icon: <LocalShipping sx={{ fontSize: 20 }} />, label: 'ติดตามพัสดุ', idx: 12, color: '#fb923c', show: canManageOrders },
-              { icon: <SupportAgent sx={{ fontSize: 20 }} />, label: 'แชทสนับสนุน', idx: 4, color: '#ec4899', show: canManageOrders },
-              { icon: <NotificationsActive sx={{ fontSize: 20 }} />, label: 'ประกาศ', idx: 5, color: '#f472b6', show: canManageAnnouncement },
-              { icon: <Settings sx={{ fontSize: 20 }} />, label: 'ตั้งค่าร้าน', idx: 6, color: '#60a5fa', show: canManageShop || canManageSheet || isSuperAdminUser },
-              { icon: <LocalShipping sx={{ fontSize: 20 }} />, label: 'ตั้งค่าจัดส่ง', idx: 10, color: '#a78bfa', show: isSuperAdminUser },
-              { icon: <AttachMoney sx={{ fontSize: 20 }} />, label: 'ตั้งค่าชำระเงิน', idx: 11, color: '#22d3ee', show: isSuperAdminUser },
-              { icon: <Send sx={{ fontSize: 20 }} />, label: 'ส่งอีเมล', idx: 7, color: '#10b981', show: canManageOrders },
-              { icon: <Groups sx={{ fontSize: 20 }} />, label: 'ประวัติผู้ใช้', idx: 8, color: '#f97316', show: isSuperAdminUser },
-              { icon: <History sx={{ fontSize: 20 }} />, label: 'ประวัติระบบ', idx: 9, color: '#94a3b8', show: isSuperAdminUser },
+              { icon: <Dashboard size={20} />, label: 'แดชบอร์ด', idx: 0, color: '#a5b4fc', show: true },
+              { icon: <ShoppingCart size={20} />, label: 'จัดการสินค้า', idx: 1, color: '#fbbf24', show: canManageProducts },
+              { icon: <Receipt size={20} />, label: 'ออเดอร์', idx: 2, color: '#34d399', badge: pendingCount, show: canManageOrders },
+              { icon: <QrCodeScanner size={20} />, label: 'รับสินค้า', idx: 3, color: '#06b6d4', show: canManagePickup },
+              { icon: <LocalShipping size={20} />, label: 'ติดตามพัสดุ', idx: 12, color: '#fb923c', show: canManageOrders },
+              { icon: <SupportAgent size={20} />, label: 'แชทสนับสนุน', idx: 4, color: '#ec4899', show: canManageOrders },
+              { icon: <NotificationsActive size={20} />, label: 'ประกาศ', idx: 5, color: '#f472b6', show: canManageAnnouncement },
+              { icon: <Settings size={20} />, label: 'ตั้งค่าร้าน', idx: 6, color: '#60a5fa', show: canManageShop || canManageSheet || isSuperAdminUser },
+              { icon: <LocalShipping size={20} />, label: 'ตั้งค่าจัดส่ง', idx: 10, color: '#a78bfa', show: isSuperAdminUser },
+              { icon: <AttachMoney size={20} />, label: 'ตั้งค่าชำระเงิน', idx: 11, color: '#22d3ee', show: isSuperAdminUser },
+              { icon: <Send size={20} />, label: 'ส่งอีเมล', idx: 7, color: '#10b981', show: canManageOrders },
+              { icon: <Groups size={20} />, label: 'ประวัติผู้ใช้', idx: 8, color: '#f97316', show: isSuperAdminUser },
+              { icon: <History size={20} />, label: 'ประวัติระบบ', idx: 9, color: 'var(--text-muted)', show: isSuperAdminUser },
             ].filter(item => item.show).map((item) => {
               const isActive = activeTab === item.idx;
               return (
@@ -7167,7 +7023,7 @@ export default function AdminPage(): JSX.Element {
                     flex: 1,
                     fontSize: '0.9rem', 
                     fontWeight: isActive ? 700 : 500, 
-                    color: isActive ? '#f1f5f9' : '#94a3b8',
+                    color: isActive ? 'var(--foreground)' : 'var(--text-muted)',
                   }}>
                     {item.label}
                   </Typography>
@@ -7201,10 +7057,10 @@ export default function AdminPage(): JSX.Element {
             }}>
               <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#34d399', mb: 0.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>
                 ร้านค้า: 
-                <FiberManualRecord sx={{ fontSize: 10, color: config.isOpen ? '#22c55e' : '#ef4444' }} />
+                <FiberManualRecord size={10} color={config.isOpen ? '#22c55e' : '#ef4444'} />
                 {config.isOpen ? 'เปิดขาย' : 'ปิดชั่วคราว'}
               </Typography>
-              <Typography sx={{ fontSize: '0.65rem', color: '#64748b' }}>
+              <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
                 สินค้า {config.products?.length || 0} รายการ
               </Typography>
             </Box>
@@ -7220,7 +7076,7 @@ export default function AdminPage(): JSX.Element {
                   borderRadius: '12px',
                   bgcolor: 'rgba(100,116,139,0.15)',
                   border: '1px solid rgba(100,116,139,0.3)',
-                  color: '#94a3b8',
+                  color: 'var(--text-muted)',
                   fontSize: '0.9rem',
                   fontWeight: 600,
                   textTransform: 'none',
@@ -7323,12 +7179,12 @@ export default function AdminPage(): JSX.Element {
           borderBottom: `1px solid ${ADMIN_THEME.border}`,
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <ImageIcon sx={{ color: '#10b981' }} />
-            <Typography sx={{ fontWeight: 700, color: '#f1f5f9' }}>
+            <ImageIcon color="#10b981" />
+            <Typography sx={{ fontWeight: 700, color: 'var(--foreground)' }}>
               สลิปการโอนเงิน #{slipViewerData?.ref ?? '-'}
             </Typography>
           </Box>
-          <IconButton onClick={() => setSlipViewerOpen(false)} sx={{ color: '#94a3b8' }}>
+          <IconButton onClick={() => setSlipViewerOpen(false)} sx={{ color: 'var(--text-muted)' }}>
             <Close />
           </IconButton>
         </DialogTitle>
@@ -7368,7 +7224,7 @@ export default function AdminPage(): JSX.Element {
                 </Button>
               )}
               {slipViewerData.slip.uploadedAt && (
-                <Typography sx={{ mt: 2, color: '#94a3b8', fontSize: '0.85rem' }}>
+                <Typography sx={{ mt: 2, color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                   อัพโหลดเมื่อ: {new Date(slipViewerData.slip.uploadedAt).toLocaleString('th-TH')}
                 </Typography>
               )}
@@ -7376,38 +7232,38 @@ export default function AdminPage(): JSX.Element {
                 <Box sx={{ mt: 2, p: 2, bgcolor: 'rgba(16,185,129,0.1)', borderRadius: '12px', textAlign: 'left' }}>
                   <Typography sx={{ color: '#10b981', fontWeight: 600, mb: 1 }}>📋 ข้อมูลจากสลิป</Typography>
                   {slipViewerData.slip.slipData.amount && (
-                    <Typography sx={{ color: '#f1f5f9', fontSize: '0.9rem' }}>💰 จำนวนเงิน: ฿{Number(slipViewerData.slip.slipData.amount).toLocaleString()}</Typography>
+                    <Typography sx={{ color: 'var(--foreground)', fontSize: '0.9rem' }}>💰 จำนวนเงิน: ฿{Number(slipViewerData.slip.slipData.amount).toLocaleString()}</Typography>
                   )}
                   {/* ข้อมูลผู้โอน - แสดงทั้งชื่อเต็มและชื่อย่อ */}
                   {(slipViewerData.slip.slipData.senderName || slipViewerData.slip.slipData.senderFullName || slipViewerData.slip.slipData.senderDisplayName) && (
                     <Box sx={{ mt: 1 }}>
-                      <Typography sx={{ color: '#94a3b8', fontSize: '0.85rem' }}>
+                      <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                         👤 ผู้โอน: {slipViewerData.slip.slipData.senderFullName || slipViewerData.slip.slipData.senderName || slipViewerData.slip.slipData.senderDisplayName}
                       </Typography>
                       {slipViewerData.slip.slipData.senderDisplayName && slipViewerData.slip.slipData.senderFullName && (
-                        <Typography sx={{ color: '#64748b', fontSize: '0.75rem', ml: 3 }}>
+                        <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.75rem', ml: 3 }}>
                           ({slipViewerData.slip.slipData.senderDisplayName})
                         </Typography>
                       )}
                       {slipViewerData.slip.slipData.senderBank && (
-                        <Typography sx={{ color: '#64748b', fontSize: '0.75rem', ml: 3 }}>
+                        <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.75rem', ml: 3 }}>
                           🏦 {slipViewerData.slip.slipData.senderBank}
                         </Typography>
                       )}
                     </Box>
                   )}
                   {slipViewerData.slip.slipData.transRef && (
-                    <Typography sx={{ color: '#94a3b8', fontSize: '0.85rem', mt: 1 }}>🔢 เลขอ้างอิง: {slipViewerData.slip.slipData.transRef}</Typography>
+                    <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem', mt: 1 }}>🔢 เลขอ้างอิง: {slipViewerData.slip.slipData.transRef}</Typography>
                   )}
                   {slipViewerData.slip.slipData.transDate && slipViewerData.slip.slipData.transTime && (
-                    <Typography sx={{ color: '#64748b', fontSize: '0.75rem', ml: 3 }}>
+                    <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.75rem', ml: 3 }}>
                       📅 {slipViewerData.slip.slipData.transDate} {slipViewerData.slip.slipData.transTime}
                     </Typography>
                   )}
                   {/* ข้อมูลผู้รับ (ร้านค้า) */}
                   {slipViewerData.slip.slipData.receiverName && (
                     <Box sx={{ mt: 1, pt: 1, borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
-                      <Typography sx={{ color: '#64748b', fontSize: '0.75rem' }}>
+                      <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
                         📥 ผู้รับ: {slipViewerData.slip.slipData.receiverName} 
                         {slipViewerData.slip.slipData.receiverBank && ` (${slipViewerData.slip.slipData.receiverBank})`}
                       </Typography>
@@ -7418,8 +7274,8 @@ export default function AdminPage(): JSX.Element {
             </Box>
           ) : (
             <Box sx={{ textAlign: 'center', py: 4 }}>
-              <Warning sx={{ fontSize: 48, color: '#f59e0b', mb: 2 }} />
-              <Typography sx={{ color: '#94a3b8' }}>
+              <Warning size={48} color="#f59e0b" style={{ marginBottom: 16 }} />
+              <Typography sx={{ color: 'var(--text-muted)' }}>
                 ไม่พบข้อมูลรูปภาพสลิป
               </Typography>
               {slipViewerData?.ref && (
@@ -7460,18 +7316,18 @@ export default function AdminPage(): JSX.Element {
           borderBottom: `1px solid ${ADMIN_THEME.border}`,
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Update sx={{ color: '#6366f1' }} />
-            <Typography sx={{ fontWeight: 700, color: '#f1f5f9' }}>
+            <Update color="#6366f1" />
+            <Typography sx={{ fontWeight: 700, color: 'var(--foreground)' }}>
               อัปเดตสถานะพร้อมกัน
             </Typography>
           </Box>
-          <IconButton onClick={() => setBatchStatusDialogOpen(false)} sx={{ color: '#94a3b8' }}>
+          <IconButton onClick={() => setBatchStatusDialogOpen(false)} sx={{ color: 'var(--text-muted)' }}>
             <Close />
           </IconButton>
         </DialogTitle>
         <DialogContent sx={{ p: 3 }}>
           <Box sx={{ mb: 3 }}>
-            <Typography sx={{ color: '#94a3b8', mb: 2 }}>
+            <Typography sx={{ color: 'var(--text-muted)', mb: 2 }}>
               เลือก {selectedOrders.size} ออเดอร์เพื่ออัปเดตสถานะ
             </Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
@@ -7490,7 +7346,7 @@ export default function AdminPage(): JSX.Element {
             </Box>
           </Box>
           
-          <Typography sx={{ color: '#f1f5f9', fontWeight: 600, mb: 1.5 }}>
+          <Typography sx={{ color: 'var(--foreground)', fontWeight: 600, mb: 1.5 }}>
             สถานะใหม่
           </Typography>
           <Select
@@ -7504,10 +7360,10 @@ export default function AdminPage(): JSX.Element {
                 borderColor: ADMIN_THEME.border,
               },
               '&:hover .MuiOutlinedInput-notchedOutline': {
-                borderColor: 'rgba(255,255,255,0.2)',
+                borderColor: 'var(--glass-border)',
               },
               '& .MuiSelect-select': {
-                color: '#e2e8f0',
+                color: 'var(--foreground)',
               },
             }}
           >
@@ -7522,7 +7378,7 @@ export default function AdminPage(): JSX.Element {
             variant="outlined"
             sx={{
               borderColor: ADMIN_THEME.border,
-              color: '#94a3b8',
+              color: 'var(--text-muted)',
               '&:hover': { borderColor: '#6366f1' },
             }}
           >
@@ -7561,10 +7417,10 @@ export default function AdminPage(): JSX.Element {
               info: { bg: 'linear-gradient(135deg, rgba(59,130,246,0.95) 0%, rgba(37,99,235,0.95) 100%)', border: 'rgba(96,165,250,0.5)' },
             };
             const icons: Record<string, JSX.Element> = {
-              success: <CheckCircle sx={{ fontSize: 20 }} />,
-              error: <Close sx={{ fontSize: 20 }} />,
-              warning: <Notifications sx={{ fontSize: 20 }} />,
-              info: <Dashboard sx={{ fontSize: 20 }} />,
+              success: <CheckCircle size={20} />,
+              error: <Close size={20} />,
+              warning: <Notifications size={20} />,
+              info: <Dashboard size={20} />,
             };
             return (
               <Box
@@ -7609,14 +7465,14 @@ export default function AdminPage(): JSX.Element {
                 </Typography>
                 <Box
                   sx={{
-                    color: 'rgba(255,255,255,0.7)',
+                    color: 'var(--foreground)',
                     cursor: 'pointer',
                     '&:hover': { color: '#fff' },
                     display: 'flex',
                     alignItems: 'center',
                   }}
                 >
-                  <Close sx={{ fontSize: 16 }} />
+                  <Close size={16} />
                 </Box>
               </Box>
             );
@@ -7711,10 +7567,10 @@ const ProductCardItem = ({ product, onEdit, onDelete, onToggle, onPickupSetting 
   const { isOpen, status } = isProductOpen(product);
   
   const statusConfig = {
-    upcoming: { label: 'รอเปิด', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)', icon: <AccessTime sx={{ fontSize: 12 }} /> },
-    active: { label: 'กำลังขาย', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)', icon: <FiberManualRecord sx={{ fontSize: 10, color: '#22c55e' }} /> },
-    ended: { label: 'หมดเวลา', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)', icon: <FiberManualRecord sx={{ fontSize: 10, color: '#ef4444' }} /> },
-    always: { label: product.isActive ? 'เปิดขาย' : 'ปิดขาย', color: product.isActive ? '#10b981' : '#64748b', bg: product.isActive ? 'rgba(16, 185, 129, 0.15)' : 'rgba(100, 116, 139, 0.15)', icon: product.isActive ? <Check sx={{ fontSize: 12 }} /> : <Close sx={{ fontSize: 12 }} /> },
+    upcoming: { label: 'รอเปิด', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)', icon: <AccessTime size={12} /> },
+    active: { label: 'กำลังขาย', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)', icon: <FiberManualRecord size={10} color="#22c55e" /> },
+    ended: { label: 'หมดเวลา', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)', icon: <FiberManualRecord size={10} color="#ef4444" /> },
+    always: { label: product.isActive ? 'เปิดขาย' : 'ปิดขาย', color: product.isActive ? '#10b981' : '#64748b', bg: product.isActive ? 'rgba(16, 185, 129, 0.15)' : 'rgba(100, 116, 139, 0.15)', icon: product.isActive ? <Check size={12} /> : <Close size={12} /> },
   };
   
   const currentStatus = statusConfig[status];
@@ -7765,8 +7621,8 @@ const ProductCardItem = ({ product, onEdit, onDelete, onToggle, onPickupSetting 
             bgcolor: 'rgba(0,0,0,0.6)',
             backdropFilter: 'blur(8px)',
           }}>
-            <Typography sx={{ fontSize: '0.65rem', color: '#e2e8f0', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <CalendarToday sx={{ fontSize: 12 }} /> {product.startDate ? formatDateTime(product.startDate).split(' ')[0] : '...'} - {product.endDate ? formatDateTime(product.endDate).split(' ')[0] : '...'}
+            <Typography sx={{ fontSize: '0.65rem', color: 'var(--foreground)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <CalendarToday size={12} /> {product.startDate ? formatDateTime(product.startDate).split(' ')[0] : '...'} - {product.endDate ? formatDateTime(product.endDate).split(' ')[0] : '...'}
             </Typography>
           </Box>
         )}
@@ -7846,7 +7702,7 @@ const ProductCardItem = ({ product, onEdit, onDelete, onToggle, onPickupSetting 
             variant="outlined"
             fullWidth
             onClick={onPickupSetting}
-            startIcon={<LocalMall sx={{ fontSize: 16 }} />}
+            startIcon={<LocalMall size={16} />}
             sx={{ 
               mt: 1, 
               borderColor: product.pickup?.enabled ? '#10b981' : ADMIN_THEME.border, 
@@ -7995,13 +7851,13 @@ function ProductsView({ config, searchTerm, setSearchTerm, saveFullConfig, showT
         pt: { xs: 0.5, md: 0 },
       }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5, mb: 1.5 }}>
-          <Typography sx={{ fontSize: { xs: '1.1rem', md: '1.4rem' }, fontWeight: 800, color: '#f1f5f9' }}>
+          <Typography sx={{ fontSize: { xs: '1.1rem', md: '1.4rem' }, fontWeight: 800, color: 'var(--foreground)' }}>
             สินค้า ({filteredProducts.length}/{config.products.length})
           </Typography>
           <Button
             variant="contained"
             size="small"
-            startIcon={<Add sx={{ fontSize: 18 }} />}
+            startIcon={<Add size={18} />}
             onClick={createNewProduct}
             sx={{ ...gradientButtonSx, px: 2, py: 0.8, fontSize: '0.85rem' }}
           >
@@ -8027,13 +7883,13 @@ function ProductsView({ config, searchTerm, setSearchTerm, saveFullConfig, showT
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
-                <Search sx={{ fontSize: 20, color: '#64748b' }} />
+                <Search size={20} color="#64748b" />
               </InputAdornment>
             ),
             endAdornment: searchTerm ? (
               <InputAdornment position="end">
-                <IconButton size="small" onClick={() => setSearchTerm('')} sx={{ color: '#64748b' }}>
-                  <Clear sx={{ fontSize: 18 }} />
+                <IconButton size="small" onClick={() => setSearchTerm('')} sx={{ color: 'var(--text-muted)' }}>
+                  <Clear size={18} />
                 </IconButton>
               </InputAdornment>
             ) : null,
@@ -8043,7 +7899,7 @@ function ProductsView({ config, searchTerm, setSearchTerm, saveFullConfig, showT
 
       {filteredProducts.length === 0 ? (
         <Box sx={{ textAlign: 'center', py: 4 }}>
-          <History sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
+          <History size={48} color="text.secondary" style={{ marginBottom: 8 }} />
           <Typography sx={{ color: ADMIN_THEME.muted }}>No logs found</Typography>
         </Box>
       ) : (
@@ -8180,7 +8036,7 @@ const ProductPickupDialog = ({
         gap: 1.5,
         pb: 2,
       }}>
-        <LocalMall sx={{ color: '#06b6d4' }} />
+        <LocalMall color="#06b6d4" />
         <Box>
           <Typography sx={{ fontWeight: 700, color: ADMIN_THEME.text }}>
             ตั้งค่ารับสินค้า
@@ -8476,7 +8332,7 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any
       PaperProps={{ 
         sx: { 
           ...glassCardSx, 
-          background: 'rgba(15,23,42,0.94)', 
+          background: 'var(--glass-strong)', 
           borderColor: ADMIN_THEME.border,
           borderRadius: isMobileDevice ? 0 : undefined,
         } 
@@ -8824,7 +8680,7 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any
               inputProps={{ min: 0, max: 999999 }}
               sx={inputSx}
             />
-            <Button onClick={handleAddSize} variant="contained" sx={gradientButtonSx} startIcon={<Add />}>เพิ่มไซส์</Button>
+            <Button onClick={handleAddSize} variant="contained" sx={gradientButtonSx} startIcon={<Add size={20} />}>เพิ่มไซส์</Button>
           </Box>
         </Box>
         )}
@@ -8855,7 +8711,7 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any
                     gap: 1, 
                     alignItems: 'center',
                     p: 1.5,
-                    bgcolor: 'rgba(255,255,255,0.05)',
+                    bgcolor: 'var(--glass-bg)',
                     borderRadius: 1,
                     border: `1px solid ${ADMIN_THEME.border}`,
                   }}>
@@ -8891,14 +8747,14 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any
                         onClick={() => handleUpdateVariant(variant.id, 'isActive', !variant.isActive)}
                         sx={{ color: variant.isActive ? '#22c55e' : '#64748b' }}
                       >
-                        {variant.isActive ? <Visibility fontSize="small" /> : <VisibilityOff fontSize="small" />}
+                        {variant.isActive ? <Visibility size={20} /> : <VisibilityOff size={20} />}
                       </IconButton>
                       <IconButton 
                         size="small"
                         onClick={() => handleRemoveVariant(variant.id)} 
                         sx={{ color: '#f87171' }}
                       >
-                        <Delete fontSize="small" />
+                        <Delete size={20} />
                       </IconButton>
                     </Box>
                   </Box>
@@ -9010,7 +8866,7 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any
               alignItems: 'center',
               justifyContent: 'center',
             }}>
-              <DateRange sx={{ fontSize: 20, color: '#fff' }} />
+              <DateRange size={20} color="#fff" />
             </Box>
             <Box>
               <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: ADMIN_THEME.text }}>กำหนดเวลาขาย</Typography>
@@ -9020,8 +8876,8 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any
 
           <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
             <Box>
-              <Typography sx={{ fontSize: '0.8rem', color: '#64748b', mb: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <FiberManualRecord sx={{ fontSize: 10, color: '#22c55e' }} /> เปิดขายเมื่อ
+              <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)', mb: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <FiberManualRecord size={10} color="#22c55e" /> เปิดขายเมื่อ
               </Typography>
               <TextField
                 type="datetime-local"
@@ -9041,15 +8897,15 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any
                 <Button 
                   size="small" 
                   onClick={() => onChange({...product, startDate: ''})}
-                  sx={{ mt: 0.5, color: '#64748b', textTransform: 'none', fontSize: '0.7rem' }}
+                  sx={{ mt: 0.5, color: 'var(--text-muted)', textTransform: 'none', fontSize: '0.7rem' }}
                 >
                   ✕ ล้างวันเริ่ม
                 </Button>
               )}
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '0.8rem', color: '#64748b', mb: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <FiberManualRecord sx={{ fontSize: 10, color: '#ef4444' }} /> ปิดขายเมื่อ
+              <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)', mb: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <FiberManualRecord size={10} color="#ef4444" /> ปิดขายเมื่อ
               </Typography>
               <TextField
                 type="datetime-local"
@@ -9069,7 +8925,7 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any
                 <Button 
                   size="small" 
                   onClick={() => onChange({...product, endDate: ''})}
-                  sx={{ mt: 0.5, color: '#64748b', textTransform: 'none', fontSize: '0.7rem' }}
+                  sx={{ mt: 0.5, color: 'var(--text-muted)', textTransform: 'none', fontSize: '0.7rem' }}
                 >
                   ✕ ล้างวันสิ้นสุด
                 </Button>
@@ -9081,10 +8937,10 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any
           {(() => {
             const { status } = isProductOpen(product);
             const statusInfo: Record<string, { icon: React.ReactNode, text: string, color: string }> = {
-              upcoming: { icon: <AccessTime sx={{ fontSize: 16 }} />, text: 'สินค้าจะเปิดขายเมื่อถึงเวลาที่กำหนด', color: '#f59e0b' },
-              active: { icon: <FiberManualRecord sx={{ fontSize: 12, color: '#22c55e' }} />, text: 'สินค้ากำลังเปิดขายอยู่', color: '#10b981' },
-              ended: { icon: <FiberManualRecord sx={{ fontSize: 12, color: '#ef4444' }} />, text: 'หมดเวลาขายแล้ว', color: '#ef4444' },
-              always: { icon: <DateRange sx={{ fontSize: 16 }} />, text: 'ไม่มีกำหนดเวลา (เปิดตลอด)', color: '#64748b' },
+              upcoming: { icon: <AccessTime size={16} />, text: 'สินค้าจะเปิดขายเมื่อถึงเวลาที่กำหนด', color: '#f59e0b' },
+              active: { icon: <FiberManualRecord size={12} color="#22c55e" />, text: 'สินค้ากำลังเปิดขายอยู่', color: '#10b981' },
+              ended: { icon: <FiberManualRecord size={12} color="#ef4444" />, text: 'หมดเวลาขายแล้ว', color: '#ef4444' },
+              always: { icon: <DateRange size={16} />, text: 'ไม่มีกำหนดเวลา (เปิดตลอด)', color: 'var(--text-muted)' },
             };
             const info = statusInfo[status];
             return (
@@ -9147,7 +9003,7 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any
                     <Button size="small" variant="contained" onClick={() => handleSetCover(img)} sx={{ background: 'rgba(99,102,241,0.9)', color: '#fff', textTransform: 'none' }}>
                       ตั้งเป็นปก
                     </Button>
-                    <Button size="small" variant="outlined" onClick={() => handleRemoveImage(img)} sx={{ color: '#fff', borderColor: 'rgba(255,255,255,0.4)', textTransform: 'none' }}>
+                    <Button size="small" variant="outlined" onClick={() => handleRemoveImage(img)} sx={{ color: '#fff', borderColor: 'var(--glass-border)', textTransform: 'none' }}>
                       ลบรูป
                     </Button>
                   </Box>
@@ -9168,10 +9024,10 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any
               key={opt.key}
               control={
                 <Checkbox
-                  checked={(product.options as any)?.[opt.key] ?? false}
+                  checked={(product.options as any)[opt.key]}
                   onChange={(e) => onChange({
                     ...product,
-                    options: {...(product.options || {}), [opt.key]: e.target.checked}
+                    options: {...product.options, [opt.key]: e.target.checked}
                   })}
                 />
               }
@@ -9203,7 +9059,7 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any
         {/* Custom Tags Section */}
         <Box sx={{ bgcolor: ADMIN_THEME.glassSoft, p: 2, borderRadius: 1, border: `1px solid ${ADMIN_THEME.border}` }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1.5, color: ADMIN_THEME.text, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <LocalOffer fontSize="small" />
+            <LocalOffer size={20} />
             แท้กสินค้า (Custom Tags)
           </Typography>
           <Typography variant="caption" sx={{ color: ADMIN_THEME.muted, display: 'block', mb: 2 }}>

@@ -21,18 +21,7 @@ import {
   Tooltip,
   Divider,
 } from '@mui/material';
-import {
-  LocalShipping,
-  Search,
-  OpenInNew,
-  ContentCopy,
-  CheckCircle,
-  Schedule,
-  Flight,
-  Home,
-  Error,
-  Refresh,
-} from '@mui/icons-material';
+import { Truck as LocalShipping, Search, ExternalLink as OpenInNew, Copy as ContentCopy, CheckCircle2 as CheckCircle, Clock as Schedule, Plane as Flight, Home, AlertCircle as Error, RotateCcw as Refresh } from 'lucide-react';
 import {
   TrackingInfo,
   TrackingStatus,
@@ -48,14 +37,14 @@ interface ShippingTrackerProps {
 }
 
 const STATUS_ICONS: Record<TrackingStatus, React.ReactNode> = {
-  pending: <Schedule sx={{ fontSize: 18 }} />,
-  picked_up: <Flight sx={{ fontSize: 18 }} />,
-  in_transit: <LocalShipping sx={{ fontSize: 18 }} />,
-  out_for_delivery: <LocalShipping sx={{ fontSize: 18, color: '#22d3ee' }} />,
-  delivered: <CheckCircle sx={{ fontSize: 18, color: '#22c55e' }} />,
-  returned: <Error sx={{ fontSize: 18, color: '#f59e0b' }} />,
-  failed: <Error sx={{ fontSize: 18, color: '#ef4444' }} />,
-  unknown: <Schedule sx={{ fontSize: 18 }} />,
+  pending: <Schedule size={18} />,
+  picked_up: <Flight size={18} />,
+  in_transit: <LocalShipping size={18} />,
+  out_for_delivery: <LocalShipping size={18} color="#22d3ee" />,
+  delivered: <CheckCircle size={18} color="#22c55e" />,
+  returned: <Error size={18} color="#f59e0b" />,
+  failed: <Error size={18} color="#ef4444" />,
+  unknown: <Schedule size={18} />,
 };
 
 const STATUS_COLORS: Record<TrackingStatus, string> = {
@@ -135,7 +124,7 @@ export default function ShippingTracker({
       <CardContent sx={{ p: compact ? 2 : 3 }}>
         {/* Header */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-          <LocalShipping sx={{ fontSize: 28, color: '#8b5cf6' }} />
+          <LocalShipping size={28} color="#1e40af" />
           <Typography variant="h6" fontWeight="bold">
             ติดตามพัสดุ
           </Typography>
@@ -160,11 +149,11 @@ export default function ShippingTracker({
                   label={info.nameThai}
                   onClick={() => setProvider(key as ShippingProvider)}
                   sx={{
-                    bgcolor: provider === key ? 'rgba(139, 92, 246, 0.3)' : 'rgba(255, 255, 255, 0.05)',
-                    border: `1px solid ${provider === key ? '#8b5cf6' : 'rgba(255, 255, 255, 0.1)'}`,
+                    bgcolor: provider === key ? 'rgba(30, 64, 175, 0.3)' : 'rgba(255, 255, 255, 0.05)',
+                    border: `1px solid ${provider === key ? '#1e40af' : 'rgba(255, 255, 255, 0.1)'}`,
                     color: provider === key ? '#a78bfa' : '#94a3b8',
                     '&:hover': {
-                      bgcolor: 'rgba(139, 92, 246, 0.2)',
+                      bgcolor: 'rgba(30, 64, 175, 0.2)',
                     },
                   }}
                 />
@@ -185,7 +174,7 @@ export default function ShippingTracker({
                   bgcolor: 'rgba(255, 255, 255, 0.05)',
                   '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.1)' },
                   '&:hover fieldset': { borderColor: 'rgba(255, 255, 255, 0.2)' },
-                  '&.Mui-focused fieldset': { borderColor: '#8b5cf6' },
+                  '&.Mui-focused fieldset': { borderColor: '#1e40af' },
                 },
                 '& .MuiInputBase-input': { color: '#fff' },
               }}
@@ -193,7 +182,7 @@ export default function ShippingTracker({
                 endAdornment: trackingNumber && (
                   <Tooltip title={copied ? 'คัดลอกแล้ว!' : 'คัดลอก'}>
                     <IconButton size="small" onClick={handleCopyTracking}>
-                      <ContentCopy sx={{ fontSize: 18, color: copied ? '#22c55e' : '#94a3b8' }} />
+                      <ContentCopy size={18} color={copied ? '#22c55e' : '#94a3b8'} />
                     </IconButton>
                   </Tooltip>
                 ),
@@ -203,11 +192,11 @@ export default function ShippingTracker({
               variant="contained"
               onClick={handleTrack}
               disabled={loading || !trackingNumber.trim()}
-              startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <Search />}
+              startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <Search size={20} />}
               sx={{
                 minWidth: '120px',
                 borderRadius: '12px',
-                bgcolor: '#8b5cf6',
+                bgcolor: '#1e40af',
                 '&:hover': { bgcolor: '#7c3aed' },
               }}
             >
@@ -257,22 +246,22 @@ export default function ShippingTracker({
                   <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                     <Tooltip title="รีเฟรช">
                       <IconButton onClick={handleTrack} disabled={loading}>
-                        <Refresh sx={{ color: '#94a3b8' }} />
+                        <Refresh size={24} color="#94a3b8" />
                       </IconButton>
                     </Tooltip>
                     {trackingInfo.track123Url && (
                       <Button
                         variant="outlined"
                         size="small"
-                        endIcon={<OpenInNew sx={{ fontSize: 16 }} />}
+                        endIcon={<OpenInNew size={16} />}
                         onClick={() => window.open(trackingInfo.track123Url, '_blank')}
                         sx={{
-                          borderColor: 'rgba(139, 92, 246, 0.3)',
+                          borderColor: 'rgba(30, 64, 175, 0.3)',
                           color: '#a78bfa',
                           '&:hover': {
-                            borderColor: '#8b5cf6',
-                            color: '#8b5cf6',
-                            bgcolor: 'rgba(139, 92, 246, 0.1)',
+                            borderColor: '#1e40af',
+                            color: '#1e40af',
+                            bgcolor: 'rgba(30, 64, 175, 0.1)',
                           },
                         }}
                       >
@@ -283,14 +272,14 @@ export default function ShippingTracker({
                       <Button
                         variant="outlined"
                         size="small"
-                        endIcon={<OpenInNew sx={{ fontSize: 16 }} />}
+                        endIcon={<OpenInNew size={16} />}
                         onClick={openExternalTracking}
                         sx={{
                           borderColor: 'rgba(255, 255, 255, 0.2)',
                           color: '#94a3b8',
                           '&:hover': {
-                            borderColor: '#8b5cf6',
-                            color: '#8b5cf6',
+                            borderColor: '#1e40af',
+                            color: '#1e40af',
                           },
                         }}
                       >
@@ -400,7 +389,7 @@ export default function ShippingTracker({
                   sx={{
                     fontSize: '0.75rem',
                     color: '#94a3b8',
-                    '&:hover': { color: '#8b5cf6' },
+                    '&:hover': { color: '#1e40af' },
                   }}
                 >
                   {info.nameThai} ↗

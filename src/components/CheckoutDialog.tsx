@@ -266,17 +266,17 @@ export default function CheckoutDialog({
         sx: {
           width: { xs: '100%', sm: '92%', md: '720px' },
           maxWidth: 'calc(100% - 24px)',
-          bgcolor: '#0a0f1a',
-          color: '#f1f5f9',
+          bgcolor: 'background.default',
+          color: 'text.primary',
           borderRadius: isMobile ? 0 : '20px',
-          border: isMobile ? 'none' : '1px solid rgba(255,255,255,0.1)',
+          border: isMobile ? 'none' : '1px solid var(--glass-border)',
           maxHeight: isMobile ? '100vh' : '90vh',
         },
       }}
     >
       {/* Header */}
       <DialogTitle sx={{ 
-        background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', 
+        background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)', 
         color: 'white',
         display: 'flex',
         alignItems: 'center',
@@ -295,15 +295,15 @@ export default function CheckoutDialog({
         flexDirection: 'column', 
         gap: 2, 
         pt: 3, 
-        bgcolor: '#0a0f1a',
+        bgcolor: 'background.default',
         pb: 2,
       }}>
         {/* Order Summary */}
         <Box sx={{ 
           p: 2, 
           borderRadius: '18px',
-          bgcolor: 'rgba(30,41,59,0.6)',
-          border: '1px solid rgba(255,255,255,0.06)',
+          bgcolor: 'var(--surface-2)',
+          border: '1px solid var(--glass-border)',
         }}>
           <Box 
             sx={{ 
@@ -316,17 +316,17 @@ export default function CheckoutDialog({
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Package size={18} color="#94a3b8" />
-              <Typography sx={{ fontWeight: 700, color: '#f1f5f9', fontSize: '0.95rem' }}>
+              <Typography sx={{ fontWeight: 700, color: 'text.primary', fontSize: '0.95rem' }}>
                 สรุปคำสั่งซื้อ
               </Typography>
               <Box sx={{
                 px: 1,
                 py: 0.2,
                 borderRadius: '10px',
-                bgcolor: 'rgba(99,102,241,0.2)',
+                bgcolor: 'rgba(37,99,235,0.2)',
                 fontSize: '0.7rem',
                 fontWeight: 600,
-                color: '#a5b4fc',
+                color: 'var(--secondary)',
               }}>
                 {cart.reduce((sum, item) => sum + item.quantity, 0)} ชิ้น
               </Box>
@@ -358,14 +358,14 @@ export default function CheckoutDialog({
                     gap: 1.5,
                     p: 1.5,
                     borderRadius: '12px',
-                    bgcolor: 'rgba(15,23,42,0.6)',
+                    bgcolor: 'var(--surface)',
                     border: '1px solid rgba(255,255,255,0.04)',
                   }}>
                     <Box sx={{
                       width: 48,
                       height: 48,
                       borderRadius: '10px',
-                      bgcolor: '#0b1224',
+                      bgcolor: 'var(--surface-2)',
                       backgroundImage: productImage ? `url(${productImage})` : undefined,
                       backgroundSize: 'cover',
                       backgroundPosition: 'center',
@@ -373,15 +373,15 @@ export default function CheckoutDialog({
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      border: '1px solid rgba(255,255,255,0.06)',
+                      border: '1px solid var(--glass-border)',
                     }}>
-                      {!productImage && <Package size={18} style={{ color: '#475569' }} />}
+                      {!productImage && <Package size={18} style={{ color: 'var(--text-muted)' }} />}
                     </Box>
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Typography sx={{ 
                         fontSize: '0.8rem', 
                         fontWeight: 600, 
-                        color: '#e2e8f0',
+                        color: 'text.primary',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
@@ -390,11 +390,11 @@ export default function CheckoutDialog({
                       </Typography>
                       <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.5 }}>
                         {item.size && item.size !== '-' && (
-                          <Box sx={{ px: 0.6, py: 0.1, borderRadius: '4px', bgcolor: 'rgba(99,102,241,0.15)', fontSize: '0.65rem', color: '#a5b4fc' }}>
+                          <Box sx={{ px: 0.6, py: 0.1, borderRadius: '4px', bgcolor: 'rgba(37,99,235,0.15)', fontSize: '0.65rem', color: 'var(--secondary)' }}>
                             {item.size}
                           </Box>
                         )}
-                        <Box sx={{ px: 0.6, py: 0.1, borderRadius: '4px', bgcolor: 'rgba(255,255,255,0.08)', fontSize: '0.65rem', color: '#94a3b8' }}>
+                        <Box sx={{ px: 0.6, py: 0.1, borderRadius: '4px', bgcolor: 'var(--glass-bg)', fontSize: '0.65rem', color: 'text.secondary' }}>
                           x{item.quantity}
                         </Box>
                       </Box>
@@ -411,7 +411,7 @@ export default function CheckoutDialog({
 
         {/* Shipping Options */}
         {loadingConfig ? (
-          <Skeleton variant="rounded" height={120} sx={{ bgcolor: 'rgba(255,255,255,0.05)' }} />
+          <Skeleton variant="rounded" height={120} sx={{ bgcolor: 'var(--glass-bg)' }} />
         ) : enabledShippingOptions.length > 0 && shippingConfig?.showOptions && (
           <Box sx={{ 
             p: 2, 
@@ -431,7 +431,7 @@ export default function CheckoutDialog({
             >
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Truck size={18} color="#22d3ee" />
-                <Typography sx={{ fontWeight: 700, color: '#f1f5f9', fontSize: '0.95rem' }}>
+                <Typography sx={{ fontWeight: 700, color: 'text.primary', fontSize: '0.95rem' }}>
                   วิธีจัดส่ง
                 </Typography>
               </Box>
@@ -481,13 +481,13 @@ export default function CheckoutDialog({
                               {SHIPPING_ICONS[option.provider] || <Truck size={18} />}
                             </Box>
                             <Box>
-                              <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: '#e2e8f0' }}>
+                              <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'text.primary' }}>
                                 {option.name}
                               </Typography>
                               {option.estimatedDays && (
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.3 }}>
                                   <Clock size={12} color="#64748b" />
-                                  <Typography sx={{ fontSize: '0.7rem', color: '#64748b' }}>
+                                  <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary' }}>
                                     {option.estimatedDays.min === option.estimatedDays.max 
                                       ? `${option.estimatedDays.min} วัน`
                                       : `${option.estimatedDays.min}-${option.estimatedDays.max} วัน`
@@ -515,7 +515,7 @@ export default function CheckoutDialog({
                                 </Box>
                               </Box>
                             ) : (
-                              <Typography sx={{ fontSize: '0.85rem', color: '#f1f5f9', fontWeight: 600 }}>
+                              <Typography sx={{ fontSize: '0.85rem', color: 'text.primary', fontWeight: 600 }}>
                                 ฿{(option.baseFee || 0).toLocaleString()}
                               </Typography>
                             )}
@@ -542,7 +542,7 @@ export default function CheckoutDialog({
 
         {/* Payment Options */}
         {loadingConfig ? (
-          <Skeleton variant="rounded" height={120} sx={{ bgcolor: 'rgba(255,255,255,0.05)' }} />
+          <Skeleton variant="rounded" height={120} sx={{ bgcolor: 'var(--glass-bg)' }} />
         ) : enabledPaymentOptions.length > 0 && (
           <Box sx={{ 
             p: 2, 
@@ -562,7 +562,7 @@ export default function CheckoutDialog({
             >
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <CreditCard size={18} color="#10b981" />
-                <Typography sx={{ fontWeight: 700, color: '#f1f5f9', fontSize: '0.95rem' }}>
+                <Typography sx={{ fontWeight: 700, color: 'text.primary', fontSize: '0.95rem' }}>
                   วิธีชำระเงิน
                 </Typography>
               </Box>
@@ -611,11 +611,11 @@ export default function CheckoutDialog({
                               {PAYMENT_ICONS[option.method] || <CreditCard size={18} />}
                             </Box>
                             <Box>
-                              <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: '#e2e8f0' }}>
+                              <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'text.primary' }}>
                                 {option.nameThai || option.name}
                               </Typography>
                               {option.description && (
-                                <Typography sx={{ fontSize: '0.7rem', color: '#64748b' }}>
+                                <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary' }}>
                                   {option.description}
                                 </Typography>
                               )}
@@ -650,13 +650,13 @@ export default function CheckoutDialog({
         <Box sx={{ 
           p: 2, 
           borderRadius: '18px',
-          bgcolor: 'rgba(99,102,241,0.08)', 
-          border: '1px solid rgba(99,102,241,0.2)',
+          bgcolor: 'rgba(37,99,235,0.08)', 
+          border: '1px solid rgba(37,99,235,0.2)',
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <User size={18} color="#a5b4fc" />
-              <Typography sx={{ fontWeight: 700, color: '#f1f5f9', fontSize: '0.95rem' }}>ข้อมูลผู้รับสินค้า</Typography>
+              <User size={18} color="#93c5fd" />
+              <Typography sx={{ fontWeight: 700, color: 'text.primary', fontSize: '0.95rem' }}>ข้อมูลผู้รับสินค้า</Typography>
             </Box>
             <Button 
               size="small" 
@@ -664,32 +664,32 @@ export default function CheckoutDialog({
               sx={{ 
                 borderRadius: '8px',
                 px: 1.5,
-                bgcolor: 'rgba(99,102,241,0.15)',
-                color: '#a5b4fc', 
+                bgcolor: 'rgba(37,99,235,0.15)',
+                color: 'var(--secondary)', 
                 fontSize: '0.75rem',
                 fontWeight: 600,
-                '&:hover': { bgcolor: 'rgba(99,102,241,0.25)' },
+                '&:hover': { bgcolor: 'rgba(37,99,235,0.25)' },
               }}
             >
               แก้ไข
             </Button>
           </Box>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-            <Typography sx={{ color: '#e2e8f0', fontSize: '0.9rem' }}>
-              <Box component="span" sx={{ color: '#64748b', mr: 1 }}>ชื่อ:</Box>{orderData.name || '—'}
+            <Typography sx={{ color: 'text.primary', fontSize: '0.9rem' }}>
+              <Box component="span" sx={{ color: 'text.secondary', mr: 1 }}>ชื่อ:</Box>{orderData.name || '—'}
             </Typography>
-            <Typography sx={{ color: '#e2e8f0', fontSize: '0.9rem' }}>
-              <Box component="span" sx={{ color: '#64748b', mr: 1 }}>โทร:</Box>{orderData.phone || '—'}
+            <Typography sx={{ color: 'text.primary', fontSize: '0.9rem' }}>
+              <Box component="span" sx={{ color: 'text.secondary', mr: 1 }}>โทร:</Box>{orderData.phone || '—'}
             </Typography>
-            <Typography sx={{ color: '#e2e8f0', fontSize: '0.9rem' }}>
-              <Box component="span" sx={{ color: '#64748b', mr: 1 }}>IG:</Box>{orderData.instagram || '—'}
+            <Typography sx={{ color: 'text.primary', fontSize: '0.9rem' }}>
+              <Box component="span" sx={{ color: 'text.secondary', mr: 1 }}>IG:</Box>{orderData.instagram || '—'}
             </Typography>
             {/* Address - always show with required indicator for delivery */}
-            <Typography sx={{ color: '#e2e8f0', fontSize: '0.9rem', display: 'flex', alignItems: 'flex-start' }}>
-              <Box component="span" sx={{ color: '#64748b', mr: 1, flexShrink: 0 }}>
+            <Typography sx={{ color: 'text.primary', fontSize: '0.9rem', display: 'flex', alignItems: 'flex-start' }}>
+              <Box component="span" sx={{ color: 'text.secondary', mr: 1, flexShrink: 0 }}>
                 ที่อยู่:{requiresAddress && <Box component="span" sx={{ color: '#ef4444', ml: 0.3 }}>*</Box>}
               </Box>
-              <Box component="span" sx={{ color: orderData.address ? '#e2e8f0' : '#64748b' }}>
+              <Box component="span" sx={{ color: orderData.address ? 'var(--foreground)' : 'var(--text-muted)' }}>
                 {orderData.address || (requiresAddress ? 'กรุณากรอกที่อยู่จัดส่ง' : '—')}
               </Box>
             </Typography>
@@ -732,24 +732,24 @@ export default function CheckoutDialog({
         <Box sx={{ 
           p: 2, 
           borderRadius: '18px',
-          bgcolor: 'rgba(30,41,59,0.8)',
-          border: '1px solid rgba(255,255,255,0.1)',
+          bgcolor: 'var(--surface-2)',
+          border: '1px solid var(--glass-border)',
         }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-            <Typography sx={{ color: '#94a3b8', fontSize: '0.85rem' }}>ราคาสินค้า</Typography>
-            <Typography sx={{ color: '#e2e8f0', fontSize: '0.85rem' }}>฿{subtotal.toLocaleString()}</Typography>
+            <Typography sx={{ color: 'text.secondary', fontSize: '0.85rem' }}>ราคาสินค้า</Typography>
+            <Typography sx={{ color: 'text.primary', fontSize: '0.85rem' }}>฿{subtotal.toLocaleString()}</Typography>
           </Box>
           {shippingFee > 0 && (
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-              <Typography sx={{ color: '#94a3b8', fontSize: '0.85rem' }}>ค่าจัดส่ง</Typography>
-              <Typography sx={{ color: '#e2e8f0', fontSize: '0.85rem' }}>฿{shippingFee.toLocaleString()}</Typography>
+              <Typography sx={{ color: 'text.secondary', fontSize: '0.85rem' }}>ค่าจัดส่ง</Typography>
+              <Typography sx={{ color: 'text.primary', fontSize: '0.85rem' }}>฿{shippingFee.toLocaleString()}</Typography>
             </Box>
           )}
           {shippingFee === 0 && selectedShippingOption && selectedShippingOption.baseFee > 0 && (
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-              <Typography sx={{ color: '#94a3b8', fontSize: '0.85rem' }}>ค่าจัดส่ง</Typography>
+              <Typography sx={{ color: 'text.secondary', fontSize: '0.85rem' }}>ค่าจัดส่ง</Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <Typography sx={{ color: '#64748b', fontSize: '0.8rem', textDecoration: 'line-through' }}>
+                <Typography sx={{ color: 'text.secondary', fontSize: '0.8rem', textDecoration: 'line-through' }}>
                   ฿{selectedShippingOption.baseFee}
                 </Typography>
                 <Typography sx={{ color: '#10b981', fontSize: '0.85rem', fontWeight: 600 }}>ฟรี</Typography>
@@ -758,13 +758,13 @@ export default function CheckoutDialog({
           )}
           {paymentFee > 0 && (
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-              <Typography sx={{ color: '#94a3b8', fontSize: '0.85rem' }}>ค่าธรรมเนียม</Typography>
+              <Typography sx={{ color: 'text.secondary', fontSize: '0.85rem' }}>ค่าธรรมเนียม</Typography>
               <Typography sx={{ color: '#f59e0b', fontSize: '0.85rem' }}>฿{paymentFee.toLocaleString()}</Typography>
             </Box>
           )}
-          <Divider sx={{ my: 1.5, borderColor: 'rgba(255,255,255,0.1)' }} />
+          <Divider sx={{ my: 1.5, borderColor: 'var(--glass-border)' }} />
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography sx={{ fontWeight: 700, color: '#f1f5f9', fontSize: '1rem' }}>ยอดรวมทั้งหมด</Typography>
+            <Typography sx={{ fontWeight: 700, color: 'text.primary', fontSize: '1rem' }}>ยอดรวมทั้งหมด</Typography>
             <Typography sx={{ fontWeight: 900, color: '#10b981', fontSize: '1.4rem' }}>
               ฿{total.toLocaleString()}
             </Typography>
@@ -788,19 +788,19 @@ export default function CheckoutDialog({
       <DialogActions sx={{ 
         p: 2, 
         gap: 1, 
-        borderTop: '1px solid rgba(255,255,255,0.08)',
-        bgcolor: '#0a0f1a',
+        borderTop: '1px solid var(--glass-border)',
+        bgcolor: 'background.default',
       }}>
         <Button
           onClick={onClose}
           sx={{ 
             flex: 1,
             py: 1.3,
-            color: '#94a3b8', 
+            color: 'text.secondary', 
             borderRadius: '14px',
             fontSize: '0.9rem',
             fontWeight: 600,
-            '&:hover': { bgcolor: 'rgba(255,255,255,0.05)' },
+            '&:hover': { bgcolor: 'var(--glass-bg)' },
           }}
         >
           ยกเลิก
@@ -826,7 +826,7 @@ export default function CheckoutDialog({
                 : 'rgba(100,116,139,0.3)',
             },
             '&:disabled': {
-              color: '#64748b',
+              color: 'text.secondary',
             },
           }}
         >

@@ -73,7 +73,7 @@ export default function LoadingScreen(props: LoadingScreenProps) {
             position: 'absolute',
             inset: -8,
             borderRadius: '20px',
-            background: 'radial-gradient(circle, rgba(99,102,241,0.3) 0%, transparent 70%)',
+            background: 'radial-gradient(circle, rgba(37,99,235,0.3) 0%, transparent 70%)',
             filter: 'blur(16px)',
             animation: `${pulse} 2s ease-in-out infinite`,
           }} />
@@ -83,8 +83,8 @@ export default function LoadingScreen(props: LoadingScreenProps) {
             width: logoSize + 24,
             height: logoSize + 24,
             borderRadius: '18px',
-            background: 'linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(139,92,246,0.15) 100%)',
-            border: '2px solid rgba(99,102,241,0.3)',
+            background: 'linear-gradient(135deg, rgba(37,99,235,0.15) 0%, rgba(30,64,175,0.15) 100%)',
+            border: '2px solid rgba(37,99,235,0.3)',
             display: 'grid',
             placeItems: 'center',
             position: 'relative',
@@ -115,7 +115,7 @@ export default function LoadingScreen(props: LoadingScreenProps) {
       <Typography sx={{
         fontWeight: 800,
         fontSize: textSize,
-        background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #6366f1 100%)',
+        background: 'linear-gradient(135deg, #2563eb 0%, #60a5fa 50%, #2563eb 100%)',
         backgroundSize: '200% auto',
         backgroundClip: 'text',
         WebkitBackgroundClip: 'text',
@@ -140,10 +140,10 @@ export default function LoadingScreen(props: LoadingScreenProps) {
               width: 4,
               height: '100%',
               borderRadius: 2,
-              bgcolor: '#6366f1',
+              bgcolor: '#2563eb',
               animation: `${wave} 1s ease-in-out infinite`,
               animationDelay: `${i * 0.1}s`,
-              boxShadow: '0 0 8px rgba(99,102,241,0.5)',
+              boxShadow: '0 0 8px rgba(37,99,235,0.5)',
             }}
           />
         ))}
@@ -151,7 +151,7 @@ export default function LoadingScreen(props: LoadingScreenProps) {
 
       {/* Loading Message */}
       <Typography sx={{
-        color: '#94a3b8',
+        color: 'text.secondary',
         fontSize: '0.85rem',
         fontWeight: 500,
         animation: `${pulse} 2s ease-in-out infinite`,
@@ -199,11 +199,11 @@ export default function LoadingScreen(props: LoadingScreenProps) {
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      bgcolor: '#0a0f1a',
+      bgcolor: 'background.default',
       zIndex: 9999,
       backgroundImage: `
-        radial-gradient(circle at 20% 30%, rgba(99,102,241,0.08) 0%, transparent 40%),
-        radial-gradient(circle at 80% 70%, rgba(139,92,246,0.08) 0%, transparent 40%)
+        radial-gradient(circle at 20% 30%, rgba(37,99,235,0.08) 0%, transparent 40%),
+        radial-gradient(circle at 80% 70%, rgba(30,64,175,0.08) 0%, transparent 40%)
       `,
     }}>
       {content}

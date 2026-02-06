@@ -34,35 +34,35 @@ import {
   useTheme,
 } from '@mui/material';
 import {
-  SupportAgent as SupportAgentIcon,
+  Headphones as SupportAgentIcon,
   Send as SendIcon,
-  Person as PersonIcon,
-  CheckCircle as CheckCircleIcon,
-  PlayArrow as AcceptIcon,
-  Chat as ChatIcon,
+  User as PersonIcon,
+  CheckCircle2 as CheckCircleIcon,
+  Play as AcceptIcon,
+  MessageCircle as ChatIcon,
   Star as StarIcon,
-  Refresh as RefreshIcon,
-  FiberManualRecord as DotIcon,
+  RotateCcw as RefreshIcon,
+  Circle as DotIcon,
   Image as ImageIcon,
-  Close as CloseIcon,
+  X as CloseIcon,
   Settings as SettingsIcon,
-  ArrowBack as ArrowBackIcon,
-  DoneAll as DoneAllIcon,
-  Done as DoneIcon,
+  ArrowLeft as ArrowBackIcon,
+  CheckCheck as DoneAllIcon,
+  Check as DoneIcon,
   Receipt as ReceiptIcon,
   Search as SearchIcon,
-  Visibility as ViewIcon,
-  Edit as EditIcon,
+  Eye as ViewIcon,
+  Pencil as EditIcon,
   ShoppingBag as ShoppingBagIcon,
   ZoomIn as ZoomInIcon,
-} from '@mui/icons-material';
+} from 'lucide-react';
 
 const ADMIN_THEME = {
-  bg: '#0f172a',
-  bgCard: '#1e293b',
-  text: '#f1f5f9',
-  textMuted: '#94a3b8',
-  border: '#334155',
+  bg: 'var(--surface)',
+  bgCard: 'var(--surface-2)',
+  text: 'var(--foreground)',
+  textMuted: 'var(--text-muted)',
+  border: 'var(--glass-border)',
 };
 
 interface ChatSession {
@@ -463,10 +463,10 @@ export default function SupportChatPanel() {
   // Send order reference to chat
   const handleSendOrderToChat = async (order: any) => {
     if (!selectedChat || selectedChat.status !== 'active') return;
-    const orderMsg = `📦 *ออเดอร์ #${order.ref}*
-💰 ยอด: ฿${order.totalAmount?.toLocaleString() || order.amount?.toLocaleString() || 0}
-📅 วันที่: ${new Date(order.date || order.createdAt).toLocaleDateString('th-TH')}
-🏷️ สถานะ: ${getOrderStatusLabel(order.status)}
+    const orderMsg = `*ออเดอร์ #${order.ref}*
+ยอด: ฿${order.totalAmount?.toLocaleString() || order.amount?.toLocaleString() || 0}
+วันที่: ${new Date(order.date || order.createdAt).toLocaleDateString('th-TH')}
+สถานะ: ${getOrderStatusLabel(order.status)}
 [ORDER_REF:${order.ref}]`;
     
     setSending(true);
@@ -487,13 +487,13 @@ export default function SupportChatPanel() {
 
   const getOrderStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
-      'PENDING': '⏳ รอดำเนินการ',
-      'PAID': '✅ ชำระแล้ว',
-      'PROCESSING': '🔄 กำลังดำเนินการ',
-      'READY': '📦 พร้อมรับ',
-      'SHIPPED': '🚚 จัดส่งแล้ว',
-      'COMPLETED': '✓ เสร็จสิ้น',
-      'CANCELLED': '❌ ยกเลิก',
+      'PENDING': 'รอดำเนินการ',
+      'PAID': 'ชำระแล้ว',
+      'PROCESSING': 'กำลังดำเนินการ',
+      'READY': 'พร้อมรับ',
+      'SHIPPED': 'จัดส่งแล้ว',
+      'COMPLETED': 'เสร็จสิ้น',
+      'CANCELLED': 'ยกเลิก',
     };
     return labels[status?.toUpperCase()] || status;
   };
@@ -531,8 +531,8 @@ export default function SupportChatPanel() {
               top: 16,
               right: 16,
               color: 'white',
-              bgcolor: 'rgba(255,255,255,0.15)',
-              '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' },
+              bgcolor: 'var(--glass-bg)',
+              '&:hover': { bgcolor: 'var(--glass-strong)' },
             }}
           >
             <CloseIcon />
@@ -544,8 +544,8 @@ export default function SupportChatPanel() {
               top: 16,
               right: 64,
               color: 'white',
-              bgcolor: 'rgba(255,255,255,0.15)',
-              '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' },
+              bgcolor: 'var(--glass-bg)',
+              '&:hover': { bgcolor: 'var(--glass-strong)' },
             }}
             title="เปิดในแท็บใหม่"
           >
@@ -568,7 +568,7 @@ export default function SupportChatPanel() {
           <Typography sx={{
             position: 'absolute',
             bottom: 24,
-            color: 'rgba(255,255,255,0.6)',
+            color: 'var(--text-muted)',
             fontSize: '0.8rem',
           }}>
             คลิกที่ใดก็ได้เพื่อปิด
@@ -585,7 +585,7 @@ export default function SupportChatPanel() {
         PaperProps={{ sx: { bgcolor: ADMIN_THEME.bgCard, color: ADMIN_THEME.text } }}
       >
         <DialogTitle sx={{ borderBottom: '1px solid ' + ADMIN_THEME.border, display: 'flex', alignItems: 'center', gap: 1 }}>
-          <ReceiptIcon sx={{ color: '#6366f1' }} />
+          <ReceiptIcon size={24} color="#2563eb" />
           ค้นหาออเดอร์ / ดูประวัติลูกค้า
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
@@ -605,7 +605,7 @@ export default function SupportChatPanel() {
                 '& .MuiOutlinedInput-root': {
                   color: ADMIN_THEME.text,
                   '& fieldset': { borderColor: ADMIN_THEME.border },
-                  '&:hover fieldset': { borderColor: '#6366f1' },
+                  '&:hover fieldset': { borderColor: '#2563eb' },
                 },
               }}
             />
@@ -613,7 +613,7 @@ export default function SupportChatPanel() {
               variant="contained"
               onClick={handleSearchOrder}
               disabled={searchingOrder || !orderSearchRef.trim()}
-              sx={{ bgcolor: '#6366f1', '&:hover': { bgcolor: '#4f46e5' }, minWidth: 80 }}
+              sx={{ bgcolor: '#2563eb', '&:hover': { bgcolor: '#1d4ed8' }, minWidth: 80 }}
             >
               {searchingOrder ? <CircularProgress size={20} color="inherit" /> : <SearchIcon />}
             </Button>
@@ -621,7 +621,7 @@ export default function SupportChatPanel() {
           
           {/* Search Result */}
           {foundOrder && (
-            <Paper sx={{ p: 2, mb: 3, bgcolor: '#0f172a', borderRadius: 2 }}>
+            <Paper sx={{ p: 2, mb: 3, bgcolor: 'var(--surface)', borderRadius: 2 }}>
               {foundOrder.notFound ? (
                 <Typography sx={{ color: '#f87171', textAlign: 'center' }}>
                   ไม่พบออเดอร์ "{orderSearchRef}"
@@ -637,7 +637,7 @@ export default function SupportChatPanel() {
                       width: 40,
                       height: 40,
                       borderRadius: 1.5,
-                      bgcolor: '#6366f1',
+                      bgcolor: '#2563eb',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -666,8 +666,8 @@ export default function SupportChatPanel() {
                     />
                   </Box>
                   <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', fontSize: '0.8rem', color: ADMIN_THEME.textMuted, mb: 2 }}>
-                    <span>💰 ฿{foundOrder.totalAmount?.toLocaleString() || foundOrder.amount?.toLocaleString()}</span>
-                    <span>📅 {new Date(foundOrder.date || foundOrder.createdAt).toLocaleDateString('th-TH')}</span>
+                    <span>฿{foundOrder.totalAmount?.toLocaleString() || foundOrder.amount?.toLocaleString()}</span>
+                    <span>{new Date(foundOrder.date || foundOrder.createdAt).toLocaleDateString('th-TH')}</span>
                   </Box>
                   <Box sx={{ display: 'flex', gap: 1 }}>
                     <Button
@@ -707,9 +707,9 @@ export default function SupportChatPanel() {
                   size="small"
                   onClick={() => fetchCustomerOrders(selectedChat.customer_email)}
                   disabled={loadingCustomerOrders}
-                  sx={{ color: '#6366f1', fontSize: '0.75rem' }}
+                  sx={{ color: '#2563eb', fontSize: '0.75rem' }}
                 >
-                  {loadingCustomerOrders ? <CircularProgress size={16} /> : <RefreshIcon sx={{ fontSize: 16 }} />}
+                  {loadingCustomerOrders ? <CircularProgress size={16} /> : <RefreshIcon size={16} />}
                 </Button>
               </Box>
               <Box sx={{ maxHeight: 200, overflowY: 'auto' }}>
@@ -724,13 +724,13 @@ export default function SupportChatPanel() {
                       sx={{
                         p: 1.5,
                         mb: 1,
-                        bgcolor: '#0f172a',
+                        bgcolor: 'var(--surface)',
                         borderRadius: 1.5,
                         display: 'flex',
                         alignItems: 'center',
                         gap: 1,
                         cursor: 'pointer',
-                        '&:hover': { bgcolor: 'rgba(99, 102, 241, 0.1)' },
+                        '&:hover': { bgcolor: 'rgba(37, 99, 235, 0.1)' },
                       }}
                       onClick={() => handleSendOrderToChat(order)}
                     >
@@ -742,7 +742,7 @@ export default function SupportChatPanel() {
                           {new Date(order.date || order.createdAt).toLocaleDateString('th-TH')} · {order.status}
                         </Typography>
                       </Box>
-                      <SendIcon sx={{ fontSize: 16, color: '#6366f1' }} />
+                      <SendIcon size={16} color="#2563eb" />
                     </Paper>
                   ))
                 )}
@@ -771,28 +771,28 @@ export default function SupportChatPanel() {
           <Box sx={{ p: 2, borderBottom: '1px solid ' + ADMIN_THEME.border }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
               <Typography sx={{ fontWeight: 700, color: ADMIN_THEME.text, fontSize: { xs: '0.9rem', sm: '1rem' } }}>
-                <SupportAgentIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+                <SupportAgentIcon size={24} style={{ marginRight: 8, verticalAlign: 'middle' }} />
                 แชทสนับสนุน
               </Typography>
               <Box>
                 <IconButton size="small" onClick={() => setSettingsOpen(true)} sx={{ color: ADMIN_THEME.textMuted }}>
-                  <SettingsIcon sx={{ fontSize: 18 }} />
+                  <SettingsIcon size={18} />
                 </IconButton>
                 <IconButton size="small" onClick={() => fetchChats()} sx={{ color: ADMIN_THEME.textMuted }}>
-                  <RefreshIcon sx={{ fontSize: 18 }} />
+                  <RefreshIcon size={18} />
                 </IconButton>
               </Box>
             </Box>
             {stats && (
               <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                <Chip size="small" icon={<DotIcon sx={{ fontSize: 10, color: '#fbbf24 !important' }} />}
+                <Chip size="small" icon={<DotIcon size={10} color="#fbbf24" />}
                   label={'รอ ' + stats.pendingCount}
                   sx={{ bgcolor: 'rgba(251, 191, 36, 0.1)', color: '#fbbf24', fontWeight: 500, fontSize: '0.7rem' }} />
-                <Chip size="small" icon={<DotIcon sx={{ fontSize: 10, color: '#22c55e !important' }} />}
+                <Chip size="small" icon={<DotIcon size={10} color="#22c55e" />}
                   label={'Active ' + stats.activeCount}
                   sx={{ bgcolor: 'rgba(34, 197, 94, 0.1)', color: '#22c55e', fontWeight: 500, fontSize: '0.7rem' }} />
                 {stats.avgRating > 0 && (
-                  <Chip size="small" icon={<StarIcon sx={{ fontSize: 12, color: '#fbbf24 !important' }} />}
+                  <Chip size="small" icon={<StarIcon size={12} color="#fbbf24" />}
                     label={stats.avgRating.toFixed(1)}
                     sx={{ bgcolor: 'rgba(251, 191, 36, 0.1)', color: '#fbbf24', fontWeight: 500, fontSize: '0.7rem' }} />
                 )}
@@ -803,8 +803,8 @@ export default function SupportChatPanel() {
           <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)} variant="fullWidth"
             sx={{
               borderBottom: '1px solid ' + ADMIN_THEME.border,
-              '& .MuiTab-root': { color: ADMIN_THEME.textMuted, minHeight: 36, fontSize: '0.7rem', px: 0.5, '&.Mui-selected': { color: '#6366f1' } },
-              '& .MuiTabs-indicator': { bgcolor: '#6366f1' },
+              '& .MuiTab-root': { color: ADMIN_THEME.textMuted, minHeight: 36, fontSize: '0.7rem', px: 0.5, '&.Mui-selected': { color: '#2563eb' } },
+              '& .MuiTabs-indicator': { bgcolor: '#2563eb' },
             }}>
             <Tab label="ทั้งหมด" />
             <Tab label={<Badge badgeContent={stats?.pendingCount} color="warning" max={99}><span>รอรับ</span></Badge>} />
@@ -815,11 +815,11 @@ export default function SupportChatPanel() {
           <Box sx={{ flex: 1, overflowY: 'auto' }}>
             {loading ? (
               <Box sx={{ display: 'grid', placeItems: 'center', height: 200 }}>
-                <CircularProgress size={32} sx={{ color: '#6366f1' }} />
+                <CircularProgress size={32} sx={{ color: '#2563eb' }} />
               </Box>
             ) : chats.length === 0 ? (
               <Box sx={{ p: 3, textAlign: 'center' }}>
-                <ChatIcon sx={{ fontSize: 48, color: ADMIN_THEME.textMuted, mb: 1 }} />
+                <ChatIcon size={48} color={ADMIN_THEME.textMuted} style={{ marginBottom: 8 }} />
                 <Typography sx={{ color: ADMIN_THEME.textMuted }}>ไม่มีแชท</Typography>
               </Box>
             ) : (
@@ -827,7 +827,7 @@ export default function SupportChatPanel() {
                 {chats.map((chat) => (
                   <React.Fragment key={chat.id}>
                     <ListItemButton selected={selectedChat?.id === chat.id} onClick={() => handleSelectChat(chat.id)}
-                      sx={{ py: 1.5, '&.Mui-selected': { bgcolor: 'rgba(99, 102, 241, 0.1)', borderLeft: '3px solid #6366f1' }, '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.05)' } }}>
+                      sx={{ py: 1.5, '&.Mui-selected': { bgcolor: 'rgba(37, 99, 235, 0.1)', borderLeft: '3px solid #2563eb' }, '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.05)' } }}>
                       <ListItemAvatar>
                         <Badge badgeContent={chat.unread_count} color="error" overlap="circular">
                           <Avatar 
@@ -913,7 +913,7 @@ export default function SupportChatPanel() {
                   }}
                   title="ค้นหาออเดอร์"
                 >
-                  <ReceiptIcon sx={{ fontSize: 20 }} />
+                  <ReceiptIcon size={20} />
                 </IconButton>
                 {selectedChat.status === 'pending' && (
                   <Button variant="contained" size="small" startIcon={<AcceptIcon />} onClick={() => handleAcceptChat(selectedChat.id)}
@@ -923,7 +923,7 @@ export default function SupportChatPanel() {
                 )}
                 {selectedChat.status === 'active' && (
                   <Button variant="outlined" size="small" startIcon={<CheckCircleIcon />} onClick={handleCloseChat}
-                    sx={{ borderColor: '#64748b', color: '#64748b', '&:hover': { borderColor: '#94a3b8', bgcolor: 'rgba(148, 163, 184, 0.1)' }, fontSize: '0.75rem', py: 0.5 }}>
+                    sx={{ borderColor: '#64748b', color: 'var(--text-muted)', '&:hover': { borderColor: '#94a3b8', bgcolor: 'rgba(148, 163, 184, 0.1)' }, fontSize: '0.75rem', py: 0.5 }}>
                     ปิด
                   </Button>
                 )}
@@ -932,7 +932,7 @@ export default function SupportChatPanel() {
                 )}
               </Box>
 
-              <Box sx={{ flex: 1, overflowY: 'auto', p: 2, display: 'flex', flexDirection: 'column', gap: 1.5, bgcolor: '#0f172a' }}
+              <Box sx={{ flex: 1, overflowY: 'auto', p: 2, display: 'flex', flexDirection: 'column', gap: 1.5, bgcolor: 'var(--surface)' }}
                 onScroll={(e) => {
                   const el = e.target as HTMLDivElement;
                   isUserScrollingRef.current = el.scrollHeight - el.scrollTop - el.clientHeight > 100;
@@ -946,23 +946,23 @@ export default function SupportChatPanel() {
                   return (
                     <Box key={msg.id} sx={{ display: 'flex', justifyContent: msg.sender === 'admin' ? 'flex-end' : msg.sender === 'system' ? 'center' : 'flex-start' }}>
                       {msg.sender === 'system' ? (
-                        <Chip size="small" label={msg.message} sx={{ bgcolor: 'rgba(255,255,255,0.08)', color: ADMIN_THEME.textMuted, fontSize: '0.7rem' }} />
+                        <Chip size="small" label={msg.message} sx={{ bgcolor: 'var(--glass-bg)', color: ADMIN_THEME.textMuted, fontSize: '0.7rem' }} />
                       ) : (
                         <Box sx={{ maxWidth: { xs: '85%', sm: '75%' }, display: 'flex', flexDirection: msg.sender === 'admin' ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 1 }}>
                           {msg.sender === 'customer' && (
                             <Avatar src={msg.sender_avatar || undefined} sx={{ width: 28, height: 28, bgcolor: '#fbbf24', flexShrink: 0 }}>
-                              {!msg.sender_avatar && <PersonIcon sx={{ fontSize: 16 }} />}
+                              {!msg.sender_avatar && <PersonIcon size={16} />}
                             </Avatar>
                           )}
                           {msg.sender === 'admin' && (
-                            <Avatar src={msg.sender_avatar || undefined} sx={{ width: 28, height: 28, bgcolor: '#6366f1', flexShrink: 0 }}>
-                              {!msg.sender_avatar && <SupportAgentIcon sx={{ fontSize: 16 }} />}
+                            <Avatar src={msg.sender_avatar || undefined} sx={{ width: 28, height: 28, bgcolor: '#2563eb', flexShrink: 0 }}>
+                              {!msg.sender_avatar && <SupportAgentIcon size={16} />}
                             </Avatar>
                           )}
                           <Box sx={{ minWidth: 0 }}>
                             <Paper elevation={0} sx={{
                               px: 1.5, py: 1,
-                              bgcolor: msg.sender === 'admin' ? '#6366f1' : ADMIN_THEME.bgCard,
+                              bgcolor: msg.sender === 'admin' ? '#2563eb' : ADMIN_THEME.bgCard,
                               color: ADMIN_THEME.text,
                               borderRadius: 2,
                               borderBottomRightRadius: msg.sender === 'admin' ? 4 : 16,
@@ -981,14 +981,14 @@ export default function SupportChatPanel() {
                                   sx={{
                                     mt: text ? 1 : 0,
                                     p: 1.5,
-                                    bgcolor: msg.sender === 'admin' ? 'rgba(255,255,255,0.15)' : '#0f172a',
+                                    bgcolor: msg.sender === 'admin' ? 'var(--glass-bg)' : 'var(--surface)',
                                     borderRadius: 1.5,
                                     border: '1px solid',
-                                    borderColor: msg.sender === 'admin' ? 'rgba(255,255,255,0.2)' : ADMIN_THEME.border,
+                                    borderColor: msg.sender === 'admin' ? 'var(--glass-border)' : ADMIN_THEME.border,
                                     cursor: 'pointer',
                                     transition: 'all 0.2s',
                                     '&:hover': { 
-                                      bgcolor: msg.sender === 'admin' ? 'rgba(255,255,255,0.25)' : 'rgba(99, 102, 241, 0.1)',
+                                      bgcolor: msg.sender === 'admin' ? 'var(--glass-strong)' : 'rgba(37, 99, 235, 0.1)',
                                     },
                                   }}
                                 >
@@ -1002,7 +1002,7 @@ export default function SupportChatPanel() {
                                       alignItems: 'center',
                                       justifyContent: 'center',
                                     }}>
-                                      <ReceiptIcon sx={{ fontSize: 18, color: 'white' }} />
+                                      <ReceiptIcon size={18} color="white" />
                                     </Box>
                                     <Box sx={{ flex: 1, minWidth: 0 }}>
                                       <Typography sx={{ 
@@ -1014,12 +1014,12 @@ export default function SupportChatPanel() {
                                       </Typography>
                                       <Typography sx={{ 
                                         fontSize: '0.7rem',
-                                        color: msg.sender === 'admin' ? 'rgba(255,255,255,0.8)' : ADMIN_THEME.textMuted,
+                                        color: msg.sender === 'admin' ? 'var(--foreground)' : ADMIN_THEME.textMuted,
                                       }}>
                                         คลิกเพื่อดูรายละเอียด
                                       </Typography>
                                     </Box>
-                                    <ViewIcon sx={{ fontSize: 16, color: msg.sender === 'admin' ? 'rgba(255,255,255,0.6)' : ADMIN_THEME.textMuted }} />
+                                    <ViewIcon size={16} color={msg.sender === 'admin' ? 'var(--text-muted)' : ADMIN_THEME.textMuted} />
                                   </Box>
                                 </Box>
                               )}
@@ -1037,8 +1037,8 @@ export default function SupportChatPanel() {
                               {isLastAdminMessage && (
                                 <>
                                   {msg.is_read 
-                                    ? <DoneAllIcon sx={{ fontSize: 12, color: '#22c55e' }} /> 
-                                    : <DoneIcon sx={{ fontSize: 12, color: ADMIN_THEME.textMuted }} />
+                                    ? <DoneAllIcon size={12} color="#22c55e" /> 
+                                    : <DoneIcon size={12} color={ADMIN_THEME.textMuted} />
                                   }
                                   {msg.is_read && msg.read_at && (
                                     <Typography sx={{ fontSize: '0.55rem', color: '#22c55e' }}>
@@ -1058,7 +1058,7 @@ export default function SupportChatPanel() {
                 
                 {otherTyping && (
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Avatar sx={{ width: 28, height: 28, bgcolor: '#fbbf24' }}><PersonIcon sx={{ fontSize: 16 }} /></Avatar>
+                    <Avatar sx={{ width: 28, height: 28, bgcolor: '#fbbf24' }}><PersonIcon size={16} /></Avatar>
                     <Paper sx={{ px: 2, py: 1, bgcolor: ADMIN_THEME.bgCard, borderRadius: 2 }}>
                       <Box sx={{ display: 'flex', gap: 0.5 }}>
                         <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: ADMIN_THEME.textMuted, animation: 'bounce 1.4s infinite ease-in-out both', animationDelay: '0s' }} />
@@ -1075,18 +1075,18 @@ export default function SupportChatPanel() {
                 <Box sx={{ px: 2, py: 1, borderTop: '1px solid ' + ADMIN_THEME.border, overflowX: 'auto', display: 'flex', gap: 0.5 }}>
                   {chatSettings.quick_replies.map((reply, idx) => (
                     <Chip key={idx} label={reply} size="small" onClick={() => handleQuickReply(reply)}
-                      sx={{ bgcolor: 'rgba(99, 102, 241, 0.1)', color: '#6366f1', fontSize: '0.7rem', cursor: 'pointer', '&:hover': { bgcolor: 'rgba(99, 102, 241, 0.2)' }, flexShrink: 0 }} />
+                      sx={{ bgcolor: 'rgba(37, 99, 235, 0.1)', color: '#2563eb', fontSize: '0.7rem', cursor: 'pointer', '&:hover': { bgcolor: 'rgba(37, 99, 235, 0.2)' }, flexShrink: 0 }} />
                   ))}
                 </Box>
               )}
 
               {previewImage && (
-                <Box sx={{ px: 2, py: 1, bgcolor: '#0f172a', borderTop: '1px solid ' + ADMIN_THEME.border }}>
+                <Box sx={{ px: 2, py: 1, bgcolor: 'var(--surface)', borderTop: '1px solid ' + ADMIN_THEME.border }}>
                   <Box sx={{ position: 'relative', display: 'inline-block' }}>
                     <Box component="img" src={previewImage} alt="Preview" sx={{ maxHeight: 80, borderRadius: 1 }} />
                     <IconButton size="small" onClick={() => setPreviewImage(null)}
                       sx={{ position: 'absolute', top: -8, right: -8, bgcolor: '#ef4444', color: 'white', width: 20, height: 20, '&:hover': { bgcolor: '#dc2626' } }}>
-                      <CloseIcon sx={{ fontSize: 14 }} />
+                      <CloseIcon size={14} />
                     </IconButton>
                   </Box>
                 </Box>
@@ -1095,16 +1095,16 @@ export default function SupportChatPanel() {
               {selectedChat.status === 'active' && selectedChat.admin_email === session?.user?.email && (
                 <Box sx={{ p: 1.5, borderTop: '1px solid ' + ADMIN_THEME.border, display: 'flex', gap: 1 }}>
                   <IconButton onClick={() => fileInputRef.current?.click()} disabled={uploadingImage}
-                    sx={{ color: ADMIN_THEME.textMuted, '&:hover': { color: '#6366f1' } }}>
+                    sx={{ color: ADMIN_THEME.textMuted, '&:hover': { color: '#2563eb' } }}>
                     <ImageIcon />
                   </IconButton>
                   <TextField fullWidth size="small" placeholder="พิมพ์ข้อความ..." value={message}
                     onChange={(e) => { setMessage(e.target.value); sendTypingIndicator(); }}
                     onKeyPress={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
                     disabled={sending || uploadingImage}
-                    sx={{ '& .MuiOutlinedInput-root': { bgcolor: '#0f172a', color: ADMIN_THEME.text, fontSize: '0.9rem', '& fieldset': { borderColor: ADMIN_THEME.border }, '&:hover fieldset': { borderColor: '#6366f1' }, '&.Mui-focused fieldset': { borderColor: '#6366f1' } } }} />
+                    sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'var(--surface)', color: ADMIN_THEME.text, fontSize: '0.9rem', '& fieldset': { borderColor: ADMIN_THEME.border }, '&:hover fieldset': { borderColor: '#2563eb' }, '&.Mui-focused fieldset': { borderColor: '#2563eb' } } }} />
                   <IconButton onClick={handleSendMessage} disabled={(!message.trim() && !previewImage) || sending || uploadingImage}
-                    sx={{ bgcolor: '#6366f1', color: 'white', '&:hover': { bgcolor: '#4f46e5' }, '&.Mui-disabled': { bgcolor: ADMIN_THEME.border } }}>
+                    sx={{ bgcolor: '#2563eb', color: 'white', '&:hover': { bgcolor: '#1d4ed8' }, '&.Mui-disabled': { bgcolor: ADMIN_THEME.border } }}>
                     {sending || uploadingImage ? <CircularProgress size={20} color="inherit" /> : <SendIcon />}
                   </IconButton>
                 </Box>
@@ -1117,7 +1117,7 @@ export default function SupportChatPanel() {
               display: 'flex', 
               flexDirection: 'column',
               alignItems: 'center', 
-              background: 'linear-gradient(180deg, #0f172a 0%, #1e293b 100%)',
+              background: 'var(--background)',
               overflowY: 'auto',
               minHeight: 0,
             }}>
@@ -1136,21 +1136,21 @@ export default function SupportChatPanel() {
                 width: 100,
                 height: 100,
                 borderRadius: '50%',
-                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%)',
+                background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(30, 64, 175, 0.2) 100%)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 mb: 3,
                 flexShrink: 0,
-                border: '2px solid rgba(99, 102, 241, 0.3)',
+                border: '2px solid rgba(37, 99, 235, 0.3)',
                 animation: 'pulse 2s infinite',
                 '@keyframes pulse': {
-                  '0%': { boxShadow: '0 0 0 0 rgba(99, 102, 241, 0.4)' },
-                  '70%': { boxShadow: '0 0 0 20px rgba(99, 102, 241, 0)' },
-                  '100%': { boxShadow: '0 0 0 0 rgba(99, 102, 241, 0)' },
+                  '0%': { boxShadow: '0 0 0 0 rgba(37, 99, 235, 0.4)' },
+                  '70%': { boxShadow: '0 0 0 20px rgba(37, 99, 235, 0)' },
+                  '100%': { boxShadow: '0 0 0 0 rgba(37, 99, 235, 0)' },
                 },
               }}>
-                <ChatIcon sx={{ fontSize: 48, color: '#6366f1' }} />
+                <ChatIcon size={48} color="#2563eb" />
               </Box>
 
               <Typography sx={{ 
@@ -1220,12 +1220,12 @@ export default function SupportChatPanel() {
                 mt: 4, 
                 p: 2, 
                 borderRadius: 2, 
-                bgcolor: 'rgba(99, 102, 241, 0.1)',
-                border: '1px solid rgba(99, 102, 241, 0.2)',
+                bgcolor: 'rgba(37, 99, 235, 0.1)',
+                border: '1px solid rgba(37, 99, 235, 0.2)',
                 maxWidth: 320,
               }}>
                 <Typography sx={{ 
-                  color: '#6366f1', 
+                  color: '#2563eb', 
                   fontSize: '0.75rem', 
                   fontWeight: 600,
                   mb: 1,
@@ -1233,7 +1233,7 @@ export default function SupportChatPanel() {
                   alignItems: 'center',
                   gap: 0.5,
                 }}>
-                  💡 เคล็ดลับ
+                  เคล็ดลับ
                 </Typography>
                 <Typography sx={{ color: ADMIN_THEME.textMuted, fontSize: '0.75rem', lineHeight: 1.5 }}>
                   คลิกที่แชทในรายการเพื่อดูรายละเอียด กดปุ่ม &quot;รับเคส&quot; เพื่อเริ่มช่วยเหลือลูกค้า
@@ -1248,7 +1248,7 @@ export default function SupportChatPanel() {
       <Dialog open={settingsOpen} onClose={() => setSettingsOpen(false)} maxWidth="sm" fullWidth
         PaperProps={{ sx: { bgcolor: ADMIN_THEME.bgCard, color: ADMIN_THEME.text } }}>
         <DialogTitle sx={{ borderBottom: '1px solid ' + ADMIN_THEME.border }}>
-          <SettingsIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+          <SettingsIcon size={24} style={{ marginRight: 8, verticalAlign: 'middle' }} />
           ตั้งค่าแชท
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
@@ -1278,7 +1278,7 @@ export default function SupportChatPanel() {
         </DialogContent>
         <DialogActions sx={{ borderTop: '1px solid ' + ADMIN_THEME.border, p: 2 }}>
           <Button onClick={() => setSettingsOpen(false)} sx={{ color: ADMIN_THEME.textMuted }}>ยกเลิก</Button>
-          <Button variant="contained" onClick={handleSaveSettings} sx={{ bgcolor: '#6366f1', '&:hover': { bgcolor: '#4f46e5' } }}>บันทึก</Button>
+          <Button variant="contained" onClick={handleSaveSettings} sx={{ bgcolor: '#2563eb', '&:hover': { bgcolor: '#1d4ed8' } }}>บันทึก</Button>
         </DialogActions>
       </Dialog>
     </>

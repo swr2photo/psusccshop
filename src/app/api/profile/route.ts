@@ -3,7 +3,14 @@ import { getJson, putJson } from '@/lib/filebase';
 import crypto from 'crypto';
 import { requireAuth, normalizeEmail, isResourceOwner, isAdminEmail, getCurrentUserEmail } from '@/lib/auth';
 
-const profileKey = (email: string) => `users/${crypto.createHash('sha256').update(email.toLowerCase()).digest('hex')}.json`;
+const emailHash = (email: string) => crypto.createHash('sha256').update(email.toLowerCase()).digest('hex');
+const profileKey = (email: string) => `users/${emailHash(email)}.json`;
+const profileExtrasKey = (email: string) => `profile-extras/${emailHash(email)}.json`;
+
+// Fields stored in the profiles table (has dedicated columns)
+const PROFILE_TABLE_FIELDS = ['name', 'phone', 'address', 'instagram'];
+// Extra fields stored in key_value_store (no dedicated columns yet)
+const EXTRA_FIELDS = ['profileImage', 'theme'];
 
 // Helper to save user log server-side
 async function saveUserLogServer(log: {
@@ -45,7 +52,13 @@ export async function GET(req: NextRequest) {
   }
 
   const data = await getJson(profileKey(email));
-  return NextResponse.json({ status: 'success', data: { profile: data || {} } });
+  // Load extra fields (profileImage, theme) from key_value_store
+  let extras: Record<string, any> = {};
+  try {
+    extras = (await getJson(profileExtrasKey(email))) || {};
+  } catch { /* ignore - extras may not exist */ }
+  const merged = { ...(data || {}), ...extras };
+  return NextResponse.json({ status: 'success', data: { profile: merged } });
 }
 
 export async function POST(req: NextRequest) {
@@ -67,7 +80,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: 'error', message: 'ไม่มีสิทธิ์แก้ไขข้อมูลนี้' }, { status: 403 });
     }
 
-    await putJson(profileKey(email), data);
+    // Separate profile table fields from extra fields
+    const profileData: Record<string, any> = {};
+    const extrasData: Record<string, any> = {};
+    for (const [k, v] of Object.entries(data)) {
+      if (EXTRA_FIELDS.includes(k)) {
+        extrasData[k] = v;
+      } else {
+        profileData[k] = v;
+      }
+    }
+
+    // Merge and save profile table fields
+    const existing = await getJson(profileKey(email)) || {};
+    const mergedProfile = { ...existing, ...profileData };
+    await putJson(profileKey(email), mergedProfile);
+
+    // Merge and save extra fields (profileImage, theme) to key_value_store
+    if (Object.keys(extrasData).length > 0) {
+      let existingExtras: Record<string, any> = {};
+      try { existingExtras = (await getJson(profileExtrasKey(email))) || {}; } catch { /* ignore */ }
+      const mergedExtras = { ...existingExtras, ...extrasData };
+      await putJson(profileExtrasKey(email), mergedExtras);
+    }
+
+    const merged = { ...mergedProfile, ...extrasData };
     
     // Log profile update
     const userAgent = req.headers.get('user-agent') || undefined;
@@ -75,20 +112,22 @@ export async function POST(req: NextRequest) {
                      req.headers.get('x-real-ip') || undefined;
     await saveUserLogServer({
       email,
-      name: data.name,
+      name: merged.name,
       action: 'profile_update',
       details: 'อัปเดตโปรไฟล์',
       metadata: { 
-        hasName: !!data.name,
-        hasPhone: !!data.phone,
-        hasAddress: !!data.address,
-        hasInstagram: !!data.instagram,
+        hasName: !!merged.name,
+        hasPhone: !!merged.phone,
+        hasAddress: !!merged.address,
+        hasInstagram: !!merged.instagram,
+        hasProfileImage: !!extrasData.profileImage,
+        hasTheme: !!extrasData.theme,
       },
       ip: clientIP,
       userAgent,
     });
     
-    return NextResponse.json({ status: 'success', data: { profile: data } });
+    return NextResponse.json({ status: 'success', data: { profile: merged } });
   } catch (error: any) {
     return NextResponse.json({
       status: 'error',

@@ -63,9 +63,9 @@ export const SHOP_STATUS_CONFIG: Record<ShopStatusType, Omit<ShopStatusInfo, 'ty
     label: 'รอเปิดให้บริการ',
     description: 'กรุณารอสักครู่ ร้านค้ากำลังจะเปิด',
     icon: CalendarClock,
-    color: '#6366f1',
-    bgGradient: 'linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(99,102,241,0.05) 100%)',
-    borderColor: 'rgba(99,102,241,0.4)',
+    color: '#2563eb',
+    bgGradient: 'linear-gradient(135deg, rgba(37,99,235,0.15) 0%, rgba(37,99,235,0.05) 100%)',
+    borderColor: 'rgba(37,99,235,0.4)',
   },
 };
 
@@ -212,7 +212,7 @@ export default function ShopStatusCard({
           {config.label}
         </Typography>
         {countdown && (
-          <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8', ml: 0.5 }}>
+          <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary', ml: 0.5 }}>
             ({countdown})
           </Typography>
         )}
@@ -293,7 +293,7 @@ export default function ShopStatusCard({
             <Typography
               sx={{
                 fontSize: { xs: '0.85rem', sm: '0.9rem' },
-                color: '#94a3b8',
+                color: 'text.secondary',
                 lineHeight: 1.5,
               }}
             >
@@ -311,12 +311,12 @@ export default function ShopStatusCard({
                   px: 2,
                   py: 1,
                   borderRadius: '12px',
-                  bgcolor: 'rgba(0,0,0,0.3)',
-                  border: '1px solid rgba(255,255,255,0.1)',
+                  bgcolor: 'var(--glass-bg)',
+                  border: '1px solid var(--glass-border)',
                 }}
               >
                 <Clock size={16} color={config.color} />
-                <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: '#f1f5f9' }}>
+                <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'text.primary' }}>
                   {(status === 'COMING_SOON' || status === 'WAITING_TO_OPEN') ? 'เปิดใน ' : ''}
                   <Box component="span" sx={{ color: config.color, fontWeight: 700 }}>
                     {countdown}
@@ -385,7 +385,7 @@ export function ProductStatusBadge({ product }: ProductStatusBadgeProps) {
         {config.label}
       </Typography>
       {product.startDate && status === 'COMING_SOON' && (
-        <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8', mt: 0.5 }}>
+        <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary', mt: 0.5 }}>
           เปิด {new Date(product.startDate).toLocaleDateString('th-TH')}
         </Typography>
       )}
@@ -466,7 +466,7 @@ export function StatusChip({ status, countdownDate }: StatusChipProps) {
         {config.label}
       </Typography>
       {countdown && (
-        <Typography sx={{ fontSize: '0.65rem', color: '#94a3b8' }}>
+        <Typography sx={{ fontSize: '0.65rem', color: 'text.secondary' }}>
           {countdown}
         </Typography>
       )}

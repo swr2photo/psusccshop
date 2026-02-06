@@ -12,32 +12,35 @@ import {
   IconButton,
   TextField,
   Typography,
+  useTheme,
 } from '@mui/material';
-import ChatIcon from '@mui/icons-material/Chat';
-import SendIcon from '@mui/icons-material/Send';
-import CloseIcon from '@mui/icons-material/Close';
-import SmartToyIcon from '@mui/icons-material/SmartToy';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import StorefrontIcon from '@mui/icons-material/Storefront';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import CheckIcon from '@mui/icons-material/Check';
-import FullscreenIcon from '@mui/icons-material/Fullscreen';
-import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
-import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
-import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
-import PaidOutlinedIcon from '@mui/icons-material/PaidOutlined';
-import StraightenOutlinedIcon from '@mui/icons-material/StraightenOutlined';
-import LocalShippingOutlinedIcon from '@mui/icons-material/LocalShippingOutlined';
-import AccountBalanceWalletOutlinedIcon from '@mui/icons-material/AccountBalanceWalletOutlined';
-import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined';
-import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
-import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
-import VerifiedIcon from '@mui/icons-material/Verified';
-import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined';
-import WavingHandIcon from '@mui/icons-material/WavingHand';
-import ReplyIcon from '@mui/icons-material/Reply';
-import EditIcon from '@mui/icons-material/Edit';
+import {
+  MessageCircle,
+  Send,
+  X,
+  Bot,
+  RotateCcw,
+  Sparkles,
+  Store,
+  Copy,
+  Check,
+  Maximize2,
+  Minimize2,
+  ImagePlus,
+  ShoppingCart,
+  Coins,
+  Ruler,
+  Truck,
+  Wallet,
+  HelpCircle,
+  Image,
+  User,
+  BadgeCheck,
+  BookOpen,
+  Hand,
+  Reply,
+  Pencil,
+} from 'lucide-react';
 
 // ==================== CONSTANTS ====================
 const QUICK_QUESTIONS_DATA = [
@@ -79,20 +82,22 @@ export interface ShirtChatBotProps {
 
 // ==================== HELPER COMPONENTS ====================
 const QuickQuestionIcon = ({ type, size = 14 }: { type: string; size?: number }) => {
-  const sx = { fontSize: size, opacity: 0.85 };
+  const props = { size, opacity: 0.85 };
   switch (type) {
-    case 'cart': return <ShoppingCartOutlinedIcon sx={sx} />;
-    case 'price': return <PaidOutlinedIcon sx={sx} />;
-    case 'size': return <StraightenOutlinedIcon sx={sx} />;
-    case 'shipping': return <LocalShippingOutlinedIcon sx={sx} />;
-    case 'payment': return <AccountBalanceWalletOutlinedIcon sx={sx} />;
-    case 'help': return <HelpOutlineOutlinedIcon sx={sx} />;
+    case 'cart': return <ShoppingCart {...props} />;
+    case 'price': return <Coins {...props} />;
+    case 'size': return <Ruler {...props} />;
+    case 'shipping': return <Truck {...props} />;
+    case 'payment': return <Wallet {...props} />;
+    case 'help': return <HelpCircle {...props} />;
     default: return null;
   }
 };
 
 // ==================== MAIN COMPONENT ====================
 export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   const [input, setInput] = React.useState('');
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -603,21 +608,21 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
           my: 1.5,
           fontSize: 13,
           '& th, & td': {
-            border: '1px solid rgba(255,255,255,0.15)',
+            border: `1px solid ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)'}`,
             px: 1.5,
             py: 0.75,
             textAlign: 'left',
           },
           '& th': {
-            bgcolor: 'rgba(99, 102, 241, 0.2)',
+            bgcolor: isDark ? 'rgba(37, 99, 235, 0.2)' : 'rgba(37, 99, 235, 0.08)',
             fontWeight: 600,
-            color: '#a5b4fc',
+            color: isDark ? '#93c5fd' : '#1e40af',
           },
           '& td': {
-            bgcolor: 'rgba(255,255,255,0.03)',
+            bgcolor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
           },
           '& tr:hover td': {
-            bgcolor: 'rgba(255,255,255,0.06)',
+            bgcolor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
           },
         }}
       >
@@ -650,7 +655,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
       if (bulletMatch) {
         return (
           <Box key={lineIdx} sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.75, my: 0.25 }}>
-            <Box component="span" sx={{ color: '#a5b4fc', flexShrink: 0 }}>•</Box>
+            <Box component="span" sx={{ color: isDark ? '#93c5fd' : '#2563eb', flexShrink: 0 }}>•</Box>
             <span>{renderTextSegment(bulletMatch[1])}</span>
           </Box>
         );
@@ -660,7 +665,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
       if (numberedMatch) {
         return (
           <Box key={lineIdx} sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.75, my: 0.25 }}>
-            <Box component="span" sx={{ color: '#a5b4fc', flexShrink: 0, minWidth: 16 }}>{numberedMatch[1]}.</Box>
+            <Box component="span" sx={{ color: isDark ? '#93c5fd' : '#2563eb', flexShrink: 0, minWidth: 16 }}>{numberedMatch[1]}.</Box>
             <span>{renderTextSegment(numberedMatch[2])}</span>
           </Box>
         );
@@ -680,7 +685,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
     const parts = text.split(/(\*\*.*?\*\*|\[.*?\]\(.*?\)|`.*?`)/g);
     return parts.map((part, i) => {
       if (part.startsWith('**') && part.endsWith('**')) {
-        return <strong key={i} style={{ color: '#e0e7ff' }}>{part.slice(2, -2)}</strong>;
+        return <strong key={i} style={{ color: isDark ? '#e0e7ff' : '#1e3a5f' }}>{part.slice(2, -2)}</strong>;
       }
       const linkMatch = part.match(/\[(.*?)\]\((.*?)\)/);
       if (linkMatch) {
@@ -691,7 +696,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
             href={linkMatch[2]} 
             target="_blank" 
             rel="noopener noreferrer"
-            sx={{ color: '#818cf8', textDecoration: 'underline', '&:hover': { color: '#a5b4fc' } }}
+            sx={{ color: isDark ? '#3b82f6' : '#2563eb', textDecoration: 'underline', '&:hover': { color: isDark ? '#93c5fd' : '#1e40af' } }}
           >
             {linkMatch[1]}
           </Box>
@@ -703,7 +708,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
             key={i} 
             component="code" 
             sx={{ 
-              bgcolor: 'rgba(255,255,255,0.1)', 
+              bgcolor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)', 
               px: 0.5, 
               py: 0.125, 
               borderRadius: 0.5, 
@@ -758,11 +763,13 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
             borderRadius: isFullscreen ? 0 : 2.5,
             overflow: 'hidden',
             maxHeight: isFullscreen ? '100vh' : '85vh',
-            background: 'linear-gradient(180deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.03) 100%)',
-            backdropFilter: 'blur(32px) saturate(180%)',
-            WebkitBackdropFilter: 'blur(32px) saturate(180%)',
-            border: isFullscreen ? 'none' : '1px solid rgba(255,255,255,0.15)',
-            boxShadow: isFullscreen ? 'none' : '0 20px 40px rgba(0, 0, 0, 0.4)',
+            background: isDark
+              ? 'linear-gradient(180deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.03) 100%)'
+              : 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
+            backdropFilter: isDark ? 'blur(32px) saturate(180%)' : 'none',
+            WebkitBackdropFilter: isDark ? 'blur(32px) saturate(180%)' : 'none',
+            border: isFullscreen ? 'none' : `1px solid ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)'}`,
+            boxShadow: isFullscreen ? 'none' : isDark ? '0 20px 40px rgba(0, 0, 0, 0.4)' : '0 20px 40px rgba(0, 0, 0, 0.12)',
           }
         }}
       >
@@ -774,8 +781,10 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
             justifyContent: 'space-between',
             px: 2.5,
             py: 2,
-            background: 'linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 100%)',
-            borderBottom: '1px solid rgba(255,255,255,0.1)',
+            background: isDark
+              ? 'linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 100%)'
+              : 'linear-gradient(180deg, #f1f5f9 0%, #ffffff 100%)',
+            borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)'}`,
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -784,8 +793,10 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 width: 44,
                 height: 44,
                 borderRadius: 1.5,
-                background: 'linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 100%)',
-                border: '1px solid rgba(255,255,255,0.2)',
+                background: isDark
+                  ? 'linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 100%)'
+                  : 'linear-gradient(135deg, #e2e8f0 0%, #f1f5f9 100%)',
+                border: `1px solid ${isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.08)'}`,
                 boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
                 display: 'flex',
                 alignItems: 'center',
@@ -813,8 +824,8 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 <Typography sx={{ 
                   fontWeight: 600, 
                   fontSize: 17, 
-                  color: 'rgba(255,255,255,0.95)',
-                  textShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                  color: isDark ? 'rgba(255,255,255,0.95)' : 'rgba(0,0,0,0.87)',
+                  textShadow: isDark ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
                 }}>
                   SCC Shop
                 </Typography>
@@ -832,29 +843,25 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                     color: '#6ee7b7',
                     fontWeight: 600,
                   }}>
-                    <AutoAwesomeIcon sx={{ fontSize: 9 }} />
+                    <Sparkles size={9} />
                     AI
                   </Box>
                 )}
               </Box>
               <Typography sx={{ 
                 fontSize: 12, 
-                color: 'rgba(255,255,255,0.6)', 
+                color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)', 
                 display: 'flex', 
                 alignItems: 'center', 
-                gap: 0.5 
+                gap: 0.5,
+                '@keyframes shimmer': {
+                  '0%, 100%': { opacity: 1 },
+                  '50%': { opacity: 0.4 },
+                },
               }}>
                 {loading ? (
                   <>
-                    <AutoAwesomeIcon sx={{ 
-                      fontSize: 14,
-                      color: '#a5b4fc',
-                      animation: 'shimmer 1.5s infinite',
-                      '@keyframes shimmer': {
-                        '0%, 100%': { opacity: 1 },
-                        '50%': { opacity: 0.4 },
-                      }
-                    }} />
+                    <Sparkles size={14} color={isDark ? '#93c5fd' : '#2563eb'} style={{ animation: 'shimmer 1.5s infinite' }} />
                     กำลังคิด...
                   </>
                 ) : (
@@ -877,45 +884,45 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
               size="small" 
               onClick={handleClearChat}
               sx={{ 
-                color: 'rgba(255,255,255,0.6)', 
+                color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)', 
                 transition: 'all 0.2s',
                 '&:hover': { 
-                  color: 'rgba(255,255,255,0.9)', 
-                  bgcolor: 'rgba(255,255,255,0.1)',
+                  color: isDark ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.8)', 
+                  bgcolor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
                   transform: 'rotate(180deg)',
                 } 
               }}
               title="ล้างแชท"
             >
-              <RefreshIcon fontSize="small" />
+              <RotateCcw size={20} />
             </IconButton>
             <IconButton 
               size="small" 
               onClick={toggleFullscreen}
               sx={{ 
-                color: 'rgba(255,255,255,0.6)', 
+                color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)', 
                 display: { xs: 'flex', sm: 'flex' },
                 '&:hover': { 
-                  color: 'rgba(255,255,255,0.9)', 
-                  bgcolor: 'rgba(255,255,255,0.1)' 
+                  color: isDark ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.8)', 
+                  bgcolor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
                 } 
               }}
               title={isFullscreen ? "ย่อหน้าต่าง" : "ขยายเต็มจอ"}
             >
-              {isFullscreen ? <FullscreenExitIcon fontSize="small" /> : <FullscreenIcon fontSize="small" />}
+              {isFullscreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
             </IconButton>
             <IconButton 
               size="small" 
               onClick={() => setOpen(false)}
               sx={{ 
-                color: 'rgba(255,255,255,0.6)', 
+                color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)', 
                 '&:hover': { 
-                  color: 'rgba(255,255,255,0.9)', 
-                  bgcolor: 'rgba(255,255,255,0.1)' 
+                  color: isDark ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.8)', 
+                  bgcolor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
                 } 
               }}
             >
-              <CloseIcon fontSize="small" />
+              <X size={20} />
             </IconButton>
           </Box>
         </Box>
@@ -924,7 +931,9 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
         <DialogContent 
           ref={messagesContainerRef}
           sx={{ 
-            background: 'linear-gradient(180deg, rgba(15,23,42,0.8) 0%, rgba(30,41,59,0.9) 100%)',
+            background: isDark
+              ? 'linear-gradient(180deg, rgba(15,23,42,0.8) 0%, rgba(30,41,59,0.9) 100%)'
+              : 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)',
             minHeight: isFullscreen ? 'calc(100vh - 160px)' : 320,
             maxHeight: isFullscreen ? 'calc(100vh - 160px)' : 380,
             overflowY: 'auto',
@@ -934,9 +943,9 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
             '&::-webkit-scrollbar': { width: 4 },
             '&::-webkit-scrollbar-track': { bgcolor: 'transparent' },
             '&::-webkit-scrollbar-thumb': { 
-              bgcolor: 'rgba(255,255,255,0.15)', 
+              bgcolor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)', 
               borderRadius: 2,
-              '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' },
+              '&:hover': { bgcolor: isDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.2)' },
             },
           }}
         >
@@ -948,9 +957,11 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                   width: 72,
                   height: 72,
                   borderRadius: 2,
-                  background: 'linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.04) 100%)',
-                  border: '1px solid rgba(255,255,255,0.15)',
-                  boxShadow: '0 6px 20px rgba(99, 102, 241, 0.15)',
+                  background: isDark
+                    ? 'linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.04) 100%)'
+                    : 'linear-gradient(135deg, #e2e8f0 0%, #f1f5f9 100%)',
+                  border: `1px solid ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)'}`,
+                  boxShadow: '0 6px 20px rgba(37, 99, 235, 0.15)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -976,7 +987,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
               </Box>
               
               <Typography sx={{ 
-                color: 'rgba(255,255,255,0.95)', 
+                color: isDark ? 'rgba(255,255,255,0.95)' : 'rgba(0,0,0,0.87)', 
                 fontWeight: 600, 
                 fontSize: 18,
                 mb: 0.5,
@@ -985,7 +996,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 justifyContent: 'center',
                 gap: 0.75,
               }}>
-                สวัสดีค่ะ! <WavingHandIcon sx={{ fontSize: 20, color: '#fbbf24' }} />
+                สวัสดีค่ะ! <Hand size={20} color="#fbbf24" />
               </Typography>
               
               {aiEnabled && (
@@ -997,18 +1008,18 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                   px: 1,
                   py: 0.4,
                   borderRadius: 1,
-                  background: 'rgba(99, 102, 241, 0.15)',
-                  border: '1px solid rgba(99, 102, 241, 0.25)',
-                  color: 'rgba(165, 180, 252, 0.95)',
+                  background: isDark ? 'rgba(37, 99, 235, 0.15)' : 'rgba(37, 99, 235, 0.08)',
+                  border: `1px solid ${isDark ? 'rgba(37, 99, 235, 0.25)' : 'rgba(37, 99, 235, 0.15)'}`,
+                  color: isDark ? 'rgba(165, 180, 252, 0.95)' : '#2563eb',
                   fontWeight: 500,
                   mb: 1.5,
                 }}>
-                  <AutoAwesomeIcon sx={{ fontSize: 12 }} />
+                  <Sparkles size={12} />
                   ขับเคลื่อนด้วย Gemini AI
                 </Box>
               )}
               
-              <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, mb: 2 }}>
+              <Typography sx={{ color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)', fontSize: 13, mb: 2 }}>
                 ถามเกี่ยวกับสินค้า ราคา ไซซ์ ได้เลยค่ะ
               </Typography>
 
@@ -1026,14 +1037,14 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                     alignItems: 'center',
                     gap: 0.5,
                     fontSize: 11,
-                    color: 'rgba(165, 180, 252, 0.9)',
-                    background: 'rgba(99, 102, 241, 0.15)',
-                    border: '1px solid rgba(99, 102, 241, 0.25)',
+                    color: isDark ? 'rgba(165, 180, 252, 0.9)' : '#2563eb',
+                    background: isDark ? 'rgba(37, 99, 235, 0.15)' : 'rgba(37, 99, 235, 0.08)',
+                    border: `1px solid ${isDark ? 'rgba(37, 99, 235, 0.25)' : 'rgba(37, 99, 235, 0.15)'}`,
                     px: 1.25,
                     py: 0.4,
                     borderRadius: 1,
                   }}>
-                    <StorefrontIcon sx={{ fontSize: 13 }} />
+                    <Store size={13} />
                     {shopInfo.totalProducts} สินค้า
                   </Box>
                   {typeof shopInfo.availableProducts === 'number' && shopInfo.availableProducts > 0 && (
@@ -1042,14 +1053,14 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       alignItems: 'center',
                       gap: 0.5,
                       fontSize: 11,
-                      color: 'rgba(110, 231, 183, 0.9)',
-                      background: 'rgba(16, 185, 129, 0.15)',
-                      border: '1px solid rgba(16, 185, 129, 0.25)',
+                      color: isDark ? 'rgba(110, 231, 183, 0.9)' : '#059669',
+                      background: isDark ? 'rgba(16, 185, 129, 0.15)' : 'rgba(16, 185, 129, 0.08)',
+                      border: `1px solid ${isDark ? 'rgba(16, 185, 129, 0.25)' : 'rgba(16, 185, 129, 0.15)'}`,
                       px: 1.25,
                       py: 0.4,
                       borderRadius: 1,
                     }}>
-                      <VerifiedIcon sx={{ fontSize: 12 }} /> {shopInfo.availableProducts} พร้อมขาย
+                      <BadgeCheck size={12} /> {shopInfo.availableProducts} พร้อมขาย
                     </Box>
                   )}
                   {shopInfo.priceRange && shopInfo.priceRange.max > 0 && (
@@ -1058,14 +1069,14 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       alignItems: 'center',
                       gap: 0.5,
                       fontSize: 11,
-                      color: 'rgba(251, 191, 36, 0.9)',
-                      background: 'rgba(251, 191, 36, 0.15)',
-                      border: '1px solid rgba(251, 191, 36, 0.25)',
+                      color: isDark ? 'rgba(251, 191, 36, 0.9)' : '#d97706',
+                      background: isDark ? 'rgba(251, 191, 36, 0.15)' : 'rgba(251, 191, 36, 0.08)',
+                      border: `1px solid ${isDark ? 'rgba(251, 191, 36, 0.25)' : 'rgba(251, 191, 36, 0.15)'}`,
                       px: 1.25,
                       py: 0.4,
                       borderRadius: 1,
                     }}>
-                      <PaidOutlinedIcon sx={{ fontSize: 12 }} /> {shopInfo.priceRange.min === shopInfo.priceRange.max 
+                      <Coins size={12} /> {shopInfo.priceRange.min === shopInfo.priceRange.max 
                         ? `${shopInfo.priceRange.min}฿`
                         : `${shopInfo.priceRange.min}-${shopInfo.priceRange.max}฿`}
                     </Box>
@@ -1074,7 +1085,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
               )}
               
               {/* Quick Questions */}
-              <Typography sx={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, mb: 1.5, textAlign: 'left' }}>
+              <Typography sx={{ color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)', fontSize: 11, mb: 1.5, textAlign: 'left' }}>
                 ลองถาม:
               </Typography>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, justifyContent: 'center' }}>
@@ -1085,9 +1096,9 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                     label={q.label}
                     onClick={() => handleQuickQuestion(q.label)}
                     sx={{
-                      background: 'rgba(255,255,255,0.08)',
-                      border: '1px solid rgba(255,255,255,0.12)',
-                      color: 'rgba(255,255,255,0.8)',
+                      background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+                      border: `1px solid ${isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)'}`,
+                      color: isDark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.7)',
                       fontSize: 12,
                       height: 32,
                       borderRadius: 1.5,
@@ -1095,12 +1106,12 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       transition: 'all 0.2s ease',
                       pl: 0.5,
                       '& .MuiChip-icon': {
-                        color: 'rgba(165, 180, 252, 0.9)',
+                        color: isDark ? 'rgba(165, 180, 252, 0.9)' : '#2563eb',
                         marginLeft: '6px',
                       },
                       '&:hover': {
-                        background: 'rgba(255,255,255,0.12)',
-                        borderColor: 'rgba(255,255,255,0.2)',
+                        background: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(37, 99, 235, 0.08)',
+                        borderColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(37, 99, 235, 0.2)',
                       },
                     }}
                   />
@@ -1133,11 +1144,11 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 src={msg.sender === 'user' && userSession?.image ? userSession.image : undefined}
                 sx={{ 
                   background: msg.sender === 'user' 
-                    ? 'rgba(99, 102, 241, 0.5)'
-                    : 'rgba(255,255,255,0.1)',
+                    ? 'rgba(37, 99, 235, 0.5)'
+                    : isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
                   border: msg.sender === 'user'
-                    ? '1px solid rgba(139, 92, 246, 0.4)'
-                    : '1px solid rgba(255,255,255,0.12)',
+                    ? '1px solid rgba(30, 64, 175, 0.4)'
+                    : `1px solid ${isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)'}`,
                   width: 30, 
                   height: 30, 
                   fontSize: 14,
@@ -1146,9 +1157,9 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 }}
               >
                 {msg.sender === 'user' ? (
-                  userSession?.image ? null : <PersonOutlineIcon sx={{ fontSize: 16 }} />
+                  userSession?.image ? null : <User size={16} />
                 ) : (
-                  <SmartToyIcon sx={{ fontSize: 16, color: '#a5b4fc' }} />
+                  <Bot size={16} color={isDark ? '#93c5fd' : '#2563eb'} />
                 )}
               </Avatar>
               <Box sx={{ mx: 1.25, maxWidth: '78%' }}>
@@ -1171,15 +1182,15 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                           height: 72,
                           borderRadius: 1.5,
                           overflow: 'hidden',
-                          border: '1px solid rgba(255,255,255,0.15)',
-                          background: 'rgba(255,255,255,0.05)',
+                          border: `1px solid ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)'}`,
+                          background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
                           flexShrink: 0,
                           cursor: 'pointer',
                           transition: 'all 0.2s ease',
                           '&:hover': {
                             transform: 'scale(1.05)',
-                            borderColor: 'rgba(99, 102, 241, 0.5)',
-                            boxShadow: '0 4px 12px rgba(99, 102, 241, 0.25)',
+                            borderColor: 'rgba(37, 99, 235, 0.5)',
+                            boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
                           },
                           '&:hover .zoom-icon': {
                             opacity: 1,
@@ -1213,7 +1224,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                             p: 0.5,
                           }}
                         >
-                          <FullscreenIcon sx={{ fontSize: 16, color: 'white' }} />
+                          <Maximize2 size={16} color="white" />
                         </Box>
                         <Box
                           sx={{
@@ -1256,19 +1267,19 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       py: 0.5,
                       borderRadius: 1,
                       bgcolor: msg.sender === 'user' 
-                        ? 'rgba(139, 92, 246, 0.2)'
-                        : 'rgba(255,255,255,0.05)',
+                        ? 'rgba(30, 64, 175, 0.2)'
+                        : isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
                       borderLeft: msg.replyTo.sender === 'user' 
-                        ? '2px solid rgba(139, 92, 246, 0.6)'
-                        : '2px solid rgba(165, 180, 252, 0.6)',
+                        ? '2px solid rgba(30, 64, 175, 0.6)'
+                        : `2px solid ${isDark ? 'rgba(165, 180, 252, 0.6)' : 'rgba(37, 99, 235, 0.5)'}`,
                       fontSize: 11,
-                      color: 'rgba(255,255,255,0.6)',
+                      color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)',
                       cursor: 'pointer',
                       transition: 'all 0.2s',
                       '&:hover': {
                         bgcolor: msg.sender === 'user' 
-                          ? 'rgba(139, 92, 246, 0.3)'
-                          : 'rgba(255,255,255,0.08)',
+                          ? 'rgba(30, 64, 175, 0.3)'
+                          : isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
                       },
                     }}
                     onClick={() => {
@@ -1276,14 +1287,14 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       if (el) {
                         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                         el.style.transition = 'background 0.3s';
-                        el.style.background = 'rgba(99, 102, 241, 0.3)';
+                        el.style.background = 'rgba(37, 99, 235, 0.3)';
                         setTimeout(() => {
                           el.style.background = '';
                         }, 1500);
                       }
                     }}
                   >
-                    <ReplyIcon sx={{ fontSize: 12, transform: 'scaleX(-1)' }} />
+                    <Reply size={12} style={{ transform: 'scaleX(-1)' }} />
                     <Box sx={{ 
                       overflow: 'hidden', 
                       textOverflow: 'ellipsis', 
@@ -1303,12 +1314,12 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                   id={msg.id}
                   sx={{
                     background: msg.sender === 'user' 
-                      ? 'rgba(99, 102, 241, 0.35)'
-                      : 'rgba(255,255,255,0.08)',
+                      ? isDark ? 'rgba(37, 99, 235, 0.35)' : 'rgba(37, 99, 235, 0.12)'
+                      : isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
                     border: msg.sender === 'user'
-                      ? '1px solid rgba(139, 92, 246, 0.35)'
-                      : '1px solid rgba(255,255,255,0.1)',
-                    color: 'rgba(255,255,255,0.95)',
+                      ? `1px solid ${isDark ? 'rgba(30, 64, 175, 0.35)' : 'rgba(37, 99, 235, 0.2)'}`
+                      : `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)'}`,
+                    color: isDark ? 'rgba(255,255,255,0.95)' : 'rgba(0,0,0,0.87)',
                     px: 1.5,
                     py: 1,
                     borderRadius: msg.sender === 'user' 
@@ -1329,7 +1340,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                   alignItems: 'center', 
                   gap: 0.5,
                   fontSize: 10, 
-                  color: 'rgba(255,255,255,0.4)', 
+                  color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)', 
                   mt: 0.5,
                   textAlign: msg.sender === 'user' ? 'right' : 'left',
                   flexDirection: msg.sender === 'user' ? 'row-reverse' : 'row',
@@ -1338,7 +1349,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                   {msg.isEdited && (
                     <Box sx={{
                       fontSize: 9,
-                      color: 'rgba(255,255,255,0.4)',
+                      color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)',
                       fontStyle: 'italic',
                     }}>
                       (แก้ไขแล้ว)
@@ -1351,8 +1362,8 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                         px: 0.6,
                         py: 0.2,
                         borderRadius: 0.5,
-                        bgcolor: 'rgba(16, 185, 129, 0.2)',
-                        color: '#6ee7b7',
+                        bgcolor: isDark ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.1)',
+                        color: isDark ? '#6ee7b7' : '#059669',
                         cursor: 'help',
                         display: 'flex',
                         alignItems: 'center',
@@ -1360,7 +1371,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       }}
                       title={msg.modelUsed ? `Powered by ${msg.modelUsed}` : 'AI'}
                     >
-                      <AutoAwesomeIcon sx={{ fontSize: 10 }} /> {msg.modelUsed ? msg.modelUsed.replace('gemini-', '') : 'AI'}
+                      <Sparkles size={10} /> {msg.modelUsed ? msg.modelUsed.replace('gemini-', '') : 'AI'}
                     </Box>
                   )}
                   {msg.sender === 'bot' && msg.source === 'faq' && (
@@ -1369,13 +1380,13 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       px: 0.6,
                       py: 0.2,
                       borderRadius: 0.5,
-                      bgcolor: 'rgba(99, 102, 241, 0.2)',
-                      color: '#a5b4fc',
+                      bgcolor: isDark ? 'rgba(37, 99, 235, 0.2)' : 'rgba(37, 99, 235, 0.1)',
+                      color: isDark ? '#93c5fd' : '#2563eb',
                       display: 'flex',
                       alignItems: 'center',
                       gap: 0.25,
                     }}>
-                      <MenuBookOutlinedIcon sx={{ fontSize: 10 }} /> FAQ
+                      <BookOpen size={10} /> FAQ
                     </Box>
                   )}
                   {msg.sender === 'user' && (
@@ -1384,12 +1395,12 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       onClick={() => handleEditMessage(msg)}
                       sx={{
                         p: 0.25,
-                        color: 'rgba(255,255,255,0.4)',
+                        color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)',
                         '&:hover': { color: '#fbbf24', bgcolor: 'transparent' },
                       }}
                       title="แก้ไขข้อความ"
                     >
-                      <EditIcon sx={{ fontSize: 12 }} />
+                      <Pencil size={12} />
                     </IconButton>
                   )}
                   <IconButton
@@ -1397,12 +1408,12 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                     onClick={() => handleReply(msg)}
                     sx={{
                       p: 0.25,
-                      color: 'rgba(255,255,255,0.4)',
-                      '&:hover': { color: '#a5b4fc', bgcolor: 'transparent' },
+                      color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)',
+                      '&:hover': { color: isDark ? '#93c5fd' : '#2563eb', bgcolor: 'transparent' },
                     }}
                     title="ตอบกลับ"
                   >
-                    <ReplyIcon sx={{ fontSize: 12, transform: 'scaleX(-1)' }} />
+                    <Reply size={12} style={{ transform: 'scaleX(-1)' }} />
                   </IconButton>
                   {msg.sender === 'bot' && (
                     <IconButton
@@ -1410,15 +1421,15 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       onClick={() => handleCopyMessage(msg.id, msg.text)}
                       sx={{
                         p: 0.25,
-                        color: copiedMessageId === msg.id ? '#4ade80' : 'rgba(255,255,255,0.4)',
-                        '&:hover': { color: 'rgba(255,255,255,0.8)', bgcolor: 'transparent' },
+                        color: copiedMessageId === msg.id ? '#4ade80' : isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)',
+                        '&:hover': { color: isDark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.6)', bgcolor: 'transparent' },
                       }}
                       title="คัดลอก"
                     >
                       {copiedMessageId === msg.id ? (
-                        <CheckIcon sx={{ fontSize: 12 }} />
+                        <Check size={12} />
                       ) : (
-                        <ContentCopyIcon sx={{ fontSize: 12 }} />
+                        <Copy size={12} />
                       )}
                     </IconButton>
                   )}
@@ -1434,16 +1445,18 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                         size="small"
                         onClick={() => handleQuickQuestion(s)}
                         sx={{
-                          background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)',
-                          color: 'rgba(165, 180, 252, 0.9)',
-                          border: '1px solid rgba(255,255,255,0.15)',
+                          background: isDark
+                            ? 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)'
+                            : 'linear-gradient(135deg, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0.02) 100%)',
+                          color: isDark ? 'rgba(165, 180, 252, 0.9)' : '#2563eb',
+                          border: `1px solid ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)'}`,
                           fontSize: 11,
                           height: 28,
                           cursor: 'pointer',
                           transition: 'all 0.2s ease',
                           '&:hover': { 
-                            background: 'rgba(255,255,255,0.1)',
-                            borderColor: 'rgba(255,255,255,0.2)',
+                            background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(37, 99, 235, 0.06)',
+                            borderColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(37, 99, 235, 0.2)',
                           },
                         }}
                       />
@@ -1454,7 +1467,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 {/* Related Questions */}
                 {msg.sender === 'bot' && msg.relatedQuestions && msg.relatedQuestions.length > 0 && (
                   <Box sx={{ mt: 1.5 }}>
-                    <Typography sx={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', mb: 0.75 }}>
+                    <Typography sx={{ fontSize: 10, color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)', mb: 0.75 }}>
                       คำถามที่เกี่ยวข้อง:
                     </Typography>
                     {msg.relatedQuestions.map((q, i) => (
@@ -1462,13 +1475,13 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                         key={i}
                         onClick={() => handleQuickQuestion(q)}
                         sx={{ 
-                          color: 'rgba(165, 180, 252, 0.8)', 
+                          color: isDark ? 'rgba(165, 180, 252, 0.8)' : '#2563eb', 
                           fontSize: 12, 
                           cursor: 'pointer',
                           py: 0.25,
                           transition: 'all 0.2s',
                           '&:hover': { 
-                            color: 'rgba(165, 180, 252, 1)',
+                            color: isDark ? 'rgba(165, 180, 252, 1)' : '#1e40af',
                             transform: 'translateX(4px)',
                           },
                         }}
@@ -1487,18 +1500,18 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
             <Box sx={{ display: 'flex', alignItems: 'flex-end', mb: 2 }}>
               <Avatar 
                 sx={{ 
-                  background: 'rgba(255,255,255,0.1)',
-                  border: '1px solid rgba(255,255,255,0.12)',
+                  background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
+                  border: `1px solid ${isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)'}`,
                   width: 32, 
                   height: 32,
                 }}
               >
-                <SmartToyIcon sx={{ fontSize: 18, color: '#a5b4fc' }} />
+                <Bot size={18} color={isDark ? '#93c5fd' : '#2563eb'} />
               </Avatar>
               <Box
                 sx={{
-                  background: 'rgba(255,255,255,0.08)',
-                  border: '1px solid rgba(255,255,255,0.1)',
+                  background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+                  border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)'}`,
                   px: 2,
                   py: 1.25,
                   borderRadius: '12px 12px 12px 4px',
@@ -1515,7 +1528,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       width: 7,
                       height: 7,
                       borderRadius: '50%',
-                      bgcolor: '#a5b4fc',
+                      bgcolor: isDark ? '#93c5fd' : '#2563eb',
                       animation: 'bounce 1.4s infinite',
                       animationDelay: `${i * 0.16}s`,
                       '@keyframes bounce': {
@@ -1544,20 +1557,20 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
               px: 1.5,
               py: 0.5,
               borderRadius: 1.5,
-              bgcolor: 'rgba(99, 102, 241, 0.15)',
-              borderLeft: '3px solid rgba(99, 102, 241, 0.6)',
+              bgcolor: isDark ? 'rgba(37, 99, 235, 0.15)' : 'rgba(37, 99, 235, 0.06)',
+              borderLeft: '3px solid rgba(37, 99, 235, 0.6)',
             }}
           >
-            <ReplyIcon sx={{ fontSize: 14, color: '#a5b4fc', transform: 'scaleX(-1)' }} />
+            <Reply size={14} color={isDark ? '#93c5fd' : '#2563eb'} style={{ transform: 'scaleX(-1)' }} />
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Typography sx={{ 
                 fontSize: 11, 
-                color: 'rgba(255,255,255,0.7)',
+                color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
               }}>
-                <Box component="span" sx={{ color: '#a5b4fc', fontWeight: 500, mr: 0.5 }}>
+                <Box component="span" sx={{ color: isDark ? '#93c5fd' : '#2563eb', fontWeight: 500, mr: 0.5 }}>
                   ตอบกลับ {replyToMessage.sender === 'user' ? 'คุณ' : 'Bot'}:
                 </Box>
                 {replyToMessage.text}
@@ -1568,11 +1581,11 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
               onClick={() => setReplyToMessage(null)}
               sx={{ 
                 p: 0.25,
-                color: 'rgba(255,255,255,0.5)',
-                '&:hover': { color: 'rgba(255,255,255,0.8)' },
+                color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)',
+                '&:hover': { color: isDark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.7)' },
               }}
             >
-              <CloseIcon sx={{ fontSize: 14 }} />
+              <X size={14} />
             </IconButton>
           </Box>
         )}
@@ -1589,20 +1602,20 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
               px: 1.5,
               py: 0.5,
               borderRadius: 1.5,
-              bgcolor: 'rgba(251, 191, 36, 0.15)',
+              bgcolor: isDark ? 'rgba(251, 191, 36, 0.15)' : 'rgba(251, 191, 36, 0.08)',
               borderLeft: '3px solid rgba(251, 191, 36, 0.6)',
             }}
           >
-            <EditIcon sx={{ fontSize: 14, color: '#fbbf24' }} />
+            <Pencil size={14} color={isDark ? '#fbbf24' : '#d97706'} />
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Typography sx={{ 
                 fontSize: 11, 
-                color: 'rgba(255,255,255,0.7)',
+                color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
               }}>
-                <Box component="span" sx={{ color: '#fbbf24', fontWeight: 500, mr: 0.5 }}>
+                <Box component="span" sx={{ color: isDark ? '#fbbf24' : '#d97706', fontWeight: 500, mr: 0.5 }}>
                   แก้ไขข้อความ
                 </Box>
                 {editingMessage.text.slice(0, 50) + (editingMessage.text.length > 50 ? '...' : '')}
@@ -1613,11 +1626,11 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
               onClick={cancelEditMode}
               sx={{ 
                 p: 0.25,
-                color: 'rgba(255,255,255,0.5)',
-                '&:hover': { color: 'rgba(255,255,255,0.8)' },
+                color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)',
+                '&:hover': { color: isDark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.7)' },
               }}
             >
-              <CloseIcon sx={{ fontSize: 14 }} />
+              <X size={14} />
             </IconButton>
           </Box>
         )}
@@ -1627,8 +1640,8 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
           px: 1.5,
           pt: (replyToMessage || editingMessage) ? 0.5 : 1,
           pb: 1.25,
-          background: 'rgba(255,255,255,0.05)',
-          borderTop: (replyToMessage || editingMessage) ? 'none' : '1px solid rgba(255,255,255,0.08)',
+          background: isDark ? 'rgba(255,255,255,0.05)' : '#f8fafc',
+          borderTop: (replyToMessage || editingMessage) ? 'none' : `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
         }}>
           <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'flex-end' }}>
             <input
@@ -1646,25 +1659,25 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 width: 40,
                 height: 40,
                 borderRadius: 1.5,
-                bgcolor: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.1)',
-                color: 'rgba(255,255,255,0.6)',
+                bgcolor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}`,
+                color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)',
                 flexShrink: 0,
                 transition: 'all 0.2s',
                 '&:hover': {
-                  bgcolor: 'rgba(255,255,255,0.1)',
-                  color: 'rgba(255,255,255,0.9)',
+                  bgcolor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
+                  color: isDark ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.8)',
                 },
                 '&:disabled': {
-                  color: 'rgba(255,255,255,0.3)',
+                  color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)',
                 },
               }}
               title="อัปโหลดรูปภาพ"
             >
               {isUploading ? (
-                <CircularProgress size={18} sx={{ color: 'rgba(255,255,255,0.5)' }} />
+                <CircularProgress size={18} sx={{ color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)' }} />
               ) : (
-                <AddPhotoAlternateIcon sx={{ fontSize: 20 }} />
+                <ImagePlus size={20} />
               )}
             </IconButton>
             
@@ -1674,17 +1687,17 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 display: 'flex',
                 alignItems: 'flex-end',
                 gap: 1,
-                background: 'rgba(255,255,255,0.05)',
+                background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
                 borderRadius: 1.5,
-                border: '1px solid rgba(255,255,255,0.1)',
+                border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}`,
                 px: 1,
                 py: 0.5,
                 transition: 'all 0.2s',
                 '&:focus-within': {
-                  borderColor: 'rgba(99, 102, 241, 0.5)',
+                  borderColor: isDark ? 'rgba(37, 99, 235, 0.5)' : 'rgba(37, 99, 235, 0.4)',
                 },
                 '&:hover': {
-                  borderColor: 'rgba(255,255,255,0.2)',
+                  borderColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)',
                 },
               }}
             >
@@ -1705,7 +1718,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       height: 36,
                       borderRadius: 1,
                       objectFit: 'cover',
-                      border: '1px solid rgba(99, 102, 241, 0.4)',
+                      border: '1px solid rgba(37, 99, 235, 0.4)',
                     }}
                   />
                   <IconButton
@@ -1725,7 +1738,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       },
                     }}
                   >
-                    <CloseIcon sx={{ fontSize: 10 }} />
+                    <X size={10} />
                   </IconButton>
                 </Box>
               )}
@@ -1752,7 +1765,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                   flex: 1,
                   '& .MuiOutlinedInput-root': {
                     background: 'transparent',
-                    color: 'rgba(255,255,255,0.95)',
+                    color: isDark ? 'rgba(255,255,255,0.95)' : 'rgba(0,0,0,0.87)',
                     fontSize: 14,
                     '& fieldset': { 
                       border: 'none',
@@ -1761,7 +1774,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                   '& .MuiOutlinedInput-input': {
                     py: 0.75,
                     px: 0,
-                    '&::placeholder': { color: 'rgba(255,255,255,0.4)', opacity: 1 },
+                    '&::placeholder': { color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)', opacity: 1 },
                   },
                 }}
               />
@@ -1776,25 +1789,25 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 height: 40,
                 borderRadius: 1.5,
                 flexShrink: 0,
-                bgcolor: uploadedImage ? 'rgba(16, 185, 129, 0.5)' : 'rgba(99, 102, 241, 0.5)',
-                border: uploadedImage ? '1px solid rgba(16, 185, 129, 0.35)' : '1px solid rgba(139, 92, 246, 0.35)',
+                bgcolor: uploadedImage ? 'rgba(16, 185, 129, 0.5)' : 'rgba(37, 99, 235, 0.5)',
+                border: uploadedImage ? '1px solid rgba(16, 185, 129, 0.35)' : '1px solid rgba(30, 64, 175, 0.35)',
                 transition: 'all 0.2s',
                 '&:hover': {
-                  bgcolor: uploadedImage ? 'rgba(16, 185, 129, 0.65)' : 'rgba(99, 102, 241, 0.65)',
+                  bgcolor: uploadedImage ? 'rgba(16, 185, 129, 0.65)' : 'rgba(37, 99, 235, 0.65)',
                 },
                 '&:disabled': {
-                  bgcolor: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  color: 'rgba(255,255,255,0.3)',
+                  bgcolor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+                  border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
+                  color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.25)',
                 },
               }}
             >
-              <SendIcon sx={{ fontSize: 18 }} />
+              <Send size={18} />
             </Button>
           </Box>
           <Typography sx={{ 
             fontSize: 9, 
-            color: 'rgba(255,255,255,0.3)', 
+            color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)', 
             mt: 0.5, 
             textAlign: 'center',
             display: 'flex',
@@ -1805,17 +1818,17 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
           }}>
             {userSession && (
               <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
-                <PersonOutlineIcon sx={{ fontSize: 10 }} />
+                <User size={10} />
                 {userSession.name || userSession.email}
                 <Box component="span" sx={{ mx: 0.5 }}>•</Box>
               </Box>
             )}
             <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
-              <AutoAwesomeIcon sx={{ fontSize: 10 }} /> Gemini AI
+              <Sparkles size={10} /> Gemini AI
             </Box>
             <Box component="span" sx={{ mx: 0.5 }}>•</Box>
             <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
-              <ImageOutlinedIcon sx={{ fontSize: 10 }} /> รองรับรูปภาพ
+              <Image size={10} /> รองรับรูปภาพ
             </Box>
           </Typography>
         </Box>
@@ -1846,7 +1859,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
             zIndex: 1,
           }}
         >
-          <CloseIcon />
+          <X size={24} />
         </IconButton>
         {lightboxImage && (
           <Box
@@ -1883,9 +1896,9 @@ export function ChatBotFab({ onClick, showPulse = true }: ChatBotFabProps) {
         width: 56,
         height: 56,
         borderRadius: '50%',
-        background: 'linear-gradient(135deg, rgba(99,102,241,0.9) 0%, rgba(139,92,246,0.9) 100%)',
+        background: 'linear-gradient(135deg, rgba(37,99,235,0.9) 0%, rgba(30,64,175,0.9) 100%)',
         border: '2px solid rgba(255,255,255,0.2)',
-        boxShadow: '0 8px 32px rgba(99, 102, 241, 0.4)',
+        boxShadow: '0 8px 32px rgba(37, 99, 235, 0.4)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -1893,7 +1906,7 @@ export function ChatBotFab({ onClick, showPulse = true }: ChatBotFabProps) {
         transition: 'all 0.3s ease',
         '&:hover': {
           transform: 'scale(1.1)',
-          boxShadow: '0 12px 40px rgba(99, 102, 241, 0.5)',
+          boxShadow: '0 12px 40px rgba(37, 99, 235, 0.5)',
         },
         '&:active': {
           transform: 'scale(0.95)',
@@ -1904,7 +1917,7 @@ export function ChatBotFab({ onClick, showPulse = true }: ChatBotFabProps) {
             position: 'absolute',
             inset: -4,
             borderRadius: '50%',
-            background: 'linear-gradient(135deg, rgba(99,102,241,0.5) 0%, rgba(139,92,246,0.5) 100%)',
+            background: 'linear-gradient(135deg, rgba(37,99,235,0.5) 0%, rgba(30,64,175,0.5) 100%)',
             animation: 'pulse 2s ease-in-out infinite',
             zIndex: -1,
           },
@@ -1915,7 +1928,7 @@ export function ChatBotFab({ onClick, showPulse = true }: ChatBotFabProps) {
         }),
       }}
     >
-      <ChatIcon sx={{ color: 'white', fontSize: 28 }} />
+      <MessageCircle size={28} color="white" />
     </Box>
   );
 }

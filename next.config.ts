@@ -55,7 +55,7 @@ const nextConfig: NextConfig = {
             // 'unsafe-eval' needed for Next.js (both dev HMR and production hydration in some cases)
             "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://static.cloudflareinsights.com;",
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;",
-            "img-src 'self' data: blob: https://*.filebase.io https://*.filebase.com https://lh3.googleusercontent.com https://ui-avatars.com https://*.supabase.co;",
+            "img-src 'self' data: blob: https://*.filebase.io https://*.filebase.com https://*.googleusercontent.com https://ui-avatars.com https://*.supabase.co;",
             "font-src 'self' https://fonts.gstatic.com;",
             "connect-src 'self' https://*.filebase.com https://*.filebase.io https://api.resend.com https://challenges.cloudflare.com https://*.supabase.co wss://*.supabase.co;",
             "media-src 'self';",

@@ -25,9 +25,9 @@ export async function GET(
         <head><title>ไม่มีสิทธิ์เข้าถึง</title><meta charset="utf-8"></head>
         <body style="font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #1e293b; color: #94a3b8;">
           <div style="text-align: center;">
-            <h1 style="color: #ef4444;">🔒 ไม่มีสิทธิ์เข้าถึง</h1>
+            <h1 style="color: #ef4444;">ไม่มีสิทธิ์เข้าถึง</h1>
             <p>เฉพาะผู้ดูแลระบบเท่านั้นที่สามารถดูสลิปได้</p>
-            <a href="/admin" style="color: #6366f1; text-decoration: none;">เข้าสู่ระบบแอดมิน</a>
+            <a href="/admin" style="color: #2563eb; text-decoration: none;">เข้าสู่ระบบแอดมิน</a>
           </div>
         </body>
         </html>`,
@@ -113,8 +113,8 @@ export async function GET(
       margin: 0 auto;
     }
     .header {
-      background: rgba(99, 102, 241, 0.1);
-      border: 1px solid rgba(99, 102, 241, 0.3);
+      background: rgba(37, 99, 235, 0.1);
+      border: 1px solid rgba(37, 99, 235, 0.3);
       border-radius: 16px;
       padding: 20px;
       margin-bottom: 20px;
@@ -123,7 +123,7 @@ export async function GET(
     .header h1 {
       margin: 0 0 10px 0;
       font-size: 1.5rem;
-      color: #a5b4fc;
+      color: #93c5fd;
     }
     .header .ref {
       font-family: monospace;
@@ -205,7 +205,7 @@ export async function GET(
 <body>
   <div class="container">
     <div class="header">
-      <h1>🧾 สลิปการโอนเงิน</h1>
+      <h1>สลิปการโอนเงิน</h1>
       <span class="ref">#${ref}</span>
     </div>
     
@@ -226,7 +226,7 @@ export async function GET(
     
     ${slipData ? `
     <div class="slip-data">
-      <h3>📋 ข้อมูลจากสลิป</h3>
+      <h3>ข้อมูลจากสลิป</h3>
       ${slipData.sendingBank || slipData.senderBank ? `<div class="row"><span class="label">ธนาคารผู้โอน</span><span class="value">${slipData.sendingBank || slipData.senderBank}</span></div>` : ''}
       ${slipData.receivingBank || slipData.receiverBank ? `<div class="row"><span class="label">ธนาคารผู้รับ</span><span class="value">${slipData.receivingBank || slipData.receiverBank}</span></div>` : ''}
       ${slipData.sender?.displayName || slipData.senderName ? `<div class="row"><span class="label">ชื่อผู้โอน</span><span class="value">${slipData.sender?.displayName || slipData.senderName}</span></div>` : ''}

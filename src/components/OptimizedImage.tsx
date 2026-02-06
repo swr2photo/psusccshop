@@ -229,14 +229,14 @@ function OptimizedImageComponent({
             sx={{
               position: 'absolute',
               inset: 0,
-              bgcolor: 'rgba(30,41,59,0.8)',
+              bgcolor: 'var(--glass-bg)',
               borderRadius,
               overflow: 'hidden',
               '&::after': placeholder === 'shimmer' ? {
                 content: '""',
                 position: 'absolute',
                 inset: 0,
-                background: 'linear-gradient(90deg, transparent 0%, rgba(99,102,241,0.15) 50%, transparent 100%)',
+                background: 'linear-gradient(90deg, transparent 0%, rgba(37,99,235,0.15) 50%, transparent 100%)',
                 animation: 'shimmer 1.5s infinite',
                 '@keyframes shimmer': {
                   '0%': { transform: 'translateX(-100%)' },
@@ -251,10 +251,10 @@ function OptimizedImageComponent({
               top: '50%',
               left: '50%',
               transform: 'translate(-50%, -50%)',
-              color: 'rgba(99,102,241,0.3)',
+              color: 'rgba(37,99,235,0.3)',
               fontSize: '2rem',
             }}>
-              🖼️
+              
             </Box>
           </Box>
         )}
@@ -295,14 +295,14 @@ function OptimizedImageComponent({
           alignItems: 'center',
           justifyContent: 'center',
           gap: 1,
-          bgcolor: 'rgba(30,41,59,0.8)',
+          bgcolor: 'var(--glass-bg)',
           color: '#64748b',
           fontSize: '0.75rem',
           cursor: 'pointer',
           transition: 'all 0.2s ease',
           '&:hover': {
-            bgcolor: 'rgba(30,41,59,0.9)',
-            color: '#94a3b8',
+            bgcolor: 'var(--glass-strong)',
+            color: 'var(--text-muted)',
           },
         }}
       >
@@ -316,11 +316,11 @@ function OptimizedImageComponent({
             '75%': { transform: 'translateX(2px)' },
           },
         }}>
-          ⚠️
+          
         </Box>
         <Box sx={{ textAlign: 'center', px: 1 }}>
           โหลดรูปไม่สำเร็จ
-          <Box component="span" sx={{ display: 'block', fontSize: '0.65rem', color: '#6366f1', mt: 0.5 }}>
+          <Box component="span" sx={{ display: 'block', fontSize: '0.65rem', color: '#2563eb', mt: 0.5 }}>
             แตะเพื่อลองใหม่
           </Box>
         </Box>
@@ -342,14 +342,14 @@ function OptimizedImageComponent({
               sx={{
                 position: 'absolute',
                 inset: 0,
-                bgcolor: 'rgba(30,41,59,0.8)',
+                bgcolor: 'var(--glass-bg)',
                 borderRadius,
                 overflow: 'hidden',
                 '&::after': placeholder === 'shimmer' ? {
                   content: '""',
                   position: 'absolute',
                   inset: 0,
-                  background: 'linear-gradient(90deg, transparent 0%, rgba(99,102,241,0.2) 50%, transparent 100%)',
+                  background: 'linear-gradient(90deg, transparent 0%, rgba(37,99,235,0.2) 50%, transparent 100%)',
                   animation: 'shimmer 1.5s infinite',
                   '@keyframes shimmer': {
                     '0%': { transform: 'translateX(-100%)' },
@@ -370,7 +370,7 @@ function OptimizedImageComponent({
                     size={32} 
                     thickness={3}
                     sx={{ 
-                      color: '#6366f1',
+                      color: '#2563eb',
                       '& .MuiCircularProgress-circle': {
                         strokeLinecap: 'round',
                       },
@@ -385,7 +385,7 @@ function OptimizedImageComponent({
                   top: '50%',
                   left: '50%',
                   transform: 'translate(-50%, -50%)',
-                  color: 'rgba(99,102,241,0.4)',
+                  color: 'rgba(37,99,235,0.4)',
                   fontSize: '2rem',
                   animation: 'pulse 2s ease-in-out infinite',
                   '@keyframes pulse': {
@@ -393,7 +393,7 @@ function OptimizedImageComponent({
                     '50%': { opacity: 0.8 },
                   },
                 }}>
-                  🖼️
+                  
                 </Box>
               )}
             </Box>
@@ -472,7 +472,7 @@ export const OptimizedBackground = memo(function OptimizedBackgroundComponent({
   style = {},
   objectFit = 'cover',
   priority = false,
-  fallbackColor = 'rgba(15,23,42,0.8)',
+  fallbackColor = 'var(--glass-strong)',
   overlay,
   blur = 0,
   disableFade = false,

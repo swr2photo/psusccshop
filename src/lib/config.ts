@@ -64,12 +64,12 @@ export const SUBTYPE_LABELS: Record<string, string> = {
 
 /** Category icons */
 export const CATEGORY_ICONS: Record<string, string> = {
-  APPAREL: '👕',
-  MERCHANDISE: '🎁',
-  CAMP_FEE: '🏕️',
-  EVENT: '🎫',
-  SERVICE: '🛠️',
-  OTHER: '📦',
+  APPAREL: '',
+  MERCHANDISE: '',
+  CAMP_FEE: '',
+  EVENT: '',
+  SERVICE: '',
+  OTHER: '',
 };
 
 /** Get subtypes for a category */
@@ -94,7 +94,7 @@ export const getSubTypeLabel = (subType: string): string => {
 
 /** Helper: Get category icon (returns default if not in predefined list) */
 export const getCategoryIcon = (category: string): string => {
-  return CATEGORY_ICONS[category] || '📦';
+  return CATEGORY_ICONS[category] || '';
 };
 
 // ==================== TYPES ====================

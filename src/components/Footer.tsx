@@ -28,11 +28,11 @@ export default function Footer() {
     }
   };
   return (
-    <footer className="bg-slate-900 border-t border-slate-800 text-slate-400 py-10 mt-auto">
+    <footer className="bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 py-10 mt-auto">
       <div className="max-w-6xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-8">
         {/* Brand */}
         <div>
-          <h3 className="text-xl font-bold text-white mb-4 bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent w-fit">
+          <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4 bg-gradient-to-r from-indigo-500 dark:from-indigo-400 to-cyan-500 dark:to-cyan-400 bg-clip-text text-transparent w-fit">
             PSUSCCSHOP
           </h3>
           <p className="text-sm">
@@ -42,7 +42,7 @@ export default function Footer() {
 
         {/* Links */}
         <div>
-          <h4 className="font-bold text-white mb-4">เมนู</h4>
+          <h4 className="font-bold text-slate-800 dark:text-white mb-4">เมนู</h4>
           <ul className="space-y-2 text-sm">
             <li>
               <Link href="/" className="hover:text-indigo-400 transition flex items-center gap-2">
@@ -70,7 +70,7 @@ export default function Footer() {
 
         {/* Contact */}
         <div>
-          <h4 className="font-bold text-white mb-4">ติดต่อเรา</h4>
+          <h4 className="font-bold text-slate-800 dark:text-white mb-4">ติดต่อเรา</h4>
           <div className="flex gap-4 mb-4">
             <a href="https://facebook.com/psuscc" className="hover:text-indigo-500 transition" title="Facebook">
               <Facebook size={20} />
@@ -89,7 +89,7 @@ export default function Footer() {
       </div>
       
       {/* Build Version */}
-      <div className="max-w-6xl mx-auto px-6 mt-6 pt-4 border-t border-slate-800/50">
+      <div className="max-w-6xl mx-auto px-6 mt-6 pt-4 border-t border-slate-200/50 dark:border-slate-800/50">
         <div className="flex items-center justify-center gap-2 text-xs">
           <button
             onClick={() => setShowBuildInfo(!showBuildInfo)}

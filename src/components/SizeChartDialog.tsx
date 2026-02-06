@@ -52,8 +52,8 @@ export default function SizeChartDialog(props: SizeChartDialogProps) {
       sx={{ zIndex: 1500 }}
       PaperProps={{
         sx: {
-          bgcolor: '#0a0f1a',
-          color: '#f1f5f9',
+          bgcolor: 'var(--surface)',
+          color: 'var(--foreground)',
           borderRadius: '20px',
           border: '1px solid rgba(255,255,255,0.1)',
           mx: 2,
@@ -81,14 +81,14 @@ export default function SizeChartDialog(props: SizeChartDialogProps) {
             width: 40,
             height: 40,
             borderRadius: '12px',
-            background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+            background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
             display: 'grid',
             placeItems: 'center',
           }}>
             <Ruler size={20} color="white" />
           </Box>
           <Box>
-            <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', color: '#f1f5f9' }}>ตารางไซส์</Typography>
+            <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--foreground)' }}>ตารางไซส์</Typography>
             <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>สัดส่วนรอบอก/ความยาว (นิ้ว)</Typography>
           </Box>
         </Box>
@@ -102,11 +102,11 @@ export default function SizeChartDialog(props: SizeChartDialogProps) {
             px: 1.2,
             py: 0.4,
             borderRadius: '8px',
-            bgcolor: 'rgba(99,102,241,0.15)',
-            border: '1px solid rgba(99,102,241,0.3)',
+            bgcolor: 'rgba(37,99,235,0.15)',
+            border: '1px solid rgba(37,99,235,0.3)',
             fontSize: '0.75rem',
             fontWeight: 600,
-            color: '#a5b4fc',
+            color: '#93c5fd',
             display: 'flex',
             alignItems: 'center',
             gap: 0.5,
@@ -144,15 +144,15 @@ export default function SizeChartDialog(props: SizeChartDialogProps) {
                 sx={{
                   p: 1.8,
                   borderRadius: '14px',
-                  bgcolor: isSelected ? 'rgba(99,102,241,0.2)' : 'rgba(30,41,59,0.6)',
+                  bgcolor: isSelected ? 'rgba(37,99,235,0.2)' : 'rgba(30,41,59,0.6)',
                   border: isSelected 
-                    ? '2px solid rgba(99,102,241,0.6)' 
+                    ? '2px solid rgba(37,99,235,0.6)' 
                     : '1px solid rgba(255,255,255,0.06)',
                   cursor: onSelectSize ? 'pointer' : 'default',
                   transition: 'all 0.2s ease',
                   '&:hover': onSelectSize ? {
-                    bgcolor: isSelected ? 'rgba(99,102,241,0.25)' : 'rgba(30,41,59,0.8)',
-                    borderColor: isSelected ? 'rgba(99,102,241,0.8)' : 'rgba(255,255,255,0.15)',
+                    bgcolor: isSelected ? 'rgba(37,99,235,0.25)' : 'rgba(30,41,59,0.8)',
+                    borderColor: isSelected ? 'rgba(37,99,235,0.8)' : 'rgba(255,255,255,0.15)',
                     transform: 'translateY(-2px)',
                   } : {},
                 }}
@@ -160,14 +160,14 @@ export default function SizeChartDialog(props: SizeChartDialogProps) {
                 <Typography sx={{
                   fontSize: '1rem',
                   fontWeight: 800,
-                  color: isSelected ? '#a5b4fc' : '#e2e8f0',
+                  color: isSelected ? 'var(--primary)' : 'var(--foreground)',
                   mb: 0.5,
                 }}>
                   {size}
                 </Typography>
                 <Typography sx={{
                   fontSize: '0.8rem',
-                  color: '#94a3b8',
+                  color: 'var(--text-muted)',
                 }}>
                   {measurement.chest}" × {measurement.length}"
                 </Typography>
@@ -191,7 +191,7 @@ export default function SizeChartDialog(props: SizeChartDialogProps) {
             borderRadius: '12px',
             bgcolor: 'rgba(100,116,139,0.15)',
             border: '1px solid rgba(100,116,139,0.3)',
-            color: '#94a3b8',
+            color: 'var(--text-muted)',
             fontSize: '0.9rem',
             fontWeight: 600,
             textTransform: 'none',

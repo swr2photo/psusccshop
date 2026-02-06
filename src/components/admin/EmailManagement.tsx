@@ -37,38 +37,38 @@ import {
   Collapse,
 } from '@mui/material';
 import {
-  Email,
+  Mail as Email,
   Send,
   Search,
-  Refresh,
-  CheckCircle,
-  Error,
-  Pending,
-  Campaign,
-  Person,
-  ExpandMore,
-  ExpandLess,
-  ContentCopy,
-  FilterList,
-  AccessTime,
+  RotateCcw as Refresh,
+  CheckCircle2 as CheckCircle,
+  AlertCircle as Error,
+  Clock as Pending,
+  Megaphone as Campaign,
+  User as Person,
+  ChevronDown as ExpandMore,
+  ChevronUp as ExpandLess,
+  Copy as ContentCopy,
+  Filter as FilterList,
   TrendingUp,
-  Groups,
+  Users as Groups,
   History,
-  Visibility,
-  Close,
-} from '@mui/icons-material';
+  Eye as Visibility,
+  X as Close,
+} from 'lucide-react';
+const AccessTime = Pending;
 
 // Theme
 const THEME = {
-  bg: '#0a0f1a',
-  bgCard: 'rgba(15,23,42,0.7)',
-  glass: 'rgba(30,41,59,0.6)',
-  glassSoft: 'rgba(30,41,59,0.4)',
-  text: '#f1f5f9',
-  textSecondary: '#94a3b8',
-  muted: '#64748b',
-  border: 'rgba(255,255,255,0.08)',
-  primary: '#6366f1',
+  bg: 'var(--background)',
+  bgCard: 'var(--glass-bg)',
+  glass: 'var(--glass-bg)',
+  glassSoft: 'var(--glass-bg)',
+  text: 'var(--foreground)',
+  textSecondary: 'var(--text-muted)',
+  muted: 'var(--text-muted)',
+  border: 'var(--glass-border)',
+  primary: '#2563eb',
   success: '#10b981',
   warning: '#f59e0b',
   error: '#ef4444',
@@ -108,14 +108,14 @@ interface Props {
 }
 
 const typeLabels: Record<string, { label: string; color: string; icon: ReactElement }> = {
-  order_confirmation: { label: 'ยืนยันคำสั่งซื้อ', color: '#6366f1', icon: <CheckCircle sx={{ fontSize: 16 }} /> },
-  payment_received: { label: 'ชำระเงินแล้ว', color: '#10b981', icon: <CheckCircle sx={{ fontSize: 16 }} /> },
-  order_ready: { label: 'พร้อมรับ', color: '#f59e0b', icon: <CheckCircle sx={{ fontSize: 16 }} /> },
-  order_shipped: { label: 'จัดส่งแล้ว', color: '#0ea5e9', icon: <Send sx={{ fontSize: 16 }} /> },
-  order_completed: { label: 'สำเร็จ', color: '#10b981', icon: <CheckCircle sx={{ fontSize: 16 }} /> },
-  order_cancelled: { label: 'ยกเลิก', color: '#ef4444', icon: <Error sx={{ fontSize: 16 }} /> },
-  custom: { label: 'ส่งเอง', color: '#8b5cf6', icon: <Email sx={{ fontSize: 16 }} /> },
-  broadcast: { label: 'ประกาศ', color: '#f472b6', icon: <Campaign sx={{ fontSize: 16 }} /> },
+  order_confirmation: { label: 'ยืนยันคำสั่งซื้อ', color: '#2563eb', icon: <CheckCircle size={16} /> },
+  payment_received: { label: 'ชำระเงินแล้ว', color: '#10b981', icon: <CheckCircle size={16} /> },
+  order_ready: { label: 'พร้อมรับ', color: '#f59e0b', icon: <CheckCircle size={16} /> },
+  order_shipped: { label: 'จัดส่งแล้ว', color: '#0ea5e9', icon: <Send size={16} /> },
+  order_completed: { label: 'สำเร็จ', color: '#10b981', icon: <CheckCircle size={16} /> },
+  order_cancelled: { label: 'ยกเลิก', color: '#ef4444', icon: <Error size={16} /> },
+  custom: { label: 'ส่งเอง', color: '#1e40af', icon: <Email size={16} /> },
+  broadcast: { label: 'ประกาศ', color: '#f472b6', icon: <Campaign size={16} /> },
 };
 
 const statusColors: Record<string, string> = {
@@ -296,7 +296,7 @@ export default function EmailManagement({ showToast }: Props) {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
         <Box>
           <Typography variant="h5" sx={{ fontWeight: 800, color: THEME.text, mb: 0.5 }}>
-            📧 ระบบจัดการอีเมล
+            ระบบจัดการอีเมล
           </Typography>
           <Typography sx={{ color: THEME.textSecondary, fontSize: '0.9rem' }}>
             ส่งอีเมลแจ้งลูกค้าและดูประวัติการส่ง
@@ -322,7 +322,7 @@ export default function EmailManagement({ showToast }: Props) {
             onClick={() => setComposeOpen(true)}
             sx={{
               bgcolor: THEME.primary,
-              '&:hover': { bgcolor: '#4f46e5' },
+              '&:hover': { bgcolor: '#1d4ed8' },
             }}
           >
             เขียนอีเมล
@@ -376,9 +376,9 @@ export default function EmailManagement({ showToast }: Props) {
             '& .MuiTabs-indicator': { bgcolor: THEME.primary },
           }}
         >
-          <Tab icon={<History sx={{ fontSize: 18 }} />} iconPosition="start" label="ประวัติส่ง" />
-          <Tab icon={<Groups sx={{ fontSize: 18 }} />} iconPosition="start" label={`ลูกค้า (${customers.length})`} />
-          <Tab icon={<TrendingUp sx={{ fontSize: 18 }} />} iconPosition="start" label="สถิติ" />
+          <Tab icon={<History size={18} />} iconPosition="start" label="ประวัติส่ง" />
+          <Tab icon={<Groups size={18} />} iconPosition="start" label={`ลูกค้า (${customers.length})`} />
+          <Tab icon={<TrendingUp size={18} />} iconPosition="start" label="สถิติ" />
         </Tabs>
 
         <CardContent>
@@ -401,7 +401,7 @@ export default function EmailManagement({ showToast }: Props) {
                       InputProps={{
                         startAdornment: (
                           <InputAdornment position="start">
-                            <Search sx={{ color: THEME.muted }} />
+                            <Search size={20} color={THEME.muted} />
                           </InputAdornment>
                         ),
                       }}
@@ -432,7 +432,7 @@ export default function EmailManagement({ showToast }: Props) {
                       </TableHead>
                       <TableBody>
                         {paginatedLogs.map((log) => {
-                          const typeInfo = typeLabels[log.type] || { label: log.type, color: THEME.muted, icon: <Email sx={{ fontSize: 16 }} /> };
+                          const typeInfo = typeLabels[log.type] || { label: log.type, color: THEME.muted, icon: <Email size={16} /> };
                           const isExpanded = expandedLog === log.id;
                           
                           return (
@@ -488,7 +488,7 @@ export default function EmailManagement({ showToast }: Props) {
                                       size="small"
                                       label={log.orderRef}
                                       sx={{
-                                        bgcolor: 'rgba(99,102,241,0.1)',
+                                        bgcolor: 'rgba(37,99,235,0.1)',
                                         color: THEME.primary,
                                         fontWeight: 600,
                                         fontSize: '0.7rem',
@@ -589,7 +589,7 @@ export default function EmailManagement({ showToast }: Props) {
                       InputProps={{
                         startAdornment: (
                           <InputAdornment position="start">
-                            <Search sx={{ color: THEME.muted }} />
+                            <Search size={24} color={THEME.muted} />
                           </InputAdornment>
                         ),
                       }}
@@ -653,7 +653,7 @@ export default function EmailManagement({ showToast }: Props) {
                             key={customer.email}
                             onClick={() => toggleCustomerSelection(customer)}
                             sx={{
-                              bgcolor: isSelected ? 'rgba(99,102,241,0.15)' : THEME.glassSoft,
+                              bgcolor: isSelected ? 'rgba(37,99,235,0.15)' : THEME.glassSoft,
                               border: `1px solid ${isSelected ? THEME.primary : THEME.border}`,
                               borderRadius: '12px',
                               cursor: 'pointer',
@@ -704,7 +704,7 @@ export default function EmailManagement({ showToast }: Props) {
                                     flex: 1, 
                                     color: THEME.primary,
                                     fontSize: '0.75rem',
-                                    '&:hover': { bgcolor: 'rgba(99,102,241,0.1)' },
+                                    '&:hover': { bgcolor: 'rgba(37,99,235,0.1)' },
                                   }}
                                 >
                                   ส่งอีเมล
@@ -719,7 +719,7 @@ export default function EmailManagement({ showToast }: Props) {
                                     }}
                                     sx={{ color: THEME.muted }}
                                   >
-                                    <ContentCopy sx={{ fontSize: 16 }} />
+                                    <ContentCopy size={16} />
                                   </IconButton>
                                 </Tooltip>
                               </Box>
@@ -739,7 +739,7 @@ export default function EmailManagement({ showToast }: Props) {
                     <Card sx={{ bgcolor: THEME.glassSoft, border: `1px solid ${THEME.border}`, borderRadius: '12px' }}>
                       <CardContent>
                         <Typography sx={{ color: THEME.text, fontWeight: 700, mb: 2 }}>
-                          📊 จำแนกตามประเภท
+                          จำแนกตามประเภท
                         </Typography>
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                           {Object.entries(stats.byType).map(([type, count]) => {
@@ -777,7 +777,7 @@ export default function EmailManagement({ showToast }: Props) {
                     <Card sx={{ bgcolor: THEME.glassSoft, border: `1px solid ${THEME.border}`, borderRadius: '12px' }}>
                       <CardContent>
                         <Typography sx={{ color: THEME.text, fontWeight: 700, mb: 2 }}>
-                          📈 ภาพรวม
+                          ภาพรวม
                         </Typography>
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -827,7 +827,7 @@ export default function EmailManagement({ showToast }: Props) {
       >
         <DialogTitle sx={{ borderBottom: `1px solid ${THEME.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            {composeMode === 'broadcast' ? <Campaign sx={{ color: THEME.success }} /> : <Email sx={{ color: THEME.primary }} />}
+            {composeMode === 'broadcast' ? <Campaign size={24} color={THEME.success} /> : <Email size={24} color={THEME.primary} />}
             <Typography sx={{ color: THEME.text, fontWeight: 700 }}>
               {composeMode === 'broadcast' ? `ส่งถึงลูกค้า ${selectedCustomers.length} คน` : 'เขียนอีเมล'}
             </Typography>
@@ -883,7 +883,7 @@ export default function EmailManagement({ showToast }: Props) {
                       label={c.name || c.email}
                       size="small"
                       onDelete={() => toggleCustomerSelection(c)}
-                      sx={{ bgcolor: 'rgba(99,102,241,0.2)', color: THEME.primary }}
+                      sx={{ bgcolor: 'rgba(37,99,235,0.2)', color: THEME.primary }}
                     />
                   ))}
                 </Box>
@@ -939,7 +939,7 @@ export default function EmailManagement({ showToast }: Props) {
             disabled={sending}
             sx={{
               bgcolor: composeMode === 'broadcast' ? THEME.success : THEME.primary,
-              '&:hover': { bgcolor: composeMode === 'broadcast' ? '#059669' : '#4f46e5' },
+              '&:hover': { bgcolor: composeMode === 'broadcast' ? '#059669' : '#1d4ed8' },
             }}
           >
             {sending ? 'กำลังส่ง...' : composeMode === 'broadcast' ? `ส่ง ${selectedCustomers.length} ฉบับ` : 'ส่งอีเมล'}

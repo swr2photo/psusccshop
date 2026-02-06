@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
   });
   if (!rateLimitResult.allowed) {
     return NextResponse.json({ 
-      answer: '⏳ คุณส่งคำถามเร็วเกินไป กรุณารอสักครู่แล้วลองใหม่ค่ะ',
+      answer: 'คุณส่งคำถามเร็วเกินไป กรุณารอสักครู่แล้วลองใหม่ค่ะ',
       source: 'rate-limit',
       suggestions: QUICK_QUESTIONS,
     }, { status: 429 });
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
     // Allow empty message if image is provided
     if ((!message || typeof message !== 'string') && !image) {
       return NextResponse.json({ 
-        answer: 'กรุณาพิมพ์คำถามเกี่ยวกับสินค้าหรือบริการของร้านค่ะ 😊', 
+        answer: 'กรุณาพิมพ์คำถามเกี่ยวกับสินค้าหรือบริการของร้านค่ะ', 
         source: 'validation',
         suggestions: QUICK_QUESTIONS,
       }, { status: 400 });
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
     
     if (trimmedMessage.length < 2) {
       return NextResponse.json({ 
-        answer: 'กรุณาพิมพ์คำถามให้ชัดเจนกว่านี้ค่ะ 😊', 
+        answer: 'กรุณาพิมพ์คำถามให้ชัดเจนกว่านี้ค่ะ', 
         source: 'validation',
         suggestions: QUICK_QUESTIONS,
       }, { status: 400 });
@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Chatbot API error:', error);
     return NextResponse.json({ 
-      answer: '❌ เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้งค่ะ', 
+      answer: 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้งค่ะ', 
       source: 'error',
       suggestions: QUICK_QUESTIONS,
     }, { status: 500 });

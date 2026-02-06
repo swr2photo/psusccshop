@@ -543,15 +543,17 @@ export function useRealtimeOrders(options: UseRealtimeOrdersOptions = {}) {
 // ============== CONVENIENCE HOOKS ==============
 
 /**
- * Hook for admin to listen to all order changes
+ * Hook for admin to listen to all order changes + config changes
  */
 export function useRealtimeAdminOrders(
   onOrderChange: (change: OrderChange) => void,
-  onStateChange?: (state: RealtimeState) => void
+  onStateChange?: (state: RealtimeState) => void,
+  onConfigChange?: (config: any) => void
 ) {
   return useRealtimeOrders({
     adminMode: true,
     onOrderChange,
+    onConfigChange,
     onStateChange,
     enabled: true,
   });

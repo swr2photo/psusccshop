@@ -24,14 +24,14 @@ import { useRouter } from 'next/navigation';
 
 // Theme colors
 const THEME = {
-  bg: '#0a0f1a',
-  bgCard: 'rgba(15,23,42,0.85)',
-  glass: 'rgba(30,41,59,0.6)',
-  text: '#f1f5f9',
-  textSecondary: '#94a3b8',
-  muted: '#64748b',
-  border: 'rgba(255,255,255,0.08)',
-  primary: '#6366f1',
+  bg: 'var(--background)',
+  bgCard: 'var(--glass-strong)',
+  glass: 'var(--glass-bg)',
+  text: 'var(--foreground)',
+  textSecondary: 'var(--text-muted)',
+  muted: 'var(--text-muted)',
+  border: 'var(--glass-border)',
+  primary: '#2563eb',
   success: '#10b981',
 };
 
@@ -76,10 +76,10 @@ export default function PrivacyPolicyPage() {
               width: 56,
               height: 56,
               borderRadius: '16px',
-              background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+              background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
               display: 'grid',
               placeItems: 'center',
-              boxShadow: '0 8px 24px rgba(99,102,241,0.3)',
+              boxShadow: '0 8px 24px rgba(37,99,235,0.3)',
             }}>
               <Shield size={28} color="white" />
             </Box>
@@ -99,8 +99,8 @@ export default function PrivacyPolicyPage() {
             gap: 2, 
             p: 2, 
             borderRadius: '12px', 
-            bgcolor: 'rgba(99,102,241,0.1)',
-            border: '1px solid rgba(99,102,241,0.2)',
+            bgcolor: 'rgba(37,99,235,0.1)',
+            border: '1px solid rgba(37,99,235,0.2)',
           }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Clock size={16} color="#94a3b8" />
@@ -166,7 +166,7 @@ export default function PrivacyPolicyPage() {
             sx={{ p: { xs: 2, md: 3 } }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Database size={24} color="#6366f1" />
+              <Database size={24} color="#2563eb" />
               <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', color: THEME.text }}>
                 1. ข้อมูลที่เราเก็บรวบรวม
               </Typography>
@@ -177,7 +177,7 @@ export default function PrivacyPolicyPage() {
               เราเก็บรวบรวมข้อมูลส่วนบุคคลของท่านเฉพาะเท่าที่จำเป็นสำหรับการให้บริการ:
             </Typography>
             
-            <Box sx={{ bgcolor: 'rgba(30,41,59,0.5)', borderRadius: '14px', p: 3 }}>
+            <Box sx={{ bgcolor: 'var(--glass-bg)', borderRadius: '14px', p: 3 }}>
               <Typography sx={{ fontWeight: 600, color: THEME.text, mb: 2 }}>
                 ข้อมูลที่ท่านให้โดยตรง:
               </Typography>
@@ -205,7 +205,7 @@ export default function PrivacyPolicyPage() {
               </List>
             </Box>
 
-            <Box sx={{ bgcolor: 'rgba(30,41,59,0.5)', borderRadius: '14px', p: 3, mt: 3 }}>
+            <Box sx={{ bgcolor: 'var(--glass-bg)', borderRadius: '14px', p: 3, mt: 3 }}>
               <Typography sx={{ fontWeight: 600, color: THEME.text, mb: 2 }}>
                 ข้อมูลที่เก็บรวบรวมโดยอัตโนมัติ:
               </Typography>
@@ -217,7 +217,7 @@ export default function PrivacyPolicyPage() {
                 ].map((item, idx) => (
                   <ListItem key={idx} sx={{ py: 1 }}>
                     <ListItemIcon sx={{ minWidth: 36 }}>
-                      <Settings size={16} color="#6366f1" />
+                      <Settings size={16} color="#2563eb" />
                     </ListItemIcon>
                     <ListItemText 
                       primary={item.primary}
@@ -248,7 +248,7 @@ export default function PrivacyPolicyPage() {
             sx={{ p: { xs: 2, md: 3 } }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Eye size={24} color="#6366f1" />
+              <Eye size={24} color="#2563eb" />
               <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', color: THEME.text }}>
                 2. วัตถุประสงค์ในการใช้ข้อมูล
               </Typography>
@@ -292,14 +292,14 @@ export default function PrivacyPolicyPage() {
             sx={{ p: { xs: 2, md: 3 } }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Clock size={24} color="#6366f1" />
+              <Clock size={24} color="#2563eb" />
               <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', color: THEME.text }}>
                 3. ระยะเวลาในการเก็บรักษาข้อมูล
               </Typography>
             </Box>
           </AccordionSummary>
           <AccordionDetails sx={{ px: { xs: 2, md: 4 }, pb: 4 }}>
-            <Box sx={{ bgcolor: 'rgba(30,41,59,0.5)', borderRadius: '14px', overflow: 'hidden' }}>
+            <Box sx={{ bgcolor: 'var(--glass-bg)', borderRadius: '14px', overflow: 'hidden' }}>
               {[
                 { type: 'ข้อมูลคำสั่งซื้อ', duration: '2 ปี นับจากวันที่สั่งซื้อ', note: 'ตามข้อกำหนดทางบัญชี' },
                 { type: 'หลักฐานการชำระเงิน', duration: '2 ปี นับจากวันที่ชำระเงิน', note: 'เพื่อการตรวจสอบ' },
@@ -347,7 +347,7 @@ export default function PrivacyPolicyPage() {
             sx={{ p: { xs: 2, md: 3 } }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Users size={24} color="#6366f1" />
+              <Users size={24} color="#2563eb" />
               <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', color: THEME.text }}>
                 4. สิทธิ์ของเจ้าของข้อมูล (PDPA Rights)
               </Typography>
@@ -364,7 +364,7 @@ export default function PrivacyPolicyPage() {
                   icon: <Eye size={20} />, 
                   title: 'สิทธิ์ในการเข้าถึง', 
                   desc: 'ท่านสามารถขอดูข้อมูลส่วนบุคคลที่เราเก็บรักษาไว้เกี่ยวกับท่านได้',
-                  color: '#6366f1'
+                  color: '#2563eb'
                 },
                 { 
                   icon: <Download size={20} />, 
@@ -388,7 +388,7 @@ export default function PrivacyPolicyPage() {
                   icon: <Lock size={20} />, 
                   title: 'สิทธิ์ในการระงับการใช้', 
                   desc: 'ท่านสามารถขอให้ระงับการใช้ข้อมูลส่วนบุคคลของท่านชั่วคราว',
-                  color: '#8b5cf6'
+                  color: '#1e40af'
                 },
                 { 
                   icon: <AlertCircle size={20} />, 
@@ -402,7 +402,7 @@ export default function PrivacyPolicyPage() {
                   sx={{
                     p: 2.5,
                     borderRadius: '14px',
-                    bgcolor: 'rgba(30,41,59,0.5)',
+                    bgcolor: 'var(--glass-bg)',
                     border: `1px solid ${THEME.border}`,
                     display: 'flex',
                     alignItems: 'flex-start',
@@ -437,8 +437,8 @@ export default function PrivacyPolicyPage() {
               mt: 4, 
               p: 3, 
               borderRadius: '14px', 
-              bgcolor: 'rgba(99,102,241,0.1)',
-              border: '1px solid rgba(99,102,241,0.2)',
+              bgcolor: 'rgba(37,99,235,0.1)',
+              border: '1px solid rgba(37,99,235,0.2)',
             }}>
               <Typography sx={{ fontWeight: 600, color: THEME.text, mb: 2 }}>
                 วิธีการใช้สิทธิ์:
@@ -468,7 +468,7 @@ export default function PrivacyPolicyPage() {
             sx={{ p: { xs: 2, md: 3 } }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Lock size={24} color="#6366f1" />
+              <Lock size={24} color="#2563eb" />
               <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', color: THEME.text }}>
                 5. มาตรการรักษาความปลอดภัย
               </Typography>
@@ -527,7 +527,7 @@ export default function PrivacyPolicyPage() {
             sx={{ p: { xs: 2, md: 3 } }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Cookie size={24} color="#6366f1" />
+              <Cookie size={24} color="#2563eb" />
               <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', color: THEME.text }}>
                 6. นโยบายคุกกี้
               </Typography>
@@ -538,7 +538,7 @@ export default function PrivacyPolicyPage() {
               เราใช้คุกกี้เพื่อปรับปรุงประสบการณ์การใช้งานของท่าน โดยแบ่งออกเป็น 4 ประเภท:
             </Typography>
             
-            <Box sx={{ bgcolor: 'rgba(30,41,59,0.5)', borderRadius: '14px', overflow: 'hidden' }}>
+            <Box sx={{ bgcolor: 'var(--glass-bg)', borderRadius: '14px', overflow: 'hidden' }}>
               {[
                 { 
                   type: 'คุกกี้ที่จำเป็น (Essential)', 
@@ -612,7 +612,7 @@ export default function PrivacyPolicyPage() {
             sx={{ p: { xs: 2, md: 3 } }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Globe size={24} color="#6366f1" />
+              <Globe size={24} color="#2563eb" />
               <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', color: THEME.text }}>
                 7. การเปิดเผยข้อมูลต่อบุคคลภายนอก
               </Typography>
@@ -623,7 +623,7 @@ export default function PrivacyPolicyPage() {
               เราอาจเปิดเผยข้อมูลส่วนบุคคลของท่านให้กับบุคคลภายนอกในกรณีต่อไปนี้เท่านั้น:
             </Typography>
             
-            <Box sx={{ bgcolor: 'rgba(30,41,59,0.5)', borderRadius: '14px', overflow: 'hidden' }}>
+            <Box sx={{ bgcolor: 'var(--glass-bg)', borderRadius: '14px', overflow: 'hidden' }}>
               {[
                 { 
                   party: 'Google (OAuth)', 
@@ -691,7 +691,7 @@ export default function PrivacyPolicyPage() {
           mb: 3,
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-            <Mail size={24} color="#6366f1" />
+            <Mail size={24} color="#2563eb" />
             <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', color: THEME.text }}>
               8. ช่องทางติดต่อ (Data Protection Officer)
             </Typography>
@@ -704,8 +704,8 @@ export default function PrivacyPolicyPage() {
           <Box sx={{ 
             p: 3, 
             borderRadius: '14px', 
-            bgcolor: 'rgba(99,102,241,0.1)',
-            border: '1px solid rgba(99,102,241,0.2)',
+            bgcolor: 'rgba(37,99,235,0.1)',
+            border: '1px solid rgba(37,99,235,0.2)',
           }}>
             <Typography sx={{ fontWeight: 700, color: THEME.text, mb: 2, fontSize: '1.1rem' }}>
               ชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์
@@ -742,7 +742,7 @@ export default function PrivacyPolicyPage() {
           border: `1px solid ${THEME.border}`,
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-            <FileText size={24} color="#6366f1" />
+            <FileText size={24} color="#2563eb" />
             <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', color: THEME.text }}>
               9. การเปลี่ยนแปลงนโยบาย
             </Typography>

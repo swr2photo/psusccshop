@@ -9,19 +9,7 @@ import {
   IconButton,
   Collapse,
 } from '@mui/material';
-import {
-  LocalShipping as ShippingIcon,
-  CheckCircle,
-  Schedule,
-  Error as ErrorIcon,
-  Inventory,
-  DeliveryDining,
-  Home,
-  Refresh,
-  ExpandMore,
-  ExpandLess,
-  OpenInNew,
-} from '@mui/icons-material';
+import { Truck as ShippingIcon, CheckCircle2 as CheckCircle, Clock as Schedule, AlertCircle as ErrorIcon, Package as Inventory, Bike as DeliveryDining, Home, RotateCcw as Refresh, ChevronDown as ExpandMore, ChevronUp as ExpandLess, ExternalLink as OpenInNew } from 'lucide-react';
 import { 
   TrackingInfo, 
   TrackingStatus, 
@@ -41,21 +29,21 @@ interface TrackingTimelineProps {
 }
 
 const STATUS_ICONS: Record<TrackingStatus, React.ReactNode> = {
-  pending: <Schedule sx={{ color: '#f59e0b' }} />,
-  picked_up: <Inventory sx={{ color: '#3b82f6' }} />,
-  in_transit: <ShippingIcon sx={{ color: '#3b82f6' }} />,
-  out_for_delivery: <DeliveryDining sx={{ color: '#8b5cf6' }} />,
-  delivered: <Home sx={{ color: '#10b981' }} />,
-  returned: <ErrorIcon sx={{ color: '#ef4444' }} />,
-  failed: <ErrorIcon sx={{ color: '#ef4444' }} />,
-  unknown: <Schedule sx={{ color: '#6b7280' }} />,
+  pending: <Schedule size={24} color="#f59e0b" />,
+  picked_up: <Inventory size={24} color="#3b82f6" />,
+  in_transit: <ShippingIcon size={24} color="#3b82f6" />,
+  out_for_delivery: <DeliveryDining size={24} color="#1e40af" />,
+  delivered: <Home size={24} color="#10b981" />,
+  returned: <ErrorIcon size={24} color="#ef4444" />,
+  failed: <ErrorIcon size={24} color="#ef4444" />,
+  unknown: <Schedule size={24} color="#6b7280" />,
 };
 
 const STATUS_COLORS: Record<TrackingStatus, string> = {
   pending: '#f59e0b',
   picked_up: '#3b82f6',
   in_transit: '#3b82f6',
-  out_for_delivery: '#8b5cf6',
+  out_for_delivery: '#1e40af',
   delivered: '#10b981',
   returned: '#ef4444',
   failed: '#ef4444',
@@ -132,7 +120,7 @@ export default function TrackingTimeline({
     return (
       <Box sx={{ p: 2, bgcolor: 'rgba(16, 185, 129, 0.1)', borderRadius: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <CheckCircle sx={{ color: '#10b981' }} />
+          <CheckCircle size={24} color="#10b981" />
           <Typography sx={{ color: '#10b981', fontWeight: 600 }}>
             รับสินค้าหน้าร้าน
           </Typography>
@@ -160,7 +148,7 @@ export default function TrackingTimeline({
       <Box sx={{ p: 2, bgcolor: 'rgba(239, 68, 68, 0.1)', borderRadius: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <ErrorIcon sx={{ color: '#ef4444', fontSize: 20 }} />
+            <ErrorIcon size={20} color="#ef4444" />
             <Typography sx={{ color: '#ef4444', fontSize: 14 }}>
               {error}
             </Typography>
@@ -170,7 +158,7 @@ export default function TrackingTimeline({
             onClick={() => fetchTracking(true)}
             sx={{ color: 'rgba(255,255,255,0.6)' }}
           >
-            <Refresh fontSize="small" />
+            <Refresh size={20} />
           </IconButton>
         </Box>
         <Typography sx={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, mt: 1 }}>
@@ -208,9 +196,9 @@ export default function TrackingTimeline({
                 },
               }}
             >
-              <ShippingIcon sx={{ fontSize: 18 }} />
+              <ShippingIcon size={18} />
               ตรวจสอบที่ {SHIPPING_PROVIDERS[shippingProvider]?.nameThai || 'ขนส่ง'}
-              <OpenInNew sx={{ fontSize: 14 }} />
+              <OpenInNew size={14} />
             </Box>
           </Box>
         )}
@@ -223,7 +211,7 @@ export default function TrackingTimeline({
     return (
       <Box sx={{ p: 2, bgcolor: 'rgba(107, 114, 128, 0.1)', borderRadius: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Schedule sx={{ color: '#6b7280' }} />
+          <Schedule size={24} color="#6b7280" />
           <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 14 }}>
             รอข้อมูลจากขนส่ง
           </Typography>
@@ -299,12 +287,12 @@ export default function TrackingTimeline({
               onClick={(e) => { e.stopPropagation(); fetchTracking(true); }}
               sx={{ color: 'rgba(255,255,255,0.4)' }}
             >
-              <Refresh fontSize="small" />
+              <Refresh size={20} />
             </IconButton>
           )}
           {compact && (
             <IconButton size="small" sx={{ color: 'rgba(255,255,255,0.4)' }}>
-              {expanded ? <ExpandLess /> : <ExpandMore />}
+              {expanded ? <ExpandLess size={24} /> : <ExpandMore size={24} />}
             </IconButton>
           )}
         </Box>
@@ -372,7 +360,7 @@ export default function TrackingTimeline({
                       boxShadow: isCurrent ? `0 0 8px ${STATUS_COLORS[currentStatus]}50` : 'none',
                     }}>
                       {isCompleted && (
-                        <CheckCircle sx={{ fontSize: 16, color: '#fff' }} />
+                        <CheckCircle size={16} color="#fff" />
                       )}
                     </Box>
                     <Typography sx={{
@@ -466,7 +454,7 @@ function EventItem({ event, isLatest }: { event: TrackingEvent; isLatest: boolea
           </Typography>
           {event.location && (
             <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>
-              📍 {event.location}
+              {event.location}
             </Typography>
           )}
         </Box>

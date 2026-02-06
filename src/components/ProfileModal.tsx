@@ -1,13 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { X, ShieldCheck, User, Phone, Instagram, AlertTriangle, MapPin, Check, Sparkles, UserCircle, CheckCircle2, AlertCircle } from 'lucide-react';
-import { Drawer, Box, Typography, Button, IconButton, TextField, InputAdornment, Checkbox, FormControlLabel, useMediaQuery, Slide } from '@mui/material';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { X, ShieldCheck, User, Phone, Instagram, AlertTriangle, MapPin, Check, Sparkles, UserCircle, CheckCircle2, AlertCircle, Search, Camera, ZoomIn, ZoomOut, RotateCw, Move } from 'lucide-react';
+import {
+  Drawer, Box, Typography, Button, IconButton, TextField, InputAdornment,
+  Slide, Avatar, Autocomplete, CircularProgress, Paper, Dialog, Slider,
+} from '@mui/material';
+import { useThaiAddress, type AddressSelection } from '@/hooks/useThaiAddress';
 
 interface ProfileModalProps {
-  initialData: { name: string; phone: string; address: string; instagram: string };
+  initialData: { name: string; phone: string; address: string; instagram: string; profileImage?: string };
   onClose: () => void;
   onSave: (data: any) => void;
+  userImage?: string;
+  userEmail?: string;
 }
 
 // ============== INLINE NOTIFICATION ==============
@@ -32,12 +38,104 @@ const NOTIFICATION_STYLES = {
   },
 };
 
-export default function ProfileModal({ initialData, onClose, onSave }: ProfileModalProps) {
-  const isMobile = useMediaQuery('(max-width: 640px)');
-  const [formData, setFormData] = useState(initialData);
+export default function ProfileModal({ initialData, onClose, onSave, userImage, userEmail }: ProfileModalProps) {
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 640;
+  const [formData, setFormData] = useState({
+    name: initialData.name,
+    phone: initialData.phone,
+    instagram: initialData.instagram,
+  });
+
+  // Address structured fields
+  const [addressFields, setAddressFields] = useState<AddressSelection>({
+    province: '',
+    district: '',
+    subDistrict: '',
+    zipCode: '',
+    detail: '',
+  });
+
   const [pdpaAccepted, setPdpaAccepted] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [notification, setNotification] = useState<InlineNotification | null>(null);
+
+  // Profile image upload
+  const [customProfileImage, setCustomProfileImage] = useState(initialData.profileImage || '');
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Crop preview state
+  const [cropPreview, setCropPreview] = useState<string | null>(null);
+  const [cropFileName, setCropFileName] = useState('');
+  const [cropMime, setCropMime] = useState('image/png');
+  const [cropScale, setCropScale] = useState(1);
+  const [cropOffset, setCropOffset] = useState({ x: 0, y: 0 });
+  const [cropRotation, setCropRotation] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef({ x: 0, y: 0, ox: 0, oy: 0 });
+  const cropCanvasRef = useRef<HTMLCanvasElement>(null);
+  const cropImageRef = useRef<HTMLImageElement | null>(null);
+
+  const displayImage = customProfileImage || userImage || '';
+
+  // Thai address data
+  const {
+    loading: addressLoading,
+    loadData: loadAddressData,
+    provinces,
+    getDistricts,
+    getSubDistricts,
+    lookupByZipCode,
+    findProvinceId,
+    findDistrictId,
+    composeAddress,
+  } = useThaiAddress();
+
+  // Load address data on mount
+  useEffect(() => {
+    loadAddressData();
+  }, [loadAddressData]);
+
+  // Parse existing address into structured fields when data is loaded
+  useEffect(() => {
+    if (initialData.address && provinces.length > 0) {
+      const addr = initialData.address;
+      // Extract zip code
+      const zipMatch = addr.match(/\b(\d{5})\b/);
+      if (zipMatch) {
+        const results = lookupByZipCode(zipMatch[1]);
+        if (results.length > 0) {
+          const match = results[0];
+          // Extract sub-district from text
+          const provMatch = addr.match(/(?:จ\.|จังหวัด)\s*([^\s,]+)/);
+          const distMatch = addr.match(/(?:อ\.|อำเภอ|เขต)\s*([^\s,]+)/);
+          const subMatch = addr.match(/(?:ต\.|ตำบล|แขวง)\s*([^\s,]+)/);
+
+          // Determine residual detail text
+          let detail = addr;
+          if (zipMatch) detail = detail.replace(zipMatch[0], '');
+          if (provMatch) detail = detail.replace(provMatch[0], '');
+          if (distMatch) detail = detail.replace(distMatch[0], '');
+          if (subMatch) detail = detail.replace(subMatch[0], '');
+          detail = detail.replace(/\s+/g, ' ').trim();
+
+          setAddressFields({
+            province: match.province,
+            district: match.district,
+            subDistrict: subMatch ? subMatch[1] : (match.subDistricts.length === 1 ? match.subDistricts[0] : ''),
+            zipCode: zipMatch[1],
+            detail: detail,
+          });
+          return;
+        }
+      }
+      // Fallback: put everything in detail
+      setAddressFields(prev => ({ ...prev, detail: addr }));
+    } else if (initialData.address && provinces.length === 0) {
+      setAddressFields(prev => ({ ...prev, detail: initialData.address }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialData.address, provinces.length]);
 
   useEffect(() => {
     if (initialData.name && initialData.phone && initialData.instagram) {
@@ -60,6 +158,67 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
   const sanitizeThai = (value: string) => value.replace(/[^\u0E00-\u0E7F\s]/g, '').trimStart();
   const sanitizePhone = (value: string) => value.replace(/\D/g, '').slice(0, 12);
 
+  // Derived address lists
+  const selectedProvinceId = useMemo(() => {
+    if (!addressFields.province) return null;
+    return findProvinceId(addressFields.province);
+  }, [addressFields.province, findProvinceId]);
+
+  const districts = useMemo(() => {
+    if (!selectedProvinceId) return [];
+    return getDistricts(selectedProvinceId);
+  }, [selectedProvinceId, getDistricts]);
+
+  const selectedDistrictId = useMemo(() => {
+    if (!addressFields.district || !selectedProvinceId) return null;
+    return findDistrictId(addressFields.district, selectedProvinceId);
+  }, [addressFields.district, selectedProvinceId, findDistrictId]);
+
+  const subDistricts = useMemo(() => {
+    if (!selectedDistrictId) return [];
+    return getSubDistricts(selectedDistrictId);
+  }, [selectedDistrictId, getSubDistricts]);
+
+  // Handlers
+  const handleZipCodeChange = useCallback((zipCode: string) => {
+    const cleaned = zipCode.replace(/\D/g, '').slice(0, 5);
+    setAddressFields(prev => ({ ...prev, zipCode: cleaned }));
+    if (cleaned.length === 5) {
+      const results = lookupByZipCode(cleaned);
+      if (results.length > 0) {
+        const first = results[0];
+        setAddressFields(prev => ({
+          ...prev,
+          zipCode: cleaned,
+          province: first.province,
+          district: first.district,
+          subDistrict: first.subDistricts.length === 1 ? first.subDistricts[0] : prev.subDistrict,
+        }));
+      }
+    }
+  }, [lookupByZipCode]);
+
+  const handleProvinceChange = useCallback((name: string | null) => {
+    setAddressFields(prev => ({ ...prev, province: name || '', district: '', subDistrict: '', zipCode: '' }));
+  }, []);
+
+  const handleDistrictChange = useCallback((name: string | null) => {
+    setAddressFields(prev => ({ ...prev, district: name || '', subDistrict: '' }));
+  }, []);
+
+  const handleSubDistrictChange = useCallback((name: string | null) => {
+    if (!name) {
+      setAddressFields(prev => ({ ...prev, subDistrict: '' }));
+      return;
+    }
+    const sd = subDistricts.find(s => s.name === name);
+    setAddressFields(prev => ({
+      ...prev,
+      subDistrict: name,
+      zipCode: sd ? String(sd.zipCode) : prev.zipCode,
+    }));
+  }, [subDistricts]);
+
   const validate = () => {
     const nextErrors: Record<string, string> = {};
     if (!formData.name || !/^[\u0E00-\u0E7F\s]+$/.test(formData.name.trim())) {
@@ -75,41 +234,312 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
       nextErrors.pdpa = 'กรุณายืนยันการใช้ข้อมูล';
     }
     setErrors(nextErrors);
-    
-    // Show notification for first error
     if (Object.keys(nextErrors).length > 0) {
-      const firstError = Object.values(nextErrors)[0];
-      showNotification('warning', firstError);
+      showNotification('warning', Object.values(nextErrors)[0]);
     }
-    
     return Object.keys(nextErrors).length === 0;
   };
+
+  // Open file → show crop preview (no upload yet)
+  const handleImageSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      showNotification('error', 'กรุณาเลือกไฟล์รูปภาพ');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showNotification('error', 'ไฟล์ใหญ่เกินไป (สูงสุด 5MB)');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCropPreview(reader.result as string);
+      setCropFileName(file.name);
+      setCropMime(file.type);
+      setCropScale(1);
+      setCropOffset({ x: 0, y: 0 });
+      setCropRotation(0);
+    };
+    reader.readAsDataURL(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }, []);
+
+  // Draw crop preview on canvas
+  const drawCropPreview = useCallback(() => {
+    const canvas = cropCanvasRef.current;
+    const img = cropImageRef.current;
+    if (!canvas || !img) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const size = canvas.width;
+    ctx.clearRect(0, 0, size, size);
+
+    ctx.save();
+    ctx.translate(size / 2, size / 2);
+    ctx.rotate((cropRotation * Math.PI) / 180);
+    ctx.scale(cropScale, cropScale);
+
+    const aspect = img.naturalWidth / img.naturalHeight;
+    let drawW: number, drawH: number;
+    if (aspect >= 1) {
+      drawH = size;
+      drawW = size * aspect;
+    } else {
+      drawW = size;
+      drawH = size / aspect;
+    }
+
+    ctx.drawImage(
+      img,
+      -drawW / 2 + cropOffset.x,
+      -drawH / 2 + cropOffset.y,
+      drawW,
+      drawH,
+    );
+    ctx.restore();
+
+    // Dark overlay outside circle
+    ctx.save();
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+    ctx.fillRect(0, 0, size, size);
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size / 2 - 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // Circle border
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size / 2 - 4, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Grid lines (rule of thirds)
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+    ctx.lineWidth = 1;
+    const r = size / 2 - 4;
+    // Vertical lines
+    for (let i = 1; i <= 2; i++) {
+      const gx = (size / 3) * i;
+      // Clip to circle
+      const dx = gx - size / 2;
+      if (Math.abs(dx) < r) {
+        const dy = Math.sqrt(r * r - dx * dx);
+        ctx.beginPath();
+        ctx.moveTo(gx, size / 2 - dy);
+        ctx.lineTo(gx, size / 2 + dy);
+        ctx.stroke();
+      }
+    }
+    // Horizontal lines
+    for (let i = 1; i <= 2; i++) {
+      const gy = (size / 3) * i;
+      const dy = gy - size / 2;
+      if (Math.abs(dy) < r) {
+        const dx = Math.sqrt(r * r - dy * dy);
+        ctx.beginPath();
+        ctx.moveTo(size / 2 - dx, gy);
+        ctx.lineTo(size / 2 + dx, gy);
+        ctx.stroke();
+      }
+    }
+
+    // Center crosshair dot
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }, [cropScale, cropOffset, cropRotation]);
+
+  // Load image for crop preview
+  useEffect(() => {
+    if (!cropPreview) return;
+    const img = new Image();
+    img.onload = () => {
+      cropImageRef.current = img;
+      drawCropPreview();
+    };
+    img.src = cropPreview;
+  }, [cropPreview, drawCropPreview]);
+
+  // Redraw when transform changes
+  useEffect(() => {
+    if (cropImageRef.current && cropPreview) drawCropPreview();
+  }, [cropScale, cropOffset, cropRotation, drawCropPreview, cropPreview]);
+
+  // Drag handlers for crop
+  const handleCropPointerDown = useCallback((e: React.PointerEvent) => {
+    setIsDragging(true);
+    dragStartRef.current = { x: e.clientX, y: e.clientY, ox: cropOffset.x, oy: cropOffset.y };
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  }, [cropOffset]);
+
+  const handleCropPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!isDragging) return;
+    const dx = e.clientX - dragStartRef.current.x;
+    const dy = e.clientY - dragStartRef.current.y;
+    // Scale the movement relative to canvas display size vs internal size
+    const canvas = cropCanvasRef.current;
+    const displaySize = canvas ? canvas.getBoundingClientRect().width : 280;
+    const canvasSize = canvas ? canvas.width : 560;
+    const ratio = canvasSize / displaySize;
+    setCropOffset({
+      x: dragStartRef.current.ox + dx * ratio / cropScale,
+      y: dragStartRef.current.oy + dy * ratio / cropScale,
+    });
+  }, [isDragging, cropScale]);
+
+  const handleCropPointerUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  // Crop + upload + auto-save profile image
+  const handleCropConfirm = useCallback(async () => {
+    const img = cropImageRef.current;
+    if (!img) return;
+
+    setUploadingImage(true);
+    try {
+      // Render the final cropped circle into a square canvas
+      const outputSize = 512;
+      const offscreen = document.createElement('canvas');
+      offscreen.width = outputSize;
+      offscreen.height = outputSize;
+      const ctx = offscreen.getContext('2d')!;
+
+      // Clip to circle
+      ctx.beginPath();
+      ctx.arc(outputSize / 2, outputSize / 2, outputSize / 2, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+
+      ctx.translate(outputSize / 2, outputSize / 2);
+      ctx.rotate((cropRotation * Math.PI) / 180);
+      ctx.scale(cropScale, cropScale);
+
+      const aspect = img.naturalWidth / img.naturalHeight;
+      let drawW: number, drawH: number;
+      if (aspect >= 1) {
+        drawH = outputSize;
+        drawW = outputSize * aspect;
+      } else {
+        drawW = outputSize;
+        drawH = outputSize / aspect;
+      }
+
+      ctx.drawImage(
+        img,
+        -drawW / 2 + cropOffset.x * (outputSize / 560),
+        -drawH / 2 + cropOffset.y * (outputSize / 560),
+        drawW,
+        drawH,
+      );
+
+      const croppedBase64 = offscreen.toDataURL('image/png', 0.92);
+
+      // Upload image
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          base64: croppedBase64,
+          filename: cropFileName.replace(/\.[^.]+$/, '') + '_cropped.png',
+          mime: 'image/png',
+        }),
+      });
+
+      const json = await res.json();
+      if (json.status === 'success' && json.data?.url) {
+        const newUrl = json.data.url;
+        setCustomProfileImage(newUrl);
+
+        // Save profile image immediately to server (without closing modal)
+        try {
+          await fetch('/api/profile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: userEmail,
+              data: {
+                name: formData.name,
+                phone: formData.phone,
+                instagram: formData.instagram,
+                address: composeAddress(addressFields),
+                profileImage: newUrl,
+              },
+            }),
+          });
+        } catch {
+          // Ignore - image is still set locally, will be saved on form submit
+        }
+
+        showNotification('success', 'บันทึกรูปโปรไฟล์แล้ว');
+      } else {
+        showNotification('error', json.message || 'อัปโหลดไม่สำเร็จ');
+      }
+    } catch (err) {
+      showNotification('error', 'อัปโหลดไม่สำเร็จ กรุณาลองใหม่');
+    } finally {
+      setUploadingImage(false);
+      setCropPreview(null);
+      cropImageRef.current = null;
+    }
+  }, [cropScale, cropOffset, cropRotation, cropFileName, userEmail, formData, composeAddress, addressFields]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
-    onSave(formData);
+    const composedAddress = composeAddress(addressFields);
+    onSave({ ...formData, address: composedAddress, profileImage: customProfileImage || undefined });
   };
 
   const isFormValid = formData.name && formData.phone && formData.instagram && pdpaAccepted;
 
   const inputSx = {
     '& .MuiOutlinedInput-root': {
-      bgcolor: 'rgba(30,41,59,0.4)',
+      bgcolor: 'var(--surface)',
       borderRadius: '14px',
-      color: '#f1f5f9',
-      fontSize: '1rem',
+      color: 'text.primary',
+      fontSize: '0.95rem',
       transition: 'all 0.2s ease',
-      '& fieldset': { borderColor: 'rgba(255,255,255,0.08)', borderWidth: '1px' },
-      '&:hover fieldset': { borderColor: 'rgba(139,92,246,0.4)' },
-      '&.Mui-focused fieldset': { borderColor: '#8b5cf6', borderWidth: '2px' },
-      '&.Mui-focused': { bgcolor: 'rgba(30,41,59,0.6)' },
+      '& fieldset': { borderColor: 'var(--glass-border)', borderWidth: '1px' },
+      '&:hover fieldset': { borderColor: 'rgba(30,64,175,0.4)' },
+      '&.Mui-focused fieldset': { borderColor: '#2563eb', borderWidth: '2px' },
+      '&.Mui-focused': { bgcolor: 'var(--surface)' },
     },
-    '& .MuiInputLabel-root': { color: '#64748b', fontSize: '0.9rem' },
-    '& .MuiInputLabel-root.Mui-focused': { color: '#a78bfa' },
-    '& .MuiInputAdornment-root': { color: '#64748b' },
+    '& .MuiInputLabel-root': { color: 'text.secondary', fontSize: '0.9rem' },
+    '& .MuiInputLabel-root.Mui-focused': { color: '#2563eb' },
+    '& .MuiInputAdornment-root': { color: 'text.secondary' },
     '& .MuiFormHelperText-root': { color: '#f87171', fontSize: '0.75rem', mt: 0.5 },
   };
+
+  const autocompleteSx = {
+    ...inputSx,
+    '& .MuiAutocomplete-popupIndicator': { color: 'text.secondary' },
+    '& .MuiAutocomplete-clearIndicator': { color: 'text.secondary' },
+  };
+
+  const dropdownPaper = (props: any) => (
+    <Paper {...props} sx={{
+      bgcolor: 'var(--surface)',
+      color: 'text.primary',
+      border: '1px solid var(--glass-border)',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
+      borderRadius: '12px',
+      mt: 0.5,
+      '& .MuiAutocomplete-option': {
+        fontSize: '0.9rem',
+        '&[aria-selected="true"]': { bgcolor: 'rgba(37,99,235,0.12)' },
+        '&.Mui-focused': { bgcolor: 'rgba(37,99,235,0.08)' },
+      },
+    }} />
+  );
 
   return (
     <Drawer
@@ -118,16 +548,16 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
       onClose={onClose}
       PaperProps={{
         sx: {
-          height: { xs: '80vh', sm: '80vh' },
-          maxHeight: { xs: '85vh', sm: '85vh' },
+          height: { xs: '90vh', sm: '85vh' },
+          maxHeight: { xs: '95vh', sm: '90vh' },
           borderTopLeftRadius: { xs: 20, sm: 24 },
           borderTopRightRadius: { xs: 20, sm: 24 },
-          bgcolor: '#0a0f1a',
+          bgcolor: 'background.default',
           overflow: 'hidden',
         },
       }}
     >
-      {/* Inline Notification Toast - Bottom */}
+      {/* Inline Notification Toast */}
       {notification && (
         <Box
           sx={{
@@ -181,51 +611,89 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
         </Box>
       )}
 
-      {/* Header - Compact */}
+      {/* Hidden file input for profile image */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        style={{ display: 'none' }}
+        onChange={handleImageSelect}
+      />
+
+      {/* Header */}
       <Box sx={{
         px: { xs: 2, sm: 3 },
         pt: 1,
         pb: 1.5,
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
-        background: 'linear-gradient(180deg, rgba(15,23,42,0.98) 0%, rgba(10,15,26,0.98) 100%)',
+        borderBottom: '1px solid var(--glass-border)',
+        background: 'var(--glass-strong)',
         position: 'sticky',
         top: 0,
         zIndex: 10,
       }}>
-        {/* Drag Handle */}
-        <Box sx={{ width: 36, height: 4, bgcolor: 'rgba(255,255,255,0.15)', borderRadius: 3, mx: 'auto', mb: 1.5 }} />
-        
+        <Box sx={{ width: 36, height: 4, bgcolor: 'var(--glass-bg)', borderRadius: 3, mx: 'auto', mb: 1.5 }} />
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Box sx={{
-              width: 40,
-              height: 40,
-              borderRadius: '12px',
-              background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
-              display: 'grid',
-              placeItems: 'center',
-              boxShadow: '0 4px 16px rgba(139,92,246,0.25)',
-            }}>
-              <UserCircle size={20} color="white" />
+            {/* Clickable Avatar with camera overlay */}
+            <Box
+              onClick={() => !uploadingImage && fileInputRef.current?.click()}
+              sx={{
+                position: 'relative',
+                cursor: uploadingImage ? 'wait' : 'pointer',
+                '&:hover .camera-overlay': { opacity: 1 },
+              }}
+            >
+              <Avatar
+                src={displayImage || undefined}
+                sx={{
+                  width: 44,
+                  height: 44,
+                  border: '2px solid',
+                  borderColor: customProfileImage ? 'rgba(16,185,129,0.4)' : 'rgba(37,99,235,0.3)',
+                  boxShadow: customProfileImage
+                    ? '0 4px 16px rgba(16,185,129,0.2)'
+                    : '0 4px 16px rgba(37,99,235,0.15)',
+                  transition: 'all 0.3s ease',
+                }}
+              >
+                {!displayImage && <UserCircle size={22} />}
+              </Avatar>
+              {/* Camera overlay */}
+              <Box
+                className="camera-overlay"
+                sx={{
+                  position: 'absolute',
+                  inset: 0,
+                  borderRadius: '50%',
+                  bgcolor: 'rgba(0,0,0,0.5)',
+                  display: 'grid',
+                  placeItems: 'center',
+                  opacity: 0,
+                  transition: 'opacity 0.2s ease',
+                }}
+              >
+                {uploadingImage
+                  ? <CircularProgress size={18} sx={{ color: 'white' }} />
+                  : <Camera size={16} color="white" />
+                }
+              </Box>
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#f1f5f9', lineHeight: 1.2 }}>
+              <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'text.primary', lineHeight: 1.2 }}>
                 ข้อมูลผู้ติดต่อ
               </Typography>
-              <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>
-                กรอกข้อมูลเพื่อดำเนินการสั่งซื้อ
+              <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {userEmail || 'กรอกข้อมูลเพื่อดำเนินการสั่งซื้อ'}
               </Typography>
             </Box>
           </Box>
-          
-          {/* Close Button */}
           <IconButton
             onClick={onClose}
             size="small"
             sx={{
-              bgcolor: 'rgba(255,255,255,0.05)',
-              color: '#94a3b8',
-              '&:hover': { bgcolor: 'rgba(255,255,255,0.1)', color: '#f1f5f9' },
+              bgcolor: 'var(--glass-bg)',
+              color: 'text.secondary',
+              '&:hover': { bgcolor: 'var(--glass-bg)', color: 'text.primary' },
             }}
           >
             <X size={20} />
@@ -234,52 +702,45 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
       </Box>
 
       {/* Content */}
-      <Box 
-        component="form" 
+      <Box
+        component="form"
         onSubmit={handleSubmit}
-        sx={{ 
-          flex: 1, 
-          overflow: 'auto', 
+        sx={{
+          flex: 1,
+          overflow: 'auto',
           WebkitOverflowScrolling: 'touch',
           px: { xs: 1.5, sm: 2.5 },
           py: 2,
         }}
       >
-        <Box sx={{ maxWidth: 480, mx: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
-          
-          {/* Name Card */}
+        <Box sx={{ maxWidth: 520, mx: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
+
+          {/* ====== Name Card ====== */}
           <Box sx={{
             p: 2,
             borderRadius: '16px',
-            bgcolor: 'rgba(30,41,59,0.4)',
-            border: '1px solid rgba(255,255,255,0.06)',
+            bgcolor: 'var(--surface-2)',
+            border: '1px solid var(--glass-border)',
           }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
               <Box sx={{
-                width: 32,
-                height: 32,
-                borderRadius: '8px',
-                background: 'linear-gradient(135deg, rgba(139,92,246,0.2) 0%, rgba(99,102,241,0.2) 100%)',
-                display: 'grid',
-                placeItems: 'center',
+                width: 32, height: 32, borderRadius: '8px',
+                background: 'linear-gradient(135deg, rgba(30,64,175,0.2) 0%, rgba(37,99,235,0.2) 100%)',
+                display: 'grid', placeItems: 'center',
               }}>
                 <User size={16} style={{ color: '#a78bfa' }} />
               </Box>
               <Box>
-                <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#e2e8f0' }}>
+                <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'text.primary' }}>
                   ชื่อ-นามสกุล
                 </Typography>
-                <Typography sx={{ fontSize: '0.65rem', color: '#64748b' }}>
+                <Typography sx={{ fontSize: '0.65rem', color: 'text.secondary' }}>
                   กรุณากรอกเป็นภาษาไทย
                 </Typography>
               </Box>
-              <Box sx={{ 
-                ml: 'auto', 
-                px: 1, 
-                py: 0.3, 
-                borderRadius: '6px', 
-                bgcolor: 'rgba(239,68,68,0.15)', 
-                border: '1px solid rgba(239,68,68,0.2)' 
+              <Box sx={{
+                ml: 'auto', px: 1, py: 0.3, borderRadius: '6px',
+                bgcolor: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.2)',
               }}>
                 <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: '#f87171' }}>จำเป็น</Typography>
               </Box>
@@ -288,42 +749,38 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
               fullWidth
               placeholder="เช่น สมชาย ใจดี"
               value={formData.name}
-              onChange={e => setFormData({...formData, name: sanitizeThai(e.target.value)})}
+              onChange={e => setFormData({ ...formData, name: sanitizeThai(e.target.value) })}
               error={!!errors.name}
               helperText={errors.name}
               sx={inputSx}
             />
           </Box>
 
-          {/* Contact Card */}
+          {/* ====== Contact Card ====== */}
           <Box sx={{
             p: 2,
             borderRadius: '16px',
-            bgcolor: 'rgba(30,41,59,0.4)',
-            border: '1px solid rgba(255,255,255,0.06)',
+            bgcolor: 'var(--surface-2)',
+            border: '1px solid var(--glass-border)',
           }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
               <Box sx={{
-                width: 32,
-                height: 32,
-                borderRadius: '8px',
+                width: 32, height: 32, borderRadius: '8px',
                 background: 'linear-gradient(135deg, rgba(16,185,129,0.2) 0%, rgba(6,182,212,0.2) 100%)',
-                display: 'grid',
-                placeItems: 'center',
+                display: 'grid', placeItems: 'center',
               }}>
                 <Phone size={16} style={{ color: '#6ee7b7' }} />
               </Box>
-              <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#e2e8f0' }}>
+              <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'text.primary' }}>
                 ข้อมูลติดต่อ
               </Typography>
             </Box>
-            
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <TextField
                 fullWidth
                 placeholder="เบอร์โทรศัพท์ เช่น 0812345678"
                 value={formData.phone}
-                onChange={e => setFormData({...formData, phone: sanitizePhone(e.target.value)})}
+                onChange={e => setFormData({ ...formData, phone: sanitizePhone(e.target.value) })}
                 error={!!errors.phone}
                 helperText={errors.phone}
                 InputProps={{
@@ -339,7 +796,7 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
                 fullWidth
                 placeholder="Instagram เช่น @username"
                 value={formData.instagram}
-                onChange={e => setFormData({...formData, instagram: e.target.value.trimStart()})}
+                onChange={e => setFormData({ ...formData, instagram: e.target.value.trimStart() })}
                 error={!!errors.instagram}
                 helperText={errors.instagram}
                 InputProps={{
@@ -354,85 +811,186 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
             </Box>
           </Box>
 
-          {/* Address Card */}
+          {/* ====== Address Card - Smart Thai Address ====== */}
           <Box sx={{
             p: 2,
             borderRadius: '16px',
-            bgcolor: 'rgba(30,41,59,0.4)',
-            border: '1px solid rgba(255,255,255,0.06)',
+            bgcolor: 'var(--surface-2)',
+            border: '1px solid var(--glass-border)',
           }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
               <Box sx={{
-                width: 32,
-                height: 32,
-                borderRadius: '8px',
+                width: 32, height: 32, borderRadius: '8px',
                 background: 'linear-gradient(135deg, rgba(245,158,11,0.2) 0%, rgba(234,88,12,0.2) 100%)',
-                display: 'grid',
-                placeItems: 'center',
+                display: 'grid', placeItems: 'center',
               }}>
                 <MapPin size={16} style={{ color: '#fbbf24' }} />
               </Box>
               <Box>
-                <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#e2e8f0' }}>
+                <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'text.primary' }}>
                   ที่อยู่จัดส่ง
                 </Typography>
-                <Typography sx={{ fontSize: '0.65rem', color: '#64748b' }}>
-                  ไม่บังคับ - กรอกเมื่อต้องการจัดส่ง
+                <Typography sx={{ fontSize: '0.65rem', color: 'text.secondary' }}>
+                  กรอกรหัสไปรษณีย์เพื่อค้นหาอัตโนมัติ
                 </Typography>
               </Box>
             </Box>
-            <TextField
-              fullWidth
-              multiline
-              rows={2}
-              placeholder="บ้านเลขที่ หมู่บ้าน ซอย ถนน ตำบล อำเภอ จังหวัด รหัสไปรษณีย์"
-              value={formData.address}
-              onChange={e => setFormData({...formData, address: e.target.value})}
-              sx={inputSx}
-            />
+
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              {/* Zip Code → auto-fill */}
+              <TextField
+                fullWidth
+                placeholder="รหัสไปรษณีย์ เช่น 90110"
+                value={addressFields.zipCode}
+                onChange={e => handleZipCodeChange(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Search size={16} style={{ color: '#fbbf24' }} />
+                    </InputAdornment>
+                  ),
+                  endAdornment: addressFields.zipCode.length === 5 && addressFields.province ? (
+                    <InputAdornment position="end">
+                      <Check size={16} style={{ color: '#10b981' }} />
+                    </InputAdornment>
+                  ) : null,
+                }}
+                sx={{
+                  ...inputSx,
+                  '& .MuiOutlinedInput-root': {
+                    ...inputSx['& .MuiOutlinedInput-root'],
+                    bgcolor: addressFields.zipCode.length === 5 && addressFields.province
+                      ? 'rgba(16,185,129,0.06)'
+                      : 'var(--surface)',
+                  },
+                }}
+                inputProps={{ maxLength: 5, inputMode: 'numeric' }}
+              />
+
+              {/* Province + District */}
+              <Box sx={{ display: 'flex', gap: 1.5 }}>
+                <Autocomplete
+                  fullWidth
+                  options={provinces.map(p => p.name)}
+                  value={addressFields.province || null}
+                  onChange={(_, val) => handleProvinceChange(val)}
+                  loading={addressLoading}
+                  noOptionsText="ไม่พบจังหวัด"
+                  loadingText="กำลังโหลด..."
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      placeholder="จังหวัด"
+                      sx={autocompleteSx}
+                      InputProps={{
+                        ...params.InputProps,
+                        endAdornment: (
+                          <>
+                            {addressLoading ? <CircularProgress size={16} /> : null}
+                            {params.InputProps.endAdornment}
+                          </>
+                        ),
+                      }}
+                    />
+                  )}
+                  PaperComponent={dropdownPaper}
+                  sx={{ flex: 1 }}
+                />
+                <Autocomplete
+                  fullWidth
+                  options={districts.map(d => d.name)}
+                  value={addressFields.district || null}
+                  onChange={(_, val) => handleDistrictChange(val)}
+                  disabled={!addressFields.province}
+                  noOptionsText="เลือกจังหวัดก่อน"
+                  renderInput={(params) => (
+                    <TextField {...params} placeholder="อำเภอ/เขต" sx={autocompleteSx} />
+                  )}
+                  PaperComponent={dropdownPaper}
+                  sx={{ flex: 1 }}
+                />
+              </Box>
+
+              {/* Sub-district */}
+              <Autocomplete
+                fullWidth
+                options={subDistricts.map(s => s.name)}
+                value={addressFields.subDistrict || null}
+                onChange={(_, val) => handleSubDistrictChange(val)}
+                disabled={!addressFields.district}
+                noOptionsText="เลือกอำเภอ/เขตก่อน"
+                renderInput={(params) => (
+                  <TextField {...params} placeholder="ตำบล/แขวง" sx={autocompleteSx} />
+                )}
+                PaperComponent={dropdownPaper}
+              />
+
+              {/* Detail address */}
+              <TextField
+                fullWidth
+                multiline
+                rows={2}
+                placeholder="บ้านเลขที่ หมู่บ้าน ซอย ถนน"
+                value={addressFields.detail}
+                onChange={e => setAddressFields(prev => ({ ...prev, detail: e.target.value }))}
+                sx={inputSx}
+              />
+
+              {/* Address Preview */}
+              {(addressFields.province || addressFields.detail) && (
+                <Box sx={{
+                  p: 1.5,
+                  borderRadius: '10px',
+                  bgcolor: 'rgba(37,99,235,0.06)',
+                  border: '1px solid rgba(37,99,235,0.15)',
+                }}>
+                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#60a5fa', mb: 0.3 }}>
+                    ที่อยู่ที่จะบันทึก:
+                  </Typography>
+                  <Typography sx={{ fontSize: '0.8rem', color: 'text.primary', lineHeight: 1.5 }}>
+                    {composeAddress(addressFields) || '—'}
+                  </Typography>
+                </Box>
+              )}
+            </Box>
           </Box>
 
-          {/* PDPA Card */}
+          {/* ====== PDPA Card ====== */}
           <Box sx={{
             p: 2,
             borderRadius: '16px',
-            background: pdpaAccepted 
+            background: pdpaAccepted
               ? 'linear-gradient(135deg, rgba(16,185,129,0.1) 0%, rgba(6,182,212,0.1) 100%)'
-              : 'rgba(30,41,59,0.4)',
-            border: pdpaAccepted 
-              ? '2px solid rgba(16,185,129,0.3)' 
-              : '1px solid rgba(255,255,255,0.06)',
+              : 'var(--surface-2)',
+            border: pdpaAccepted
+              ? '2px solid rgba(16,185,129,0.3)'
+              : '1px solid var(--glass-border)',
             transition: 'all 0.3s ease',
           }}>
             <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, mb: 1.5 }}>
               <Box sx={{
-                width: 36,
-                height: 36,
-                borderRadius: '10px',
+                width: 36, height: 36, borderRadius: '10px',
                 background: pdpaAccepted
                   ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                  : 'rgba(139,92,246,0.15)',
-                display: 'grid',
-                placeItems: 'center',
-                flexShrink: 0,
+                  : 'rgba(30,64,175,0.15)',
+                display: 'grid', placeItems: 'center', flexShrink: 0,
                 transition: 'all 0.3s ease',
               }}>
-                {pdpaAccepted 
+                {pdpaAccepted
                   ? <Check size={18} style={{ color: 'white' }} />
                   : <ShieldCheck size={18} style={{ color: '#a78bfa' }} />
                 }
               </Box>
               <Box sx={{ flex: 1 }}>
-                <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: pdpaAccepted ? '#6ee7b7' : '#e2e8f0', mb: 0.3 }}>
+                <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: pdpaAccepted ? '#10b981' : 'text.primary', mb: 0.3 }}>
                   {pdpaAccepted ? 'ยินยอมแล้ว' : 'นโยบายความเป็นส่วนตัว'}
                 </Typography>
-                <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8', lineHeight: 1.5 }}>
+                <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary', lineHeight: 1.5 }}>
                   ข้อมูลของท่านจะถูกใช้เพื่อการจัดส่งและติดต่อเท่านั้น
                 </Typography>
               </Box>
             </Box>
-            
-            <Box 
+            <Box
               onClick={() => setPdpaAccepted(!pdpaAccepted)}
               sx={{
                 display: 'flex',
@@ -440,39 +998,30 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
                 gap: 1.5,
                 p: 1.2,
                 borderRadius: '10px',
-                bgcolor: pdpaAccepted ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.03)',
+                bgcolor: pdpaAccepted ? 'rgba(16,185,129,0.15)' : 'var(--glass-bg)',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
-                '&:hover': { bgcolor: pdpaAccepted ? 'rgba(16,185,129,0.2)' : 'rgba(255,255,255,0.06)' },
+                '&:hover': { bgcolor: pdpaAccepted ? 'rgba(16,185,129,0.2)' : 'var(--glass-bg)' },
               }}
             >
               <Box sx={{
-                width: 22,
-                height: 22,
-                borderRadius: '6px',
-                bgcolor: pdpaAccepted ? '#10b981' : 'rgba(255,255,255,0.1)',
-                border: pdpaAccepted ? 'none' : '2px solid rgba(255,255,255,0.2)',
-                display: 'grid',
-                placeItems: 'center',
+                width: 22, height: 22, borderRadius: '6px',
+                bgcolor: pdpaAccepted ? '#10b981' : 'var(--glass-bg)',
+                border: pdpaAccepted ? 'none' : '2px solid var(--glass-border)',
+                display: 'grid', placeItems: 'center',
                 transition: 'all 0.2s ease',
               }}>
                 {pdpaAccepted && <Check size={12} style={{ color: 'white' }} />}
               </Box>
-              <Typography sx={{ fontSize: '0.8rem', color: pdpaAccepted ? '#6ee7b7' : '#e2e8f0', fontWeight: 600 }}>
+              <Typography sx={{ fontSize: '0.8rem', color: pdpaAccepted ? '#10b981' : 'text.primary', fontWeight: 600 }}>
                 ยินยอมให้ใช้ข้อมูลตามนโยบาย
               </Typography>
             </Box>
-
             {errors.pdpa && (
-              <Box sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: 1, 
-                mt: 2, 
-                p: 1.5, 
-                borderRadius: '10px',
-                bgcolor: 'rgba(245,158,11,0.1)',
-                border: '1px solid rgba(245,158,11,0.2)',
+              <Box sx={{
+                display: 'flex', alignItems: 'center', gap: 1,
+                mt: 2, p: 1.5, borderRadius: '10px',
+                bgcolor: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)',
               }}>
                 <AlertTriangle size={16} style={{ color: '#fbbf24' }} />
                 <Typography sx={{ fontSize: '0.8rem', color: '#fbbf24' }}>{errors.pdpa}</Typography>
@@ -482,16 +1031,16 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
         </Box>
       </Box>
 
-      {/* Bottom Submit Button - Compact */}
+      {/* Bottom Submit Button */}
       <Box sx={{
         px: { xs: 2, sm: 3 },
         py: 1.5,
-        borderTop: '1px solid rgba(255,255,255,0.08)',
-        background: 'linear-gradient(180deg, rgba(15,23,42,0.98) 0%, rgba(10,15,26,0.98) 100%)',
+        borderTop: '1px solid var(--glass-border)',
+        background: 'var(--glass-strong)',
         backdropFilter: 'blur(20px)',
         paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
       }}>
-        <Box sx={{ maxWidth: 480, mx: 'auto' }}>
+        <Box sx={{ maxWidth: 520, mx: 'auto' }}>
           <Button
             fullWidth
             type="submit"
@@ -501,41 +1050,192 @@ export default function ProfileModal({ initialData, onClose, onSave }: ProfileMo
             sx={{
               py: 1.5,
               borderRadius: '14px',
-              background: isFormValid 
+              background: isFormValid
                 ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
                 : pdpaAccepted
-                  ? 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)'
+                  ? 'linear-gradient(135deg, #1e40af 0%, #2563eb 100%)'
                   : 'rgba(100,116,139,0.15)',
-              color: pdpaAccepted ? 'white' : '#64748b',
+              color: pdpaAccepted ? 'white' : 'text.secondary',
               fontSize: '0.95rem',
               fontWeight: 700,
               textTransform: 'none',
               boxShadow: isFormValid ? '0 6px 24px rgba(16,185,129,0.3)' : 'none',
               transition: 'all 0.3s ease',
               '&:hover': {
-                background: isFormValid 
+                background: isFormValid
                   ? 'linear-gradient(135deg, #059669 0%, #047857 100%)'
                   : pdpaAccepted
-                    ? 'linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)'
+                    ? 'linear-gradient(135deg, #7c3aed 0%, #1d4ed8 100%)'
                     : 'rgba(100,116,139,0.2)',
                 transform: isFormValid ? 'translateY(-1px)' : 'none',
                 boxShadow: isFormValid ? '0 8px 32px rgba(16,185,129,0.35)' : 'none',
               },
               '&:disabled': {
                 background: 'rgba(100,116,139,0.15)',
-                color: '#64748b',
+                color: 'text.secondary',
               },
             }}
           >
             {isFormValid ? 'บันทึกและดำเนินการต่อ' : 'กรอกข้อมูลให้ครบถ้วน'}
           </Button>
           {!pdpaAccepted && (
-            <Typography sx={{ textAlign: 'center', fontSize: '0.7rem', color: '#475569', mt: 1 }}>
+            <Typography sx={{ textAlign: 'center', fontSize: '0.7rem', color: 'var(--text-muted)', mt: 1 }}>
               กรุณายินยอมนโยบายความเป็นส่วนตัวก่อนดำเนินการ
             </Typography>
           )}
         </Box>
       </Box>
+
+      {/* ====== Image Crop Preview Dialog ====== */}
+      <Dialog
+        open={!!cropPreview}
+        onClose={() => { setCropPreview(null); cropImageRef.current = null; }}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: 'var(--surface)',
+            borderRadius: '20px',
+            overflow: 'hidden',
+            m: 1,
+          },
+        }}
+      >
+        {/* Dialog Header */}
+        <Box sx={{
+          px: 2.5, py: 1.5,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          borderBottom: '1px solid var(--glass-border)',
+        }}>
+          <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'text.primary' }}>
+            ครอปรูปโปรไฟล์
+          </Typography>
+          <IconButton
+            size="small"
+            onClick={() => { setCropPreview(null); cropImageRef.current = null; }}
+            sx={{ color: 'text.secondary' }}
+          >
+            <X size={18} />
+          </IconButton>
+        </Box>
+
+        {/* Canvas Area */}
+        <Box sx={{
+          display: 'flex', justifyContent: 'center', alignItems: 'center',
+          p: 2, bgcolor: 'rgba(0,0,0,0.03)',
+        }}>
+          <Box sx={{ position: 'relative', touchAction: 'none' }}>
+            <canvas
+              ref={cropCanvasRef}
+              width={560}
+              height={560}
+              style={{
+                width: 280,
+                height: 280,
+                borderRadius: '16px',
+                cursor: isDragging ? 'grabbing' : 'grab',
+                userSelect: 'none',
+              }}
+              onPointerDown={handleCropPointerDown}
+              onPointerMove={handleCropPointerMove}
+              onPointerUp={handleCropPointerUp}
+              onPointerCancel={handleCropPointerUp}
+            />
+            {/* Drag hint */}
+            <Box sx={{
+              position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)',
+              px: 1.5, py: 0.3, borderRadius: '8px',
+              bgcolor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)',
+              display: 'flex', alignItems: 'center', gap: 0.5,
+              opacity: isDragging ? 0 : 0.7, transition: 'opacity 0.2s',
+              pointerEvents: 'none',
+            }}>
+              <Move size={12} color="white" />
+              <Typography sx={{ fontSize: '0.65rem', color: 'white', fontWeight: 500 }}>
+                ลากเพื่อเลื่อน
+              </Typography>
+            </Box>
+          </Box>
+        </Box>
+
+        {/* Controls */}
+        <Box sx={{ px: 2.5, pt: 1, pb: 0.5 }}>
+          {/* Zoom */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+            <ZoomOut size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+            <Slider
+              value={cropScale}
+              onChange={(_, v) => setCropScale(v as number)}
+              min={0.5}
+              max={3}
+              step={0.05}
+              sx={{
+                color: '#2563eb',
+                '& .MuiSlider-thumb': { width: 18, height: 18, bgcolor: 'white', border: '2px solid #2563eb' },
+                '& .MuiSlider-track': { height: 4 },
+                '& .MuiSlider-rail': { height: 4, bgcolor: 'var(--glass-border)' },
+              }}
+            />
+            <ZoomIn size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+          </Box>
+
+          {/* Rotate */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <RotateCw size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+            <Slider
+              value={cropRotation}
+              onChange={(_, v) => setCropRotation(v as number)}
+              min={-180}
+              max={180}
+              step={1}
+              sx={{
+                color: '#8b5cf6',
+                '& .MuiSlider-thumb': { width: 18, height: 18, bgcolor: 'white', border: '2px solid #8b5cf6' },
+                '& .MuiSlider-track': { height: 4 },
+                '& .MuiSlider-rail': { height: 4, bgcolor: 'var(--glass-border)' },
+              }}
+            />
+            <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary', minWidth: 32, textAlign: 'right' }}>
+              {cropRotation}°
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* Action Buttons */}
+        <Box sx={{
+          px: 2.5, py: 1.5, display: 'flex', gap: 1.5,
+          borderTop: '1px solid var(--glass-border)',
+        }}>
+          <Button
+            fullWidth
+            onClick={() => { setCropPreview(null); cropImageRef.current = null; }}
+            sx={{
+              py: 1, borderRadius: '12px',
+              bgcolor: 'var(--glass-bg)', color: 'text.primary',
+              fontWeight: 600, fontSize: '0.85rem', textTransform: 'none',
+              '&:hover': { bgcolor: 'var(--glass-border)' },
+            }}
+          >
+            ยกเลิก
+          </Button>
+          <Button
+            fullWidth
+            onClick={handleCropConfirm}
+            disabled={uploadingImage}
+            startIcon={uploadingImage ? <CircularProgress size={16} sx={{ color: 'white' }} /> : <Check size={16} />}
+            sx={{
+              py: 1, borderRadius: '12px',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              color: 'white', fontWeight: 600, fontSize: '0.85rem', textTransform: 'none',
+              boxShadow: '0 4px 16px rgba(16,185,129,0.25)',
+              '&:hover': { background: 'linear-gradient(135deg, #059669 0%, #047857 100%)' },
+              '&:disabled': { opacity: 0.7 },
+            }}
+          >
+            {uploadingImage ? 'กำลังบันทึก...' : 'ยืนยันและบันทึก'}
+          </Button>
+        </Box>
+      </Dialog>
     </Drawer>
   );
 }

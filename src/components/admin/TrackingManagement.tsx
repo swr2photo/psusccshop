@@ -34,29 +34,29 @@ import {
   InputAdornment,
 } from '@mui/material';
 import {
-  LocalShipping,
+  Truck as LocalShipping,
   Search,
-  Refresh,
-  OpenInNew,
-  ContentCopy,
-  Edit,
+  RotateCcw as Refresh,
+  ExternalLink as OpenInNew,
+  Copy as ContentCopy,
+  Pencil as Edit,
   Save,
-  CheckCircle,
-  Schedule,
-  Error as ErrorIcon,
-  Flight,
-  Close,
-  Add,
-  Delete,
+  CheckCircle2 as CheckCircle,
+  Clock as Schedule,
+  AlertCircle as ErrorIcon,
+  Plane as Flight,
+  X as Close,
+  Plus as Add,
+  Trash2 as Delete,
   Download,
-  Print,
-  FilterList,
-  SelectAll,
-  ClearAll,
-  Person,
+  Printer as Print,
+  Filter as FilterList,
+  CheckSquare as SelectAll,
+  ListX as ClearAll,
+  User as Person,
   Phone,
   Home,
-} from '@mui/icons-material';
+} from 'lucide-react';
 import {
   TrackingInfo,
   TrackingStatus,
@@ -91,14 +91,14 @@ interface Order {
 }
 
 const STATUS_ICONS: Record<TrackingStatus, React.ReactNode> = {
-  pending: <Schedule sx={{ fontSize: 18, color: '#94a3b8' }} />,
-  picked_up: <Flight sx={{ fontSize: 18, color: '#a78bfa' }} />,
-  in_transit: <LocalShipping sx={{ fontSize: 18, color: '#60a5fa' }} />,
-  out_for_delivery: <LocalShipping sx={{ fontSize: 18, color: '#22d3ee' }} />,
-  delivered: <CheckCircle sx={{ fontSize: 18, color: '#22c55e' }} />,
-  returned: <ErrorIcon sx={{ fontSize: 18, color: '#f59e0b' }} />,
-  failed: <ErrorIcon sx={{ fontSize: 18, color: '#ef4444' }} />,
-  unknown: <Schedule sx={{ fontSize: 18, color: '#94a3b8' }} />,
+  pending: <Schedule size={18} color="#94a3b8" />,
+  picked_up: <Flight size={18} color="#a78bfa" />,
+  in_transit: <LocalShipping size={18} color="#60a5fa" />,
+  out_for_delivery: <LocalShipping size={18} color="#22d3ee" />,
+  delivered: <CheckCircle size={18} color="#22c55e" />,
+  returned: <ErrorIcon size={18} color="#f59e0b" />,
+  failed: <ErrorIcon size={18} color="#ef4444" />,
+  unknown: <Schedule size={18} color="#94a3b8" />,
 };
 
 const inputSx = {
@@ -108,11 +108,11 @@ const inputSx = {
     '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.08)' },
     '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.1)' },
     '&:hover fieldset': { borderColor: 'rgba(255, 255, 255, 0.2)' },
-    '&.Mui-focused fieldset': { borderColor: '#8b5cf6' },
+    '&.Mui-focused fieldset': { borderColor: '#1e40af' },
   },
   '& .MuiInputLabel-root': {
     color: 'rgba(255, 255, 255, 0.6)',
-    '&.Mui-focused': { color: '#8b5cf6' },
+    '&.Mui-focused': { color: '#1e40af' },
   },
   '& .MuiInputBase-input': { color: '#fff' },
 };
@@ -406,11 +406,11 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1400, mx: 'auto' }}>
       {/* Header */}
       <Box sx={{ mb: 3 }}>
-        <Typography variant="h5" sx={{ fontWeight: 700, color: '#f1f5f9', mb: 1, display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <LocalShipping sx={{ color: '#8b5cf6' }} />
+        <Typography variant="h5" sx={{ fontWeight: 700, color: 'var(--foreground)', mb: 1, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <LocalShipping size={24} color="#1e40af" />
           จัดการการจัดส่ง
         </Typography>
-        <Typography sx={{ color: '#94a3b8', fontSize: '0.9rem' }}>
+        <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
           เพิ่มเลขพัสดุ ติดตามสถานะ และส่งออกข้อมูลการจัดส่ง
         </Typography>
       </Box>
@@ -455,9 +455,9 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
         onChange={(_, v) => setActiveTab(v)}
         sx={{
           mb: 3,
-          '& .MuiTab-root': { color: '#94a3b8', fontWeight: 600 },
-          '& .Mui-selected': { color: '#8b5cf6' },
-          '& .MuiTabs-indicator': { bgcolor: '#8b5cf6' },
+          '& .MuiTab-root': { color: 'var(--text-muted)', fontWeight: 600 },
+          '& .Mui-selected': { color: '#1e40af' },
+          '& .MuiTabs-indicator': { bgcolor: '#1e40af' },
         }}
       >
         <Tab label="รายการออเดอร์" />
@@ -467,7 +467,7 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
 
       {/* Tab 0: Order List */}
       {activeTab === 0 && (
-        <Card sx={{ bgcolor: 'rgba(30, 41, 59, 0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 3 }}>
+        <Card sx={{ bgcolor: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 3 }}>
           <CardContent sx={{ p: 3 }}>
             {/* Toolbar */}
             <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, mb: 3 }}>
@@ -481,7 +481,7 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <Search sx={{ color: '#64748b' }} />
+                      <Search size={24} color="#64748b" />
                     </InputAdornment>
                   ),
                 }}
@@ -492,7 +492,7 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
                 <Select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value as any)}
-                  startAdornment={<FilterList sx={{ color: '#64748b', mr: 1 }} />}
+                  startAdornment={<FilterList size={24} color="#64748b" style={{ marginRight: 8 }} />}
                 >
                   <MenuItem value="all">ทั้งหมด ({allOrders.length})</MenuItem>
                   <MenuItem value="pending">รอจัดส่ง ({pendingOrders.length})</MenuItem>
@@ -501,7 +501,7 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
               </FormControl>
 
               {/* Refresh */}
-              <IconButton onClick={loadOrders} disabled={loadingOrders} sx={{ color: '#64748b' }}>
+              <IconButton onClick={loadOrders} disabled={loadingOrders} sx={{ color: 'var(--text-muted)' }}>
                 <Refresh />
               </IconButton>
             </Box>
@@ -521,7 +521,7 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
                   size="small"
                   startIcon={<ClearAll />}
                   onClick={clearSelection}
-                  sx={{ color: '#94a3b8' }}
+                  sx={{ color: 'var(--text-muted)' }}
                 >
                   ยกเลิก ({selectedOrders.size})
                 </Button>
@@ -544,8 +544,8 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
 
             {/* Print Labels Buttons */}
             <Box sx={{ display: 'flex', gap: 1, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
-              <Typography sx={{ color: '#94a3b8', fontSize: '0.8rem', mr: 1 }}>
-                <Print sx={{ fontSize: 16, verticalAlign: 'middle', mr: 0.5 }} />
+              <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.8rem', mr: 1 }}>
+                <Print size={16} style={{ verticalAlign: 'middle', marginRight: 4 }} />
                 พิมพ์ใบจ่าหน้า:
               </Typography>
               {Object.entries(SHIPPING_PROVIDERS)
@@ -559,11 +559,11 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
                     rel="noopener noreferrer"
                     size="small"
                     sx={{ 
-                      bgcolor: 'rgba(139, 92, 246, 0.1)',
+                      bgcolor: 'rgba(30, 64, 175, 0.1)',
                       color: '#a78bfa',
                       fontSize: '0.75rem',
                       textDecoration: 'none',
-                      '&:hover': { bgcolor: 'rgba(139, 92, 246, 0.2)' },
+                      '&:hover': { bgcolor: 'rgba(30, 64, 175, 0.2)' },
                     }}
                   >
                     {info.nameThai}
@@ -586,20 +586,20 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
                 <Table size="small" stickyHeader>
                   <TableHead>
                     <TableRow>
-                      <TableCell padding="checkbox" sx={{ bgcolor: '#1e293b', color: '#94a3b8', borderColor: 'rgba(255,255,255,0.1)' }}>
+                      <TableCell padding="checkbox" sx={{ bgcolor: 'var(--surface-2)', color: 'var(--text-muted)', borderColor: 'var(--glass-border)' }}>
                         <Checkbox 
                           checked={selectedOrders.size === filteredOrders.length && filteredOrders.length > 0}
                           indeterminate={selectedOrders.size > 0 && selectedOrders.size < filteredOrders.length}
                           onChange={(e) => e.target.checked ? selectAllOrders() : clearSelection()}
-                          sx={{ color: '#64748b' }}
+                          sx={{ color: 'var(--text-muted)' }}
                         />
                       </TableCell>
-                      <TableCell sx={{ bgcolor: '#1e293b', color: '#94a3b8', borderColor: 'rgba(255,255,255,0.1)' }}>ออเดอร์</TableCell>
-                      <TableCell sx={{ bgcolor: '#1e293b', color: '#94a3b8', borderColor: 'rgba(255,255,255,0.1)' }}>ลูกค้า</TableCell>
-                      <TableCell sx={{ bgcolor: '#1e293b', color: '#94a3b8', borderColor: 'rgba(255,255,255,0.1)' }}>ที่อยู่</TableCell>
-                      <TableCell sx={{ bgcolor: '#1e293b', color: '#94a3b8', borderColor: 'rgba(255,255,255,0.1)' }}>ตัวเลือกจัดส่ง</TableCell>
-                      <TableCell sx={{ bgcolor: '#1e293b', color: '#94a3b8', borderColor: 'rgba(255,255,255,0.1)' }}>เลขพัสดุ</TableCell>
-                      <TableCell sx={{ bgcolor: '#1e293b', color: '#94a3b8', borderColor: 'rgba(255,255,255,0.1)' }} align="right">จัดการ</TableCell>
+                      <TableCell sx={{ bgcolor: 'var(--surface-2)', color: 'var(--text-muted)', borderColor: 'var(--glass-border)' }}>ออเดอร์</TableCell>
+                      <TableCell sx={{ bgcolor: 'var(--surface-2)', color: 'var(--text-muted)', borderColor: 'var(--glass-border)' }}>ลูกค้า</TableCell>
+                      <TableCell sx={{ bgcolor: 'var(--surface-2)', color: 'var(--text-muted)', borderColor: 'var(--glass-border)' }}>ที่อยู่</TableCell>
+                      <TableCell sx={{ bgcolor: 'var(--surface-2)', color: 'var(--text-muted)', borderColor: 'var(--glass-border)' }}>ตัวเลือกจัดส่ง</TableCell>
+                      <TableCell sx={{ bgcolor: 'var(--surface-2)', color: 'var(--text-muted)', borderColor: 'var(--glass-border)' }}>เลขพัสดุ</TableCell>
+                      <TableCell sx={{ bgcolor: 'var(--surface-2)', color: 'var(--text-muted)', borderColor: 'var(--glass-border)' }} align="right">จัดการ</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -609,18 +609,18 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
                         selected={selectedOrders.has(order.ref)}
                         sx={{ 
                           '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' },
-                          '&.Mui-selected': { bgcolor: 'rgba(139, 92, 246, 0.1)' },
+                          '&.Mui-selected': { bgcolor: 'rgba(30, 64, 175, 0.1)' },
                         }}
                       >
-                        <TableCell padding="checkbox" sx={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+                        <TableCell padding="checkbox" sx={{ borderColor: 'var(--glass-border)' }}>
                           <Checkbox 
                             checked={selectedOrders.has(order.ref)}
                             onChange={() => toggleSelectOrder(order.ref)}
-                            sx={{ color: '#64748b' }}
+                            sx={{ color: 'var(--text-muted)' }}
                           />
                         </TableCell>
-                        <TableCell sx={{ borderColor: 'rgba(255,255,255,0.05)' }}>
-                          <Typography sx={{ fontWeight: 600, fontSize: '0.85rem', color: '#f1f5f9' }}>
+                        <TableCell sx={{ borderColor: 'var(--glass-border)' }}>
+                          <Typography sx={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--foreground)' }}>
                             {order.ref}
                           </Typography>
                           <Chip
@@ -634,28 +634,28 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
                             }}
                           />
                         </TableCell>
-                        <TableCell sx={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+                        <TableCell sx={{ borderColor: 'var(--glass-border)' }}>
                           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.3 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              <Person sx={{ fontSize: 14, color: '#a78bfa' }} />
-                              <Typography sx={{ color: '#f1f5f9', fontSize: '0.85rem' }}>
+                              <Person size={14} color="#a78bfa" />
+                              <Typography sx={{ color: 'var(--foreground)', fontSize: '0.85rem' }}>
                                 {order.customerName || order.name || '-'}
                               </Typography>
                             </Box>
                             {order.phone && (
                               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <Phone sx={{ fontSize: 12, color: '#64748b' }} />
-                                <Typography sx={{ color: '#94a3b8', fontSize: '0.75rem' }}>
+                                <Phone size={12} color="#64748b" />
+                                <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
                                   {order.phone}
                                 </Typography>
                               </Box>
                             )}
                           </Box>
                         </TableCell>
-                        <TableCell sx={{ borderColor: 'rgba(255,255,255,0.05)', maxWidth: 200 }}>
+                        <TableCell sx={{ borderColor: 'var(--glass-border)', maxWidth: 200 }}>
                           <Tooltip title={order.address || '-'}>
                             <Typography sx={{ 
-                              color: '#94a3b8', 
+                              color: 'var(--text-muted)', 
                               fontSize: '0.75rem',
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
@@ -665,13 +665,13 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
                             </Typography>
                           </Tooltip>
                         </TableCell>
-                        <TableCell sx={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+                        <TableCell sx={{ borderColor: 'var(--glass-border)' }}>
                           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.3 }}>
                             {order.shippingOption === 'pickup' ? (
                               <Chip
                                 label="รับหน้าร้าน"
                                 size="small"
-                                icon={<Home sx={{ fontSize: 14 }} />}
+                                icon={<Home size={14} />}
                                 sx={{
                                   height: 22,
                                   fontSize: '0.7rem',
@@ -684,7 +684,7 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
                               <Chip
                                 label="จัดส่ง (เดิม)"
                                 size="small"
-                                icon={<LocalShipping sx={{ fontSize: 14 }} />}
+                                icon={<LocalShipping size={14} />}
                                 sx={{
                                   height: 22,
                                   fontSize: '0.7rem',
@@ -697,7 +697,7 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
                               <Chip
                                 label="EMS ไปรษณีย์ไทย"
                                 size="small"
-                                icon={<LocalShipping sx={{ fontSize: 14 }} />}
+                                icon={<LocalShipping size={14} />}
                                 sx={{
                                   height: 22,
                                   fontSize: '0.7rem',
@@ -710,7 +710,7 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
                               <Chip
                                 label={SHIPPING_PROVIDERS[order.shippingProvider]?.nameThai || order.shippingProvider}
                                 size="small"
-                                icon={<LocalShipping sx={{ fontSize: 14 }} />}
+                                icon={<LocalShipping size={14} />}
                                 sx={{
                                   height: 22,
                                   fontSize: '0.7rem',
@@ -732,7 +732,7 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
                                   order.shippingOption
                                 }
                                 size="small"
-                                icon={<LocalShipping sx={{ fontSize: 14 }} />}
+                                icon={<LocalShipping size={14} />}
                                 sx={{
                                   height: 22,
                                   fontSize: '0.7rem',
@@ -745,26 +745,26 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
                               <Chip
                                 label="จัดส่ง"
                                 size="small"
-                                icon={<LocalShipping sx={{ fontSize: 14 }} />}
+                                icon={<LocalShipping size={14} />}
                                 sx={{
                                   height: 22,
                                   fontSize: '0.7rem',
                                   bgcolor: 'rgba(148, 163, 184, 0.2)',
-                                  color: '#94a3b8',
-                                  '& .MuiChip-icon': { color: '#94a3b8' },
+                                  color: 'var(--text-muted)',
+                                  '& .MuiChip-icon': { color: 'var(--text-muted)' },
                                 }}
                               />
                             )}
                           </Box>
                         </TableCell>
-                        <TableCell sx={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+                        <TableCell sx={{ borderColor: 'var(--glass-border)' }}>
                           {order.trackingNumber ? (
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                               <Typography sx={{ color: '#10b981', fontSize: '0.85rem', fontWeight: 600, fontFamily: 'monospace' }}>
                                 {order.trackingNumber}
                               </Typography>
                               <IconButton size="small" onClick={() => copyToClipboard(order.trackingNumber!)}>
-                                <ContentCopy sx={{ fontSize: 14, color: '#64748b' }} />
+                                <ContentCopy size={14} color="#64748b" />
                               </IconButton>
                               {order.shippingProvider && SHIPPING_PROVIDERS[order.shippingProvider] && (
                                 <Chip 
@@ -775,12 +775,12 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
                               )}
                             </Box>
                           ) : (
-                            <Typography sx={{ color: '#64748b', fontSize: '0.8rem', fontStyle: 'italic' }}>
+                            <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontStyle: 'italic' }}>
                               ยังไม่มี
                             </Typography>
                           )}
                         </TableCell>
-                        <TableCell sx={{ borderColor: 'rgba(255,255,255,0.05)' }} align="right">
+                        <TableCell sx={{ borderColor: 'var(--glass-border)' }} align="right">
                           <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
                             <Tooltip title={order.trackingNumber ? 'แก้ไขเลขพัสดุ' : 'เพิ่มเลขพัสดุ'}>
                               <IconButton
@@ -792,9 +792,9 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
                                 }}
                               >
                                 {order.trackingNumber ? (
-                                  <Edit sx={{ fontSize: 18, color: '#60a5fa' }} />
+                                  <Edit size={18} color="#60a5fa" />
                                 ) : (
-                                  <Add sx={{ fontSize: 18, color: '#10b981' }} />
+                                  <Add size={18} color="#10b981" />
                                 )}
                               </IconButton>
                             </Tooltip>
@@ -810,7 +810,7 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
                                       setTimeout(() => handleTrack(), 100);
                                     }}
                                   >
-                                    <Search sx={{ fontSize: 18, color: '#a78bfa' }} />
+                                    <Search size={18} color="#a78bfa" />
                                   </IconButton>
                                 </Tooltip>
                                 <Tooltip title="ลบเลขพัสดุ">
@@ -818,7 +818,7 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
                                     size="small"
                                     onClick={() => handleDeleteTracking(order)}
                                   >
-                                    <Delete sx={{ fontSize: 18, color: '#ef4444' }} />
+                                    <Delete size={18} color="#ef4444" />
                                   </IconButton>
                                 </Tooltip>
                               </>
@@ -837,12 +837,12 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
 
       {/* Tab 1: Bulk Add */}
       {activeTab === 1 && (
-        <Card sx={{ bgcolor: 'rgba(30, 41, 59, 0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 3 }}>
+        <Card sx={{ bgcolor: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 3 }}>
           <CardContent sx={{ p: 3 }}>
-            <Typography sx={{ fontWeight: 700, color: '#f1f5f9', mb: 2 }}>
+            <Typography sx={{ fontWeight: 700, color: 'var(--foreground)', mb: 2 }}>
               เพิ่มเลขพัสดุแบบกลุ่ม
             </Typography>
-            <Typography sx={{ color: '#94a3b8', fontSize: '0.85rem', mb: 2 }}>
+            <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem', mb: 2 }}>
               ใส่ข้อมูลในรูปแบบ <code style={{ color: '#a78bfa' }}>เลขออเดอร์:เลขพัสดุ</code> บรรทัดละ 1 รายการ
             </Typography>
 
@@ -888,8 +888,8 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
             </Box>
 
             {/* Quick reference */}
-            <Box sx={{ mt: 3, p: 2, bgcolor: 'rgba(0,0,0,0.2)', borderRadius: 2 }}>
-              <Typography sx={{ color: '#94a3b8', fontSize: '0.8rem', mb: 1 }}>
+            <Box sx={{ mt: 3, p: 2, bgcolor: 'var(--glass-bg)', borderRadius: 2 }}>
+              <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.8rem', mb: 1 }}>
                 รายการรอจัดส่ง (คัดลอกเลขออเดอร์):
               </Typography>
               <Box sx={{ maxHeight: 150, overflow: 'auto' }}>
@@ -904,15 +904,15 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
                       borderBottom: '1px solid rgba(255,255,255,0.05)',
                     }}
                   >
-                    <Typography sx={{ color: '#f1f5f9', fontSize: '0.8rem', fontFamily: 'monospace' }}>
+                    <Typography sx={{ color: 'var(--foreground)', fontSize: '0.8rem', fontFamily: 'monospace' }}>
                       {order.ref}
                     </Typography>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography sx={{ color: '#64748b', fontSize: '0.75rem' }}>
+                      <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
                         {order.customerName || order.name}
                       </Typography>
                       <IconButton size="small" onClick={() => copyToClipboard(order.ref)}>
-                        <ContentCopy sx={{ fontSize: 14, color: '#64748b' }} />
+                        <ContentCopy size={14} color="#64748b" />
                       </IconButton>
                     </Box>
                   </Box>
@@ -925,10 +925,10 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
 
       {/* Tab 2: Track Lookup */}
       {activeTab === 2 && (
-        <Card sx={{ bgcolor: 'rgba(30, 41, 59, 0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 3 }}>
+        <Card sx={{ bgcolor: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 3 }}>
           <CardContent sx={{ p: 3 }}>
-            <Typography sx={{ fontWeight: 700, color: '#f1f5f9', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Search sx={{ color: '#60a5fa' }} />
+            <Typography sx={{ fontWeight: 700, color: 'var(--foreground)', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Search size={20} color="#60a5fa" />
               ค้นหาสถานะพัสดุ
             </Typography>
 
@@ -961,8 +961,8 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
                 disabled={loadingTracking || !searchTrackingNumber.trim()}
                 sx={{
                   minWidth: 120,
-                  bgcolor: '#6366f1',
-                  '&:hover': { bgcolor: '#4f46e5' },
+                  bgcolor: '#2563eb',
+                  '&:hover': { bgcolor: '#1d4ed8' },
                 }}
               >
                 {loadingTracking ? <CircularProgress size={24} color="inherit" /> : 'ค้นหา'}
@@ -977,16 +977,16 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
 
             {/* Tracking Result */}
             {trackingResult && (
-              <Box sx={{ mt: 3, p: 2, borderRadius: 2, bgcolor: 'rgba(15, 23, 42, 0.5)', border: '1px solid rgba(255,255,255,0.1)' }}>
+              <Box sx={{ mt: 3, p: 2, borderRadius: 2, bgcolor: 'var(--glass-bg)', border: '1px solid var(--glass-border)' }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
                   <Box>
-                    <Typography sx={{ color: '#94a3b8', fontSize: '0.8rem' }}>เลขพัสดุ</Typography>
+                    <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>เลขพัสดุ</Typography>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography sx={{ color: '#f1f5f9', fontWeight: 700, fontSize: '1.1rem' }}>
+                      <Typography sx={{ color: 'var(--foreground)', fontWeight: 700, fontSize: '1.1rem' }}>
                         {trackingResult.trackingNumber}
                       </Typography>
                       <IconButton size="small" onClick={() => copyToClipboard(trackingResult.trackingNumber)}>
-                        <ContentCopy sx={{ fontSize: 16, color: '#64748b' }} />
+                        <ContentCopy size={16} color="#64748b" />
                       </IconButton>
                     </Box>
                   </Box>
@@ -1006,7 +1006,7 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
                 {/* Events */}
                 {trackingResult.events && trackingResult.events.length > 0 && (
                   <Box sx={{ mt: 2 }}>
-                    <Typography sx={{ color: '#94a3b8', fontSize: '0.8rem', mb: 1 }}>ประวัติการเคลื่อนไหว</Typography>
+                    <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.8rem', mb: 1 }}>ประวัติการเคลื่อนไหว</Typography>
                     <Box sx={{ maxHeight: 200, overflow: 'auto' }}>
                       {trackingResult.events.slice(0, 10).map((event, idx) => (
                         <Box
@@ -1018,10 +1018,10 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
                             borderBottom: idx < trackingResult.events.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
                           }}
                         >
-                          <Typography sx={{ color: '#64748b', fontSize: '0.75rem', minWidth: 90 }}>
+                          <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.75rem', minWidth: 90 }}>
                             {new Date(event.timestamp).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}
                           </Typography>
-                          <Typography sx={{ color: '#e2e8f0', fontSize: '0.8rem', flex: 1 }}>
+                          <Typography sx={{ color: 'var(--foreground)', fontSize: '0.8rem', flex: 1 }}>
                             {event.descriptionThai || event.description}
                           </Typography>
                         </Box>
@@ -1069,38 +1069,38 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
         fullWidth
         PaperProps={{
           sx: {
-            bgcolor: '#0f172a',
-            color: '#f1f5f9',
+            bgcolor: 'var(--surface)',
+            color: 'var(--foreground)',
             borderRadius: 2,
           },
         }}
       >
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <LocalShipping sx={{ color: '#8b5cf6' }} />
+            <LocalShipping size={24} color="#1e40af" />
             {editingOrder?.trackingNumber ? 'แก้ไขเลขพัสดุ' : 'เพิ่มเลขพัสดุ'}
           </Box>
-          <IconButton onClick={() => setEditingOrder(null)} sx={{ color: '#94a3b8' }}>
+          <IconButton onClick={() => setEditingOrder(null)} sx={{ color: 'var(--text-muted)' }}>
             <Close />
           </IconButton>
         </DialogTitle>
-        <DialogContent dividers sx={{ borderColor: 'rgba(255,255,255,0.1)' }}>
+        <DialogContent dividers sx={{ borderColor: 'var(--glass-border)' }}>
           {editingOrder && (
             <>
-              <Box sx={{ mb: 2, p: 2, bgcolor: 'rgba(0,0,0,0.2)', borderRadius: 2 }}>
-                <Typography sx={{ color: '#f1f5f9', fontWeight: 600, mb: 1 }}>
+              <Box sx={{ mb: 2, p: 2, bgcolor: 'var(--glass-bg)', borderRadius: 2 }}>
+                <Typography sx={{ color: 'var(--foreground)', fontWeight: 600, mb: 1 }}>
                   {editingOrder.ref}
                 </Typography>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Person sx={{ fontSize: 14, color: '#a78bfa' }} />
-                    <Typography sx={{ color: '#94a3b8', fontSize: '0.85rem' }}>
+                    <Person size={14} color="#a78bfa" />
+                    <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                       {editingOrder.customerName || editingOrder.name || '-'}
                     </Typography>
                   </Box>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Home sx={{ fontSize: 14, color: '#64748b' }} />
-                    <Typography sx={{ color: '#94a3b8', fontSize: '0.8rem' }}>
+                    <Home size={14} color="#64748b" />
+                    <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
                       {editingOrder.address || '-'}
                     </Typography>
                   </Box>
@@ -1140,7 +1140,7 @@ export default function TrackingManagement({ showToast }: TrackingManagementProp
         <DialogActions sx={{ p: 2 }}>
           <Button
             onClick={() => setEditingOrder(null)}
-            sx={{ color: '#94a3b8' }}
+            sx={{ color: 'var(--text-muted)' }}
           >
             ยกเลิก
           </Button>

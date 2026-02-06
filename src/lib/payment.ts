@@ -131,7 +131,7 @@ export const PAYMENT_METHODS: Record<PaymentMethod, {
   bank_transfer: {
     name: 'Bank Transfer / QR PromptPay',
     nameThai: 'โอนเงิน / QR พร้อมเพย์',
-    icon: '🏦',
+    icon: '',
     description: 'Transfer via bank app or scan QR code',
     descriptionThai: 'โอนผ่านแอปธนาคารหรือสแกน QR Code',
     requiresGateway: false,
@@ -140,7 +140,7 @@ export const PAYMENT_METHODS: Record<PaymentMethod, {
   credit_card: {
     name: 'Credit/Debit Card',
     nameThai: 'บัตรเครดิต/เดบิต',
-    icon: '💳',
+    icon: '',
     description: 'Visa, Mastercard, JCB',
     descriptionThai: 'บัตร Visa, Mastercard, JCB',
     requiresGateway: true,
@@ -149,7 +149,7 @@ export const PAYMENT_METHODS: Record<PaymentMethod, {
   installment: {
     name: 'Installment',
     nameThai: 'ผ่อนชำระ',
-    icon: '📆',
+    icon: '',
     description: 'Pay in installments',
     descriptionThai: 'ผ่อนชำระ 0% ผ่านบัตรเครดิต',
     requiresGateway: true,
@@ -158,7 +158,7 @@ export const PAYMENT_METHODS: Record<PaymentMethod, {
   true_money: {
     name: 'TrueMoney Wallet',
     nameThai: 'ทรูมันนี่ วอลเล็ท',
-    icon: '🔴',
+    icon: '',
     description: 'Pay with TrueMoney Wallet',
     descriptionThai: 'ชำระผ่านทรูมันนี่ วอลเล็ท',
     requiresGateway: true,
@@ -167,7 +167,7 @@ export const PAYMENT_METHODS: Record<PaymentMethod, {
   rabbit_line_pay: {
     name: 'Rabbit LINE Pay',
     nameThai: 'แรบบิท ไลน์ เพย์',
-    icon: '💚',
+    icon: '',
     description: 'Pay with Rabbit LINE Pay',
     descriptionThai: 'ชำระผ่านแรบบิท ไลน์ เพย์',
     requiresGateway: true,
@@ -176,7 +176,7 @@ export const PAYMENT_METHODS: Record<PaymentMethod, {
   shopeepay: {
     name: 'ShopeePay',
     nameThai: 'ช้อปปี้เพย์',
-    icon: '🟠',
+    icon: '',
     description: 'Pay with ShopeePay',
     descriptionThai: 'ชำระผ่านช้อปปี้เพย์',
     requiresGateway: true,
@@ -185,7 +185,7 @@ export const PAYMENT_METHODS: Record<PaymentMethod, {
   cod: {
     name: 'Cash on Delivery',
     nameThai: 'เก็บเงินปลายทาง',
-    icon: '💵',
+    icon: '',
     description: 'Pay when you receive',
     descriptionThai: 'ชำระเงินเมื่อรับสินค้า',
     requiresGateway: false,

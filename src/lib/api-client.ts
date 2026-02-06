@@ -129,8 +129,8 @@ class APIClient {
         NEXT_PUBLIC_GAS_URL: process.env.NEXT_PUBLIC_GAS_URL || 'NOT SET',
         NODE_ENV: process.env.NODE_ENV,
       };
-      console.error('❌ Environment check:', envCheck);
-      console.error('📝 กรุณาสร้างไฟล์ .env.local ที่ root ของโปรเจค:');
+      console.error('Environment check:', envCheck);
+      console.error('กรุณาสร้างไฟล์ .env.local ที่ root ของโปรเจค:');
       console.error('   NEXT_PUBLIC_GAS_URL=https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec');
       
       return {
@@ -142,7 +142,7 @@ class APIClient {
 
     // Validate URL format
     if (!baseUrl.includes('script.google.com/macros')) {
-      console.error('❌ URL ไม่ถูกต้อง:', baseUrl);
+      console.error('URL ไม่ถูกต้อง:', baseUrl);
       return {
         status: 'error',
         message: 'URL ต้องเป็นรูปแบบ: https://script.google.com/macros/s/.../exec',
@@ -165,7 +165,7 @@ class APIClient {
       }
 
       const fullUrl = url.toString();
-      console.log(`📤 [${action}] URL:`, fullUrl);
+      console.log(`[${action}] URL:`, fullUrl);
 
       // Create abort controller for timeout
       const controller = new AbortController();
@@ -185,14 +185,14 @@ class APIClient {
         fetchOptions.body = JSON.stringify(body);
       }
 
-      console.log('🌐 Fetch options:', { method: fetchOptions.method, mode: fetchOptions.mode });
+      console.log('Fetch options:', { method: fetchOptions.method, mode: fetchOptions.mode });
 
       // Make fetch request
       const response = await fetch(fullUrl, fetchOptions);
       clearTimeout(timeoutId);
 
-      console.log(`📥 Response: ${response.status} ${response.statusText}`);
-      console.log(`📥 Response URL: ${response.url}`);
+      console.log(`Response: ${response.status} ${response.statusText}`);
+      console.log(`Response URL: ${response.url}`);
 
       // Check if response is ok
       if (!response.ok) {
@@ -232,7 +232,7 @@ class APIClient {
       }
 
       if (this.debug) {
-        console.log('✅ GAS Response:', {
+        console.log('GAS Response:', {
           status: data.status,
           hasData: !!data.data,
           hasConfig: !!data.config,
@@ -289,10 +289,10 @@ class APIClient {
    */
   private handleError(error: unknown, action: string): APIResponse {
     // Log full error for debugging
-    console.error(`❌ Full error object:`, error);
+    console.error(`Full error object:`, error);
 
     if (error instanceof AppError) {
-      console.error(`❌ AppError (${action}):`, error.message);
+      console.error(`AppError (${action}):`, error.message);
       return {
         status: 'error',
         message: error.message,
@@ -304,7 +304,7 @@ class APIClient {
 
     // Check for fetch/network errors
     if (error instanceof TypeError) {
-      console.error(`❌ Network Error (${action}):`, error.message);
+      console.error(`Network Error (${action}):`, error.message);
       
       // Provide more specific guidance
       let helpMessage = 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์';
@@ -325,7 +325,7 @@ class APIClient {
     }
 
     if (error instanceof Error && error.name === 'AbortError') {
-      console.error(`❌ Timeout (${action})`);
+      console.error(`Timeout (${action})`);
       return {
         status: 'error',
         message: `หมดเวลาการเชื่อมต่อ (${this.timeout / 1000}s) - กรุณาลองใหม่`,
@@ -333,7 +333,7 @@ class APIClient {
       };
     }
 
-    console.error(`❌ Unknown Error (${action}):`, error);
+    console.error(`Unknown Error (${action}):`, error);
 
     return {
       status: 'error',
@@ -493,6 +493,8 @@ export async function saveProfile(
     phone?: string;
     address?: string;
     instagram?: string;
+    profileImage?: string;
+    theme?: string;
   }
 ): Promise<APIResponse> {
   return fetchJson('/api/profile', {
@@ -631,13 +633,13 @@ export function throwIfError(response: APIResponse): void {
 export function enableDebugMode(): void {
   if (typeof window !== 'undefined') {
     localStorage.setItem('NEXT_PUBLIC_DEBUG', 'true');
-    console.log('🔍 Debug mode enabled');
+    console.log('Debug mode enabled');
   }
 }
 
 export function disableDebugMode(): void {
   if (typeof window !== 'undefined') {
     localStorage.removeItem('NEXT_PUBLIC_DEBUG');
-    console.log('🔍 Debug mode disabled');
+    console.log('Debug mode disabled');
   }
 }

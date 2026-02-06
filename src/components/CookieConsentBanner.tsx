@@ -48,10 +48,10 @@ export default function CookieConsentBanner() {
             maxWidth: 520,
             mx: 'auto',
             borderRadius: '24px',
-            bgcolor: 'rgba(15, 23, 42, 0.98)',
+            bgcolor: 'var(--glass-strong)',
             backdropFilter: 'blur(20px)',
             border: '1px solid rgba(255, 255, 255, 0.1)',
-            boxShadow: '0 -8px 40px rgba(0, 0, 0, 0.4), 0 4px 20px rgba(139, 92, 246, 0.1)',
+            boxShadow: '0 -8px 40px rgba(0, 0, 0, 0.4), 0 4px 20px rgba(30, 64, 175, 0.1)',
             overflow: 'hidden',
           }}
         >
@@ -70,11 +70,11 @@ export default function CookieConsentBanner() {
                 width: 48,
                 height: 48,
                 borderRadius: '14px',
-                background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
+                background: 'linear-gradient(135deg, #1e40af 0%, #2563eb 100%)',
                 display: 'grid',
                 placeItems: 'center',
                 flexShrink: 0,
-                boxShadow: '0 4px 16px rgba(139, 92, 246, 0.3)',
+                boxShadow: '0 4px 16px rgba(30, 64, 175, 0.3)',
               }}
             >
               <Cookie size={24} color="white" />
@@ -84,16 +84,16 @@ export default function CookieConsentBanner() {
                 sx={{
                   fontSize: '1.1rem',
                   fontWeight: 800,
-                  color: '#f1f5f9',
+                  color: 'var(--foreground)',
                   mb: 0.5,
                 }}
               >
-                🍪 เราใช้คุกกี้
+                เราใช้คุกกี้
               </Typography>
               <Typography
                 sx={{
                   fontSize: '0.85rem',
-                  color: '#94a3b8',
+                  color: 'var(--text-muted)',
                   lineHeight: 1.5,
                 }}
               >
@@ -113,7 +113,7 @@ export default function CookieConsentBanner() {
                 py: 1,
                 borderRadius: '12px',
                 bgcolor: 'rgba(255, 255, 255, 0.05)',
-                color: '#94a3b8',
+                color: 'var(--text-muted)',
                 textTransform: 'none',
                 fontSize: '0.85rem',
                 fontWeight: 600,
@@ -148,8 +148,8 @@ export default function CookieConsentBanner() {
                     sx={{
                       p: 2,
                       borderRadius: '14px',
-                      bgcolor: isEnabled ? 'rgba(139, 92, 246, 0.1)' : 'rgba(30, 41, 59, 0.5)',
-                      border: `1px solid ${isEnabled ? 'rgba(139, 92, 246, 0.3)' : 'rgba(255, 255, 255, 0.05)'}`,
+                      bgcolor: isEnabled ? 'rgba(30, 64, 175, 0.1)' : 'rgba(30, 41, 59, 0.5)',
+                      border: `1px solid ${isEnabled ? 'rgba(30, 64, 175, 0.3)' : 'rgba(255, 255, 255, 0.05)'}`,
                       transition: 'all 0.2s ease',
                     }}
                   >
@@ -167,7 +167,7 @@ export default function CookieConsentBanner() {
                             sx={{
                               fontSize: '0.9rem',
                               fontWeight: 700,
-                              color: '#e2e8f0',
+                              color: 'var(--foreground)',
                             }}
                           >
                             {info.name}
@@ -211,9 +211,9 @@ export default function CookieConsentBanner() {
                         sx={{
                           '& .MuiSwitch-switchBase': {
                             '&.Mui-checked': {
-                              color: '#8b5cf6',
+                              color: '#1e40af',
                               '& + .MuiSwitch-track': {
-                                bgcolor: 'rgba(139, 92, 246, 0.5)',
+                                bgcolor: 'rgba(30, 64, 175, 0.5)',
                               },
                             },
                             '&.Mui-disabled': {
@@ -255,7 +255,7 @@ export default function CookieConsentBanner() {
                     py: 1.5,
                     borderRadius: '14px',
                     bgcolor: 'rgba(255, 255, 255, 0.05)',
-                    color: '#94a3b8',
+                    color: 'var(--text-muted)',
                     textTransform: 'none',
                     fontSize: '0.9rem',
                     fontWeight: 600,
@@ -274,14 +274,14 @@ export default function CookieConsentBanner() {
                   sx={{
                     py: 1.5,
                     borderRadius: '14px',
-                    background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
+                    background: 'linear-gradient(135deg, #1e40af 0%, #2563eb 100%)',
                     color: 'white',
                     textTransform: 'none',
                     fontSize: '0.9rem',
                     fontWeight: 700,
-                    boxShadow: '0 4px 16px rgba(139, 92, 246, 0.3)',
+                    boxShadow: '0 4px 16px rgba(30, 64, 175, 0.3)',
                     '&:hover': {
-                      background: 'linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)',
+                      background: 'linear-gradient(135deg, #7c3aed 0%, #1d4ed8 100%)',
                     },
                   }}
                 >
@@ -297,7 +297,7 @@ export default function CookieConsentBanner() {
                     py: 1.5,
                     borderRadius: '14px',
                     bgcolor: 'rgba(255, 255, 255, 0.05)',
-                    color: '#94a3b8',
+                    color: 'var(--text-muted)',
                     textTransform: 'none',
                     fontSize: '0.9rem',
                     fontWeight: 600,

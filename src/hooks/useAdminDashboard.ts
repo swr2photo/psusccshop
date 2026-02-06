@@ -139,7 +139,7 @@ export function useAdminDashboard() {
  *     <div>
  *       <Header>
  *         {isRefreshing && <Spinner size="sm" />}
- *         {realtimeConnected ? '🟢 Live' : '⏳ Polling'}
+ *         {realtimeConnected ? 'Live' : 'Polling'}
  *         <button onClick={refresh}>Refresh</button>
  *       </Header>
  *       

@@ -22,10 +22,10 @@ export default function NotFound() {
           <h1 
             className="text-[150px] sm:text-[200px] font-black leading-none select-none"
             style={{
-              background: 'linear-gradient(135deg, #6366f1 0%, #06b6d4 50%, #8b5cf6 100%)',
+              background: 'linear-gradient(135deg, #2563eb 0%, #06b6d4 50%, #1e40af 100%)',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
-              textShadow: '0 0 80px rgba(99, 102, 241, 0.5)',
+              textShadow: '0 0 80px rgba(37, 99, 235, 0.5)',
             }}
           >
             404
@@ -56,18 +56,19 @@ export default function NotFound() {
 
         {/* Glass Card */}
         <div 
-          className="backdrop-blur-xl rounded-3xl p-8 mb-8 border border-white/10"
+          className="backdrop-blur-xl rounded-3xl p-8 mb-8"
           style={{
-            background: 'linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%)',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255,255,255,0.1)',
+            background: 'var(--glass-strong)',
+            border: '1px solid var(--glass-border)',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, var(--shadow-opacity))',
           }}
         >
           <div className="flex items-center justify-center gap-2 mb-4">
             <Search className="w-6 h-6 text-indigo-400" />
-            <h2 className="text-2xl font-bold text-white">ไม่พบหน้าที่คุณต้องการ</h2>
+            <h2 className="text-2xl font-bold" style={{ color: 'var(--foreground)' }}>ไม่พบหน้าที่คุณต้องการ</h2>
           </div>
           
-          <p className="text-slate-400 mb-6 leading-relaxed">
+          <p className="mb-6 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
             หน้าที่คุณกำลังค้นหาอาจถูกย้าย ลบไปแล้ว หรือไม่เคยมีอยู่<br />
             ลองตรวจสอบ URL อีกครั้ง หรือกลับไปหน้าหลัก
           </p>
@@ -76,7 +77,12 @@ export default function NotFound() {
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <button
               onClick={() => router.back()}
-              className="group flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all duration-300 border border-white/20 text-white hover:bg-white/10 hover:border-white/30"
+              className="group flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all duration-300"
+              style={{ 
+                border: '1px solid var(--glass-border)', 
+                color: 'var(--foreground)',
+                background: 'transparent',
+              }}
             >
               <ArrowLeft className="w-5 h-5 transition-transform group-hover:-translate-x-1" />
               ย้อนกลับ
@@ -86,8 +92,8 @@ export default function NotFound() {
               href="/"
               className="group flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all duration-300 text-white"
               style={{
-                background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-                boxShadow: '0 4px 15px rgba(99, 102, 241, 0.4)',
+                background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                boxShadow: '0 4px 15px rgba(37, 99, 235, 0.4)',
               }}
             >
               <Home className="w-5 h-5 transition-transform group-hover:scale-110" />
@@ -100,15 +106,17 @@ export default function NotFound() {
         <div className="flex flex-wrap justify-center gap-4 text-sm">
           <Link 
             href="/" 
-            className="flex items-center gap-2 text-slate-400 hover:text-indigo-400 transition-colors"
+            className="flex items-center gap-2 hover:text-indigo-400 transition-colors"
+            style={{ color: 'var(--text-muted)' }}
           >
             <ShoppingBag className="w-4 h-4" />
             สินค้าทั้งหมด
           </Link>
-          <span className="text-slate-600">•</span>
+          <span style={{ color: 'var(--text-muted)' }}>•</span>
           <Link 
             href="/#history" 
-            className="flex items-center gap-2 text-slate-400 hover:text-indigo-400 transition-colors"
+            className="flex items-center gap-2 hover:text-indigo-400 transition-colors"
+            style={{ color: 'var(--text-muted)' }}
           >
             <Search className="w-4 h-4" />
             ตรวจสอบคำสั่งซื้อ

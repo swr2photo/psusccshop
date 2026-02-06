@@ -72,16 +72,22 @@ export const viewport: Viewport = {
   maximumScale: 5,
   userScalable: true,
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#5ac8fa" },
-    { media: "(prefers-color-scheme: dark)", color: "#060914" },
+    { media: "(prefers-color-scheme: light)", color: "#f8fafc" },
+    { media: "(prefers-color-scheme: dark)", color: "#040818" },
   ],
-  colorScheme: "dark",
+  colorScheme: "dark light",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="th" dir="ltr">
+    <html lang="th" dir="ltr" suppressHydrationWarning>
       <head>
+        {/* Inline theme script — runs before React hydration to prevent FOUC */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var s=localStorage.getItem('psusccshop-theme');if(s){var m=JSON.parse(s).state.mode;var r=m==='system'?window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark':m;document.documentElement.setAttribute('data-theme',r);document.documentElement.style.colorScheme=r}else{var r=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark';document.documentElement.setAttribute('data-theme',r);document.documentElement.style.colorScheme=r}}catch(e){}})()`,
+          }}
+        />
         {/* Preconnect to external resources for faster loading */}
         <link rel="preconnect" href="https://ipfs.filebase.io" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://s3.filebase.com" crossOrigin="anonymous" />
@@ -102,10 +108,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           ข้ามไปยังเนื้อหาหลัก
         </a>
-        <div className="pointer-events-none fixed inset-0 overflow-hidden">
-          <div className="absolute -left-10 -top-24 h-80 w-80 rounded-full bg-[radial-gradient(circle_at_30%_30%,rgba(90,200,250,0.35),transparent_65%)] blur-3xl" />
-          <div className="absolute right-[-12%] top-10 h-96 w-96 rounded-full bg-[radial-gradient(circle_at_70%_30%,rgba(124,138,255,0.28),transparent_60%)] blur-3xl" />
-          <div className="absolute left-1/2 bottom-[-18%] h-[420px] w-[420px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_50%_50%,rgba(52,211,153,0.28),transparent_60%)] blur-3xl" />
+        {/* Decorative gradient orbs - theme-aware via CSS vars */}
+        <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
+          <div className="absolute -left-10 -top-24 h-80 w-80 rounded-full blur-3xl" style={{ background: 'radial-gradient(circle at 30% 30%, var(--glow-1), transparent 65%)' }} />
+          <div className="absolute right-[-12%] top-10 h-96 w-96 rounded-full blur-3xl" style={{ background: 'radial-gradient(circle at 70% 30%, var(--glow-2), transparent 60%)' }} />
+          <div className="absolute left-1/2 bottom-[-18%] h-[420px] w-[420px] -translate-x-1/2 rounded-full blur-3xl" style={{ background: 'radial-gradient(circle at 50% 50%, var(--glow-3), transparent 60%)' }} />
         </div>
         <ThemeRegistry>
           <Providers>

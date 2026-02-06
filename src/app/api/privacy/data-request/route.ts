@@ -330,8 +330,8 @@ function generateRequestConfirmationEmail(request: DataRequest): string {
       <div style="max-width:600px;margin:0 auto;padding:40px 20px;">
         <div style="background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);border-radius:24px;padding:40px;border:1px solid rgba(255,255,255,0.1);">
           <div style="text-align:center;margin-bottom:30px;">
-            <div style="width:64px;height:64px;background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);border-radius:16px;display:inline-flex;align-items:center;justify-content:center;">
-              <span style="font-size:28px;">📋</span>
+            <div style="width:64px;height:64px;background:linear-gradient(135deg,#2563eb 0%,#1e40af 100%);border-radius:16px;display:inline-flex;align-items:center;justify-content:center;">
+              <span style="font-size:28px;"></span>
             </div>
           </div>
           
@@ -343,7 +343,7 @@ function generateRequestConfirmationEmail(request: DataRequest): string {
             เราได้รับคำขอใช้สิทธิ์ข้อมูลส่วนบุคคลของท่านเรียบร้อยแล้ว
           </p>
           
-          <div style="background:rgba(99,102,241,0.1);border-radius:16px;padding:24px;margin-bottom:24px;border:1px solid rgba(99,102,241,0.2);">
+          <div style="background:rgba(37,99,235,0.1);border-radius:16px;padding:24px;margin-bottom:24px;border:1px solid rgba(37,99,235,0.2);">
             <table style="width:100%;border-collapse:collapse;">
               <tr>
                 <td style="color:#94a3b8;padding:8px 0;">หมายเลขคำขอ:</td>
@@ -366,7 +366,7 @@ function generateRequestConfirmationEmail(request: DataRequest): string {
           
           <div style="background:rgba(16,185,129,0.1);border-radius:12px;padding:16px;margin-bottom:24px;border:1px solid rgba(16,185,129,0.2);">
             <p style="color:#6ee7b7;margin:0;font-size:14px;line-height:1.6;">
-              ⏱️ เราจะดำเนินการตามคำขอของท่านภายใน <strong>30 วัน</strong> นับจากวันที่ได้รับคำขอ ตาม พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562
+              เราจะดำเนินการตามคำขอของท่านภายใน <strong>30 วัน</strong> นับจากวันที่ได้รับคำขอ ตาม พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562
             </p>
           </div>
           
@@ -397,7 +397,7 @@ function generateAdminNotificationEmail(request: DataRequest): string {
     <body style="margin:0;padding:20px;background:#f8fafc;font-family:sans-serif;">
       <div style="max-width:600px;margin:0 auto;background:white;border-radius:12px;padding:30px;box-shadow:0 2px 10px rgba(0,0,0,0.1);">
         <h1 style="color:#dc2626;font-size:20px;margin-bottom:20px;">
-          🔔 คำขอใช้สิทธิ์ PDPA ใหม่
+          คำขอใช้สิทธิ์ PDPA ใหม่
         </h1>
         
         <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
@@ -427,7 +427,7 @@ function generateAdminNotificationEmail(request: DataRequest): string {
         
         <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px;">
           <p style="color:#dc2626;margin:0;font-size:14px;">
-            ⚠️ กรุณาดำเนินการภายใน 30 วัน ตาม พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562
+            กรุณาดำเนินการภายใน 30 วัน ตาม พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562
           </p>
         </div>
       </div>
@@ -449,7 +449,7 @@ function generateDeletionConfirmationEmail(email: string): string {
         <div style="background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);border-radius:24px;padding:40px;border:1px solid rgba(255,255,255,0.1);">
           <div style="text-align:center;margin-bottom:30px;">
             <div style="width:64px;height:64px;background:linear-gradient(135deg,#10b981 0%,#059669 100%);border-radius:16px;display:inline-flex;align-items:center;justify-content:center;">
-              <span style="font-size:28px;">✓</span>
+              <span style="font-size:28px;"></span>
             </div>
           </div>
           
@@ -471,7 +471,7 @@ function generateDeletionConfirmationEmail(email: string): string {
           
           <div style="background:rgba(245,158,11,0.1);border-radius:12px;padding:16px;margin-bottom:24px;border:1px solid rgba(245,158,11,0.2);">
             <p style="color:#fbbf24;margin:0;font-size:14px;line-height:1.6;">
-              📋 <strong>หมายเหตุ:</strong> ข้อมูลคำสั่งซื้อยังคงเก็บไว้ตามข้อกำหนดทางกฎหมาย (2 ปี) เพื่อวัตถุประสงค์ทางบัญชีและการตรวจสอบ
+              <strong>หมายเหตุ:</strong> ข้อมูลคำสั่งซื้อยังคงเก็บไว้ตามข้อกำหนดทางกฎหมาย (2 ปี) เพื่อวัตถุประสงค์ทางบัญชีและการตรวจสอบ
             </p>
           </div>
           

@@ -97,7 +97,7 @@ export default function PromptPayQR({ payload, amount, size = 256 }: PromptPayQR
       <Box sx={{ mt: 2, textAlign: 'center' }}>
         <Typography
           variant="body2"
-          sx={{ color: 'rgba(255,255,255,0.8)', mb: 0.5 }}
+          sx={{ color: 'var(--foreground)', mb: 0.5 }}
         >
           จำนวนเงิน
         </Typography>
@@ -117,7 +117,7 @@ export default function PromptPayQR({ payload, amount, size = 256 }: PromptPayQR
       <Typography
         variant="caption"
         sx={{
-          color: 'rgba(255,255,255,0.7)',
+          color: 'var(--foreground)',
           mt: 1.5,
           textAlign: 'center',
           lineHeight: 1.4,

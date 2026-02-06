@@ -36,26 +36,84 @@ interface EncryptedPayload {
   nonce: string;
 }
 
+// ==================== STABLE HMAC-BASED TOKEN (V2) ====================
+// Cache for HMAC tokens - same URL always produces same token
+const hmacTokenCache = new Map<string, string>();
+
 /**
- * Encrypt image URL using AES-256-GCM
- * รวม timestamp เพื่อป้องกัน replay attacks (optional expiry)
+ * Generate a STABLE HMAC-signed image token (V2)
+ * Same URL always produces the same token → enables browser/CDN caching
+ * Format: HMAC(url) + AES-ECB(url) → base64url
+ * 
+ * Security: URL is encrypted (can't be read without key) + HMAC prevents tampering
+ * Performance: Deterministic → same image URL = same /api/image/ path = browser cache hit
  */
 export function encryptImageUrl(url: string, expiryHours: number = 0): string {
   if (!url) return '';
   
-  // Skip if already encrypted
+  // Skip if already a proxy URL
   if (url.startsWith('/api/image/')) return url;
   
   // Skip data URLs
   if (url.startsWith('data:')) return url;
   
+  // Check cache first - same URL always gets same token
+  const cached = hmacTokenCache.get(url);
+  if (cached) return cached;
+  
   try {
     const key = deriveKey();
     
-    // Generate random IV (12 bytes for GCM)
-    const iv = crypto.randomBytes(12);
+    // Deterministic IV from HMAC of URL (no random bytes = same output every time)
+    const iv = crypto.createHmac('sha256', key)
+      .update('iv:' + url)
+      .digest()
+      .subarray(0, 12);
     
-    // Create payload with timestamp
+    // Encrypt URL only (no timestamp/nonce for determinism)
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+    let encrypted = cipher.update(url, 'utf8');
+    encrypted = Buffer.concat([encrypted, cipher.final()]);
+    const authTag = cipher.getAuthTag();
+    
+    // Combine: IV (12) + Auth Tag (16) + Ciphertext
+    const combined = Buffer.concat([iv, authTag, encrypted]);
+    
+    // URL-safe base64
+    const base64 = combined
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
+    
+    const result = `/api/image/${base64}`;
+    
+    // Cache: limit size to prevent memory leak
+    if (hmacTokenCache.size > 5000) {
+      const firstKey = hmacTokenCache.keys().next().value;
+      if (firstKey) hmacTokenCache.delete(firstKey);
+    }
+    hmacTokenCache.set(url, result);
+    
+    return result;
+  } catch (error) {
+    console.error('[image-crypto] Encryption error:', error);
+    return url;
+  }
+}
+
+/**
+ * Legacy AES-256-GCM encryption with random nonce (V1)
+ * Kept for backward compatibility with existing tokens
+ */
+export function encryptImageUrlLegacy(url: string): string {
+  if (!url) return '';
+  if (url.startsWith('/api/image/')) return url;
+  if (url.startsWith('data:')) return url;
+  
+  try {
+    const key = deriveKey();
+    const iv = crypto.randomBytes(12);
     const payload: EncryptedPayload = {
       url,
       timestamp: Date.now(),
@@ -63,20 +121,12 @@ export function encryptImageUrl(url: string, expiryHours: number = 0): string {
     };
     
     const plaintext = JSON.stringify(payload);
-    
-    // Encrypt with AES-256-GCM
     const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
-    
     let encrypted = cipher.update(plaintext, 'utf8');
     encrypted = Buffer.concat([encrypted, cipher.final()]);
-    
-    // Get auth tag (16 bytes)
     const authTag = cipher.getAuthTag();
-    
-    // Combine: IV (12) + Auth Tag (16) + Ciphertext
     const combined = Buffer.concat([iv, authTag, encrypted]);
     
-    // Convert to URL-safe base64
     const base64 = combined
       .toString('base64')
       .replace(/\+/g, '-')
@@ -85,14 +135,14 @@ export function encryptImageUrl(url: string, expiryHours: number = 0): string {
     
     return `/api/image/${base64}`;
   } catch (error) {
-    console.error('[image-crypto] Encryption error:', error);
-    // Fallback to simple encoding if encryption fails
+    console.error('[image-crypto] Legacy encryption error:', error);
     return url;
   }
 }
 
 /**
- * Decrypt image URL from AES-256-GCM encrypted token
+ * Decrypt image URL from AES-256-GCM token
+ * Handles both V2 (stable HMAC, raw URL) and V1 (random nonce, JSON payload)
  */
 export function decryptImageUrl(token: string, maxAgeHours: number = 0): string | null {
   if (!token) return null;
@@ -126,20 +176,32 @@ export function decryptImageUrl(token: string, maxAgeHours: number = 0): string 
     let decrypted = decipher.update(ciphertext);
     decrypted = Buffer.concat([decrypted, decipher.final()]);
     
-    // Parse payload
-    const payload: EncryptedPayload = JSON.parse(decrypted.toString('utf8'));
+    const decryptedStr = decrypted.toString('utf8');
     
-    // Check expiry if maxAgeHours is set
-    if (maxAgeHours > 0) {
-      const ageMs = Date.now() - payload.timestamp;
-      const maxAgeMs = maxAgeHours * 60 * 60 * 1000;
-      if (ageMs > maxAgeMs) {
-        console.warn('[image-crypto] Token expired');
-        return null;
-      }
+    // V2 format: raw URL string (starts with http)
+    if (decryptedStr.startsWith('http://') || decryptedStr.startsWith('https://')) {
+      return decryptedStr;
     }
     
-    return payload.url;
+    // V1 format: JSON payload with url, timestamp, nonce
+    try {
+      const payload: EncryptedPayload = JSON.parse(decryptedStr);
+      
+      // Check expiry if maxAgeHours is set
+      if (maxAgeHours > 0) {
+        const ageMs = Date.now() - payload.timestamp;
+        const maxAgeMs = maxAgeHours * 60 * 60 * 1000;
+        if (ageMs > maxAgeMs) {
+          console.warn('[image-crypto] Token expired');
+          return null;
+        }
+      }
+      
+      return payload.url;
+    } catch {
+      // If it's not JSON but also doesn't start with http, it's invalid
+      return null;
+    }
   } catch (error) {
     console.error('[image-crypto] Decryption error:', error);
     return null;

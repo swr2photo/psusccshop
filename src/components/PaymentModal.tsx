@@ -177,7 +177,7 @@ function PaymentToastContainer({
                 sx={{ 
                   color: 'rgba(255, 255, 255, 0.8)', 
                   p: 0.5,
-                  '&:hover': { color: 'white', bgcolor: 'rgba(255,255,255,0.15)' } 
+                  '&:hover': { color: 'white', bgcolor: 'var(--glass-bg)' } 
                 }}
               >
                 <X size={14} />
@@ -326,14 +326,14 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
             title = 'สลิปซ้ำ';
             message = 'สลิปนี้เคยใช้แล้ว กรุณาโอนเงินใหม่';
           } else if (errorCode === 1013) {
-            title = '💰 ยอดเงินไม่ตรง';
+            title = 'ยอดเงินไม่ตรง';
           } else if (errorCode === 1014) {
-            title = '🏦 บัญชีผิด';
+            title = 'บัญชีผิด';
             message = 'กรุณาโอนเข้าบัญชีที่ถูกต้อง';
           } else if (errorCode === 1007 || errorCode === 1008) {
-            title = '📷 QR ไม่ถูกต้อง';
+            title = 'QR ไม่ถูกต้อง';
           } else if (errorCode === 'PAYMENT_DISABLED') {
-            title = '⚠️ ระบบชำระเงินปิด';
+            title = 'ระบบชำระเงินปิด';
             message = data.message || 'ระบบชำระเงินปิดชั่วคราว กรุณารอแอดมินเปิดระบบ';
             // อัปเดตสถานะเพื่อแสดง UI ที่ถูกต้อง
             setPaymentEnabled(false);
@@ -546,7 +546,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
           maxHeight: { xs: '85vh', sm: '90vh' },
           borderTopLeftRadius: { xs: 20, sm: 24 },
           borderTopRightRadius: { xs: 20, sm: 24 },
-          bgcolor: '#0a0f1a',
+          bgcolor: 'background.default',
           overflow: 'hidden',
         },
       }}
@@ -558,14 +558,14 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
         px: { xs: 2, sm: 3 },
         pt: 1,
         pb: 1.5,
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
-        background: 'linear-gradient(180deg, rgba(15,23,42,0.98) 0%, rgba(10,15,26,0.98) 100%)',
+        borderBottom: '1px solid var(--glass-border)',
+        background: 'var(--glass-strong)',
         position: 'sticky',
         top: 0,
         zIndex: 10,
       }}>
         {/* Drag Handle */}
-        <Box sx={{ width: 36, height: 4, bgcolor: 'rgba(255,255,255,0.15)', borderRadius: 3, mx: 'auto', mb: 1.5 }} />
+        <Box sx={{ width: 36, height: 4, bgcolor: 'var(--glass-bg)', borderRadius: 3, mx: 'auto', mb: 1.5 }} />
         
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -581,10 +581,10 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
               <CreditCard size={20} color="white" />
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#f1f5f9', lineHeight: 1.2 }}>
+              <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'text.primary', lineHeight: 1.2 }}>
                 ชำระเงิน
               </Typography>
-              <Typography sx={{ fontSize: '0.75rem', color: '#64748b', fontFamily: 'monospace' }}>
+              <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary', fontFamily: 'monospace' }}>
                 #{orderRef}
               </Typography>
             </Box>
@@ -595,9 +595,9 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
             onClick={onClose}
             size="small"
             sx={{
-              bgcolor: 'rgba(255,255,255,0.05)',
-              color: '#94a3b8',
-              '&:hover': { bgcolor: 'rgba(255,255,255,0.1)', color: '#f1f5f9' },
+              bgcolor: 'var(--glass-bg)',
+              color: 'text.secondary',
+              '&:hover': { bgcolor: 'var(--glass-bg)', color: 'text.primary' },
             }}
           >
             <X size={20} />
@@ -655,7 +655,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                 </Typography>
               </Box>
               {index < steps.length - 1 && (
-                <ArrowRight size={12} style={{ color: '#475569' }} />
+                <ArrowRight size={12} style={{ color: 'var(--text-muted)' }} />
               )}
             </Box>
           ))}
@@ -666,9 +666,9 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
       <Box sx={{ flex: 1, overflow: 'auto', WebkitOverflowScrolling: 'touch', px: { xs: 2, sm: 3 }, py: 2.5 }}>
         {loading ? (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, maxWidth: 500, mx: 'auto' }}>
-            <Skeleton variant="rectangular" height={120} sx={{ bgcolor: 'rgba(30,41,59,0.5)', borderRadius: '20px' }} />
-            <Skeleton variant="rectangular" height={300} sx={{ bgcolor: 'rgba(30,41,59,0.5)', borderRadius: '20px' }} />
-            <Skeleton variant="rectangular" height={180} sx={{ bgcolor: 'rgba(30,41,59,0.5)', borderRadius: '20px' }} />
+            <Skeleton variant="rectangular" height={120} sx={{ bgcolor: 'var(--surface-2)', borderRadius: '20px' }} />
+            <Skeleton variant="rectangular" height={300} sx={{ bgcolor: 'var(--surface-2)', borderRadius: '20px' }} />
+            <Skeleton variant="rectangular" height={180} sx={{ bgcolor: 'var(--surface-2)', borderRadius: '20px' }} />
           </Box>
         ) : isPaid ? (
           /* ============== ALREADY PAID UI ============== */
@@ -691,7 +691,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                 width: 120,
                 height: 120,
                 borderRadius: '50%',
-                bgcolor: 'rgba(255,255,255,0.1)',
+                bgcolor: 'var(--glass-bg)',
               }} />
               <Box sx={{
                 position: 'absolute',
@@ -700,7 +700,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                 width: 80,
                 height: 80,
                 borderRadius: '50%',
-                bgcolor: 'rgba(255,255,255,0.08)',
+                bgcolor: 'var(--glass-bg)',
               }} />
               
               {/* Success Icon */}
@@ -708,7 +708,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                 width: 80,
                 height: 80,
                 borderRadius: '50%',
-                bgcolor: 'rgba(255,255,255,0.2)',
+                bgcolor: 'var(--glass-bg)',
                 display: 'grid',
                 placeItems: 'center',
                 mx: 'auto',
@@ -719,7 +719,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
               </Box>
               
               <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, mb: 1 }}>
-                ชำระเงินสำเร็จแล้ว! 🎉
+                ชำระเงินสำเร็จแล้ว!
               </Typography>
               <Typography sx={{ fontSize: '0.9rem', opacity: 0.9, mb: 2 }}>
                 คำสั่งซื้อนี้ได้รับการชำระเงินเรียบร้อยแล้ว
@@ -733,7 +733,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                 px: 2,
                 py: 0.8,
                 borderRadius: '20px',
-                bgcolor: 'rgba(255,255,255,0.2)',
+                bgcolor: 'var(--glass-bg)',
               }}>
                 <Typography sx={{ fontSize: '0.8rem', opacity: 0.9 }}>
                   หมายเลขคำสั่งซื้อ:
@@ -748,8 +748,8 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
             <Box sx={{
               p: 2.5,
               borderRadius: '20px',
-              bgcolor: 'rgba(30,41,59,0.4)',
-              border: '1px solid rgba(255,255,255,0.06)',
+              bgcolor: 'var(--surface-2)',
+              border: '1px solid var(--glass-border)',
             }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
                 <Box sx={{
@@ -763,10 +763,10 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                   <Clock size={18} style={{ color: '#60a5fa' }} />
                 </Box>
                 <Box>
-                  <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#e2e8f0' }}>
+                  <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: 'text.primary' }}>
                     สถานะคำสั่งซื้อ
                   </Typography>
-                  <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>
+                  <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
                     อัปเดตล่าสุด
                   </Typography>
                 </Box>
@@ -800,7 +800,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                     {orderStatus === 'VERIFYING' && 'กำลังตรวจสอบสลิป'}
                     {!['PAID', 'READY', 'SHIPPED', 'COMPLETED', 'VERIFYING'].includes(orderStatus) && 'ดำเนินการแล้ว'}
                   </Typography>
-                  <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                  <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary' }}>
                     รอแอดมินเตรียมสินค้า
                   </Typography>
                 </Box>
@@ -811,11 +811,11 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
             <Box sx={{
               p: 2.5,
               borderRadius: '20px',
-              bgcolor: 'rgba(30,41,59,0.4)',
-              border: '1px solid rgba(255,255,255,0.06)',
+              bgcolor: 'var(--surface-2)',
+              border: '1px solid var(--glass-border)',
             }}>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Typography sx={{ fontSize: '0.9rem', color: '#94a3b8' }}>
+                <Typography sx={{ fontSize: '0.9rem', color: 'text.secondary' }}>
                   ยอดที่ชำระแล้ว
                 </Typography>
                 <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: '#10b981' }}>
@@ -866,7 +866,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                 width: 100,
                 height: 100,
                 borderRadius: '50%',
-                bgcolor: 'rgba(255,255,255,0.1)',
+                bgcolor: 'var(--glass-bg)',
               }} />
               <Box sx={{
                 position: 'absolute',
@@ -875,7 +875,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                 width: 60,
                 height: 60,
                 borderRadius: '50%',
-                bgcolor: 'rgba(255,255,255,0.08)',
+                bgcolor: 'var(--glass-bg)',
               }} />
               
               <Typography sx={{ fontSize: '0.85rem', opacity: 0.9, mb: 1, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'center' }}>
@@ -888,9 +888,9 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                 <IconButton 
                   onClick={copyAmount} 
                   sx={{ 
-                    color: 'rgba(255,255,255,0.8)', 
-                    bgcolor: 'rgba(255,255,255,0.15)',
-                    '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' },
+                    color: 'var(--foreground)', 
+                    bgcolor: 'var(--glass-bg)',
+                    '&:hover': { bgcolor: 'var(--glass-bg)' },
                   }}
                 >
                   <Copy size={16} />
@@ -905,7 +905,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                   px: 2,
                   py: 0.5,
                   borderRadius: '20px',
-                  bgcolor: 'rgba(255,255,255,0.15)',
+                  bgcolor: 'var(--glass-bg)',
                   fontSize: '0.8rem',
                 }}>
                   <Typography sx={{ opacity: 0.9, textDecoration: 'line-through' }}>฿{baseAmount.toLocaleString()}</Typography>
@@ -946,7 +946,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                     color: '#fca5a5', 
                     mb: 0.5 
                   }}>
-                    ⚠️ ระบบชำระเงินปิดชั่วคราว
+                    ระบบชำระเงินปิดชั่วคราว
                   </Typography>
                   <Typography sx={{ 
                     fontSize: '0.85rem', 
@@ -963,8 +963,8 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
             {cartItems.length > 0 && (
               <Box sx={{
                 borderRadius: '24px',
-                bgcolor: 'rgba(30,41,59,0.4)',
-                border: '1px solid rgba(255,255,255,0.06)',
+                bgcolor: 'var(--surface-2)',
+                border: '1px solid var(--glass-border)',
                 overflow: 'hidden',
               }}>
                 {/* Card Header - Clickable */}
@@ -973,13 +973,13 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                   sx={{ 
                     px: 2.5, 
                     py: 2, 
-                    borderBottom: showCartDetails ? '1px solid rgba(255,255,255,0.06)' : 'none',
+                    borderBottom: showCartDetails ? '1px solid var(--glass-border)' : 'none',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     cursor: 'pointer',
                     transition: 'background 0.2s',
-                    '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' },
+                    '&:hover': { bgcolor: 'var(--glass-bg)' },
                   }}
                 >
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -987,17 +987,17 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                       width: 40,
                       height: 40,
                       borderRadius: '12px',
-                      background: 'linear-gradient(135deg, rgba(139,92,246,0.2) 0%, rgba(236,72,153,0.2) 100%)',
+                      background: 'linear-gradient(135deg, rgba(30,64,175,0.2) 0%, rgba(236,72,153,0.2) 100%)',
                       display: 'grid',
                       placeItems: 'center',
                     }}>
                       <ShoppingBag size={20} style={{ color: '#c4b5fd' }} />
                     </Box>
                     <Box>
-                      <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#e2e8f0' }}>
+                      <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'text.primary' }}>
                         รายการสินค้า
                       </Typography>
-                      <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>
+                      <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
                         {cartItems.length} รายการ • {cartItems.reduce((sum, item) => sum + item.quantity, 0)} ชิ้น
                       </Typography>
                     </Box>
@@ -1007,8 +1007,8 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                       px: 1.5,
                       py: 0.5,
                       borderRadius: '20px',
-                      bgcolor: 'rgba(139,92,246,0.1)',
-                      border: '1px solid rgba(139,92,246,0.2)',
+                      bgcolor: 'rgba(30,64,175,0.1)',
+                      border: '1px solid rgba(30,64,175,0.2)',
                     }}>
                       <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#c4b5fd' }}>
                         {showCartDetails ? 'ซ่อน' : 'ดูรายละเอียด'}
@@ -1026,22 +1026,22 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                         sx={{
                           p: 2,
                           borderRadius: '16px',
-                          bgcolor: 'rgba(15,23,42,0.5)',
+                          bgcolor: 'var(--surface)',
                           border: '1px solid rgba(255,255,255,0.04)',
                         }}
                       >
                         {/* Product Name & Quantity */}
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
                           <Box sx={{ flex: 1 }}>
-                            <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: '#e2e8f0' }}>
+                            <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: 'text.primary' }}>
                               {item.productName}
                             </Typography>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-                              <Typography sx={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                              <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
                                 ไซส์ {item.size}
                               </Typography>
-                              <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>•</Typography>
-                              <Typography sx={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                              <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>•</Typography>
+                              <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
                                 x{item.quantity}
                               </Typography>
                             </Box>
@@ -1117,15 +1117,15 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
             {/* QR Code Card */}
             <Box sx={{
               borderRadius: '24px',
-              bgcolor: 'rgba(30,41,59,0.4)',
-              border: '1px solid rgba(255,255,255,0.06)',
+              bgcolor: 'var(--surface-2)',
+              border: '1px solid var(--glass-border)',
               overflow: 'hidden',
             }}>
               {/* Card Header */}
               <Box sx={{ 
                 px: 2.5, 
                 py: 2, 
-                borderBottom: '1px solid rgba(255,255,255,0.06)',
+                borderBottom: '1px solid var(--glass-border)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
@@ -1142,10 +1142,10 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                     <QrCode size={20} style={{ color: '#6ee7b7' }} />
                   </Box>
                   <Box>
-                    <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#e2e8f0' }}>
+                    <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'text.primary' }}>
                       สแกนเพื่อโอนเงิน
                     </Typography>
-                    <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>
+                    <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
                       PromptPay / Mobile Banking
                     </Typography>
                   </Box>
@@ -1222,7 +1222,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                     </Box>
                     {/* Amount */}
                     <Box sx={{ mt: 1.5, textAlign: 'center' }}>
-                      <Typography sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.75rem', mb: 0.25 }}>
+                      <Typography sx={{ color: 'var(--foreground)', fontSize: '0.75rem', mb: 0.25 }}>
                         จำนวนเงิน
                       </Typography>
                       <Typography sx={{ color: '#fff', fontWeight: 700, fontSize: '1.25rem', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
@@ -1230,18 +1230,18 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                       </Typography>
                     </Box>
                     {/* Account Name */}
-                    <Box sx={{ mt: 1, textAlign: 'center', bgcolor: 'rgba(255,255,255,0.1)', borderRadius: 1.5, px: 2, py: 0.75 }}>
-                      <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.65rem' }}>
+                    <Box sx={{ mt: 1, textAlign: 'center', bgcolor: 'var(--glass-bg)', borderRadius: 1.5, px: 2, py: 0.75 }}>
+                      <Typography sx={{ color: 'var(--foreground)', fontSize: '0.65rem' }}>
                         ชื่อบัญชี
                       </Typography>
                       <Typography sx={{ color: '#fff', fontWeight: 600, fontSize: '0.8rem' }}>
                         นายวีรชาติ แก้วขำ
                       </Typography>
-                      <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.6rem' }}>
+                      <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.6rem' }}>
                         (เลขานุการชุมนุมคอมพิวเตอร์)
                       </Typography>
                     </Box>
-                    <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.65rem', mt: 1, textAlign: 'center' }}>
+                    <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.65rem', mt: 1, textAlign: 'center' }}>
                       สแกน QR Code ด้วยแอปธนาคาร
                     </Typography>
                   </Box>
@@ -1276,7 +1276,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                     placeItems: 'center',
                     mb: 2,
                   }}>
-                    <Loader2 size={32} style={{ color: '#64748b' }} className="animate-spin" />
+                    <Loader2 size={32} style={{ color: 'text.secondary' }} className="animate-spin" />
                   </Box>
                 )}
 
@@ -1307,7 +1307,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                       mt: 1.5, 
                       width: '100%',
                       borderRadius: 1, 
-                      bgcolor: 'rgba(255,255,255,0.1)',
+                      bgcolor: 'var(--glass-bg)',
                       '& .MuiLinearProgress-bar': { bgcolor: '#10b981' }
                     }} 
                   />
@@ -1318,8 +1318,8 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
             {/* Slip Upload Card */}
             <Box sx={{
               borderRadius: '24px',
-              bgcolor: 'rgba(30,41,59,0.4)',
-              border: hasSlip ? '2px solid rgba(16,185,129,0.4)' : '1px solid rgba(255,255,255,0.06)',
+              bgcolor: 'var(--surface-2)',
+              border: hasSlip ? '2px solid rgba(16,185,129,0.4)' : '1px solid var(--glass-border)',
               overflow: 'hidden',
               transition: 'all 0.3s ease',
             }}>
@@ -1327,7 +1327,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
               <Box sx={{ 
                 px: 2.5, 
                 py: 2, 
-                borderBottom: '1px solid rgba(255,255,255,0.06)',
+                borderBottom: '1px solid var(--glass-border)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
@@ -1346,10 +1346,10 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                     {hasSlip ? <Check size={20} style={{ color: 'white' }} /> : <Image size={20} style={{ color: '#67e8f9' }} />}
                   </Box>
                   <Box>
-                    <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#e2e8f0' }}>
+                    <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'text.primary' }}>
                       {hasSlip ? 'แนบสลิปแล้ว' : 'แนบสลิปโอนเงิน'}
                     </Typography>
-                    <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>
+                    <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
                       {hasSlip ? 'พร้อมยืนยันการชำระ' : 'อัปโหลดหลักฐานการโอน'}
                     </Typography>
                   </Box>
@@ -1435,10 +1435,10 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                     }}>
                       <Upload size={28} style={{ color: '#67e8f9' }} />
                     </Box>
-                    <Typography sx={{ color: '#e2e8f0', fontWeight: 600, mb: 0.5, fontSize: '1rem' }}>
+                    <Typography sx={{ color: 'text.primary', fontWeight: 600, mb: 0.5, fontSize: '1rem' }}>
                       คลิกหรือลากไฟล์มาวาง
                     </Typography>
-                    <Typography sx={{ color: '#64748b', fontSize: '0.8rem' }}>
+                    <Typography sx={{ color: 'text.secondary', fontSize: '0.8rem' }}>
                       รูปสลิปที่คมชัด เห็นยอดและเวลา
                     </Typography>
                     <Box sx={{ 
@@ -1447,7 +1447,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                       justifyContent: 'center',
                       gap: 0.5, 
                       mt: 1.5,
-                      color: '#475569',
+                      color: 'var(--text-muted)',
                       fontSize: '0.75rem',
                     }}>
                       <Smartphone size={14} />
@@ -1537,7 +1537,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
               gap: 1.5,
             }}>
               <Clock3 size={18} style={{ color: '#fbbf24', flexShrink: 0 }} />
-              <Typography sx={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+              <Typography sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>
                 อัปโหลดสลิปภายใน 15 นาที • ระบบตรวจอัตโนมัติ
               </Typography>
             </Box>
@@ -1549,8 +1549,8 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
       <Box sx={{
         px: { xs: 2, sm: 3 },
         py: 2,
-        borderTop: '1px solid rgba(255,255,255,0.08)',
-        background: 'linear-gradient(180deg, rgba(15,23,42,0.98) 0%, rgba(10,15,26,0.98) 100%)',
+        borderTop: '1px solid var(--glass-border)',
+        background: 'var(--glass-strong)',
         backdropFilter: 'blur(20px)',
         paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
       }}>
@@ -1630,11 +1630,11 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                 },
               }}
             >
-              {verifying ? 'กำลังตรวจสอบสลิป...' : hasSlip ? '✓ ยืนยันการชำระเงิน' : 'แนบสลิปเพื่อชำระเงิน'}
+              {verifying ? 'กำลังตรวจสอบสลิป...' : hasSlip ? 'ยืนยันการชำระเงิน' : 'แนบสลิปเพื่อชำระเงิน'}
             </Button>
           )}
           {!hasSlip && paymentEnabled && !isPaid && (
-            <Typography sx={{ textAlign: 'center', fontSize: '0.75rem', color: '#475569', mt: 1.5 }}>
+            <Typography sx={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)', mt: 1.5 }}>
               กรุณาแนบสลิปก่อนกดยืนยัน
             </Typography>
           )}
@@ -1650,7 +1650,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
               borderRadius: '12px',
               bgcolor: 'rgba(100,116,139,0.15)',
               border: '1px solid rgba(100,116,139,0.3)',
-              color: '#94a3b8',
+              color: 'text.secondary',
               fontSize: '0.85rem',
               fontWeight: 600,
               textTransform: 'none',

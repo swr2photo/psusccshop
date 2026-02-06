@@ -28,8 +28,6 @@ interface UseAdminDataSWROptions {
   onError?: (error: any) => void;
   onLoadingChange?: (loading: boolean) => void;
   realtimeConnected?: boolean;
-  // Force no caching - always fetch fresh data
-  noCache?: boolean;
 }
 
 /**
@@ -50,7 +48,6 @@ export function useAdminDataSWR(options: UseAdminDataSWROptions) {
     onError, 
     onLoadingChange,
     realtimeConnected = false,
-    noCache = false,
   } = options;
 
   const initialLoadDone = useRef(false);
@@ -71,11 +68,10 @@ export function useAdminDataSWR(options: UseAdminDataSWROptions) {
     onLoadingChangeRef.current = onLoadingChange;
   }, [onLoadingChange]);
 
-  // Custom fetcher with cache-busting for noCache mode
+  // Standard fetcher - SWR handles caching/dedup automatically
   const adminFetcher = useCallback(async (url: string) => {
-    const fetchUrl = noCache ? `${url}${url.includes('?') ? '&' : '?'}_t=${Date.now()}` : url;
-    return fetcher(fetchUrl);
-  }, [noCache]);
+    return fetcher(url);
+  }, []);
 
   // SWR fetch with configuration
   const { 
@@ -93,11 +89,12 @@ export function useAdminDataSWR(options: UseAdminDataSWROptions) {
       revalidateOnReconnect: true,
       revalidateIfStale: true,
       
-      // Shorter interval for real-time feel, even shorter with noCache
-      refreshInterval: noCache ? 10000 : (realtimeConnected ? 120000 : 30000), // 10s with noCache, 2min with realtime, 30s default
+      // When realtime is connected, reduce polling significantly
+      // Realtime pushes handle instant updates; SWR is just a safety net
+      refreshInterval: realtimeConnected ? 300000 : 30000, // 5min with realtime, 30s without
       
-      // Minimal deduplication for noCache mode - allow more frequent fetches
-      dedupingInterval: noCache ? 1000 : 5000, // 1s vs 5s
+      // Standard deduplication
+      dedupingInterval: 5000,
       
       // Error handling
       errorRetryCount: 3,
@@ -108,6 +105,29 @@ export function useAdminDataSWR(options: UseAdminDataSWROptions) {
       
       // Don't suspend - we handle loading state manually
       suspense: false,
+      
+      // Use localStorage as fallback for instant display on page load
+      fallbackData: (() => {
+        if (typeof window === 'undefined') return undefined;
+        try {
+          const cached = localStorage.getItem('admin_cache');
+          if (cached) {
+            const { data } = JSON.parse(cached);
+            if (data) {
+              return { status: 'success', data } as AdminDataRaw;
+            }
+          }
+          // Also try the SWR-specific cache key
+          const swrCached = localStorage.getItem('psusccshop_admin_cache_v2');
+          if (swrCached) {
+            const parsed = JSON.parse(swrCached);
+            if (parsed?.orders || parsed?.config) {
+              return { status: 'success', data: parsed } as AdminDataRaw;
+            }
+          }
+        } catch {}
+        return undefined;
+      })(),
     }
   );
 
@@ -133,10 +153,12 @@ export function useAdminDataSWR(options: UseAdminDataSWROptions) {
   // Handle loading state
   useEffect(() => {
     if (onLoadingChangeRef.current) {
-      // Only show loading on initial load, not on revalidation
-      onLoadingChangeRef.current(isLoading && !initialLoadDone.current);
+      // Only show loading on initial load when no data/cache, not on revalidation
+      // If we have fallback data, SWR considers it "not loading"
+      const showLoading = isLoading && !initialLoadDone.current && !data;
+      onLoadingChangeRef.current(showLoading);
     }
-  }, [isLoading]);
+  }, [isLoading, data]);
 
   // Manual refresh function
   const refresh = useCallback(async (options?: { silent?: boolean }) => {

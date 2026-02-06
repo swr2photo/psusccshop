@@ -22,7 +22,7 @@ if (typeof window !== 'undefined' && supabaseServiceKey) {
 // ==================== CLIENTS ====================
 
 // Public client (for client-side, uses anon key with RLS)
-// ⚠️ ใช้เฉพาะสำหรับ read public config เท่านั้น
+// ใช้เฉพาะสำหรับ read public config เท่านั้น
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: false,
@@ -31,7 +31,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 });
 
 // Admin client (for server-side ONLY, bypasses RLS)
-// ⚠️ ห้ามใช้ใน client components!
+// ห้ามใช้ใน client components!
 let _supabaseAdmin: SupabaseClient | null = null;
 export const getSupabaseAdmin = () => {
   // ป้องกันการเรียกใช้จาก client-side

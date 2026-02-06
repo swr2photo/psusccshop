@@ -97,7 +97,7 @@ export async function GET(req: NextRequest) {
         ref: sanitizedRef,
         bankName,
         accountName,
-        // ⚠️ SECURITY: Mask account number - แสดงแค่ 4 ตัวท้าย
+        // SECURITY: Mask account number - แสดงแค่ 4 ตัวท้าย
         accountNumber: maskAccountNumber(accountNumber),
         baseAmount,
         discount,

@@ -3,7 +3,6 @@ import { smartDecryptUrl, encryptImageUrl } from '@/lib/image-crypto';
 import { S3Client, GetObjectCommand, PutObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { Readable } from 'stream';
 import crypto from 'crypto';
-import { requireAuth } from '@/lib/auth';
 
 // Ensure Node runtime for fetch
 export const runtime = 'nodejs';
@@ -172,7 +171,7 @@ export async function GET(
       return NextResponse.json({ error: 'Missing image ID' }, { status: 400 });
     }
 
-    // ⚠️ SECURITY: Basic referer check - log suspicious requests but don't block
+    //  SECURITY: Basic referer check - log suspicious requests but don't block
     // Images need to load from any origin for proper UX
     const referer = req.headers.get('referer');
     if (referer) {
@@ -230,7 +229,7 @@ export async function GET(
     // Generate cache key
     const cacheKey = getCacheKey(imageUrl);
     
-    // ✅ Check cache first - permanent storage
+    //  Check cache first - permanent storage
     const cached = await getFromCache(cacheKey);
     if (cached) {
       return new NextResponse(new Uint8Array(cached.buffer), {
@@ -277,7 +276,7 @@ export async function GET(
     // Get image data
     const imageBuffer = Buffer.from(await response.arrayBuffer());
 
-    // ✅ Save to cache for permanent storage (async, don't wait)
+    //  Save to cache for permanent storage (async, don't wait)
     saveToCache(cacheKey, imageBuffer, contentType).catch(() => {});
 
     // Return image with long cache headers

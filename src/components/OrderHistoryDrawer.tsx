@@ -116,7 +116,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
           maxHeight: '92vh',
           borderTopLeftRadius: { xs: 20, sm: 24 },
           borderTopRightRadius: { xs: 20, sm: 24 },
-          bgcolor: '#0a0f1a',
+          bgcolor: 'background.default',
           overflow: 'hidden',
         },
       }}
@@ -125,15 +125,15 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
       <Box sx={{
         px: { xs: 2, sm: 3 },
         py: { xs: 1.5, sm: 2 },
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
-        background: 'linear-gradient(180deg, rgba(15,23,42,0.98) 0%, rgba(10,15,26,0.98) 100%)',
+        borderBottom: '1px solid var(--glass-border)',
+        background: 'var(--glass-strong)',
         backdropFilter: 'blur(20px)',
         position: 'sticky',
         top: 0,
         zIndex: 10,
       }}>
         {/* Drag Handle */}
-        <Box sx={{ width: 36, height: 4, bgcolor: 'rgba(255,255,255,0.2)', borderRadius: 2, mx: 'auto', mb: 2 }} />
+        <Box sx={{ width: 36, height: 4, bgcolor: 'var(--glass-bg)', borderRadius: 2, mx: 'auto', mb: 2 }} />
         
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -141,22 +141,22 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
               width: 40,
               height: 40,
               borderRadius: '12px',
-              background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+              background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
               display: 'grid',
               placeItems: 'center',
             }}>
               <Package size={20} color="white" />
             </Box>
             <Box sx={{ flex: 1 }}>
-              <Typography sx={{ fontSize: '1.1rem', fontWeight: 700, color: '#f1f5f9' }}>
+              <Typography sx={{ fontSize: '1.1rem', fontWeight: 700, color: 'text.primary' }}>
                 คำสั่งซื้อของฉัน
               </Typography>
-              <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>
+              <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
                 {orderHistory.length} รายการ
               </Typography>
             </Box>
           </Box>
-          <IconButton onClick={onClose} sx={{ color: '#94a3b8' }}>
+          <IconButton onClick={onClose} sx={{ color: 'text.secondary' }}>
             <X size={20} />
           </IconButton>
         </Box>
@@ -183,9 +183,9 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                   px: 2,
                   py: 0.8,
                   borderRadius: '20px',
-                  bgcolor: isActive ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.04)',
-                  border: isActive ? '1px solid rgba(99,102,241,0.4)' : '1px solid rgba(255,255,255,0.06)',
-                  color: isActive ? '#a5b4fc' : '#94a3b8',
+                  bgcolor: isActive ? 'rgba(37,99,235,0.15)' : 'rgba(255,255,255,0.04)',
+                  border: isActive ? '1px solid rgba(37,99,235,0.4)' : '1px solid var(--glass-border)',
+                  color: isActive ? '#93c5fd' : '#94a3b8',
                   fontSize: '0.8rem',
                   fontWeight: 600,
                   cursor: 'pointer',
@@ -195,7 +195,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                   alignItems: 'center',
                   gap: 0.8,
                   '&:hover': {
-                    bgcolor: isActive ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.08)',
+                    bgcolor: isActive ? 'rgba(37,99,235,0.2)' : 'rgba(255,255,255,0.08)',
                   },
                 }}
               >
@@ -204,7 +204,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                   px: 0.8,
                   py: 0.1,
                   borderRadius: '8px',
-                  bgcolor: isActive ? 'rgba(99,102,241,0.3)' : 'rgba(255,255,255,0.08)',
+                  bgcolor: isActive ? 'rgba(37,99,235,0.3)' : 'rgba(255,255,255,0.08)',
                   fontSize: '0.7rem',
                   fontWeight: 700,
                   minWidth: 20,
@@ -228,8 +228,8 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
       }}>
         {loadingHistory ? (
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 8, gap: 2 }}>
-            <CircularProgress size={36} sx={{ color: '#6366f1' }} />
-            <Typography sx={{ color: '#64748b', fontSize: '0.9rem' }}>กำลังโหลดคำสั่งซื้อ...</Typography>
+            <CircularProgress size={36} sx={{ color: '#2563eb' }} />
+            <Typography sx={{ color: 'text.secondary', fontSize: '0.9rem' }}>กำลังโหลดคำสั่งซื้อ...</Typography>
           </Box>
         ) : filteredOrders.length === 0 ? (
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 8, gap: 2 }}>
@@ -241,10 +241,10 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
               display: 'grid',
               placeItems: 'center',
             }}>
-              <Package size={36} style={{ color: '#475569' }} />
+              <Package size={36} style={{ color: 'var(--text-muted)' }} />
             </Box>
-            <Typography sx={{ color: '#64748b', fontSize: '0.95rem' }}>ไม่พบคำสั่งซื้อ</Typography>
-            <Typography sx={{ color: '#475569', fontSize: '0.8rem' }}>
+            <Typography sx={{ color: 'text.secondary', fontSize: '0.95rem' }}>ไม่พบคำสั่งซื้อ</Typography>
+            <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
               {historyFilter === 'ALL' ? 'ยังไม่มีคำสั่งซื้อ' : 'ลองเปลี่ยนตัวกรองดู'}
             </Typography>
           </Box>
@@ -272,22 +272,22 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                   sx={{
                     p: { xs: 2, sm: 2.5 },
                     borderRadius: '18px',
-                    bgcolor: 'rgba(30,41,59,0.5)',
-                    border: '1px solid rgba(255,255,255,0.06)',
+                    bgcolor: 'var(--surface-2)',
+                    border: '1px solid var(--glass-border)',
                     transition: 'all 0.2s ease',
                     '&:hover': {
-                      bgcolor: 'rgba(30,41,59,0.7)',
-                      borderColor: 'rgba(255,255,255,0.1)',
+                      bgcolor: 'var(--surface-2)',
+                      borderColor: 'var(--glass-border)',
                     },
                   }}
                 >
                   {/* Order Header */}
                   <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2 }}>
                     <Box>
-                      <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: '#e2e8f0', letterSpacing: '0.02em' }}>
+                      <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'text.primary', letterSpacing: '0.02em' }}>
                         #{order.ref}
                       </Typography>
-                      <Typography sx={{ fontSize: '0.75rem', color: '#64748b', mt: 0.3 }}>
+                      <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary', mt: 0.3 }}>
                         {new Date(order.date).toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short', year: '2-digit' })}
                         {' • '}
                         {new Date(order.date).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
@@ -335,15 +335,15 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                                 gap: 1.5,
                                 p: 1.5,
                                 borderRadius: '14px',
-                                bgcolor: 'rgba(15,23,42,0.5)',
-                                border: '1px solid rgba(255,255,255,0.06)',
+                                bgcolor: 'var(--surface)',
+                                border: '1px solid var(--glass-border)',
                               }}
                             >
                               <Box sx={{
                                 width: 60,
                                 height: 60,
                                 borderRadius: '12px',
-                                bgcolor: '#0b1224',
+                                bgcolor: 'var(--surface-2)',
                                 backgroundImage: productImage ? `url(${productImage})` : undefined,
                                 backgroundSize: 'cover',
                                 backgroundPosition: 'center',
@@ -351,16 +351,16 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                border: '1px solid rgba(255,255,255,0.06)',
+                                border: '1px solid var(--glass-border)',
                               }}>
-                                {!productImage && <Package size={20} style={{ color: '#475569' }} />}
+                                {!productImage && <Package size={20} style={{ color: 'var(--text-muted)' }} />}
                               </Box>
                               <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
                                 {/* Product Name */}
                                 <Typography sx={{
                                   fontSize: '0.85rem',
                                   fontWeight: 700,
-                                  color: '#e2e8f0',
+                                  color: 'text.primary',
                                   lineHeight: 1.3,
                                 }}>
                                   {itemName}
@@ -373,15 +373,15 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                                       px: 1, 
                                       py: 0.3, 
                                       borderRadius: '6px', 
-                                      bgcolor: 'rgba(99,102,241,0.15)', 
+                                      bgcolor: 'rgba(37,99,235,0.15)', 
                                       fontSize: '0.72rem', 
                                       fontWeight: 600, 
-                                      color: '#a5b4fc' 
+                                      color: 'var(--secondary)' 
                                     }}>
                                       ไซส์ {item.size}
                                     </Box>
                                   )}
-                                  <Typography sx={{ fontSize: '0.72rem', color: '#64748b' }}>
+                                  <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary' }}>
                                     จำนวน {itemQty} ชิ้น
                                   </Typography>
                                 </Box>
@@ -399,7 +399,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                                         fontWeight: 600, 
                                         color: '#fbbf24' 
                                       }}>
-                                        ✨ แขนยาว
+                                        แขนยาว
                                       </Box>
                                     )}
                                     {itemCustomName && (
@@ -437,9 +437,9 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                                   alignItems: 'center', 
                                   justifyContent: 'space-between',
                                   pt: 0.5,
-                                  borderTop: '1px solid rgba(255,255,255,0.06)',
+                                  borderTop: '1px solid var(--glass-border)',
                                 }}>
-                                  <Typography sx={{ fontSize: '0.72rem', color: '#64748b' }}>
+                                  <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary' }}>
                                     ราคาต่อชิ้น ฿{(itemSubtotal / itemQty).toLocaleString()}
                                   </Typography>
                                   <Typography sx={{ fontSize: '0.88rem', fontWeight: 700, color: '#10b981' }}>
@@ -451,7 +451,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                           );
                         })}
                         {orderItems.length > 3 && (
-                          <Typography sx={{ fontSize: '0.75rem', color: '#64748b', textAlign: 'center', py: 0.5 }}>
+                          <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary', textAlign: 'center', py: 0.5 }}>
                             +{orderItems.length - 3} รายการ
                           </Typography>
                         )}
@@ -487,12 +487,12 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                               <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#10b981' }}>สถานที่รับสินค้า</Typography>
                             </Box>
                             {uniqueLocations.map((loc, idx) => (
-                              <Typography key={idx} sx={{ fontSize: '0.85rem', color: '#f1f5f9', fontWeight: 600 }}>{loc}</Typography>
+                              <Typography key={idx} sx={{ fontSize: '0.85rem', color: 'text.primary', fontWeight: 600 }}>{loc}</Typography>
                             ))}
                             {productsWithPickup[0]?.pickup && (productsWithPickup[0].pickup.startDate || productsWithPickup[0].pickup.endDate) && (
                               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 1 }}>
-                                <Clock size={14} style={{ color: '#64748b' }} />
-                                <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                                <Clock size={14} style={{ color: 'text.secondary' }} />
+                                <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary' }}>
                                   {productsWithPickup[0].pickup.startDate && new Date(productsWithPickup[0].pickup.startDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                                   {productsWithPickup[0].pickup.startDate && productsWithPickup[0].pickup.endDate && ' - '}
                                   {productsWithPickup[0].pickup.endDate && new Date(productsWithPickup[0].pickup.endDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
@@ -500,7 +500,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                               </Box>
                             )}
                             {productsWithPickup[0]?.pickup?.notes && (
-                              <Typography sx={{ fontSize: '0.7rem', color: '#fbbf24', mt: 0.5 }}>📝 {productsWithPickup[0].pickup.notes}</Typography>
+                              <Typography sx={{ fontSize: '0.7rem', color: '#fbbf24', mt: 0.5 }}>{productsWithPickup[0].pickup.notes}</Typography>
                             )}
                           </Box>
                         );
@@ -531,7 +531,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                         <Package size={20} />
                         แสดง QR รับสินค้า
                       </Button>
-                      <Typography sx={{ fontSize: '0.7rem', color: '#64748b', textAlign: 'center', mt: 1 }}>
+                      <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary', textAlign: 'center', mt: 1 }}>
                         กดเพื่อแสดง QR Code สำหรับรับสินค้า
                       </Typography>
                     </Box>
@@ -545,15 +545,15 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                       mt: 2,
                       p: 2,
                       borderRadius: '16px',
-                      background: 'linear-gradient(135deg, rgba(99,102,241,0.1) 0%, rgba(139,92,246,0.1) 100%)',
-                      border: '1px solid rgba(99,102,241,0.3)',
+                      background: 'linear-gradient(135deg, rgba(37,99,235,0.1) 0%, rgba(30,64,175,0.1) 100%)',
+                      border: '1px solid rgba(37,99,235,0.3)',
                     }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                         <Box sx={{
                           width: 32,
                           height: 32,
                           borderRadius: '10px',
-                          background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                          background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -561,10 +561,10 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                           <Truck size={18} color="#fff" />
                         </Box>
                         <Box>
-                          <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#a5b4fc' }}>
+                          <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--secondary)' }}>
                             เตรียมจัดส่ง
                           </Typography>
-                          <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                          <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary' }}>
                             รอทางร้านจัดส่งสินค้า
                           </Typography>
                         </Box>
@@ -572,17 +572,17 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                       <Box sx={{ 
                         p: 1.5, 
                         borderRadius: '10px', 
-                        bgcolor: 'rgba(99,102,241,0.08)',
+                        bgcolor: 'rgba(37,99,235,0.08)',
                         display: 'flex',
                         alignItems: 'center',
                         gap: 1,
                       }}>
-                        <Package size={16} color="#a5b4fc" />
-                        <Typography sx={{ fontSize: '0.78rem', color: '#cbd5e1' }}>
+                        <Package size={16} color="#93c5fd" />
+                        <Typography sx={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                           ออเดอร์ของคุณเข้าระบบแล้ว กำลังเตรียมของและจะจัดส่งเร็วๆนี้
                         </Typography>
                       </Box>
-                      <Typography sx={{ fontSize: '0.68rem', color: '#64748b', textAlign: 'center', mt: 1.5 }}>
+                      <Typography sx={{ fontSize: '0.68rem', color: 'text.secondary', textAlign: 'center', mt: 1.5 }}>
                         เมื่อจัดส่งแล้วจะแจ้งเลขพัสดุให้ทราบ
                       </Typography>
                     </Box>
@@ -602,7 +602,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                   {/* Order Total & Actions */}
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pt: 1.5, borderTop: '1px solid rgba(255,255,255,0.04)' }}>
                     <Box>
-                      <Typography sx={{ fontSize: '0.7rem', color: '#64748b', mb: 0.2 }}>ยอดรวม</Typography>
+                      <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary', mb: 0.2 }}>ยอดรวม</Typography>
                       <Typography sx={{ fontSize: '1.1rem', fontWeight: 800, color: '#10b981' }}>
                         ฿{order.total?.toLocaleString() || '0'}
                       </Typography>
@@ -667,7 +667,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                               borderColor: 'rgba(239,68,68,0.5)',
                             },
                             '&:disabled': {
-                              color: '#64748b',
+                              color: 'text.secondary',
                               borderColor: 'rgba(100,116,139,0.3)',
                             },
                           }}
@@ -691,19 +691,19 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                     px: 4,
                     py: 1,
                     borderRadius: '12px',
-                    bgcolor: 'rgba(99,102,241,0.1)',
-                    border: '1px solid rgba(99,102,241,0.3)',
-                    color: '#a5b4fc',
+                    bgcolor: 'rgba(37,99,235,0.1)',
+                    border: '1px solid rgba(37,99,235,0.3)',
+                    color: 'var(--secondary)',
                     fontSize: '0.85rem',
                     fontWeight: 600,
                     textTransform: 'none',
-                    '&:hover': { bgcolor: 'rgba(99,102,241,0.2)' },
-                    '&:disabled': { color: '#64748b' },
+                    '&:hover': { bgcolor: 'rgba(37,99,235,0.2)' },
+                    '&:disabled': { color: 'text.secondary' },
                   }}
                 >
                   {loadingHistoryMore ? (
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <CircularProgress size={16} sx={{ color: '#a5b4fc' }} />
+                      <CircularProgress size={16} sx={{ color: 'var(--secondary)' }} />
                       กำลังโหลด...
                     </Box>
                   ) : (
@@ -720,8 +720,8 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
       <Box sx={{
         px: { xs: 2, sm: 3 },
         py: 1.5,
-        borderTop: '1px solid rgba(255,255,255,0.06)',
-        background: 'rgba(10,15,26,0.98)',
+        borderTop: '1px solid var(--glass-border)',
+        background: 'var(--glass-strong)',
         backdropFilter: 'blur(20px)',
         paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
       }}>
@@ -731,12 +731,12 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
           sx={{
             py: 1.3,
             borderRadius: '12px',
-            bgcolor: 'rgba(255,255,255,0.06)',
-            color: '#94a3b8',
+            bgcolor: 'var(--glass-bg)',
+            color: 'text.secondary',
             fontSize: '0.9rem',
             fontWeight: 600,
             textTransform: 'none',
-            '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' },
+            '&:hover': { bgcolor: 'var(--glass-bg)' },
           }}
         >
           ปิด

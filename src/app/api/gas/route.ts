@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log(`🔄 [GAS-API] GET ${action}`, { authorization: authorization ? '***' : 'none' });
+    console.log(`[GAS-API] GET ${action}`, { authorization: authorization ? '***' : 'none' });
 
     // Forward to Google Apps Script
     const gasUrl = new URL(GAS_URL);
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
 
     const data = await response.json();
 
-    console.log(`✅ [GAS-API] GET ${action} - Success`);
+    console.log(`[GAS-API] GET ${action} - Success`);
 
     return NextResponse.json(data, {
       status: 200,
@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error(`❌ [GAS-API] GET Error:`, error?.message || error);
+    console.error(`[GAS-API] GET Error:`, error?.message || error);
     return NextResponse.json(
       {
         status: 'error',
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`🔄 [GAS-API] POST ${action}`);
+    console.log(`[GAS-API] POST ${action}`);
 
     const body = await request.json();
 
@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
 
     const data = await response.json();
 
-    console.log(`✅ [GAS-API] POST ${action} - Success`);
+    console.log(`[GAS-API] POST ${action} - Success`);
 
     return NextResponse.json(data, {
       status: 200,
@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error: any) {
-    console.error(`❌ [GAS-API] POST Error:`, error?.message || error);
+    console.error(`[GAS-API] POST Error:`, error?.message || error);
     return NextResponse.json(
       {
         status: 'error',

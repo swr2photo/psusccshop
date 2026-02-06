@@ -98,7 +98,7 @@ export default function CartDrawer(props: CartDrawerProps) {
             maxHeight: '90vh',
             borderTopLeftRadius: { xs: 20, sm: 24 },
             borderTopRightRadius: { xs: 20, sm: 24 },
-            bgcolor: '#0a0f1a',
+            bgcolor: 'background.default',
             overflow: 'hidden',
           },
         }}
@@ -107,13 +107,13 @@ export default function CartDrawer(props: CartDrawerProps) {
         <Box sx={{
           px: { xs: 2, sm: 3 },
           py: { xs: 1.5, sm: 2 },
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
-          background: 'linear-gradient(180deg, rgba(15,23,42,0.98) 0%, rgba(10,15,26,0.98) 100%)',
+          borderBottom: '1px solid var(--glass-border)',
+          background: 'var(--glass-strong)',
           position: 'sticky',
           top: 0,
           zIndex: 10,
         }}>
-          <Box sx={{ width: 36, height: 4, bgcolor: 'rgba(255,255,255,0.2)', borderRadius: 2, mx: 'auto', mb: 2 }} />
+          <Box sx={{ width: 36, height: 4, bgcolor: 'var(--glass-bg)', borderRadius: 2, mx: 'auto', mb: 2 }} />
           
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -121,18 +121,18 @@ export default function CartDrawer(props: CartDrawerProps) {
                 width: 44,
                 height: 44,
                 borderRadius: '14px',
-                background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
                 display: 'grid',
                 placeItems: 'center',
-                boxShadow: '0 4px 14px rgba(99,102,241,0.3)',
+                boxShadow: '0 4px 14px rgba(37,99,235,0.3)',
               }}>
                 <ShoppingCart size={22} color="white" />
               </Box>
               <Box>
-                <Typography sx={{ fontSize: '1.15rem', fontWeight: 800, color: '#f1f5f9' }}>
+                <Typography sx={{ fontSize: '1.15rem', fontWeight: 800, color: 'text.primary' }}>
                   ตะกร้าสินค้า
                 </Typography>
-                <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>
+                <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
                   {cart.length} รายการ · {cart.reduce((sum, item) => sum + item.quantity, 0)} ชิ้น
                 </Typography>
               </Box>
@@ -156,7 +156,7 @@ export default function CartDrawer(props: CartDrawerProps) {
                   ล้างทั้งหมด
                 </Button>
               )}
-              <IconButton onClick={onClose} sx={{ color: '#94a3b8', bgcolor: 'rgba(255,255,255,0.05)', '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' } }}>
+              <IconButton onClick={onClose} sx={{ color: 'text.secondary', bgcolor: 'var(--glass-bg)', '&:hover': { bgcolor: 'var(--glass-bg)' } }}>
                 <X size={20} />
               </IconButton>
             </Box>
@@ -175,10 +175,10 @@ export default function CartDrawer(props: CartDrawerProps) {
                 display: 'grid',
                 placeItems: 'center',
               }}>
-                <ShoppingCart size={36} style={{ color: '#475569' }} />
+                <ShoppingCart size={36} style={{ color: 'var(--text-muted)' }} />
               </Box>
-              <Typography sx={{ color: '#64748b', fontSize: '1rem', fontWeight: 600 }}>ตะกร้าว่างเปล่า</Typography>
-              <Typography sx={{ color: '#475569', fontSize: '0.85rem' }}>เลือกสินค้าที่ต้องการแล้วเพิ่มลงตะกร้า</Typography>
+              <Typography sx={{ color: 'text.secondary', fontSize: '1rem', fontWeight: 600 }}>ตะกร้าว่างเปล่า</Typography>
+              <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>เลือกสินค้าที่ต้องการแล้วเพิ่มลงตะกร้า</Typography>
               <Button
                 onClick={onGoHome}
                 sx={{
@@ -186,7 +186,7 @@ export default function CartDrawer(props: CartDrawerProps) {
                   px: 3,
                   py: 1,
                   borderRadius: '12px',
-                  background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                  background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
                   color: 'white',
                   fontWeight: 600,
                   textTransform: 'none',
@@ -206,10 +206,10 @@ export default function CartDrawer(props: CartDrawerProps) {
                       p: 2,
                       mb: 1.5,
                       borderRadius: '16px',
-                      bgcolor: 'rgba(30,41,59,0.5)',
-                      border: '1px solid rgba(255,255,255,0.06)',
+                      bgcolor: 'var(--surface-2)',
+                      border: '1px solid var(--glass-border)',
                       transition: 'all 0.2s ease',
-                      '&:hover': { bgcolor: 'rgba(30,41,59,0.7)' },
+                      '&:hover': { bgcolor: 'var(--surface-2)' },
                     }}
                   >
                     <Box sx={{ display: 'flex', gap: 2 }}>
@@ -220,7 +220,7 @@ export default function CartDrawer(props: CartDrawerProps) {
                           borderRadius: '12px',
                           overflow: 'hidden',
                           flexShrink: 0,
-                          border: '1px solid rgba(255,255,255,0.1)',
+                          border: '1px solid var(--glass-border)',
                         }}>
                           <OptimizedImage
                             src={product.images[0]}
@@ -234,12 +234,12 @@ export default function CartDrawer(props: CartDrawerProps) {
                       )}
                       
                       <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: '#e2e8f0', mb: 0.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'text.primary', mb: 0.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {item.productName}
                         </Typography>
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.6, mb: 1.5 }}>
-                          <Box sx={{ px: 1, py: 0.2, borderRadius: '6px', bgcolor: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)' }}>
-                            <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: '#a5b4fc' }}>{item.size}</Typography>
+                          <Box sx={{ px: 1, py: 0.2, borderRadius: '6px', bgcolor: 'rgba(37,99,235,0.15)', border: '1px solid rgba(37,99,235,0.3)' }}>
+                            <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--secondary)' }}>{item.size}</Typography>
                           </Box>
                           {item.options.isLongSleeve && (
                             <Box sx={{ px: 1, py: 0.2, borderRadius: '6px', bgcolor: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)' }}>
@@ -263,9 +263,9 @@ export default function CartDrawer(props: CartDrawerProps) {
                             <Box sx={{
                               display: 'flex',
                               alignItems: 'center',
-                              bgcolor: 'rgba(255,255,255,0.05)',
+                              bgcolor: 'var(--glass-bg)',
                               borderRadius: '10px',
-                              border: '1px solid rgba(255,255,255,0.1)',
+                              border: '1px solid var(--glass-border)',
                             }}>
                               <IconButton
                                 size="small"
@@ -275,11 +275,11 @@ export default function CartDrawer(props: CartDrawerProps) {
                                 onMouseLeave={() => onStopHold(item.id)}
                                 onTouchStart={() => onStartHold(item.id, -1)}
                                 onTouchEnd={() => onStopHold(item.id)}
-                                sx={{ color: '#94a3b8', p: 0.8, '&:hover': { color: '#f1f5f9' } }}
+                                sx={{ color: 'text.secondary', p: 0.8, '&:hover': { color: 'text.primary' } }}
                               >
                                 <Minus size={14} />
                               </IconButton>
-                              <Typography sx={{ color: '#f1f5f9', minWidth: 28, textAlign: 'center', fontWeight: 700, fontSize: '0.85rem' }}>
+                              <Typography sx={{ color: 'text.primary', minWidth: 28, textAlign: 'center', fontWeight: 700, fontSize: '0.85rem' }}>
                                 {item.quantity}
                               </Typography>
                               <IconButton
@@ -290,26 +290,26 @@ export default function CartDrawer(props: CartDrawerProps) {
                                 onMouseLeave={() => onStopHold(item.id)}
                                 onTouchStart={() => onStartHold(item.id, 1)}
                                 onTouchEnd={() => onStopHold(item.id)}
-                                sx={{ color: '#94a3b8', p: 0.8, '&:hover': { color: '#f1f5f9' } }}
+                                sx={{ color: 'text.secondary', p: 0.8, '&:hover': { color: 'text.primary' } }}
                               >
                                 <Plus size={14} />
                               </IconButton>
                             </Box>
-                            <Typography sx={{ fontSize: '0.7rem', color: '#64748b' }}>× ฿{item.unitPrice.toLocaleString()}</Typography>
+                            <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary' }}>× ฿{item.unitPrice.toLocaleString()}</Typography>
                           </Box>
 
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <IconButton
                               size="small"
                               onClick={() => onEditItem(item)}
-                              sx={{ color: '#94a3b8', p: 0.6, '&:hover': { color: '#6366f1', bgcolor: 'rgba(99,102,241,0.1)' } }}
+                              sx={{ color: 'text.secondary', p: 0.6, '&:hover': { color: '#2563eb', bgcolor: 'rgba(37,99,235,0.1)' } }}
                             >
                               <Edit size={14} />
                             </IconButton>
                             <IconButton
                               size="small"
                               onClick={() => onRemoveItem(item.id)}
-                              sx={{ color: '#94a3b8', p: 0.6, '&:hover': { color: '#f87171', bgcolor: 'rgba(239,68,68,0.1)' } }}
+                              sx={{ color: 'text.secondary', p: 0.6, '&:hover': { color: '#f87171', bgcolor: 'rgba(239,68,68,0.1)' } }}
                             >
                               <X size={14} />
                             </IconButton>
@@ -335,8 +335,8 @@ export default function CartDrawer(props: CartDrawerProps) {
           <Box sx={{
             px: { xs: 2, sm: 3 },
             py: 2,
-            borderTop: '1px solid rgba(255,255,255,0.08)',
-            background: 'linear-gradient(180deg, rgba(15,23,42,0.98) 0%, rgba(10,15,26,0.98) 100%)',
+            borderTop: '1px solid var(--glass-border)',
+            background: 'var(--glass-strong)',
             backdropFilter: 'blur(20px)',
             paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
           }}>
@@ -370,11 +370,11 @@ export default function CartDrawer(props: CartDrawerProps) {
                       border: '1px solid rgba(34,197,94,0.3)' 
                     }}>
                       <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#22c55e' }}>
-                        🎉 ส่งฟรี!
+                        ส่งฟรี!
                       </Typography>
                     </Box>
                   ) : remainingForFreeShipping && remainingForFreeShipping > 0 ? (
-                    <Typography sx={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                    <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary' }}>
                       อีก ฿{remainingForFreeShipping.toLocaleString()} ส่งฟรี
                     </Typography>
                   ) : null}
@@ -391,19 +391,19 @@ export default function CartDrawer(props: CartDrawerProps) {
             }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Box>
-                  <Typography sx={{ fontSize: '0.75rem', color: '#64748b', mb: 0.3 }}>ยอดรวมสินค้า</Typography>
+                  <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary', mb: 0.3 }}>ยอดรวมสินค้า</Typography>
                   <Typography sx={{ fontSize: '1.6rem', fontWeight: 900, color: '#10b981' }}>
                     ฿{getTotalPrice().toLocaleString()}
                   </Typography>
                   {!hasFreeShipping && lowestShippingFee !== null && lowestShippingFee > 0 && (
-                    <Typography sx={{ fontSize: '0.7rem', color: '#64748b' }}>
+                    <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary' }}>
                       + ค่าส่ง (คำนวณตอนยืนยัน)
                     </Typography>
                   )}
                 </Box>
                 <Box sx={{ textAlign: 'right' }}>
-                  <Typography sx={{ fontSize: '0.7rem', color: '#64748b' }}>{cart.length} รายการ</Typography>
-                  <Typography sx={{ fontSize: '0.7rem', color: '#64748b' }}>
+                  <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary' }}>{cart.length} รายการ</Typography>
+                  <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary' }}>
                     {cart.reduce((sum, item) => sum + item.quantity, 0)} ชิ้น
                   </Typography>
                 </Box>
@@ -432,7 +432,7 @@ export default function CartDrawer(props: CartDrawerProps) {
                 },
                 '&:disabled': {
                   background: 'rgba(100,116,139,0.2)',
-                  color: '#64748b',
+                  color: 'text.secondary',
                 },
               }}
             >
@@ -449,7 +449,7 @@ export default function CartDrawer(props: CartDrawerProps) {
                 borderRadius: '12px',
                 bgcolor: 'rgba(100,116,139,0.15)',
                 border: '1px solid rgba(100,116,139,0.3)',
-                color: '#94a3b8',
+                color: 'text.secondary',
                 fontSize: '0.85rem',
                 fontWeight: 600,
                 textTransform: 'none',
@@ -465,8 +465,8 @@ export default function CartDrawer(props: CartDrawerProps) {
           <Box sx={{
             px: { xs: 2, sm: 3 },
             py: 2,
-            borderTop: '1px solid rgba(255,255,255,0.06)',
-            background: 'rgba(10,15,26,0.98)',
+            borderTop: '1px solid var(--glass-border)',
+            background: 'var(--glass-strong)',
             paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
           }}>
             <Button
@@ -478,7 +478,7 @@ export default function CartDrawer(props: CartDrawerProps) {
                 borderRadius: '12px',
                 bgcolor: 'rgba(100,116,139,0.15)',
                 border: '1px solid rgba(100,116,139,0.3)',
-                color: '#94a3b8',
+                color: 'text.secondary',
                 fontSize: '0.85rem',
                 fontWeight: 600,
                 textTransform: 'none',
@@ -499,10 +499,10 @@ export default function CartDrawer(props: CartDrawerProps) {
         fullWidth
         PaperProps={{
           sx: {
-            bgcolor: '#0a0f1a',
-            color: '#f1f5f9',
+            bgcolor: 'background.default',
+            color: 'text.primary',
             borderRadius: '20px',
-            border: '1px solid rgba(255,255,255,0.1)',
+            border: '1px solid var(--glass-border)',
             mx: 2,
           },
         }}
@@ -523,22 +523,22 @@ export default function CartDrawer(props: CartDrawerProps) {
           return (
             <>
               <DialogTitle sx={{ 
-                borderBottom: '1px solid rgba(255,255,255,0.08)',
+                borderBottom: '1px solid var(--glass-border)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
               }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                  <Edit size={20} color="#6366f1" />
+                  <Edit size={20} color="#2563eb" />
                   <Typography sx={{ fontWeight: 700 }}>แก้ไขสินค้า</Typography>
                 </Box>
               </DialogTitle>
               <DialogContent sx={{ pt: 3 }}>
-                <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#e2e8f0', mb: 2 }}>
+                <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'text.primary', mb: 2 }}>
                   {editingCartItem.productName}
                 </Typography>
 
-                <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: '#94a3b8', mb: 1 }}>ขนาด</Typography>
+                <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'text.secondary', mb: 1 }}>ขนาด</Typography>
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}>
                   {displaySizes.map((size) => {
                     const basePrice = product?.sizePricing?.[size] ?? product?.basePrice ?? editingCartItem.unitPrice;
@@ -558,14 +558,14 @@ export default function CartDrawer(props: CartDrawerProps) {
                           px: 2,
                           py: 1,
                           borderRadius: '10px',
-                          border: active ? '2px solid #6366f1' : '1px solid rgba(255,255,255,0.1)',
-                          bgcolor: active ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.03)',
+                          border: active ? '2px solid #2563eb' : '1px solid var(--glass-border)',
+                          bgcolor: active ? 'rgba(37,99,235,0.15)' : 'rgba(255,255,255,0.03)',
                           cursor: 'pointer',
                           transition: 'all 0.2s',
-                          '&:hover': { borderColor: '#6366f1' },
+                          '&:hover': { borderColor: '#2563eb' },
                         }}
                       >
-                        <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: active ? '#a5b4fc' : '#e2e8f0' }}>
+                        <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: active ? 'var(--primary)' : 'var(--foreground)' }}>
                           {size}
                         </Typography>
                       </Box>
@@ -585,9 +585,9 @@ export default function CartDrawer(props: CartDrawerProps) {
                     inputProps={{ maxLength: 7 }}
                     sx={{ 
                       mb: 2,
-                      '& .MuiOutlinedInput-root': { color: '#f1f5f9', borderRadius: '12px' },
-                      '& fieldset': { borderColor: 'rgba(255,255,255,0.15)' },
-                      '& label': { color: '#64748b' },
+                      '& .MuiOutlinedInput-root': { color: 'text.primary', borderRadius: '12px' },
+                      '& fieldset': { borderColor: 'var(--glass-border)' },
+                      '& label': { color: 'text.secondary' },
                     }}
                   />
                 )}
@@ -604,9 +604,9 @@ export default function CartDrawer(props: CartDrawerProps) {
                     inputProps={{ inputMode: 'numeric' }}
                     sx={{ 
                       mb: 2,
-                      '& .MuiOutlinedInput-root': { color: '#f1f5f9', borderRadius: '12px' },
-                      '& fieldset': { borderColor: 'rgba(255,255,255,0.15)' },
-                      '& label': { color: '#64748b' },
+                      '& .MuiOutlinedInput-root': { color: 'text.primary', borderRadius: '12px' },
+                      '& fieldset': { borderColor: 'var(--glass-border)' },
+                      '& label': { color: 'text.secondary' },
                     }}
                   />
                 )}
@@ -627,7 +627,7 @@ export default function CartDrawer(props: CartDrawerProps) {
                       p: 2,
                       mb: 2,
                       borderRadius: '12px',
-                      border: editingCartItem.options.isLongSleeve ? '2px solid #f59e0b' : '1px solid rgba(255,255,255,0.1)',
+                      border: editingCartItem.options.isLongSleeve ? '2px solid #f59e0b' : '1px solid var(--glass-border)',
                       bgcolor: editingCartItem.options.isLongSleeve ? 'rgba(245,158,11,0.1)' : 'transparent',
                       cursor: 'pointer',
                       display: 'flex',
@@ -635,46 +635,46 @@ export default function CartDrawer(props: CartDrawerProps) {
                       justifyContent: 'space-between',
                     }}
                   >
-                    <Typography sx={{ color: '#e2e8f0', fontWeight: 600 }}>แขนยาว (+฿{product?.options?.longSleevePrice ?? 50})</Typography>
+                    <Typography sx={{ color: 'text.primary', fontWeight: 600 }}>แขนยาว (+฿{product?.options?.longSleevePrice ?? 50})</Typography>
                     <Switch checked={editingCartItem.options.isLongSleeve} color="warning" sx={{ pointerEvents: 'none' }} />
                   </Box>
                 )}
 
-                <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: '#94a3b8', mb: 1 }}>จำนวน</Typography>
+                <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'text.secondary', mb: 1 }}>จำนวน</Typography>
                 <Box sx={{
                   display: 'flex',
                   alignItems: 'center',
-                  bgcolor: 'rgba(255,255,255,0.05)',
+                  bgcolor: 'var(--glass-bg)',
                   borderRadius: '12px',
-                  border: '1px solid rgba(255,255,255,0.1)',
+                  border: '1px solid var(--glass-border)',
                   width: 'fit-content',
                 }}>
                   <IconButton
                     onClick={() => onSetEditingCartItem({ ...editingCartItem, quantity: Math.max(1, editingCartItem.quantity - 1) })}
-                    sx={{ color: '#94a3b8', p: 1.5 }}
+                    sx={{ color: 'text.secondary', p: 1.5 }}
                   >
                     <Minus size={18} />
                   </IconButton>
-                  <Typography sx={{ color: '#f1f5f9', minWidth: 48, textAlign: 'center', fontWeight: 800, fontSize: '1.1rem' }}>
+                  <Typography sx={{ color: 'text.primary', minWidth: 48, textAlign: 'center', fontWeight: 800, fontSize: '1.1rem' }}>
                     {editingCartItem.quantity}
                   </Typography>
                   <IconButton
                     onClick={() => onSetEditingCartItem({ ...editingCartItem, quantity: Math.min(99, editingCartItem.quantity + 1) })}
-                    sx={{ color: '#94a3b8', p: 1.5 }}
+                    sx={{ color: 'text.secondary', p: 1.5 }}
                   >
                     <Plus size={18} />
                   </IconButton>
                 </Box>
               </DialogContent>
-              <DialogActions sx={{ p: 3, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                <Button onClick={() => onSetEditingCartItem(null)} sx={{ color: '#94a3b8' }}>
+              <DialogActions sx={{ p: 3, borderTop: '1px solid var(--glass-border)' }}>
+                <Button onClick={() => onSetEditingCartItem(null)} sx={{ color: 'text.secondary' }}>
                   ยกเลิก
                 </Button>
                 <Button
                   variant="contained"
                   onClick={() => onUpdateCartItem(editingCartItem.id, editingCartItem)}
                   sx={{
-                    background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                    background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
                     fontWeight: 700,
                     borderRadius: '12px',
                     px: 3,

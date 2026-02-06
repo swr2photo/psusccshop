@@ -35,7 +35,7 @@ export const STATUS_COLORS: Record<string, string> = {
   WAITING_SLIP: '#06b6d4',
   REJECTED: '#ef4444',
   FAILED: '#ef4444',
-  REFUNDED: '#8b5cf6',
+  REFUNDED: '#1e40af',
 };
 
 // ==================== STATUS HELPERS ====================
@@ -84,11 +84,11 @@ export const TYPE_LABELS: Record<string, string> = {
 
 // ==================== CATEGORY HELPERS ====================
 export const CATEGORY_COLORS: Record<string, string> = {
-  APPAREL: '#6366f1',
+  APPAREL: '#2563eb',
   MERCHANDISE: '#10b981',
   CAMP_FEE: '#f59e0b',
   EVENT: '#ec4899',
-  SERVICE: '#8b5cf6',
+  SERVICE: '#1e40af',
   OTHER: '#64748b',
 };
 

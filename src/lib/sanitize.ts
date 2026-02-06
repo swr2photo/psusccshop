@@ -123,7 +123,7 @@ export function maskPhone(phone: string | null | undefined): string {
 
 /**
  * Public config fields that are safe for frontend
- * ⚠️ SECURITY: ไม่รวม sheetUrl, sheetId, vendorSheetUrl, vendorSheetId
+ * SECURITY: ไม่รวม sheetUrl, sheetId, vendorSheetUrl, vendorSheetId
  */
 interface PublicShopConfig {
   isOpen: boolean;
@@ -155,7 +155,7 @@ interface PublicShopConfig {
   bankAccount?: {
     bankName: string;
     accountName: string;
-    // ⚠️ Mask account number for security
+    // SECURITY: Mask account number for security
     accountNumberMasked: string;
   };
 }
@@ -175,19 +175,19 @@ function maskAccountNumber(accountNumber: string | null | undefined): string {
 
 /**
  * Sanitize shop config for public/frontend use
- * ⚠️ SECURITY: Removes adminEmails, adminPermissions, sheetId, sheetUrl, vendorSheetId, vendorSheetUrl
- * ⚠️ SECURITY: Encodes all image URLs to hide real storage paths
+ * SECURITY: Removes adminEmails, adminPermissions, sheetId, sheetUrl, vendorSheetId, vendorSheetUrl
+ * SECURITY: Encodes all image URLs to hide real storage paths
  */
 export function sanitizeConfigForPublic(config: ShopConfig | null): PublicShopConfig | null {
   if (!config) return null;
   
-  // ⚠️ SECURITY: Explicitly pick only safe fields - NO sheet URLs!
-  // ⚠️ SECURITY: Encode all image URLs
+  // SECURITY: Explicitly pick only safe fields - NO sheet URLs!
+  // SECURITY: Encode all image URLs
   const sanitized: PublicShopConfig = {
     isOpen: config.isOpen,
     closeDate: config.closeDate,
     products: (config.products || []).map(sanitizeProductImages),
-    // ❌ REMOVED: sheetUrl, vendorSheetUrl - ไม่ส่งให้ frontend
+    // REMOVED: sheetUrl, vendorSheetUrl - ไม่ส่งให้ frontend
   };
   
   // Copy announcement without postedBy email, encode image URLs
@@ -235,7 +235,7 @@ export function sanitizeConfigForPublic(config: ShopConfig | null): PublicShopCo
 
 /**
  * Sanitize config for admin use (keeps some sensitive fields but removes API keys)
- * ⚠️ SECURITY: Still encodes image URLs to prevent URL exposure in network requests
+ * SECURITY: Still encodes image URLs to prevent URL exposure in network requests
  */
 export function sanitizeConfigForAdmin(config: ShopConfig | null): ShopConfig | null {
   if (!config) return null;

@@ -87,6 +87,7 @@ export function useAdminData(options: UseAdminDataOptions = {}) {
     {
       refreshInterval,
       revalidateOnMount: true,
+      keepPreviousData: true, // Show stale data immediately while revalidating
       onSuccess: (data) => {
         if (data?.status === 'success') {
           // Save to localStorage as backup
@@ -104,15 +105,15 @@ export function useAdminData(options: UseAdminDataOptions = {}) {
         console.warn('[useAdminData] Error, attempting to load from cache');
         onError?.(err);
       },
-      // Use localStorage as fallback
+      // Use localStorage as fallback - always use available cache for instant display
       fallbackData: (() => {
         if (typeof window === 'undefined') return undefined;
         try {
           const cached = localStorage.getItem('admin_cache');
           if (cached) {
-            const { data, timestamp } = JSON.parse(cached);
-            // Use cache if less than 5 minutes old
-            if (Date.now() - timestamp < 5 * 60 * 1000) {
+            const { data } = JSON.parse(cached);
+            // Always use cache for instant display; SWR will revalidate in background
+            if (data) {
               return { status: 'success', data };
             }
           }

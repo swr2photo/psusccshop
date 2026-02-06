@@ -31,20 +31,20 @@ import {
 } from '@mui/material';
 import {
   CreditCard,
-  Add,
-  Delete,
-  Edit,
+  Plus as Add,
+  Trash2 as Delete,
+  Pencil as Edit,
   Save,
-  ExpandMore,
-  ExpandLess,
+  ChevronDown as ExpandMore,
+  ChevronUp as ExpandLess,
   Settings,
-  Payment,
-  AttachMoney,
-  Security,
-  Warning,
+  Wallet as Payment,
+  DollarSign as AttachMoney,
+  Shield as Security,
+  AlertTriangle as Warning,
   Info,
-  CheckCircle,
-} from '@mui/icons-material';
+  CheckCircle2 as CheckCircle,
+} from 'lucide-react';
 import {
   PaymentConfig,
   PaymentOption,
@@ -74,13 +74,13 @@ const inputSx = {
       borderColor: 'rgba(255, 255, 255, 0.2)',
     },
     '&.Mui-focused fieldset': {
-      borderColor: '#8b5cf6',
+      borderColor: '#1e40af',
     },
   },
   '& .MuiInputLabel-root': {
     color: 'rgba(255, 255, 255, 0.6)',
     '&.Mui-focused': {
-      color: '#8b5cf6',
+      color: '#1e40af',
     },
   },
   '& .MuiInputBase-input': {
@@ -223,7 +223,7 @@ export default function PaymentSettings({ onSave }: PaymentSettingsProps) {
       {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <CreditCard sx={{ fontSize: 28, color: '#8b5cf6' }} />
+          <CreditCard size={28} color="#1e40af" />
           <Typography variant="h5" fontWeight="bold">
             ตั้งค่าการชำระเงิน
           </Typography>
@@ -234,7 +234,7 @@ export default function PaymentSettings({ onSave }: PaymentSettingsProps) {
           onClick={saveConfig}
           disabled={saving}
           sx={{
-            bgcolor: '#8b5cf6',
+            bgcolor: '#1e40af',
             '&:hover': { bgcolor: '#7c3aed' },
           }}
         >
@@ -274,7 +274,7 @@ export default function PaymentSettings({ onSave }: PaymentSettingsProps) {
       }}>
         <CardContent>
           <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Security sx={{ fontSize: 20 }} />
+            <Security size={20} />
             Payment Gateways
           </Typography>
 
@@ -331,7 +331,7 @@ export default function PaymentSettings({ onSave }: PaymentSettingsProps) {
                         setEditingGateway(gateway);
                         setGatewayDialogOpen(true);
                       }}
-                      sx={{ color: '#8b5cf6' }}
+                      sx={{ color: '#1e40af' }}
                     >
                       ตั้งค่า
                     </Button>
@@ -353,7 +353,7 @@ export default function PaymentSettings({ onSave }: PaymentSettingsProps) {
         <CardContent>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
             <Typography variant="subtitle1" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Payment sx={{ fontSize: 20 }} />
+              <Payment size={20} />
               ตัวเลือกการชำระเงิน
             </Typography>
             <Button
@@ -362,9 +362,9 @@ export default function PaymentSettings({ onSave }: PaymentSettingsProps) {
               startIcon={<Add />}
               onClick={() => setAddDialogOpen(true)}
               sx={{
-                borderColor: '#8b5cf6',
-                color: '#8b5cf6',
-                '&:hover': { borderColor: '#7c3aed', bgcolor: 'rgba(139, 92, 246, 0.1)' },
+                borderColor: '#1e40af',
+                color: '#1e40af',
+                '&:hover': { borderColor: '#7c3aed', bgcolor: 'rgba(30, 64, 175, 0.1)' },
               }}
             >
               เพิ่ม
@@ -396,7 +396,7 @@ export default function PaymentSettings({ onSave }: PaymentSettingsProps) {
       }}>
         <CardContent>
           <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <AttachMoney sx={{ fontSize: 20 }} />
+            <AttachMoney size={20} />
             เก็บเงินปลายทาง (COD)
           </Typography>
           
@@ -482,8 +482,8 @@ function PaymentOptionCard({
 
   return (
     <Card sx={{
-      bgcolor: option.enabled ? 'rgba(139, 92, 246, 0.1)' : 'rgba(255, 255, 255, 0.02)',
-      border: `1px solid ${option.enabled ? 'rgba(139, 92, 246, 0.3)' : 'rgba(255, 255, 255, 0.08)'}`,
+      bgcolor: option.enabled ? 'rgba(30, 64, 175, 0.1)' : 'rgba(255, 255, 255, 0.02)',
+      border: `1px solid ${option.enabled ? 'rgba(30, 64, 175, 0.3)' : 'rgba(255, 255, 255, 0.08)'}`,
       borderRadius: '10px',
       transition: 'all 0.2s',
       opacity: canEnable ? 1 : 0.6,
@@ -763,7 +763,7 @@ function AddPaymentOptionDialog({
           onClick={handleAdd} 
           variant="contained"
           disabled={!canAdd}
-          sx={{ bgcolor: '#8b5cf6', '&:hover': { bgcolor: '#7c3aed' } }}
+          sx={{ bgcolor: '#1e40af', '&:hover': { bgcolor: '#7c3aed' } }}
         >
           เพิ่ม
         </Button>
@@ -809,7 +809,7 @@ function GatewayConfigDialog({
               <strong>Secret Keys ต้องเก็บใน Environment Variables:</strong>
             </Typography>
             <Typography variant="caption" component="pre" sx={{ 
-              bgcolor: 'rgba(0,0,0,0.3)', 
+              bgcolor: 'var(--glass-bg)', 
               p: 1, 
               borderRadius: 1,
               overflow: 'auto',
@@ -863,7 +863,7 @@ function GatewayConfigDialog({
                   key={method}
                   label={`${PAYMENT_METHODS[method]?.icon} ${PAYMENT_METHODS[method]?.nameThai}`}
                   size="small"
-                  sx={{ bgcolor: 'rgba(139, 92, 246, 0.2)' }}
+                  sx={{ bgcolor: 'rgba(30, 64, 175, 0.2)' }}
                 />
               ))}
             </Box>
@@ -873,9 +873,9 @@ function GatewayConfigDialog({
             variant="outlined"
             href={gatewayInfo.docUrl}
             target="_blank"
-            sx={{ borderColor: '#8b5cf6', color: '#8b5cf6' }}
+            sx={{ borderColor: '#1e40af', color: '#1e40af' }}
           >
-            📖 เอกสาร API
+            เอกสาร API
           </Button>
         </Stack>
       </DialogContent>
