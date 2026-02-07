@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getJson, putJson, listKeys } from '@/lib/filebase';
-import { requireAdmin } from '@/lib/auth';
+import { requireAdminWithPermission } from '@/lib/auth';
 import { ShopConfig } from '@/lib/config';
 import { sendOrderStatusEmail } from '@/lib/email';
 import crypto from 'crypto';
@@ -34,7 +34,7 @@ const updateIndexEntry = async (email: string, order: any) => {
  * Body: { productId: string, pickup: { enabled, location, startDate, endDate, notes }, autoUpdateOrders?: boolean }
  */
 export async function POST(req: NextRequest) {
-  const authResult = await requireAdmin();
+  const authResult = await requireAdminWithPermission('canManagePickup');
   if (authResult instanceof NextResponse) {
     return authResult;
   }

@@ -205,6 +205,45 @@ export interface ProductCustomField {
   };
 }
 
+/** Admin permissions - granular access control for each admin */
+export interface AdminPermissions {
+  // ร้านค้า & ระบบ
+  canManageShop?: boolean;         // เปิด/ปิดร้าน, ตั้งค่าทั่วไป
+  canManageSheet?: boolean;        // จัดการ Google Sheet
+  canManageShipping?: boolean;     // ตั้งค่าการจัดส่ง
+  canManagePayment?: boolean;      // ตั้งค่าชำระเงิน
+  // สินค้า & ออเดอร์
+  canManageProducts?: boolean;     // จัดการสินค้า
+  canManageOrders?: boolean;       // จัดการออเดอร์
+  canManagePickup?: boolean;       // จัดการรับสินค้า
+  canManageTracking?: boolean;     // ติดตามพัสดุ
+  canManageRefunds?: boolean;      // จัดการคืนเงิน
+  // การตลาด & สื่อสาร
+  canManageAnnouncement?: boolean; // จัดการประกาศ
+  canManageEvents?: boolean;       // จัดการอีเวนต์/โปรโมชั่น
+  canManagePromoCodes?: boolean;   // จัดการโค้ดส่วนลด
+  canManageSupport?: boolean;      // แชทสนับสนุน
+  canSendEmail?: boolean;          // ส่งอีเมลถึงลูกค้า
+}
+
+/** Default permissions for newly added admins */
+export const DEFAULT_ADMIN_PERMISSIONS: AdminPermissions = {
+  canManageShop: false,
+  canManageSheet: false,
+  canManageShipping: false,
+  canManagePayment: false,
+  canManageProducts: true,
+  canManageOrders: true,
+  canManagePickup: false,
+  canManageTracking: true,
+  canManageRefunds: true,
+  canManageAnnouncement: false,
+  canManageEvents: false,
+  canManagePromoCodes: false,
+  canManageSupport: true,
+  canSendEmail: false,
+};
+
 export interface ShopConfig {
   isOpen: boolean;
   closeDate: string;
@@ -282,14 +321,7 @@ export interface ShopConfig {
   adminEmails?: string[];
   /** Admin permissions - what each admin can do */
   adminPermissions?: {
-    [email: string]: {
-      canManageShop?: boolean;      // เปิด/ปิดร้าน
-      canManageSheet?: boolean;     // จัดการ Sheet
-      canManageAnnouncement?: boolean; // ประกาศ
-      canManageOrders?: boolean;    // จัดการออเดอร์
-      canManageProducts?: boolean;  // จัดการสินค้า
-      canManagePickup?: boolean;    // จัดการรับสินค้า
-    };
+    [email: string]: AdminPermissions;
   };
   /** Pickup system configuration */
   pickup?: {

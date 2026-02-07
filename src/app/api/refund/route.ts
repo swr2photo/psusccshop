@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth, requireAdmin, isResourceOwner } from '@/lib/auth';
+import { requireAuth, requireAdmin, requireAdminWithPermission, isResourceOwner } from '@/lib/auth';
 import { getOrderByRef } from '@/lib/supabase';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { triggerSheetSync } from '@/lib/sheet-sync';
@@ -123,7 +123,7 @@ export async function GET(req: NextRequest) {
   const useColumns = await hasRefundColumns();
 
   if (isAdminQuery) {
-    const adminAuth = await requireAdmin();
+    const adminAuth = await requireAdminWithPermission('canManageRefunds');
     if (adminAuth instanceof NextResponse) return adminAuth;
 
     try {
@@ -347,7 +347,7 @@ export async function POST(req: NextRequest) {
  * PUT /api/refund - Admin: approve/reject/complete refund
  */
 export async function PUT(req: NextRequest) {
-  const authResult = await requireAdmin();
+  const authResult = await requireAdminWithPermission('canManageRefunds');
   if (authResult instanceof NextResponse) return authResult;
 
   try {

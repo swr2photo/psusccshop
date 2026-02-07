@@ -4889,8 +4889,8 @@ export default function HomePage() {
               name: item.productName,
               size: item.size,
               qty: item.quantity,
-              customName: item.options.customName,
-              isLongSleeve: item.options.isLongSleeve,
+              customName: item.options?.customName,
+              isLongSleeve: item.options?.isLongSleeve,
               unitPrice: item.unitPrice,
               subtotal: item.unitPrice * item.quantity,
             })),
@@ -5169,8 +5169,14 @@ export default function HomePage() {
     const entries = Object.entries(allGroupedProducts)
       .filter(([key]) => categoryFilter === 'ALL' || key === categoryFilter)
       .map(([key, items]) => {
-        const byName = term ? items.filter((p) => p.name?.toLowerCase().includes(term)) : items;
-        const byPrice = byName.filter((p) => {
+        const bySearch = term ? items.filter((p) => {
+          const name = p.name?.toLowerCase() || '';
+          const desc = p.description?.toLowerCase() || '';
+          const type = (TYPE_LABELS[p.type] || p.type || '').toLowerCase();
+          const cat = (getCategoryLabel(key) || key || '').toLowerCase();
+          return name.includes(term) || desc.includes(term) || type.includes(term) || cat.includes(term);
+        }) : items;
+        const byPrice = bySearch.filter((p) => {
           const price = getBasePrice(p);
           return priceRange[0] <= price && price <= priceRange[1];
         });
@@ -5663,78 +5669,225 @@ export default function HomePage() {
           )}
         </Toolbar>
         {showSearchBar && (
-          <Box sx={{ px: { xs: 2, md: 3 }, pb: 2, pt: 1 }}>
+          <Box sx={{ px: { xs: 1.5, md: 3 }, pb: 2, pt: 1 }}>
             <Box sx={{
-              p: 2,
-              borderRadius: '16px',
-              bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.95)' : 'rgba(255,255,255,0.98)',
-              border: '1px solid rgba(0,113,227,0.2)',
-              boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 4px 20px rgba(0,0,0,0.3)' : '0 4px 20px rgba(0,0,0,0.08)',
+              borderRadius: '20px',
+              bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(15,15,15,0.98)' : 'rgba(255,255,255,0.99)',
+              border: '1px solid',
+              borderColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+              boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 8px 32px rgba(0,0,0,0.5)' : '0 8px 32px rgba(0,0,0,0.1)',
+              overflow: 'hidden',
             }}>
-              <TextField
-                autoFocus
-                size="small"
-                value={productSearch}
-                onChange={(e) => setProductSearch(e.target.value)}
-                placeholder="ค้นหาชื่อสินค้า, ประเภท..."
-                inputProps={{ maxLength: 50 }}
-                fullWidth
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    color: 'var(--foreground)',
-                    background: (theme) => theme.palette.mode === 'dark' ? 'rgba(29,29,31,0.5)' : 'rgba(0,0,0,0.03)',
-                    borderRadius: '12px',
-                    '& fieldset': { borderColor: 'divider' },
-                    '&:hover fieldset': { borderColor: 'rgba(0,113,227,0.5)' },
-                    '&.Mui-focused fieldset': { borderColor: '#0071e3' },
-                  },
-                  '& .MuiInputBase-input::placeholder': { color: 'text.disabled', opacity: 1 },
-                }}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Search size={18} color="#0071e3" />
-                    </InputAdornment>
-                  ),
-                  endAdornment: productSearch && (
-                    <InputAdornment position="end">
-                      <IconButton size="small" onClick={() => setProductSearch('')} sx={{ color: 'var(--text-muted)' }}>
-                        <X size={16} />
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                }}
-              />
-              
-              {/* Quick Filters */}
-              {productSearch && (
-                <Box sx={{ mt: 1.5, display: 'flex', flexWrap: 'wrap', gap: 0.8 }}>
-                  {Object.entries(TYPE_LABELS).slice(0, 4).map(([key, label]) => (
-                    <Chip
-                      key={key}
-                      label={label}
-                      size="small"
-                      onClick={() => setProductSearch(label)}
-                      sx={{
-                        bgcolor: productSearch.includes(label) ? 'rgba(0,113,227,0.2)' : 'var(--glass-bg)',
-                        color: productSearch.includes(label) ? 'var(--primary)' : 'var(--text-muted)',
-                        border: '1px solid',
-                        borderColor: productSearch.includes(label) ? 'rgba(0,113,227,0.4)' : 'var(--glass-bg)',
-                        fontSize: '0.75rem',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        '&:hover': { bgcolor: 'rgba(0,113,227,0.15)' },
-                      }}
-                    />
-                  ))}
-                </Box>
-              )}
+              {/* Search Input */}
+              <Box sx={{ p: 2, pb: 1.5 }}>
+                <TextField
+                  autoFocus
+                  size="small"
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Escape') { setProductSearch(''); setShowSearchBar(false); } }}
+                  placeholder="ค้นหาสินค้า, ประเภท, คำอธิบาย..."
+                  inputProps={{ maxLength: 50 }}
+                  fullWidth
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      color: 'var(--foreground)',
+                      background: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                      borderRadius: '14px',
+                      fontSize: '0.95rem',
+                      '& fieldset': { border: 'none' },
+                    },
+                    '& .MuiInputBase-input::placeholder': { color: 'text.disabled', opacity: 0.7 },
+                  }}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Search size={20} color="var(--text-muted)" />
+                      </InputAdornment>
+                    ),
+                    endAdornment: productSearch ? (
+                      <InputAdornment position="end">
+                        <IconButton size="small" onClick={() => setProductSearch('')} sx={{ color: 'var(--text-muted)' }}>
+                          <X size={16} />
+                        </IconButton>
+                      </InputAdornment>
+                    ) : (
+                      <InputAdornment position="end">
+                        <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)', opacity: 0.5 }}>ESC</Typography>
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </Box>
 
-              {/* Search Results Count */}
-              {productSearch && (
-                <Typography sx={{ mt: 1.5, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  พบ {Object.values(filteredGroupedProducts).flat().length} รายการ
-                </Typography>
+              {/* Category Quick Chips - always visible */}
+              <Box sx={{ px: 2, pb: 1.5, display: 'flex', gap: 0.6, overflowX: 'auto', '&::-webkit-scrollbar': { display: 'none' } }}>
+                {categoryMeta.slice(0, 8).map((cat) => (
+                  <Chip
+                    key={cat.key}
+                    label={`${cat.icon ? cat.icon + ' ' : ''}${cat.label}`}
+                    size="small"
+                    onClick={() => {
+                      setCategoryFilter(prev => prev === cat.key ? 'ALL' : cat.key);
+                      if (!productSearch) setProductSearch('');
+                    }}
+                    sx={{
+                      bgcolor: categoryFilter === cat.key ? 'rgba(0,113,227,0.15)' : 'transparent',
+                      color: categoryFilter === cat.key ? '#0071e3' : 'var(--text-muted)',
+                      border: '1px solid',
+                      borderColor: categoryFilter === cat.key ? 'rgba(0,113,227,0.3)' : (theme: any) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      height: 28,
+                      flexShrink: 0,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      '&:hover': { bgcolor: 'rgba(0,113,227,0.1)', borderColor: 'rgba(0,113,227,0.2)' },
+                    }}
+                  />
+                ))}
+              </Box>
+
+              {/* Instant Search Results Preview */}
+              {productSearch.trim() && (() => {
+                const allResults = Object.values(filteredGroupedProducts).flat();
+                const previewItems = allResults.slice(0, 5);
+                return (
+                  <Box sx={{ borderTop: '1px solid', borderColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }}>
+                    {/* Results header */}
+                    <Box sx={{ px: 2, pt: 1.5, pb: 0.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                        ผลการค้นหา
+                      </Typography>
+                      <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                        {allResults.length} รายการ
+                      </Typography>
+                    </Box>
+
+                    {previewItems.length > 0 ? (
+                      <Box sx={{ px: 1, pb: 1.5 }}>
+                        {previewItems.map((product) => {
+                          const img = product.coverImage || product.images?.[0];
+                          const eventDisc = getEventDiscount(product.id, config?.events as ShopEvent[] | undefined);
+                          return (
+                            <Box
+                              key={product.id}
+                              onClick={() => {
+                                if (isProductCurrentlyOpen(product)) {
+                                  setSelectedProduct(product);
+                                  setProductDialogOpen(true);
+                                  setShowSearchBar(false);
+                                  setProductSearch('');
+                                }
+                              }}
+                              sx={{
+                                display: 'flex', alignItems: 'center', gap: 1.5,
+                                px: 1.5, py: 1,
+                                borderRadius: '12px',
+                                cursor: isProductCurrentlyOpen(product) ? 'pointer' : 'default',
+                                opacity: isProductCurrentlyOpen(product) ? 1 : 0.5,
+                                transition: 'all 0.15s ease',
+                                '&:hover': { bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)' },
+                              }}
+                            >
+                              {/* Thumbnail */}
+                              <Box sx={{
+                                width: 44, height: 44, borderRadius: '10px', flexShrink: 0,
+                                bgcolor: 'var(--surface-2)', overflow: 'hidden',
+                                border: '1px solid', borderColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              }}>
+                                {img ? (
+                                  <img src={img} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
+                                ) : (
+                                  <Package size={18} style={{ color: 'var(--text-muted)', opacity: 0.4 }} />
+                                )}
+                              </Box>
+                              {/* Info */}
+                              <Box sx={{ flex: 1, minWidth: 0 }}>
+                                <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {product.name}
+                                </Typography>
+                                <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {TYPE_LABELS[product.type] || product.type}
+                                </Typography>
+                              </Box>
+                              {/* Price */}
+                              <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
+                                {eventDisc ? (
+                                  <>
+                                    <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)', textDecoration: 'line-through' }}>
+                                      ฿{getBasePrice(product).toLocaleString()}
+                                    </Typography>
+                                    <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#ff453a' }}>
+                                      ฿{eventDisc.discountedPrice(getBasePrice(product)).toLocaleString()}
+                                    </Typography>
+                                  </>
+                                ) : (
+                                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#34c759' }}>
+                                    ฿{getBasePrice(product).toLocaleString()}
+                                  </Typography>
+                                )}
+                              </Box>
+                            </Box>
+                          );
+                        })}
+                        {allResults.length > 5 && (
+                          <Typography sx={{ textAlign: 'center', fontSize: '0.72rem', color: '#0071e3', fontWeight: 600, py: 1, cursor: 'pointer' }}
+                            onClick={() => { setShowSearchBar(false); document.getElementById('product-grid')?.scrollIntoView({ behavior: 'smooth' }); }}
+                          >
+                            ดูทั้งหมด {allResults.length} รายการ →
+                          </Typography>
+                        )}
+                      </Box>
+                    ) : (
+                      <Box sx={{ textAlign: 'center', py: 3, px: 2 }}>
+                        <Search size={32} style={{ color: 'var(--text-muted)', opacity: 0.2, marginBottom: 8 }} />
+                        <Typography sx={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                          ไม่พบสินค้าที่ค้นหา
+                        </Typography>
+                        <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', opacity: 0.6, mt: 0.5 }}>
+                          ลองค้นหาด้วยคำอื่น หรือเลือกหมวดหมู่
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+                );
+              })()}
+
+              {/* No search - show suggestions */}
+              {!productSearch.trim() && totalProductCount > 0 && (
+                <Box sx={{ borderTop: '1px solid', borderColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', px: 2, py: 1.5 }}>
+                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', mb: 1 }}>
+                    ค้นหายอดนิยม
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.6 }}>
+                    {['เสื้อกีฬา', 'เสื้อยืด', 'สติกเกอร์', 'พวงกุญแจ', 'หมวก'].filter(s => {
+                      const term = s.toLowerCase();
+                      return Object.values(allGroupedProducts).flat().some(p => 
+                        p.name?.toLowerCase().includes(term) || (TYPE_LABELS[p.type] || '').toLowerCase().includes(term)
+                      );
+                    }).map(suggestion => (
+                      <Chip
+                        key={suggestion}
+                        label={suggestion}
+                        size="small"
+                        onClick={() => setProductSearch(suggestion)}
+                        sx={{
+                          bgcolor: 'transparent',
+                          color: 'var(--text-muted)',
+                          border: '1px solid',
+                          borderColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                          fontSize: '0.72rem',
+                          fontWeight: 500,
+                          height: 26,
+                          cursor: 'pointer',
+                          '&:hover': { bgcolor: 'rgba(0,113,227,0.08)', color: '#0071e3' },
+                        }}
+                      />
+                    ))}
+                  </Box>
+                </Box>
               )}
             </Box>
           </Box>
@@ -6553,9 +6706,9 @@ export default function HomePage() {
                       <Typography variant="caption" sx={{ color: 'var(--text-muted)' }}>
                         {item.size} × {item.quantity}
                       </Typography>
-                      {(item.options.customName || item.options.customNumber || item.options.isLongSleeve) && (
+                      {(item.options?.customName || item.options?.customNumber || item.options?.isLongSleeve) && (
                         <Typography variant="caption" sx={{ color: 'var(--text-muted)', display: 'block' }}>
-                          {item.options.customName && `ชื่อ: ${item.options.customName}`} {item.options.customNumber && `เบอร์: ${item.options.customNumber}`} {item.options.isLongSleeve && '(แขนยาว)'}
+                          {item.options?.customName && `ชื่อ: ${item.options.customName}`} {item.options?.customNumber && `เบอร์: ${item.options.customNumber}`} {item.options?.isLongSleeve && '(แขนยาว)'}
                         </Typography>
                       )}
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>

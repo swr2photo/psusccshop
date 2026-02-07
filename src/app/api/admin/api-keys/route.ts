@@ -2,7 +2,7 @@
 // Admin API for managing API keys
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/auth';
+import { requireSuperAdmin } from '@/lib/auth';
 import { 
   createAPIKey, 
   listAPIKeys, 
@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic';
 
 // GET - List all API keys
 export async function GET(req: NextRequest) {
-  const adminResult = await requireAdmin();
+  const adminResult = await requireSuperAdmin();
   if (adminResult instanceof NextResponse) {
     return adminResult;
   }
@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
 
 // POST - Create new API key
 export async function POST(req: NextRequest) {
-  const adminResult = await requireAdmin();
+  const adminResult = await requireSuperAdmin();
   if (adminResult instanceof NextResponse) {
     return adminResult;
   }
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
 
 // PUT - Rotate an API key
 export async function PUT(req: NextRequest) {
-  const adminResult = await requireAdmin();
+  const adminResult = await requireSuperAdmin();
   if (adminResult instanceof NextResponse) {
     return adminResult;
   }
@@ -140,7 +140,7 @@ export async function PUT(req: NextRequest) {
 
 // DELETE - Revoke an API key
 export async function DELETE(req: NextRequest) {
-  const adminResult = await requireAdmin();
+  const adminResult = await requireSuperAdmin();
   if (adminResult instanceof NextResponse) {
     return adminResult;
   }

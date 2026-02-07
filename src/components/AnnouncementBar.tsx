@@ -193,10 +193,13 @@ export default function AnnouncementBar({ announcements, history }: Announcement
                 fontWeight: 600,
                 color: 'var(--foreground)',
                 lineHeight: 1.4,
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
                 ...(expanded ? {} : {
-                  whiteSpace: 'nowrap',
+                  display: '-webkit-box',
+                  WebkitLineClamp: 3,
+                  WebkitBoxOrient: 'vertical',
                   overflow: 'hidden',
-                  textOverflow: 'ellipsis',
                 }),
                 cursor: isLongMessage || hasImage ? 'pointer' : 'default',
               }}

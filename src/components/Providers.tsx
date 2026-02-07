@@ -35,6 +35,11 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, ErrorBounda
 
   render() {
     if (this.state.hasError) {
+      const errorMessage = this.state.error?.message || 'Unknown error';
+      const isDataError = errorMessage.includes('Cannot read properties of undefined') || 
+                          errorMessage.includes('Cannot read properties of null') ||
+                          errorMessage.includes('is not a function');
+      
       return (
         <div style={{
           minHeight: '100vh',
@@ -48,33 +53,89 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, ErrorBounda
           fontFamily: 'system-ui, -apple-system, sans-serif',
           textAlign: 'center'
         }}>
-          <h1 style={{ fontSize: 24, marginBottom: 16, color: 'var(--error, #ff453a)' }}>
-            เกิดข้อผิดพลาด / Something went wrong
+          <div style={{ 
+            fontSize: 48, marginBottom: 16, 
+            background: 'linear-gradient(135deg, #ff453a, #ff6b6b)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+          }}>
+            ⚠️
+          </div>
+          <h1 style={{ fontSize: 22, marginBottom: 8, fontWeight: 700, color: 'var(--foreground, #f5f5f7)' }}>
+            เกิดข้อผิดพลาด
           </h1>
-          <p style={{ fontSize: 16, marginBottom: 24, maxWidth: 400, lineHeight: 1.6, color: 'var(--text-muted, #86868b)' }}>
-            กรุณาลองรีเฟรชหน้าเว็บ หรืออัปเดต browser เป็นเวอร์ชันใหม่
-            <br /><br />
-            Please try refreshing the page or update your browser to the latest version.
+          <p style={{ fontSize: 14, marginBottom: 24, maxWidth: 400, lineHeight: 1.6, color: 'var(--text-muted, #86868b)' }}>
+            {isDataError
+              ? 'ข้อมูลบางส่วนอาจล้าสมัย กรุณาล้างข้อมูลเก่าแล้วลองใหม่อีกครั้ง'
+              : 'มีบางอย่างผิดพลาด กรุณารีเฟรชหน้าเว็บ หรืออัปเดต browser'}
           </p>
-          <button
-            onClick={function() { window.location.reload(); }}
-            style={{
-              padding: '12px 32px',
-              fontSize: 16,
-              fontWeight: 600,
-              backgroundColor: '#0071e3',
-              color: 'white',
-              border: 'none',
-              borderRadius: 8,
-              cursor: 'pointer',
-              marginBottom: 16
-            }}
-          >
-            รีเฟรช / Refresh
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', maxWidth: 280 }}>
+            <button
+              onClick={function() { window.location.reload(); }}
+              style={{
+                padding: '12px 32px',
+                fontSize: 15,
+                fontWeight: 600,
+                backgroundColor: '#0071e3',
+                color: 'white',
+                border: 'none',
+                borderRadius: 12,
+                cursor: 'pointer',
+              }}
+            >
+              🔄 รีเฟรชหน้าเว็บ
+            </button>
+            {isDataError && (
+              <button
+                onClick={function() {
+                  try {
+                    // Clear potentially corrupted cached data
+                    const keysToRemove = [];
+                    for (let i = 0; i < localStorage.length; i++) {
+                      const key = localStorage.key(i);
+                      if (key && (key.includes('cart') || key.includes('Cache') || key.includes('cache'))) {
+                        keysToRemove.push(key);
+                      }
+                    }
+                    keysToRemove.forEach(function(k) { localStorage.removeItem(k); });
+                    window.location.reload();
+                  } catch (e) {
+                    window.location.reload();
+                  }
+                }}
+                style={{
+                  padding: '12px 32px',
+                  fontSize: 15,
+                  fontWeight: 600,
+                  backgroundColor: 'rgba(255,69,58,0.15)',
+                  color: '#ff453a',
+                  border: '1px solid rgba(255,69,58,0.3)',
+                  borderRadius: 12,
+                  cursor: 'pointer',
+                }}
+              >
+                🗑️ ล้างข้อมูลเก่าแล้วรีเฟรช
+              </button>
+            )}
+            <button
+              onClick={function() { window.location.href = '/'; }}
+              style={{
+                padding: '10px 32px',
+                fontSize: 14,
+                fontWeight: 500,
+                backgroundColor: 'transparent',
+                color: 'var(--text-muted, #86868b)',
+                border: '1px solid rgba(134,134,139,0.3)',
+                borderRadius: 12,
+                cursor: 'pointer',
+              }}
+            >
+              🏠 กลับหน้าหลัก
+            </button>
+          </div>
           {this.state.error && (
-            <details style={{ marginTop: 16, fontSize: 12, color: '#86868b', maxWidth: 500 }}>
-              <summary style={{ cursor: 'pointer' }}>รายละเอียด Error</summary>
+            <details style={{ marginTop: 24, fontSize: 12, color: '#86868b', maxWidth: 500, width: '100%' }}>
+              <summary style={{ cursor: 'pointer', userSelect: 'none' }}>📋 รายละเอียดทางเทคนิค</summary>
               <pre style={{ 
                 textAlign: 'left', 
                 whiteSpace: 'pre-wrap', 
@@ -82,9 +143,13 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, ErrorBounda
                 marginTop: 8,
                 padding: 12,
                 backgroundColor: 'rgba(0,0,0,0.3)',
-                borderRadius: 8
+                borderRadius: 8,
+                fontSize: 11,
+                lineHeight: 1.5,
               }}>
                 {this.state.error.toString()}
+                {'\n\nTime: ' + new Date().toISOString()}
+                {'\nURL: ' + (typeof window !== 'undefined' ? window.location.href : '')}
               </pre>
             </details>
           )}

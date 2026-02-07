@@ -483,9 +483,9 @@ export default function CheckoutDialog({
                       </Box>
                       {(item.options?.customName || item.options?.customNumber) && (
                         <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)', mt: 0.3 }}>
-                          {item.options.customName ? `ชื่อ: ${item.options.customName}` : ''}
-                          {item.options.customName && item.options.customNumber ? ' · ' : ''}
-                          {item.options.customNumber ? `เบอร์: ${item.options.customNumber}` : ''}
+                          {item.options?.customName ? `ชื่อ: ${item.options.customName}` : ''}
+                          {item.options?.customName && item.options?.customNumber ? ' · ' : ''}
+                          {item.options?.customNumber ? `เบอร์: ${item.options.customNumber}` : ''}
                         </Typography>
                       )}
                     </Box>

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getJson, putJson } from '@/lib/filebase';
 import { ShopConfig } from '@/lib/config';
-import { requireAdmin, requireAuth } from '@/lib/auth';
+import { requireAdmin, requireAuth, isSuperAdminEmail } from '@/lib/auth';
 import { sanitizeConfigForPublic, sanitizeObjectUtf8 } from '@/lib/sanitize';
 
 // Helper to save user log server-side
@@ -87,6 +87,17 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const config = body?.config as ShopConfig | undefined;
     if (!config) return NextResponse.json({ status: 'error', message: 'missing config' }, { status: 400 });
+    
+    // Protect admin management fields - only super admin can modify these
+    if (!isSuperAdminEmail(authResult.email)) {
+      // Load current config to compare admin-related fields
+      const currentConfig = await getJson<ShopConfig>(CONFIG_KEY);
+      if (currentConfig) {
+        // Prevent non-super-admin from modifying adminEmails or adminPermissions
+        config.adminEmails = currentConfig.adminEmails;
+        config.adminPermissions = currentConfig.adminPermissions;
+      }
+    }
     
     // Sanitize UTF-8 input ก่อนบันทึก
     const sanitizedConfig = sanitizeObjectUtf8(config);

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSheets } from '@/lib/google';
 import { getJson, listKeys } from '@/lib/filebase';
-import { requireAdmin } from '@/lib/auth';
+import { requireAdminWithPermission } from '@/lib/auth';
 
 // Force Node runtime (googleapis needs Node, not Edge)
 export const runtime = 'nodejs';
@@ -247,8 +247,8 @@ const ensureSheet = async (sheets: any, spreadsheetId: string, title: string = O
 };
 
 export async function POST(req: NextRequest) {
-  // ตรวจสอบสิทธิ์ Admin
-  const authResult = await requireAdmin();
+  // ตรวจสอบสิทธิ์ Admin + permission canManageSheet
+  const authResult = await requireAdminWithPermission('canManageSheet');
   if (authResult instanceof NextResponse) {
     return authResult;
   }

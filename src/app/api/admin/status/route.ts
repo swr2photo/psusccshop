@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getJson, putJson, listKeys } from '@/lib/filebase';
-import { requireAdmin } from '@/lib/auth';
+import { requireAdminWithPermission } from '@/lib/auth';
 import { triggerSheetSync } from '@/lib/sheet-sync';
 import { sendOrderStatusEmail } from '@/lib/email';
 import { ShopConfig } from '@/lib/config';
@@ -68,8 +68,8 @@ const updateIndexEntry = async (email: string, order: any) => {
 };
 
 export async function POST(req: NextRequest) {
-  // ตรวจสอบสิทธิ์ Admin
-  const authResult = await requireAdmin();
+  // ตรวจสอบสิทธิ์ Admin + permission canManageOrders
+  const authResult = await requireAdminWithPermission('canManageOrders');
   if (authResult instanceof NextResponse) {
     return authResult;
   }

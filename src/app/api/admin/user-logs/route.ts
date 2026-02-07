@@ -5,7 +5,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/auth';
+import { requireSuperAdmin } from '@/lib/auth';
 import { getJson, putJson, listKeys } from '@/lib/filebase';
 
 export interface UserLog {
@@ -56,9 +56,9 @@ export async function saveUserLog(log: Omit<UserLog, 'id' | 'timestamp'>): Promi
 // GET: Retrieve user logs
 export async function GET(request: NextRequest) {
   try {
-    const admin = await requireAdmin();
-    if (!admin) {
-      return NextResponse.json('Unauthorized', { status: 401 });
+    const admin = await requireSuperAdmin();
+    if (!admin || admin instanceof NextResponse) {
+      return admin instanceof NextResponse ? admin : NextResponse.json('Unauthorized', { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);

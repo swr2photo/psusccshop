@@ -191,22 +191,15 @@ export async function buildDetailedShopContext(): Promise<string> {
     let sizeList: string[] = [];
     
     if (p.sizePricing && Object.keys(p.sizePricing).length > 0) {
-      // New format: sizePricing object { "S": 319, "M": 319, "XL": 349 }
       const pricing = p.sizePricing as Record<string, number>;
-      
-      // Group sizes by price for cleaner display
       const priceGroups: Record<number, string[]> = {};
       Object.entries(pricing).forEach(([size, price]) => {
         if (!priceGroups[price]) priceGroups[price] = [];
         priceGroups[price].push(size);
       });
-      
-      // Sort sizes properly
       const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL', '7XL', '8XL', '9XL', '10XL'];
       const sortSizes = (sizes: string[]) => 
         sizes.sort((a, b) => sizeOrder.indexOf(a) - sizeOrder.indexOf(b));
-      
-      // Format price info by groups
       const priceEntries = Object.entries(priceGroups)
         .sort(([a], [b]) => Number(a) - Number(b))
         .map(([price, sizes]) => {
@@ -217,22 +210,16 @@ export async function buildDetailedShopContext(): Promise<string> {
             return `${sortedSizes[0]}-${sortedSizes[sortedSizes.length - 1]}=${price}฿`;
           }
         });
-      
       priceInfo = priceEntries.join(', ');
       sizeList = Object.keys(pricing);
-      
     } else if (p.sizes && p.sizes.length > 0) {
-      // Old format: sizes array [{ size: "S", price: 319 }]
       priceInfo = (p.sizes || []).map((s: any) => `${s.size}=${s.price}฿`).join(', ');
       sizeList = p.sizes.map((s: any) => s.size);
-      
     } else if (p.basePrice) {
-      // Fallback: just basePrice
       priceInfo = `ราคาเริ่มต้น ${p.basePrice}฿`;
-      sizeList = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL']; // Default sizes
+      sizeList = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL'];
     }
     
-    // Format size list for display
     const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL', '7XL', '8XL', '9XL', '10XL'];
     const sortedSizes = sizeList.sort((a, b) => sizeOrder.indexOf(a) - sizeOrder.indexOf(b));
     const sizeDisplay = sortedSizes.length > 0 ? sortedSizes.join(', ') : 'XS, S, M, L, XL, 2XL, 3XL';
@@ -242,42 +229,56 @@ export async function buildDetailedShopContext(): Promise<string> {
       .map((s: any) => `${s.size}:${s.stock}ตัว`)
       .join(', ');
     
-    // Handle options - read from product.options
     const options = [];
     const opts = p.options || {};
-    
-    // สกรีนชื่อและเบอร์ ฟรี! (ไม่มี customNamePrice/customNumberPrice ในระบบ)
-    // มีเฉพาะ longSleevePrice เท่านั้นที่คิดค่าเพิ่ม
-    if (opts.hasCustomName) {
-      options.push(`สกรีนชื่อ (ฟรี)`);
-    }
-    if (opts.hasCustomNumber) {
-      options.push(`สกรีนเบอร์ (ฟรี)`);
-    }
+    if (opts.hasCustomName) options.push(`สกรีนชื่อ (ฟรี)`);
+    if (opts.hasCustomNumber) options.push(`สกรีนเบอร์ (ฟรี)`);
     if (opts.hasLongSleeve) {
       const price = opts.longSleevePrice || 50;
       options.push(`แขนยาว +${price}฿`);
     }
-    
-    // If no options enabled, note it
     const optionsText = options.length > 0 
       ? `ออปชั่นเพิ่มเติม: ${options.join(', ')}`
       : 'ไม่มีออปชั่นเพิ่มเติม';
     
     const available = p.available !== false && p.isActive !== false;
-    
-    // Extract dates if available
     const dateInfo = p.endDate ? `หมดเขตสั่ง: ${new Date(p.endDate).toLocaleDateString('th-TH')}` : '';
+
+    // Variants info
+    const variantsInfo = p.variants?.length
+      ? `ตัวเลือก: ${p.variants.map((v: any) => `${v.name}(${v.price}฿)`).join(', ')}`
+      : '';
+
+    // Event discount info
+    let discountInfo = '';
+    const now = Date.now();
+    const events = shopData.config.events || [];
+    const activeEvent = events.find((e: any) =>
+      e.enabled &&
+      e.linkedProducts?.includes(p.id) &&
+      e.discountType && e.discountValue &&
+      (!e.startDate || new Date(e.startDate).getTime() <= now) &&
+      (!e.endDate || new Date(e.endDate).getTime() > now)
+    );
+    if (activeEvent) {
+      if (activeEvent.discountType === 'percent') {
+        discountInfo = `ลดราคา ${activeEvent.discountValue}% (กิจกรรม: ${activeEvent.title})`;
+      } else {
+        discountInfo = `ลด ${activeEvent.discountValue}฿ (กิจกรรม: ${activeEvent.title})`;
+      }
+    }
     
     return `
 [สินค้า ${idx + 1}] ${p.name}
-- ประเภท: ${p.type || 'เสื้อ'}
+- ประเภท: ${p.type || p.category || 'เสื้อ'}${p.category ? ` (หมวดหมู่: ${p.category})` : ''}
 - คำอธิบาย: ${p.description || '-'}
 - ไซซ์และราคา: ${priceInfo || `ราคาเริ่มต้น ${p.basePrice || 'สอบถาม'}฿`}
 - ไซซ์ที่มี: ${sizeDisplay}
 ${stockInfo ? `- จำนวนคงเหลือ: ${stockInfo}` : ''}
 - ${optionsText}
+${variantsInfo ? `- ${variantsInfo}` : ''}
 ${dateInfo ? `- ${dateInfo}` : ''}
+${discountInfo ? `- ${discountInfo}` : ''}
 - สถานะ: ${available ? '[พร้อมจำหน่าย]' : '[ปิดรับสั่งจอง]'}`;
   }).join('\n');
 
@@ -287,12 +288,68 @@ ${dateInfo ? `- ${dateInfo}` : ''}
     .map((a: any) => `• ${a.message}`)
     .join('\n');
 
-  // Payment info
+  // Payment info — now supports multiple methods
   const paymentMethods = [];
   if (bankAccount.accountNumber) {
     paymentMethods.push(`โอนเงิน: ${bankAccount.bankName || 'ธนาคาร'} ${bankAccount.accountNumber} ชื่อบัญชี "${bankAccount.accountName || '-'}"`);
   }
   paymentMethods.push('PromptPay QR Code');
+  // Check for additional payment methods from config
+  const paymentConfig = shopData.config.paymentConfig || {};
+  if (paymentConfig.providers) {
+    const providers = paymentConfig.providers;
+    if (providers.credit_card?.enabled) paymentMethods.push('บัตรเครดิต/เดบิต');
+    if (providers.true_money?.enabled) paymentMethods.push('TrueMoney Wallet');
+    if (providers.rabbit_line_pay?.enabled) paymentMethods.push('Rabbit LINE Pay');
+    if (providers.shopeepay?.enabled) paymentMethods.push('ShopeePay');
+    if (providers.cod?.enabled) paymentMethods.push('เก็บเงินปลายทาง (COD)');
+  }
+
+  // Shipping options
+  const shippingConfig = shopData.config.shippingConfig || {};
+  const shippingOptions = (shippingConfig.options || [])
+    .filter((o: any) => o.enabled)
+    .map((o: any) => `• ${o.name}${o.price ? ` (${o.price}฿)` : ' (ฟรี)'}${o.estimatedDays ? ` — ประมาณ ${o.estimatedDays} วัน` : ''}`)
+    .join('\n');
+
+  // Active events with discounts
+  const now = Date.now();
+  const activeEvents = (shopData.config.events || [])
+    .filter((e: any) =>
+      e.enabled &&
+      (!e.endDate || new Date(e.endDate).getTime() > now)
+    )
+    .map((e: any) => {
+      let info = `• ${e.title} (${e.type || 'event'})`;
+      if (e.discountType && e.discountValue) {
+        info += ` — ลด${e.discountType === 'percent' ? ` ${e.discountValue}%` : ` ${e.discountValue}฿`}`;
+        if (e.linkedProducts?.length) info += ` (${e.linkedProducts.length} สินค้า)`;
+      }
+      if (e.startDate && new Date(e.startDate).getTime() > now) {
+        info += ` [เริ่ม ${new Date(e.startDate).toLocaleDateString('th-TH')}]`;
+      }
+      if (e.endDate) {
+        info += ` [ถึง ${new Date(e.endDate).toLocaleDateString('th-TH')}]`;
+      }
+      return info;
+    })
+    .join('\n');
+
+  // Promo codes (non-sensitive info only)
+  const promoCodes = (shopData.config.promoCodes || [])
+    .filter((c: any) => c.enabled && (!c.expiresAt || new Date(c.expiresAt) > new Date()) && (c.usageLimit == null || (c.usageCount || 0) < c.usageLimit))
+    .map((c: any) => {
+      let info = `• โค้ด "${c.code}"`;
+      if (c.discountType === 'percent') {
+        info += ` ลด ${c.discountValue}%${c.maxDiscount ? ` (สูงสุด ${c.maxDiscount}฿)` : ''}`;
+      } else {
+        info += ` ลด ${c.discountValue}฿`;
+      }
+      if (c.minOrderAmount) info += ` (ขั้นต่ำ ${c.minOrderAmount}฿)`;
+      if (c.description) info += ` — ${c.description}`;
+      return info;
+    })
+    .join('\n');
 
   // Build context
   return `
@@ -309,6 +366,8 @@ ${!isOpen && shopData.config.closedMessage ? `- ข้อความ: ${shopDat
 [ประกาศ]
 ${activeAnnouncements || '(ไม่มีประกาศ)'}
 
+${activeEvents ? `[กิจกรรม/โปรโมชั่น]\n${activeEvents}` : ''}
+
 ═══════════════════════════════════════════════════════════════
 [สินค้าทั้งหมด] (${stats?.totalProducts || 0} รายการ, พร้อมจำหน่าย ${stats?.availableProducts || 0} รายการ)
 ช่วงราคา: ${stats?.priceRange.min || 0} - ${stats?.priceRange.max || 0} บาท
@@ -316,18 +375,25 @@ ${activeAnnouncements || '(ไม่มีประกาศ)'}
 ${productDetails || '(ยังไม่มีสินค้า)'}
 
 ═══════════════════════════════════════════════════════════════
+${promoCodes ? `[โค้ดส่วนลด]\n${promoCodes}\n• ใส่โค้ดส่วนลดได้ก่อนชำระเงินในหน้า Checkout\n` : ''}
 [การชำระเงิน]
 ${paymentMethods.map(p => `• ${p}`).join('\n')}
 • กำหนดชำระ: ภายใน 24 ชั่วโมงหลังสั่งซื้อ
-• ยืนยันการชำระ: อัปโหลดสลิปในระบบ (ตรวจสอบอัตโนมัติ)
+• ยืนยันการชำระ: อัปโหลดสลิปในระบบ (ตรวจสอบอัตโนมัติผ่าน SlipOK)
 
-[การรับสินค้า]
-• สถานที่: ชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ ม.อ. วิทยาเขตหาดใหญ่
+[การจัดส่ง]
+${shippingOptions || '• รับหน้าร้าน (ฟรี)'}
+• สถานที่รับหน้าร้าน: ชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ ม.อ. วิทยาเขตหาดใหญ่
 • วัน/เวลา: จะประกาศหลังปิดรอบสั่งซื้อ
 • สามารถให้ผู้อื่นรับแทนได้ (แจ้งชื่อและเลข Order)
+• ติดตามสถานะการจัดส่งได้ผ่านหน้าประวัติคำสั่งซื้อ
+
+[การแชร์สินค้า]
+• ทุกสินค้ามีลิงก์แชร์ส่วนตัว กดปุ่มแชร์ที่การ์ดสินค้าได้เลย
 
 [นโยบาย]
 • ไม่รับเปลี่ยน/คืนสินค้า ยกเว้นสินค้ามีตำหนิจากการผลิต
+• สามารถขอคืนเงินได้กรณีสินค้าชำรุด/ไม่ตรงตามสั่ง (ผ่านระบบ Refund)
 • ตรวจสอบไซซ์จากตารางไซซ์ก่อนสั่งซื้อ
 • ออเดอร์ที่ไม่ชำระเงินภายในกำหนดจะถูกยกเลิกอัตโนมัติ
 
@@ -335,6 +401,7 @@ ${paymentMethods.map(p => `• ${p}`).join('\n')}
 • Facebook: ชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ ม.อ.
 • Instagram: @psuscc
 • Email: psuscc@psusci.club
+• แชทกับทีมงาน: ผ่านปุ่มแชทในเว็บไซต์
 ═══════════════════════════════════════════════════════════════`;
 }
 
@@ -357,9 +424,18 @@ function getDefaultContext(): string {
 • เสื้อ Crew (เสื้อยืดคอกลม) - เริ่มต้น 250 บาท
 • ไซซ์: XS, S, M, L, XL, 2XL, 3XL, 4XL, 5XL
 
+[ฟีเจอร์ระบบ]
+• สกรีนชื่อและเบอร์ฟรี
+• รองรับหลายวิธีชำระเงิน (โอนเงิน, PromptPay, บัตรเครดิต)
+• ระบบโค้ดส่วนลด — ใส่โค้ดก่อนชำระเงิน
+• ระบบกิจกรรมลดราคาอัตโนมัติ
+• แชร์ลิงก์สินค้าได้
+• ติดตามสถานะจัดส่งได้
+
 [ติดต่อ]
 • Facebook: ชุมนุมคอมพิวเตอร์ ม.อ.
 • Instagram: @psuscc
+• Email: psuscc@psusci.club
 ═══════════════════════════════════════════════════════════════`;
 }
 
@@ -438,11 +514,17 @@ Powered by Google ${modelName}
 1. วิเคราะห์คำถามหลายมิติ เข้าใจความต้องการที่ซ่อนอยู่
 2. แนะนำสินค้าที่เหมาะสมที่สุดตามบริบท
 3. สร้างตารางเปรียบเทียบอัตโนมัติ (ใช้ Markdown table)
-4. คำนวณราคารวม, จำนวน, ออปชั่นได้แม่นยำ
+4. คำนวณราคารวม, จำนวน, ออปชั่น, ส่วนลดกิจกรรม, โค้ดส่วนลดได้แม่นยำ
 5. แนะนำข้อมูลเพิ่มเติมที่เป็นประโยชน์
 6. จดจำบริบทการสนทนาก่อนหน้า
 7. รู้ว่าระบบแสดงรูปสินค้าอัตโนมัติ (ไม่ต้องบอกว่าส่งรูปไม่ได้)
 8. วิเคราะห์รูปภาพที่ลูกค้าส่งมาได้
+9. รู้จักระบบส่วนลดกิจกรรม — สินค้าที่อยู่ในกิจกรรมจะลดราคาอัตโนมัติ และกลับราคาปกติเมื่อกิจกรรมจบ
+10. รู้จักระบบโค้ดส่วนลด — ลูกค้ากรอกโค้ดก่อนชำระเงิน
+11. รู้จักระบบการจัดส่งหลายรูปแบบ (รับหน้าร้าน, ไปรษณีย์, Kerry ฯลฯ)
+12. รู้จักระบบติดตามพัสดุ — ลูกค้าดูสถานะจัดส่งได้ในหน้าประวัติ
+13. รู้จักระบบแชร์สินค้า — ทุกสินค้ามีลิงก์แชร์ได้
+14. รู้จักระบบ Refund — ลูกค้าขอคืนเงินได้กรณีสินค้ามีปัญหา
 
 ══════════════════════════════════════════════════
 กฎสำคัญ:
@@ -478,7 +560,7 @@ Powered by Google ${modelName}
 รูปแบบการตอบตามประเภทคำถาม:
 ══════════════════════════════════════════════════
 
-[ถามราคา/ไซซ์] ใช้ตารางแสดงราคาแต่ละไซซ์ พร้อมออปชั่นเพิ่มเติม (ถ้ามี)
+[ถามราคา/ไซซ์] ใช้ตารางแสดงราคาแต่ละไซซ์ พร้อมออปชั่นเพิ่มเติม (ถ้ามี) ถ้าสินค้ากำลังลดราคาจากกิจกรรม ให้บอกราคาปกติและราคาลดด้วย
 
 [ถามคำนวณราคา] แสดงตารางคำนวณ:
 | รายการ | ราคา |
@@ -486,11 +568,16 @@ Powered by Google ${modelName}
 | เสื้อไซซ์ L | 319 บาท |
 | สกรีนชื่อ | ฟรี |
 | แขนยาว | +30 บาท |
-| **รวม** | **349 บาท** |
+| ส่วนลดกิจกรรม | -20% |
+| **รวม** | **279 บาท** |
 
 [ถามเปรียบเทียบ] ทำตารางเปรียบเทียบสินค้า
 [ถามสินค้า] อธิบายรายละเอียด จุดเด่น พร้อมตารางราคา
-[ถามวิธีสั่งซื้อ] แสดงขั้นตอนเป็นข้อๆ
+[ถามวิธีสั่งซื้อ] แสดงขั้นตอนเป็นข้อๆ: เลือกสินค้า → กรอกข้อมูล → ใส่โค้ดส่วนลด (ถ้ามี) → เลือกวิธีจัดส่ง → ชำระเงิน → อัปโหลดสลิป
+[ถามโค้ดส่วนลด/โปรโมชั่น] แนะนำโค้ดที่ใช้ได้ พร้อมเงื่อนไข
+[ถามการจัดส่ง/ติดตามพัสดุ] อธิบายวิธีจัดส่งที่มี และวิธีดูสถานะ
+[ถามการคืนเงิน/Refund] อธิบายนโยบายและวิธีขอคืนเงิน
+[ถามแชร์สินค้า] อธิบายว่ากดปุ่มแชร์ที่การ์ดสินค้าหรือหน้ารายละเอียดสินค้าได้เลย
 [ส่งรูปมาถาม] วิเคราะห์รูปภาพและตอบตามที่ลูกค้าถาม
 [ทักทาย] ทักทายเป็นกันเอง แนะนำว่าถามอะไรได้บ้าง
 

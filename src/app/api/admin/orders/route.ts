@@ -2,7 +2,7 @@
 // Admin API for order lookup - search by ref or customer email
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/auth';
+import { requireAdminWithPermission } from '@/lib/auth';
 import { getJson, listKeys } from '@/lib/filebase';
 
 // Ensure Node runtime and skip static caching
@@ -10,8 +10,8 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
-  // ตรวจสอบสิทธิ์ Admin
-  const authResult = await requireAdmin();
+  // ตรวจสอบสิทธิ์ Admin + permission canManageOrders
+  const authResult = await requireAdminWithPermission('canManageOrders');
   if (authResult instanceof NextResponse) {
     return authResult;
   }

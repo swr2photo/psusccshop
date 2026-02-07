@@ -242,17 +242,17 @@ export default function CartDrawer(props: CartDrawerProps) {
                           <Box sx={{ px: 1, py: 0.2, borderRadius: '6px', bgcolor: 'rgba(0,113,227,0.15)', border: '1px solid rgba(0,113,227,0.3)' }}>
                             <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--secondary)' }}>{item.size}</Typography>
                           </Box>
-                          {item.options.isLongSleeve && (
+                          {item.options?.isLongSleeve && (
                             <Box sx={{ px: 1, py: 0.2, borderRadius: '6px', bgcolor: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)' }}>
                               <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--warning)' }}>แขนยาว</Typography>
                             </Box>
                           )}
-                          {item.options.customName && (
+                          {item.options?.customName && (
                             <Box sx={{ px: 1, py: 0.2, borderRadius: '6px', bgcolor: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)' }}>
                               <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--success)' }}>{item.options.customName}</Typography>
                             </Box>
                           )}
-                          {item.options.customNumber && (
+                          {item.options?.customNumber && (
                             <Box sx={{ px: 1, py: 0.2, borderRadius: '6px', bgcolor: 'rgba(6,182,212,0.15)', border: '1px solid rgba(6,182,212,0.3)' }}>
                               <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--secondary)' }}>#{item.options.customNumber}</Typography>
                             </Box>
@@ -543,7 +543,7 @@ export default function CartDrawer(props: CartDrawerProps) {
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}>
                   {displaySizes.map((size) => {
                     const basePrice = product?.sizePricing?.[size] ?? product?.basePrice ?? editingCartItem.unitPrice;
-                    const longSleeveFee = product?.options?.hasLongSleeve && editingCartItem.options.isLongSleeve 
+                    const longSleeveFee = product?.options?.hasLongSleeve && editingCartItem.options?.isLongSleeve 
                       ? (product?.options?.longSleevePrice ?? 50) 
                       : 0;
                     const active = editingCartItem.size === size;
@@ -578,7 +578,7 @@ export default function CartDrawer(props: CartDrawerProps) {
                   <TextField
                     label="ชื่อติดเสื้อ"
                     fullWidth
-                    value={editingCartItem.options.customName || ''}
+                    value={editingCartItem.options?.customName || ''}
                     onChange={(e) => onSetEditingCartItem({
                       ...editingCartItem,
                       options: { ...editingCartItem.options, customName: normalizeEngName(e.target.value) }
@@ -597,7 +597,7 @@ export default function CartDrawer(props: CartDrawerProps) {
                   <TextField
                     label="หมายเลขเสื้อ"
                     fullWidth
-                    value={editingCartItem.options.customNumber || ''}
+                    value={editingCartItem.options?.customNumber || ''}
                     onChange={(e) => onSetEditingCartItem({
                       ...editingCartItem,
                       options: { ...editingCartItem.options, customNumber: normalizeDigits99(e.target.value) }
@@ -615,7 +615,7 @@ export default function CartDrawer(props: CartDrawerProps) {
                 {product?.options?.hasLongSleeve && (
                   <Box 
                     onClick={() => {
-                      const newIsLong = !editingCartItem.options.isLongSleeve;
+                      const newIsLong = !editingCartItem.options?.isLongSleeve;
                       const basePrice = product?.sizePricing?.[editingCartItem.size] ?? product?.basePrice ?? 0;
                       const sleeveFee = product?.options?.longSleevePrice ?? 50;
                       onSetEditingCartItem({
@@ -628,8 +628,8 @@ export default function CartDrawer(props: CartDrawerProps) {
                       p: 2,
                       mb: 2,
                       borderRadius: '12px',
-                      border: editingCartItem.options.isLongSleeve ? '2px solid #ff9f0a' : '1px solid var(--glass-border)',
-                      bgcolor: editingCartItem.options.isLongSleeve ? 'rgba(245,158,11,0.1)' : 'transparent',
+                      border: editingCartItem.options?.isLongSleeve ? '2px solid #ff9f0a' : '1px solid var(--glass-border)',
+                      bgcolor: editingCartItem.options?.isLongSleeve ? 'rgba(245,158,11,0.1)' : 'transparent',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
@@ -637,7 +637,7 @@ export default function CartDrawer(props: CartDrawerProps) {
                     }}
                   >
                     <Typography sx={{ color: 'var(--foreground)', fontWeight: 600 }}>แขนยาว (+฿{product?.options?.longSleevePrice ?? 50})</Typography>
-                    <Switch checked={editingCartItem.options.isLongSleeve} color="warning" sx={{ pointerEvents: 'none' }} />
+                    <Switch checked={editingCartItem.options?.isLongSleeve || false} color="warning" sx={{ pointerEvents: 'none' }} />
                   </Box>
                 )}
 

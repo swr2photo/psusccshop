@@ -142,7 +142,7 @@ import {
   Ticket,
 } from 'lucide-react';
 
-import { isAdmin, isSuperAdmin, setDynamicAdminEmails, SUPER_ADMIN_EMAIL, Product, ShopConfig, SIZES } from '@/lib/config';
+import { isAdmin, isSuperAdmin, setDynamicAdminEmails, SUPER_ADMIN_EMAIL, Product, ShopConfig, SIZES, AdminPermissions, DEFAULT_ADMIN_PERMISSIONS } from '@/lib/config';
 import { deleteOrderAdmin, saveShopConfig, syncOrdersSheet, updateOrderAdmin, updateOrderStatusAPI } from '@/lib/api-client';
 import SupportChatPanel from '@/components/admin/SupportChatPanel';
 import EmailManagement from '@/components/admin/EmailManagement';
@@ -1158,14 +1158,9 @@ const SettingsView = React.memo(function SettingsView({
                 </Box>
               ) : (
                 (localConfig.adminEmails || []).map((adminEmail, idx) => {
-                  const perms = localConfig.adminPermissions?.[adminEmail.toLowerCase()] ?? {
-                    canManageShop: false,
-                    canManageSheet: false,
-                    canManageAnnouncement: true,
-                    canManageOrders: true,
-                    canManageProducts: true,
-                    canManagePickup: false,
-                  };
+                  const perms: AdminPermissions = localConfig.adminPermissions?.[adminEmail.toLowerCase()]
+                    ? { ...DEFAULT_ADMIN_PERMISSIONS, ...localConfig.adminPermissions[adminEmail.toLowerCase()] }
+                    : { ...DEFAULT_ADMIN_PERMISSIONS };
                   
                   const togglePermission = (key: string, value: boolean) => {
                     const currentPerms = localConfig.adminPermissions ?? {};
@@ -1239,45 +1234,167 @@ const SettingsView = React.memo(function SettingsView({
                       {/* Permissions */}
                       <Box sx={{ p: 1.5 }}>
                         <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', mb: 1 }}>สิทธิ์การใช้งาน:</Typography>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                          {[
-                            { key: 'canManageShop', label: '🏪 เปิด/ปิดร้าน', color: '#10b981' },
-                            { key: 'canManageSheet', label: '📊 จัดการ Sheet', color: '#3b82f6' },
-                            { key: 'canManageAnnouncement', label: '📢 ประกาศ', color: '#f59e0b' },
-                            { key: 'canManageOrders', label: '📦 จัดการออเดอร์', color: '#8b5cf6' },
-                            { key: 'canManageProducts', label: '🛍️ จัดการสินค้า', color: '#ec4899' },
-                            { key: 'canManagePickup', label: '📍 จัดการรับสินค้า', color: '#06b6d4' },
-                          ].map(perm => (
-                            <Box
-                              key={perm.key}
-                              onClick={() => togglePermission(perm.key, !perms[perm.key as keyof typeof perms])}
-                              sx={{
-                                px: 1.5,
-                                py: 0.5,
-                                borderRadius: '8px',
-                                cursor: 'pointer',
-                                fontSize: '0.75rem',
-                                fontWeight: 500,
-                                bgcolor: perms[perm.key as keyof typeof perms] 
-                                  ? `${perm.color}20` 
-                                  : 'rgba(255,255,255,0.05)',
-                                color: perms[perm.key as keyof typeof perms] 
-                                  ? perm.color 
-                                  : '#64748b',
-                                border: `1px solid ${perms[perm.key as keyof typeof perms] 
-                                  ? perm.color 
-                                  : 'transparent'}`,
-                                transition: 'all 0.2s ease',
-                                '&:hover': { 
-                                  bgcolor: perms[perm.key as keyof typeof perms] 
-                                    ? `${perm.color}30` 
-                                    : 'rgba(255,255,255,0.1)',
-                                },
-                              }}
-                            >
-                              {perm.label}
+                        
+                        {/* Permission Groups */}
+                        {[
+                          {
+                            group: '🏪 ร้านค้า & ระบบ',
+                            items: [
+                              { key: 'canManageShop', label: 'เปิด/ปิดร้าน', color: '#10b981' },
+                              { key: 'canManageSheet', label: 'จัดการ Sheet', color: '#3b82f6' },
+                              { key: 'canManageShipping', label: 'ตั้งค่าจัดส่ง', color: '#a78bfa' },
+                              { key: 'canManagePayment', label: 'ตั้งค่าชำระเงิน', color: '#22d3ee' },
+                            ],
+                          },
+                          {
+                            group: '📦 สินค้า & ออเดอร์',
+                            items: [
+                              { key: 'canManageProducts', label: 'จัดการสินค้า', color: '#ec4899' },
+                              { key: 'canManageOrders', label: 'จัดการออเดอร์', color: '#8b5cf6' },
+                              { key: 'canManagePickup', label: 'รับสินค้า', color: '#06b6d4' },
+                              { key: 'canManageTracking', label: 'ติดตามพัสดุ', color: '#fb923c' },
+                              { key: 'canManageRefunds', label: 'คืนเงิน', color: '#c084fc' },
+                            ],
+                          },
+                          {
+                            group: '📢 การตลาด & สื่อสาร',
+                            items: [
+                              { key: 'canManageAnnouncement', label: 'ประกาศ', color: '#f59e0b' },
+                              { key: 'canManageEvents', label: 'อีเวนต์/โปรโมชั่น', color: '#fbbf24' },
+                              { key: 'canManagePromoCodes', label: 'โค้ดส่วนลด', color: '#34c759' },
+                              { key: 'canManageSupport', label: 'แชทสนับสนุน', color: '#ec4899' },
+                              { key: 'canSendEmail', label: 'ส่งอีเมล', color: '#10b981' },
+                            ],
+                          },
+                        ].map((group) => (
+                          <Box key={group.group} sx={{ mb: 1.5 }}>
+                            <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', mb: 0.5, fontWeight: 600 }}>
+                              {group.group}
+                            </Typography>
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                              {group.items.map(perm => (
+                                <Box
+                                  key={perm.key}
+                                  onClick={() => togglePermission(perm.key, !perms[perm.key as keyof AdminPermissions])}
+                                  sx={{
+                                    px: 1.5,
+                                    py: 0.5,
+                                    borderRadius: '8px',
+                                    cursor: 'pointer',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 500,
+                                    bgcolor: perms[perm.key as keyof AdminPermissions] 
+                                      ? `${perm.color}20` 
+                                      : 'rgba(255,255,255,0.05)',
+                                    color: perms[perm.key as keyof AdminPermissions] 
+                                      ? perm.color 
+                                      : '#64748b',
+                                    border: `1px solid ${perms[perm.key as keyof AdminPermissions] 
+                                      ? perm.color 
+                                      : 'transparent'}`,
+                                    transition: 'all 0.2s ease',
+                                    '&:hover': { 
+                                      bgcolor: perms[perm.key as keyof AdminPermissions] 
+                                        ? `${perm.color}30` 
+                                        : 'rgba(255,255,255,0.1)',
+                                    },
+                                  }}
+                                >
+                                  {perm.label}
+                                </Box>
+                              ))}
                             </Box>
-                          ))}
+                          </Box>
+                        ))}
+
+                        {/* Quick Actions */}
+                        <Box sx={{ display: 'flex', gap: 0.5, mt: 1, pt: 1, borderTop: `1px solid ${ADMIN_THEME.border}` }}>
+                          <Box
+                            onClick={() => {
+                              const allPerms: AdminPermissions = {};
+                              Object.keys(DEFAULT_ADMIN_PERMISSIONS).forEach(k => {
+                                (allPerms as Record<string, boolean>)[k] = true;
+                              });
+                              const currentPerms = localConfig.adminPermissions ?? {};
+                              onConfigChange({
+                                ...localConfig,
+                                adminPermissions: {
+                                  ...currentPerms,
+                                  [adminEmail.toLowerCase()]: allPerms,
+                                }
+                              });
+                            }}
+                            sx={{
+                              px: 1.5,
+                              py: 0.4,
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              fontSize: '0.7rem',
+                              fontWeight: 600,
+                              bgcolor: 'rgba(16,185,129,0.1)',
+                              color: '#10b981',
+                              border: '1px solid rgba(16,185,129,0.3)',
+                              '&:hover': { bgcolor: 'rgba(16,185,129,0.2)' },
+                            }}
+                          >
+                            ✅ เปิดทั้งหมด
+                          </Box>
+                          <Box
+                            onClick={() => {
+                              const noPerms: AdminPermissions = {};
+                              Object.keys(DEFAULT_ADMIN_PERMISSIONS).forEach(k => {
+                                (noPerms as Record<string, boolean>)[k] = false;
+                              });
+                              const currentPerms = localConfig.adminPermissions ?? {};
+                              onConfigChange({
+                                ...localConfig,
+                                adminPermissions: {
+                                  ...currentPerms,
+                                  [adminEmail.toLowerCase()]: noPerms,
+                                }
+                              });
+                            }}
+                            sx={{
+                              px: 1.5,
+                              py: 0.4,
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              fontSize: '0.7rem',
+                              fontWeight: 600,
+                              bgcolor: 'rgba(239,68,68,0.1)',
+                              color: '#ef4444',
+                              border: '1px solid rgba(239,68,68,0.3)',
+                              '&:hover': { bgcolor: 'rgba(239,68,68,0.2)' },
+                            }}
+                          >
+                            ❌ ปิดทั้งหมด
+                          </Box>
+                          <Box
+                            onClick={() => {
+                              const currentPerms = localConfig.adminPermissions ?? {};
+                              onConfigChange({
+                                ...localConfig,
+                                adminPermissions: {
+                                  ...currentPerms,
+                                  [adminEmail.toLowerCase()]: { ...DEFAULT_ADMIN_PERMISSIONS },
+                                }
+                              });
+                            }}
+                            sx={{
+                              px: 1.5,
+                              py: 0.4,
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              fontSize: '0.7rem',
+                              fontWeight: 600,
+                              bgcolor: 'rgba(99,102,241,0.1)',
+                              color: '#6366f1',
+                              border: '1px solid rgba(99,102,241,0.3)',
+                              '&:hover': { bgcolor: 'rgba(99,102,241,0.2)' },
+                            }}
+                          >
+                            🔄 ค่าเริ่มต้น
+                          </Box>
                         </Box>
                       </Box>
                     </Box>
@@ -3310,14 +3427,9 @@ export default function AdminPage(): JSX.Element {
   const userEmail = session?.user?.email?.toLowerCase() ?? '';
   const isSuperAdminUser = isSuperAdmin(session?.user?.email ?? null);
   const adminPerms = useMemo(() => {
-    return config.adminPermissions?.[userEmail] ?? {
-      canManageShop: false,
-      canManageSheet: false,
-      canManageAnnouncement: true,
-      canManageOrders: true,
-      canManageProducts: true,
-      canManagePickup: false,
-    };
+    return config.adminPermissions?.[userEmail] 
+      ? { ...DEFAULT_ADMIN_PERMISSIONS, ...config.adminPermissions[userEmail] }
+      : { ...DEFAULT_ADMIN_PERMISSIONS };
   }, [config.adminPermissions, userEmail]);
 
   // Permission flags - super admin has all permissions
@@ -3327,6 +3439,14 @@ export default function AdminPage(): JSX.Element {
   const canManageOrders = isSuperAdminUser || adminPerms.canManageOrders;
   const canManageProducts = isSuperAdminUser || adminPerms.canManageProducts;
   const canManagePickup = isSuperAdminUser || adminPerms.canManagePickup;
+  const canManageEvents = isSuperAdminUser || adminPerms.canManageEvents;
+  const canManagePromoCodes = isSuperAdminUser || adminPerms.canManagePromoCodes;
+  const canManageRefunds = isSuperAdminUser || adminPerms.canManageRefunds;
+  const canManageTracking = isSuperAdminUser || adminPerms.canManageTracking;
+  const canManageShipping = isSuperAdminUser || adminPerms.canManageShipping;
+  const canManagePayment = isSuperAdminUser || adminPerms.canManagePayment;
+  const canManageSupport = isSuperAdminUser || adminPerms.canManageSupport;
+  const canSendEmail = isSuperAdminUser || adminPerms.canSendEmail;
   
   const isSessionLoading = status === 'loading';
   const isDataLoading = loading && !hasInitialData;
@@ -3547,7 +3667,17 @@ export default function AdminPage(): JSX.Element {
               mime: 'image/png',
             }),
           });
-          const data = await res.json();
+          if (!res.ok) {
+            const errText = await res.text().catch(() => '');
+            console.error(`Upload HTTP ${res.status}:`, errText.substring(0, 200));
+            return { ...item, url: null, error: `อัปโหลดล้มเหลว (HTTP ${res.status})` };
+          }
+          let data;
+          try {
+            data = await res.json();
+          } catch {
+            return { ...item, url: null, error: 'เซิร์ฟเวอร์ตอบกลับผิดปกติ' };
+          }
           if (data.status === 'success' && data.data?.url) {
             return { ...item, url: data.data.url };
           }
@@ -5663,7 +5793,7 @@ export default function AdminPage(): JSX.Element {
                                     borderRadius: '6px',
                                     letterSpacing: '0.05em',
                                   }}>
-                                    {item.options.customName}
+                                    {item.options?.customName}
                                   </Typography>
                                 </Box>
                               )}
@@ -5684,7 +5814,7 @@ export default function AdminPage(): JSX.Element {
                                     minWidth: 36,
                                     textAlign: 'center',
                                   }}>
-                                    {item.options.customNumber}
+                                    {item.options?.customNumber}
                                   </Typography>
                                 </Box>
                               )}
@@ -6408,7 +6538,7 @@ export default function AdminPage(): JSX.Element {
                                     {item.options?.customName && (
                                       <Chip
                                         size="small"
-                                        label={`ชื่อ: ${item.options.customName}`}
+                                        label={`ชื่อ: ${item.options?.customName}`}
                                         sx={{
                                           height: 20,
                                           fontSize: '0.7rem',
@@ -6421,7 +6551,7 @@ export default function AdminPage(): JSX.Element {
                                     {item.options?.customNumber && (
                                       <Chip
                                         size="small"
-                                        label={`เบอร์: ${item.options.customNumber}`}
+                                        label={`เบอร์: ${item.options?.customNumber}`}
                                         sx={{
                                           height: 20,
                                           fontSize: '0.7rem',
@@ -7126,9 +7256,19 @@ export default function AdminPage(): JSX.Element {
         }),
       });
 
-      const data = await response.json();
+      if (!response.ok) {
+        const errText = await response.text().catch(() => '');
+        console.error(`Upload HTTP ${response.status}:`, errText.substring(0, 200));
+        throw new Error(`อัปโหลดล้มเหลว (HTTP ${response.status}) กรุณาลองใหม่`);
+      }
+      let data;
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error('เซิร์ฟเวอร์ตอบกลับผิดปกติ กรุณาลองใหม่');
+      }
       
-      if (!response.ok || data.status === 'error') {
+      if (data.status === 'error') {
         console.error('Upload failed:', data.message);
         throw new Error(data.message || 'Upload failed');
       }
@@ -7969,16 +8109,16 @@ export default function AdminPage(): JSX.Element {
               { icon: <ShoppingCart size={20} />, label: 'จัดการสินค้า', idx: 1, color: '#fbbf24', show: canManageProducts },
               { icon: <Receipt size={20} />, label: 'ออเดอร์', idx: 2, color: '#34d399', badge: pendingCount, show: canManageOrders },
               { icon: <QrCodeScanner size={20} />, label: 'รับสินค้า', idx: 3, color: '#06b6d4', show: canManagePickup },
-              { icon: <LocalShipping size={20} />, label: 'ติดตามพัสดุ', idx: 12, color: '#fb923c', show: canManageOrders },
-              { icon: <Refresh size={20} />, label: 'คืนเงิน', idx: 13, color: '#c084fc', show: canManageOrders },
-              { icon: <SupportAgent size={20} />, label: 'แชทสนับสนุน', idx: 4, color: '#ec4899', show: canManageOrders },
+              { icon: <LocalShipping size={20} />, label: 'ติดตามพัสดุ', idx: 12, color: '#fb923c', show: canManageTracking },
+              { icon: <Refresh size={20} />, label: 'คืนเงิน', idx: 13, color: '#c084fc', show: canManageRefunds },
+              { icon: <SupportAgent size={20} />, label: 'แชทสนับสนุน', idx: 4, color: '#ec4899', show: canManageSupport },
               { icon: <NotificationsActive size={20} />, label: 'ประกาศ', idx: 5, color: '#f472b6', show: canManageAnnouncement },
-              { icon: <Sparkles size={20} />, label: 'อีเวนต์/โปรโมชั่น', idx: 14, color: '#fbbf24', show: canManageAnnouncement },
-              { icon: <Ticket size={20} />, label: 'โค้ดส่วนลด', idx: 15, color: '#34c759', show: canManageAnnouncement },
+              { icon: <Sparkles size={20} />, label: 'อีเวนต์/โปรโมชั่น', idx: 14, color: '#fbbf24', show: canManageEvents },
+              { icon: <Ticket size={20} />, label: 'โค้ดส่วนลด', idx: 15, color: '#34c759', show: canManagePromoCodes },
               { icon: <Settings size={20} />, label: 'ตั้งค่าร้าน', idx: 6, color: '#60a5fa', show: canManageShop || canManageSheet || isSuperAdminUser },
-              { icon: <LocalShipping size={20} />, label: 'ตั้งค่าจัดส่ง', idx: 10, color: '#a78bfa', show: isSuperAdminUser },
-              { icon: <AttachMoney size={20} />, label: 'ตั้งค่าชำระเงิน', idx: 11, color: '#22d3ee', show: isSuperAdminUser },
-              { icon: <Send size={20} />, label: 'ส่งอีเมล', idx: 7, color: '#10b981', show: canManageOrders },
+              { icon: <LocalShipping size={20} />, label: 'ตั้งค่าจัดส่ง', idx: 10, color: '#a78bfa', show: canManageShipping },
+              { icon: <AttachMoney size={20} />, label: 'ตั้งค่าชำระเงิน', idx: 11, color: '#22d3ee', show: canManagePayment },
+              { icon: <Send size={20} />, label: 'ส่งอีเมล', idx: 7, color: '#10b981', show: canSendEmail },
               { icon: <Groups size={20} />, label: 'ประวัติผู้ใช้', idx: 8, color: '#f97316', show: isSuperAdminUser },
               { icon: <History size={20} />, label: 'ประวัติระบบ', idx: 9, color: 'var(--text-muted)', show: isSuperAdminUser },
             ].filter(item => item.show).map((item) => {
@@ -8116,7 +8256,7 @@ export default function AdminPage(): JSX.Element {
           )}
           {activeTab === 2 && (canManageOrders ? OrdersView() : <NoPermissionView permission="จัดการออเดอร์" />)}
           {activeTab === 3 && (canManagePickup ? PickupView() : <NoPermissionView permission="จัดการรับสินค้า" />)}
-          {activeTab === 4 && (canManageOrders ? <SupportChatPanel /> : <NoPermissionView permission="แชทสนับสนุน" />)}
+          {activeTab === 4 && (canManageSupport ? <SupportChatPanel /> : <NoPermissionView permission="แชทสนับสนุน" />)}
           {activeTab === 5 && (
             canManageAnnouncement ? (
               <AnnouncementsView
@@ -8131,7 +8271,7 @@ export default function AdminPage(): JSX.Element {
             )
           )}
           {activeTab === 14 && (
-            canManageAnnouncement ? (
+            canManageEvents ? (
               <EventsView
                 config={config}
                 saveConfig={saveFullConfig}
@@ -8144,7 +8284,7 @@ export default function AdminPage(): JSX.Element {
             )
           )}
           {activeTab === 15 && (
-            canManageAnnouncement ? (
+            canManagePromoCodes ? (
               <PromoCodesView
                 config={config}
                 saveConfig={saveFullConfig}
@@ -8173,13 +8313,13 @@ export default function AdminPage(): JSX.Element {
               onImageUpload={handleAnnouncementImageUpload}
             />
           )}
-          {activeTab === 7 && (canManageOrders ? <EmailManagement showToast={showToast} /> : <NoPermissionView permission="ส่งอีเมล" />)}
+          {activeTab === 7 && (canSendEmail ? <EmailManagement showToast={showToast} /> : <NoPermissionView permission="ส่งอีเมล" />)}
           {activeTab === 8 && (isSuperAdminUser ? <UserLogsView showToast={showToast} /> : <NoPermissionView permission="ดูประวัติผู้ใช้" />)}
           {activeTab === 9 && (isSuperAdminUser ? <LogsView /> : <NoPermissionView permission="ดูประวัติระบบ" />)}
-          {activeTab === 10 && (isSuperAdminUser ? <ShippingSettings onSave={() => showToast('success', 'บันทึกการตั้งค่าจัดส่งแล้ว')} /> : <NoPermissionView permission="ตั้งค่าจัดส่ง" />)}
-          {activeTab === 11 && (isSuperAdminUser ? <PaymentSettings onSave={() => showToast('success', 'บันทึกการตั้งค่าชำระเงินแล้ว')} /> : <NoPermissionView permission="ตั้งค่าชำระเงิน" />)}
-          {activeTab === 12 && (canManageOrders ? <TrackingManagement showToast={showToast} /> : <NoPermissionView permission="ติดตามพัสดุ" />)}
-          {activeTab === 13 && (canManageOrders ? <RefundManagement showToast={showToast} /> : <NoPermissionView permission="จัดการคืนเงิน" />)}
+          {activeTab === 10 && (canManageShipping ? <ShippingSettings onSave={() => showToast('success', 'บันทึกการตั้งค่าจัดส่งแล้ว')} /> : <NoPermissionView permission="ตั้งค่าจัดส่ง" />)}
+          {activeTab === 11 && (canManagePayment ? <PaymentSettings onSave={() => showToast('success', 'บันทึกการตั้งค่าชำระเงินแล้ว')} /> : <NoPermissionView permission="ตั้งค่าชำระเงิน" />)}
+          {activeTab === 12 && (canManageTracking ? <TrackingManagement showToast={showToast} /> : <NoPermissionView permission="ติดตามพัสดุ" />)}
+          {activeTab === 13 && (canManageRefunds ? <RefundManagement showToast={showToast} /> : <NoPermissionView permission="จัดการคืนเงิน" />)}
         </Box>
       </Box>
 

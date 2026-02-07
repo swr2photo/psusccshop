@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getJson, putJson, listKeys, getOrderByRef, getAllOrders, getSupabaseAdmin } from '@/lib/filebase';
-import { requireAuth, requireAdmin, isAdminEmail } from '@/lib/auth';
+import { requireAuth, requireAdmin, requireAdminWithPermission, isAdminEmail } from '@/lib/auth';
 import { sanitizeUtf8Input } from '@/lib/sanitize';
 import crypto from 'crypto';
 
@@ -218,7 +218,7 @@ export async function GET(req: NextRequest) {
 
 // POST - อัปเดต pickup status (admin only)
 export async function POST(req: NextRequest) {
-  const authResult = await requireAdmin();
+  const authResult = await requireAdminWithPermission('canManagePickup');
   if (authResult instanceof NextResponse) {
     return authResult;
   }

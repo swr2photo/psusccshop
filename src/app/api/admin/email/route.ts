@@ -5,7 +5,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/auth';
+import { requireAdminWithPermission } from '@/lib/auth';
 import {
   sendEmail,
   getEmailLogs,
@@ -21,9 +21,9 @@ import { getJson, listKeys } from '@/lib/filebase';
 // GET: Retrieve email logs
 export async function GET(request: NextRequest) {
   try {
-    const admin = await requireAdmin();
-    if (!admin) {
-      return NextResponse.json('Unauthorized', { status: 401 });
+    const admin = await requireAdminWithPermission('canSendEmail');
+    if (!admin || admin instanceof NextResponse) {
+      return admin instanceof NextResponse ? admin : NextResponse.json('Unauthorized', { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -123,9 +123,9 @@ export async function GET(request: NextRequest) {
 // POST: Send email
 export async function POST(request: NextRequest) {
   try {
-    const admin = await requireAdmin();
-    if (!admin) {
-      return NextResponse.json('Unauthorized', { status: 401 });
+    const admin = await requireAdminWithPermission('canSendEmail');
+    if (!admin || admin instanceof NextResponse) {
+      return admin instanceof NextResponse ? admin : NextResponse.json('Unauthorized', { status: 401 });
     }
 
     const body = await request.json();

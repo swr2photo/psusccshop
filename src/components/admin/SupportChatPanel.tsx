@@ -352,7 +352,15 @@ export default function SupportChatPanel() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ base64: previewImage, filename: 'admin_chat_' + Date.now() + '.' + ext, mime }),
       });
-      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok) {
+        throw new Error(`อัปโหลดล้มเหลว (HTTP ${uploadRes.status})`);
+      }
+      let uploadData;
+      try {
+        uploadData = await uploadRes.json();
+      } catch {
+        throw new Error('เซิร์ฟเวอร์ตอบกลับผิดปกติ กรุณาลองใหม่');
+      }
       if (uploadData.status === 'success' && uploadData.data?.url) {
         const imageUrl = uploadData.data.url;
         const msgContent = message.trim() ? message.trim() + '\n[รูปภาพ: ' + imageUrl + ']' : '[รูปภาพ: ' + imageUrl + ']';
@@ -367,9 +375,9 @@ export default function SupportChatPanel() {
       } else {
         toastError('ไม่สามารถอัปโหลดรูปภาพได้');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error uploading image:', error);
-      toastError('เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ');
+      toastError(error?.message || 'เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ');
     } finally {
       setUploadingImage(false);
       if (fileInputRef.current) fileInputRef.current.value = '';

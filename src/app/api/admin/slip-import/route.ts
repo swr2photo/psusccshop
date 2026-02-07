@@ -5,7 +5,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/auth';
+import { requireSuperAdmin } from '@/lib/auth';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
 interface SlipOKLogEntry {
@@ -28,7 +28,7 @@ interface SlipOKLogEntry {
 // GET: ดู orders ที่ไม่มี slip data
 export async function GET(request: NextRequest) {
   try {
-    const admin = await requireAdmin();
+    const admin = await requireSuperAdmin();
     if (!admin) {
       return NextResponse.json('Unauthorized', { status: 401 });
     }
@@ -92,7 +92,7 @@ export async function GET(request: NextRequest) {
 // POST: Import slip URLs จาก SlipOK log
 export async function POST(request: NextRequest) {
   try {
-    const admin = await requireAdmin();
+    const admin = await requireSuperAdmin();
     if (!admin) {
       return NextResponse.json('Unauthorized', { status: 401 });
     }
@@ -232,7 +232,7 @@ export async function POST(request: NextRequest) {
 // PUT: Manual update - ระบุ orderRef และ imageUrl โดยตรง
 export async function PUT(request: NextRequest) {
   try {
-    const admin = await requireAdmin();
+    const admin = await requireSuperAdmin();
     if (!admin) {
       return NextResponse.json('Unauthorized', { status: 401 });
     }
