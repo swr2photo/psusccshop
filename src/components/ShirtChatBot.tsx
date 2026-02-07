@@ -40,6 +40,8 @@ import {
   Hand,
   Reply,
   Pencil,
+  ClipboardList,
+  Tag,
 } from 'lucide-react';
 import { useNotification } from './NotificationContext';
 
@@ -48,8 +50,10 @@ const QUICK_QUESTIONS_DATA = [
   { icon: 'cart', label: 'วิธีสั่งซื้อ' },
   { icon: 'price', label: 'ราคาสินค้า' },
   { icon: 'size', label: 'ไซซ์และขนาด' },
+  { icon: 'order', label: 'เช็คสถานะออเดอร์' },
   { icon: 'shipping', label: 'การจัดส่ง' },
   { icon: 'payment', label: 'วิธีชำระเงิน' },
+  { icon: 'promo', label: 'โค้ดส่วนลด' },
   { icon: 'help', label: 'ติดต่อร้าน' },
 ];
 
@@ -88,8 +92,10 @@ const QuickQuestionIcon = ({ type, size = 14 }: { type: string; size?: number })
     case 'cart': return <ShoppingCart {...props} />;
     case 'price': return <Coins {...props} />;
     case 'size': return <Ruler {...props} />;
+    case 'order': return <ClipboardList {...props} />;
     case 'shipping': return <Truck {...props} />;
     case 'payment': return <Wallet {...props} />;
+    case 'promo': return <Tag {...props} />;
     case 'help': return <HelpCircle {...props} />;
     default: return null;
   }

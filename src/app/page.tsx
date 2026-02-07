@@ -1,15 +1,17 @@
 'use client';
 
 import React from 'react';
-import { MessageCircle as ChatIcon, Send as SendIcon, X as CloseIcon, Bot as SmartToyIcon, RotateCcw as RefreshIcon, Sparkles as AutoAwesomeIcon, Store as StorefrontIcon, Copy as ContentCopyIcon, Check as CheckIcon, Maximize2 as FullscreenIcon, Minimize2 as FullscreenExitIcon, ImagePlus as AddPhotoAlternateIcon, ShoppingCart as ShoppingCartOutlinedIcon, Coins as PaidOutlinedIcon, Ruler as StraightenOutlinedIcon, Truck as LocalShippingOutlinedIcon, Wallet as AccountBalanceWalletOutlinedIcon, HelpCircle as HelpOutlineOutlinedIcon, Image as ImageOutlinedIcon, User as PersonOutlineIcon, BadgeCheck as VerifiedIcon, BookOpen as MenuBookOutlinedIcon, Hand as WavingHandIcon, Reply as ReplyIcon, Pencil as EditIcon } from 'lucide-react';
+import { MessageCircle as ChatIcon, Send as SendIcon, X as CloseIcon, Bot as SmartToyIcon, RotateCcw as RefreshIcon, Sparkles as AutoAwesomeIcon, Store as StorefrontIcon, Copy as ContentCopyIcon, Check as CheckIcon, Maximize2 as FullscreenIcon, Minimize2 as FullscreenExitIcon, ImagePlus as AddPhotoAlternateIcon, ShoppingCart as ShoppingCartOutlinedIcon, Coins as PaidOutlinedIcon, Ruler as StraightenOutlinedIcon, Truck as LocalShippingOutlinedIcon, Wallet as AccountBalanceWalletOutlinedIcon, HelpCircle as HelpOutlineOutlinedIcon, Image as ImageOutlinedIcon, User as PersonOutlineIcon, BadgeCheck as VerifiedIcon, BookOpen as MenuBookOutlinedIcon, Hand as WavingHandIcon, Reply as ReplyIcon, Pencil as EditIcon, ClipboardList as ClipboardListIcon, Tag as TagIcon } from 'lucide-react';
 
 // ==================== CHATBOT COMPONENT (Enhanced with Logo & AI) ====================
 const QUICK_QUESTIONS_DATA = [
   { icon: 'cart', label: 'วิธีสั่งซื้อ' },
   { icon: 'price', label: 'ราคาสินค้า' },
   { icon: 'size', label: 'ไซซ์และขนาด' },
+  { icon: 'order', label: 'เช็คสถานะออเดอร์' },
   { icon: 'shipping', label: 'การจัดส่ง' },
   { icon: 'payment', label: 'วิธีชำระเงิน' },
+  { icon: 'promo', label: 'โค้ดส่วนลด' },
   { icon: 'help', label: 'ติดต่อร้าน' },
 ];
 
@@ -19,8 +21,10 @@ const QuickQuestionIcon = ({ type, size = 14 }: { type: string; size?: number })
     case 'cart': return <ShoppingCartOutlinedIcon size={size} opacity={0.85} />;
     case 'price': return <PaidOutlinedIcon size={size} opacity={0.85} />;
     case 'size': return <StraightenOutlinedIcon size={size} opacity={0.85} />;
+    case 'order': return <ClipboardListIcon size={size} opacity={0.85} />;
     case 'shipping': return <LocalShippingOutlinedIcon size={size} opacity={0.85} />;
     case 'payment': return <AccountBalanceWalletOutlinedIcon size={size} opacity={0.85} />;
+    case 'promo': return <TagIcon size={size} opacity={0.85} />;
     case 'help': return <HelpOutlineOutlinedIcon size={size} opacity={0.85} />;
     default: return null;
   }

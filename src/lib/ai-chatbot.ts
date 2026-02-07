@@ -1,7 +1,7 @@
 // src/lib/ai-chatbot.ts
-// AI-powered chatbot using Google Gemini with real-time shop database context
+// AI-powered chatbot using Google Gemini with real-time shop database context + order lookup
 
-import { getShopConfig, getAllOrders } from './supabase';
+import { getShopConfig, getAllOrders, getOrdersByEmail, getOrderByRef } from './supabase';
 import { SHIRT_FAQ, findShirtFAQ, QUICK_QUESTIONS } from './shirt-faq';
 
 // ==================== Types ====================
@@ -40,12 +40,32 @@ export interface ShopData {
   };
 }
 
+// ==================== Caching ====================
+let shopDataCache: { data: ShopData; timestamp: number } | null = null;
+const SHOP_CACHE_TTL = 60_000; // 1 minute cache
+
+let orderStatsCache: { data: OrderStats; timestamp: number } | null = null;
+const ORDER_STATS_CACHE_TTL = 120_000; // 2 minutes cache
+
+interface OrderStats {
+  totalOrders: number;
+  statusBreakdown: Record<string, number>;
+  recentOrders: number; // last 24h
+  popularProducts: { name: string; count: number }[];
+  avgOrderAmount: number;
+}
+
 // ==================== Database Functions ====================
 
 /**
  * ดึงข้อมูลร้านค้าแบบละเอียดจาก database
  */
 export async function getShopData(): Promise<ShopData> {
+  // Return cached data if fresh
+  if (shopDataCache && Date.now() - shopDataCache.timestamp < SHOP_CACHE_TTL) {
+    return shopDataCache.data;
+  }
+  
   try {
     const config = await getShopConfig();
     
@@ -85,7 +105,8 @@ export async function getShopData(): Promise<ShopData> {
       }
     });
 
-    return {
+    // Store in cache
+    const result: ShopData = {
       config,
       products,
       announcements: config.announcements || [],
@@ -94,12 +115,11 @@ export async function getShopData(): Promise<ShopData> {
       stats: {
         totalProducts: products.length,
         availableProducts: availableProducts.length,
-        priceRange: { 
-          min: minPrice === Infinity ? 0 : minPrice, 
-          max: maxPrice 
-        },
+        priceRange: { min: minPrice === Infinity ? 0 : minPrice, max: maxPrice },
       },
     };
+    shopDataCache = { data: result, timestamp: Date.now() };
+    return result;
   } catch (error) {
     console.error('Error fetching shop data:', error);
     return {
@@ -170,6 +190,299 @@ export function findSizePrice(product: any, size: string): { size: string; price
   return sizeData ? { size: sizeData.size, price: sizeData.price } : null;
 }
 
+// ==================== Order Lookup Functions ====================
+
+/**
+ * ดึงสถิติออเดอร์รวม (cached)
+ */
+export async function getOrderStats(): Promise<OrderStats> {
+  if (orderStatsCache && Date.now() - orderStatsCache.timestamp < ORDER_STATS_CACHE_TTL) {
+    return orderStatsCache.data;
+  }
+  
+  try {
+    const { orders, total } = await getAllOrders({ limit: 500 });
+    
+    const statusBreakdown: Record<string, number> = {};
+    const productCounts: Record<string, number> = {};
+    let totalAmount = 0;
+    let recentCount = 0;
+    const now = Date.now();
+    const dayAgo = now - 24 * 60 * 60 * 1000;
+    
+    orders.forEach((o: any) => {
+      // Status breakdown
+      const s = o.status || 'UNKNOWN';
+      statusBreakdown[s] = (statusBreakdown[s] || 0) + 1;
+      
+      // Recent orders
+      const orderTime = new Date(o.createdAt || o.date).getTime();
+      if (orderTime > dayAgo) recentCount++;
+      
+      // Total amount
+      totalAmount += o.totalAmount || o.amount || 0;
+      
+      // Popular products
+      (o.cart || []).forEach((item: any) => {
+        const name = item.name || item.productName || 'Unknown';
+        productCounts[name] = (productCounts[name] || 0) + (item.quantity || 1);
+      });
+    });
+    
+    const popularProducts = Object.entries(productCounts)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 5)
+      .map(([name, count]) => ({ name, count }));
+    
+    const stats: OrderStats = {
+      totalOrders: total,
+      statusBreakdown,
+      recentOrders: recentCount,
+      popularProducts,
+      avgOrderAmount: total > 0 ? Math.round(totalAmount / total) : 0,
+    };
+    
+    orderStatsCache = { data: stats, timestamp: Date.now() };
+    return stats;
+  } catch (error) {
+    console.error('Error getting order stats:', error);
+    return {
+      totalOrders: 0,
+      statusBreakdown: {},
+      recentOrders: 0,
+      popularProducts: [],
+      avgOrderAmount: 0,
+    };
+  }
+}
+
+/**
+ * ค้นหาออเดอร์จาก reference number
+ */
+export async function lookupOrderByRef(ref: string): Promise<string> {
+  try {
+    const order = await getOrderByRef(ref.toUpperCase());
+    if (!order) {
+      return `ไม่พบออเดอร์หมายเลข "${ref}" ในระบบค่ะ กรุณาตรวจสอบหมายเลขออเดอร์อีกครั้งนะคะ`;
+    }
+    return formatOrderForChat(order);
+  } catch (error) {
+    console.error('Order lookup error:', error);
+    return 'ไม่สามารถค้นหาออเดอร์ได้ในขณะนี้ค่ะ กรุณาลองใหม่อีกครั้งนะคะ';
+  }
+}
+
+/**
+ * ดึงออเดอร์ทั้งหมดของ user (ตาม email)
+ */
+export async function lookupOrdersByEmail(email: string): Promise<string> {
+  try {
+    const { orders, total } = await getOrdersByEmail(email, { limit: 10 });
+    if (!orders.length) {
+      return 'ยังไม่มีประวัติการสั่งซื้อค่ะ';
+    }
+    
+    let result = `พบ ${total} ออเดอร์ (แสดง ${orders.length} รายการล่าสุด)\n\n`;
+    result += '| หมายเลข | วันที่ | สถานะ | ยอดรวม |\n';
+    result += '|---------|--------|--------|--------|\n';
+    
+    orders.forEach((o: any) => {
+      const date = new Date(o.createdAt || o.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+      const statusThai = getStatusThai(o.status);
+      result += `| ${o.ref} | ${date} | ${statusThai} | ${(o.totalAmount || 0).toLocaleString()}฿ |\n`;
+    });
+    
+    return result;
+  } catch (error) {
+    console.error('Orders by email error:', error);
+    return 'ไม่สามารถดึงข้อมูลประวัติการสั่งซื้อได้ในขณะนี้ค่ะ';
+  }
+}
+
+/**
+ * Format order data for chat display
+ */
+function formatOrderForChat(order: any): string {
+  const statusThai = getStatusThai(order.status);
+  const date = new Date(order.createdAt || order.date).toLocaleDateString('th-TH', { 
+    day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' 
+  });
+  
+  let result = `ข้อมูลออเดอร์ ${order.ref}\n\n`;
+  result += `| รายการ | รายละเอียด |\n`;
+  result += `|--------|------------|\n`;
+  result += `| หมายเลข | ${order.ref} |\n`;
+  result += `| วันที่สั่ง | ${date} |\n`;
+  result += `| สถานะ | ${statusThai} |\n`;
+  result += `| ยอดรวม | ${(order.totalAmount || 0).toLocaleString()} บาท |\n`;
+  
+  if (order.paymentMethod) {
+    result += `| วิธีชำระ | ${order.paymentMethod} |\n`;
+  }
+  
+  if (order.shippingOption) {
+    const shipping = typeof order.shippingOption === 'object' 
+      ? order.shippingOption.name 
+      : order.shippingOption;
+    result += `| การจัดส่ง | ${shipping} |\n`;
+  }
+  
+  if (order.trackingNumber) {
+    result += `| เลขพัสดุ | ${order.trackingNumber} |\n`;
+    if (order.shippingProvider) {
+      result += `| ขนส่ง | ${order.shippingProvider} |\n`;
+    }
+    if (order.trackingStatus) {
+      result += `| สถานะพัสดุ | ${order.trackingStatus} |\n`;
+    }
+  }
+  
+  // Refund info
+  if (order.refundStatus) {
+    const refundStatusThai = getRefundStatusThai(order.refundStatus);
+    result += `| การคืนเงิน | ${refundStatusThai} |\n`;
+    if (order.refundAmount) {
+      result += `| จำนวนคืน | ${order.refundAmount.toLocaleString()} บาท |\n`;
+    }
+  }
+  
+  // Cart items
+  if (order.cart && order.cart.length > 0) {
+    result += '\n\nรายการสินค้า\n\n';
+    result += '| สินค้า | ไซซ์ | จำนวน | ราคา |\n';
+    result += '|--------|------|--------|------|\n';
+    order.cart.forEach((item: any) => {
+      const name = item.name || item.productName || '-';
+      const size = item.size || '-';
+      const qty = item.quantity || 1;
+      const price = item.price || item.totalPrice || 0;
+      const extras = [];
+      if (item.options?.customName) extras.push(`ชื่อ: ${item.options.customName}`);
+      if (item.options?.customNumber) extras.push(`เบอร์: ${item.options.customNumber}`);
+      if (item.options?.isLongSleeve) extras.push('แขนยาว');
+      const extraText = extras.length > 0 ? ` (${extras.join(', ')})` : '';
+      result += `| ${name}${extraText} | ${size} | ${qty} | ${price.toLocaleString()}฿ |\n`;
+    });
+  }
+  
+  // Status-specific messages
+  result += '\n';
+  switch (order.status) {
+    case 'WAITING_PAYMENT':
+    case 'AWAITING_PAYMENT':
+    case 'PENDING':
+      result += 'กรุณาชำระเงินและอัปโหลดสลิปภายใน 24 ชั่วโมงค่ะ';
+      break;
+    case 'VERIFYING':
+      result += 'ทีมงานกำลังตรวจสอบการชำระเงินค่ะ โปรดรอสักครู่';
+      break;
+    case 'PAID':
+    case 'CONFIRMED':
+      result += 'ชำระเงินเรียบร้อยแล้วค่ะ รอทีมงานจัดเตรียมสินค้า';
+      break;
+    case 'PREPARING':
+      result += 'กำลังจัดเตรียมสินค้าให้ค่ะ';
+      break;
+    case 'SHIPPED':
+      result += order.trackingNumber 
+        ? `สินค้าจัดส่งแล้วค่ะ ติดตามพัสดุได้ที่หมายเลข ${order.trackingNumber}`
+        : 'สินค้าจัดส่งแล้วค่ะ';
+      break;
+    case 'READY':
+      result += 'สินค้าพร้อมรับแล้วค่ะ มารับได้ที่ชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ ม.อ.';
+      break;
+    case 'COMPLETED':
+    case 'DELIVERED':
+      result += 'ออเดอร์เสร็จสมบูรณ์แล้วค่ะ ขอบคุณที่อุดหนุนนะคะ';
+      break;
+    case 'CANCELLED':
+      result += 'ออเดอร์นี้ถูกยกเลิกแล้วค่ะ';
+      break;
+    case 'REFUNDED':
+      result += 'ออเดอร์นี้ได้รับการคืนเงินแล้วค่ะ';
+      break;
+  }
+  
+  return result;
+}
+
+function getStatusThai(status: string): string {
+  const map: Record<string, string> = {
+    'WAITING_PAYMENT': 'รอชำระเงิน',
+    'AWAITING_PAYMENT': 'รอชำระเงิน',
+    'PENDING': 'รอดำเนินการ',
+    'VERIFYING': 'กำลังตรวจสอบ',
+    'PAID': 'ชำระแล้ว',
+    'CONFIRMED': 'ยืนยันแล้ว',
+    'PREPARING': 'กำลังจัดเตรียม',
+    'SHIPPED': 'จัดส่งแล้ว',
+    'READY': 'พร้อมรับ',
+    'COMPLETED': 'เสร็จสมบูรณ์',
+    'DELIVERED': 'ส่งถึงแล้ว',
+    'CANCELLED': 'ยกเลิก',
+    'EXPIRED': 'หมดอายุ',
+    'REFUNDED': 'คืนเงินแล้ว',
+  };
+  return map[status] || status;
+}
+
+function getRefundStatusThai(status: string): string {
+  const map: Record<string, string> = {
+    'requested': 'ขอคืนเงิน',
+    'approved': 'อนุมัติแล้ว',
+    'rejected': 'ปฏิเสธ',
+    'completed': 'คืนเงินแล้ว',
+  };
+  return map[status] || status;
+}
+
+/**
+ * ตรวจจับว่าข้อความถามเกี่ยวกับออเดอร์หรือไม่
+ */
+export function detectOrderQuery(message: string): { isOrderQuery: boolean; orderRef?: string; isMyOrders?: boolean } {
+  const q = message.toLowerCase().trim();
+  
+  // Check for order reference number pattern (e.g., SCC-XXXXXX, ORD-XXXXX, or just alphanumeric refs)
+  const refPatterns = [
+    /(?:ออเดอร์|order|คำสั่งซื้อ|หมายเลข|เลขที่|ref|#)\s*[:\s]?\s*([A-Z0-9-]{6,20})/i,
+    /\b(SCC-[A-Z0-9]+)\b/i,
+    /\b(ORD-[A-Z0-9]+)\b/i,
+    /\b([A-Z]{2,4}-\d{6,})\b/,
+  ];
+  
+  for (const pattern of refPatterns) {
+    const match = q.match(pattern) || message.match(pattern);
+    if (match) {
+      return { isOrderQuery: true, orderRef: match[1].toUpperCase() };
+    }
+  }
+  
+  // Check for "my orders" type queries
+  const myOrderKeywords = [
+    'ออเดอร์ของฉัน', 'คำสั่งซื้อของฉัน', 'ประวัติสั่งซื้อ', 'ประวัติการสั่ง',
+    'ออเดอร์ทั้งหมด', 'สถานะออเดอร์', 'สถานะคำสั่งซื้อ', 'ออเดอร์ที่สั่ง',
+    'my order', 'order status', 'order history', 'เช็คออเดอร์', 'เช็คสถานะ',
+    'ดูออเดอร์', 'ดูคำสั่งซื้อ', 'ติดตามออเดอร์', 'ติดตามคำสั่ง',
+    'สั่งอะไรไป', 'เคยสั่ง', 'สถานะการสั่ง',
+  ];
+  
+  if (myOrderKeywords.some(k => q.includes(k))) {
+    return { isOrderQuery: true, isMyOrders: true };
+  }
+  
+  // Check for tracking-related queries
+  const trackingKeywords = [
+    'เลขพัสดุ', 'tracking', 'ส่งถึงไหน', 'ส่งแล้วยัง', 'จัดส่ง',
+    'พัสดุ', 'ขนส่ง', 'ems', 'kerry', 'flash', 'j&t',
+    'ติดตามพัสดุ', 'เช็คพัสดุ',
+  ];
+  if (trackingKeywords.some(k => q.includes(k))) {
+    return { isOrderQuery: true, isMyOrders: true };
+  }
+  
+  return { isOrderQuery: false };
+}
+
 // ==================== Shop Context Builder ====================
 
 /**
@@ -183,6 +496,27 @@ export async function buildDetailedShopContext(): Promise<string> {
   }
 
   const { products, announcements, bankAccount, isOpen, stats } = shopData;
+  
+  // Get order stats (cached)
+  let orderStatsText = '';
+  try {
+    const orderStats = await getOrderStats();
+    if (orderStats.totalOrders > 0) {
+      const statusEntries = Object.entries(orderStats.statusBreakdown)
+        .map(([status, count]) => `${getStatusThai(status)}: ${count}`)
+        .join(', ');
+      
+      orderStatsText = `
+[สถิติออเดอร์]
+- ออเดอร์ทั้งหมด: ${orderStats.totalOrders} รายการ
+- ออเดอร์วันนี้: ${orderStats.recentOrders} รายการ
+- ยอดเฉลี่ย: ${orderStats.avgOrderAmount.toLocaleString()} บาท/ออเดอร์
+- สถานะ: ${statusEntries}
+${orderStats.popularProducts.length > 0 ? `- สินค้าขายดี: ${orderStats.popularProducts.map(p => `${p.name} (${p.count} ชิ้น)`).join(', ')}` : ''}`;
+    }
+  } catch (e) {
+    // Order stats are optional, don't fail
+  }
 
   // Build detailed product info
   const productDetails = products.map((p: any, idx: number) => {
@@ -367,6 +701,7 @@ ${!isOpen && shopData.config.closedMessage ? `- ข้อความ: ${shopDat
 ${activeAnnouncements || '(ไม่มีประกาศ)'}
 
 ${activeEvents ? `[กิจกรรม/โปรโมชั่น]\n${activeEvents}` : ''}
+${orderStatsText}
 
 ═══════════════════════════════════════════════════════════════
 [สินค้าทั้งหมด] (${stats?.totalProducts || 0} รายการ, พร้อมจำหน่าย ${stats?.availableProducts || 0} รายการ)
@@ -396,6 +731,9 @@ ${shippingOptions || '• รับหน้าร้าน (ฟรี)'}
 • สามารถขอคืนเงินได้กรณีสินค้าชำรุด/ไม่ตรงตามสั่ง (ผ่านระบบ Refund)
 • ตรวจสอบไซซ์จากตารางไซซ์ก่อนสั่งซื้อ
 • ออเดอร์ที่ไม่ชำระเงินภายในกำหนดจะถูกยกเลิกอัตโนมัติ
+
+[สถานะออเดอร์ที่เป็นไปได้]
+WAITING_PAYMENT=รอชำระเงิน, VERIFYING=ตรวจสอบการชำระ, PAID=ชำระแล้ว, CONFIRMED=ยืนยันแล้ว, PREPARING=จัดเตรียมสินค้า, SHIPPED=จัดส่งแล้ว, READY=พร้อมรับ, COMPLETED=เสร็จสมบูรณ์, DELIVERED=ส่งถึงแล้ว, CANCELLED=ยกเลิก, EXPIRED=หมดอายุ, REFUNDED=คืนเงินแล้ว
 
 [ช่องทางติดต่อ]
 • Facebook: ชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ ม.อ.
@@ -492,11 +830,17 @@ export function getCurrentModelName(): string {
 }
 
 /**
- * System prompt ที่ปรับปรุงใหม่สำหรับ AI - Ultra Enhanced Intelligence (Gemini 2.5)
+ * System prompt ที่ปรับปรุงใหม่สำหรับ AI - Ultra Enhanced Intelligence v2
+ * รองรับ order lookup, user context, DB-driven answers
  */
-function getEnhancedSystemPrompt(shopContext: string, conversationHistory?: string): string {
+function getEnhancedSystemPrompt(
+  shopContext: string, 
+  conversationHistory?: string,
+  userContext?: string,
+  orderContext?: string,
+): string {
   const modelName = GEMINI_MODELS[currentModelTier].name;
-  return `คุณคือ "SCC Bot" ผู้ช่วย AI ของร้าน SCC Shop — ร้านค้าออนไลน์ของชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ ม.อ.
+  return `คุณคือ "SCC Bot" ผู้ช่วย AI ระดับสูงของร้าน SCC Shop — ร้านค้าออนไลน์ของชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ ม.อ.
 Powered by Google ${modelName}
 
 ══════════════════════════════════════════════════
@@ -518,19 +862,23 @@ Powered by Google ${modelName}
 5. แนะนำข้อมูลเพิ่มเติมที่เป็นประโยชน์
 6. จดจำบริบทการสนทนาก่อนหน้า
 7. รู้ว่าระบบแสดงรูปสินค้าอัตโนมัติ (ไม่ต้องบอกว่าส่งรูปไม่ได้)
-8. วิเคราะห์รูปภาพที่ลูกค้าส่งมาได้
-9. รู้จักระบบส่วนลดกิจกรรม — สินค้าที่อยู่ในกิจกรรมจะลดราคาอัตโนมัติ และกลับราคาปกติเมื่อกิจกรรมจบ
+8. วิเคราะห์รูปภาพที่ลูกค้าส่งมาได้ (เช่นดูไซซ์, เปรียบเทียบสี)
+9. รู้จักระบบส่วนลดกิจกรรม — สินค้าที่อยู่ในกิจกรรมจะลดราคาอัตโนมัติ
 10. รู้จักระบบโค้ดส่วนลด — ลูกค้ากรอกโค้ดก่อนชำระเงิน
-11. รู้จักระบบการจัดส่งหลายรูปแบบ (รับหน้าร้าน, ไปรษณีย์, Kerry ฯลฯ)
-12. รู้จักระบบติดตามพัสดุ — ลูกค้าดูสถานะจัดส่งได้ในหน้าประวัติ
-13. รู้จักระบบแชร์สินค้า — ทุกสินค้ามีลิงก์แชร์ได้
+11. รู้จักระบบการจัดส่งหลายรูปแบบ
+12. รู้จักระบบติดตามพัสดุ
+13. รู้จักระบบแชร์สินค้าผ่านลิงก์
 14. รู้จักระบบ Refund — ลูกค้าขอคืนเงินได้กรณีสินค้ามีปัญหา
+15. **ค้นหาข้อมูลออเดอร์จาก Database ได้** — ถ้าลูกค้าถามสถานะออเดอร์ ระบบจะดึงข้อมูลจริงมาให้
+16. **ดูประวัติการสั่งซื้อของลูกค้าที่ล็อกอินได้** — แสดงรายการสั่งซื้อทั้งหมด
+17. **รู้สถิติร้านค้า** — ออเดอร์ทั้งหมด, สินค้าขายดี, ยอดเฉลี่ย
+18. **วิเคราะห์ปัญหาและแนะนำวิธีแก้** — เช่น สลิปไม่ผ่าน, ชำระเงินไม่สำเร็จ, ขอคืนเงิน
 
 ══════════════════════════════════════════════════
 กฎสำคัญ:
 ══════════════════════════════════════════════════
 1. ตอบเป็นภาษาไทยเสมอ สุภาพ เป็นกันเอง
-2. อ้างอิงข้อมูลจริงจากข้อมูลร้านค้าที่ให้มาเท่านั้น ห้ามแต่งเติม
+2. อ้างอิงข้อมูลจริงจากข้อมูลร้านค้าและ Database เท่านั้น ห้ามแต่งเติม
 3. ถ้าถามราคา/ไซซ์ ให้ตอบตามข้อมูลจริงจาก Database พร้อมตาราง
 4. ถ้าถามละเอียด ตอบละเอียดพร้อมตาราง ถ้าถามสั้น ตอบกระชับ
 5. **ห้ามใช้ emoji ในคำตอบโดยเด็ดขาด** — ใช้ข้อความล้วนเท่านั้น
@@ -541,10 +889,14 @@ Powered by Google ${modelName}
 10. ข้อมูลไซซ์และราคาอยู่ในส่วน "ไซซ์และราคา" ของแต่ละสินค้า ดูให้ดี
 11. ห้ามอธิบายวิธีขึ้นบรรทัดใหม่ (ห้ามพูดถึง \\n)
 12. ห้ามอธิบายการ format ข้อความ (ห้ามพูดถึง markdown syntax)
-13. ถ้าลูกค้าส่งรูปมา ให้วิเคราะห์รูปและตอบคำถามเกี่ยวกับรูปนั้น
+13. ถ้าลูกค้าส่งรูปมา ให้วิเคราะห์รูปและตอบคำถาม
 14. **สกรีนชื่อ และ สกรีนเบอร์ = ฟรี! ไม่มีค่าใช้จ่ายเพิ่ม**
 15. เฉพาะแขนยาวเท่านั้นที่คิดค่าเพิ่ม (ถ้ามี)
 16. ห้ามพูดว่า "ไม่สามารถส่งรูปสินค้าให้ได้" — รูปจะแสดงอัตโนมัติ
+17. **ถ้ามีข้อมูลออเดอร์ส่งมา ให้ใช้ข้อมูลจริงตอบ อย่าแต่งเติม**
+18. **ถ้าลูกค้าถามออเดอร์แต่ไม่ได้ล็อกอิน ให้แนะนำล็อกอินก่อน**
+19. **ห้ามเปิดเผยข้อมูลส่วนตัวของลูกค้าคนอื่น** (เบอร์โทร, ที่อยู่, อีเมล)
+20. ข้อมูลทุกอย่างมาจาก Database จริง ตอบด้วยความมั่นใจได้เลย
 
 ══════════════════════════════════════════════════
 การใช้ตาราง Markdown:
@@ -579,13 +931,32 @@ Powered by Google ${modelName}
 [ถามการคืนเงิน/Refund] อธิบายนโยบายและวิธีขอคืนเงิน
 [ถามแชร์สินค้า] อธิบายว่ากดปุ่มแชร์ที่การ์ดสินค้าหรือหน้ารายละเอียดสินค้าได้เลย
 [ส่งรูปมาถาม] วิเคราะห์รูปภาพและตอบตามที่ลูกค้าถาม
-[ทักทาย] ทักทายเป็นกันเอง แนะนำว่าถามอะไรได้บ้าง
+[ทักทาย] ทักทายเป็นกันเอง แนะนำว่าถามอะไรได้บ้าง (สินค้า, ราคา, สถานะออเดอร์, ส่วนลด ฯลฯ)
+
+[ถามสถานะออเดอร์] ถ้ามีข้อมูลออเดอร์ ให้แสดงรายละเอียดออเดอร์พร้อมสถานะ ถ้าไม่มีข้อมูล ให้แนะนำให้ลูกค้าบอกหมายเลขออเดอร์หรือล็อกอินก่อน
+[ถามประวัติสั่งซื้อ] แสดงตารางรายการสั่งซื้อล่าสุด
+[ถามเลขพัสดุ/ติดตามพัสดุ] แสดงเลขพัสดุและสถานะจัดส่ง ถ้าไม่มีเลขพัสดุ ให้แจ้งว่ายังไม่ได้จัดส่ง
+[ถามสถิติร้าน] แสดงจำนวนออเดอร์ สินค้าขายดี ยอดเฉลี่ย
 
 ${conversationHistory ? `
 ══════════════════════════════════════════════════
 บริบทการสนทนาก่อนหน้า:
 ══════════════════════════════════════════════════
 ${conversationHistory}
+` : ''}
+
+${userContext ? `
+══════════════════════════════════════════════════
+ข้อมูลผู้ใช้ปัจจุบัน:
+══════════════════════════════════════════════════
+${userContext}
+` : ''}
+
+${orderContext ? `
+══════════════════════════════════════════════════
+ข้อมูลออเดอร์จาก Database (Real-time):
+══════════════════════════════════════════════════
+${orderContext}
 ` : ''}
 
 ══════════════════════════════════════════════════
@@ -605,7 +976,9 @@ async function callGeminiAPI(
   prompt: string, 
   shopContext: string,
   conversationHistory?: ChatMessage[],
-  imageBase64?: string
+  imageBase64?: string,
+  userContext?: string,
+  orderContext?: string,
 ): Promise<string | null> {
   if (!GEMINI_API_KEY) {
     console.log('No Gemini API key configured');
@@ -662,7 +1035,7 @@ async function callGeminiAPI(
       // Build request body with system instruction
       const requestBody: any = {
         systemInstruction: {
-          parts: [{ text: getEnhancedSystemPrompt(shopContext, historyStr) }]
+          parts: [{ text: getEnhancedSystemPrompt(shopContext, historyStr, userContext, orderContext) }]
         },
         contents: [
           {
@@ -749,12 +1122,14 @@ async function callGeminiAPI(
 // ==================== Main Chat Function ====================
 
 /**
- * ประมวลผลข้อความจากผู้ใช้ (ปรับปรุงใหม่ - รองรับรูปภาพ)
+ * ประมวลผลข้อความจากผู้ใช้ (v2 — รองรับ order lookup, user context)
  */
 export async function processChat(
   message: string,
   conversationHistory?: ChatMessage[],
-  imageBase64?: string
+  imageBase64?: string,
+  userEmail?: string,
+  userName?: string,
 ): Promise<ChatResponse> {
   const trimmedMessage = message.trim();
   
@@ -852,9 +1227,37 @@ export async function processChat(
   const hasMultipleTopics = detectMultipleTopics(trimmedMessage);
   const isProductQuery = isProductRelatedQuery(trimmedMessage);
   const hasImage = !!imageBase64;
+  
+  // Detect order-related queries
+  const orderDetection = detectOrderQuery(trimmedMessage);
+  
+  // Build user context
+  let userContext: string | undefined;
+  if (userEmail) {
+    userContext = `ล็อกอินแล้ว: ${userName || 'ไม่ทราบชื่อ'} (${userEmail})`;
+  }
+  
+  // Build order context if needed
+  let orderContext: string | undefined;
+  if (orderDetection.isOrderQuery) {
+    try {
+      if (orderDetection.orderRef) {
+        // Lookup specific order by ref
+        orderContext = await lookupOrderByRef(orderDetection.orderRef);
+      } else if (orderDetection.isMyOrders && userEmail) {
+        // Lookup user's orders
+        orderContext = await lookupOrdersByEmail(userEmail);
+      } else if (orderDetection.isMyOrders && !userEmail) {
+        // User not logged in
+        orderContext = 'ลูกค้ายังไม่ได้ล็อกอิน — ไม่สามารถดึงประวัติการสั่งซื้อได้ แนะนำให้ล็อกอินก่อน หรือบอกหมายเลขออเดอร์มาเพื่อตรวจสอบ';
+      }
+    } catch (e) {
+      console.error('Order context error:', e);
+    }
+  }
 
-  // Use AI for: detailed questions, specific product queries, multi-topic, long questions, or when image is provided
-  const shouldUseAI = isDetailedQuestion || isSpecificProductQuestion || hasMultipleTopics || trimmedMessage.length > 25 || hasImage;
+  // Use AI for: detailed questions, specific product queries, multi-topic, long questions, image, or order queries
+  const shouldUseAI = isDetailedQuestion || isSpecificProductQuestion || hasMultipleTopics || trimmedMessage.length > 25 || hasImage || orderDetection.isOrderQuery;
   
   // Find related product images for product-related questions - ALWAYS try for product queries
   const productImages = (isSpecificProductQuestion || isPriceQuestion || isProductQuery) 
@@ -864,17 +1267,25 @@ export async function processChat(
   if (shouldUseAI) {
     try {
       const shopContext = await buildDetailedShopContext();
-      const aiResponse = await callGeminiAPI(trimmedMessage, shopContext, conversationHistory, imageBase64);
+      const aiResponse = await callGeminiAPI(trimmedMessage, shopContext, conversationHistory, imageBase64, userContext, orderContext);
       
       if (aiResponse) {
         // Clean up response
         const cleanedResponse = cleanAIResponse(aiResponse);
         
+        // Smart suggestions based on the query type
+        let suggestions = getSuggestionsForResponse(trimmedMessage);
+        if (orderDetection.isOrderQuery && orderDetection.orderRef) {
+          suggestions = ['ดูประวัติทั้งหมด', 'ติดต่อทีมงาน', 'ขอคืนเงิน'];
+        } else if (orderDetection.isMyOrders) {
+          suggestions = ['สั่งซื้อเพิ่ม', 'ดูสินค้าใหม่', 'ติดต่อทีมงาน'];
+        }
+        
         return {
           answer: cleanedResponse,
           source: 'ai',
           confidence: 0.9,
-          suggestions: getSuggestionsForResponse(trimmedMessage),
+          suggestions,
           productImages: productImages.length > 0 ? productImages : undefined,
         };
       }
@@ -887,8 +1298,8 @@ export async function processChat(
   const faqResult = findShirtFAQ(trimmedMessage);
   const confidence = faqResult ? calculateConfidence(trimmedMessage, faqResult) : 0;
   
-  // High confidence FAQ match (but not if image is provided)
-  if (faqResult && confidence > 0.7 && !isDetailedQuestion && !hasImage) {
+  // High confidence FAQ match (but not if image is provided or order query)
+  if (faqResult && confidence > 0.7 && !isDetailedQuestion && !hasImage && !orderDetection.isOrderQuery) {
     return {
       answer: faqResult.answer,
       source: 'faq',
@@ -901,7 +1312,7 @@ export async function processChat(
   // Fallback to AI for any question
   try {
     const shopContext = await buildDetailedShopContext();
-    const aiResponse = await callGeminiAPI(trimmedMessage, shopContext, conversationHistory, imageBase64);
+    const aiResponse = await callGeminiAPI(trimmedMessage, shopContext, conversationHistory, imageBase64, userContext, orderContext);
     
     if (aiResponse) {
       return {
@@ -945,6 +1356,8 @@ function detectDetailedQuestion(query: string): boolean {
     'คำนวณ', 'รวม', 'ทั้งหมด', 'ครบ', 'ทุก', 'หมด',
     'แนะนำ', 'เลือก', 'ดีกว่า', 'เหมาะ', 'ควร',
     'ขั้นตอน', 'วิธี', 'อย่างไร', 'ยังไง',
+    'ออเดอร์', 'คำสั่งซื้อ', 'สถานะ', 'ประวัติ', 'ติดตาม',
+    'สถิติ', 'ขายดี', 'จำนวน', 'กี่ออเดอร์',
   ];
   const q = query.toLowerCase();
   return detailedKeywords.some(k => q.includes(k)) || query.includes('?');
@@ -1051,16 +1464,28 @@ function getSuggestionsForResponse(message: string): string[] {
   const q = message.toLowerCase();
   
   if (q.includes('ราคา') || q.includes('เท่าไหร่')) {
-    return ['ดูไซซ์', 'วิธีสั่งซื้อ', 'วิธีชำระเงิน'];
+    return ['ดูไซซ์', 'วิธีสั่งซื้อ', 'โค้ดส่วนลด'];
   }
   if (q.includes('ไซซ์') || q.includes('size')) {
-    return ['ราคาเท่าไหร่', 'เปรียบเทียบรุ่น'];
+    return ['ราคาเท่าไหร่', 'เปรียบเทียบรุ่น', 'ตารางไซซ์'];
   }
   if (q.includes('สั่ง') || q.includes('ซื้อ')) {
-    return ['ชำระเงินยังไง', 'รับสินค้าที่ไหน'];
+    return ['ชำระเงินยังไง', 'ดูสถานะออเดอร์', 'โค้ดส่วนลด'];
+  }
+  if (q.includes('ออเดอร์') || q.includes('order') || q.includes('คำสั่งซื้อ')) {
+    return ['สั่งซื้อเพิ่ม', 'ขอคืนเงิน', 'ติดต่อทีมงาน'];
+  }
+  if (q.includes('ส่ง') || q.includes('พัสดุ') || q.includes('tracking')) {
+    return ['เช็คสถานะออเดอร์', 'ติดต่อทีมงาน'];
+  }
+  if (q.includes('คืน') || q.includes('refund')) {
+    return ['ขั้นตอนขอคืนเงิน', 'ดูสถานะออเดอร์', 'ติดต่อทีมงาน'];
+  }
+  if (q.includes('โค้ด') || q.includes('ส่วนลด') || q.includes('โปรโมชั่น')) {
+    return ['ดูสินค้า', 'วิธีสั่งซื้อ', 'กิจกรรมลดราคา'];
   }
   
-  return [];
+  return ['ดูสินค้าทั้งหมด', 'วิธีสั่งซื้อ', 'เช็คสถานะออเดอร์'];
 }
 
 // ==================== Product Search ====================

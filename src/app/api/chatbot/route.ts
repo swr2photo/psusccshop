@@ -1,10 +1,11 @@
 // src/app/api/chatbot/route.ts
-// AI-powered chatbot API with real-time database context
+// AI-powered chatbot API with real-time database context + order lookup
 import { NextRequest, NextResponse } from 'next/server';
 import { processChat, buildDetailedShopContext, getShopData, ChatMessage, getCurrentModelName } from '@/lib/ai-chatbot';
 import { QUICK_QUESTIONS, SHIRT_FAQ } from '@/lib/shirt-faq';
 import { checkCombinedRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
-import { requireAuth } from '@/lib/auth';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -32,6 +33,19 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { message, conversationHistory, image } = body;
+    
+    // Get user session (optional — chatbot works for anonymous users too)
+    let userEmail: string | undefined;
+    let userName: string | undefined;
+    try {
+      const session = await getServerSession(authOptions);
+      if (session?.user?.email) {
+        userEmail = session.user.email;
+        userName = session.user.name || undefined;
+      }
+    } catch {
+      // Session fetch failed — continue without user context
+    }
     
     // Log if image is received
     if (image) {
@@ -67,8 +81,8 @@ export async function POST(req: NextRequest) {
       }));
     }
 
-    // Process with AI (include image if provided)
-    const result = await processChat(trimmedMessage, history, image);
+    // Process with AI (include image + user context)
+    const result = await processChat(trimmedMessage, history, image, userEmail, userName);
     
     return NextResponse.json({
       answer: result.answer,
