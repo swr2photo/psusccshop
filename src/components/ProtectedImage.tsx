@@ -379,7 +379,7 @@ export default function ProtectedImage({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: 'rgba(30, 41, 59, 0.5)',
+            background: 'rgba(29,29,31, 0.5)',
             zIndex: 1,
           }}
         >
@@ -399,8 +399,8 @@ export default function ProtectedImage({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: 'rgba(30, 41, 59, 0.8)',
-            color: '#94a3b8',
+            background: 'rgba(29,29,31, 0.8)',
+            color: '#86868b',
             fontSize: '0.875rem',
             zIndex: 1,
           }}

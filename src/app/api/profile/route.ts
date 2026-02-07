@@ -10,7 +10,7 @@ const profileExtrasKey = (email: string) => `profile-extras/${emailHash(email)}.
 // Fields stored in the profiles table (has dedicated columns)
 const PROFILE_TABLE_FIELDS = ['name', 'phone', 'address', 'instagram'];
 // Extra fields stored in key_value_store (no dedicated columns yet)
-const EXTRA_FIELDS = ['profileImage', 'theme'];
+const EXTRA_FIELDS = ['profileImage', 'theme', 'savedAddresses'];
 
 // Helper to save user log server-side
 async function saveUserLogServer(log: {

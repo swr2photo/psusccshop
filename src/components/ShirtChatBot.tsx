@@ -41,6 +41,7 @@ import {
   Reply,
   Pencil,
 } from 'lucide-react';
+import { useNotification } from './NotificationContext';
 
 // ==================== CONSTANTS ====================
 const QUICK_QUESTIONS_DATA = [
@@ -98,6 +99,7 @@ const QuickQuestionIcon = ({ type, size = 14 }: { type: string; size?: number })
 export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
+  const { warning: toastWarning, error: toastError } = useNotification();
   const [input, setInput] = React.useState('');
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -455,11 +457,11 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
     
     const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
-      alert('รองรับเฉพาะไฟล์รูปภาพ (PNG, JPG, WEBP)');
+      toastWarning('รองรับเฉพาะไฟล์รูปภาพ (PNG, JPG, WEBP)');
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      alert('ไฟล์ต้องมีขนาดไม่เกิน 5MB');
+      toastWarning('ไฟล์ต้องมีขนาดไม่เกิน 5MB');
       return;
     }
     
@@ -472,7 +474,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
         setIsUploading(false);
       };
       reader.onerror = () => {
-        alert('ไม่สามารถอ่านไฟล์ได้');
+        toastError('ไม่สามารถอ่านไฟล์ได้');
         setIsUploading(false);
       };
       reader.readAsDataURL(file);
@@ -614,9 +616,9 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
             textAlign: 'left',
           },
           '& th': {
-            bgcolor: isDark ? 'rgba(37, 99, 235, 0.2)' : 'rgba(37, 99, 235, 0.08)',
+            bgcolor: isDark ? 'rgba(0,113,227, 0.2)' : 'rgba(0,113,227, 0.08)',
             fontWeight: 600,
-            color: isDark ? '#93c5fd' : '#1e40af',
+            color: isDark ? '#2997ff' : '#0077ED',
           },
           '& td': {
             bgcolor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
@@ -655,7 +657,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
       if (bulletMatch) {
         return (
           <Box key={lineIdx} sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.75, my: 0.25 }}>
-            <Box component="span" sx={{ color: isDark ? '#93c5fd' : '#2563eb', flexShrink: 0 }}>•</Box>
+            <Box component="span" sx={{ color: isDark ? '#2997ff' : '#0071e3', flexShrink: 0 }}>•</Box>
             <span>{renderTextSegment(bulletMatch[1])}</span>
           </Box>
         );
@@ -665,7 +667,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
       if (numberedMatch) {
         return (
           <Box key={lineIdx} sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.75, my: 0.25 }}>
-            <Box component="span" sx={{ color: isDark ? '#93c5fd' : '#2563eb', flexShrink: 0, minWidth: 16 }}>{numberedMatch[1]}.</Box>
+            <Box component="span" sx={{ color: isDark ? '#2997ff' : '#0071e3', flexShrink: 0, minWidth: 16 }}>{numberedMatch[1]}.</Box>
             <span>{renderTextSegment(numberedMatch[2])}</span>
           </Box>
         );
@@ -696,7 +698,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
             href={linkMatch[2]} 
             target="_blank" 
             rel="noopener noreferrer"
-            sx={{ color: isDark ? '#3b82f6' : '#2563eb', textDecoration: 'underline', '&:hover': { color: isDark ? '#93c5fd' : '#1e40af' } }}
+            sx={{ color: isDark ? '#0071e3' : '#0071e3', textDecoration: 'underline', '&:hover': { color: isDark ? '#2997ff' : '#0077ED' } }}
           >
             {linkMatch[1]}
           </Box>
@@ -765,7 +767,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
             maxHeight: isFullscreen ? '100vh' : '85vh',
             background: isDark
               ? 'linear-gradient(180deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.03) 100%)'
-              : 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
+              : 'linear-gradient(180deg, #ffffff 0%, #f5f5f7 100%)',
             backdropFilter: isDark ? 'blur(32px) saturate(180%)' : 'none',
             WebkitBackdropFilter: isDark ? 'blur(32px) saturate(180%)' : 'none',
             border: isFullscreen ? 'none' : `1px solid ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)'}`,
@@ -783,7 +785,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
             py: 2,
             background: isDark
               ? 'linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 100%)'
-              : 'linear-gradient(180deg, #f1f5f9 0%, #ffffff 100%)',
+              : 'linear-gradient(180deg, #f5f5f7 0%, #ffffff 100%)',
             borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)'}`,
           }}
         >
@@ -795,7 +797,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 borderRadius: 1.5,
                 background: isDark
                   ? 'linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 100%)'
-                  : 'linear-gradient(135deg, #e2e8f0 0%, #f1f5f9 100%)',
+                  : 'linear-gradient(135deg, #e2e8f0 0%, #f5f5f7 100%)',
                 border: `1px solid ${isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.08)'}`,
                 boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
                 display: 'flex',
@@ -808,6 +810,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 component="img"
                 src="/logo.png"
                 alt="SCC Shop"
+                className="theme-logo"
                 sx={{
                   width: 36,
                   height: 36,
@@ -840,7 +843,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                     borderRadius: 0.75,
                     background: 'rgba(16, 185, 129, 0.2)',
                     border: '1px solid rgba(16, 185, 129, 0.35)',
-                    color: '#6ee7b7',
+                    color: '#30d158',
                     fontWeight: 600,
                   }}>
                     <Sparkles size={9} />
@@ -861,7 +864,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
               }}>
                 {loading ? (
                   <>
-                    <Sparkles size={14} color={isDark ? '#93c5fd' : '#2563eb'} style={{ animation: 'shimmer 1.5s infinite' }} />
+                    <Sparkles size={14} color={isDark ? '#2997ff' : '#0071e3'} style={{ animation: 'shimmer 1.5s infinite' }} />
                     กำลังคิด...
                   </>
                 ) : (
@@ -870,8 +873,8 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       width: 6, 
                       height: 6, 
                       borderRadius: '50%', 
-                      bgcolor: '#4ade80',
-                      boxShadow: '0 0 6px #4ade80',
+                      bgcolor: '#30d158',
+                      boxShadow: '0 0 6px #30d158',
                     }} />
                     ออนไลน์
                   </>
@@ -932,8 +935,8 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
           ref={messagesContainerRef}
           sx={{ 
             background: isDark
-              ? 'linear-gradient(180deg, rgba(15,23,42,0.8) 0%, rgba(30,41,59,0.9) 100%)'
-              : 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)',
+              ? 'linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(29,29,31,0.9) 100%)'
+              : 'linear-gradient(180deg, #f5f5f7 0%, #f5f5f7 100%)',
             minHeight: isFullscreen ? 'calc(100vh - 160px)' : 320,
             maxHeight: isFullscreen ? 'calc(100vh - 160px)' : 380,
             overflowY: 'auto',
@@ -959,9 +962,9 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                   borderRadius: 2,
                   background: isDark
                     ? 'linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.04) 100%)'
-                    : 'linear-gradient(135deg, #e2e8f0 0%, #f1f5f9 100%)',
+                    : 'linear-gradient(135deg, #e2e8f0 0%, #f5f5f7 100%)',
                   border: `1px solid ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)'}`,
-                  boxShadow: '0 6px 20px rgba(37, 99, 235, 0.15)',
+                  boxShadow: '0 6px 20px rgba(0,113,227, 0.15)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -974,6 +977,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                   component="img"
                   src="/logo.png"
                   alt="SCC Shop"
+                  className="theme-logo"
                   sx={{
                     width: 52,
                     height: 52,
@@ -996,7 +1000,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 justifyContent: 'center',
                 gap: 0.75,
               }}>
-                สวัสดีค่ะ! <Hand size={20} color="#fbbf24" />
+                สวัสดีค่ะ! <Hand size={20} color="#ffd60a" />
               </Typography>
               
               {aiEnabled && (
@@ -1008,9 +1012,9 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                   px: 1,
                   py: 0.4,
                   borderRadius: 1,
-                  background: isDark ? 'rgba(37, 99, 235, 0.15)' : 'rgba(37, 99, 235, 0.08)',
-                  border: `1px solid ${isDark ? 'rgba(37, 99, 235, 0.25)' : 'rgba(37, 99, 235, 0.15)'}`,
-                  color: isDark ? 'rgba(165, 180, 252, 0.95)' : '#2563eb',
+                  background: isDark ? 'rgba(0,113,227, 0.15)' : 'rgba(0,113,227, 0.08)',
+                  border: `1px solid ${isDark ? 'rgba(0,113,227, 0.25)' : 'rgba(0,113,227, 0.15)'}`,
+                  color: isDark ? 'rgba(165, 180, 252, 0.95)' : '#0071e3',
                   fontWeight: 500,
                   mb: 1.5,
                 }}>
@@ -1037,9 +1041,9 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                     alignItems: 'center',
                     gap: 0.5,
                     fontSize: 11,
-                    color: isDark ? 'rgba(165, 180, 252, 0.9)' : '#2563eb',
-                    background: isDark ? 'rgba(37, 99, 235, 0.15)' : 'rgba(37, 99, 235, 0.08)',
-                    border: `1px solid ${isDark ? 'rgba(37, 99, 235, 0.25)' : 'rgba(37, 99, 235, 0.15)'}`,
+                    color: isDark ? 'rgba(165, 180, 252, 0.9)' : '#0071e3',
+                    background: isDark ? 'rgba(0,113,227, 0.15)' : 'rgba(0,113,227, 0.08)',
+                    border: `1px solid ${isDark ? 'rgba(0,113,227, 0.25)' : 'rgba(0,113,227, 0.15)'}`,
                     px: 1.25,
                     py: 0.4,
                     borderRadius: 1,
@@ -1053,7 +1057,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       alignItems: 'center',
                       gap: 0.5,
                       fontSize: 11,
-                      color: isDark ? 'rgba(110, 231, 183, 0.9)' : '#059669',
+                      color: isDark ? 'rgba(110, 231, 183, 0.9)' : '#34c759',
                       background: isDark ? 'rgba(16, 185, 129, 0.15)' : 'rgba(16, 185, 129, 0.08)',
                       border: `1px solid ${isDark ? 'rgba(16, 185, 129, 0.25)' : 'rgba(16, 185, 129, 0.15)'}`,
                       px: 1.25,
@@ -1069,7 +1073,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       alignItems: 'center',
                       gap: 0.5,
                       fontSize: 11,
-                      color: isDark ? 'rgba(251, 191, 36, 0.9)' : '#d97706',
+                      color: isDark ? 'rgba(251, 191, 36, 0.9)' : '#ff9f0a',
                       background: isDark ? 'rgba(251, 191, 36, 0.15)' : 'rgba(251, 191, 36, 0.08)',
                       border: `1px solid ${isDark ? 'rgba(251, 191, 36, 0.25)' : 'rgba(251, 191, 36, 0.15)'}`,
                       px: 1.25,
@@ -1106,12 +1110,12 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       transition: 'all 0.2s ease',
                       pl: 0.5,
                       '& .MuiChip-icon': {
-                        color: isDark ? 'rgba(165, 180, 252, 0.9)' : '#2563eb',
+                        color: isDark ? 'rgba(165, 180, 252, 0.9)' : '#0071e3',
                         marginLeft: '6px',
                       },
                       '&:hover': {
-                        background: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(37, 99, 235, 0.08)',
-                        borderColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(37, 99, 235, 0.2)',
+                        background: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,113,227, 0.08)',
+                        borderColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,113,227, 0.2)',
                       },
                     }}
                   />
@@ -1144,10 +1148,10 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 src={msg.sender === 'user' && userSession?.image ? userSession.image : undefined}
                 sx={{ 
                   background: msg.sender === 'user' 
-                    ? 'rgba(37, 99, 235, 0.5)'
+                    ? 'rgba(0,113,227, 0.5)'
                     : isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
                   border: msg.sender === 'user'
-                    ? '1px solid rgba(30, 64, 175, 0.4)'
+                    ? '1px solid rgba(0,113,227, 0.4)'
                     : `1px solid ${isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)'}`,
                   width: 30, 
                   height: 30, 
@@ -1159,7 +1163,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 {msg.sender === 'user' ? (
                   userSession?.image ? null : <User size={16} />
                 ) : (
-                  <Bot size={16} color={isDark ? '#93c5fd' : '#2563eb'} />
+                  <Bot size={16} color={isDark ? '#2997ff' : '#0071e3'} />
                 )}
               </Avatar>
               <Box sx={{ mx: 1.25, maxWidth: '78%' }}>
@@ -1189,8 +1193,8 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                           transition: 'all 0.2s ease',
                           '&:hover': {
                             transform: 'scale(1.05)',
-                            borderColor: 'rgba(37, 99, 235, 0.5)',
-                            boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
+                            borderColor: 'rgba(0,113,227, 0.5)',
+                            boxShadow: '0 4px 12px rgba(0,113,227, 0.25)',
                           },
                           '&:hover .zoom-icon': {
                             opacity: 1,
@@ -1267,18 +1271,18 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       py: 0.5,
                       borderRadius: 1,
                       bgcolor: msg.sender === 'user' 
-                        ? 'rgba(30, 64, 175, 0.2)'
+                        ? 'rgba(0,113,227, 0.2)'
                         : isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
                       borderLeft: msg.replyTo.sender === 'user' 
-                        ? '2px solid rgba(30, 64, 175, 0.6)'
-                        : `2px solid ${isDark ? 'rgba(165, 180, 252, 0.6)' : 'rgba(37, 99, 235, 0.5)'}`,
+                        ? '2px solid rgba(0,113,227, 0.6)'
+                        : `2px solid ${isDark ? 'rgba(165, 180, 252, 0.6)' : 'rgba(0,113,227, 0.5)'}`,
                       fontSize: 11,
                       color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)',
                       cursor: 'pointer',
                       transition: 'all 0.2s',
                       '&:hover': {
                         bgcolor: msg.sender === 'user' 
-                          ? 'rgba(30, 64, 175, 0.3)'
+                          ? 'rgba(0,113,227, 0.3)'
                           : isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
                       },
                     }}
@@ -1287,7 +1291,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       if (el) {
                         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                         el.style.transition = 'background 0.3s';
-                        el.style.background = 'rgba(37, 99, 235, 0.3)';
+                        el.style.background = 'rgba(0,113,227, 0.3)';
                         setTimeout(() => {
                           el.style.background = '';
                         }, 1500);
@@ -1314,10 +1318,10 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                   id={msg.id}
                   sx={{
                     background: msg.sender === 'user' 
-                      ? isDark ? 'rgba(37, 99, 235, 0.35)' : 'rgba(37, 99, 235, 0.12)'
+                      ? isDark ? 'rgba(0,113,227, 0.35)' : 'rgba(0,113,227, 0.12)'
                       : isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
                     border: msg.sender === 'user'
-                      ? `1px solid ${isDark ? 'rgba(30, 64, 175, 0.35)' : 'rgba(37, 99, 235, 0.2)'}`
+                      ? `1px solid ${isDark ? 'rgba(0,113,227, 0.35)' : 'rgba(0,113,227, 0.2)'}`
                       : `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)'}`,
                     color: isDark ? 'rgba(255,255,255,0.95)' : 'rgba(0,0,0,0.87)',
                     px: 1.5,
@@ -1363,7 +1367,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                         py: 0.2,
                         borderRadius: 0.5,
                         bgcolor: isDark ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.1)',
-                        color: isDark ? '#6ee7b7' : '#059669',
+                        color: isDark ? '#30d158' : '#34c759',
                         cursor: 'help',
                         display: 'flex',
                         alignItems: 'center',
@@ -1380,8 +1384,8 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       px: 0.6,
                       py: 0.2,
                       borderRadius: 0.5,
-                      bgcolor: isDark ? 'rgba(37, 99, 235, 0.2)' : 'rgba(37, 99, 235, 0.1)',
-                      color: isDark ? '#93c5fd' : '#2563eb',
+                      bgcolor: isDark ? 'rgba(0,113,227, 0.2)' : 'rgba(0,113,227, 0.1)',
+                      color: isDark ? '#2997ff' : '#0071e3',
                       display: 'flex',
                       alignItems: 'center',
                       gap: 0.25,
@@ -1396,7 +1400,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       sx={{
                         p: 0.25,
                         color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)',
-                        '&:hover': { color: '#fbbf24', bgcolor: 'transparent' },
+                        '&:hover': { color: '#ffd60a', bgcolor: 'transparent' },
                       }}
                       title="แก้ไขข้อความ"
                     >
@@ -1409,7 +1413,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                     sx={{
                       p: 0.25,
                       color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)',
-                      '&:hover': { color: isDark ? '#93c5fd' : '#2563eb', bgcolor: 'transparent' },
+                      '&:hover': { color: isDark ? '#2997ff' : '#0071e3', bgcolor: 'transparent' },
                     }}
                     title="ตอบกลับ"
                   >
@@ -1421,7 +1425,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       onClick={() => handleCopyMessage(msg.id, msg.text)}
                       sx={{
                         p: 0.25,
-                        color: copiedMessageId === msg.id ? '#4ade80' : isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)',
+                        color: copiedMessageId === msg.id ? '#30d158' : isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)',
                         '&:hover': { color: isDark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.6)', bgcolor: 'transparent' },
                       }}
                       title="คัดลอก"
@@ -1448,15 +1452,15 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                           background: isDark
                             ? 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)'
                             : 'linear-gradient(135deg, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0.02) 100%)',
-                          color: isDark ? 'rgba(165, 180, 252, 0.9)' : '#2563eb',
+                          color: isDark ? 'rgba(165, 180, 252, 0.9)' : '#0071e3',
                           border: `1px solid ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)'}`,
                           fontSize: 11,
                           height: 28,
                           cursor: 'pointer',
                           transition: 'all 0.2s ease',
                           '&:hover': { 
-                            background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(37, 99, 235, 0.06)',
-                            borderColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(37, 99, 235, 0.2)',
+                            background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,113,227, 0.06)',
+                            borderColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,113,227, 0.2)',
                           },
                         }}
                       />
@@ -1475,13 +1479,13 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                         key={i}
                         onClick={() => handleQuickQuestion(q)}
                         sx={{ 
-                          color: isDark ? 'rgba(165, 180, 252, 0.8)' : '#2563eb', 
+                          color: isDark ? 'rgba(165, 180, 252, 0.8)' : '#0071e3', 
                           fontSize: 12, 
                           cursor: 'pointer',
                           py: 0.25,
                           transition: 'all 0.2s',
                           '&:hover': { 
-                            color: isDark ? 'rgba(165, 180, 252, 1)' : '#1e40af',
+                            color: isDark ? 'rgba(165, 180, 252, 1)' : '#0077ED',
                             transform: 'translateX(4px)',
                           },
                         }}
@@ -1506,7 +1510,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                   height: 32,
                 }}
               >
-                <Bot size={18} color={isDark ? '#93c5fd' : '#2563eb'} />
+                <Bot size={18} color={isDark ? '#2997ff' : '#0071e3'} />
               </Avatar>
               <Box
                 sx={{
@@ -1528,7 +1532,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       width: 7,
                       height: 7,
                       borderRadius: '50%',
-                      bgcolor: isDark ? '#93c5fd' : '#2563eb',
+                      bgcolor: isDark ? '#2997ff' : '#0071e3',
                       animation: 'bounce 1.4s infinite',
                       animationDelay: `${i * 0.16}s`,
                       '@keyframes bounce': {
@@ -1557,11 +1561,11 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
               px: 1.5,
               py: 0.5,
               borderRadius: 1.5,
-              bgcolor: isDark ? 'rgba(37, 99, 235, 0.15)' : 'rgba(37, 99, 235, 0.06)',
-              borderLeft: '3px solid rgba(37, 99, 235, 0.6)',
+              bgcolor: isDark ? 'rgba(0,113,227, 0.15)' : 'rgba(0,113,227, 0.06)',
+              borderLeft: '3px solid rgba(0,113,227, 0.6)',
             }}
           >
-            <Reply size={14} color={isDark ? '#93c5fd' : '#2563eb'} style={{ transform: 'scaleX(-1)' }} />
+            <Reply size={14} color={isDark ? '#2997ff' : '#0071e3'} style={{ transform: 'scaleX(-1)' }} />
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Typography sx={{ 
                 fontSize: 11, 
@@ -1570,7 +1574,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
               }}>
-                <Box component="span" sx={{ color: isDark ? '#93c5fd' : '#2563eb', fontWeight: 500, mr: 0.5 }}>
+                <Box component="span" sx={{ color: isDark ? '#2997ff' : '#0071e3', fontWeight: 500, mr: 0.5 }}>
                   ตอบกลับ {replyToMessage.sender === 'user' ? 'คุณ' : 'Bot'}:
                 </Box>
                 {replyToMessage.text}
@@ -1606,7 +1610,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
               borderLeft: '3px solid rgba(251, 191, 36, 0.6)',
             }}
           >
-            <Pencil size={14} color={isDark ? '#fbbf24' : '#d97706'} />
+            <Pencil size={14} color={isDark ? '#ffd60a' : '#ff9f0a'} />
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Typography sx={{ 
                 fontSize: 11, 
@@ -1615,7 +1619,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
               }}>
-                <Box component="span" sx={{ color: isDark ? '#fbbf24' : '#d97706', fontWeight: 500, mr: 0.5 }}>
+                <Box component="span" sx={{ color: isDark ? '#ffd60a' : '#ff9f0a', fontWeight: 500, mr: 0.5 }}>
                   แก้ไขข้อความ
                 </Box>
                 {editingMessage.text.slice(0, 50) + (editingMessage.text.length > 50 ? '...' : '')}
@@ -1640,7 +1644,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
           px: 1.5,
           pt: (replyToMessage || editingMessage) ? 0.5 : 1,
           pb: 1.25,
-          background: isDark ? 'rgba(255,255,255,0.05)' : '#f8fafc',
+          background: isDark ? 'rgba(255,255,255,0.05)' : '#f5f5f7',
           borderTop: (replyToMessage || editingMessage) ? 'none' : `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
         }}>
           <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'flex-end' }}>
@@ -1694,7 +1698,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 py: 0.5,
                 transition: 'all 0.2s',
                 '&:focus-within': {
-                  borderColor: isDark ? 'rgba(37, 99, 235, 0.5)' : 'rgba(37, 99, 235, 0.4)',
+                  borderColor: isDark ? 'rgba(0,113,227, 0.5)' : 'rgba(0,113,227, 0.4)',
                 },
                 '&:hover': {
                   borderColor: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)',
@@ -1718,7 +1722,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       height: 36,
                       borderRadius: 1,
                       objectFit: 'cover',
-                      border: '1px solid rgba(37, 99, 235, 0.4)',
+                      border: '1px solid rgba(0,113,227, 0.4)',
                     }}
                   />
                   <IconButton
@@ -1789,11 +1793,11 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 height: 40,
                 borderRadius: 1.5,
                 flexShrink: 0,
-                bgcolor: uploadedImage ? 'rgba(16, 185, 129, 0.5)' : 'rgba(37, 99, 235, 0.5)',
-                border: uploadedImage ? '1px solid rgba(16, 185, 129, 0.35)' : '1px solid rgba(30, 64, 175, 0.35)',
+                bgcolor: uploadedImage ? 'rgba(16, 185, 129, 0.5)' : 'rgba(0,113,227, 0.5)',
+                border: uploadedImage ? '1px solid rgba(16, 185, 129, 0.35)' : '1px solid rgba(0,113,227, 0.35)',
                 transition: 'all 0.2s',
                 '&:hover': {
-                  bgcolor: uploadedImage ? 'rgba(16, 185, 129, 0.65)' : 'rgba(37, 99, 235, 0.65)',
+                  bgcolor: uploadedImage ? 'rgba(16, 185, 129, 0.65)' : 'rgba(0,113,227, 0.65)',
                 },
                 '&:disabled': {
                   bgcolor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
@@ -1896,9 +1900,9 @@ export function ChatBotFab({ onClick, showPulse = true }: ChatBotFabProps) {
         width: 56,
         height: 56,
         borderRadius: '50%',
-        background: 'linear-gradient(135deg, rgba(37,99,235,0.9) 0%, rgba(30,64,175,0.9) 100%)',
+        background: 'linear-gradient(135deg, rgba(0,113,227,0.9) 0%, rgba(0,113,227,0.9) 100%)',
         border: '2px solid rgba(255,255,255,0.2)',
-        boxShadow: '0 8px 32px rgba(37, 99, 235, 0.4)',
+        boxShadow: '0 8px 32px rgba(0,113,227, 0.4)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -1906,7 +1910,7 @@ export function ChatBotFab({ onClick, showPulse = true }: ChatBotFabProps) {
         transition: 'all 0.3s ease',
         '&:hover': {
           transform: 'scale(1.1)',
-          boxShadow: '0 12px 40px rgba(37, 99, 235, 0.5)',
+          boxShadow: '0 12px 40px rgba(0,113,227, 0.5)',
         },
         '&:active': {
           transform: 'scale(0.95)',
@@ -1917,7 +1921,7 @@ export function ChatBotFab({ onClick, showPulse = true }: ChatBotFabProps) {
             position: 'absolute',
             inset: -4,
             borderRadius: '50%',
-            background: 'linear-gradient(135deg, rgba(37,99,235,0.5) 0%, rgba(30,64,175,0.5) 100%)',
+            background: 'linear-gradient(135deg, rgba(0,113,227,0.5) 0%, rgba(0,113,227,0.5) 100%)',
             animation: 'pulse 2s ease-in-out infinite',
             zIndex: -1,
           },

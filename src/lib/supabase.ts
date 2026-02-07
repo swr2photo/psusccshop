@@ -579,6 +579,18 @@ function transformDBOrderToLegacy(dbOrder: any): any {
     trackingLastChecked: dbOrder.tracking_last_checked,
     shippedAt: dbOrder.shipped_at,
     receivedAt: dbOrder.received_at,
+    // Refund fields
+    refundStatus: dbOrder.refund_status,
+    refundReason: dbOrder.refund_reason,
+    refundDetails: dbOrder.refund_details,
+    refundBankName: dbOrder.refund_bank_name,
+    refundBankAccount: dbOrder.refund_bank_account,
+    refundAccountName: dbOrder.refund_account_name,
+    refundAmount: dbOrder.refund_amount,
+    refundRequestedAt: dbOrder.refund_requested_at,
+    refundReviewedAt: dbOrder.refund_reviewed_at,
+    refundReviewedBy: dbOrder.refund_reviewed_by,
+    refundAdminNote: dbOrder.refund_admin_note,
     createdAt: dbOrder.created_at,
     updatedAt: dbOrder.updated_at,
     _key: `orders/${new Date(dbOrder.created_at).getFullYear()}-${String(new Date(dbOrder.created_at).getMonth() + 1).padStart(2, '0')}/${dbOrder.ref}.json`,
@@ -817,6 +829,18 @@ export async function updateOrderByRef(ref: string, updates: Partial<any>): Prom
   if (updates.trackingLastChecked !== undefined) dbUpdates.tracking_last_checked = updates.trackingLastChecked;
   if (updates.shippedAt !== undefined) dbUpdates.shipped_at = updates.shippedAt;
   if (updates.receivedAt !== undefined) dbUpdates.received_at = updates.receivedAt;
+  // Refund fields
+  if (updates.refundStatus !== undefined) dbUpdates.refund_status = updates.refundStatus;
+  if (updates.refundReason !== undefined) dbUpdates.refund_reason = updates.refundReason;
+  if (updates.refundDetails !== undefined) dbUpdates.refund_details = updates.refundDetails;
+  if (updates.refundBankName !== undefined) dbUpdates.refund_bank_name = updates.refundBankName;
+  if (updates.refundBankAccount !== undefined) dbUpdates.refund_bank_account = updates.refundBankAccount;
+  if (updates.refundAccountName !== undefined) dbUpdates.refund_account_name = updates.refundAccountName;
+  if (updates.refundAmount !== undefined) dbUpdates.refund_amount = updates.refundAmount;
+  if (updates.refundRequestedAt !== undefined) dbUpdates.refund_requested_at = updates.refundRequestedAt;
+  if (updates.refundReviewedAt !== undefined) dbUpdates.refund_reviewed_at = updates.refundReviewedAt;
+  if (updates.refundReviewedBy !== undefined) dbUpdates.refund_reviewed_by = updates.refundReviewedBy;
+  if (updates.refundAdminNote !== undefined) dbUpdates.refund_admin_note = updates.refundAdminNote;
   
   const { data, error } = await db
     .from('orders')

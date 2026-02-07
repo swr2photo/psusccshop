@@ -136,6 +136,10 @@ import {
   Headphones as SupportAgent,
   HelpCircle as HelpOutline,
   Tag as LocalOffer,
+  Sparkles,
+  Calendar as CalendarIcon,
+  PartyPopper,
+  Ticket,
 } from 'lucide-react';
 
 import { isAdmin, isSuperAdmin, setDynamicAdminEmails, SUPER_ADMIN_EMAIL, Product, ShopConfig, SIZES } from '@/lib/config';
@@ -147,6 +151,7 @@ import ShippingSettings from '@/components/admin/ShippingSettings';
 import { SHIPPING_PROVIDERS, type ShippingProvider } from '@/lib/shipping';
 import PaymentSettings from '@/components/admin/PaymentSettings';
 import TrackingManagement from '@/components/admin/TrackingManagement';
+import RefundManagement from '@/components/admin/RefundManagement';
 
 // ============== TYPES ==============
 interface AdminDataResponse {
@@ -377,7 +382,7 @@ const saveAdminCache = (payload: { config: ShopConfig; orders?: AdminOrder[]; lo
   }
 };
 
-const ORDER_STATUSES = ['WAITING_PAYMENT', 'PENDING', 'PAID', 'READY', 'SHIPPED', 'COMPLETED', 'CANCELLED'];
+const ORDER_STATUSES = ['WAITING_PAYMENT', 'PENDING', 'PAID', 'READY', 'SHIPPED', 'COMPLETED', 'CANCELLED', 'REFUND_REQUESTED', 'REFUNDED'];
 const PRODUCT_TYPES = ['JERSEY', 'CREW', 'OTHER'];
 
 // New category system
@@ -475,6 +480,8 @@ const STATUS_THEME: Record<string, { bg: string; text: string; border: string }>
   SHIPPED: { bg: 'rgba(6,182,212,0.15)', text: '#22d3ee', border: 'rgba(6,182,212,0.4)' },
   COMPLETED: { bg: 'rgba(34,197,94,0.15)', text: '#4ade80', border: 'rgba(34,197,94,0.4)' },
   CANCELLED: { bg: 'rgba(239,68,68,0.15)', text: '#f87171', border: 'rgba(239,68,68,0.4)' },
+  REFUND_REQUESTED: { bg: 'rgba(124,58,237,0.15)', text: '#a78bfa', border: 'rgba(124,58,237,0.4)' },
+  REFUNDED: { bg: 'rgba(168,85,247,0.15)', text: '#c084fc', border: 'rgba(168,85,247,0.4)' },
 };
 
 const glassCardSx = {
@@ -1411,6 +1418,946 @@ const SettingsView = React.memo(function SettingsView({
   );
 });
 
+// ============== PROMO CODES VIEW COMPONENT ==============
+interface PromoCode {
+  id: string;
+  code: string;
+  enabled: boolean;
+  discountType: 'percent' | 'fixed';
+  discountValue: number;
+  minOrderAmount?: number;
+  maxDiscount?: number;
+  usageLimit?: number | null;
+  usageCount?: number;
+  expiresAt?: string;
+  description?: string;
+  createdBy?: string;
+  createdAt: string;
+}
+
+interface PromoCodesViewProps {
+  config: ShopConfig;
+  saveConfig: (newConfig: ShopConfig) => Promise<void>;
+  showToast: (type: 'success' | 'error' | 'info' | 'warning', message: string) => void;
+  userEmail: string | null | undefined;
+}
+
+const PromoCodesView = React.memo(function PromoCodesView({ config, saveConfig, showToast, userEmail }: PromoCodesViewProps) {
+  const [codes, setCodes] = React.useState<PromoCode[]>((config.promoCodes || []) as PromoCode[]);
+  const [editingCode, setEditingCode] = React.useState<PromoCode | null>(null);
+  const [saving, setSaving] = React.useState(false);
+
+  React.useEffect(() => {
+    setCodes((config.promoCodes || []) as PromoCode[]);
+  }, [config.promoCodes]);
+
+  const createNewCode = (): PromoCode => ({
+    id: `promo_${Date.now()}`,
+    code: '',
+    enabled: true,
+    discountType: 'percent',
+    discountValue: 10,
+    createdBy: userEmail || 'admin',
+    createdAt: new Date().toISOString(),
+  });
+
+  const handleSave = async (code: PromoCode) => {
+    if (!code.code.trim()) { showToast('warning', 'กรุณากรอกรหัสส่วนลด'); return; }
+    setSaving(true);
+    try {
+      const existingIdx = codes.findIndex(c => c.id === code.id);
+      let newCodes: PromoCode[];
+      if (existingIdx >= 0) {
+        newCodes = codes.map(c => c.id === code.id ? code : c);
+      } else {
+        newCodes = [...codes, code];
+      }
+      await saveConfig({ ...config, promoCodes: newCodes as any });
+      setCodes(newCodes);
+      setEditingCode(null);
+      showToast('success', existingIdx >= 0 ? 'อัปเดตโค้ดแล้ว' : 'สร้างโค้ดแล้ว');
+    } catch {
+      showToast('error', 'บันทึกไม่สำเร็จ');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = (id: string) => {
+    Swal.fire({
+      title: 'ลบโค้ดส่วนลด?',
+      text: 'โค้ดนี้จะถูกลบถาวร',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#475569',
+      confirmButtonText: 'ลบ',
+      cancelButtonText: 'ยกเลิก',
+    }).then(async (result) => {
+      if (result.isConfirmed) {
+        const newCodes = codes.filter(c => c.id !== id);
+        await saveConfig({ ...config, promoCodes: newCodes as any });
+        setCodes(newCodes);
+        showToast('success', 'ลบโค้ดแล้ว');
+      }
+    });
+  };
+
+  const toggleEnabled = async (id: string) => {
+    const newCodes = codes.map(c => c.id === id ? { ...c, enabled: !c.enabled } : c);
+    await saveConfig({ ...config, promoCodes: newCodes as any });
+    setCodes(newCodes);
+  };
+
+  return (
+    <Box>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Box>
+          <Typography variant="h5" sx={{ fontWeight: 800, color: ADMIN_THEME.text }}>🎫 โค้ดส่วนลด</Typography>
+          <Typography sx={{ color: ADMIN_THEME.muted, fontSize: '0.85rem' }}>จัดการรหัสส่วนลดสำหรับลูกค้า</Typography>
+        </Box>
+        <Button
+          variant="contained"
+          onClick={() => setEditingCode(createNewCode())}
+          sx={{ background: ADMIN_THEME.gradient, fontWeight: 700, borderRadius: '12px', textTransform: 'none', px: 3, py: 1 }}
+        >
+          + สร้างโค้ดใหม่
+        </Button>
+      </Box>
+
+      {codes.length === 0 ? (
+        <Box sx={{ textAlign: 'center', py: 8, color: ADMIN_THEME.muted }}>
+          <Ticket size={48} style={{ margin: '0 auto 16px', opacity: 0.3 }} />
+          <Typography sx={{ fontWeight: 600 }}>ยังไม่มีโค้ดส่วนลด</Typography>
+          <Typography sx={{ fontSize: '0.85rem', mt: 0.5 }}>สร้างโค้ดใหม่เพื่อเริ่มต้นใช้งาน</Typography>
+        </Box>
+      ) : (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          {codes.map(code => {
+            const isExpired = code.expiresAt && new Date(code.expiresAt) < new Date();
+            const isUsedUp = code.usageLimit != null && (code.usageCount || 0) >= code.usageLimit;
+            return (
+              <Box key={code.id} sx={{ p: 2, borderRadius: '14px', bgcolor: ADMIN_THEME.glass, border: `1px solid ${ADMIN_THEME.border}`, display: 'flex', alignItems: 'center', gap: 2, opacity: isExpired || isUsedUp ? 0.5 : 1 }}>
+                <Switch checked={code.enabled} onChange={() => toggleEnabled(code.id)} size="small" />
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                    <Typography sx={{ fontWeight: 800, fontSize: '1rem', color: '#34c759', fontFamily: 'monospace', letterSpacing: '0.05em' }}>
+                      {code.code}
+                    </Typography>
+                    {isExpired && <Chip label="หมดอายุ" size="small" sx={{ bgcolor: 'rgba(239,68,68,0.15)', color: '#ef4444', fontWeight: 600, fontSize: '0.65rem' }} />}
+                    {isUsedUp && <Chip label="ใช้ครบแล้ว" size="small" sx={{ bgcolor: 'rgba(245,158,11,0.15)', color: '#f59e0b', fontWeight: 600, fontSize: '0.65rem' }} />}
+                  </Box>
+                  <Typography sx={{ fontSize: '0.8rem', color: ADMIN_THEME.muted }}>
+                    {code.discountType === 'percent' ? `ลด ${code.discountValue}%` : `ลด ฿${code.discountValue}`}
+                    {code.maxDiscount ? ` (สูงสุด ฿${code.maxDiscount})` : ''}
+                    {code.minOrderAmount ? ` • ขั้นต่ำ ฿${code.minOrderAmount}` : ''}
+                    {code.usageLimit != null ? ` • ใช้แล้ว ${code.usageCount || 0}/${code.usageLimit}` : ''}
+                    {code.expiresAt ? ` • หมดอายุ ${new Date(code.expiresAt).toLocaleDateString('th-TH')}` : ''}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', gap: 0.5 }}>
+                  <IconButton size="small" onClick={() => setEditingCode(code)} sx={{ color: ADMIN_THEME.primary }}>
+                    <Edit size={16} />
+                  </IconButton>
+                  <IconButton size="small" onClick={() => handleDelete(code.id)} sx={{ color: '#ef4444' }}>
+                    <Delete size={16} />
+                  </IconButton>
+                </Box>
+              </Box>
+            );
+          })}
+        </Box>
+      )}
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editingCode} onClose={() => !saving && setEditingCode(null)} maxWidth="sm" fullWidth
+        PaperProps={{ sx: { bgcolor: 'var(--background)', color: 'var(--foreground)', borderRadius: '16px', border: '1px solid var(--glass-border)' } }}>
+        {editingCode && (
+          <>
+            <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700 }}>
+              <Ticket size={20} /> {codes.some(c => c.id === editingCode.id) ? 'แก้ไขโค้ด' : 'สร้างโค้ดใหม่'}
+            </DialogTitle>
+            <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '8px !important' }}>
+              <TextField fullWidth label="รหัสส่วนลด" value={editingCode.code} onChange={e => setEditingCode({ ...editingCode, code: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '') })} placeholder="เช่น FIRST20, SALE50" helperText="ใช้ตัวพิมพ์ใหญ่และตัวเลขเท่านั้น"
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px', bgcolor: 'var(--surface)', color: 'var(--foreground)', fontFamily: 'monospace', fontWeight: 700, fontSize: '1.1rem', letterSpacing: '0.05em' }, '& .MuiInputLabel-root': { color: 'var(--text-muted)' } }} />
+
+              <TextField fullWidth label="คำอธิบาย" value={editingCode.description || ''} onChange={e => setEditingCode({ ...editingCode, description: e.target.value })} placeholder="เช่น ลูกค้าใหม่ลด 20%"
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px', bgcolor: 'var(--surface)', color: 'var(--foreground)' }, '& .MuiInputLabel-root': { color: 'var(--text-muted)' } }} />
+
+              <Box sx={{ display: 'flex', gap: 1.5 }}>
+                <Box sx={{ display: 'flex', gap: 0.5 }}>
+                  {([{ value: 'percent' as const, label: 'ลด %' }, { value: 'fixed' as const, label: 'ลด ฿' }]).map(opt => (
+                    <Chip key={opt.value} label={opt.label} onClick={() => setEditingCode({ ...editingCode, discountType: opt.value })}
+                      sx={{ bgcolor: editingCode.discountType === opt.value ? 'rgba(52,199,89,0.2)' : 'var(--surface)', color: editingCode.discountType === opt.value ? '#34c759' : 'var(--text-muted)', border: `1px solid ${editingCode.discountType === opt.value ? 'rgba(52,199,89,0.4)' : 'var(--glass-border)'}`, fontWeight: 700, cursor: 'pointer' }} />
+                  ))}
+                </Box>
+                <TextField type="number" label={editingCode.discountType === 'percent' ? 'เปอร์เซ็นต์ (%)'  : 'จำนวนเงิน (฿)'} value={editingCode.discountValue || ''} onChange={e => setEditingCode({ ...editingCode, discountValue: Number(e.target.value) || 0 })} inputProps={{ min: 0, max: editingCode.discountType === 'percent' ? 100 : 99999 }} size="small" sx={{ flex: 1, '& .MuiOutlinedInput-root': { borderRadius: '10px', bgcolor: 'var(--surface)', color: 'var(--foreground)' }, '& .MuiInputLabel-root': { color: 'var(--text-muted)' } }} />
+              </Box>
+
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+                <TextField type="number" label="ยอดขั้นต่ำ (฿)" value={editingCode.minOrderAmount || ''} onChange={e => setEditingCode({ ...editingCode, minOrderAmount: Number(e.target.value) || undefined })} inputProps={{ min: 0 }} size="small" sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px', bgcolor: 'var(--surface)', color: 'var(--foreground)' }, '& .MuiInputLabel-root': { color: 'var(--text-muted)' } }} />
+                {editingCode.discountType === 'percent' && (
+                  <TextField type="number" label="ลดสูงสุด (฿)" value={editingCode.maxDiscount || ''} onChange={e => setEditingCode({ ...editingCode, maxDiscount: Number(e.target.value) || undefined })} inputProps={{ min: 0 }} size="small" sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px', bgcolor: 'var(--surface)', color: 'var(--foreground)' }, '& .MuiInputLabel-root': { color: 'var(--text-muted)' } }} />
+                )}
+                <TextField type="number" label="จำนวนครั้งที่ใช้ได้ (0 = ไม่จำกัด)" value={editingCode.usageLimit ?? ''} onChange={e => setEditingCode({ ...editingCode, usageLimit: e.target.value === '' || e.target.value === '0' ? null : Number(e.target.value) })} inputProps={{ min: 0 }} size="small" sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px', bgcolor: 'var(--surface)', color: 'var(--foreground)' }, '& .MuiInputLabel-root': { color: 'var(--text-muted)' } }} />
+                <TextField type="datetime-local" label="วันหมดอายุ" value={editingCode.expiresAt?.slice(0, 16) || ''} onChange={e => setEditingCode({ ...editingCode, expiresAt: e.target.value ? new Date(e.target.value).toISOString() : undefined })} InputLabelProps={{ shrink: true }} size="small" sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px', bgcolor: 'var(--surface)', color: 'var(--foreground)' }, '& .MuiInputLabel-root': { color: 'var(--text-muted)' }, '& input': { color: 'var(--foreground)' } }} />
+              </Box>
+
+              <FormControlLabel control={<Switch checked={editingCode.enabled} onChange={e => setEditingCode({ ...editingCode, enabled: e.target.checked })} />} label="เปิดใช้งาน" sx={{ color: 'var(--foreground)' }} />
+            </DialogContent>
+            <DialogActions sx={{ p: 2, gap: 1, borderTop: '1px solid var(--glass-border)' }}>
+              <Button onClick={() => setEditingCode(null)} sx={{ color: 'var(--text-muted)', borderRadius: '10px' }}>ยกเลิก</Button>
+              <Button onClick={() => handleSave(editingCode)} disabled={saving} variant="contained"
+                sx={{ background: `linear-gradient(135deg, #34c759, #30d158)`, borderRadius: '10px', fontWeight: 700, textTransform: 'none' }}>
+                {saving ? 'กำลังบันทึก...' : 'บันทึก'}
+              </Button>
+            </DialogActions>
+          </>
+        )}
+      </Dialog>
+    </Box>
+  );
+});
+
+// ============== EVENTS VIEW COMPONENT ==============
+interface ShopEvent {
+  id: string;
+  enabled: boolean;
+  title: string;
+  description?: string;
+  imageUrl?: string;
+  color: string;
+  type: 'event' | 'promotion' | 'sale' | 'announcement';
+  startDate?: string;
+  endDate?: string;
+  ctaText?: string;
+  ctaLink?: string;
+  badge?: string;
+  priority?: number;
+  linkedProducts?: string[];
+  discountType?: 'percent' | 'fixed';
+  discountValue?: number;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+interface EventsViewProps {
+  config: ShopConfig;
+  saveConfig: (newConfig: ShopConfig) => Promise<void>;
+  showToast: (type: 'success' | 'error' | 'info' | 'warning', message: string) => void;
+  userEmail: string | null | undefined;
+  onImageUpload: (file: File) => Promise<string | null>;
+}
+
+const EVENT_TYPE_OPTIONS = [
+  { value: 'event', label: 'อีเวนท์', icon: '🎉', color: '#bf5af2' },
+  { value: 'promotion', label: 'โปรโมชั่น', icon: '✨', color: '#ff9f0a' },
+  { value: 'sale', label: 'ลดราคา', icon: '🏷️', color: '#ff453a' },
+  { value: 'announcement', label: 'ประกาศพิเศษ', icon: '📢', color: '#0071e3' },
+];
+
+const EVENT_COLORS = [
+  '#0071e3', '#3b82f6', '#5e5ce6', '#bf5af2',
+  '#ff375f', '#ff453a', '#ff9f0a', '#ffd60a',
+  '#30d158', '#34c759', '#64d2ff', '#06b6d4',
+  '#ec4899', '#f472b6', '#a78bfa', '#fb923c',
+];
+
+const EventsView = React.memo(function EventsView({
+  config,
+  saveConfig,
+  showToast,
+  userEmail,
+  onImageUpload,
+}: EventsViewProps) {
+  const [events, setEvents] = React.useState<ShopEvent[]>(config.events || []);
+  const [editingEvent, setEditingEvent] = React.useState<ShopEvent | null>(null);
+  const [saving, setSaving] = React.useState(false);
+  const [uploadingImage, setUploadingImage] = React.useState(false);
+
+  React.useEffect(() => {
+    setEvents(config.events || []);
+  }, [config.events]);
+
+  const createNewEvent = (): ShopEvent => ({
+    id: `evt_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+    enabled: true,
+    title: '',
+    description: '',
+    color: '#0071e3',
+    type: 'promotion',
+    ctaText: '',
+    ctaLink: '',
+    badge: '',
+    priority: events.length,
+    createdBy: userEmail || 'แอดมิน',
+    createdAt: new Date().toISOString(),
+  });
+
+  const handleSave = async (event: ShopEvent) => {
+    setSaving(true);
+    try {
+      const existingIndex = events.findIndex(e => e.id === event.id);
+      let newEvents: ShopEvent[];
+      if (existingIndex >= 0) {
+        newEvents = events.map(e => e.id === event.id ? { ...event, updatedAt: new Date().toISOString() } : e);
+      } else {
+        newEvents = [...events, event];
+      }
+      await saveConfig({ ...config, events: newEvents });
+      setEvents(newEvents);
+      setEditingEvent(null);
+      showToast('success', existingIndex >= 0 ? 'อัปเดตอีเวนต์แล้ว' : 'สร้างอีเวนต์แล้ว');
+    } catch {
+      showToast('error', 'บันทึกไม่สำเร็จ');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (event: ShopEvent) => {
+    const result = await Swal.fire({
+      title: 'ยืนยันการลบ?',
+      text: `ลบ "${event.title}" ออกจากระบบ`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'ลบ',
+      cancelButtonText: 'ยกเลิก',
+      background: 'var(--surface-2)',
+      color: 'var(--foreground)',
+    });
+    if (!result.isConfirmed) return;
+
+    setSaving(true);
+    try {
+      const newEvents = events.filter(e => e.id !== event.id);
+      await saveConfig({ ...config, events: newEvents });
+      setEvents(newEvents);
+      showToast('success', 'ลบอีเวนต์แล้ว');
+    } catch {
+      showToast('error', 'ลบไม่สำเร็จ');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleToggle = async (event: ShopEvent) => {
+    const newEvents = events.map(e => e.id === event.id ? { ...e, enabled: !e.enabled } : e);
+    setEvents(newEvents);
+    try {
+      await saveConfig({ ...config, events: newEvents });
+      showToast('success', event.enabled ? 'ปิดอีเวนต์แล้ว' : 'เปิดอีเวนต์แล้ว');
+    } catch {
+      showToast('error', 'บันทึกไม่สำเร็จ');
+      setEvents(events); // rollback
+    }
+  };
+
+  const handleImageUpload = async (file: File) => {
+    if (!editingEvent) return;
+    setUploadingImage(true);
+    try {
+      const url = await onImageUpload(file);
+      if (url) {
+        setEditingEvent(prev => prev ? { ...prev, imageUrl: url } : null);
+        showToast('success', 'อัปโหลดรูปสำเร็จ');
+      }
+    } catch {
+      showToast('error', 'อัปโหลดรูปไม่สำเร็จ');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  return (
+    <Box sx={{ maxWidth: 900, mx: 'auto' }}>
+      {/* Header */}
+      <Box sx={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        mb: 3, flexWrap: 'wrap', gap: 2,
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box sx={{
+            width: 44, height: 44, borderRadius: '14px',
+            background: 'linear-gradient(135deg, #fbbf24, #f59e0b)',
+            display: 'grid', placeItems: 'center',
+            boxShadow: '0 4px 16px rgba(251,191,36,0.3)',
+          }}>
+            <Sparkles size={22} color="#fff" />
+          </Box>
+          <Box>
+            <Typography sx={{ fontWeight: 800, fontSize: '1.3rem', color: 'var(--foreground)' }}>
+              อีเวนต์ & โปรโมชั่น
+            </Typography>
+            <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              จัดการแบนเนอร์โฆษณาและอีเวนต์ ({events.length} รายการ)
+            </Typography>
+          </Box>
+        </Box>
+        <Button
+          variant="contained"
+          startIcon={<Add size={18} />}
+          onClick={() => setEditingEvent(createNewEvent())}
+          sx={{
+            borderRadius: '12px',
+            textTransform: 'none',
+            fontWeight: 700,
+            background: 'linear-gradient(135deg, #fbbf24, #f59e0b)',
+            color: '#000',
+            px: 2.5,
+            '&:hover': { background: 'linear-gradient(135deg, #f59e0b, #d97706)' },
+          }}
+        >
+          สร้างอีเวนต์ใหม่
+        </Button>
+      </Box>
+
+      {/* Events List */}
+      {events.length === 0 ? (
+        <Box sx={{
+          py: 8, textAlign: 'center',
+          borderRadius: '20px',
+          bgcolor: 'var(--surface-2)',
+          border: '1px solid var(--glass-border)',
+        }}>
+          <Sparkles size={56} style={{ opacity: 0.2, marginBottom: 16, color: 'var(--text-muted)' }} />
+          <Typography sx={{ color: 'var(--text-muted)', fontSize: '1.1rem', fontWeight: 600 }}>
+            ยังไม่มีอีเวนต์
+          </Typography>
+          <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem', mt: 0.5 }}>
+            สร้างอีเวนต์แรกเพื่อโปรโมทสินค้า
+          </Typography>
+        </Box>
+      ) : (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          {events.sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99)).map((event) => {
+            const typeInfo = EVENT_TYPE_OPTIONS.find(t => t.value === event.type) || EVENT_TYPE_OPTIONS[0];
+            const isActive = event.enabled && (!event.endDate || new Date(event.endDate) > new Date());
+            const isExpired = event.endDate && new Date(event.endDate) < new Date();
+
+            return (
+              <Box key={event.id} sx={{
+                p: 2, borderRadius: '16px',
+                bgcolor: 'var(--surface-2)',
+                border: `1px solid ${isActive ? event.color + '30' : 'var(--glass-border)'}`,
+                opacity: isExpired ? 0.6 : 1,
+                transition: 'all 0.2s ease',
+                '&:hover': { borderColor: event.color + '50' },
+              }}>
+                <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
+                  {/* Thumbnail */}
+                  {event.imageUrl && (
+                    <Box sx={{
+                      width: 80, height: 56, borderRadius: '10px', overflow: 'hidden',
+                      flexShrink: 0, border: '1px solid var(--glass-border)',
+                    }}>
+                      <img src={event.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    </Box>
+                  )}
+
+                  {/* Content */}
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5, flexWrap: 'wrap' }}>
+                      <Chip
+                        label={`${typeInfo.icon} ${typeInfo.label}`}
+                        size="small"
+                        sx={{
+                          bgcolor: typeInfo.color + '18',
+                          color: typeInfo.color,
+                          fontWeight: 700,
+                          fontSize: '0.7rem',
+                          height: 22,
+                        }}
+                      />
+                      {event.badge && (
+                        <Chip label={event.badge} size="small" sx={{
+                          bgcolor: event.color + '18', color: event.color,
+                          fontWeight: 700, fontSize: '0.7rem', height: 22,
+                        }} />
+                      )}
+                      {isExpired && (
+                        <Chip label="หมดอายุ" size="small" sx={{
+                          bgcolor: 'rgba(239,68,68,0.1)', color: '#ef4444',
+                          fontWeight: 700, fontSize: '0.65rem', height: 20,
+                        }} />
+                      )}
+                      <Chip
+                        label={event.enabled ? 'เปิด' : 'ปิด'}
+                        size="small"
+                        sx={{
+                          bgcolor: event.enabled ? 'rgba(16,185,129,0.1)' : 'rgba(107,114,128,0.1)',
+                          color: event.enabled ? '#10b981' : '#6b7280',
+                          fontWeight: 700, fontSize: '0.65rem', height: 20,
+                        }}
+                      />
+                    </Box>
+
+                    <Typography sx={{
+                      fontWeight: 700, fontSize: '1rem', color: 'var(--foreground)',
+                      mb: 0.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    }}>
+                      {event.title || '(ไม่มีชื่อ)'}
+                    </Typography>
+
+                    {event.description && (
+                      <Typography sx={{
+                        fontSize: '0.8rem', color: 'var(--text-muted)',
+                        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                      }}>
+                        {event.description}
+                      </Typography>
+                    )}
+
+                    {/* Date info */}
+                    <Box sx={{ display: 'flex', gap: 1.5, mt: 0.5, flexWrap: 'wrap' }}>
+                      {event.startDate && (
+                        <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 0.3 }}>
+                          <CalendarIcon size={11} /> เริ่ม: {new Date(event.startDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </Typography>
+                      )}
+                      {event.endDate && (
+                        <Typography sx={{ fontSize: '0.7rem', color: isExpired ? '#ef4444' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 0.3 }}>
+                          <AccessTime size={11} /> สิ้นสุด: {new Date(event.endDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </Typography>
+                      )}
+                    </Box>
+                  </Box>
+
+                  {/* Actions */}
+                  <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
+                    <Tooltip title={event.enabled ? 'ปิดอีเวนต์' : 'เปิดอีเวนต์'}>
+                      <IconButton size="small" onClick={() => handleToggle(event)}
+                        sx={{ color: event.enabled ? '#10b981' : 'var(--text-muted)' }}>
+                        {event.enabled ? <ToggleOn size={18} /> : <ToggleOff size={18} />}
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="แก้ไข">
+                      <IconButton size="small" onClick={() => setEditingEvent({ ...event })}
+                        sx={{ color: 'var(--text-muted)', '&:hover': { color: '#0071e3' } }}>
+                        <Edit size={16} />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="ลบ">
+                      <IconButton size="small" onClick={() => handleDelete(event)}
+                        sx={{ color: 'var(--text-muted)', '&:hover': { color: '#ef4444' } }}>
+                        <Delete size={16} />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                </Box>
+              </Box>
+            );
+          })}
+        </Box>
+      )}
+
+      {/* Edit/Create Dialog */}
+      <Dialog
+        open={!!editingEvent}
+        onClose={() => !saving && setEditingEvent(null)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: 'var(--surface)',
+            borderRadius: '20px',
+            border: '1px solid var(--glass-border)',
+            maxHeight: '90vh',
+          },
+        }}
+      >
+        {editingEvent && (
+          <>
+            <DialogTitle sx={{ borderBottom: '1px solid var(--glass-border)', pb: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Box sx={{
+                  width: 40, height: 40, borderRadius: '12px',
+                  background: 'linear-gradient(135deg, #fbbf24, #f59e0b)',
+                  display: 'grid', placeItems: 'center',
+                }}>
+                  <Sparkles size={20} color="#fff" />
+                </Box>
+                <Box>
+                  <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--foreground)' }}>
+                    {events.some(e => e.id === editingEvent.id) ? 'แก้ไขอีเวนต์' : 'สร้างอีเวนต์ใหม่'}
+                  </Typography>
+                </Box>
+              </Box>
+            </DialogTitle>
+
+            <DialogContent sx={{ py: 2.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {/* Enable toggle */}
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+                <Typography sx={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--foreground)' }}>
+                  เปิดใช้งาน
+                </Typography>
+                <Switch
+                  checked={editingEvent.enabled}
+                  onChange={e => setEditingEvent(prev => prev ? { ...prev, enabled: e.target.checked } : null)}
+                  sx={{
+                    '& .MuiSwitch-switchBase.Mui-checked': { color: '#10b981' },
+                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: '#10b981' },
+                  }}
+                />
+              </Box>
+
+              {/* Type selector */}
+              <Box>
+                <Typography sx={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--foreground)', mb: 1 }}>
+                  ประเภท
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                  {EVENT_TYPE_OPTIONS.map(opt => (
+                    <Chip
+                      key={opt.value}
+                      label={`${opt.icon} ${opt.label}`}
+                      onClick={() => setEditingEvent(prev => prev ? { ...prev, type: opt.value as ShopEvent['type'] } : null)}
+                      sx={{
+                        bgcolor: editingEvent.type === opt.value ? opt.color + '20' : 'var(--glass-bg)',
+                        color: editingEvent.type === opt.value ? opt.color : 'var(--text-muted)',
+                        border: editingEvent.type === opt.value ? `2px solid ${opt.color}50` : '2px solid transparent',
+                        fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        '&:hover': { bgcolor: opt.color + '15' },
+                      }}
+                    />
+                  ))}
+                </Box>
+              </Box>
+
+              {/* Title */}
+              <TextField
+                fullWidth
+                label="ชื่ออีเวนต์ / โปรโมชั่น"
+                value={editingEvent.title}
+                onChange={e => setEditingEvent(prev => prev ? { ...prev, title: e.target.value } : null)}
+                placeholder="เช่น Flash Sale วันนี้เท่านั้น!"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '12px',
+                    bgcolor: 'var(--surface)',
+                    color: 'var(--foreground)',
+                  },
+                  '& .MuiInputLabel-root': { color: 'var(--text-muted)' },
+                }}
+              />
+
+              {/* Description */}
+              <TextField
+                fullWidth
+                multiline
+                rows={2}
+                label="รายละเอียด (ไม่บังคับ)"
+                value={editingEvent.description || ''}
+                onChange={e => setEditingEvent(prev => prev ? { ...prev, description: e.target.value } : null)}
+                placeholder="รายละเอียดเพิ่มเติม..."
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '12px',
+                    bgcolor: 'var(--surface)',
+                    color: 'var(--foreground)',
+                  },
+                  '& .MuiInputLabel-root': { color: 'var(--text-muted)' },
+                }}
+              />
+
+              {/* Badge */}
+              <TextField
+                fullWidth
+                label="ป้ายข้อความ เช่น ลด 20%, ฟรีค่าส่ง"
+                value={editingEvent.badge || ''}
+                onChange={e => setEditingEvent(prev => prev ? { ...prev, badge: e.target.value } : null)}
+                placeholder="ลด 30%"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '12px',
+                    bgcolor: 'var(--surface)',
+                    color: 'var(--foreground)',
+                  },
+                  '& .MuiInputLabel-root': { color: 'var(--text-muted)' },
+                }}
+              />
+
+              {/* CTA */}
+              <Box sx={{ display: 'flex', gap: 1.5 }}>
+                <TextField
+                  fullWidth
+                  label="ข้อความปุ่ม"
+                  value={editingEvent.ctaText || ''}
+                  onChange={e => setEditingEvent(prev => prev ? { ...prev, ctaText: e.target.value } : null)}
+                  placeholder="ดูรายละเอียด"
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '12px',
+                      bgcolor: 'var(--surface)',
+                      color: 'var(--foreground)',
+                    },
+                    '& .MuiInputLabel-root': { color: 'var(--text-muted)' },
+                  }}
+                />
+                <TextField
+                  fullWidth
+                  label="ลิงก์ / Product ID"
+                  value={editingEvent.ctaLink || ''}
+                  onChange={e => setEditingEvent(prev => prev ? { ...prev, ctaLink: e.target.value } : null)}
+                  placeholder="https://... หรือ product_id"
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '12px',
+                      bgcolor: 'var(--surface)',
+                      color: 'var(--foreground)',
+                    },
+                    '& .MuiInputLabel-root': { color: 'var(--text-muted)' },
+                  }}
+                />
+              </Box>
+
+              {/* Dates */}
+              <Box sx={{ display: 'flex', gap: 1.5 }}>
+                <TextField
+                  fullWidth
+                  label="วันเริ่มต้น"
+                  type="datetime-local"
+                  value={editingEvent.startDate?.slice(0, 16) || ''}
+                  onChange={e => setEditingEvent(prev => prev ? { ...prev, startDate: e.target.value ? new Date(e.target.value).toISOString() : undefined } : null)}
+                  InputLabelProps={{ shrink: true }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '12px',
+                      bgcolor: 'var(--surface)',
+                      color: 'var(--foreground)',
+                    },
+                    '& .MuiInputLabel-root': { color: 'var(--text-muted)' },
+                    '& input': { color: 'var(--foreground)' },
+                  }}
+                />
+                <TextField
+                  fullWidth
+                  label="วันสิ้นสุด"
+                  type="datetime-local"
+                  value={editingEvent.endDate?.slice(0, 16) || ''}
+                  onChange={e => setEditingEvent(prev => prev ? { ...prev, endDate: e.target.value ? new Date(e.target.value).toISOString() : undefined } : null)}
+                  InputLabelProps={{ shrink: true }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '12px',
+                      bgcolor: 'var(--surface)',
+                      color: 'var(--foreground)',
+                    },
+                    '& .MuiInputLabel-root': { color: 'var(--text-muted)' },
+                    '& input': { color: 'var(--foreground)' },
+                  }}
+                />
+              </Box>
+
+              {/* Discount Settings */}
+              <Box sx={{ p: 2, borderRadius: '12px', bgcolor: 'rgba(255,69,58,0.08)', border: '1px solid rgba(255,69,58,0.2)' }}>
+                <Typography sx={{ fontWeight: 700, fontSize: '0.9rem', color: '#ff453a', mb: 1.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  🏷️ ส่วนลดสินค้า (ลดราคาอัตโนมัติเมื่ออีเวนต์เปิด)
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1.5, mb: 1.5 }}>
+                  <Box sx={{ display: 'flex', gap: 0.5 }}>
+                    {([{ value: 'percent', label: 'ลด %' }, { value: 'fixed', label: 'ลด ฿' }] as const).map(opt => (
+                      <Chip
+                        key={opt.value}
+                        label={opt.label}
+                        onClick={() => setEditingEvent(prev => prev ? { ...prev, discountType: prev.discountType === opt.value ? undefined : opt.value } : null)}
+                        sx={{
+                          bgcolor: editingEvent.discountType === opt.value ? 'rgba(255,69,58,0.2)' : 'var(--surface)',
+                          color: editingEvent.discountType === opt.value ? '#ff453a' : 'var(--text-muted)',
+                          border: `1px solid ${editingEvent.discountType === opt.value ? 'rgba(255,69,58,0.4)' : 'var(--glass-border)'}`,
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      />
+                    ))}
+                  </Box>
+                  {editingEvent.discountType && (
+                    <TextField
+                      type="number"
+                      label={editingEvent.discountType === 'percent' ? 'เปอร์เซ็นต์ลด' : 'จำนวนเงินลด (฿)'}
+                      value={editingEvent.discountValue || ''}
+                      onChange={e => setEditingEvent(prev => prev ? { ...prev, discountValue: Number(e.target.value) || 0 } : null)}
+                      inputProps={{ min: 0, max: editingEvent.discountType === 'percent' ? 100 : 99999 }}
+                      size="small"
+                      sx={{
+                        width: 160,
+                        '& .MuiOutlinedInput-root': { borderRadius: '10px', bgcolor: 'var(--surface)', color: 'var(--foreground)' },
+                        '& .MuiInputLabel-root': { color: 'var(--text-muted)' },
+                      }}
+                    />
+                  )}
+                </Box>
+
+                {/* Linked Products */}
+                <Typography sx={{ fontWeight: 600, fontSize: '0.8rem', color: 'var(--text-muted)', mb: 0.75 }}>
+                  สินค้าที่เข้าร่วม (คลิกเพื่อเลือก/ยกเลิก)
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', maxHeight: 150, overflowY: 'auto' }}>
+                  {(config.products || []).map(p => {
+                    const isLinked = editingEvent.linkedProducts?.includes(p.id);
+                    return (
+                      <Chip
+                        key={p.id}
+                        label={`${p.name}${p.basePrice ? ` ฿${p.basePrice}` : ''}`}
+                        size="small"
+                        onClick={() => setEditingEvent(prev => {
+                          if (!prev) return null;
+                          const current = prev.linkedProducts || [];
+                          const next = isLinked ? current.filter(id => id !== p.id) : [...current, p.id];
+                          return { ...prev, linkedProducts: next };
+                        })}
+                        sx={{
+                          bgcolor: isLinked ? 'rgba(255,69,58,0.15)' : 'var(--surface)',
+                          color: isLinked ? '#ff453a' : 'var(--text-muted)',
+                          border: `1px solid ${isLinked ? 'rgba(255,69,58,0.4)' : 'var(--glass-border)'}`,
+                          fontWeight: isLinked ? 700 : 500,
+                          fontSize: '0.7rem',
+                          cursor: 'pointer',
+                        }}
+                      />
+                    );
+                  })}
+                </Box>
+                {editingEvent.linkedProducts?.length ? (
+                  <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', mt: 0.5 }}>
+                    เลือก {editingEvent.linkedProducts.length} สินค้า
+                    {editingEvent.discountType && editingEvent.discountValue ? ` • ลด${editingEvent.discountType === 'percent' ? ` ${editingEvent.discountValue}%` : ` ฿${editingEvent.discountValue}`}` : ''}
+                  </Typography>
+                ) : null}
+              </Box>
+
+              {/* Color picker */}
+              <Box>
+                <Typography sx={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--foreground)', mb: 1 }}>
+                  สีธีม
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
+                  {EVENT_COLORS.map(c => (
+                    <Box
+                      key={c}
+                      onClick={() => setEditingEvent(prev => prev ? { ...prev, color: c } : null)}
+                      sx={{
+                        width: 28, height: 28, borderRadius: '8px',
+                        bgcolor: c, cursor: 'pointer',
+                        border: editingEvent.color === c ? '3px solid var(--foreground)' : '2px solid transparent',
+                        transition: 'all 0.15s ease',
+                        '&:hover': { transform: 'scale(1.15)' },
+                      }}
+                    />
+                  ))}
+                </Box>
+              </Box>
+
+              {/* Image upload */}
+              <Box>
+                <Typography sx={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--foreground)', mb: 1 }}>
+                  รูปแบนเนอร์
+                </Typography>
+                {editingEvent.imageUrl ? (
+                  <Box sx={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--glass-border)' }}>
+                    <img src={editingEvent.imageUrl} alt="" style={{ width: '100%', height: 150, objectFit: 'cover' }} />
+                    <IconButton
+                      onClick={() => setEditingEvent(prev => prev ? { ...prev, imageUrl: undefined } : null)}
+                      sx={{
+                        position: 'absolute', top: 8, right: 8,
+                        bgcolor: 'rgba(0,0,0,0.5)', color: '#fff',
+                        width: 28, height: 28,
+                        '&:hover': { bgcolor: 'rgba(239,68,68,0.8)' },
+                      }}
+                    >
+                      <Close size={14} />
+                    </IconButton>
+                  </Box>
+                ) : (
+                  <Button
+                    component="label"
+                    variant="outlined"
+                    fullWidth
+                    disabled={uploadingImage}
+                    startIcon={uploadingImage ? <CircularProgress size={16} /> : <ImageIcon size={18} />}
+                    sx={{
+                      borderRadius: '12px',
+                      borderStyle: 'dashed',
+                      borderColor: 'var(--glass-border)',
+                      color: 'var(--text-muted)',
+                      py: 2,
+                      textTransform: 'none',
+                      fontWeight: 600,
+                      '&:hover': { borderColor: '#fbbf24', color: '#fbbf24' },
+                    }}
+                  >
+                    {uploadingImage ? 'กำลังอัปโหลด...' : 'เลือกรูปภาพ'}
+                    <input
+                      type="file"
+                      hidden
+                      accept="image/*"
+                      onChange={e => {
+                        const file = e.target.files?.[0];
+                        if (file) handleImageUpload(file);
+                        e.target.value = '';
+                      }}
+                    />
+                  </Button>
+                )}
+              </Box>
+
+              {/* Priority */}
+              <TextField
+                fullWidth
+                label="ลำดับการแสดง (ตัวเลขน้อย = แสดงก่อน)"
+                type="number"
+                value={editingEvent.priority ?? 0}
+                onChange={e => setEditingEvent(prev => prev ? { ...prev, priority: parseInt(e.target.value) || 0 } : null)}
+                InputProps={{ inputProps: { min: 0, max: 99 } }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '12px',
+                    bgcolor: 'var(--surface)',
+                    color: 'var(--foreground)',
+                  },
+                  '& .MuiInputLabel-root': { color: 'var(--text-muted)' },
+                }}
+              />
+            </DialogContent>
+
+            <DialogActions sx={{ borderTop: '1px solid var(--glass-border)', p: 2, gap: 1 }}>
+              <Button
+                onClick={() => setEditingEvent(null)}
+                disabled={saving}
+                sx={{ color: 'var(--text-muted)', borderRadius: '10px', textTransform: 'none' }}
+              >
+                ยกเลิก
+              </Button>
+              <Button
+                variant="contained"
+                onClick={() => handleSave(editingEvent)}
+                disabled={saving || !editingEvent.title.trim()}
+                startIcon={saving ? <CircularProgress size={16} /> : <Save size={16} />}
+                sx={{
+                  borderRadius: '10px',
+                  textTransform: 'none',
+                  fontWeight: 700,
+                  background: 'linear-gradient(135deg, #fbbf24, #f59e0b)',
+                  color: '#000',
+                  px: 3,
+                  '&:hover': { background: 'linear-gradient(135deg, #f59e0b, #d97706)' },
+                  '&.Mui-disabled': { opacity: 0.5 },
+                }}
+              >
+                {saving ? 'กำลังบันทึก...' : 'บันทึก'}
+              </Button>
+            </DialogActions>
+          </>
+        )}
+      </Dialog>
+    </Box>
+  );
+});
+
 // ============== ANNOUNCEMENTS VIEW COMPONENT ==============
 interface AnnouncementsViewProps {
   config: ShopConfig;
@@ -2112,7 +3059,7 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
                     )}
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1, mt: 1 }}>
                       {editingAnn.showLogo && (
-                        <Box component="img" src="/logo.png" alt="Logo" sx={{ width: 20, height: 20, borderRadius: '4px' }} onError={(e: any) => { e.target.style.display = 'none'; }} />
+                        <Box component="img" src="/logo.png" alt="Logo" className="theme-logo" sx={{ width: 20, height: 20, borderRadius: '4px' }} onError={(e: any) => { e.target.style.display = 'none'; }} />
                       )}
                       <Typography sx={{ fontSize: '0.7rem', color: 'var(--foreground)' }}>
                         — {editingAnn.displayName || 'แอดมิน'}
@@ -2263,6 +3210,8 @@ export default function AdminPage(): JSX.Element {
     10: 'shipping',
     11: 'payment',
     12: 'tracking',
+    14: 'events',
+    15: 'promo',
   };
   const HASH_TAB_MAP: Record<string, number> = Object.fromEntries(
     Object.entries(TAB_HASH_MAP).map(([k, v]) => [v, Number(k)])
@@ -2290,11 +3239,15 @@ export default function AdminPage(): JSX.Element {
     }
   }, []);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const toastTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  // Available OAuth providers
+  const [availableProviders, setAvailableProviders] = useState<string[]>(['google']);
 
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [logs, setLogs] = useState<any[][]>([]);
@@ -2899,6 +3852,13 @@ export default function AdminPage(): JSX.Element {
       setOrderProcessingRef(null);
     }
   };
+  // Fetch available OAuth providers
+  useEffect(() => {
+    fetch('/api/auth/available-providers')
+      .then(res => res.json())
+      .then(data => { if (data.providers) setAvailableProviders(data.providers); })
+      .catch(() => {});
+  }, []);
 
   // 🔐 Authentication Check - Load cache immediately (SWR handles fresh fetch)
   useEffect(() => {
@@ -5038,6 +5998,8 @@ export default function AdminPage(): JSX.Element {
                 'SHIPPED': 'ส่งแล้ว',
                 'COMPLETED': 'สำเร็จ',
                 'CANCELLED': 'ยกเลิก',
+                'REFUND_REQUESTED': 'ขอคืนเงิน',
+                'REFUNDED': 'คืนแล้ว',
               };
               return (
                 <Box
@@ -6506,7 +7468,7 @@ export default function AdminPage(): JSX.Element {
                   mb: 3,
                 }}
               >
-                เข้าสู่ระบบด้วยบัญชี Google ที่ได้รับอนุญาต
+                เข้าสู่ระบบด้วยบัญชีที่ได้รับอนุญาต
               </Typography>
 
               {/* Google Sign In Button */}
@@ -6558,6 +7520,40 @@ export default function AdminPage(): JSX.Element {
                 </Box>
                 เข้าสู่ระบบด้วย Google
               </Button>
+
+              {/* Microsoft Sign In Button */}
+              {availableProviders.includes('azure-ad') && <Button
+                onClick={() => signIn('azure-ad')}
+                fullWidth
+                sx={{
+                  mt: 1.5,
+                  py: 1.8,
+                  borderRadius: '14px',
+                  background: '#2f2f2f',
+                  color: '#ffffff',
+                  fontWeight: 600,
+                  fontSize: '1rem',
+                  textTransform: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 2,
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+                  transition: 'all 0.3s ease',
+                  '&:hover': {
+                    background: '#404040',
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 8px 30px rgba(0,0,0,0.2)',
+                  },
+                }}
+              >
+                <Box component="svg" viewBox="0 0 23 23" sx={{ width: 24, height: 24 }}>
+                  <path fill="#f35325" d="M1 1h10v10H1z"/>
+                  <path fill="#81bc06" d="M12 1h10v10H12z"/>
+                  <path fill="#05a6f0" d="M1 12h10v10H1z"/>
+                  <path fill="#ffba08" d="M12 12h10v10H12z"/>
+                </Box>
+                เข้าสู่ระบบด้วย Microsoft
+              </Button>}
 
               {/* Divider */}
               <Box sx={{ display: 'flex', alignItems: 'center', my: 3 }}>
@@ -6854,7 +7850,7 @@ export default function AdminPage(): JSX.Element {
                 </Typography>
               </Box>
               <IconButton 
-                onClick={() => signOut()}
+                onClick={() => setLogoutConfirmOpen(true)}
                 sx={{ 
                   color: 'var(--text-muted)',
                   '&:hover': { color: '#f87171', bgcolor: 'rgba(239,68,68,0.1)' },
@@ -6974,8 +7970,11 @@ export default function AdminPage(): JSX.Element {
               { icon: <Receipt size={20} />, label: 'ออเดอร์', idx: 2, color: '#34d399', badge: pendingCount, show: canManageOrders },
               { icon: <QrCodeScanner size={20} />, label: 'รับสินค้า', idx: 3, color: '#06b6d4', show: canManagePickup },
               { icon: <LocalShipping size={20} />, label: 'ติดตามพัสดุ', idx: 12, color: '#fb923c', show: canManageOrders },
+              { icon: <Refresh size={20} />, label: 'คืนเงิน', idx: 13, color: '#c084fc', show: canManageOrders },
               { icon: <SupportAgent size={20} />, label: 'แชทสนับสนุน', idx: 4, color: '#ec4899', show: canManageOrders },
               { icon: <NotificationsActive size={20} />, label: 'ประกาศ', idx: 5, color: '#f472b6', show: canManageAnnouncement },
+              { icon: <Sparkles size={20} />, label: 'อีเวนต์/โปรโมชั่น', idx: 14, color: '#fbbf24', show: canManageAnnouncement },
+              { icon: <Ticket size={20} />, label: 'โค้ดส่วนลด', idx: 15, color: '#34c759', show: canManageAnnouncement },
               { icon: <Settings size={20} />, label: 'ตั้งค่าร้าน', idx: 6, color: '#60a5fa', show: canManageShop || canManageSheet || isSuperAdminUser },
               { icon: <LocalShipping size={20} />, label: 'ตั้งค่าจัดส่ง', idx: 10, color: '#a78bfa', show: isSuperAdminUser },
               { icon: <AttachMoney size={20} />, label: 'ตั้งค่าชำระเงิน', idx: 11, color: '#22d3ee', show: isSuperAdminUser },
@@ -7131,6 +8130,31 @@ export default function AdminPage(): JSX.Element {
               <NoPermissionView permission="จัดการประกาศ" />
             )
           )}
+          {activeTab === 14 && (
+            canManageAnnouncement ? (
+              <EventsView
+                config={config}
+                saveConfig={saveFullConfig}
+                showToast={showToast}
+                userEmail={session?.user?.email}
+                onImageUpload={handleAnnouncementImageUpload}
+              />
+            ) : (
+              <NoPermissionView permission="จัดการอีเวนต์" />
+            )
+          )}
+          {activeTab === 15 && (
+            canManageAnnouncement ? (
+              <PromoCodesView
+                config={config}
+                saveConfig={saveFullConfig}
+                showToast={showToast}
+                userEmail={session?.user?.email}
+              />
+            ) : (
+              <NoPermissionView permission="จัดการโค้ดส่วนลด" />
+            )
+          )}
           {activeTab === 6 && (
             <SettingsView
               localConfig={settingsLocalConfig}
@@ -7155,6 +8179,7 @@ export default function AdminPage(): JSX.Element {
           {activeTab === 10 && (isSuperAdminUser ? <ShippingSettings onSave={() => showToast('success', 'บันทึกการตั้งค่าจัดส่งแล้ว')} /> : <NoPermissionView permission="ตั้งค่าจัดส่ง" />)}
           {activeTab === 11 && (isSuperAdminUser ? <PaymentSettings onSave={() => showToast('success', 'บันทึกการตั้งค่าชำระเงินแล้ว')} /> : <NoPermissionView permission="ตั้งค่าชำระเงิน" />)}
           {activeTab === 12 && (canManageOrders ? <TrackingManagement showToast={showToast} /> : <NoPermissionView permission="ติดตามพัสดุ" />)}
+          {activeTab === 13 && (canManageOrders ? <RefundManagement showToast={showToast} /> : <NoPermissionView permission="จัดการคืนเงิน" />)}
         </Box>
       </Box>
 
@@ -7485,6 +8510,44 @@ export default function AdminPage(): JSX.Element {
       
       {/* Pickup Confirm Dialog */}
       {pickupConfirmDialog}
+
+      {/* Logout Confirmation Dialog */}
+      <Dialog
+        open={logoutConfirmOpen}
+        onClose={() => setLogoutConfirmOpen(false)}
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            background: ADMIN_THEME.glass,
+            backdropFilter: 'blur(20px)',
+            border: `1px solid ${ADMIN_THEME.border}`,
+            minWidth: 320,
+          },
+        }}
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, pb: 1, color: ADMIN_THEME.text }}>
+          <Warning size={22} color="#f59e0b" />
+          ยืนยันการออกจากระบบ
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ color: ADMIN_THEME.muted }}>
+            คุณต้องการออกจากระบบใช่หรือไม่?
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setLogoutConfirmOpen(false)} sx={{ borderRadius: 2, color: ADMIN_THEME.text }}>
+            ยกเลิก
+          </Button>
+          <Button
+            onClick={() => signOut()}
+            variant="contained"
+            color="error"
+            sx={{ borderRadius: 2 }}
+          >
+            ออกจากระบบ
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
@@ -8354,6 +9417,16 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any
           value={product.name}
           onChange={(e) => onChange({...product, name: e.target.value})}
           fullWidth
+          sx={inputSx}
+        />
+
+        <TextField
+          label="Slug (ลิงก์สินค้า)"
+          value={(product as any).slug || ''}
+          onChange={(e) => onChange({...product, slug: e.target.value.replace(/[^a-zA-Z0-9\u0E00-\u0E7F\s-]/g, '').replace(/\s+/g, '-').toLowerCase()} as any)}
+          fullWidth
+          placeholder={product.name.replace(/[^\u0E00-\u0E7Fa-zA-Z0-9\s-]/g, '').replace(/\s+/g, '-').toLowerCase() || 'auto-generated'}
+          helperText={`ลิงก์: ${typeof window !== 'undefined' ? window.location.origin : ''}/?p=${product.id}`}
           sx={inputSx}
         />
 

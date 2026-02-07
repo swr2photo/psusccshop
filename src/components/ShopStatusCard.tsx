@@ -31,7 +31,7 @@ export const SHOP_STATUS_CONFIG: Record<ShopStatusType, Omit<ShopStatusInfo, 'ty
     label: 'เปิดให้บริการ',
     description: 'สั่งซื้อสินค้าได้แล้ววันนี้!',
     icon: CheckCircle,
-    color: '#10b981',
+    color: '#34c759',
     bgGradient: 'linear-gradient(135deg, rgba(16,185,129,0.15) 0%, rgba(16,185,129,0.05) 100%)',
     borderColor: 'rgba(16,185,129,0.4)',
   },
@@ -39,7 +39,7 @@ export const SHOP_STATUS_CONFIG: Record<ShopStatusType, Omit<ShopStatusInfo, 'ty
     label: 'เร็วๆ นี้',
     description: 'เตรียมพบกับสินค้าใหม่เร็วๆ นี้!',
     icon: Zap,
-    color: '#f59e0b',
+    color: '#ff9f0a',
     bgGradient: 'linear-gradient(135deg, rgba(245,158,11,0.15) 0%, rgba(245,158,11,0.05) 100%)',
     borderColor: 'rgba(245,158,11,0.4)',
   },
@@ -47,7 +47,7 @@ export const SHOP_STATUS_CONFIG: Record<ShopStatusType, Omit<ShopStatusInfo, 'ty
     label: 'หมดเขตสั่งซื้อ',
     description: 'ระยะเวลาการสั่งซื้อสิ้นสุดแล้ว',
     icon: XCircle,
-    color: '#ef4444',
+    color: '#ff453a',
     bgGradient: 'linear-gradient(135deg, rgba(239,68,68,0.15) 0%, rgba(239,68,68,0.05) 100%)',
     borderColor: 'rgba(239,68,68,0.4)',
   },
@@ -55,7 +55,7 @@ export const SHOP_STATUS_CONFIG: Record<ShopStatusType, Omit<ShopStatusInfo, 'ty
     label: 'ปิดชั่วคราว',
     description: 'ร้านค้าปิดให้บริการชั่วคราว กรุณารอการแจ้งเปิดใหม่',
     icon: AlertTriangle,
-    color: '#f97316',
+    color: '#ff9f0a',
     bgGradient: 'linear-gradient(135deg, rgba(249,115,22,0.15) 0%, rgba(249,115,22,0.05) 100%)',
     borderColor: 'rgba(249,115,22,0.4)',
   },
@@ -63,9 +63,9 @@ export const SHOP_STATUS_CONFIG: Record<ShopStatusType, Omit<ShopStatusInfo, 'ty
     label: 'รอเปิดให้บริการ',
     description: 'กรุณารอสักครู่ ร้านค้ากำลังจะเปิด',
     icon: CalendarClock,
-    color: '#2563eb',
-    bgGradient: 'linear-gradient(135deg, rgba(37,99,235,0.15) 0%, rgba(37,99,235,0.05) 100%)',
-    borderColor: 'rgba(37,99,235,0.4)',
+    color: '#0071e3',
+    bgGradient: 'linear-gradient(135deg, rgba(0,113,227,0.15) 0%, rgba(0,113,227,0.05) 100%)',
+    borderColor: 'rgba(0,113,227,0.4)',
   },
 };
 
@@ -212,7 +212,7 @@ export default function ShopStatusCard({
           {config.label}
         </Typography>
         {countdown && (
-          <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary', ml: 0.5 }}>
+          <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', ml: 0.5 }}>
             ({countdown})
           </Typography>
         )}
@@ -293,7 +293,7 @@ export default function ShopStatusCard({
             <Typography
               sx={{
                 fontSize: { xs: '0.85rem', sm: '0.9rem' },
-                color: 'text.secondary',
+                color: 'var(--text-muted)',
                 lineHeight: 1.5,
               }}
             >
@@ -316,7 +316,7 @@ export default function ShopStatusCard({
                 }}
               >
                 <Clock size={16} color={config.color} />
-                <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'text.primary' }}>
+                <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>
                   {(status === 'COMING_SOON' || status === 'WAITING_TO_OPEN') ? 'เปิดใน ' : ''}
                   <Box component="span" sx={{ color: config.color, fontWeight: 700 }}>
                     {countdown}
@@ -385,7 +385,7 @@ export function ProductStatusBadge({ product }: ProductStatusBadgeProps) {
         {config.label}
       </Typography>
       {product.startDate && status === 'COMING_SOON' && (
-        <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary', mt: 0.5 }}>
+        <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', mt: 0.5 }}>
           เปิด {new Date(product.startDate).toLocaleDateString('th-TH')}
         </Typography>
       )}
@@ -466,7 +466,7 @@ export function StatusChip({ status, countdownDate }: StatusChipProps) {
         {config.label}
       </Typography>
       {countdown && (
-        <Typography sx={{ fontSize: '0.65rem', color: 'text.secondary' }}>
+        <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
           {countdown}
         </Typography>
       )}

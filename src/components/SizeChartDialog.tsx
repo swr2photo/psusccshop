@@ -81,7 +81,7 @@ export default function SizeChartDialog(props: SizeChartDialogProps) {
             width: 40,
             height: 40,
             borderRadius: '12px',
-            background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+            background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
             display: 'grid',
             placeItems: 'center',
           }}>
@@ -89,7 +89,7 @@ export default function SizeChartDialog(props: SizeChartDialogProps) {
           </Box>
           <Box>
             <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--foreground)' }}>ตารางไซส์</Typography>
-            <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>สัดส่วนรอบอก/ความยาว (นิ้ว)</Typography>
+            <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>สัดส่วนรอบอก/ความยาว (นิ้ว)</Typography>
           </Box>
         </Box>
       </Box>
@@ -102,11 +102,11 @@ export default function SizeChartDialog(props: SizeChartDialogProps) {
             px: 1.2,
             py: 0.4,
             borderRadius: '8px',
-            bgcolor: 'rgba(37,99,235,0.15)',
-            border: '1px solid rgba(37,99,235,0.3)',
+            bgcolor: 'rgba(0,113,227,0.15)',
+            border: '1px solid rgba(0,113,227,0.3)',
             fontSize: '0.75rem',
             fontWeight: 600,
-            color: '#93c5fd',
+            color: 'var(--primary)',
             display: 'flex',
             alignItems: 'center',
             gap: 0.5,
@@ -121,7 +121,7 @@ export default function SizeChartDialog(props: SizeChartDialogProps) {
             border: '1px solid rgba(245,158,11,0.3)',
             fontSize: '0.75rem',
             fontWeight: 600,
-            color: '#fbbf24',
+            color: '#ffd60a',
           }}>
             แขนยาว +{longSleevePrice}฿
           </Box>
@@ -144,15 +144,15 @@ export default function SizeChartDialog(props: SizeChartDialogProps) {
                 sx={{
                   p: 1.8,
                   borderRadius: '14px',
-                  bgcolor: isSelected ? 'rgba(37,99,235,0.2)' : 'rgba(30,41,59,0.6)',
+                  bgcolor: isSelected ? 'rgba(0,113,227,0.2)' : 'var(--surface-2)',
                   border: isSelected 
-                    ? '2px solid rgba(37,99,235,0.6)' 
-                    : '1px solid rgba(255,255,255,0.06)',
+                    ? '2px solid rgba(0,113,227,0.6)' 
+                    : '1px solid var(--glass-border)',
                   cursor: onSelectSize ? 'pointer' : 'default',
                   transition: 'all 0.2s ease',
                   '&:hover': onSelectSize ? {
-                    bgcolor: isSelected ? 'rgba(37,99,235,0.25)' : 'rgba(30,41,59,0.8)',
-                    borderColor: isSelected ? 'rgba(37,99,235,0.8)' : 'rgba(255,255,255,0.15)',
+                    bgcolor: isSelected ? 'rgba(0,113,227,0.25)' : 'var(--glass-bg)',
+                    borderColor: isSelected ? 'rgba(0,113,227,0.8)' : 'var(--text-muted)',
                     transform: 'translateY(-2px)',
                   } : {},
                 }}

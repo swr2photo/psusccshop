@@ -54,6 +54,7 @@ interface ShirtChatBotProps {
 }
 
 function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
+  const { warning: toastWarning, error: toastError } = useNotification();
   const [input, setInput] = React.useState('');
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -431,11 +432,11 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
     // Validate file type and size
     const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
-      alert('รองรับเฉพาะไฟล์รูปภาพ (PNG, JPG, WEBP)');
+      toastWarning('รองรับเฉพาะไฟล์รูปภาพ (PNG, JPG, WEBP)');
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      alert('ไฟล์ต้องมีขนาดไม่เกิน 5MB');
+      toastWarning('ไฟล์ต้องมีขนาดไม่เกิน 5MB');
       return;
     }
     
@@ -448,7 +449,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
         setIsUploading(false);
       };
       reader.onerror = () => {
-        alert('ไม่สามารถอ่านไฟล์ได้');
+        toastError('ไม่สามารถอ่านไฟล์ได้');
         setIsUploading(false);
       };
       reader.readAsDataURL(file);
@@ -594,7 +595,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
             textAlign: 'left',
           },
           '& th': {
-            bgcolor: 'rgba(37, 99, 235, 0.2)',
+            bgcolor: 'rgba(0,113,227, 0.2)',
             fontWeight: 600,
             color: 'var(--secondary)',
           },
@@ -671,7 +672,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
     return parts.map((part, i) => {
       // Bold
       if (part.startsWith('**') && part.endsWith('**')) {
-        return <strong key={i} style={{ color: '#e0e7ff' }}>{part.slice(2, -2)}</strong>;
+        return <strong key={i} style={{ color: 'var(--primary)' }}>{part.slice(2, -2)}</strong>;
       }
       // Link
       const linkMatch = part.match(/\[(.*?)\]\((.*?)\)/);
@@ -683,7 +684,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
             href={linkMatch[2]} 
             target="_blank" 
             rel="noopener noreferrer"
-            sx={{ color: '#3b82f6', textDecoration: 'underline', '&:hover': { color: 'var(--secondary)' } }}
+            sx={{ color: '#0071e3', textDecoration: 'underline', '&:hover': { color: 'var(--secondary)' } }}
           >
             {linkMatch[1]}
           </Box>
@@ -756,7 +757,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
             // Liquid Glass background
             background: (theme: any) => theme.palette.mode === 'dark'
               ? 'linear-gradient(180deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.03) 100%)'
-              : 'linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.9) 100%)',
+              : 'linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.9) 100%)',
             backdropFilter: 'blur(32px) saturate(180%)',
             WebkitBackdropFilter: 'blur(32px) saturate(180%)',
             border: isFullscreen ? 'none' : '1px solid var(--glass-border)',
@@ -775,7 +776,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
             // Liquid Glass header
             background: (theme: any) => theme.palette.mode === 'dark'
               ? 'linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 100%)'
-              : 'linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(241,245,249,0.9) 100%)',
+              : 'linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(245,245,247,0.9) 100%)',
             borderBottom: '1px solid var(--glass-border)',
           }}
         >
@@ -788,7 +789,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 borderRadius: 1.5,
                 background: (theme: any) => theme.palette.mode === 'dark'
                   ? 'linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 100%)'
-                  : 'linear-gradient(135deg, rgba(37,99,235,0.1) 0%, rgba(37,99,235,0.03) 100%)',
+                  : 'linear-gradient(135deg, rgba(0,113,227,0.1) 0%, rgba(0,113,227,0.03) 100%)',
                 border: '1px solid var(--glass-border)',
                 display: 'flex',
                 alignItems: 'center',
@@ -800,6 +801,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 component="img"
                 src="/logo.png"
                 alt="SCC Shop"
+                className="theme-logo"
                 sx={{
                   width: 36,
                   height: 36,
@@ -832,7 +834,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                     borderRadius: 0.75,
                     background: 'rgba(16, 185, 129, 0.2)',
                     border: '1px solid rgba(16, 185, 129, 0.35)',
-                    color: '#6ee7b7',
+                    color: 'var(--success)',
                     fontWeight: 600,
                   }}>
                     <AutoAwesomeIcon size={9} />
@@ -849,7 +851,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
               }}>
                 {loading ? (
                   <>
-                    <AutoAwesomeIcon size={14} color="#93c5fd" style={{ animation: 'shimmer 1.5s infinite' }} />
+                    <AutoAwesomeIcon size={14} color="#2997ff" style={{ animation: 'shimmer 1.5s infinite' }} />
                     กำลังคิด...
                   </>
                 ) : (
@@ -858,8 +860,8 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       width: 6, 
                       height: 6, 
                       borderRadius: '50%', 
-                      bgcolor: '#4ade80',
-                      boxShadow: '0 0 6px #4ade80',
+                      bgcolor: '#30d158',
+                      boxShadow: '0 0 6px #30d158',
                     }} />
                     ออนไลน์
                   </>
@@ -920,8 +922,8 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
           ref={messagesContainerRef}
           sx={{ 
             background: (theme: any) => theme.palette.mode === 'dark' 
-              ? 'linear-gradient(180deg, rgba(15,23,42,0.8) 0%, rgba(30,41,59,0.9) 100%)' 
-              : 'linear-gradient(180deg, rgba(248,250,252,0.95) 0%, rgba(241,245,249,0.98) 100%)',
+              ? 'linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(29,29,31,0.9) 100%)' 
+              : 'linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(245,245,247,0.98) 100%)',
             minHeight: isFullscreen ? 'calc(100vh - 160px)' : 320,
             maxHeight: isFullscreen ? 'calc(100vh - 160px)' : 380,
             overflowY: 'auto',
@@ -948,9 +950,9 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                   borderRadius: 2,
                   background: (theme: any) => theme.palette.mode === 'dark' 
                     ? 'linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.04) 100%)'
-                    : 'linear-gradient(135deg, rgba(37,99,235,0.08) 0%, rgba(37,99,235,0.02) 100%)',
+                    : 'linear-gradient(135deg, rgba(0,113,227,0.08) 0%, rgba(0,113,227,0.02) 100%)',
                   border: '1px solid var(--glass-border)',
-                  boxShadow: '0 6px 20px rgba(37, 99, 235, 0.15)',
+                  boxShadow: '0 6px 20px rgba(0,113,227, 0.15)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -963,6 +965,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                   component="img"
                   src="/logo.png"
                   alt="SCC Shop"
+                  className="theme-logo"
                   sx={{
                     width: 52,
                     height: 52,
@@ -985,7 +988,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 justifyContent: 'center',
                 gap: 0.75,
               }}>
-                สวัสดีค่ะ! <WavingHandIcon size={20} color="#fbbf24" />
+                สวัสดีค่ะ! <WavingHandIcon size={20} color="#ffd60a" />
               </Typography>
               
               {aiEnabled && (
@@ -997,8 +1000,8 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                   px: 1,
                   py: 0.4,
                   borderRadius: 1,
-                  background: 'rgba(37, 99, 235, 0.15)',
-                  border: '1px solid rgba(37, 99, 235, 0.25)',
+                  background: 'rgba(0,113,227, 0.15)',
+                  border: '1px solid rgba(0,113,227, 0.25)',
                   color: 'rgba(165, 180, 252, 0.95)',
                   fontWeight: 500,
                   mb: 1.5,
@@ -1027,8 +1030,8 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                     gap: 0.5,
                     fontSize: 11,
                     color: 'rgba(165, 180, 252, 0.9)',
-                    background: 'rgba(37, 99, 235, 0.15)',
-                    border: '1px solid rgba(37, 99, 235, 0.25)',
+                    background: 'rgba(0,113,227, 0.15)',
+                    border: '1px solid rgba(0,113,227, 0.25)',
                     px: 1.25,
                     py: 0.4,
                     borderRadius: 1,
@@ -1133,10 +1136,10 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 src={msg.sender === 'user' && userSession?.image ? userSession.image : undefined}
                 sx={{ 
                   background: msg.sender === 'user' 
-                    ? 'rgba(37, 99, 235, 0.5)'
+                    ? 'rgba(0,113,227, 0.5)'
                     : 'var(--glass-bg)',
                   border: msg.sender === 'user'
-                    ? '1px solid rgba(30, 64, 175, 0.4)'
+                    ? '1px solid rgba(0,113,227, 0.4)'
                     : '1px solid var(--glass-border)',
                   width: 30, 
                   height: 30, 
@@ -1148,7 +1151,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 {msg.sender === 'user' ? (
                   userSession?.image ? null : <PersonOutlineIcon size={16} />
                 ) : (
-                  <SmartToyIcon size={16} color="#93c5fd" />
+                  <SmartToyIcon size={16} color="#2997ff" />
                 )}
               </Avatar>
               <Box sx={{ mx: 1.25, maxWidth: '78%' }}>
@@ -1178,8 +1181,8 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                           transition: 'all 0.2s ease',
                           '&:hover': {
                             transform: 'scale(1.05)',
-                            borderColor: 'rgba(37, 99, 235, 0.5)',
-                            boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
+                            borderColor: 'rgba(0,113,227, 0.5)',
+                            boxShadow: '0 4px 12px rgba(0,113,227, 0.25)',
                           },
                           '&:hover .zoom-icon': {
                             opacity: 1,
@@ -1257,10 +1260,10 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       py: 0.5,
                       borderRadius: 1,
                       bgcolor: msg.sender === 'user' 
-                        ? 'rgba(30, 64, 175, 0.2)'
+                        ? 'rgba(0,113,227, 0.2)'
                         : 'var(--glass-bg)',
                       borderLeft: msg.replyTo.sender === 'user' 
-                        ? '2px solid rgba(30, 64, 175, 0.6)'
+                        ? '2px solid rgba(0,113,227, 0.6)'
                         : '2px solid rgba(165, 180, 252, 0.6)',
                       fontSize: 11,
                       color: 'var(--text-muted)',
@@ -1268,7 +1271,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       transition: 'all 0.2s',
                       '&:hover': {
                         bgcolor: msg.sender === 'user' 
-                          ? 'rgba(30, 64, 175, 0.3)'
+                          ? 'rgba(0,113,227, 0.3)'
                           : 'var(--glass-bg)',
                       },
                     }}
@@ -1278,7 +1281,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       if (el) {
                         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                         el.style.transition = 'background 0.3s';
-                        el.style.background = 'rgba(37, 99, 235, 0.3)';
+                        el.style.background = 'rgba(0,113,227, 0.3)';
                         setTimeout(() => {
                           el.style.background = '';
                         }, 1500);
@@ -1305,10 +1308,10 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                   id={msg.id}
                   sx={{
                     background: (theme: any) => msg.sender === 'user' 
-                      ? 'rgba(37, 99, 235, 0.35)'
+                      ? 'rgba(0,113,227, 0.35)'
                       : (theme.palette.mode === 'dark' ? 'var(--glass-bg)' : 'rgba(0,0,0,0.04)'),
                     border: msg.sender === 'user'
-                      ? '1px solid rgba(30, 64, 175, 0.35)'
+                      ? '1px solid rgba(0,113,227, 0.35)'
                       : '1px solid var(--glass-border)',
                     color: 'var(--foreground)',
                     px: 1.5,
@@ -1355,7 +1358,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                         py: 0.2,
                         borderRadius: 0.5,
                         bgcolor: 'rgba(16, 185, 129, 0.2)',
-                        color: '#6ee7b7',
+                        color: 'var(--success)',
                         cursor: 'help',
                         display: 'flex',
                         alignItems: 'center',
@@ -1372,7 +1375,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       px: 0.6,
                       py: 0.2,
                       borderRadius: 0.5,
-                      bgcolor: 'rgba(37, 99, 235, 0.2)',
+                      bgcolor: 'rgba(0,113,227, 0.2)',
                       color: 'var(--secondary)',
                       display: 'flex',
                       alignItems: 'center',
@@ -1389,7 +1392,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       sx={{
                         p: 0.25,
                         color: 'var(--text-muted)',
-                        '&:hover': { color: '#fbbf24', bgcolor: 'transparent' },
+                        '&:hover': { color: 'var(--warning)', bgcolor: 'transparent' },
                       }}
                       title="แก้ไขข้อความ"
                     >
@@ -1416,7 +1419,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       onClick={() => handleCopyMessage(msg.id, msg.text)}
                       sx={{
                         p: 0.25,
-                        color: copiedMessageId === msg.id ? '#4ade80' : 'var(--text-muted)',
+                        color: copiedMessageId === msg.id ? '#30d158' : 'var(--text-muted)',
                         '&:hover': { color: 'var(--foreground)', bgcolor: 'transparent' },
                       }}
                       title="คัดลอก"
@@ -1499,7 +1502,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                   height: 32,
                 }}
               >
-                <SmartToyIcon size={18} color="#93c5fd" />
+                <SmartToyIcon size={18} color="#2997ff" />
               </Avatar>
               <Box
                 sx={{
@@ -1550,11 +1553,11 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
               px: 1.5,
               py: 0.5,
               borderRadius: 1.5,
-              bgcolor: 'rgba(37, 99, 235, 0.15)',
-              borderLeft: '3px solid rgba(37, 99, 235, 0.6)',
+              bgcolor: 'rgba(0,113,227, 0.15)',
+              borderLeft: '3px solid rgba(0,113,227, 0.6)',
             }}
           >
-            <ReplyIcon size={14} color="#93c5fd" style={{ transform: 'scaleX(-1)' }} />
+            <ReplyIcon size={14} color="#2997ff" style={{ transform: 'scaleX(-1)' }} />
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Typography sx={{ 
                 fontSize: 11, 
@@ -1599,7 +1602,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
               borderLeft: '3px solid rgba(251, 191, 36, 0.6)',
             }}
           >
-            <EditIcon size={14} color="#fbbf24" />
+            <EditIcon size={14} color="#ffd60a" />
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Typography sx={{ 
                 fontSize: 11, 
@@ -1608,7 +1611,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
               }}>
-                <Box component="span" sx={{ color: '#fbbf24', fontWeight: 500, mr: 0.5 }}>
+                <Box component="span" sx={{ color: 'var(--warning)', fontWeight: 500, mr: 0.5 }}>
                   แก้ไขข้อความ
                 </Box>
                 {editingMessage.text.slice(0, 50) + (editingMessage.text.length > 50 ? '...' : '')}
@@ -1690,7 +1693,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 py: 0.5,
                 transition: 'all 0.2s',
                 '&:focus-within': {
-                  borderColor: 'rgba(37, 99, 235, 0.5)',
+                  borderColor: 'rgba(0,113,227, 0.5)',
                 },
                 '&:hover': {
                   borderColor: 'var(--glass-border)',
@@ -1715,7 +1718,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       height: 36,
                       borderRadius: 1,
                       objectFit: 'cover',
-                      border: '1px solid rgba(37, 99, 235, 0.4)',
+                      border: '1px solid rgba(0,113,227, 0.4)',
                     }}
                   />
                   <IconButton
@@ -1787,11 +1790,11 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 height: 40,
                 borderRadius: 1.5,
                 flexShrink: 0,
-                bgcolor: uploadedImage ? 'rgba(16, 185, 129, 0.5)' : 'rgba(37, 99, 235, 0.5)',
-                border: uploadedImage ? '1px solid rgba(16, 185, 129, 0.35)' : '1px solid rgba(30, 64, 175, 0.35)',
+                bgcolor: uploadedImage ? 'rgba(16, 185, 129, 0.5)' : 'rgba(0,113,227, 0.5)',
+                border: uploadedImage ? '1px solid rgba(16, 185, 129, 0.35)' : '1px solid rgba(0,113,227, 0.35)',
                 transition: 'all 0.2s',
                 '&:hover': {
-                  bgcolor: uploadedImage ? 'rgba(16, 185, 129, 0.65)' : 'rgba(37, 99, 235, 0.65)',
+                  bgcolor: uploadedImage ? 'rgba(16, 185, 129, 0.65)' : 'rgba(0,113,227, 0.65)',
                 },
                 '&:disabled': {
                   bgcolor: 'var(--glass-bg)',
@@ -1913,6 +1916,7 @@ import {
   FormControlLabel,
   Switch,
   Typography,
+  Popover,
 } from '@mui/material';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import Grid from '@mui/material/Grid';
@@ -1947,9 +1951,21 @@ import {
   Clock,
   CheckCircle,
   XCircle,
+  ArrowLeftRight,
+  TriangleAlert,
+  Headphones,
+  Bot,
+  HandMetal,
+  Share2,
+  Link2,
+  Percent,
+  Ticket,
 } from 'lucide-react';
+import { useNotification } from '@/components/NotificationContext';
 import PaymentFlow from '@/components/PaymentFlow';
-import ProfileModal from '@/components/ProfileModal';
+import ProfileModal, { type SavedAddress } from '@/components/ProfileModal';
+import AnnouncementBar from '@/components/AnnouncementBar';
+import EventBanner, { type ShopEvent } from '@/components/EventBanner';
 import Footer from '@/components/Footer';
 import TurnstileWidget from '@/components/TurnstileWidget';
 import { ShopStatusBanner, getProductStatus, getShopStatus, SHOP_STATUS_CONFIG, type ShopStatusType } from '@/components/ShopStatusCard';
@@ -2003,21 +2019,21 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  PENDING: '#f59e0b',
-  PAID: '#10b981',
-  READY: '#10b981',
-  SHIPPED: '#0ea5e9',
-  COMPLETED: '#22c55e',
-  CANCELLED: '#ef4444',
-  WAITING_PAYMENT: '#f59e0b',
-  AWAITING_PAYMENT: '#f59e0b',
-  UNPAID: '#f59e0b',
-  DRAFT: '#f59e0b',
-  VERIFYING: '#06b6d4',
-  WAITING_SLIP: '#06b6d4',
-  REJECTED: '#ef4444',
-  FAILED: '#ef4444',
-  REFUNDED: '#1e40af',
+  PENDING: '#ff9f0a',
+  PAID: '#34c759',
+  READY: '#34c759',
+  SHIPPED: '#2997ff',
+  COMPLETED: '#30d158',
+  CANCELLED: '#ff453a',
+  WAITING_PAYMENT: '#ff9f0a',
+  AWAITING_PAYMENT: '#ff9f0a',
+  UNPAID: '#ff9f0a',
+  DRAFT: '#ff9f0a',
+  VERIFYING: '#64d2ff',
+  WAITING_SLIP: '#64d2ff',
+  REJECTED: '#ff453a',
+  FAILED: '#ff453a',
+  REFUNDED: '#0077ED',
 };
 
 const PAYABLE_STATUSES = ['PENDING', 'WAITING_PAYMENT', 'AWAITING_PAYMENT', 'UNPAID', 'DRAFT'];
@@ -2119,22 +2135,22 @@ const SIZE_MEASUREMENTS: Record<(typeof SIZE_ORDER)[number], { chest: number; le
 };
 
 const ANNOUNCEMENT_COLOR_MAP: Record<string, string> = {
-  blue: '#3b82f6',
-  red: '#ef4444',
-  green: '#22c55e',
-  emerald: '#10b981',
-  orange: '#f97316',
+  blue: '#0071e3',
+  red: '#ff453a',
+  green: '#30d158',
+  emerald: '#34c759',
+  orange: '#ff9f0a',
 };
 
 // Shop status helpers imported from ShopStatusCard component
 
 // Helper to get announcement color (supports both named colors and hex)
 const getAnnouncementColor = (color: string | undefined): string => {
-  if (!color) return '#3b82f6';
+  if (!color) return '#0071e3';
   // If it's a hex color, return it directly
   if (color.startsWith('#')) return color;
   // Otherwise, look up in the map
-  return ANNOUNCEMENT_COLOR_MAP[color] || '#3b82f6';
+  return ANNOUNCEMENT_COLOR_MAP[color] || '#0071e3';
 };
 
 const CONFIG_CACHE_KEY = 'shopConfigCache';
@@ -2246,6 +2262,40 @@ const getBasePrice = (p: Product) => {
   return Math.min(...prices);
 };
 
+/** คำนวณราคาส่วนลดจากอีเวนต์ที่กำลังดำเนินอยู่ */
+function getEventDiscount(productId: string, events: ShopEvent[] | undefined): { discountedPrice: (original: number) => number; discountLabel: string; eventTitle: string; discountType?: 'percent' | 'fixed'; discountValue?: number } | null {
+  if (!events?.length) return null;
+  const now = new Date();
+  const active = events.find(e => 
+    e.enabled && 
+    e.linkedProducts?.includes(productId) &&
+    e.discountType && e.discountValue && e.discountValue > 0 &&
+    (!e.startDate || new Date(e.startDate) <= now) &&
+    (!e.endDate || new Date(e.endDate) > now)
+  );
+  if (!active) return null;
+  return {
+    discountedPrice: (original: number) => {
+      if (active.discountType === 'percent') return Math.round(original * (1 - active.discountValue! / 100));
+      return Math.max(0, original - active.discountValue!);
+    },
+    discountLabel: active.discountType === 'percent' ? `-${active.discountValue}%` : `-฿${active.discountValue}`,
+    eventTitle: active.title,
+    discountType: active.discountType,
+    discountValue: active.discountValue,
+  };
+}
+
+/** สร้าง slug จากชื่อสินค้า */
+function generateSlug(name: string, id: string): string {
+  return name.replace(/[^\u0E00-\u0E7Fa-zA-Z0-9\s-]/g, '').replace(/\s+/g, '-').toLowerCase() || id;
+}
+
+/** สร้าง product link (short format) */
+function getProductLink(product: Product): string {
+  return `${typeof window !== 'undefined' ? window.location.origin : ''}/?p=${encodeURIComponent(product.id)}`;
+}
+
 export default function HomePage() {
   const { data: session, status } = useSession();
   const isMobile = useMediaQuery('(max-width:600px)');
@@ -2254,8 +2304,18 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   
+  // Available OAuth providers
+  const [availableProviders, setAvailableProviders] = useState<string[]>(['google']);
+  
   // Chatbot dialog state
   const [chatbotOpen, setChatbotOpen] = useState(false);
+  // Support chat & chat menu state
+  const [supportChatOpen, setSupportChatOpen] = useState(false);
+  const [chatMenuAnchor, setChatMenuAnchor] = useState<HTMLElement | null>(null);
+
+  // Logout confirmation
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [switchAccountOpen, setSwitchAccountOpen] = useState(false);
 
   const [config, setConfig] = useState<ShopConfig | null>(null);
   const [shippingConfig, setShippingConfig] = useState<ShippingConfig | null>(null);
@@ -2430,6 +2490,19 @@ export default function HomePage() {
   const configPollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [navHandedness, setNavHandedness] = useState<'right' | 'left'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('scc_nav_hand') as 'right' | 'left') || 'right';
+    }
+    return 'right';
+  });
+  const toggleNavHandedness = useCallback(() => {
+    setNavHandedness(prev => {
+      const next = prev === 'right' ? 'left' : 'right';
+      localStorage.setItem('scc_nav_hand', next);
+      return next;
+    });
+  }, []);
   const [showCart, setShowCart] = useState(false);
   const [showHistoryDialog, setShowHistoryDialog] = useState(false);
   const [showOrderDialog, setShowOrderDialog] = useState(false);
@@ -2470,6 +2543,7 @@ export default function HomePage() {
     instagram: '',
     profileImage: '',
   });
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
   const [orderHistory, setOrderHistory] = useState<OrderHistory[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [loadingHistoryMore, setLoadingHistoryMore] = useState(false);
@@ -2509,23 +2583,31 @@ export default function HomePage() {
   const toastTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const ToastTransition = (props: any) => <Slide {...props} direction="down" />;
 
-  const bottomTabs = useMemo(
-    () => [
-      { key: 'home', label: 'หน้าแรก', icon: <Home size={22} /> },
+  const bottomTabs = useMemo(() => {
+    const leftTabs = [
+      { key: 'home', label: 'หน้าแรก', icon: <Home size={24} />, center: false },
       {
         key: 'cart',
         label: 'ตะกร้า',
         icon: (
           <Badge badgeContent={cart.length} color="error">
-            <ShoppingCart size={22} />
+            <ShoppingCart size={24} />
           </Badge>
         ),
+        center: false,
       },
-      { key: 'history', label: 'ประวัติ', icon: <History size={22} /> },
-      { key: 'profile', label: 'โปรไฟล์', icon: <User size={22} /> },
-    ],
-    [cart.length],
-  );
+    ];
+    const centerTab = { key: 'chat', label: 'แชท', icon: <Headphones size={28} />, center: true };
+    const rightTabs = [
+      { key: 'history', label: 'ประวัติ', icon: <History size={24} />, center: false },
+      { key: 'profile', label: 'โปรไฟล์', icon: <User size={24} />, center: false },
+    ];
+    // For left-handed: swap sides so primary actions are on the left
+    if (navHandedness === 'left') {
+      return [...rightTabs.reverse(), centerTab, ...leftTabs.reverse()];
+    }
+    return [...leftTabs, centerTab, ...rightTabs];
+  }, [cart.length, navHandedness]);
 
 
   const BrandMark = ({ size = 36, showText = true }: { size?: number; showText?: boolean }) => (
@@ -2545,6 +2627,7 @@ export default function HomePage() {
           alt="PSU SCC Shop Logo"
           fill
           sizes="48px"
+          className="theme-logo"
           style={{ objectFit: 'contain' }}
           priority
         />
@@ -2568,6 +2651,14 @@ export default function HomePage() {
 
   // ==================== SHOP STATUS CARD COMPONENT ====================
   useEffect(() => setMounted(true), []);
+
+  // Fetch available OAuth providers
+  useEffect(() => {
+    fetch('/api/auth/available-providers')
+      .then(res => res.json())
+      .then(data => { if (data.providers) setAvailableProviders(data.providers); })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     cartRef.current = cart;
@@ -2708,6 +2799,26 @@ export default function HomePage() {
     loadConfig();
   }, [refreshConfig]);
 
+  // Auto-open product from URL query param (?p=id or legacy ?product=slug-or-id)
+  useEffect(() => {
+    if (!config?.products?.length || loading) return;
+    const params = new URLSearchParams(window.location.search);
+    const productParam = params.get('p') || params.get('product');
+    if (!productParam) return;
+    const decoded = decodeURIComponent(productParam);
+    const found = config.products.find(p =>
+      p.id === decoded ||
+      p.slug === decoded ||
+      generateSlug(p.name, p.id) === decoded
+    );
+    if (found && isProductCurrentlyOpen(found)) {
+      setSelectedProduct(found);
+      setProductDialogOpen(true);
+      // Clean URL without reload
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, [config?.products, loading]);
+
   useEffect(() => {
     if (!session?.user?.email) return;
 
@@ -2732,6 +2843,11 @@ export default function HomePage() {
             profileImage: typeof profile.profileImage === 'string' ? profile.profileImage : '',
           };
           setOrderData((prev) => ({ ...prev, ...sanitizedProfile, email: session.user?.email || prev.email }));
+
+          // Load saved addresses
+          if (Array.isArray(profile.savedAddresses)) {
+            setSavedAddresses(profile.savedAddresses);
+          }
 
           // Load theme preference from DB
           if (profile.theme && ['light', 'dark', 'system'].includes(profile.theme)) {
@@ -3140,6 +3256,13 @@ export default function HomePage() {
     const longSleeveFee = selectedProduct.options?.hasLongSleeve && productOptions.isLongSleeve 
       ? (selectedProduct.options?.longSleevePrice ?? 50) 
       : 0;
+
+    // Apply event discount to base price before adding fees
+    const discount = getEventDiscount(selectedProduct.id, config?.events as ShopEvent[] | undefined);
+    if (discount) {
+      basePrice = discount.discountedPrice(basePrice);
+    }
+
     const unitPrice = basePrice + longSleeveFee;
     const quantity = clampQty(productOptions.quantity);
 
@@ -3184,6 +3307,20 @@ export default function HomePage() {
     if (!newItem) return;
     if (!requireProfileBeforeCheckout()) return;
     commitCartItem(newItem, { goCheckout: true });
+  };
+
+  const handleShareProduct = async (product: Product) => {
+    const url = getProductLink(product);
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: product.name, text: `${product.name} - ฿${product.basePrice.toLocaleString()}`, url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        showToast('success', 'คัดลอกลิงก์สินค้าแล้ว');
+      }
+    } catch {
+      try { await navigator.clipboard.writeText(url); showToast('success', 'คัดลอกลิงก์สินค้าแล้ว'); } catch { /* ignore */ }
+    }
   };
 
   const removeFromCart = (id: string) => {
@@ -3252,7 +3389,7 @@ export default function HomePage() {
   }, [cart]);
 
   const getStatusLabel = (status: string): string => STATUS_LABELS[normalizeStatus(status)] || status;
-  const getStatusColor = (status: string): string => STATUS_COLORS[normalizeStatus(status)] || '#475569';
+  const getStatusColor = (status: string): string => STATUS_COLORS[normalizeStatus(status)] || '#86868b';
 
   // Calculate current price for product dialog
   const getCurrentPrice = useCallback(() => {
@@ -3274,17 +3411,23 @@ export default function HomePage() {
       basePrice = selectedProduct.sizePricing?.[productOptions.size] ?? selectedProduct.basePrice;
     }
     
+    // Apply event discount
+    const discount = getEventDiscount(selectedProduct.id, config?.events as ShopEvent[] | undefined);
+    if (discount) {
+      basePrice = discount.discountedPrice(basePrice);
+    }
+
     const longSleeveFee = selectedProduct.options?.hasLongSleeve && productOptions.isLongSleeve 
       ? (selectedProduct.options?.longSleevePrice ?? 50) 
       : 0;
     return (basePrice + longSleeveFee) * productOptions.quantity;
-  }, [selectedProduct, productOptions]);
+  }, [selectedProduct, productOptions, config?.events]);
 
   const renderProductDialog = () => {
     if (!selectedProduct) return null;
 
     const productContent = (
-      <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: 'background.default', color: 'text.primary' }}>
+      <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: 'var(--background)', color: 'var(--foreground)' }}>
         {/* Header - Enhanced Design */}
         <Box sx={{
           position: 'sticky',
@@ -3292,8 +3435,8 @@ export default function HomePage() {
           zIndex: 10,
           borderBottom: '1px solid var(--glass-border)',
           background: (theme: any) => theme.palette.mode === 'dark' 
-            ? 'linear-gradient(180deg, rgba(10,15,26,0.98) 0%, rgba(15,23,42,0.95) 100%)' 
-            : 'linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(248,250,252,0.95) 100%)',
+            ? 'linear-gradient(180deg, rgba(0,0,0,0.98) 0%, rgba(0,0,0,0.95) 100%)' 
+            : 'linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.95) 100%)',
           backdropFilter: 'blur(24px)',
         }}>
           {isMobile && (
@@ -3341,24 +3484,44 @@ export default function HomePage() {
               )}
             </Box>
 
-            <IconButton 
-              onClick={() => setProductDialogOpen(false)} 
-              sx={{ 
-                color: 'var(--text-muted)', 
-                bgcolor: 'var(--glass-bg)', 
-                border: '1px solid var(--glass-border)',
-                width: 40,
-                height: 40,
-                '&:hover': { 
-                  bgcolor: 'rgba(239,68,68,0.15)', 
-                  borderColor: 'rgba(239,68,68,0.3)',
-                  color: '#f87171',
-                },
-                transition: 'all 0.2s ease',
-              }}
-            >
-              <X size={20} />
-            </IconButton>
+            <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+              <IconButton 
+                onClick={() => handleShareProduct(selectedProduct)}
+                sx={{ 
+                  color: 'var(--text-muted)', 
+                  bgcolor: 'var(--glass-bg)', 
+                  border: '1px solid var(--glass-border)',
+                  width: 40,
+                  height: 40,
+                  '&:hover': { 
+                    bgcolor: 'rgba(0,113,227,0.15)', 
+                    borderColor: 'rgba(0,113,227,0.3)',
+                    color: '#2997ff',
+                  },
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <Share2 size={18} />
+              </IconButton>
+              <IconButton 
+                onClick={() => setProductDialogOpen(false)} 
+                sx={{ 
+                  color: 'var(--text-muted)', 
+                  bgcolor: 'var(--glass-bg)', 
+                  border: '1px solid var(--glass-border)',
+                  width: 40,
+                  height: 40,
+                  '&:hover': { 
+                    bgcolor: 'rgba(239,68,68,0.15)', 
+                    borderColor: 'rgba(239,68,68,0.3)',
+                    color: '#f87171',
+                  },
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <X size={20} />
+              </IconButton>
+            </Box>
           </Box>
         </Box>
 
@@ -3376,7 +3539,7 @@ export default function HomePage() {
                   success: 'linear-gradient(135deg, rgba(16, 185, 129, 0.98) 0%, rgba(5, 150, 105, 0.98) 100%)',
                   error: 'linear-gradient(135deg, rgba(239, 68, 68, 0.98) 0%, rgba(220, 38, 38, 0.98) 100%)',
                   warning: 'linear-gradient(135deg, rgba(245, 158, 11, 0.98) 0%, rgba(234, 88, 12, 0.98) 100%)',
-                  info: 'linear-gradient(135deg, rgba(59, 130, 246, 0.98) 0%, rgba(37, 99, 235, 0.98) 100%)',
+                  info: 'linear-gradient(135deg, rgba(0,113,227, 0.98) 0%, rgba(0,113,227, 0.98) 100%)',
                 }[inlineNotice.type],
                 backdropFilter: 'blur(16px)',
                 border: '1px solid rgba(255, 255, 255, 0.15)',
@@ -3390,7 +3553,7 @@ export default function HomePage() {
                   success: '0 8px 32px rgba(16, 185, 129, 0.35)',
                   error: '0 8px 32px rgba(239, 68, 68, 0.35)',
                   warning: '0 8px 32px rgba(245, 158, 11, 0.35)',
-                  info: '0 8px 32px rgba(59, 130, 246, 0.35)',
+                  info: '0 8px 32px rgba(0,113,227, 0.35)',
                 }[inlineNotice.type],
                 minWidth: { xs: 220, sm: 300 },
                 animation: 'toastEnterBottom 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
@@ -3446,7 +3609,9 @@ export default function HomePage() {
                   overflow: 'hidden',
                   bgcolor: 'var(--surface-2)',
                   border: '1px solid var(--glass-border)',
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)',
+                  boxShadow: (theme: any) => theme.palette.mode === 'dark'
+                    ? '0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)'
+                    : '0 8px 32px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.8)',
                   height: { xs: 300, sm: 380, md: 440 },
                 }}>
                   <OptimizedImage
@@ -3536,7 +3701,7 @@ export default function HomePage() {
                           width: 6, 
                           height: 6, 
                           borderRadius: '50%', 
-                          bgcolor: '#2563eb',
+                          bgcolor: '#0071e3',
                           animation: 'pulse 2s infinite',
                           '@keyframes pulse': {
                             '0%, 100%': { opacity: 1 },
@@ -3561,7 +3726,7 @@ export default function HomePage() {
                     px: 0.5,
                     '&::-webkit-scrollbar': { height: 4 },
                     '&::-webkit-scrollbar-track': { bgcolor: 'var(--glass-bg)', borderRadius: 2 },
-                    '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(37,99,235,0.3)', borderRadius: 2 },
+                    '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0,113,227,0.3)', borderRadius: 2 },
                   }}>
                     {productImages.map((img, idx) => (
                       <Box
@@ -3571,15 +3736,15 @@ export default function HomePage() {
                           width: 72,
                           height: 72,
                           borderRadius: '14px',
-                          border: activeImageIndex === idx ? '2px solid #2563eb' : '1px solid var(--glass-border)',
+                          border: activeImageIndex === idx ? '2px solid #0071e3' : '1px solid var(--glass-border)',
                           overflow: 'hidden',
                           cursor: 'pointer',
                           opacity: activeImageIndex === idx ? 1 : 0.55,
                           transform: activeImageIndex === idx ? 'scale(1.02)' : 'scale(1)',
                           transition: 'all 0.25s ease',
                           flexShrink: 0,
-                          boxShadow: activeImageIndex === idx ? '0 4px 16px rgba(37,99,235,0.3)' : 'none',
-                          '&:hover': { opacity: 1, borderColor: 'rgba(37,99,235,0.5)' },
+                          boxShadow: activeImageIndex === idx ? '0 4px 16px rgba(0,113,227,0.3)' : 'none',
+                          '&:hover': { opacity: 1, borderColor: 'rgba(0,113,227,0.5)' },
                         }}
                       >
                         <Box 
@@ -3614,7 +3779,7 @@ export default function HomePage() {
                   display: 'grid',
                   placeItems: 'center',
                 }}>
-                  <Store size={28} color="#64748b" />
+                  <Store size={28} color="#86868b" />
                 </Box>
                 <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 500 }}>
                   ไม่มีรูปภาพสินค้า
@@ -3630,9 +3795,9 @@ export default function HomePage() {
               mb: 3,
               borderRadius: '20px',
               background: (theme: any) => theme.palette.mode === 'dark' 
-                ? 'linear-gradient(145deg, rgba(15,23,42,0.8) 0%, rgba(30,41,59,0.6) 100%)' 
-                : 'linear-gradient(145deg, rgba(255,255,255,0.9) 0%, rgba(241,245,249,0.8) 100%)',
-              border: (theme: any) => theme.palette.mode === 'dark' ? '1px solid rgba(37,99,235,0.2)' : '1px solid rgba(37,99,235,0.15)',
+                ? 'linear-gradient(145deg, rgba(0,0,0,0.8) 0%, rgba(29,29,31,0.6) 100%)' 
+                : 'linear-gradient(145deg, rgba(255,255,255,0.9) 0%, rgba(245,245,247,0.8) 100%)',
+              border: (theme: any) => theme.palette.mode === 'dark' ? '1px solid rgba(0,113,227,0.2)' : '1px solid rgba(0,113,227,0.15)',
               position: 'relative',
               overflow: 'hidden',
               boxShadow: (theme: any) => theme.palette.mode === 'dark' ? '0 4px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)' : '0 4px 20px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.8)',
@@ -3641,8 +3806,8 @@ export default function HomePage() {
               <Box sx={{
                 px: 2.5,
                 py: 1.5,
-                background: 'linear-gradient(90deg, rgba(37,99,235,0.15) 0%, rgba(30,64,175,0.1) 100%)',
-                borderBottom: '1px solid rgba(37,99,235,0.15)',
+                background: 'linear-gradient(90deg, rgba(0,113,227,0.15) 0%, rgba(0,113,227,0.1) 100%)',
+                borderBottom: '1px solid rgba(0,113,227,0.15)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 1,
@@ -3651,11 +3816,11 @@ export default function HomePage() {
                   width: 28,
                   height: 28,
                   borderRadius: '8px',
-                  background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                  background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: '0 2px 8px rgba(37,99,235,0.4)',
+                  boxShadow: '0 2px 8px rgba(0,113,227,0.4)',
                 }}>
                   <Info size={14} color="#fff" />
                 </Box>
@@ -3692,8 +3857,8 @@ export default function HomePage() {
                           px: 1,
                           py: 0.3,
                           borderRadius: '6px',
-                          background: 'linear-gradient(135deg, rgba(37,99,235,0.2) 0%, rgba(30,64,175,0.15) 100%)',
-                          border: '1px solid rgba(37,99,235,0.3)',
+                          background: 'linear-gradient(135deg, rgba(0,113,227,0.2) 0%, rgba(0,113,227,0.15) 100%)',
+                          border: '1px solid rgba(0,113,227,0.3)',
                         }}>
                           <Typography sx={{ 
                             fontSize: '0.78rem', 
@@ -3733,7 +3898,7 @@ export default function HomePage() {
                           width: 6,
                           height: 6,
                           borderRadius: '50%',
-                          bgcolor: '#1e40af',
+                          bgcolor: '#0077ED',
                           mt: 0.8,
                           flexShrink: 0,
                         }} />
@@ -3770,7 +3935,7 @@ export default function HomePage() {
                 width: 80,
                 height: 80,
                 borderRadius: '50%',
-                background: 'radial-gradient(circle, rgba(30,64,175,0.15) 0%, transparent 70%)',
+                background: 'radial-gradient(circle, rgba(0,113,227,0.15) 0%, transparent 70%)',
                 pointerEvents: 'none',
               }} />
             </Box>
@@ -3787,7 +3952,7 @@ export default function HomePage() {
             }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
                 <span style={{ fontSize: '1.5rem' }}></span>
-                <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#fbbf24' }}>
+                <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--warning)' }}>
                   ข้อมูลค่าย
                 </Typography>
               </Box>
@@ -3849,7 +4014,7 @@ export default function HomePage() {
             }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
                 <span style={{ fontSize: '1.5rem' }}></span>
-                <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#f472b6' }}>
+                <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--error)' }}>
                   ข้อมูลอีเวนต์
                 </Typography>
               </Box>
@@ -3891,8 +4056,8 @@ export default function HomePage() {
             mb: 2.5,
             borderRadius: '20px',
             background: (theme: any) => theme.palette.mode === 'dark' 
-              ? 'linear-gradient(135deg, rgba(30,41,59,0.6) 0%, rgba(30,41,59,0.3) 100%)' 
-              : 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(241,245,249,0.6) 100%)',
+              ? 'linear-gradient(135deg, rgba(29,29,31,0.6) 0%, rgba(29,29,31,0.3) 100%)' 
+              : 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(245,245,247,0.6) 100%)',
             border: '1px solid var(--glass-border)',
             boxShadow: (theme: any) => theme.palette.mode === 'dark' ? 'inset 0 1px 0 rgba(255,255,255,0.05)' : 'inset 0 1px 0 rgba(255,255,255,0.8)',
           }}>
@@ -3902,10 +4067,10 @@ export default function HomePage() {
               p: 2, 
               borderRadius: '16px', 
               bgcolor: 'var(--surface)',
-              border: '1px solid rgba(37,99,235,0.2)',
+              border: '1px solid rgba(0,113,227,0.2)',
             }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                <Ruler size={16} color="#93c5fd" />
+                <Ruler size={16} color="#2997ff" />
                 <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--secondary)' }}>
                   ตารางไซส์ (นิ้ว)
                 </Typography>
@@ -3921,7 +4086,7 @@ export default function HomePage() {
                 px: 1,
                 '&::-webkit-scrollbar': { height: 4 },
                 '&::-webkit-scrollbar-track': { bgcolor: 'var(--glass-bg)', borderRadius: 2 },
-                '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(37,99,235,0.3)', borderRadius: 2 },
+                '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0,113,227,0.3)', borderRadius: 2 },
               }}>
                 {displaySizes.map((size) => {
                   const sizeKey = size as keyof typeof SIZE_MEASUREMENTS;
@@ -3935,8 +4100,8 @@ export default function HomePage() {
                         minWidth: 70,
                         p: 1.5,
                         borderRadius: '12px',
-                        bgcolor: isSelected ? 'rgba(37,99,235,0.2)' : 'var(--glass-bg)',
-                        border: isSelected ? '2px solid rgba(37,99,235,0.5)' : '1px solid var(--glass-border)',
+                        bgcolor: isSelected ? 'rgba(0,113,227,0.2)' : 'var(--glass-bg)',
+                        border: isSelected ? '2px solid rgba(0,113,227,0.5)' : '1px solid var(--glass-border)',
                         textAlign: 'center',
                       }}
                     >
@@ -3982,14 +4147,14 @@ export default function HomePage() {
                 },
               }}>
                 {/* Header Row */}
-                <Box sx={{ bgcolor: 'rgba(37,99,235,0.15)', fontWeight: 700, color: 'var(--secondary)', borderRadius: '6px 0 0 0' }}>ขนาด</Box>
-                <Box sx={{ display: 'grid !important', gridTemplateColumns: `repeat(${displaySizes.length}, 1fr)`, bgcolor: 'rgba(37,99,235,0.08)' }}>
+                <Box sx={{ bgcolor: 'rgba(0,113,227,0.15)', fontWeight: 700, color: 'var(--secondary)', borderRadius: '6px 0 0 0' }}>ขนาด</Box>
+                <Box sx={{ display: 'grid !important', gridTemplateColumns: `repeat(${displaySizes.length}, 1fr)`, bgcolor: 'rgba(0,113,227,0.08)' }}>
                   {displaySizes.map((size, idx) => (
                     <Box key={size} sx={{ 
                       fontWeight: 700, 
                       color: productOptions.size === size ? 'var(--primary)' : 'var(--text-muted)',
                       borderRight: idx < displaySizes.length - 1 ? '1px solid var(--glass-border)' : 'none',
-                      bgcolor: productOptions.size === size ? 'rgba(37,99,235,0.2)' : 'transparent',
+                      bgcolor: productOptions.size === size ? 'rgba(0,113,227,0.2)' : 'transparent',
                     }}>
                       {size}
                     </Box>
@@ -4005,7 +4170,7 @@ export default function HomePage() {
                       <Box key={size} sx={{ 
                         color: productOptions.size === size ? 'var(--foreground)' : 'var(--text-muted)',
                         borderRight: idx < displaySizes.length - 1 ? '1px solid var(--glass-border)' : 'none',
-                        bgcolor: productOptions.size === size ? 'rgba(37,99,235,0.1)' : 'transparent',
+                        bgcolor: productOptions.size === size ? 'rgba(0,113,227,0.1)' : 'transparent',
                       }}>
                         {measurement?.chest || '-'}
                       </Box>
@@ -4022,7 +4187,7 @@ export default function HomePage() {
                       <Box key={size} sx={{ 
                         color: productOptions.size === size ? 'var(--foreground)' : 'var(--text-muted)',
                         borderRight: idx < displaySizes.length - 1 ? '1px solid var(--glass-border)' : 'none',
-                        bgcolor: productOptions.size === size ? 'rgba(37,99,235,0.1)' : 'transparent',
+                        bgcolor: productOptions.size === size ? 'rgba(0,113,227,0.1)' : 'transparent',
                         borderBottom: 'none !important',
                       }}>
                         {measurement?.length || '-'}
@@ -4039,11 +4204,11 @@ export default function HomePage() {
                 width: 36,
                 height: 36,
                 borderRadius: '10px',
-                bgcolor: 'rgba(37,99,235,0.15)',
+                bgcolor: 'rgba(0,113,227,0.15)',
                 display: 'grid',
                 placeItems: 'center',
               }}>
-                <Tag size={18} color="#93c5fd" />
+                <Tag size={18} color="#2997ff" />
               </Box>
               <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--foreground)' }}>
                 เลือกขนาด
@@ -4069,8 +4234,8 @@ export default function HomePage() {
                       px: 2,
                       py: 1.2,
                       borderRadius: '12px',
-                      border: active ? '2px solid #2563eb' : '1px solid var(--glass-border)',
-                      bgcolor: active ? 'rgba(37,99,235,0.15)' : 'var(--glass-bg)',
+                      border: active ? '2px solid #0071e3' : '1px solid var(--glass-border)',
+                      bgcolor: active ? 'rgba(0,113,227,0.15)' : 'var(--glass-bg)',
                       cursor: 'pointer',
                       transition: 'all 0.2s ease',
                       display: 'flex',
@@ -4079,19 +4244,19 @@ export default function HomePage() {
                       minWidth: 75,
                       position: 'relative',
                       '&:hover': { 
-                        borderColor: active ? '#2563eb' : 'rgba(37,99,235,0.5)',
-                        bgcolor: active ? 'rgba(37,99,235,0.2)' : 'rgba(37,99,235,0.08)',
+                        borderColor: active ? '#0071e3' : 'rgba(0,113,227,0.5)',
+                        bgcolor: active ? 'rgba(0,113,227,0.2)' : 'rgba(0,113,227,0.08)',
                       },
                     }}
                   >
                     <Typography sx={{ fontSize: '1rem', fontWeight: 800, color: active ? 'var(--primary)' : 'var(--foreground)' }}>
                       {size}
                     </Typography>
-                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: active ? '#3b82f6' : '#64748b', mb: 0.3 }}>
+                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: active ? '#0071e3' : '#86868b', mb: 0.3 }}>
                       ฿{price.toLocaleString()}
                     </Typography>
                     {measurement && (
-                      <Typography sx={{ fontSize: '0.6rem', color: active ? '#6ee7b7' : '#475569' }}>
+                      <Typography sx={{ fontSize: '0.6rem', color: active ? '#30d158' : '#86868b' }}>
                         {measurement.chest}" × {measurement.length}"
                       </Typography>
                     )}
@@ -4108,21 +4273,21 @@ export default function HomePage() {
               p: { xs: 2.5, sm: 3 },
               mb: 2.5,
               borderRadius: '20px',
-              background: 'linear-gradient(135deg, rgba(30,64,175,0.15) 0%, rgba(30,64,175,0.05) 100%)',
-              border: '1px solid rgba(30,64,175,0.3)',
+              background: 'linear-gradient(135deg, rgba(0,113,227,0.15) 0%, rgba(0,113,227,0.05) 100%)',
+              border: '1px solid rgba(0,113,227,0.3)',
             }}>
               <Box ref={sizeSelectorRef} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
                 <Box sx={{
                   width: 36,
                   height: 36,
                   borderRadius: '10px',
-                  bgcolor: 'rgba(30,64,175,0.2)',
+                  bgcolor: 'rgba(0,113,227,0.2)',
                   display: 'grid',
                   placeItems: 'center',
                 }}>
                   <span style={{ fontSize: '1.1rem' }}></span>
                 </Box>
-                <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: '#c4b5fd' }}>
+                <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--secondary)' }}>
                   เลือกตัวเลือก
                 </Typography>
               </Box>
@@ -4144,8 +4309,8 @@ export default function HomePage() {
                           px: 2,
                           py: 1.5,
                           borderRadius: '12px',
-                          border: active ? '2px solid #1e40af' : '1px solid var(--glass-border)',
-                          bgcolor: active ? 'rgba(30,64,175,0.15)' : isOutOfStock ? 'var(--glass-bg)' : 'var(--glass-bg)',
+                          border: active ? '2px solid #0077ED' : '1px solid var(--glass-border)',
+                          bgcolor: active ? 'rgba(0,113,227,0.15)' : isOutOfStock ? 'var(--glass-bg)' : 'var(--glass-bg)',
                           cursor: isOutOfStock ? 'not-allowed' : 'pointer',
                           opacity: isOutOfStock ? 0.5 : 1,
                           transition: 'all 0.2s ease',
@@ -4155,8 +4320,8 @@ export default function HomePage() {
                           minWidth: 90,
                           position: 'relative',
                           '&:hover': !isOutOfStock ? { 
-                            borderColor: active ? '#1e40af' : 'rgba(30,64,175,0.5)',
-                            bgcolor: active ? 'rgba(30,64,175,0.2)' : 'rgba(30,64,175,0.08)',
+                            borderColor: active ? '#0077ED' : 'rgba(0,113,227,0.5)',
+                            bgcolor: active ? 'rgba(0,113,227,0.2)' : 'rgba(0,113,227,0.08)',
                           } : {},
                         }}
                       >
@@ -4167,7 +4332,7 @@ export default function HomePage() {
                             right: -8,
                             px: 0.8,
                             py: 0.2,
-                            bgcolor: '#ef4444',
+                            bgcolor: '#ff453a',
                             borderRadius: '6px',
                             fontSize: '0.6rem',
                             fontWeight: 700,
@@ -4179,7 +4344,7 @@ export default function HomePage() {
                         <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: active ? 'var(--secondary)' : 'var(--foreground)' }}>
                           {variant.name}
                         </Typography>
-                        <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: active ? '#a78bfa' : '#64748b' }}>
+                        <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: active ? 'var(--secondary)' : 'var(--text-muted)' }}>
                           ฿{(variant.price || selectedProduct.basePrice).toLocaleString()}
                         </Typography>
                         {variant.stock !== null && variant.stock !== undefined && variant.stock > 0 && (
@@ -4212,7 +4377,7 @@ export default function HomePage() {
                   display: 'grid',
                   placeItems: 'center',
                 }}>
-                  <Tag size={18} color="#6ee7b7" />
+                  <Tag size={18} color="#30d158" />
                 </Box>
                 <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--foreground)' }}>
                   ตัวเลือกเพิ่มเติม
@@ -4234,8 +4399,8 @@ export default function HomePage() {
                         color: 'var(--foreground)',
                         borderRadius: '12px',
                         '& fieldset': { borderColor: 'var(--glass-border)' },
-                        '&:hover fieldset': { borderColor: 'rgba(37,99,235,0.5)' },
-                        '&.Mui-focused fieldset': { borderColor: '#2563eb' },
+                        '&:hover fieldset': { borderColor: 'rgba(0,113,227,0.5)' },
+                        '&.Mui-focused fieldset': { borderColor: '#0071e3' },
                       }, 
                       '& label': { color: 'var(--text-muted)' },
                       '& label.Mui-focused': { color: 'var(--secondary)' },
@@ -4257,8 +4422,8 @@ export default function HomePage() {
                         color: 'var(--foreground)',
                         borderRadius: '12px',
                         '& fieldset': { borderColor: 'var(--glass-border)' },
-                        '&:hover fieldset': { borderColor: 'rgba(37,99,235,0.5)' },
-                        '&.Mui-focused fieldset': { borderColor: '#2563eb' },
+                        '&:hover fieldset': { borderColor: 'rgba(0,113,227,0.5)' },
+                        '&.Mui-focused fieldset': { borderColor: '#0071e3' },
                       }, 
                       '& label': { color: 'var(--text-muted)' },
                       '& label.Mui-focused': { color: 'var(--secondary)' },
@@ -4272,14 +4437,14 @@ export default function HomePage() {
                     sx={{
                       p: 2,
                       borderRadius: '12px',
-                      border: productOptions.isLongSleeve ? '2px solid #f59e0b' : '1px solid var(--glass-border)',
+                      border: productOptions.isLongSleeve ? '2px solid #ff9f0a' : '1px solid var(--glass-border)',
                       bgcolor: productOptions.isLongSleeve ? 'rgba(245,158,11,0.1)' : 'var(--glass-bg)',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       transition: 'all 0.2s ease',
-                      '&:hover': { borderColor: productOptions.isLongSleeve ? '#f59e0b' : 'rgba(245,158,11,0.5)' },
+                      '&:hover': { borderColor: productOptions.isLongSleeve ? '#ff9f0a' : 'rgba(245,158,11,0.5)' },
                     }}
                   >
                     <Box>
@@ -4307,8 +4472,8 @@ export default function HomePage() {
             mb: 2.5,
             borderRadius: '20px',
             background: (theme: any) => theme.palette.mode === 'dark' 
-              ? 'linear-gradient(135deg, rgba(30,41,59,0.6) 0%, rgba(30,41,59,0.3) 100%)' 
-              : 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(241,245,249,0.6) 100%)',
+              ? 'linear-gradient(135deg, rgba(29,29,31,0.6) 0%, rgba(29,29,31,0.3) 100%)' 
+              : 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(245,245,247,0.6) 100%)',
             border: '1px solid var(--glass-border)',
           }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -4317,11 +4482,11 @@ export default function HomePage() {
                   width: 40,
                   height: 40,
                   borderRadius: '12px',
-                  bgcolor: 'rgba(37,99,235,0.15)',
+                  bgcolor: 'rgba(0,113,227,0.15)',
                   display: 'grid',
                   placeItems: 'center',
                 }}>
-                  <Package size={20} color="#93c5fd" />
+                  <Package size={20} color="#2997ff" />
                 </Box>
                 <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--foreground)' }}>
                   จำนวน
@@ -4365,7 +4530,7 @@ export default function HomePage() {
                     color: 'var(--text-muted)', 
                     p: 1.5, 
                     borderRadius: 0,
-                    '&:hover': { color: '#10b981', bgcolor: 'rgba(16,185,129,0.1)' },
+                    '&:hover': { color: 'var(--success)', bgcolor: 'rgba(16,185,129,0.1)' },
                     transition: 'all 0.2s ease',
                   }}
                 >
@@ -4382,8 +4547,8 @@ export default function HomePage() {
           py: 2.5,
           borderTop: '1px solid var(--glass-border)',
           background: (theme: any) => theme.palette.mode === 'dark' 
-            ? 'linear-gradient(180deg, rgba(10,15,26,0.98) 0%, rgba(5,10,20,0.99) 100%)' 
-            : 'linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(248,250,252,0.99) 100%)',
+            ? 'linear-gradient(180deg, rgba(0,0,0,0.98) 0%, rgba(0,0,0,0.99) 100%)' 
+            : 'linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.99) 100%)',
           backdropFilter: 'blur(24px)',
           paddingBottom: 'max(20px, env(safe-area-inset-bottom))',
         }}>
@@ -4412,11 +4577,17 @@ export default function HomePage() {
               pointerEvents: 'none',
             }} />
             <Box sx={{ position: 'relative', zIndex: 1 }}>
-              <Typography sx={{ fontSize: '0.78rem', color: '#6ee7b7', fontWeight: 600, mb: 0.3 }}>ราคารวม</Typography>
+              <Typography sx={{ fontSize: '0.78rem', color: 'var(--success)', fontWeight: 600, mb: 0.3 }}>
+                ราคารวม
+                {(() => {
+                  const d = getEventDiscount(selectedProduct.id, config?.events as ShopEvent[] | undefined);
+                  return d ? <Typography component="span" sx={{ fontSize: '0.68rem', color: '#ff453a', fontWeight: 700, ml: 0.5 }}>({d.discountLabel} {d.eventTitle})</Typography> : null;
+                })()}
+              </Typography>
               <Typography sx={{ 
                 fontSize: '1.75rem', 
                 fontWeight: 900, 
-                color: '#10b981',
+                color: 'var(--success)',
                 lineHeight: 1,
                 textShadow: '0 2px 12px rgba(16,185,129,0.3)',
               }}>
@@ -4437,7 +4608,7 @@ export default function HomePage() {
                 </Typography>
               </Box>
               {productOptions.isLongSleeve && selectedProduct && (
-                <Typography sx={{ fontSize: '0.72rem', color: '#fbbf24', fontWeight: 600 }}>+ แขนยาว ฿{selectedProduct.options?.longSleevePrice ?? 50}</Typography>
+                <Typography sx={{ fontSize: '0.72rem', color: 'var(--warning)', fontWeight: 600 }}>+ แขนยาว ฿{selectedProduct.options?.longSleevePrice ?? 50}</Typography>
               )}
             </Box>
           </Box>
@@ -4453,19 +4624,19 @@ export default function HomePage() {
                 py: 1.6,
                 borderRadius: '16px',
                 background: isShopOpen 
-                  ? 'linear-gradient(135deg, rgba(37,99,235,0.2) 0%, rgba(30,64,175,0.15) 100%)'
+                  ? 'linear-gradient(135deg, rgba(0,113,227,0.2) 0%, rgba(0,113,227,0.15) 100%)'
                   : 'rgba(100,116,139,0.1)',
-                border: isShopOpen ? '1px solid rgba(37,99,235,0.4)' : '1px solid rgba(100,116,139,0.2)',
-                color: isShopOpen ? '#93c5fd' : '#64748b',
+                border: isShopOpen ? '1px solid rgba(0,113,227,0.4)' : '1px solid rgba(100,116,139,0.2)',
+                color: isShopOpen ? '#2997ff' : '#86868b',
                 fontSize: '0.95rem',
                 fontWeight: 700,
                 textTransform: 'none',
-                boxShadow: isShopOpen ? '0 4px 20px rgba(37,99,235,0.2)' : 'none',
+                boxShadow: isShopOpen ? '0 4px 20px rgba(0,113,227,0.2)' : 'none',
                 transition: 'all 0.25s ease',
                 '&:hover': { 
-                  background: isShopOpen ? 'linear-gradient(135deg, rgba(37,99,235,0.3) 0%, rgba(30,64,175,0.25) 100%)' : 'rgba(100,116,139,0.1)',
+                  background: isShopOpen ? 'linear-gradient(135deg, rgba(0,113,227,0.3) 0%, rgba(0,113,227,0.25) 100%)' : 'rgba(100,116,139,0.1)',
                   transform: isShopOpen ? 'translateY(-2px)' : 'none',
-                  boxShadow: isShopOpen ? '0 8px 30px rgba(37,99,235,0.3)' : 'none',
+                  boxShadow: isShopOpen ? '0 8px 30px rgba(0,113,227,0.3)' : 'none',
                 },
                 '&:disabled': { color: 'var(--text-muted)', borderColor: 'rgba(100,116,139,0.2)' },
               }}
@@ -4481,9 +4652,9 @@ export default function HomePage() {
                 py: 1.6,
                 borderRadius: '16px',
                 background: isShopOpen 
-                  ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                  ? 'linear-gradient(135deg, #34c759 0%, #34c759 100%)'
                   : 'rgba(100,116,139,0.15)',
-                color: isShopOpen ? 'white' : '#64748b',
+                color: isShopOpen ? 'white' : '#86868b',
                 fontSize: '0.95rem',
                 fontWeight: 800,
                 textTransform: 'none',
@@ -4491,7 +4662,7 @@ export default function HomePage() {
                 transition: 'all 0.25s ease',
                 '&:hover': {
                   background: isShopOpen 
-                    ? 'linear-gradient(135deg, #059669 0%, #047857 100%)' 
+                    ? 'linear-gradient(135deg, #34c759 0%, #047857 100%)' 
                     : 'rgba(100,116,139,0.15)',
                   transform: isShopOpen ? 'translateY(-2px)' : 'none',
                   boxShadow: isShopOpen ? '0 8px 30px rgba(16,185,129,0.45)' : 'none',
@@ -4518,9 +4689,9 @@ export default function HomePage() {
               maxHeight: '95vh',
               borderTopLeftRadius: 28,
               borderTopRightRadius: 28,
-              bgcolor: 'background.default',
+              bgcolor: 'var(--background)',
               overflow: 'hidden',
-              boxShadow: '0 -10px 60px rgba(0,0,0,0.5), 0 -4px 20px rgba(37,99,235,0.15)',
+              boxShadow: (theme: any) => theme.palette.mode === 'dark' ? '0 -10px 60px rgba(0,0,0,0.5), 0 -4px 20px rgba(0,113,227,0.15)' : '0 -10px 60px rgba(0,0,0,0.1), 0 -4px 20px rgba(0,113,227,0.08)',
             },
           }}
           transitionDuration={{ enter: 350, exit: 250 }}
@@ -4540,9 +4711,9 @@ export default function HomePage() {
           sx: {
             width: '100%',
             maxWidth: 560,
-            bgcolor: 'background.default',
+            bgcolor: 'var(--background)',
             overflow: 'hidden',
-            boxShadow: '-10px 0 60px rgba(0,0,0,0.5), -4px 0 20px rgba(37,99,235,0.15)',
+            boxShadow: (theme: any) => theme.palette.mode === 'dark' ? '-10px 0 60px rgba(0,0,0,0.5), -4px 0 20px rgba(0,113,227,0.15)' : '-10px 0 60px rgba(0,0,0,0.1), -4px 0 20px rgba(0,113,227,0.08)',
           },
         }}
         transitionDuration={{ enter: 300, exit: 200 }}
@@ -4611,6 +4782,8 @@ export default function HomePage() {
     shippingOptionId?: string;
     paymentOptionId?: string;
     shippingFee?: number;
+    promoCode?: string;
+    promoDiscount?: number;
   }) => {
     // Block submission if shop is closed
     if (!isShopOpen) {
@@ -4631,10 +4804,11 @@ export default function HomePage() {
       return;
     }
 
-    // Calculate total with shipping fee
+    // Calculate total with shipping fee and promo discount
     const subtotal = getTotalPrice();
     const shippingFee = options?.shippingFee || 0;
-    const totalAmount = subtotal + shippingFee;
+    const promoDiscount = options?.promoDiscount || 0;
+    const totalAmount = Math.max(0, subtotal + shippingFee - promoDiscount);
 
     try {
       setProcessing(true);
@@ -4648,10 +4822,11 @@ export default function HomePage() {
         cart: cart,
         totalAmount: totalAmount,
         turnstileToken,
-        // Include shipping and payment options - always include if defined
         shippingOptionId: options?.shippingOptionId,
         paymentOptionId: options?.paymentOptionId,
         shippingFee: options?.shippingFee,
+        promoCode: options?.promoCode,
+        promoDiscount: options?.promoDiscount,
       });
 
       if (res.status === 'success') {
@@ -4777,7 +4952,7 @@ export default function HomePage() {
     }
   };
 
-  const handleSaveProfile = async (data: Partial<typeof orderData>) => {
+  const handleSaveProfile = async (data: Partial<typeof orderData> & { savedAddresses?: SavedAddress[] }) => {
     if (!session?.user?.email) {
       showToast('error', 'กรุณาเข้าสู่ระบบ');
       return;
@@ -4793,6 +4968,11 @@ export default function HomePage() {
     };
     setOrderData((prev) => ({ ...prev, ...sanitized }));
 
+    // Update saved addresses if provided
+    if (data.savedAddresses) {
+      setSavedAddresses(data.savedAddresses);
+    }
+
     try {
       await saveProfileApi(session.user.email, {
         name: sanitized.name,
@@ -4800,6 +4980,7 @@ export default function HomePage() {
         address: sanitized.address,
         instagram: sanitized.instagram,
         profileImage: sanitized.profileImage,
+        ...(data.savedAddresses && { savedAddresses: data.savedAddresses }),
       });
 
       showToast('success', 'บันทึกข้อมูลจัดส่งแล้ว');
@@ -4836,6 +5017,9 @@ export default function HomePage() {
     } else if (tab === 'profile') {
       setSidebarOpen(false);
       setShowProfileModal(true);
+    } else if (tab === 'chat') {
+      // Show chat selection menu - do nothing here, handled by onClick
+      return;
     }
   };
 
@@ -4972,11 +5156,11 @@ export default function HomePage() {
     const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
     
     return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: 'background.default' }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: 'var(--background)' }}>
         <AppBar
           position="sticky"
           elevation={0}
-          sx={{ bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(15,23,42,0.65)' : 'rgba(255,255,255,0.75)', borderBottom: (theme) => `1px solid ${theme.palette.divider}`, backdropFilter: 'blur(14px)' }}
+          sx={{ bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.65)' : 'rgba(255,255,255,0.75)', borderBottom: (theme) => `1px solid ${theme.palette.divider}`, backdropFilter: 'blur(14px)' }}
         >
           <Toolbar>
             <BrandMark />
@@ -5008,10 +5192,10 @@ export default function HomePage() {
                     justifyContent: 'center',
                     flexShrink: 0,
                   }}>
-                    <AlertTriangle size={22} color="#f59e0b" />
+                    <AlertTriangle size={22} color="#ff9f0a" />
                   </Box>
                   <Box>
-                    <Typography sx={{ color: '#fbbf24', fontWeight: 700, fontSize: '0.95rem', mb: 0.5 }}>
+                    <Typography sx={{ color: 'var(--warning)', fontWeight: 700, fontSize: '0.95rem', mb: 0.5 }}>
                       แนะนำให้เปิดในเบราว์เซอร์
                     </Typography>
                     <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.8rem', lineHeight: 1.6 }}>
@@ -5023,11 +5207,11 @@ export default function HomePage() {
                       size="small"
                       onClick={() => {
                         navigator.clipboard?.writeText(currentUrl);
-                        alert('คัดลอกลิงก์แล้ว! กรุณาวางในเบราว์เซอร์');
+                        showToast('info', 'คัดลอกลิงก์แล้ว! กรุณาวางในเบราว์เซอร์');
                       }}
                       sx={{
                         mt: 1.5,
-                        color: '#fbbf24',
+                        color: 'var(--warning)',
                         fontSize: '0.75rem',
                         textTransform: 'none',
                         '&:hover': { bgcolor: 'rgba(245, 158, 11, 0.1)' },
@@ -5045,13 +5229,13 @@ export default function HomePage() {
               sx={{ 
                 bgcolor: 'var(--surface)', 
                 backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(37, 99, 235, 0.2)', 
+                border: '1px solid rgba(0,113,227, 0.2)', 
                 borderRadius: '24px',
                 p: { xs: 3, sm: 5 }, 
                 textAlign: 'center',
                 boxShadow: (theme: any) => theme.palette.mode === 'dark' 
-                  ? '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 40px rgba(37, 99, 235, 0.1)'
-                  : '0 25px 50px -12px rgba(0, 0, 0, 0.1), 0 0 40px rgba(37, 99, 235, 0.06)',
+                  ? '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 40px rgba(0,113,227, 0.1)'
+                  : '0 25px 50px -12px rgba(0, 0, 0, 0.1), 0 0 40px rgba(0,113,227, 0.06)',
               }}
             >
               {/* Web Logo */}
@@ -5063,8 +5247,8 @@ export default function HomePage() {
                   borderRadius: '24px',
                   overflow: 'hidden',
                   margin: '0 auto 24px',
-                  boxShadow: '0 10px 30px rgba(37, 99, 235, 0.3)',
-                  border: '2px solid rgba(37, 99, 235, 0.3)',
+                  boxShadow: '0 10px 30px rgba(0,113,227, 0.3)',
+                  border: '2px solid rgba(0,113,227, 0.3)',
                 }}
               >
                 <Image
@@ -5072,6 +5256,7 @@ export default function HomePage() {
                   alt="PSU SCC Shop Logo"
                   fill
                   sizes="64px"
+                  className="theme-logo"
                   style={{ objectFit: 'contain' }}
                   priority
                 />
@@ -5084,8 +5269,8 @@ export default function HomePage() {
                   mb: 1, 
                   color: 'var(--foreground)',
                   background: (theme: any) => theme.palette.mode === 'dark' 
-                    ? 'linear-gradient(135deg, #f1f5f9 0%, #60a5fa 50%, #2563eb 100%)'
-                    : 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #3b82f6 100%)',
+                    ? 'linear-gradient(135deg, #f5f5f7 0%, #64d2ff 50%, #0071e3 100%)'
+                    : 'linear-gradient(135deg, #0071e3 0%, #0071e3 50%, #0071e3 100%)',
                   backgroundClip: 'text',
                   WebkitBackgroundClip: 'text',
                   WebkitTextFillColor: 'transparent',
@@ -5103,13 +5288,14 @@ export default function HomePage() {
                 เข้าสู่ระบบเพื่อเริ่มช้อปปิ้ง
               </Typography>
               
+              {/* Google Sign In */}
               <Button
                 variant="contained"
                 size="large"
                 onClick={() => signIn('google', { redirect: true, callbackUrl: '/', prompt: 'select_account' })}
                 sx={{
                   background: '#ffffff',
-                  color: '#1f2937',
+                  color: '#1d1d1f',
                   width: '100%',
                   py: 1.5,
                   borderRadius: '14px',
@@ -5123,7 +5309,7 @@ export default function HomePage() {
                   justifyContent: 'center',
                   gap: 1.5,
                   '&:hover': {
-                    background: '#f8fafc',
+                    background: '#f5f5f7',
                     transform: 'translateY(-2px)',
                     boxShadow: '0 8px 25px rgba(0,0,0,0.2)',
                   },
@@ -5141,6 +5327,149 @@ export default function HomePage() {
                 </svg>
                 เข้าสู่ระบบด้วย Google
               </Button>
+
+              {/* Microsoft Sign In */}
+              {availableProviders.includes('azure-ad') && <Button
+                variant="contained"
+                size="large"
+                onClick={() => signIn('azure-ad', { redirect: true, callbackUrl: '/' })}
+                sx={{
+                  background: '#2f2f2f',
+                  color: '#ffffff',
+                  width: '100%',
+                  mt: 1.5,
+                  py: 1.5,
+                  borderRadius: '14px',
+                  fontWeight: 600,
+                  fontSize: '1rem',
+                  textTransform: 'none',
+                  boxShadow: '0 4px 14px rgba(0,0,0,0.15)',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 1.5,
+                  '&:hover': {
+                    background: '#404040',
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 8px 25px rgba(0,0,0,0.2)',
+                  },
+                  '&:active': { transform: 'translateY(0)' },
+                }}
+              >
+                <svg width="20" height="20" viewBox="0 0 23 23">
+                  <path fill="#f35325" d="M1 1h10v10H1z"/>
+                  <path fill="#81bc06" d="M12 1h10v10H12z"/>
+                  <path fill="#05a6f0" d="M1 12h10v10H1z"/>
+                  <path fill="#ffba08" d="M12 12h10v10H12z"/>
+                </svg>
+                เข้าสู่ระบบด้วย Microsoft
+              </Button>}
+
+              {/* Facebook Sign In */}
+              {availableProviders.includes('facebook') && <Button
+                variant="contained"
+                size="large"
+                onClick={() => signIn('facebook', { redirect: true, callbackUrl: '/' })}
+                sx={{
+                  background: '#1877F2',
+                  color: '#ffffff',
+                  width: '100%',
+                  mt: 1.5,
+                  py: 1.5,
+                  borderRadius: '14px',
+                  fontWeight: 600,
+                  fontSize: '1rem',
+                  textTransform: 'none',
+                  boxShadow: '0 4px 14px rgba(24,119,242,0.3)',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 1.5,
+                  '&:hover': {
+                    background: '#166FE5',
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 8px 25px rgba(24,119,242,0.4)',
+                  },
+                  '&:active': { transform: 'translateY(0)' },
+                }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                </svg>
+                เข้าสู่ระบบด้วย Facebook
+              </Button>}
+
+              {/* Apple Sign In */}
+              {availableProviders.includes('apple') && <Button
+                variant="contained"
+                size="large"
+                onClick={() => signIn('apple', { redirect: true, callbackUrl: '/' })}
+                sx={{
+                  background: '#000000',
+                  color: '#ffffff',
+                  width: '100%',
+                  mt: 1.5,
+                  py: 1.5,
+                  borderRadius: '14px',
+                  fontWeight: 600,
+                  fontSize: '1rem',
+                  textTransform: 'none',
+                  boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 1.5,
+                  '&:hover': {
+                    background: '#1a1a1a',
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 8px 25px rgba(0,0,0,0.35)',
+                  },
+                  '&:active': { transform: 'translateY(0)' },
+                }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                  <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.52-3.23 0-1.44.62-2.2.44-3.06-.4C4.24 16.76 4.89 10.87 8.88 10.6c1.24.07 2.1.72 2.83.78.99-.2 1.94-.78 3-.84 1.28-.08 2.25.48 2.88 1.22-2.65 1.58-2.02 5.07.36 6.04-.47 1.2-.97 2.4-1.9 3.48zM12.07 10.5c-.16-2.3 1.74-4.2 3.93-4.5.32 2.5-2.25 4.64-3.93 4.5z"/>
+                </svg>
+                เข้าสู่ระบบด้วย Apple
+              </Button>}
+
+              {/* LINE Sign In */}
+              {availableProviders.includes('line') && <Button
+                variant="contained"
+                size="large"
+                onClick={() => signIn('line', { redirect: true, callbackUrl: '/' })}
+                sx={{
+                  background: '#06C755',
+                  color: '#ffffff',
+                  width: '100%',
+                  mt: 1.5,
+                  py: 1.5,
+                  borderRadius: '14px',
+                  fontWeight: 600,
+                  fontSize: '1rem',
+                  textTransform: 'none',
+                  boxShadow: '0 4px 14px rgba(6,199,85,0.3)',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 1.5,
+                  '&:hover': {
+                    background: '#05B34C',
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 8px 25px rgba(6,199,85,0.4)',
+                  },
+                  '&:active': { transform: 'translateY(0)' },
+                }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                  <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .348-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .349-.281.63-.63.63h-2.386c-.348 0-.63-.281-.63-.63V8.108c0-.348.282-.63.63-.63h2.386c.349 0 .63.282.63.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .349-.282.63-.631.63-.345 0-.627-.281-.627-.63V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.348.279-.63.63-.63.346 0 .627.282.627.63v4.771zm-5.741 0c0 .349-.282.63-.631.63-.345 0-.627-.281-.627-.63V8.108c0-.348.282-.63.627-.63.349 0 .631.282.631.63v4.771zm-2.466.63H4.917c-.348 0-.63-.281-.63-.63V8.108c0-.348.282-.63.63-.63.349 0 .63.282.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .349-.281.63-.629.63M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/>
+                </svg>
+                เข้าสู่ระบบด้วย LINE
+              </Button>}
               
               <Typography sx={{ color: 'var(--text-muted)', mt: 4, fontSize: '0.75rem' }}>
                 โดยการเข้าสู่ระบบ คุณยอมรับ<br/>ข้อกำหนดและเงื่อนไขการใช้งาน
@@ -5156,16 +5485,16 @@ export default function HomePage() {
   const hasEnabledAnnouncements = (announcements?.filter(a => a.enabled)?.length ?? 0) > 0;
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: 'background.default', pb: { xs: 9, md: 0 }, pt: hasEnabledAnnouncements ? { xs: '44px', sm: '40px' } : 0 }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: 'var(--background)', pb: { xs: 9, md: 0 } }}>
       <AppBar
         position="sticky"
         elevation={0}
         sx={{
-          bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(15,23,42,0.65)' : 'rgba(255,255,255,0.75)',
+          bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.65)' : 'rgba(255,255,255,0.75)',
           borderBottom: (theme) => `1px solid ${theme.palette.mode === 'dark' ? 'var(--glass-bg)' : 'rgba(0,0,0,0.06)'}`,
           backdropFilter: 'blur(14px)',
           boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 18px 50px rgba(0,0,0,0.35)' : '0 4px 20px rgba(0,0,0,0.04)',
-          color: 'text.primary',
+          color: 'var(--foreground)',
           transform: hideNavBars ? 'translateY(-110%)' : 'translateY(0)',
           opacity: hideNavBars ? 0 : 1,
           transition: 'transform 0.32s ease, opacity 0.28s ease',
@@ -5185,7 +5514,7 @@ export default function HomePage() {
               sx={{
                 color: (theme) => showSearchBar ? '#fff' : theme.palette.text.primary,
                 borderColor: (theme) => showSearchBar ? 'transparent' : theme.palette.divider,
-                background: (theme) => showSearchBar ? 'linear-gradient(135deg, #2563eb 0%, #06b6d4 100%)' : (theme.palette.mode === 'dark' ? 'rgba(15,23,42,0.4)' : 'rgba(0,0,0,0.04)'),
+                background: (theme) => showSearchBar ? 'linear-gradient(135deg, #0071e3 0%, #64d2ff 100%)' : (theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.04)'),
                 textTransform: 'none',
                 fontWeight: 700,
                 borderRadius: 1.5,
@@ -5196,7 +5525,7 @@ export default function HomePage() {
           </Box>
           <IconButton
             onClick={() => setShowSearchBar((v) => !v)}
-            sx={{ mr: 1, display: { xs: 'flex', md: 'none' }, color: 'text.primary', alignItems: 'center', gap: 0.5 }}
+            sx={{ mr: 1, display: { xs: 'flex', md: 'none' }, color: 'var(--foreground)', alignItems: 'center', gap: 0.5 }}
           >
             <Search size={22} />
           </IconButton>
@@ -5206,15 +5535,15 @@ export default function HomePage() {
               startIcon={<Home size={18} />}
               onClick={() => handleTabChange('home')}
               sx={{
-                color: (theme) => activeTab === 'home' ? '#2563eb' : theme.palette.text.primary,
-                borderColor: (theme) => activeTab === 'home' ? 'rgba(37,99,235,0.6)' : theme.palette.divider,
-                backgroundColor: activeTab === 'home' ? 'rgba(37,99,235,0.12)' : 'transparent',
+                color: (theme) => activeTab === 'home' ? '#0071e3' : theme.palette.text.primary,
+                borderColor: (theme) => activeTab === 'home' ? 'rgba(0,113,227,0.6)' : theme.palette.divider,
+                backgroundColor: activeTab === 'home' ? 'rgba(0,113,227,0.12)' : 'transparent',
                 textTransform: 'none',
                 borderRadius: 2,
                 px: 1.5,
                 py: 0.5,
                 height: 40,
-                '&:hover': { borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.16)' },
+                '&:hover': { borderColor: '#0071e3', backgroundColor: 'rgba(0,113,227,0.16)' },
               }}
             >
               หน้าแรก
@@ -5224,15 +5553,15 @@ export default function HomePage() {
               startIcon={<History size={18} />}
               onClick={() => handleTabChange('history')}
               sx={{
-                color: (theme) => activeTab === 'history' ? '#2563eb' : theme.palette.text.primary,
-                borderColor: (theme) => activeTab === 'history' ? 'rgba(37,99,235,0.6)' : theme.palette.divider,
-                backgroundColor: activeTab === 'history' ? 'rgba(37,99,235,0.12)' : 'transparent',
+                color: (theme) => activeTab === 'history' ? '#0071e3' : theme.palette.text.primary,
+                borderColor: (theme) => activeTab === 'history' ? 'rgba(0,113,227,0.6)' : theme.palette.divider,
+                backgroundColor: activeTab === 'history' ? 'rgba(0,113,227,0.12)' : 'transparent',
                 textTransform: 'none',
                 borderRadius: 2,
                 px: 1.5,
                 py: 0.5,
                 height: 40,
-                '&:hover': { borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.16)' },
+                '&:hover': { borderColor: '#0071e3', backgroundColor: 'rgba(0,113,227,0.16)' },
               }}
             >
               ประวัติ
@@ -5242,15 +5571,15 @@ export default function HomePage() {
               startIcon={<User size={18} />}
               onClick={() => handleTabChange('profile')}
               sx={{
-                color: (theme) => activeTab === 'profile' ? '#2563eb' : theme.palette.text.primary,
-                borderColor: (theme) => activeTab === 'profile' ? 'rgba(37,99,235,0.6)' : theme.palette.divider,
-                backgroundColor: activeTab === 'profile' ? 'rgba(37,99,235,0.12)' : 'transparent',
+                color: (theme) => activeTab === 'profile' ? '#0071e3' : theme.palette.text.primary,
+                borderColor: (theme) => activeTab === 'profile' ? 'rgba(0,113,227,0.6)' : theme.palette.divider,
+                backgroundColor: activeTab === 'profile' ? 'rgba(0,113,227,0.12)' : 'transparent',
                 textTransform: 'none',
                 borderRadius: 2,
                 px: 1.5,
                 py: 0.5,
                 height: 40,
-                '&:hover': { borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.16)' },
+                '&:hover': { borderColor: '#0071e3', backgroundColor: 'rgba(0,113,227,0.16)' },
               }}
             >
               โปรไฟล์
@@ -5264,15 +5593,15 @@ export default function HomePage() {
               )}
               onClick={() => handleTabChange('cart')}
               sx={{
-                color: (theme) => activeTab === 'cart' ? '#2563eb' : theme.palette.text.primary,
-                borderColor: (theme) => activeTab === 'cart' ? 'rgba(37,99,235,0.6)' : theme.palette.divider,
-                backgroundColor: activeTab === 'cart' ? 'rgba(37,99,235,0.12)' : 'transparent',
+                color: (theme) => activeTab === 'cart' ? '#0071e3' : theme.palette.text.primary,
+                borderColor: (theme) => activeTab === 'cart' ? 'rgba(0,113,227,0.6)' : theme.palette.divider,
+                backgroundColor: activeTab === 'cart' ? 'rgba(0,113,227,0.12)' : 'transparent',
                 textTransform: 'none',
                 borderRadius: 2,
                 px: 1.5,
                 py: 0.5,
                 height: 40,
-                '&:hover': { borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,0.16)' },
+                '&:hover': { borderColor: '#0071e3', backgroundColor: 'rgba(0,113,227,0.16)' },
               }}
             >
               ตะกร้า
@@ -5293,8 +5622,8 @@ export default function HomePage() {
             <Box sx={{
               p: 2,
               borderRadius: '16px',
-              bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(15,23,42,0.95)' : 'rgba(255,255,255,0.98)',
-              border: '1px solid rgba(37,99,235,0.2)',
+              bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.95)' : 'rgba(255,255,255,0.98)',
+              border: '1px solid rgba(0,113,227,0.2)',
               boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 4px 20px rgba(0,0,0,0.3)' : '0 4px 20px rgba(0,0,0,0.08)',
             }}>
               <TextField
@@ -5307,19 +5636,19 @@ export default function HomePage() {
                 fullWidth
                 sx={{
                   '& .MuiOutlinedInput-root': {
-                    color: 'text.primary',
-                    background: (theme) => theme.palette.mode === 'dark' ? 'rgba(30,41,59,0.5)' : 'rgba(0,0,0,0.03)',
+                    color: 'var(--foreground)',
+                    background: (theme) => theme.palette.mode === 'dark' ? 'rgba(29,29,31,0.5)' : 'rgba(0,0,0,0.03)',
                     borderRadius: '12px',
                     '& fieldset': { borderColor: 'divider' },
-                    '&:hover fieldset': { borderColor: 'rgba(37,99,235,0.5)' },
-                    '&.Mui-focused fieldset': { borderColor: '#2563eb' },
+                    '&:hover fieldset': { borderColor: 'rgba(0,113,227,0.5)' },
+                    '&.Mui-focused fieldset': { borderColor: '#0071e3' },
                   },
                   '& .MuiInputBase-input::placeholder': { color: 'text.disabled', opacity: 1 },
                 }}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <Search size={18} color="#2563eb" />
+                      <Search size={18} color="#0071e3" />
                     </InputAdornment>
                   ),
                   endAdornment: productSearch && (
@@ -5342,14 +5671,14 @@ export default function HomePage() {
                       size="small"
                       onClick={() => setProductSearch(label)}
                       sx={{
-                        bgcolor: productSearch.includes(label) ? 'rgba(37,99,235,0.2)' : 'var(--glass-bg)',
+                        bgcolor: productSearch.includes(label) ? 'rgba(0,113,227,0.2)' : 'var(--glass-bg)',
                         color: productSearch.includes(label) ? 'var(--primary)' : 'var(--text-muted)',
                         border: '1px solid',
-                        borderColor: productSearch.includes(label) ? 'rgba(37,99,235,0.4)' : 'var(--glass-bg)',
+                        borderColor: productSearch.includes(label) ? 'rgba(0,113,227,0.4)' : 'var(--glass-bg)',
                         fontSize: '0.75rem',
                         fontWeight: 600,
                         cursor: 'pointer',
-                        '&:hover': { bgcolor: 'rgba(37,99,235,0.15)' },
+                        '&:hover': { bgcolor: 'rgba(0,113,227,0.15)' },
                       }}
                     />
                   ))}
@@ -5375,545 +5704,31 @@ export default function HomePage() {
         customMessage={config?.closedMessage}
       />
 
-      {/* Top Announcement Banner - Always visible when announcements exist */}
-      {(() => {
-        const enabledAnnouncements = announcements?.filter(a => a.enabled) || [];
-        if (enabledAnnouncements.length === 0) return null;
-        const currentAnn = enabledAnnouncements[currentAnnouncementIndex % enabledAnnouncements.length];
-        if (!currentAnn) return null;
-        
-        const baseColor = getAnnouncementColor(currentAnn.color);
-        
-        return (
-          <Box
-            sx={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              zIndex: 1300, // Above everything including navbar
-              animation: 'slideInFromTop 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
-              '@keyframes slideInFromTop': {
-                from: { transform: 'translateY(-100%)', opacity: 0 },
-                to: { transform: 'translateY(0)', opacity: 1 },
-              },
-            }}
-          >
-            <Box
-              sx={{
-                position: 'relative',
-                overflow: 'hidden',
-                boxShadow: `0 4px 20px ${baseColor}40, 0 2px 8px rgba(0,0,0,0.3)`,
-              }}
-            >
-              {/* Animated gradient background */}
-              <Box
-                sx={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  background: `linear-gradient(-45deg, ${baseColor}, ${baseColor}dd, ${baseColor}bb, ${baseColor})`,
-                  backgroundSize: '400% 400%',
-                  animation: 'gradientShift 8s ease infinite',
-                  '@keyframes gradientShift': {
-                    '0%': { backgroundPosition: '0% 50%' },
-                    '50%': { backgroundPosition: '100% 50%' },
-                    '100%': { backgroundPosition: '0% 50%' },
-                  },
-                }}
-              />
-              
-              {/* Shimmer effect */}
-              <Box
-                sx={{
-                  position: 'absolute',
-                  top: 0,
-                  left: '-100%',
-                  right: 0,
-                  bottom: 0,
-                  background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent)',
-                  animation: 'shimmer 3s ease-in-out infinite',
-                  '@keyframes shimmer': {
-                    '0%': { left: '-100%' },
-                    '100%': { left: '100%' },
-                  },
-                }}
-              />
+      {/* Modern Announcement Bar */}
+      <AnnouncementBar
+        announcements={announcements || []}
+        history={announcementHistory}
+      />
 
-              {/* Content */}
-              <Box 
-                sx={{ 
-                  position: 'relative', 
-                  zIndex: 1, 
-                  px: { xs: 2, sm: 3 },
-                  py: { xs: 1, sm: 1.25 },
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: { xs: 1.5, sm: 2 },
-                  flexWrap: 'wrap',
-                }}
-              >
-                {/* Animated icon */}
-                <Box sx={{ 
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1,
-                  animation: 'pulse 2s ease-in-out infinite',
-                  '@keyframes pulse': {
-                    '0%, 100%': { transform: 'scale(1)' },
-                    '50%': { transform: 'scale(1.05)' },
-                  },
-                }}>
-                  <Box sx={{ 
-                    width: 8, 
-                    height: 8, 
-                    borderRadius: '50%', 
-                    bgcolor: '#fff',
-                    boxShadow: '0 0 8px #fff, 0 0 16px #fff',
-                    animation: 'glow 2s ease-in-out infinite',
-                    '@keyframes glow': {
-                      '0%, 100%': { boxShadow: '0 0 4px #fff, 0 0 8px #fff', opacity: 1 },
-                      '50%': { boxShadow: '0 0 12px #fff, 0 0 24px #fff', opacity: 0.7 },
-                    },
-                  }} />
-                  <Megaphone size={18} color="white" />
-                </Box>
-
-                {/* Image thumbnail (if exists) */}
-                {currentAnn.imageUrl && (
-                  <Box
-                    onClick={() => setShowAnnouncementImage(true)}
-                    sx={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: '8px',
-                      overflow: 'hidden',
-                      border: '2px solid var(--glass-border)',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                      flexShrink: 0,
-                      '&:hover': {
-                        transform: 'scale(1.1)',
-                        border: '2px solid var(--primary)',
-                      },
-                    }}
-                  >
-                    <OptimizedImage
-                      src={currentAnn.imageUrl}
-                      alt="Announcement"
-                      width={32}
-                      height={32}
-                      objectFit="cover"
-                    />
-                  </Box>
-                )}
-
-                {/* Message */}
-                <Typography
-                  onClick={currentAnn.imageUrl ? () => setShowAnnouncementImage(true) : undefined}
-                  sx={{
-                    color: '#fff',
-                    fontSize: { xs: '0.85rem', sm: '0.95rem' },
-                    fontWeight: 600,
-                    textAlign: 'center',
-                    textShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                    maxWidth: { xs: '100%', sm: '70%' },
-                    whiteSpace: { xs: 'normal', sm: 'nowrap' },
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    cursor: currentAnn.imageUrl ? 'pointer' : 'default',
-                    '&:hover': currentAnn.imageUrl ? { textDecoration: 'underline' } : {},
-                  }}
-                >
-                  {currentAnn.message || 'ประกาศจากทีมงาน'}
-                </Typography>
-
-                {/* Navigation dots for multiple announcements */}
-                {enabledAnnouncements.length > 1 && (
-                  <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
-                    {enabledAnnouncements.map((_, idx) => (
-                      <Box
-                        key={idx}
-                        onClick={() => setCurrentAnnouncementIndex(idx)}
-                        sx={{
-                          width: idx === currentAnnouncementIndex ? 14 : 6,
-                          height: 6,
-                          borderRadius: '3px',
-                          bgcolor: idx === currentAnnouncementIndex ? 'var(--foreground)' : 'var(--text-muted)',
-                          cursor: 'pointer',
-                          transition: 'all 0.3s ease',
-                          '&:hover': { bgcolor: 'var(--foreground)' },
-                        }}
-                      />
-                    ))}
-                  </Box>
-                )}
-
-                {/* History button */}
-                {announcementHistory && announcementHistory.length > 0 && (
-                  <IconButton
-                    size="small"
-                    onClick={() => setShowAnnouncementHistory(true)}
-                    sx={{
-                      color: 'var(--foreground)',
-                      bgcolor: 'var(--glass-bg)',
-                      width: 28,
-                      height: 28,
-                      '&:hover': { bgcolor: 'var(--glass-bg)' },
-                    }}
-                  >
-                    <History size={14} />
-                  </IconButton>
-                )}
-              </Box>
-            </Box>
-          </Box>
-        );
-      })()}
-
-      {/* Announcement History Dialog */}
-      <Dialog
-        open={showAnnouncementHistory}
-        onClose={() => setShowAnnouncementHistory(false)}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{
-          sx: {
-            bgcolor: 'var(--surface)',
-            backdropFilter: 'blur(20px)',
-            borderRadius: '20px',
-            border: '1px solid var(--glass-border)',
-            maxHeight: '80vh',
-          },
+      {/* Event / Promotion Banners */}
+      <EventBanner
+        events={config?.events || []}
+        onEventClick={(event) => {
+          if (event.ctaLink) {
+            // If it looks like a product ID, scroll to products
+            if (event.ctaLink.startsWith('http')) {
+              window.open(event.ctaLink, '_blank');
+            } else {
+              // Treat as product ID — scroll to product grid
+              const el = document.getElementById('product-grid');
+              if (el) el.scrollIntoView({ behavior: 'smooth' });
+            }
+          }
         }}
-      >
-        <DialogTitle sx={{ 
-          borderBottom: '1px solid var(--glass-border)',
-          pb: 2,
-        }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Box sx={{
-              width: 40,
-              height: 40,
-              borderRadius: '12px',
-              background: 'linear-gradient(135deg, #1e40af, #2563eb)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-              <History size={20} color="#fff" />
-            </Box>
-            <Box>
-              <Typography sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '1.1rem' }}>
-                ประวัติประกาศ
-              </Typography>
-              <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                ประกาศย้อนหลังทั้งหมด {announcementHistory?.length || 0} รายการ
-              </Typography>
-            </Box>
-          </Box>
-        </DialogTitle>
-        <DialogContent sx={{ p: 0 }}>
-          {announcementHistory && announcementHistory.length > 0 ? (
-            <Box sx={{ py: 2 }}>
-              {announcementHistory.map((item, index) => (
-                <Box
-                  key={item.id || index}
-                  sx={{
-                    mx: 2,
-                    mb: 2,
-                    p: 2,
-                    borderRadius: '16px',
-                    background: `linear-gradient(135deg, ${getAnnouncementColor(item.color)}20, ${getAnnouncementColor(item.color)}10)`,
-                    border: `1px solid ${getAnnouncementColor(item.color)}40`,
-                    position: 'relative',
-                    overflow: 'hidden',
-                  }}
-                >
-                  {/* Color indicator bar */}
-                  <Box sx={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    bottom: 0,
-                    width: 4,
-                    bgcolor: getAnnouncementColor(item.color),
-                  }} />
-
-                  {/* Date badge */}
-                  <Box sx={{ 
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 0.5,
-                    px: 1,
-                    py: 0.25,
-                    mb: 1,
-                    borderRadius: '8px',
-                    bgcolor: 'var(--glass-bg)',
-                    fontSize: '0.7rem',
-                    color: 'var(--text-muted)',
-                  }}>
-                    <Clock size={12} />
-                    {item.postedAt 
-                      ? new Date(item.postedAt).toLocaleDateString('th-TH', { 
-                          day: 'numeric', 
-                          month: 'long', 
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })
-                      : 'ไม่ระบุวันที่'
-                    }
-                  </Box>
-
-                  {/* Image */}
-                  {item.imageUrl && (
-                    <OptimizedImage
-                      src={item.imageUrl}
-                      alt="Announcement"
-                      width="100%"
-                      height={150}
-                      objectFit="cover"
-                      borderRadius="12px"
-                      style={{ marginBottom: item.message ? 12 : 0 }}
-                    />
-                  )}
-
-                  {/* Message */}
-                  {item.message && (
-                    <Typography sx={{ 
-                      color: 'var(--foreground)',
-                      fontSize: '0.9rem',
-                      lineHeight: 1.6,
-                      whiteSpace: 'pre-wrap',
-                    }}>
-                      {item.message}
-                    </Typography>
-                  )}
-
-                  {/* Posted by */}
-                  {(item.displayName || item.postedBy) && (
-                    <Typography sx={{ 
-                      mt: 1, 
-                      fontSize: '0.75rem', 
-                      color: 'var(--text-muted)',
-                    }}>
-                      — {item.displayName || item.postedBy}
-                    </Typography>
-                  )}
-                </Box>
-              ))}
-            </Box>
-          ) : (
-            <Box sx={{ 
-              py: 6, 
-              textAlign: 'center',
-              color: 'var(--text-muted)',
-            }}>
-              <History size={48} style={{ opacity: 0.3, marginBottom: 16 }} />
-              <Typography>ยังไม่มีประวัติประกาศ</Typography>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ borderTop: '1px solid var(--glass-border)', p: 2 }}>
-          <Button 
-            onClick={() => setShowAnnouncementHistory(false)}
-            sx={{ 
-              color: 'var(--text-muted)',
-              '&:hover': { bgcolor: 'var(--glass-bg)' },
-            }}
-          >
-            ปิด
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Announcement Image Lightbox */}
-      <Dialog
-        open={showAnnouncementImage}
-        onClose={() => setShowAnnouncementImage(false)}
-        maxWidth="md"
-        fullWidth
-        PaperProps={{
-          sx: {
-            bgcolor: 'var(--surface)',
-            backdropFilter: 'blur(24px)',
-            borderRadius: '24px',
-            border: '1px solid var(--glass-border)',
-            overflow: 'hidden',
-            maxHeight: '90vh',
-          },
-        }}
-      >
-        {(() => {
-          const enabledAnnouncements = announcements?.filter(a => a.enabled) || [];
-          const currentAnn = enabledAnnouncements[currentAnnouncementIndex % enabledAnnouncements.length];
-          if (!currentAnn) return null;
-          
-          const baseColor = getAnnouncementColor(currentAnn.color);
-          
-          return (
-            <>
-              {/* Header */}
-              <Box
-                sx={{
-                  position: 'relative',
-                  p: 2,
-                  background: `linear-gradient(135deg, ${baseColor}30, ${baseColor}10)`,
-                  borderBottom: '1px solid var(--glass-border)',
-                }}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Box sx={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: '14px',
-                    background: `linear-gradient(135deg, ${baseColor}, ${baseColor}cc)`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: `0 4px 16px ${baseColor}40`,
-                  }}>
-                    <Megaphone size={22} color="#fff" />
-                  </Box>
-                  <Box sx={{ flex: 1 }}>
-                    <Typography sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '1.1rem' }}>
-                      ประกาศ
-                    </Typography>
-                    {currentAnn.postedAt && (
-                      <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        {new Date(currentAnn.postedAt).toLocaleDateString('th-TH', { 
-                          day: 'numeric', 
-                          month: 'long', 
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </Typography>
-                    )}
-                  </Box>
-                  <IconButton 
-                    onClick={() => setShowAnnouncementImage(false)}
-                    sx={{ 
-                      color: 'var(--text-muted)',
-                      '&:hover': { bgcolor: 'var(--glass-bg)' },
-                    }}
-                  >
-                    <X size={20} />
-                  </IconButton>
-                </Box>
-              </Box>
-
-              {/* Content */}
-              <DialogContent sx={{ p: 0 }}>
-                {/* Image */}
-                {currentAnn.imageUrl && (
-                  <Box
-                    sx={{
-                      position: 'relative',
-                      width: '100%',
-                      maxHeight: '60vh',
-                      overflow: 'hidden',
-                      bgcolor: '#000',
-                    }}
-                  >
-                    <OptimizedImage
-                      src={currentAnn.imageUrl}
-                      alt="Announcement Image"
-                      width="100%"
-                      height="auto"
-                      objectFit="contain"
-                      style={{ maxHeight: '60vh' }}
-                      priority
-                    />
-                  </Box>
-                )}
-
-                {/* Message */}
-                {currentAnn.message && (
-                  <Box sx={{ p: 3 }}>
-                    <Typography
-                      sx={{
-                        color: 'var(--foreground)',
-                        fontSize: '1rem',
-                        lineHeight: 1.8,
-                        whiteSpace: 'pre-wrap',
-                      }}
-                    >
-                      {currentAnn.message}
-                    </Typography>
-                  </Box>
-                )}
-
-                {/* Footer */}
-                <Box 
-                  sx={{ 
-                    p: 2, 
-                    borderTop: '1px solid var(--glass-border)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    bgcolor: 'var(--surface-2)',
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                    {currentAnn.showLogo !== false && (
-                      <Box 
-                        component="img" 
-                        src="/logo.png" 
-                        alt="Logo" 
-                        sx={{ 
-                          width: 28, 
-                          height: 28, 
-                          borderRadius: '8px',
-                          border: '1px solid var(--glass-border)',
-                        }} 
-                        onError={(e: any) => { e.target.style.display = 'none'; }} 
-                      />
-                    )}
-                    <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                      {currentAnn.displayName || (currentAnn.postedBy === 'ระบบ' ? 'PSU SCC Shop' : 'แอดมิน')}
-                    </Typography>
-                  </Box>
-
-                  {/* Navigation for multiple announcements */}
-                  {enabledAnnouncements.length > 1 && (
-                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                      <IconButton
-                        size="small"
-                        onClick={() => setCurrentAnnouncementIndex(prev => 
-                          prev === 0 ? enabledAnnouncements.length - 1 : prev - 1
-                        )}
-                        sx={{ color: 'var(--text-muted)', '&:hover': { bgcolor: 'var(--glass-bg)' } }}
-                      >
-                        <ChevronLeft size={18} />
-                      </IconButton>
-                      <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.8rem', minWidth: 40, textAlign: 'center' }}>
-                        {currentAnnouncementIndex + 1} / {enabledAnnouncements.length}
-                      </Typography>
-                      <IconButton
-                        size="small"
-                        onClick={() => setCurrentAnnouncementIndex(prev => 
-                          (prev + 1) % enabledAnnouncements.length
-                        )}
-                        sx={{ color: 'var(--text-muted)', '&:hover': { bgcolor: 'var(--glass-bg)' } }}
-                      >
-                        <ChevronRight size={18} />
-                      </IconButton>
-                    </Box>
-                  )}
-                </Box>
-              </DialogContent>
-            </>
-          );
-        })()}
-      </Dialog>
+      />
 
       <Drawer
-        anchor="right"
+        anchor={navHandedness === 'left' ? 'left' : 'right'}
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         PaperProps={{
@@ -5925,11 +5740,15 @@ export default function HomePage() {
             overflowY: 'auto',
             WebkitOverflowScrolling: 'touch',
             backdropFilter: 'blur(24px)',
-            borderLeft: '1px solid var(--glass-border)',
-            boxShadow: (theme: any) => theme.palette.mode === 'dark' ? '-18px 0 60px rgba(0,0,0,0.45)' : '-18px 0 60px rgba(0,0,0,0.08)',
+            borderLeft: navHandedness === 'left' ? 'none' : '1px solid var(--glass-border)',
+            borderRight: navHandedness === 'left' ? '1px solid var(--glass-border)' : 'none',
+            boxShadow: (theme: any) => {
+              const dir = navHandedness === 'left' ? '18px' : '-18px';
+              return theme.palette.mode === 'dark' ? `${dir} 0 60px rgba(0,0,0,0.45)` : `${dir} 0 60px rgba(0,0,0,0.08)`;
+            },
             backgroundImage: (theme: any) => theme.palette.mode === 'dark' 
-              ? 'radial-gradient(circle at 20% 20%, rgba(37,99,235,0.18), transparent 42%), radial-gradient(circle at 80% 0%, rgba(14,165,233,0.16), transparent 38%)'
-              : 'radial-gradient(circle at 20% 20%, rgba(37,99,235,0.06), transparent 42%), radial-gradient(circle at 80% 0%, rgba(14,165,233,0.04), transparent 38%)',
+              ? 'radial-gradient(circle at 20% 20%, rgba(0,113,227,0.18), transparent 42%), radial-gradient(circle at 80% 0%, rgba(14,165,233,0.16), transparent 38%)'
+              : 'radial-gradient(circle at 20% 20%, rgba(0,113,227,0.06), transparent 42%), radial-gradient(circle at 80% 0%, rgba(14,165,233,0.04), transparent 38%)',
           },
         }}
       >
@@ -5963,10 +5782,10 @@ export default function HomePage() {
                   borderRadius: 2,
                   px: 1.5,
                   py: 1.1,
-                  background: 'linear-gradient(120deg, rgba(37,99,235,0.18), rgba(14,165,233,0.12))',
+                  background: 'linear-gradient(120deg, rgba(0,113,227,0.18), rgba(14,165,233,0.12))',
                   border: '1px solid var(--glass-border)',
                   boxShadow: (theme: any) => theme.palette.mode === 'dark' ? '0 12px 30px rgba(0,0,0,0.25)' : '0 4px 12px rgba(0,0,0,0.06)',
-                  '&:hover': { borderColor: 'rgba(37,99,235,0.5)', background: 'linear-gradient(120deg, rgba(37,99,235,0.24), rgba(14,165,233,0.18))' },
+                  '&:hover': { borderColor: 'rgba(0,113,227,0.5)', background: 'linear-gradient(120deg, rgba(0,113,227,0.24), rgba(14,165,233,0.18))' },
                 }}
                 startIcon={<User size={20} />}
               >
@@ -5994,10 +5813,50 @@ export default function HomePage() {
               </Button>
               <Button
                 fullWidth
-                onClick={() => signOut()}
+                onClick={() => { setSidebarOpen(false); setSwitchAccountOpen(true); }}
                 sx={{
                   textAlign: 'left',
-                  color: (theme: any) => theme.palette.mode === 'dark' ? '#fecdd3' : '#dc2626',
+                  mb: 1,
+                  color: 'var(--foreground)',
+                  justifyContent: 'flex-start',
+                  borderRadius: 2,
+                  px: 1.5,
+                  py: 1.1,
+                  background: 'linear-gradient(120deg, rgba(139,92,246,0.18), rgba(99,102,241,0.12))',
+                  border: '1px solid var(--glass-border)',
+                  boxShadow: (theme: any) => theme.palette.mode === 'dark' ? '0 12px 30px rgba(0,0,0,0.25)' : '0 4px 12px rgba(0,0,0,0.06)',
+                  '&:hover': { borderColor: 'rgba(139,92,246,0.5)', background: 'linear-gradient(120deg, rgba(139,92,246,0.24), rgba(99,102,241,0.18))' },
+                }}
+                startIcon={<ArrowLeftRight size={20} />}
+              >
+                สลับบัญชี
+              </Button>
+              <Button
+                fullWidth
+                onClick={toggleNavHandedness}
+                sx={{
+                  textAlign: 'left',
+                  mb: 1,
+                  color: 'var(--foreground)',
+                  justifyContent: 'flex-start',
+                  borderRadius: 2,
+                  px: 1.5,
+                  py: 1.1,
+                  background: 'linear-gradient(120deg, rgba(245,158,11,0.18), rgba(251,191,36,0.12))',
+                  border: '1px solid var(--glass-border)',
+                  boxShadow: (theme: any) => theme.palette.mode === 'dark' ? '0 12px 30px rgba(0,0,0,0.25)' : '0 4px 12px rgba(0,0,0,0.06)',
+                  '&:hover': { borderColor: 'rgba(245,158,11,0.5)', background: 'linear-gradient(120deg, rgba(245,158,11,0.24), rgba(251,191,36,0.18))' },
+                }}
+                startIcon={<HandMetal size={20} style={{ transform: navHandedness === 'left' ? 'scaleX(-1)' : 'none' }} />}
+              >
+                {navHandedness === 'right' ? 'สลับมุมมอง: คนถนัดขวา' : 'สลับมุมมอง: คนถนัดซ้าย'}
+              </Button>
+              <Button
+                fullWidth
+                onClick={() => { setSidebarOpen(false); setLogoutConfirmOpen(true); }}
+                sx={{
+                  textAlign: 'left',
+                  color: (theme: any) => theme.palette.mode === 'dark' ? '#fecdd3' : '#ff3b30',
                   justifyContent: 'flex-start',
                   borderRadius: 2,
                   px: 1.5,
@@ -6027,11 +5886,11 @@ export default function HomePage() {
               px: 1.5,
               py: 1.1,
               background: (theme: any) => theme.palette.mode === 'dark' 
-                ? 'linear-gradient(120deg, rgba(37,99,235,0.16), rgba(30,41,59,0.6))' 
-                : 'linear-gradient(120deg, rgba(37,99,235,0.08), rgba(241,245,249,0.6))',
+                ? 'linear-gradient(120deg, rgba(0,113,227,0.16), rgba(29,29,31,0.6))' 
+                : 'linear-gradient(120deg, rgba(0,113,227,0.08), rgba(245,245,247,0.6))',
               border: '1px solid var(--glass-border)',
               boxShadow: (theme: any) => theme.palette.mode === 'dark' ? '0 12px 30px rgba(0,0,0,0.22)' : '0 4px 12px rgba(0,0,0,0.06)',
-              '&:hover': { borderColor: 'rgba(37,99,235,0.6)', background: 'linear-gradient(120deg, rgba(37,99,235,0.22), rgba(37,99,235,0.08))' },
+              '&:hover': { borderColor: 'rgba(0,113,227,0.6)', background: 'linear-gradient(120deg, rgba(0,113,227,0.22), rgba(0,113,227,0.08))' },
             }}
             startIcon={<Home size={20} />}
           >
@@ -6063,11 +5922,11 @@ export default function HomePage() {
                         width: 36,
                         height: 36,
                         borderRadius: '10px',
-                        bgcolor: 'rgba(37,99,235,0.15)',
+                        bgcolor: 'rgba(0,113,227,0.15)',
                         display: 'grid',
                         placeItems: 'center',
                       }}>
-                        <Store size={18} color="#93c5fd" />
+                        <Store size={18} color="#2997ff" />
                       </Box>
                       <Box>
                         <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>
@@ -6083,7 +5942,7 @@ export default function HomePage() {
                         onClick={() => setShowSearchBar(!showSearchBar)}
                         sx={{ 
                           color: showSearchBar ? 'var(--primary)' : 'var(--text-muted)',
-                          bgcolor: showSearchBar ? 'rgba(37,99,235,0.15)' : 'var(--glass-bg)',
+                          bgcolor: showSearchBar ? 'rgba(0,113,227,0.15)' : 'var(--glass-bg)',
                         }}
                       >
                         <Search size={18} />
@@ -6112,8 +5971,8 @@ export default function HomePage() {
                             px: 1.8,
                             py: 0.8,
                             borderRadius: '12px',
-                            bgcolor: active ? 'rgba(37,99,235,0.2)' : 'var(--glass-bg)',
-                            border: active ? '1px solid rgba(37,99,235,0.5)' : '1px solid var(--glass-border)',
+                            bgcolor: active ? 'rgba(0,113,227,0.2)' : 'var(--glass-bg)',
+                            border: active ? '1px solid rgba(0,113,227,0.5)' : '1px solid var(--glass-border)',
                             color: active ? 'var(--primary)' : 'var(--text-muted)',
                             fontSize: '0.8rem',
                             fontWeight: 600,
@@ -6124,8 +5983,8 @@ export default function HomePage() {
                             alignItems: 'center',
                             gap: 0.8,
                             '&:hover': {
-                              bgcolor: active ? 'rgba(37,99,235,0.25)' : 'var(--glass-bg)',
-                              borderColor: active ? 'rgba(37,99,235,0.6)' : 'var(--glass-border)',
+                              bgcolor: active ? 'rgba(0,113,227,0.25)' : 'var(--glass-bg)',
+                              borderColor: active ? 'rgba(0,113,227,0.6)' : 'var(--glass-border)',
                             },
                           }}
                         >
@@ -6135,7 +5994,7 @@ export default function HomePage() {
                             px: 0.7,
                             py: 0.1,
                             borderRadius: '6px',
-                            bgcolor: active ? 'rgba(37,99,235,0.4)' : 'var(--glass-bg)',
+                            bgcolor: active ? 'rgba(0,113,227,0.4)' : 'var(--glass-bg)',
                             fontSize: '0.65rem',
                             fontWeight: 700,
                           }}>
@@ -6153,7 +6012,7 @@ export default function HomePage() {
                         <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
                           กรองตามราคา
                         </Typography>
-                        <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: '#10b981' }}>
+                        <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--success)' }}>
                           ฿{priceRange[0].toLocaleString()} - ฿{priceRange[1].toLocaleString()}
                         </Typography>
                       </Box>
@@ -6165,16 +6024,16 @@ export default function HomePage() {
                         onChange={(_, value) => setPriceRange(value as [number, number])}
                         valueLabelDisplay="off"
                         sx={{
-                          color: '#2563eb',
+                          color: '#0071e3',
                           height: 6,
-                          '& .MuiSlider-track': { border: 'none', bgcolor: '#2563eb' },
+                          '& .MuiSlider-track': { border: 'none', bgcolor: '#0071e3' },
                           '& .MuiSlider-rail': { bgcolor: 'var(--glass-bg)' },
                           '& .MuiSlider-thumb': {
                             width: 18,
                             height: 18,
                             backgroundColor: '#fff',
-                            border: '2px solid #2563eb',
-                            '&:hover': { boxShadow: '0 0 0 8px rgba(37,99,235,0.16)' },
+                            border: '2px solid #0071e3',
+                            '&:hover': { boxShadow: '0 0 0 8px rgba(0,113,227,0.16)' },
                           },
                         }}
                       />
@@ -6192,7 +6051,7 @@ export default function HomePage() {
                       px: 1.5,
                       py: 0.6,
                       borderRadius: '10px',
-                      background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                      background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
                       display: 'flex',
                       alignItems: 'center',
                       gap: 0.75,
@@ -6211,6 +6070,7 @@ export default function HomePage() {
                       const productStatus = getProductStatus(product);
                       const isProductAvailable = productStatus === 'OPEN' && isShopOpen;
                       const isProductClosed = productStatus !== 'OPEN'; // Product is closed/coming soon/ended
+                      const eventDiscount = getEventDiscount(product.id, config?.events as ShopEvent[] | undefined);
                       
                       return (
                       <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={product.id}>
@@ -6242,8 +6102,8 @@ export default function HomePage() {
                             opacity: isProductClosed ? 0.85 : 1,
                             '&:hover': isProductAvailable ? {
                               transform: 'translateY(-4px)',
-                              boxShadow: '0 20px 40px rgba(37,99,235,0.2)',
-                              borderColor: 'rgba(37,99,235,0.4)',
+                              boxShadow: '0 20px 40px rgba(0,113,227,0.2)',
+                              borderColor: 'rgba(0,113,227,0.4)',
                             } : {},
                           }}
                         >
@@ -6389,15 +6249,71 @@ export default function HomePage() {
                               borderRadius: '10px',
                               bgcolor: isProductClosed ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.7)',
                               backdropFilter: 'blur(8px)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 0.5,
                             }}>
-                              <Typography sx={{ 
-                                fontSize: '0.9rem', 
-                                fontWeight: 800, 
-                                color: isProductClosed ? 'var(--text-muted)' : '#10b981',
-                              }}>
-                                ฿{product.basePrice.toLocaleString()}
-                              </Typography>
+                              {eventDiscount && !isProductClosed ? (
+                                <>
+                                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#86868b', textDecoration: 'line-through' }}>
+                                    ฿{product.basePrice.toLocaleString()}
+                                  </Typography>
+                                  <Typography sx={{ fontSize: '0.9rem', fontWeight: 800, color: '#ff453a' }}>
+                                    ฿{eventDiscount.discountedPrice(product.basePrice).toLocaleString()}
+                                  </Typography>
+                                </>
+                              ) : (
+                                <Typography sx={{ 
+                                  fontSize: '0.9rem', 
+                                  fontWeight: 800, 
+                                  color: isProductClosed ? 'var(--text-muted)' : '#34c759',
+                                }}>
+                                  ฿{product.basePrice.toLocaleString()}
+                                </Typography>
+                              )}
                             </Box>
+
+                            {/* Event discount badge */}
+                            {eventDiscount && !isProductClosed && (
+                              <Box sx={{
+                                position: 'absolute',
+                                top: 8,
+                                right: 8,
+                                px: 0.8,
+                                py: 0.4,
+                                borderRadius: '8px',
+                                bgcolor: 'rgba(255,69,58,0.9)',
+                                fontSize: '0.6rem',
+                                fontWeight: 800,
+                                color: 'white',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 0.3,
+                                backdropFilter: 'blur(4px)',
+                              }}>
+                                <Tag size={10} />
+                                {eventDiscount.discountLabel}
+                              </Box>
+                            )}
+
+                            {/* Share button */}
+                            <IconButton
+                              size="small"
+                              onClick={(e) => { e.stopPropagation(); handleShareProduct(product); }}
+                              sx={{
+                                position: 'absolute',
+                                bottom: 8,
+                                left: 8,
+                                bgcolor: 'rgba(0,0,0,0.5)',
+                                backdropFilter: 'blur(8px)',
+                                color: 'white',
+                                width: 30,
+                                height: 30,
+                                '&:hover': { bgcolor: 'rgba(0,113,227,0.7)' },
+                              }}
+                            >
+                              <Share2 size={14} />
+                            </IconButton>
                           </Box>
 
                           {/* Product Info */}
@@ -6446,7 +6362,7 @@ export default function HomePage() {
                                     // Auto-generate from endDate
                                     ...(product.endDate && new Date(product.endDate) > new Date() ? [{
                                       text: `ถึง ${new Date(product.endDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}`,
-                                      color: '#f87171',
+                                      color: 'var(--error)',
                                       bgColor: 'rgba(239,68,68,0.15)',
                                       borderColor: 'rgba(239,68,68,0.3)',
                                       icon: 'clock'
@@ -6454,15 +6370,15 @@ export default function HomePage() {
                                     // Auto-generate from options
                                     ...(product.options?.hasCustomName ? [{
                                       text: 'สกรีนชื่อได้',
-                                      color: '#34d399',
+                                      color: 'var(--success)',
                                       bgColor: 'rgba(16,185,129,0.15)',
                                       borderColor: 'rgba(16,185,129,0.3)'
                                     }] : []),
                                     ...(product.options?.hasCustomNumber ? [{
                                       text: 'สกรีนเบอร์ได้',
                                       color: 'var(--secondary)',
-                                      bgColor: 'rgba(37,99,235,0.15)',
-                                      borderColor: 'rgba(37,99,235,0.3)'
+                                      bgColor: 'rgba(0,113,227,0.15)',
+                                      borderColor: 'rgba(0,113,227,0.3)'
                                     }] : []),
                                   ];
                               
@@ -6507,15 +6423,15 @@ export default function HomePage() {
                                     py: 0.8,
                                     borderRadius: '10px',
                                     background: isProductAvailable 
-                                      ? 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)' 
+                                      ? 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)' 
                                       : 'rgba(100,116,139,0.2)',
-                                    color: isProductAvailable ? 'white' : '#64748b',
+                                    color: isProductAvailable ? 'white' : '#86868b',
                                     fontSize: '0.75rem',
                                     fontWeight: 700,
                                     textTransform: 'none',
                                     '&:hover': {
                                       background: isProductAvailable 
-                                        ? 'linear-gradient(135deg, #2563eb 0%, #1e3a8a 100%)' 
+                                        ? 'linear-gradient(135deg, #0071e3 0%, #0071e3 100%)' 
                                         : 'rgba(100,116,139,0.2)',
                                     },
                                   }}
@@ -6577,7 +6493,7 @@ export default function HomePage() {
         </Box>
 
         {cart.length > 0 && (
-          <Box sx={{ display: { xs: 'none', md: 'block' }, width: 350, p: 2, bgcolor: 'background.default', borderLeft: (theme) => `1px solid ${theme.palette.divider}`, overflow: 'auto', maxHeight: 'calc(100vh - 64px)' }}>
+          <Box sx={{ display: { xs: 'none', md: 'block' }, width: 350, p: 2, bgcolor: 'var(--background)', borderLeft: (theme) => `1px solid ${theme.palette.divider}`, overflow: 'auto', maxHeight: 'calc(100vh - 64px)' }}>
             <Card sx={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', backdropFilter: 'blur(16px)' }}>
               <CardContent>
                 <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, color: 'var(--foreground)' }}>
@@ -6626,10 +6542,10 @@ export default function HomePage() {
                       </Box>
                     </Box>
                     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#10b981' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'var(--success)' }}>
                         {(item.unitPrice * item.quantity).toLocaleString()}฿
                       </Typography>
-                      <IconButton size="small" onClick={() => removeFromCart(item.id)} sx={{ color: '#ef4444' }}>
+                      <IconButton size="small" onClick={() => removeFromCart(item.id)} sx={{ color: '#ff453a' }}>
                         <X size={14} />
                       </IconButton>
                     </Box>
@@ -6638,7 +6554,7 @@ export default function HomePage() {
                 <Divider sx={{ my: 2, borderColor: 'var(--glass-border)' }} />
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                   <Typography sx={{ fontWeight: 'bold', color: 'var(--foreground)' }}>รวม:</Typography>
-                  <Typography sx={{ fontWeight: 'bold', fontSize: 18, color: '#10b981' }}>
+                  <Typography sx={{ fontWeight: 'bold', fontSize: 18, color: 'var(--success)' }}>
                     {getTotalPrice().toLocaleString()}฿
                   </Typography>
                 </Box>
@@ -6651,7 +6567,7 @@ export default function HomePage() {
                   }}
                   disabled={!isShopOpen}
                   sx={{
-                    background: 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)',
+                    background: 'linear-gradient(135deg, #34c759 0%, #64d2ff 100%)',
                     fontWeight: 700,
                     borderRadius: 2,
                     py: 1,
@@ -6697,7 +6613,7 @@ export default function HomePage() {
 
       {showProfileModal && (
         <ProfileModal
-          initialData={{ name: orderData.name, phone: orderData.phone, address: orderData.address, instagram: orderData.instagram, profileImage: orderData.profileImage }}
+          initialData={{ name: orderData.name, phone: orderData.phone, address: orderData.address, instagram: orderData.instagram, profileImage: orderData.profileImage, savedAddresses }}
           onClose={() => { setShowProfileModal(false); setActiveTab('home'); }}
           onSave={handleSaveProfile}
           userImage={session?.user?.image || ''}
@@ -6747,8 +6663,8 @@ export default function HomePage() {
         sx={{ zIndex: 1500 }}
         PaperProps={{
           sx: {
-            bgcolor: 'background.default',
-            color: 'text.primary',
+            bgcolor: 'var(--background)',
+            color: 'var(--foreground)',
             borderRadius: '20px',
             border: (theme) => `1px solid ${theme.palette.divider}`,
             mx: 2,
@@ -6776,7 +6692,7 @@ export default function HomePage() {
               width: 40,
               height: 40,
               borderRadius: '12px',
-              background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+              background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
               display: 'grid',
               placeItems: 'center',
             }}>
@@ -6797,8 +6713,8 @@ export default function HomePage() {
               px: 1.2,
               py: 0.4,
               borderRadius: '8px',
-              bgcolor: 'rgba(37,99,235,0.15)',
-              border: '1px solid rgba(37,99,235,0.3)',
+              bgcolor: 'rgba(0,113,227,0.15)',
+              border: '1px solid rgba(0,113,227,0.3)',
               fontSize: '0.75rem',
               fontWeight: 600,
               color: 'var(--secondary)',
@@ -6816,7 +6732,7 @@ export default function HomePage() {
               border: '1px solid rgba(245,158,11,0.3)',
               fontSize: '0.75rem',
               fontWeight: 600,
-              color: '#fbbf24',
+              color: 'var(--warning)',
             }}>
               แขนยาว +{selectedProduct?.options?.longSleevePrice ?? 50}฿
             </Box>
@@ -6842,7 +6758,7 @@ export default function HomePage() {
                     transition: 'all 0.2s ease',
                     '&:hover': {
                       bgcolor: 'var(--glass-bg)',
-                      borderColor: 'rgba(37,99,235,0.3)',
+                      borderColor: 'rgba(0,113,227,0.3)',
                     },
                   }}
                 >
@@ -6851,14 +6767,14 @@ export default function HomePage() {
                       px: 1,
                       py: 0.3,
                       borderRadius: '8px',
-                      background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                      background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
                       fontSize: '0.8rem',
                       fontWeight: 700,
                       color: 'white',
                     }}>
                       {size}
                     </Box>
-                    <Typography sx={{ fontSize: '0.95rem', fontWeight: 800, color: '#10b981' }}>
+                    <Typography sx={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--success)' }}>
                       {row ? `฿${row.price.toLocaleString()}` : '—'}
                     </Typography>
                   </Box>
@@ -6922,6 +6838,8 @@ export default function HomePage() {
         onEditProfile={() => { setShowProfileModal(true); setPendingCheckout(true); }}
         products={config?.products}
         isMobile={isMobile}
+        savedAddresses={savedAddresses}
+        onAddressChange={(address) => setOrderData(prev => ({ ...prev, address }))}
       />
 
       <Dialog
@@ -6940,7 +6858,7 @@ export default function HomePage() {
         }}
       >
         <DialogTitle sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
-          <AlertTriangle size={20} color="#fbbf24" />
+          <AlertTriangle size={20} color="#ffd60a" />
           ยืนยันยกเลิกคำสั่งซื้อ
         </DialogTitle>
         <DialogContent>
@@ -6969,8 +6887,8 @@ export default function HomePage() {
               await cancelOrderByRef(ref);
             }}
             sx={{
-              background: '#ef4444',
-              '&:hover': { background: '#dc2626' },
+              background: '#ff453a',
+              '&:hover': { background: '#ff3b30' },
               fontWeight: 800,
               px: 2.5,
             }}
@@ -7007,18 +6925,19 @@ export default function HomePage() {
           bottom: 0,
           left: 0,
           right: 0,
-          bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(15,23,42,0.95)' : 'rgba(255,255,255,0.92)',
+          bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.96)' : 'rgba(255,255,255,0.94)',
           borderTop: (theme) => `1px solid ${theme.palette.divider}`,
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 -4px 20px rgba(0,0,0,0.4)' : '0 -2px 12px rgba(0,0,0,0.06)',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+          boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 -4px 24px rgba(0,0,0,0.5)' : '0 -2px 16px rgba(0,0,0,0.08)',
           display: { xs: 'flex', md: 'none' },
           justifyContent: 'space-around',
-          py: 1,
-          px: 1,
+          alignItems: 'flex-end',
+          py: 0.5,
+          px: 0.5,
           touchAction: 'pan-y',
           WebkitOverflowScrolling: 'touch',
-          paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))',
+          paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))',
           zIndex: 1100,
           transform: hideNavBars ? 'translateY(120%)' : 'translateY(0)',
           opacity: hideNavBars ? 0 : 1,
@@ -7026,7 +6945,55 @@ export default function HomePage() {
         }}
       >
         {bottomTabs.map((tab) => {
-          const isActive = activeTab === tab.key;
+          const isActive = tab.key === 'chat' ? chatbotOpen : activeTab === tab.key;
+
+          // Center chat button - prominent raised design
+          if (tab.center) {
+            return (
+              <Box
+                key={tab.key}
+                onClick={(e: React.MouseEvent<HTMLElement>) => setChatMenuAnchor(e.currentTarget)}
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 0.2,
+                  cursor: 'pointer',
+                  mt: -2.5,
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <Box
+                  sx={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #0071e3 0%, #bf5af2 100%)',
+                    display: 'grid',
+                    placeItems: 'center',
+                    color: 'white',
+                    boxShadow: '0 4px 20px rgba(0,113,227,0.45), 0 0 0 4px rgba(0,113,227,0.12)',
+                    transition: 'all 0.25s ease',
+                    '&:hover': {
+                      transform: 'scale(1.08)',
+                      boxShadow: '0 6px 28px rgba(0,113,227,0.55), 0 0 0 4px rgba(0,113,227,0.18)',
+                    },
+                    '&:active': {
+                      transform: 'scale(0.95)',
+                    },
+                  }}
+                >
+                  {tab.icon}
+                </Box>
+                <Typography sx={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--primary)', mt: 0.3 }}>
+                  {tab.label}
+                </Typography>
+              </Box>
+            );
+          }
+
+          // Regular nav tabs
           return (
             <IconButton
               key={tab.key}
@@ -7036,25 +7003,41 @@ export default function HomePage() {
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                gap: 0.3,
-                color: (theme) => isActive ? '#2563eb' : theme.palette.text.secondary,
-                borderRadius: 0,
-                px: 2.5,
-                py: 0.5,
-                background: 'transparent',
+                gap: 0.2,
+                color: (theme) => isActive ? 'var(--primary)' : theme.palette.text.secondary,
+                borderRadius: '14px',
+                px: 1.8,
+                py: 0.6,
+                minWidth: 56,
+                background: (theme) => isActive
+                  ? (theme.palette.mode === 'dark' ? 'rgba(0,113,227,0.12)' : 'rgba(0,113,227,0.08)')
+                  : 'transparent',
                 border: 'none',
                 boxShadow: 'none',
-                transform: 'none',
-                transition: 'color 0.2s ease',
+                transition: 'all 0.2s ease',
                 '&:hover': {
-                  background: 'transparent',
-                  color: (theme) => isActive ? '#2563eb' : theme.palette.text.primary,
+                  background: (theme) => theme.palette.mode === 'dark' ? 'rgba(0,113,227,0.08)' : 'rgba(0,113,227,0.06)',
                 },
                 touchAction: 'manipulation',
               }}
             >
-              {tab.icon}
-              <Typography variant="caption" sx={{ fontSize: '0.65rem', fontWeight: isActive ? 700 : 500 }}>{tab.label}</Typography>
+              <Box sx={{
+                transition: 'transform 0.2s ease',
+                transform: isActive ? 'scale(1.1)' : 'scale(1)',
+              }}>
+                {tab.icon}
+              </Box>
+              <Typography
+                variant="caption"
+                sx={{
+                  fontSize: '0.62rem',
+                  fontWeight: isActive ? 800 : 500,
+                  color: (theme) => isActive ? 'var(--primary)' : theme.palette.text.secondary,
+                  lineHeight: 1.2,
+                }}
+              >
+                {tab.label}
+              </Typography>
             </IconButton>
           );
         })}
@@ -7102,9 +7085,9 @@ export default function HomePage() {
                 shadow: '0 8px 32px rgba(245, 158, 11, 0.35)',
               },
               info: { 
-                bg: 'linear-gradient(135deg, rgba(59, 130, 246, 0.98) 0%, rgba(37, 99, 235, 0.98) 100%)', 
+                bg: 'linear-gradient(135deg, rgba(0,113,227, 0.98) 0%, rgba(0,113,227, 0.98) 100%)', 
                 icon: <Info size={18} />,
-                shadow: '0 8px 32px rgba(59, 130, 246, 0.35)',
+                shadow: '0 8px 32px rgba(0,113,227, 0.35)',
               },
             };
             return (
@@ -7203,8 +7186,8 @@ export default function HomePage() {
         fullScreen
         PaperProps={{
           sx: {
-            bgcolor: 'background.default',
-            backgroundImage: (theme) => theme.palette.mode === 'dark' ? 'radial-gradient(circle at 50% 50%, rgba(6, 182, 212, 0.1) 0%, transparent 50%)' : 'radial-gradient(circle at 50% 50%, rgba(37, 99, 235, 0.06) 0%, transparent 50%)',
+            bgcolor: 'var(--background)',
+            backgroundImage: (theme) => theme.palette.mode === 'dark' ? 'radial-gradient(circle at 50% 50%, rgba(6, 182, 212, 0.1) 0%, transparent 50%)' : 'radial-gradient(circle at 50% 50%, rgba(0,113,227, 0.06) 0%, transparent 50%)',
           },
         }}
       >
@@ -7238,7 +7221,7 @@ export default function HomePage() {
               width: 64,
               height: 64,
               borderRadius: '20px',
-              background: 'linear-gradient(135deg, #06b6d4 0%, #10b981 100%)',
+              background: 'linear-gradient(135deg, #64d2ff 0%, #34c759 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -7292,7 +7275,7 @@ export default function HomePage() {
             <Typography sx={{ 
               fontSize: '1.3rem', 
               fontWeight: 800, 
-              color: '#06b6d4',
+              color: 'var(--secondary)',
               fontFamily: 'monospace',
               textAlign: 'center',
               letterSpacing: '0.05em',
@@ -7328,8 +7311,8 @@ export default function HomePage() {
                 border: '1px solid rgba(16,185,129,0.3)',
               }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                  <MapPin size={18} style={{ color: '#10b981' }} />
-                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#10b981' }}>
+                  <MapPin size={18} style={{ color: 'var(--success)' }} />
+                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--success)' }}>
                     สถานที่รับสินค้า
                   </Typography>
                 </Box>
@@ -7349,7 +7332,7 @@ export default function HomePage() {
                   </Box>
                 )}
                 {firstPickup?.notes && (
-                  <Typography sx={{ fontSize: '0.8rem', color: '#fbbf24', mt: 1 }}>
+                  <Typography sx={{ fontSize: '0.8rem', color: 'var(--warning)', mt: 1 }}>
                      {firstPickup.notes}
                   </Typography>
                 )}
@@ -7378,11 +7361,281 @@ export default function HomePage() {
         </Box>
       </Dialog>
 
+      {/* Logout Confirmation Dialog */}
+      <Dialog
+        open={logoutConfirmOpen}
+        onClose={() => setLogoutConfirmOpen(false)}
+        PaperProps={{
+          sx: {
+            borderRadius: '16px',
+            bgcolor: 'var(--surface)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid var(--glass-border)',
+            maxWidth: 360,
+          },
+        }}
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, pb: 1, color: 'var(--foreground)' }}>
+          <TriangleAlert size={22} color="#ff9f0a" />
+          ยืนยันการออกจากระบบ
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ color: 'var(--text-muted)' }}>
+            คุณต้องการออกจากระบบใช่หรือไม่?
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button
+            onClick={() => setLogoutConfirmOpen(false)}
+            sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 600, color: 'var(--foreground)' }}
+          >
+            ยกเลิก
+          </Button>
+          <Button
+            onClick={() => signOut()}
+            variant="contained"
+            color="error"
+            sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 600 }}
+          >
+            ออกจากระบบ
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Switch Account Dialog */}
+      <Dialog
+        open={switchAccountOpen}
+        onClose={() => setSwitchAccountOpen(false)}
+        fullWidth
+        maxWidth="xs"
+        PaperProps={{
+          sx: {
+            borderRadius: '20px',
+            bgcolor: 'var(--surface)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid var(--glass-border)',
+            overflow: 'hidden',
+          },
+        }}
+      >
+        <DialogTitle sx={{ 
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          borderBottom: '1px solid var(--glass-border)',
+          color: 'var(--foreground)',
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <ArrowLeftRight size={20} />
+            สลับบัญชี
+          </Box>
+          <IconButton onClick={() => setSwitchAccountOpen(false)} sx={{ color: 'var(--text-muted)' }}>
+            <X size={20} />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {/* Current Account */}
+          {session && (
+            <Box sx={{
+              p: 2, borderRadius: '14px',
+              bgcolor: 'rgba(0,113,227,0.08)',
+              border: '1px solid rgba(0,113,227,0.2)',
+              display: 'flex', alignItems: 'center', gap: 1.5,
+            }}>
+              <Avatar src={orderData.profileImage || session?.user?.image || ''} sx={{ width: 40, height: 40 }} />
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography sx={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--foreground)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {session?.user?.name}
+                </Typography>
+                <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {session?.user?.email}
+                </Typography>
+              </Box>
+              <Chip label="ปัจจุบัน" size="small" sx={{ bgcolor: 'rgba(0,113,227,0.15)', color: '#0071e3', fontWeight: 600, fontSize: '0.7rem' }} />
+            </Box>
+          )}
+
+          <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem', mt: 1 }}>
+            เลือกวิธีเข้าสู่ระบบด้วยบัญชีอื่น
+          </Typography>
+
+          {/* Provider Buttons */}
+          <Button
+            fullWidth
+            onClick={() => { setSwitchAccountOpen(false); signIn('google', { redirect: true, callbackUrl: '/', prompt: 'select_account' }); }}
+            sx={{
+              py: 1.3, borderRadius: '12px', fontWeight: 600, fontSize: '0.9rem', textTransform: 'none',
+              background: '#ffffff', color: '#1d1d1f',
+              border: '1px solid rgba(0,0,0,0.1)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5,
+              '&:hover': { background: '#f5f5f7', boxShadow: '0 4px 14px rgba(0,0,0,0.1)' },
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+            Google
+          </Button>
+
+          {availableProviders.includes('azure-ad') && (
+            <Button
+              fullWidth
+              onClick={() => { setSwitchAccountOpen(false); signIn('azure-ad', { redirect: true, callbackUrl: '/' }); }}
+              sx={{
+                py: 1.3, borderRadius: '12px', fontWeight: 600, fontSize: '0.9rem', textTransform: 'none',
+                background: '#2f2f2f', color: '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5,
+                '&:hover': { background: '#404040', boxShadow: '0 4px 14px rgba(0,0,0,0.15)' },
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 23 23">
+                <path fill="#f35325" d="M1 1h10v10H1z"/>
+                <path fill="#81bc06" d="M12 1h10v10H12z"/>
+                <path fill="#05a6f0" d="M1 12h10v10H1z"/>
+                <path fill="#ffba08" d="M12 12h10v10H12z"/>
+              </svg>
+              Microsoft
+            </Button>
+          )}
+
+          {availableProviders.includes('facebook') && (
+            <Button
+              fullWidth
+              onClick={() => { setSwitchAccountOpen(false); signIn('facebook', { redirect: true, callbackUrl: '/' }); }}
+              sx={{
+                py: 1.3, borderRadius: '12px', fontWeight: 600, fontSize: '0.9rem', textTransform: 'none',
+                background: '#1877F2', color: '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5,
+                '&:hover': { background: '#166FE5', boxShadow: '0 4px 14px rgba(24,119,242,0.3)' },
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+              </svg>
+              Facebook
+            </Button>
+          )}
+
+          {availableProviders.includes('apple') && (
+            <Button
+              fullWidth
+              onClick={() => { setSwitchAccountOpen(false); signIn('apple', { redirect: true, callbackUrl: '/' }); }}
+              sx={{
+                py: 1.3, borderRadius: '12px', fontWeight: 600, fontSize: '0.9rem', textTransform: 'none',
+                background: '#000', color: '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5,
+                '&:hover': { background: '#1a1a1a', boxShadow: '0 4px 14px rgba(0,0,0,0.2)' },
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+                <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.52-3.23 0-1.44.62-2.2.44-3.06-.4C4.24 16.76 4.89 10.87 8.88 10.6c1.24.07 2.1.72 2.83.78.99-.2 1.94-.78 3-.84 1.28-.08 2.25.48 2.88 1.22-2.65 1.58-2.02 5.07.36 6.04-.47 1.2-.97 2.4-1.9 3.48zM12.07 10.5c-.16-2.3 1.74-4.2 3.93-4.5.32 2.5-2.25 4.64-3.93 4.5z"/>
+              </svg>
+              Apple
+            </Button>
+          )}
+
+          {availableProviders.includes('line') && (
+            <Button
+              fullWidth
+              onClick={() => { setSwitchAccountOpen(false); signIn('line', { redirect: true, callbackUrl: '/' }); }}
+              sx={{
+                py: 1.3, borderRadius: '12px', fontWeight: 600, fontSize: '0.9rem', textTransform: 'none',
+                background: '#06C755', color: '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5,
+                '&:hover': { background: '#05B34C', boxShadow: '0 4px 14px rgba(6,199,85,0.3)' },
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+                <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .348-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .349-.281.63-.63.63h-2.386c-.348 0-.63-.281-.63-.63V8.108c0-.348.282-.63.63-.63h2.386c.349 0 .63.282.63.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .349-.282.63-.631.63-.345 0-.627-.281-.627-.63V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.348.279-.63.63-.63.346 0 .627.282.627.63v4.771zm-5.741 0c0 .349-.282.63-.631.63-.345 0-.627-.281-.627-.63V8.108c0-.348.282-.63.627-.63.349 0 .631.282.631.63v4.771zm-2.466.63H4.917c-.348 0-.63-.281-.63-.63V8.108c0-.348.282-.63.63-.63.349 0 .63.282.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .349-.281.63-.629.63M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/>
+              </svg>
+              LINE
+            </Button>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Chat Selection Popover */}
+      <Popover
+        open={Boolean(chatMenuAnchor)}
+        anchorEl={chatMenuAnchor}
+        onClose={() => setChatMenuAnchor(null)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        transformOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        slotProps={{
+          paper: {
+            sx: {
+              bgcolor: (theme: any) => theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.97)' : 'rgba(255,255,255,0.98)',
+              color: (theme: any) => theme.palette.mode === 'dark' ? '#f5f5f7' : '#1d1d1f',
+              borderRadius: 3,
+              minWidth: 220,
+              border: (theme: any) => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}`,
+              boxShadow: (theme: any) => theme.palette.mode === 'dark'
+                ? '0 8px 30px rgba(0,0,0,0.5)'
+                : '0 8px 30px rgba(0,0,0,0.12)',
+              mb: 1,
+              overflow: 'hidden',
+            },
+          },
+        }}
+      >
+        <Box
+          onClick={() => {
+            setChatMenuAnchor(null);
+            setChatbotOpen(true);
+          }}
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+            px: 2.5,
+            py: 1.8,
+            cursor: 'pointer',
+            transition: 'background 0.15s',
+            '&:hover': { bgcolor: (theme: any) => theme.palette.mode === 'dark' ? 'rgba(34,197,94,0.12)' : 'rgba(34,197,94,0.08)' },
+          }}
+        >
+          <Bot size={24} color="#30d158" />
+          <Box>
+            <Typography sx={{ fontSize: '0.9rem', fontWeight: 600 }}>ถามแชทบอท</Typography>
+            <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>ตอบคำถามอัตโนมัติ 24 ชม.</Typography>
+          </Box>
+        </Box>
+        <Divider sx={{ borderColor: (theme: any) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }} />
+        <Box
+          onClick={() => {
+            setChatMenuAnchor(null);
+            setSupportChatOpen(true);
+          }}
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+            px: 2.5,
+            py: 1.8,
+            cursor: 'pointer',
+            transition: 'background 0.15s',
+            '&:hover': { bgcolor: (theme: any) => theme.palette.mode === 'dark' ? 'rgba(0,113,227,0.12)' : 'rgba(0,113,227,0.08)' },
+          }}
+        >
+          <Headphones size={24} color="#0071e3" />
+          <Box>
+            <Typography sx={{ fontSize: '0.9rem', fontWeight: 600 }}>ติดต่อแอดมิน</Typography>
+            <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>แชทกับทีมงานโดยตรง</Typography>
+          </Box>
+        </Box>
+      </Popover>
+
       {/* Chatbot */}
       <ShirtChatBot open={chatbotOpen} setOpen={setChatbotOpen} />
 
       {/* Support Chat Widget - ปุ่มแชทสนับสนุน */}
-      <SupportChatWidget onOpenChatbot={() => setChatbotOpen(true)} />
+      <SupportChatWidget
+        onOpenChatbot={() => setChatbotOpen(true)}
+        hideMobileFab
+        externalOpen={supportChatOpen}
+        onExternalOpenHandled={() => setSupportChatOpen(false)}
+      />
     </Box>
   );
 }

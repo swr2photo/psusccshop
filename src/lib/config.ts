@@ -167,6 +167,8 @@ export interface Product {
     venue?: string;
     organizer?: string;
   };
+  /** URL-friendly slug สำหรับ product link */
+  slug?: string;
   /** ลำดับการแสดงผล */
   sortOrder?: number;
   /** วันที่สร้าง */
@@ -306,6 +308,70 @@ export interface ShopConfig {
     /** Last update time */
     updatedAt?: string;
   };
+  /** Events & Promotions */
+  events?: Array<{
+    id: string;
+    enabled: boolean;
+    title: string;
+    description?: string;
+    /** Banner image URL */
+    imageUrl?: string;
+    /** Event color theme */
+    color: string;
+    /** 'event' | 'promotion' | 'sale' | 'announcement' */
+    type: 'event' | 'promotion' | 'sale' | 'announcement';
+    /** Start date (for countdown) */
+    startDate?: string;
+    /** End date (for expiry) */
+    endDate?: string;
+    /** CTA button text */
+    ctaText?: string;
+    /** CTA link (product ID or URL) */
+    ctaLink?: string;
+    /** Discount badge text e.g. "ลด 20%", "ฟรีค่าส่ง" */
+    badge?: string;
+    /** Priority order (lower = higher priority) */
+    priority?: number;
+    /** สินค้าที่เข้าร่วมอีเวนต์ (product IDs) */
+    linkedProducts?: string[];
+    /** ประเภทส่วนลด: 'percent' = ลดเป็น%, 'fixed' = ลดเป็นจำนวนเงิน */
+    discountType?: 'percent' | 'fixed';
+    /** จำนวนส่วนลด (เช่น 20 = ลด 20% หรือ ลด 20 บาท) */
+    discountValue?: number;
+    /** Created by admin email */
+    createdBy?: string;
+    /** Creation timestamp */
+    createdAt: string;
+    /** Last updated */
+    updatedAt?: string;
+  }>;
+  /** รหัสส่วนลด (Promo Codes) */
+  promoCodes?: Array<{
+    id: string;
+    /** รหัสที่ลูกค้ากรอก */
+    code: string;
+    /** เปิดใช้งาน */
+    enabled: boolean;
+    /** ประเภทส่วนลด */
+    discountType: 'percent' | 'fixed';
+    /** จำนวนส่วนลด */
+    discountValue: number;
+    /** ยอดขั้นต่ำที่ใช้โค้ดได้ */
+    minOrderAmount?: number;
+    /** ส่วนลดสูงสุด (สำหรับ percent) */
+    maxDiscount?: number;
+    /** จำนวนครั้งที่ใช้ได้ (null = ไม่จำกัด) */
+    usageLimit?: number | null;
+    /** จำนวนครั้งที่ใช้ไปแล้ว */
+    usageCount?: number;
+    /** วันหมดอายุ */
+    expiresAt?: string;
+    /** คำอธิบาย */
+    description?: string;
+    /** สร้างโดย */
+    createdBy?: string;
+    createdAt: string;
+  }>;
 }
 
 export interface Order {

@@ -1,15 +1,24 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { X, ShieldCheck, User, Phone, Instagram, AlertTriangle, MapPin, Check, Sparkles, UserCircle, CheckCircle2, AlertCircle, Search, Camera, ZoomIn, ZoomOut, RotateCw, Move } from 'lucide-react';
+import { X, ShieldCheck, User, Phone, Instagram, AlertTriangle, MapPin, Check, Sparkles, UserCircle, CheckCircle2, AlertCircle, Search, Camera, ZoomIn, ZoomOut, RotateCw, Move, Plus, Trash2, Star, Edit } from 'lucide-react';
 import {
   Drawer, Box, Typography, Button, IconButton, TextField, InputAdornment,
-  Slide, Avatar, Autocomplete, CircularProgress, Paper, Dialog, Slider,
+  Slide, Avatar, Autocomplete, CircularProgress, Paper, Dialog, Slider, Chip,
 } from '@mui/material';
 import { useThaiAddress, type AddressSelection } from '@/hooks/useThaiAddress';
 
+// ============== ADDRESS TYPES ==============
+
+export interface SavedAddress {
+  id: string;
+  label: string;       // e.g. "บ้าน", "ที่ทำงาน", "หอพัก"
+  address: string;      // composed flat string
+  isDefault: boolean;
+}
+
 interface ProfileModalProps {
-  initialData: { name: string; phone: string; address: string; instagram: string; profileImage?: string };
+  initialData: { name: string; phone: string; address: string; instagram: string; profileImage?: string; savedAddresses?: SavedAddress[] };
   onClose: () => void;
   onSave: (data: any) => void;
   userImage?: string;
@@ -63,6 +72,12 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
   const [customProfileImage, setCustomProfileImage] = useState(initialData.profileImage || '');
   const [uploadingImage, setUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Saved addresses - multi-address support
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>(initialData.savedAddresses || []);
+  const [addressLabel, setAddressLabel] = useState('');
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
+  const [showAddressForm, setShowAddressForm] = useState(!initialData.savedAddresses?.length);
 
   // Crop preview state
   const [cropPreview, setCropPreview] = useState<string | null>(null);
@@ -218,6 +233,89 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
       zipCode: sd ? String(sd.zipCode) : prev.zipCode,
     }));
   }, [subDistricts]);
+
+  // ==================== ADDRESS MANAGEMENT ====================
+
+  const handleSaveAddress = useCallback(() => {
+    const composed = composeAddress(addressFields);
+    if (!composed.trim()) {
+      showNotification('warning', 'กรุณากรอกที่อยู่');
+      return;
+    }
+    const label = addressLabel.trim() || (savedAddresses.length === 0 ? 'บ้าน' : `ที่อยู่ ${savedAddresses.length + 1}`);
+
+    if (editingAddressId) {
+      // Update existing
+      setSavedAddresses(prev => prev.map(a =>
+        a.id === editingAddressId ? { ...a, label, address: composed } : a
+      ));
+      showNotification('success', 'อัปเดตที่อยู่แล้ว');
+    } else {
+      // Add new
+      const newAddr: SavedAddress = {
+        id: `addr-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        label,
+        address: composed,
+        isDefault: savedAddresses.length === 0, // First address is default
+      };
+      setSavedAddresses(prev => [...prev, newAddr]);
+      showNotification('success', 'เพิ่มที่อยู่แล้ว');
+    }
+
+    // Reset form
+    setAddressFields({ province: '', district: '', subDistrict: '', zipCode: '', detail: '' });
+    setAddressLabel('');
+    setEditingAddressId(null);
+    setShowAddressForm(false);
+  }, [addressFields, addressLabel, composeAddress, editingAddressId, savedAddresses.length]);
+
+  const handleEditAddress = useCallback((addr: SavedAddress) => {
+    setEditingAddressId(addr.id);
+    setAddressLabel(addr.label);
+    setShowAddressForm(true);
+    // Parse address back into structured fields
+    const parsed = addr.address;
+    const zipMatch = parsed.match(/\b(\d{5})\b/);
+    if (zipMatch) {
+      const results = lookupByZipCode(zipMatch[1]);
+      if (results.length > 0) {
+        const match = results[0];
+        const subMatch = parsed.match(/(?:ต\.|ตำบล|แขวง)\s*([^\s,]+)/);
+        const distMatch = parsed.match(/(?:อ\.|อำเภอ|เขต)\s*([^\s,]+)/);
+        const provMatch = parsed.match(/(?:จ\.|จังหวัด)\s*([^\s,]+)/);
+        let detail = parsed;
+        [zipMatch[0], provMatch?.[0], distMatch?.[0], subMatch?.[0]].forEach(m => {
+          if (m) detail = detail.replace(m, '');
+        });
+        setAddressFields({
+          province: match.province,
+          district: match.district,
+          subDistrict: subMatch ? subMatch[1] : (match.subDistricts.length === 1 ? match.subDistricts[0] : ''),
+          zipCode: zipMatch[1],
+          detail: detail.replace(/\s+/g, ' ').trim(),
+        });
+        return;
+      }
+    }
+    setAddressFields({ province: '', district: '', subDistrict: '', zipCode: '', detail: parsed });
+  }, [lookupByZipCode]);
+
+  const handleDeleteAddress = useCallback((id: string) => {
+    setSavedAddresses(prev => {
+      const filtered = prev.filter(a => a.id !== id);
+      // If deleted was default, make first remaining the default
+      if (filtered.length > 0 && !filtered.some(a => a.isDefault)) {
+        filtered[0].isDefault = true;
+      }
+      return filtered;
+    });
+    showNotification('success', 'ลบที่อยู่แล้ว');
+  }, []);
+
+  const handleSetDefaultAddress = useCallback((id: string) => {
+    setSavedAddresses(prev => prev.map(a => ({ ...a, isDefault: a.id === id })));
+    showNotification('success', 'ตั้งเป็นที่อยู่หลักแล้ว');
+  }, []);
 
   const validate = () => {
     const nextErrors: Record<string, string> = {};
@@ -495,8 +593,15 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
-    const composedAddress = composeAddress(addressFields);
-    onSave({ ...formData, address: composedAddress, profileImage: customProfileImage || undefined });
+    // Use default address from saved addresses, or compose current fields
+    const defaultAddr = savedAddresses.find(a => a.isDefault);
+    const composedAddress = defaultAddr ? defaultAddr.address : composeAddress(addressFields);
+    onSave({
+      ...formData,
+      address: composedAddress,
+      profileImage: customProfileImage || undefined,
+      savedAddresses,
+    });
   };
 
   const isFormValid = formData.name && formData.phone && formData.instagram && pdpaAccepted;
@@ -505,38 +610,39 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
     '& .MuiOutlinedInput-root': {
       bgcolor: 'var(--surface)',
       borderRadius: '14px',
-      color: 'text.primary',
+      color: 'var(--foreground)',
       fontSize: '0.95rem',
       transition: 'all 0.2s ease',
       '& fieldset': { borderColor: 'var(--glass-border)', borderWidth: '1px' },
-      '&:hover fieldset': { borderColor: 'rgba(30,64,175,0.4)' },
-      '&.Mui-focused fieldset': { borderColor: '#2563eb', borderWidth: '2px' },
+      '&:hover fieldset': { borderColor: 'rgba(0,113,227,0.4)' },
+      '&.Mui-focused fieldset': { borderColor: 'var(--secondary)', borderWidth: '2px' },
       '&.Mui-focused': { bgcolor: 'var(--surface)' },
+      '& input::placeholder, & textarea::placeholder': { color: 'var(--text-muted)', opacity: 1 },
     },
-    '& .MuiInputLabel-root': { color: 'text.secondary', fontSize: '0.9rem' },
-    '& .MuiInputLabel-root.Mui-focused': { color: '#2563eb' },
-    '& .MuiInputAdornment-root': { color: 'text.secondary' },
-    '& .MuiFormHelperText-root': { color: '#f87171', fontSize: '0.75rem', mt: 0.5 },
+    '& .MuiInputLabel-root': { color: 'var(--text-muted)', fontSize: '0.9rem' },
+    '& .MuiInputLabel-root.Mui-focused': { color: 'var(--secondary)' },
+    '& .MuiInputAdornment-root': { color: 'var(--text-muted)' },
+    '& .MuiFormHelperText-root': { color: 'var(--error)', fontSize: '0.75rem', mt: 0.5 },
   };
 
   const autocompleteSx = {
     ...inputSx,
-    '& .MuiAutocomplete-popupIndicator': { color: 'text.secondary' },
-    '& .MuiAutocomplete-clearIndicator': { color: 'text.secondary' },
+    '& .MuiAutocomplete-popupIndicator': { color: 'var(--text-muted)' },
+    '& .MuiAutocomplete-clearIndicator': { color: 'var(--text-muted)' },
   };
 
   const dropdownPaper = (props: any) => (
     <Paper {...props} sx={{
       bgcolor: 'var(--surface)',
-      color: 'text.primary',
+      color: 'var(--foreground)',
       border: '1px solid var(--glass-border)',
       boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
       borderRadius: '12px',
       mt: 0.5,
       '& .MuiAutocomplete-option': {
         fontSize: '0.9rem',
-        '&[aria-selected="true"]': { bgcolor: 'rgba(37,99,235,0.12)' },
-        '&.Mui-focused': { bgcolor: 'rgba(37,99,235,0.08)' },
+        '&[aria-selected="true"]': { bgcolor: 'rgba(0,113,227,0.12)' },
+        '&.Mui-focused': { bgcolor: 'rgba(0,113,227,0.08)' },
       },
     }} />
   );
@@ -552,7 +658,8 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
           maxHeight: { xs: '95vh', sm: '90vh' },
           borderTopLeftRadius: { xs: 20, sm: 24 },
           borderTopRightRadius: { xs: 20, sm: 24 },
-          bgcolor: 'background.default',
+          bgcolor: 'var(--background)',
+          color: 'var(--foreground)',
           overflow: 'hidden',
         },
       }}
@@ -649,10 +756,10 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                   width: 44,
                   height: 44,
                   border: '2px solid',
-                  borderColor: customProfileImage ? 'rgba(16,185,129,0.4)' : 'rgba(37,99,235,0.3)',
+                  borderColor: customProfileImage ? 'rgba(16,185,129,0.4)' : 'rgba(0,113,227,0.3)',
                   boxShadow: customProfileImage
                     ? '0 4px 16px rgba(16,185,129,0.2)'
-                    : '0 4px 16px rgba(37,99,235,0.15)',
+                    : '0 4px 16px rgba(0,113,227,0.15)',
                   transition: 'all 0.3s ease',
                 }}
               >
@@ -679,10 +786,10 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
               </Box>
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'text.primary', lineHeight: 1.2 }}>
+              <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--foreground)', lineHeight: 1.2 }}>
                 ข้อมูลผู้ติดต่อ
               </Typography>
-              <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {userEmail || 'กรอกข้อมูลเพื่อดำเนินการสั่งซื้อ'}
               </Typography>
             </Box>
@@ -692,8 +799,8 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
             size="small"
             sx={{
               bgcolor: 'var(--glass-bg)',
-              color: 'text.secondary',
-              '&:hover': { bgcolor: 'var(--glass-bg)', color: 'text.primary' },
+              color: 'var(--text-muted)',
+              '&:hover': { bgcolor: 'var(--glass-bg)', color: 'var(--foreground)' },
             }}
           >
             <X size={20} />
@@ -725,16 +832,16 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
               <Box sx={{
                 width: 32, height: 32, borderRadius: '8px',
-                background: 'linear-gradient(135deg, rgba(30,64,175,0.2) 0%, rgba(37,99,235,0.2) 100%)',
+                background: 'linear-gradient(135deg, rgba(0,113,227,0.2) 0%, rgba(0,113,227,0.2) 100%)',
                 display: 'grid', placeItems: 'center',
               }}>
-                <User size={16} style={{ color: '#a78bfa' }} />
+                <User size={16} style={{ color: 'var(--primary)' }} />
               </Box>
               <Box>
-                <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'text.primary' }}>
+                <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>
                   ชื่อ-นามสกุล
                 </Typography>
-                <Typography sx={{ fontSize: '0.65rem', color: 'text.secondary' }}>
+                <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
                   กรุณากรอกเป็นภาษาไทย
                 </Typography>
               </Box>
@@ -742,7 +849,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                 ml: 'auto', px: 1, py: 0.3, borderRadius: '6px',
                 bgcolor: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.2)',
               }}>
-                <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: '#f87171' }}>จำเป็น</Typography>
+                <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--error)' }}>จำเป็น</Typography>
               </Box>
             </Box>
             <TextField
@@ -769,9 +876,9 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                 background: 'linear-gradient(135deg, rgba(16,185,129,0.2) 0%, rgba(6,182,212,0.2) 100%)',
                 display: 'grid', placeItems: 'center',
               }}>
-                <Phone size={16} style={{ color: '#6ee7b7' }} />
+                <Phone size={16} style={{ color: 'var(--success)' }} />
               </Box>
-              <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'text.primary' }}>
+              <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>
                 ข้อมูลติดต่อ
               </Typography>
             </Box>
@@ -786,7 +893,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <Phone size={16} style={{ color: '#6ee7b7' }} />
+                      <Phone size={16} style={{ color: 'var(--success)' }} />
                     </InputAdornment>
                   ),
                 }}
@@ -811,148 +918,303 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
             </Box>
           </Box>
 
-          {/* ====== Address Card - Smart Thai Address ====== */}
+          {/* ====== Address Card - Multi-Address Management ====== */}
           <Box sx={{
             p: 2,
             borderRadius: '16px',
             bgcolor: 'var(--surface-2)',
             border: '1px solid var(--glass-border)',
           }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-              <Box sx={{
-                width: 32, height: 32, borderRadius: '8px',
-                background: 'linear-gradient(135deg, rgba(245,158,11,0.2) 0%, rgba(234,88,12,0.2) 100%)',
-                display: 'grid', placeItems: 'center',
-              }}>
-                <MapPin size={16} style={{ color: '#fbbf24' }} />
-              </Box>
-              <Box>
-                <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'text.primary' }}>
-                  ที่อยู่จัดส่ง
-                </Typography>
-                <Typography sx={{ fontSize: '0.65rem', color: 'text.secondary' }}>
-                  กรอกรหัสไปรษณีย์เพื่อค้นหาอัตโนมัติ
-                </Typography>
-              </Box>
-            </Box>
-
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-              {/* Zip Code → auto-fill */}
-              <TextField
-                fullWidth
-                placeholder="รหัสไปรษณีย์ เช่น 90110"
-                value={addressFields.zipCode}
-                onChange={e => handleZipCodeChange(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Search size={16} style={{ color: '#fbbf24' }} />
-                    </InputAdornment>
-                  ),
-                  endAdornment: addressFields.zipCode.length === 5 && addressFields.province ? (
-                    <InputAdornment position="end">
-                      <Check size={16} style={{ color: '#10b981' }} />
-                    </InputAdornment>
-                  ) : null,
-                }}
-                sx={{
-                  ...inputSx,
-                  '& .MuiOutlinedInput-root': {
-                    ...inputSx['& .MuiOutlinedInput-root'],
-                    bgcolor: addressFields.zipCode.length === 5 && addressFields.province
-                      ? 'rgba(16,185,129,0.06)'
-                      : 'var(--surface)',
-                  },
-                }}
-                inputProps={{ maxLength: 5, inputMode: 'numeric' }}
-              />
-
-              {/* Province + District */}
-              <Box sx={{ display: 'flex', gap: 1.5 }}>
-                <Autocomplete
-                  fullWidth
-                  options={provinces.map(p => p.name)}
-                  value={addressFields.province || null}
-                  onChange={(_, val) => handleProvinceChange(val)}
-                  loading={addressLoading}
-                  noOptionsText="ไม่พบจังหวัด"
-                  loadingText="กำลังโหลด..."
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      placeholder="จังหวัด"
-                      sx={autocompleteSx}
-                      InputProps={{
-                        ...params.InputProps,
-                        endAdornment: (
-                          <>
-                            {addressLoading ? <CircularProgress size={16} /> : null}
-                            {params.InputProps.endAdornment}
-                          </>
-                        ),
-                      }}
-                    />
-                  )}
-                  PaperComponent={dropdownPaper}
-                  sx={{ flex: 1 }}
-                />
-                <Autocomplete
-                  fullWidth
-                  options={districts.map(d => d.name)}
-                  value={addressFields.district || null}
-                  onChange={(_, val) => handleDistrictChange(val)}
-                  disabled={!addressFields.province}
-                  noOptionsText="เลือกจังหวัดก่อน"
-                  renderInput={(params) => (
-                    <TextField {...params} placeholder="อำเภอ/เขต" sx={autocompleteSx} />
-                  )}
-                  PaperComponent={dropdownPaper}
-                  sx={{ flex: 1 }}
-                />
-              </Box>
-
-              {/* Sub-district */}
-              <Autocomplete
-                fullWidth
-                options={subDistricts.map(s => s.name)}
-                value={addressFields.subDistrict || null}
-                onChange={(_, val) => handleSubDistrictChange(val)}
-                disabled={!addressFields.district}
-                noOptionsText="เลือกอำเภอ/เขตก่อน"
-                renderInput={(params) => (
-                  <TextField {...params} placeholder="ตำบล/แขวง" sx={autocompleteSx} />
-                )}
-                PaperComponent={dropdownPaper}
-              />
-
-              {/* Detail address */}
-              <TextField
-                fullWidth
-                multiline
-                rows={2}
-                placeholder="บ้านเลขที่ หมู่บ้าน ซอย ถนน"
-                value={addressFields.detail}
-                onChange={e => setAddressFields(prev => ({ ...prev, detail: e.target.value }))}
-                sx={inputSx}
-              />
-
-              {/* Address Preview */}
-              {(addressFields.province || addressFields.detail) && (
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                 <Box sx={{
-                  p: 1.5,
-                  borderRadius: '10px',
-                  bgcolor: 'rgba(37,99,235,0.06)',
-                  border: '1px solid rgba(37,99,235,0.15)',
+                  width: 32, height: 32, borderRadius: '8px',
+                  background: 'linear-gradient(135deg, rgba(245,158,11,0.2) 0%, rgba(234,88,12,0.2) 100%)',
+                  display: 'grid', placeItems: 'center',
                 }}>
-                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#60a5fa', mb: 0.3 }}>
-                    ที่อยู่ที่จะบันทึก:
+                  <MapPin size={16} style={{ color: 'var(--warning)' }} />
+                </Box>
+                <Box>
+                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                    ที่อยู่จัดส่ง
                   </Typography>
-                  <Typography sx={{ fontSize: '0.8rem', color: 'text.primary', lineHeight: 1.5 }}>
-                    {composeAddress(addressFields) || '—'}
+                  <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                    {savedAddresses.length > 0 ? `${savedAddresses.length} ที่อยู่` : 'กรอกรหัสไปรษณีย์เพื่อค้นหาอัตโนมัติ'}
                   </Typography>
                 </Box>
+              </Box>
+              {savedAddresses.length > 0 && !showAddressForm && (
+                <Button
+                  size="small"
+                  startIcon={<Plus size={14} />}
+                  onClick={() => {
+                    setShowAddressForm(true);
+                    setEditingAddressId(null);
+                    setAddressLabel('');
+                    setAddressFields({ province: '', district: '', subDistrict: '', zipCode: '', detail: '' });
+                  }}
+                  sx={{
+                    fontSize: '0.75rem',
+                    textTransform: 'none',
+                    color: 'var(--primary)',
+                    borderRadius: '10px',
+                    fontWeight: 600,
+                  }}
+                >
+                  เพิ่มที่อยู่
+                </Button>
               )}
             </Box>
+
+            {/* Saved Addresses List */}
+            {savedAddresses.length > 0 && !showAddressForm && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 1 }}>
+                {savedAddresses.map((addr) => (
+                  <Box
+                    key={addr.id}
+                    sx={{
+                      p: 1.5,
+                      borderRadius: '12px',
+                      bgcolor: addr.isDefault ? 'rgba(0,113,227,0.08)' : 'var(--surface)',
+                      border: addr.isDefault ? '2px solid rgba(0,113,227,0.3)' : '1px solid var(--glass-border)',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Chip
+                          label={addr.label}
+                          size="small"
+                          sx={{
+                            fontSize: '0.7rem',
+                            fontWeight: 700,
+                            height: 22,
+                            bgcolor: addr.isDefault ? 'rgba(0,113,227,0.15)' : 'var(--glass-bg)',
+                            color: addr.isDefault ? 'var(--primary)' : 'var(--text-muted)',
+                            border: 'none',
+                          }}
+                        />
+                        {addr.isDefault && (
+                          <Chip
+                            icon={<Star size={10} />}
+                            label="หลัก"
+                            size="small"
+                            sx={{
+                              fontSize: '0.65rem',
+                              fontWeight: 700,
+                              height: 20,
+                              bgcolor: 'rgba(16,185,129,0.15)',
+                              color: 'var(--success)',
+                              border: 'none',
+                              '& .MuiChip-icon': { color: 'var(--success)', fontSize: 10 },
+                            }}
+                          />
+                        )}
+                      </Box>
+                      <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        {!addr.isDefault && (
+                          <IconButton size="small" onClick={() => handleSetDefaultAddress(addr.id)} title="ตั้งเป็นที่อยู่หลัก"
+                            sx={{ color: 'var(--text-muted)', '&:hover': { color: 'var(--primary)' } }}>
+                            <Star size={14} />
+                          </IconButton>
+                        )}
+                        <IconButton size="small" onClick={() => handleEditAddress(addr)} title="แก้ไข"
+                          sx={{ color: 'var(--text-muted)', '&:hover': { color: 'var(--primary)' } }}>
+                          <Edit size={14} />
+                        </IconButton>
+                        <IconButton size="small" onClick={() => handleDeleteAddress(addr.id)} title="ลบ"
+                          sx={{ color: 'var(--text-muted)', '&:hover': { color: '#ef4444' } }}>
+                          <Trash2 size={14} />
+                        </IconButton>
+                      </Box>
+                    </Box>
+                    <Typography sx={{ fontSize: '0.8rem', color: 'var(--foreground)', lineHeight: 1.5, pl: 0.5 }}>
+                      {addr.address}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+            )}
+
+            {/* Address Form (add/edit) */}
+            {showAddressForm && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                {/* Address Label */}
+                <TextField
+                  fullWidth
+                  placeholder="ชื่อที่อยู่ เช่น บ้าน, ที่ทำงาน, หอพัก"
+                  value={addressLabel}
+                  onChange={e => setAddressLabel(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <MapPin size={16} style={{ color: 'var(--warning)' }} />
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={inputSx}
+                  inputProps={{ maxLength: 30 }}
+                />
+
+                {/* Zip Code → auto-fill */}
+                <TextField
+                  fullWidth
+                  placeholder="รหัสไปรษณีย์ เช่น 90110"
+                  value={addressFields.zipCode}
+                  onChange={e => handleZipCodeChange(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Search size={16} style={{ color: 'var(--warning)' }} />
+                      </InputAdornment>
+                    ),
+                    endAdornment: addressFields.zipCode.length === 5 && addressFields.province ? (
+                      <InputAdornment position="end">
+                        <Check size={16} style={{ color: 'var(--success)' }} />
+                      </InputAdornment>
+                    ) : null,
+                  }}
+                  sx={{
+                    ...inputSx,
+                    '& .MuiOutlinedInput-root': {
+                      ...inputSx['& .MuiOutlinedInput-root'],
+                      bgcolor: addressFields.zipCode.length === 5 && addressFields.province
+                        ? 'rgba(16,185,129,0.06)'
+                        : 'var(--surface)',
+                    },
+                  }}
+                  inputProps={{ maxLength: 5, inputMode: 'numeric' }}
+                />
+
+                {/* Province + District */}
+                <Box sx={{ display: 'flex', gap: 1.5 }}>
+                  <Autocomplete
+                    fullWidth
+                    options={provinces.map(p => p.name)}
+                    value={addressFields.province || null}
+                    onChange={(_, val) => handleProvinceChange(val)}
+                    loading={addressLoading}
+                    noOptionsText="ไม่พบจังหวัด"
+                    loadingText="กำลังโหลด..."
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        placeholder="จังหวัด"
+                        sx={autocompleteSx}
+                        InputProps={{
+                          ...params.InputProps,
+                          endAdornment: (
+                            <>
+                              {addressLoading ? <CircularProgress size={16} /> : null}
+                              {params.InputProps.endAdornment}
+                            </>
+                          ),
+                        }}
+                      />
+                    )}
+                    PaperComponent={dropdownPaper}
+                    sx={{ flex: 1 }}
+                  />
+                  <Autocomplete
+                    fullWidth
+                    options={districts.map(d => d.name)}
+                    value={addressFields.district || null}
+                    onChange={(_, val) => handleDistrictChange(val)}
+                    disabled={!addressFields.province}
+                    noOptionsText="เลือกจังหวัดก่อน"
+                    renderInput={(params) => (
+                      <TextField {...params} placeholder="อำเภอ/เขต" sx={autocompleteSx} />
+                    )}
+                    PaperComponent={dropdownPaper}
+                    sx={{ flex: 1 }}
+                  />
+                </Box>
+
+                {/* Sub-district */}
+                <Autocomplete
+                  fullWidth
+                  options={subDistricts.map(s => s.name)}
+                  value={addressFields.subDistrict || null}
+                  onChange={(_, val) => handleSubDistrictChange(val)}
+                  disabled={!addressFields.district}
+                  noOptionsText="เลือกอำเภอ/เขตก่อน"
+                  renderInput={(params) => (
+                    <TextField {...params} placeholder="ตำบล/แขวง" sx={autocompleteSx} />
+                  )}
+                  PaperComponent={dropdownPaper}
+                />
+
+                {/* Detail address */}
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={2}
+                  placeholder="บ้านเลขที่ หมู่บ้าน ซอย ถนน"
+                  value={addressFields.detail}
+                  onChange={e => setAddressFields(prev => ({ ...prev, detail: e.target.value }))}
+                  sx={inputSx}
+                />
+
+                {/* Address Preview */}
+                {(addressFields.province || addressFields.detail) && (
+                  <Box sx={{
+                    p: 1.5,
+                    borderRadius: '10px',
+                    bgcolor: 'rgba(0,113,227,0.06)',
+                    border: '1px solid rgba(0,113,227,0.15)',
+                  }}>
+                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--primary)', mb: 0.3 }}>
+                      ที่อยู่ที่จะบันทึก:
+                    </Typography>
+                    <Typography sx={{ fontSize: '0.8rem', color: 'var(--foreground)', lineHeight: 1.5 }}>
+                      {composeAddress(addressFields) || '—'}
+                    </Typography>
+                  </Box>
+                )}
+
+                {/* Save/Cancel buttons */}
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Button
+                    fullWidth
+                    onClick={handleSaveAddress}
+                    variant="contained"
+                    startIcon={editingAddressId ? <Check size={16} /> : <Plus size={16} />}
+                    sx={{
+                      borderRadius: '12px',
+                      textTransform: 'none',
+                      fontWeight: 700,
+                      fontSize: '0.85rem',
+                      py: 1,
+                      background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
+                      boxShadow: '0 4px 16px rgba(0,113,227,0.25)',
+                    }}
+                  >
+                    {editingAddressId ? 'อัปเดตที่อยู่' : 'บันทึกที่อยู่'}
+                  </Button>
+                  {savedAddresses.length > 0 && (
+                    <Button
+                      onClick={() => {
+                        setShowAddressForm(false);
+                        setEditingAddressId(null);
+                        setAddressLabel('');
+                        setAddressFields({ province: '', district: '', subDistrict: '', zipCode: '', detail: '' });
+                      }}
+                      sx={{
+                        borderRadius: '12px',
+                        textTransform: 'none',
+                        fontWeight: 600,
+                        fontSize: '0.85rem',
+                        py: 1,
+                        color: 'var(--text-muted)',
+                        minWidth: 80,
+                      }}
+                    >
+                      ยกเลิก
+                    </Button>
+                  )}
+                </Box>
+              </Box>
+            )}
           </Box>
 
           {/* ====== PDPA Card ====== */}
@@ -971,21 +1233,21 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
               <Box sx={{
                 width: 36, height: 36, borderRadius: '10px',
                 background: pdpaAccepted
-                  ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                  : 'rgba(30,64,175,0.15)',
+                  ? 'linear-gradient(135deg, #34c759 0%, #34c759 100%)'
+                  : 'rgba(0,113,227,0.15)',
                 display: 'grid', placeItems: 'center', flexShrink: 0,
                 transition: 'all 0.3s ease',
               }}>
                 {pdpaAccepted
                   ? <Check size={18} style={{ color: 'white' }} />
-                  : <ShieldCheck size={18} style={{ color: '#a78bfa' }} />
+                  : <ShieldCheck size={18} style={{ color: 'var(--primary)' }} />
                 }
               </Box>
               <Box sx={{ flex: 1 }}>
-                <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: pdpaAccepted ? '#10b981' : 'text.primary', mb: 0.3 }}>
+                <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: pdpaAccepted ? 'var(--success)' : 'var(--foreground)', mb: 0.3 }}>
                   {pdpaAccepted ? 'ยินยอมแล้ว' : 'นโยบายความเป็นส่วนตัว'}
                 </Typography>
-                <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary', lineHeight: 1.5 }}>
+                <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
                   ข้อมูลของท่านจะถูกใช้เพื่อการจัดส่งและติดต่อเท่านั้น
                 </Typography>
               </Box>
@@ -1006,14 +1268,14 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
             >
               <Box sx={{
                 width: 22, height: 22, borderRadius: '6px',
-                bgcolor: pdpaAccepted ? '#10b981' : 'var(--glass-bg)',
+                bgcolor: pdpaAccepted ? '#34c759' : 'var(--glass-bg)',
                 border: pdpaAccepted ? 'none' : '2px solid var(--glass-border)',
                 display: 'grid', placeItems: 'center',
                 transition: 'all 0.2s ease',
               }}>
                 {pdpaAccepted && <Check size={12} style={{ color: 'white' }} />}
               </Box>
-              <Typography sx={{ fontSize: '0.8rem', color: pdpaAccepted ? '#10b981' : 'text.primary', fontWeight: 600 }}>
+              <Typography sx={{ fontSize: '0.8rem', color: pdpaAccepted ? 'var(--success)' : 'var(--foreground)', fontWeight: 600 }}>
                 ยินยอมให้ใช้ข้อมูลตามนโยบาย
               </Typography>
             </Box>
@@ -1023,8 +1285,8 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                 mt: 2, p: 1.5, borderRadius: '10px',
                 bgcolor: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)',
               }}>
-                <AlertTriangle size={16} style={{ color: '#fbbf24' }} />
-                <Typography sx={{ fontSize: '0.8rem', color: '#fbbf24' }}>{errors.pdpa}</Typography>
+                <AlertTriangle size={16} style={{ color: 'var(--warning)' }} />
+                <Typography sx={{ fontSize: '0.8rem', color: 'var(--warning)' }}>{errors.pdpa}</Typography>
               </Box>
             )}
           </Box>
@@ -1051,11 +1313,11 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
               py: 1.5,
               borderRadius: '14px',
               background: isFormValid
-                ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                ? 'linear-gradient(135deg, #34c759 0%, #34c759 100%)'
                 : pdpaAccepted
-                  ? 'linear-gradient(135deg, #1e40af 0%, #2563eb 100%)'
+                  ? 'linear-gradient(135deg, #0077ED 0%, #0071e3 100%)'
                   : 'rgba(100,116,139,0.15)',
-              color: pdpaAccepted ? 'white' : 'text.secondary',
+              color: pdpaAccepted ? 'white' : 'var(--text-muted)',
               fontSize: '0.95rem',
               fontWeight: 700,
               textTransform: 'none',
@@ -1063,16 +1325,16 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
               transition: 'all 0.3s ease',
               '&:hover': {
                 background: isFormValid
-                  ? 'linear-gradient(135deg, #059669 0%, #047857 100%)'
+                  ? 'linear-gradient(135deg, #34c759 0%, #047857 100%)'
                   : pdpaAccepted
-                    ? 'linear-gradient(135deg, #7c3aed 0%, #1d4ed8 100%)'
+                    ? 'linear-gradient(135deg, #bf5af2 0%, #1d4ed8 100%)'
                     : 'rgba(100,116,139,0.2)',
                 transform: isFormValid ? 'translateY(-1px)' : 'none',
                 boxShadow: isFormValid ? '0 8px 32px rgba(16,185,129,0.35)' : 'none',
               },
               '&:disabled': {
                 background: 'rgba(100,116,139,0.15)',
-                color: 'text.secondary',
+                color: 'var(--text-muted)',
               },
             }}
           >
@@ -1107,13 +1369,13 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           borderBottom: '1px solid var(--glass-border)',
         }}>
-          <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'text.primary' }}>
+          <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--foreground)' }}>
             ครอปรูปโปรไฟล์
           </Typography>
           <IconButton
             size="small"
             onClick={() => { setCropPreview(null); cropImageRef.current = null; }}
-            sx={{ color: 'text.secondary' }}
+            sx={{ color: 'var(--text-muted)' }}
           >
             <X size={18} />
           </IconButton>
@@ -1122,7 +1384,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
         {/* Canvas Area */}
         <Box sx={{
           display: 'flex', justifyContent: 'center', alignItems: 'center',
-          p: 2, bgcolor: 'rgba(0,0,0,0.03)',
+          p: 2, bgcolor: 'var(--surface-2)',
         }}>
           <Box sx={{ position: 'relative', touchAction: 'none' }}>
             <canvas
@@ -1170,8 +1432,8 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
               max={3}
               step={0.05}
               sx={{
-                color: '#2563eb',
-                '& .MuiSlider-thumb': { width: 18, height: 18, bgcolor: 'white', border: '2px solid #2563eb' },
+                color: '#0071e3',
+                '& .MuiSlider-thumb': { width: 18, height: 18, bgcolor: 'var(--surface)', border: '2px solid #0071e3' },
                 '& .MuiSlider-track': { height: 4 },
                 '& .MuiSlider-rail': { height: 4, bgcolor: 'var(--glass-border)' },
               }}
@@ -1190,12 +1452,12 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
               step={1}
               sx={{
                 color: '#8b5cf6',
-                '& .MuiSlider-thumb': { width: 18, height: 18, bgcolor: 'white', border: '2px solid #8b5cf6' },
+                '& .MuiSlider-thumb': { width: 18, height: 18, bgcolor: 'var(--surface)', border: '2px solid #8b5cf6' },
                 '& .MuiSlider-track': { height: 4 },
                 '& .MuiSlider-rail': { height: 4, bgcolor: 'var(--glass-border)' },
               }}
             />
-            <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary', minWidth: 32, textAlign: 'right' }}>
+            <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', minWidth: 32, textAlign: 'right' }}>
               {cropRotation}°
             </Typography>
           </Box>
@@ -1211,7 +1473,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
             onClick={() => { setCropPreview(null); cropImageRef.current = null; }}
             sx={{
               py: 1, borderRadius: '12px',
-              bgcolor: 'var(--glass-bg)', color: 'text.primary',
+              bgcolor: 'var(--glass-bg)', color: 'var(--foreground)',
               fontWeight: 600, fontSize: '0.85rem', textTransform: 'none',
               '&:hover': { bgcolor: 'var(--glass-border)' },
             }}
@@ -1225,10 +1487,10 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
             startIcon={uploadingImage ? <CircularProgress size={16} sx={{ color: 'white' }} /> : <Check size={16} />}
             sx={{
               py: 1, borderRadius: '12px',
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              background: 'linear-gradient(135deg, #34c759 0%, #34c759 100%)',
               color: 'white', fontWeight: 600, fontSize: '0.85rem', textTransform: 'none',
               boxShadow: '0 4px 16px rgba(16,185,129,0.25)',
-              '&:hover': { background: 'linear-gradient(135deg, #059669 0%, #047857 100%)' },
+              '&:hover': { background: 'linear-gradient(135deg, #34c759 0%, #047857 100%)' },
               '&:disabled': { opacity: 0.7 },
             }}
           >

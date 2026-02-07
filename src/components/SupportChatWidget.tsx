@@ -25,12 +25,16 @@ import {
   ListItemText,
 } from '@mui/material';
 import { Headphones as SupportAgentIcon, X as CloseIcon, Send as SendIcon, Clock as TimeIcon, CheckCircle2 as CheckCircleIcon, Star as StarIcon, Image as ImageIcon, Bot as ChatbotIcon, Check as DoneIcon, CheckCheck as DoneAllIcon, MessageCircle as ChatIcon, History as HistoryIcon, ArrowLeft as ArrowBackIcon, Plus as AddIcon, MoreVertical as MoreVertIcon, Trash2 as DeleteIcon, Reply as ReplyIcon, ZoomIn as ZoomInIcon, ZoomOut as ZoomOutIcon, Receipt as ReceiptIcon, ShoppingBag as ShoppingBagIcon } from 'lucide-react';
+import { useNotification } from './NotificationContext';
 
 // ชื่อแอดมินที่แสดง (สามารถตั้งค่าได้)
 const ADMIN_DISPLAY_NAME = 'ทีมงาน PSU SCC';
 
 interface SupportChatWidgetProps {
   onOpenChatbot?: () => void;
+  hideMobileFab?: boolean;
+  externalOpen?: boolean;
+  onExternalOpenHandled?: () => void;
 }
 
 interface ChatSession {
@@ -71,8 +75,9 @@ interface ChatWithMessages extends ChatSession {
   messages: ChatMessage[];
 }
 
-export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetProps) {
+export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, externalOpen, onExternalOpenHandled }: SupportChatWidgetProps) {
   const { data: session, status: authStatus } = useSession();
+  const { warning: toastWarning, error: toastError } = useNotification();
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -303,13 +308,13 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
 
     // Check file type
     if (!file.type.startsWith('image/')) {
-      alert('กรุณาเลือกไฟล์รูปภาพเท่านั้น');
+      toastWarning('กรุณาเลือกไฟล์รูปภาพเท่านั้น');
       return;
     }
 
     // Check file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert('ไฟล์ต้องมีขนาดไม่เกิน 5MB');
+      toastWarning('ไฟล์ต้องมีขนาดไม่เกิน 5MB');
       return;
     }
 
@@ -368,7 +373,7 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
       }
     } catch (error) {
       console.error('Error uploading image:', error);
-      alert('เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ');
+      toastError('เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ');
     } finally {
       setUploadingImage(false);
       if (fileInputRef.current) {
@@ -531,6 +536,22 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
       setSending(false);
     }
   };
+
+  // Handle external open trigger (from navbar)
+  useEffect(() => {
+    if (externalOpen) {
+      if (!isLoggedIn) {
+        window.location.href = '/api/auth/signin?callbackUrl=' + encodeURIComponent(window.location.pathname);
+        onExternalOpenHandled?.();
+        return;
+      }
+      setOpen(true);
+      setLoading(true);
+      fetchActiveChat().finally(() => setLoading(false));
+      onExternalOpenHandled?.();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalOpen]);
 
   // Handle opening with mode selection
   const handleOpenMenu = (event: React.MouseEvent<HTMLElement>) => {
@@ -696,6 +717,7 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
             bottom: 24,
             right: 24,
             zIndex: 1200,
+            display: hideMobileFab ? { xs: 'none', md: 'block' } : 'block',
           }}
         >
           <Badge
@@ -714,9 +736,9 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
               sx={{
                 width: 60,
                 height: 60,
-                bgcolor: '#2563eb',
+                bgcolor: '#0071e3',
                 color: 'white',
-                boxShadow: '0 4px 20px rgba(37, 99, 235, 0.4)',
+                boxShadow: '0 4px 20px rgba(0,113,227, 0.4)',
                 '&:hover': {
                   bgcolor: '#1d4ed8',
                   transform: 'scale(1.05)',
@@ -739,11 +761,12 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
         transformOrigin={{ vertical: 'bottom', horizontal: 'center' }}
         PaperProps={{
           sx: {
-            bgcolor: 'var(--foreground)',
-            color: 'white',
+            bgcolor: 'var(--surface)',
+            color: 'var(--foreground)',
             borderRadius: 2,
             minWidth: 220,
-            boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
+            border: '1px solid var(--glass-border)',
+            boxShadow: '0 8px 30px rgba(0,0,0,0.15)',
           },
         }}
       >
@@ -751,11 +774,11 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
           onClick={handleSelectChatbot}
           sx={{ 
             py: 1.5, 
-            '&:hover': { bgcolor: 'rgba(37, 99, 235, 0.2)' },
+            '&:hover': { bgcolor: 'var(--surface-2)' },
           }}
         >
           <ListItemIcon>
-            <ChatbotIcon size={24} color="#22c55e" />
+            <ChatbotIcon size={24} color="#30d158" />
           </ListItemIcon>
           <ListItemText 
             primary="ถามแชทบอท" 
@@ -767,16 +790,16 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
           onClick={handleSelectSupport}
           sx={{ 
             py: 1.5, 
-            '&:hover': { bgcolor: 'rgba(37, 99, 235, 0.2)' },
+            '&:hover': { bgcolor: 'rgba(0,113,227, 0.2)' },
           }}
         >
           <ListItemIcon>
-            <SupportAgentIcon size={24} color="#2563eb" />
+            <SupportAgentIcon size={24} color="#0071e3" />
           </ListItemIcon>
           <ListItemText 
             primary="ติดต่อแอดมิน" 
             secondary={isLoggedIn ? "แชทกับทีมงานโดยตรง" : "ต้องเข้าสู่ระบบก่อน"}
-            secondaryTypographyProps={{ sx: { color: isLoggedIn ? '#94a3b8' : '#fbbf24', fontSize: '0.75rem' } }}
+            secondaryTypographyProps={{ sx: { color: isLoggedIn ? 'var(--text-muted)' : 'var(--warning)', fontSize: '0.75rem' } }}
           />
         </MenuItem>
       </Menu>
@@ -790,11 +813,12 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
         transformOrigin={{ vertical: 'bottom', horizontal: 'center' }}
         PaperProps={{
           sx: {
-            bgcolor: 'var(--foreground)',
-            color: 'white',
+            bgcolor: 'var(--surface)',
+            color: 'var(--foreground)',
             borderRadius: 2,
             minWidth: 160,
-            boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
+            border: '1px solid var(--glass-border)',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
           },
         }}
       >
@@ -803,15 +827,15 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
           disabled={unsending}
           sx={{ 
             py: 1.5,
-            color: '#ef4444',
+            color: 'var(--error)',
             '&:hover': { bgcolor: 'rgba(239, 68, 68, 0.15)' },
           }}
         >
           <ListItemIcon>
             {unsending ? (
-              <CircularProgress size={18} sx={{ color: '#ef4444' }} />
+              <CircularProgress size={18} sx={{ color: 'var(--error)' }} />
             ) : (
-              <DeleteIcon size={20} color="#ef4444" />
+              <DeleteIcon size={20} color="#ff453a" />
             )}
           </ListItemIcon>
           <ListItemText 
@@ -828,12 +852,12 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
             }}
             sx={{ 
               py: 1.5,
-              color: '#2563eb',
-              '&:hover': { bgcolor: 'rgba(37, 99, 235, 0.15)' },
+              color: 'var(--primary)',
+              '&:hover': { bgcolor: 'rgba(0,113,227, 0.15)' },
             }}
           >
             <ListItemIcon>
-              <ReplyIcon size={20} color="#2563eb" />
+              <ReplyIcon size={20} color="#0071e3" />
             </ListItemIcon>
             <ListItemText 
               primary="ตอบกลับ"
@@ -977,7 +1001,7 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
               alignItems: 'center',
               gap: 1,
             }}>
-              <ReceiptIcon size={24} color="#2563eb" />
+              <ReceiptIcon size={24} color="#0071e3" />
               <Typography sx={{ fontWeight: 700, color: 'var(--foreground)', flex: 1 }}>
                 เลือกออเดอร์ที่ต้องการแนบ
               </Typography>
@@ -990,11 +1014,11 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
             <Box sx={{ flex: 1, overflowY: 'auto', p: 1 }}>
               {loadingOrders ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                  <CircularProgress size={32} sx={{ color: '#2563eb' }} />
+                  <CircularProgress size={32} sx={{ color: 'var(--primary)' }} />
                 </Box>
               ) : orderHistory.length === 0 ? (
                 <Box sx={{ textAlign: 'center', py: 4 }}>
-                  <ShoppingBagIcon size={48} color="#94a3b8" style={{ marginBottom: 8 }} />
+                  <ShoppingBagIcon size={48} color="#86868b" style={{ marginBottom: 8 }} />
                   <Typography sx={{ color: 'var(--text-muted)' }}>ไม่พบประวัติการสั่งซื้อ</Typography>
                 </Box>
               ) : (
@@ -1011,8 +1035,8 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                       border: '1px solid var(--glass-border)',
                       transition: 'all 0.2s',
                       '&:hover': { 
-                        bgcolor: 'var(--foreground)',
-                        borderColor: '#2563eb',
+                        bgcolor: 'var(--glass-bg)',
+                        borderColor: 'var(--primary)',
                         transform: 'translateX(4px)',
                       },
                     }}
@@ -1022,7 +1046,7 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                         width: 40,
                         height: 40,
                         borderRadius: 1.5,
-                        bgcolor: '#2563eb',
+                        bgcolor: 'var(--primary)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -1046,12 +1070,12 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                         sx={{
                           height: 22,
                           fontSize: '0.65rem',
-                          bgcolor: order.status === 'PAID' ? '#dcfce7' : 
-                                   order.status === 'COMPLETED' ? '#dbeafe' :
-                                   order.status === 'CANCELLED' ? '#fee2e2' : '#fef3c7',
-                          color: order.status === 'PAID' ? '#166534' :
-                                 order.status === 'COMPLETED' ? '#1e40af' :
-                                 order.status === 'CANCELLED' ? '#991b1b' : '#92400e',
+                          bgcolor: order.status === 'PAID' ? 'rgba(34,197,94,0.15)' : 
+                                   order.status === 'COMPLETED' ? 'rgba(0,113,227,0.15)' :
+                                   order.status === 'CANCELLED' ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)',
+                          color: order.status === 'PAID' ? 'var(--success)' :
+                                 order.status === 'COMPLETED' ? 'var(--primary)' :
+                                 order.status === 'CANCELLED' ? 'var(--error)' : 'var(--warning)',
                         }}
                       />
                     </Box>
@@ -1085,7 +1109,7 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
           {/* Header */}
           <Box
             sx={{
-              background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+              background: 'linear-gradient(135deg, #0071e3 0%, #1d4ed8 100%)',
               color: 'white',
               px: 2,
               py: 1.5,
@@ -1145,14 +1169,14 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
           <Box sx={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
             {loading ? (
               <Box sx={{ flex: 1, display: 'grid', placeItems: 'center' }}>
-                <CircularProgress sx={{ color: '#2563eb' }} />
+                <CircularProgress sx={{ color: 'var(--primary)' }} />
               </Box>
             ) : showHistory ? (
               /* History View */
               <Box sx={{ flex: 1, overflowY: 'auto', p: 2 }}>
                 {chatHistory.length === 0 ? (
                   <Box sx={{ textAlign: 'center', py: 4 }}>
-                    <HistoryIcon size={48} color="#94a3b8" style={{ marginBottom: 8 }} />
+                    <HistoryIcon size={48} color="#86868b" style={{ marginBottom: 8 }} />
                     <Typography sx={{ color: 'var(--text-muted)' }}>ไม่มีประวัติการสนทนา</Typography>
                   </Box>
                 ) : (
@@ -1180,7 +1204,7 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                           {historyChat.last_message_preview}
                         </Typography>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
-                          <TimeIcon size={14} color="#94a3b8" />
+                          <TimeIcon size={14} color="#86868b" />
                           <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>
                             {new Date(historyChat.closed_at || historyChat.updated_at).toLocaleDateString('th-TH', { 
                               day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
@@ -1188,8 +1212,8 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                           </Typography>
                           {historyChat.rating && (
                             <>
-                              <StarIcon size={14} color="#fbbf24" />
-                              <Typography sx={{ color: '#fbbf24', fontSize: '0.7rem' }}>
+                              <StarIcon size={14} color="#ffd60a" />
+                              <Typography sx={{ color: '#ffd60a', fontSize: '0.7rem' }}>
                                 {historyChat.rating}
                               </Typography>
                             </>
@@ -1209,7 +1233,7 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                 display: 'flex', 
                 flexDirection: 'column', 
                 justifyContent: 'center',
-                background: 'linear-gradient(180deg, #f8fafc 0%, #ffffff 100%)',
+                background: 'var(--surface)',
                 overflowY: 'auto',
               }}>
                 {/* Back button */}
@@ -1240,7 +1264,7 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                     '100%': { transform: 'scale(1)' },
                   },
                 }}>
-                  <CheckCircleIcon size={40} color="#22c55e" />
+                  <CheckCircleIcon size={40} color="#30d158" />
                 </Box>
                 
                 <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5, color: 'var(--foreground)' }}>
@@ -1255,14 +1279,14 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                   p: 2, 
                   mb: 2, 
                   borderRadius: 2, 
-                  bgcolor: '#fefce8',
-                  border: '1px solid #fef08a',
+                  bgcolor: 'var(--surface-2)',
+                  border: '1px solid var(--glass-border)',
                 }}>
                   <Rating
                     value={rating}
                     onChange={(_, newValue) => setRating(newValue)}
                     size="large"
-                    icon={<StarIcon size={16} color="#fbbf24" />}
+                    icon={<StarIcon size={16} color="#ffd60a" />}
                     emptyIcon={<StarIcon size={16} color="#e2e8f0" />}
                     sx={{ 
                       justifyContent: 'center',
@@ -1273,7 +1297,7 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                     }}
                   />
                   {rating && (
-                    <Typography sx={{ color: '#92400e', fontSize: '0.8rem', mt: 1, fontWeight: 500 }}>
+                    <Typography sx={{ color: 'var(--warning)', fontSize: '0.8rem', mt: 1, fontWeight: 500 }}>
                       {rating === 5 ? 'ยอดเยี่ยมมาก!' : 
                        rating === 4 ? 'ดีมาก!' : 
                        rating === 3 ? 'พอใช้' : 
@@ -1297,8 +1321,8 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                       border: '1px solid var(--glass-border)',
                       '&:hover': { borderColor: 'var(--glass-border)' },
                       '&.Mui-focused': { 
-                        borderColor: '#2563eb',
-                        boxShadow: '0 0 0 3px rgba(37, 99, 235, 0.1)',
+                        borderColor: 'var(--primary)',
+                        boxShadow: '0 0 0 3px rgba(0,113,227, 0.1)',
                       },
                       '& fieldset': { border: 'none' },
                     },
@@ -1316,15 +1340,15 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                   onClick={handleSubmitRating}
                   disabled={!rating || sending}
                   sx={{
-                    background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                    background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
                     py: 1.5,
                     fontWeight: 600,
                     borderRadius: 2,
                     textTransform: 'none',
-                    boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)',
+                    boxShadow: '0 4px 14px rgba(0,113,227, 0.3)',
                     '&:hover': { 
-                      background: 'linear-gradient(135deg, #1d4ed8 0%, #7c3aed 100%)',
-                      boxShadow: '0 6px 20px rgba(37, 99, 235, 0.4)',
+                      background: 'linear-gradient(135deg, #1d4ed8 0%, #bf5af2 100%)',
+                      boxShadow: '0 6px 20px rgba(0,113,227, 0.4)',
                     },
                     '&.Mui-disabled': {
                       background: 'var(--surface-2)',
@@ -1344,22 +1368,22 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                 flex: 1, 
                 display: 'flex', 
                 flexDirection: 'column',
-                background: 'linear-gradient(180deg, #f8fafc 0%, #ffffff 100%)',
+                background: 'var(--surface)',
                 overflowY: 'scroll',
                 minHeight: 0,
                 scrollbarWidth: 'thin',
-                scrollbarColor: '#c7d2fe #f1f5f9',
+                scrollbarColor: 'var(--text-muted) var(--surface-2)',
                 '&::-webkit-scrollbar': {
                   width: 10,
                   background: 'var(--surface-2)',
                 },
                 '&::-webkit-scrollbar-thumb': {
-                  background: '#c7d2fe',
+                  background: 'var(--glass-border)',
                   borderRadius: 8,
-                  border: '2px solid #f1f5f9',
+                  border: '2px solid var(--surface-2)',
                 },
                 '&::-webkit-scrollbar-thumb:hover': {
-                  background: '#2563eb',
+                  background: 'var(--primary)',
                 },
               }}>
                 {/* Header Section */}
@@ -1374,11 +1398,11 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                     mx: 'auto',
                     mb: 1.5,
                     borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                    background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    boxShadow: '0 8px 24px rgba(37, 99, 235, 0.3)',
+                    boxShadow: '0 8px 24px rgba(0,113,227, 0.3)',
                   }}>
                     <SupportAgentIcon size={32} color="white" />
                   </Box>
@@ -1409,13 +1433,13 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                           fontWeight: 500,
                           cursor: 'pointer',
                           transition: 'all 0.2s ease',
-                          bgcolor: subject === topic ? '#2563eb' : 'var(--surface-2)',
+                          bgcolor: subject === topic ? 'var(--primary)' : 'var(--surface-2)',
                           color: subject === topic ? 'white' : 'var(--text-muted)',
                           border: '1px solid',
-                          borderColor: subject === topic ? '#2563eb' : 'var(--glass-border)',
+                          borderColor: subject === topic ? 'var(--primary)' : 'var(--glass-border)',
                           '&:hover': {
-                            bgcolor: subject === topic ? '#1d4ed8' : 'var(--surface-2)',
-                            borderColor: subject === topic ? '#1d4ed8' : '#cbd5e1',
+                            bgcolor: subject === topic ? 'var(--primary)' : 'var(--surface-2)',
+                            borderColor: subject === topic ? 'var(--primary)' : 'var(--glass-border)',
                           },
                         }}
                       >
@@ -1438,7 +1462,7 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                         bgcolor: 'var(--surface)',
                         border: '1px solid var(--glass-border)',
                         '&:hover': { borderColor: 'var(--glass-border)' },
-                        '&.Mui-focused': { borderColor: '#2563eb' },
+                        '&.Mui-focused': { borderColor: 'var(--primary)' },
                         '& fieldset': { border: 'none' },
                       },
                       '& .MuiInputBase-input': {
@@ -1468,7 +1492,7 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                         bgcolor: 'var(--surface)',
                         border: '1px solid var(--glass-border)',
                         '&:hover': { borderColor: 'var(--glass-border)' },
-                        '&.Mui-focused': { borderColor: '#2563eb' },
+                        '&.Mui-focused': { borderColor: 'var(--primary)' },
                         '& fieldset': { border: 'none' },
                         alignItems: 'flex-start',
                       },
@@ -1487,16 +1511,16 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                     onClick={handleCreateChat}
                     disabled={!message.trim() || sending}
                     sx={{
-                      background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                      background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
                       py: 1.5,
                       fontWeight: 600,
                       fontSize: '0.95rem',
                       borderRadius: 2,
                       textTransform: 'none',
-                      boxShadow: '0 4px 14px rgba(37, 99, 235, 0.4)',
+                      boxShadow: '0 4px 14px rgba(0,113,227, 0.4)',
                       '&:hover': { 
-                        background: 'linear-gradient(135deg, #1d4ed8 0%, #7c3aed 100%)',
-                        boxShadow: '0 6px 20px rgba(37, 99, 235, 0.5)',
+                        background: 'linear-gradient(135deg, #1d4ed8 0%, #bf5af2 100%)',
+                        boxShadow: '0 6px 20px rgba(0,113,227, 0.5)',
                       },
                       '&.Mui-disabled': {
                         background: 'var(--surface-2)',
@@ -1521,7 +1545,7 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                   p: 2, 
                   borderTop: '1px solid var(--glass-border)',
                   textAlign: 'center',
-                  bgcolor: '#fafafa',
+                  bgcolor: 'var(--surface-2)',
                 }}>
                   <Button
                     size="small"
@@ -1531,7 +1555,7 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                       color: 'var(--text-muted)', 
                       fontSize: '0.8rem',
                       textTransform: 'none',
-                      '&:hover': { color: '#2563eb', bgcolor: 'transparent' },
+                      '&:hover': { color: 'var(--primary)', bgcolor: 'transparent' },
                     }}
                   >
                     ดูประวัติการสนทนา
@@ -1546,7 +1570,8 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                   <Box sx={{ 
                     px: 2, 
                     py: 1.5, 
-                    background: 'linear-gradient(90deg, #fef3c7 0%, #fde68a 100%)',
+                    background: 'var(--surface-2)',
+                    border: '1px solid var(--warning)',
                     flexShrink: 0,
                     display: 'flex',
                     alignItems: 'center',
@@ -1557,7 +1582,7 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                       width: 8,
                       height: 8,
                       borderRadius: '50%',
-                      bgcolor: '#f59e0b',
+                      bgcolor: 'var(--warning)',
                       animation: 'pulse 1.5s infinite',
                       '@keyframes pulse': {
                         '0%': { opacity: 1, transform: 'scale(1)' },
@@ -1565,7 +1590,7 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                         '100%': { opacity: 1, transform: 'scale(1)' },
                       },
                     }} />
-                    <Typography sx={{ color: '#92400e', fontSize: '0.85rem', fontWeight: 600 }}>
+                    <Typography sx={{ color: 'var(--warning)', fontSize: '0.85rem', fontWeight: 600 }}>
                       รอแอดมินรับเคส...
                     </Typography>
                   </Box>
@@ -1580,7 +1605,7 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                     display: 'flex',
                     flexDirection: 'column',
                     gap: 0.5,
-                    bgcolor: 'var(--foreground)',
+                    bgcolor: 'var(--surface-2)',
                     minHeight: 0,
                   }}
                 >
@@ -1626,7 +1651,7 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                             {msg.sender === 'admin' && showTime && (
                               <Avatar 
                                 src={msg.sender_avatar || undefined}
-                                sx={{ width: 28, height: 28, bgcolor: '#2563eb', flexShrink: 0 }}
+                                sx={{ width: 28, height: 28, bgcolor: 'var(--primary)', flexShrink: 0 }}
                               >
                                 {!msg.sender_avatar && <SupportAgentIcon size={16} />}
                               </Avatar>
@@ -1637,7 +1662,7 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                             {msg.sender === 'customer' && showTime && (
                               <Avatar 
                                 src={getUserAvatar() || msg.sender_avatar || undefined} 
-                                sx={{ width: 28, height: 28, bgcolor: '#22c55e', flexShrink: 0 }}
+                                sx={{ width: 28, height: 28, bgcolor: 'var(--success)', flexShrink: 0 }}
                               >
                                 {!getUserAvatar() && !msg.sender_avatar && (
                                   session?.user?.name?.charAt(0)?.toUpperCase() || 'U'
@@ -1662,7 +1687,7 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                                 sx={{
                                   px: 1.5,
                                   py: 0.75,
-                                  bgcolor: msg.sender === 'customer' ? '#2563eb' : 'var(--surface)',
+                                  bgcolor: msg.sender === 'customer' ? '#0071e3' : 'var(--surface)',
                                   color: msg.sender === 'customer' ? '#ffffff' : 'var(--foreground)',
                                   borderRadius: '18px',
                                   borderBottomRightRadius: msg.sender === 'customer' ? '6px' : '18px',
@@ -1700,7 +1725,7 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                                         width: 32,
                                         height: 32,
                                         borderRadius: 1,
-                                        bgcolor: '#2563eb',
+                                        bgcolor: '#0071e3',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
@@ -1776,11 +1801,11 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                                   {isLastCustomerMessage && chat.status === 'active' && (
                                     <>
                                       {msg.is_read 
-                                        ? <DoneAllIcon size={12} color="#22c55e" />
-                                        : <DoneIcon size={12} color="#94a3b8" />
+                                        ? <DoneAllIcon size={12} color="#30d158" />
+                                        : <DoneIcon size={12} color="#86868b" />
                                       }
                                       {msg.is_read && msg.read_at && (
-                                        <Typography sx={{ fontSize: '0.6rem', color: '#22c55e', ml: 0.25 }}>
+                                        <Typography sx={{ fontSize: '0.6rem', color: '#30d158', ml: 0.25 }}>
                                           อ่านแล้ว {formatTimeAgo(msg.read_at)}
                                         </Typography>
                                       )}
@@ -1798,7 +1823,7 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                   {/* Typing Indicator */}
                   {adminTyping && (
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Avatar sx={{ width: 32, height: 32, bgcolor: '#2563eb' }}>
+                      <Avatar sx={{ width: 32, height: 32, bgcolor: '#0071e3' }}>
                         <SupportAgentIcon size={18} />
                       </Avatar>
                       <Paper sx={{ px: 2, py: 1, bgcolor: 'var(--surface)', borderRadius: 2 }}>
@@ -1845,11 +1870,11 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                           position: 'absolute',
                           top: -8,
                           right: -8,
-                          bgcolor: '#ef4444',
+                          bgcolor: '#ff453a',
                           color: 'white',
                           width: 20,
                           height: 20,
-                          '&:hover': { bgcolor: '#dc2626' },
+                          '&:hover': { bgcolor: '#ff3b30' },
                         }}
                       >
                         <CloseIcon size={14} />
@@ -1885,13 +1910,13 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                           sx={{
                             width: 3,
                             height: 36,
-                            bgcolor: '#2563eb',
+                            bgcolor: '#0071e3',
                             borderRadius: 1,
                             flexShrink: 0,
                           }}
                         />
                         <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <Typography sx={{ fontSize: '0.7rem', color: '#2563eb', fontWeight: 600 }}>
+                          <Typography sx={{ fontSize: '0.7rem', color: '#0071e3', fontWeight: 600 }}>
                             ตอบกลับ {replyToMessage.sender === 'admin' ? 'แอดมิน' : 'ตัวเอง'}
                           </Typography>
                           <Typography 
@@ -1932,10 +1957,10 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                       onClick={() => fileInputRef.current?.click()}
                       disabled={uploadingImage}
                       sx={{ 
-                        color: '#2563eb',
-                        bgcolor: 'rgba(37, 99, 235, 0.08)',
+                        color: '#0071e3',
+                        bgcolor: 'rgba(0,113,227, 0.08)',
                         '&:hover': { 
-                          bgcolor: 'rgba(37, 99, 235, 0.15)',
+                          bgcolor: 'rgba(0,113,227, 0.15)',
                           transform: 'scale(1.05)',
                         },
                         transition: 'all 0.2s',
@@ -1951,7 +1976,7 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                         setShowOrderPicker(true);
                       }}
                       sx={{ 
-                        color: '#22c55e',
+                        color: '#30d158',
                         bgcolor: 'rgba(34, 197, 94, 0.08)',
                         '&:hover': { 
                           bgcolor: 'rgba(34, 197, 94, 0.15)',
@@ -1987,13 +2012,13 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                           border: '1px solid transparent',
                           transition: 'all 0.2s',
                           '&:hover': { 
-                            bgcolor: 'var(--foreground)',
+                            bgcolor: 'var(--glass-bg)',
                             border: '1px solid var(--glass-border)',
                           },
                           '&.Mui-focused': { 
                             bgcolor: 'var(--surface)',
-                            border: '1px solid #2563eb',
-                            boxShadow: '0 0 0 3px rgba(37, 99, 235, 0.1)',
+                            border: '1px solid var(--primary)',
+                            boxShadow: '0 0 0 3px rgba(0,113,227, 0.1)',
                           },
                           '& fieldset': { border: 'none' },
                         },
@@ -2008,13 +2033,13 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                       onClick={handleSendMessage}
                       disabled={(!message.trim() && !previewImage) || sending || uploadingImage}
                       sx={{
-                        background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                        background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
                         color: 'white',
-                        boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
+                        boxShadow: '0 4px 12px rgba(0,113,227, 0.3)',
                         '&:hover': { 
-                          background: 'linear-gradient(135deg, #1d4ed8 0%, #7c3aed 100%)',
+                          background: 'linear-gradient(135deg, #1d4ed8 0%, #bf5af2 100%)',
                           transform: 'scale(1.05)',
-                          boxShadow: '0 6px 16px rgba(37, 99, 235, 0.4)',
+                          boxShadow: '0 6px 16px rgba(0,113,227, 0.4)',
                         },
                         transition: 'all 0.2s',
                         '&.Mui-disabled': { 
@@ -2041,9 +2066,9 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                       display: 'flex',
                       flexDirection: 'column',
                       gap: 1.5,
-                      background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)',
+                      background: 'var(--surface)',
                       flexShrink: 0,
-                      boxShadow: '0 -4px 12px rgba(0,0,0,0.03)',
+                      boxShadow: '0 -4px 12px rgba(0,0,0,0.05)',
                     }}
                   >
                     <Box sx={{ 
@@ -2057,7 +2082,7 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                         width: 6,
                         height: 6,
                         borderRadius: '50%',
-                        bgcolor: chat.rating ? '#22c55e' : '#94a3b8',
+                        bgcolor: chat.rating ? 'var(--success)' : 'var(--text-muted)',
                       }} />
                       <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                         {chat.rating 
@@ -2078,14 +2103,14 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                           setShowRating(true);
                         }}
                         sx={{
-                          borderColor: '#fbbf24',
-                          color: '#f59e0b',
+                          borderColor: '#ffd60a',
+                          color: '#ff9f0a',
                           py: 1,
                           fontWeight: 600,
                           borderRadius: 2,
                           textTransform: 'none',
                           '&:hover': { 
-                            borderColor: '#f59e0b',
+                            borderColor: '#ff9f0a',
                             bgcolor: 'rgba(251, 191, 36, 0.08)',
                           },
                         }}
@@ -2105,15 +2130,15 @@ export default function SupportChatWidget({ onOpenChatbot }: SupportChatWidgetPr
                         setSubject('');
                       }}
                       sx={{
-                        background: 'linear-gradient(135deg, #2563eb 0%, #1e40af 100%)',
+                        background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
                         py: 1.25,
                         fontWeight: 600,
                         borderRadius: 2,
                         textTransform: 'none',
-                        boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)',
+                        boxShadow: '0 4px 14px rgba(0,113,227, 0.3)',
                         '&:hover': { 
-                          background: 'linear-gradient(135deg, #1d4ed8 0%, #7c3aed 100%)',
-                          boxShadow: '0 6px 20px rgba(37, 99, 235, 0.4)',
+                          background: 'linear-gradient(135deg, #1d4ed8 0%, #bf5af2 100%)',
+                          boxShadow: '0 6px 20px rgba(0,113,227, 0.4)',
                           transform: 'translateY(-1px)',
                         },
                         transition: 'all 0.2s',

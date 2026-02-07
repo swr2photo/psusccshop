@@ -40,22 +40,22 @@ const STATUS_ICONS: Record<TrackingStatus, React.ReactNode> = {
   pending: <Schedule size={18} />,
   picked_up: <Flight size={18} />,
   in_transit: <LocalShipping size={18} />,
-  out_for_delivery: <LocalShipping size={18} color="#22d3ee" />,
-  delivered: <CheckCircle size={18} color="#22c55e" />,
-  returned: <Error size={18} color="#f59e0b" />,
-  failed: <Error size={18} color="#ef4444" />,
+  out_for_delivery: <LocalShipping size={18} color="#64d2ff" />,
+  delivered: <CheckCircle size={18} color="#30d158" />,
+  returned: <Error size={18} color="#ff9f0a" />,
+  failed: <Error size={18} color="#ff453a" />,
   unknown: <Schedule size={18} />,
 };
 
 const STATUS_COLORS: Record<TrackingStatus, string> = {
-  pending: '#94a3b8',
-  picked_up: '#a78bfa',
-  in_transit: '#60a5fa',
-  out_for_delivery: '#22d3ee',
-  delivered: '#22c55e',
-  returned: '#f59e0b',
-  failed: '#ef4444',
-  unknown: '#94a3b8',
+  pending: '#86868b',
+  picked_up: '#bf5af2',
+  in_transit: '#64d2ff',
+  out_for_delivery: '#64d2ff',
+  delivered: '#30d158',
+  returned: '#ff9f0a',
+  failed: '#ff453a',
+  unknown: '#86868b',
 };
 
 export default function ShippingTracker({
@@ -117,14 +117,14 @@ export default function ShippingTracker({
 
   return (
     <Card sx={{
-      bgcolor: 'rgba(255, 255, 255, 0.03)',
-      border: '1px solid rgba(255, 255, 255, 0.1)',
+      bgcolor: 'var(--surface)',
+      border: '1px solid var(--glass-border)',
       borderRadius: '16px',
     }}>
       <CardContent sx={{ p: compact ? 2 : 3 }}>
         {/* Header */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-          <LocalShipping size={28} color="#1e40af" />
+          <LocalShipping size={28} color="var(--primary)" />
           <Typography variant="h6" fontWeight="bold">
             ติดตามพัสดุ
           </Typography>
@@ -137,7 +137,7 @@ export default function ShippingTracker({
               display: 'flex', 
               gap: 1, 
               flexWrap: 'wrap',
-              bgcolor: 'rgba(255, 255, 255, 0.05)',
+              bgcolor: 'var(--surface-2)',
               borderRadius: '12px',
               p: 1,
             }}>
@@ -149,11 +149,11 @@ export default function ShippingTracker({
                   label={info.nameThai}
                   onClick={() => setProvider(key as ShippingProvider)}
                   sx={{
-                    bgcolor: provider === key ? 'rgba(30, 64, 175, 0.3)' : 'rgba(255, 255, 255, 0.05)',
-                    border: `1px solid ${provider === key ? '#1e40af' : 'rgba(255, 255, 255, 0.1)'}`,
-                    color: provider === key ? '#a78bfa' : '#94a3b8',
+                    bgcolor: provider === key ? 'rgba(0,113,227, 0.3)' : 'var(--surface)',
+                    border: `1px solid ${provider === key ? 'var(--primary)' : 'var(--glass-border)'}`,
+                    color: provider === key ? 'var(--secondary)' : 'var(--text-muted)',
                     '&:hover': {
-                      bgcolor: 'rgba(30, 64, 175, 0.2)',
+                      bgcolor: 'rgba(0,113,227, 0.2)',
                     },
                   }}
                 />
@@ -171,18 +171,18 @@ export default function ShippingTracker({
               sx={{
                 '& .MuiOutlinedInput-root': {
                   borderRadius: '12px',
-                  bgcolor: 'rgba(255, 255, 255, 0.05)',
-                  '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.1)' },
-                  '&:hover fieldset': { borderColor: 'rgba(255, 255, 255, 0.2)' },
-                  '&.Mui-focused fieldset': { borderColor: '#1e40af' },
+                  bgcolor: 'var(--surface-2)',
+                  '& fieldset': { borderColor: 'var(--glass-border)' },
+                  '&:hover fieldset': { borderColor: 'var(--text-muted)' },
+                  '&.Mui-focused fieldset': { borderColor: 'var(--primary)' },
                 },
-                '& .MuiInputBase-input': { color: '#fff' },
+                '& .MuiInputBase-input': { color: 'var(--foreground)' },
               }}
               InputProps={{
                 endAdornment: trackingNumber && (
                   <Tooltip title={copied ? 'คัดลอกแล้ว!' : 'คัดลอก'}>
                     <IconButton size="small" onClick={handleCopyTracking}>
-                      <ContentCopy size={18} color={copied ? '#22c55e' : '#94a3b8'} />
+                      <ContentCopy size={18} color={copied ? '#30d158' : 'var(--text-muted)'} />
                     </IconButton>
                   </Tooltip>
                 ),
@@ -196,8 +196,8 @@ export default function ShippingTracker({
               sx={{
                 minWidth: '120px',
                 borderRadius: '12px',
-                bgcolor: '#1e40af',
-                '&:hover': { bgcolor: '#7c3aed' },
+                bgcolor: 'var(--primary)',
+                '&:hover': { bgcolor: '#bf5af2' },
               }}
             >
               {loading ? 'กำลังค้นหา' : 'ค้นหา'}
@@ -224,7 +224,7 @@ export default function ShippingTracker({
           <Box>
             {/* Status Summary */}
             <Card sx={{
-              bgcolor: 'rgba(255, 255, 255, 0.05)',
+              bgcolor: 'var(--surface-2)',
               border: `1px solid ${STATUS_COLORS[trackingInfo.status]}33`,
               borderRadius: '12px',
               mb: 3,
@@ -246,7 +246,7 @@ export default function ShippingTracker({
                   <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                     <Tooltip title="รีเฟรช">
                       <IconButton onClick={handleTrack} disabled={loading}>
-                        <Refresh size={24} color="#94a3b8" />
+                        <Refresh size={24} color="var(--text-muted)" />
                       </IconButton>
                     </Tooltip>
                     {trackingInfo.track123Url && (
@@ -256,12 +256,12 @@ export default function ShippingTracker({
                         endIcon={<OpenInNew size={16} />}
                         onClick={() => window.open(trackingInfo.track123Url, '_blank')}
                         sx={{
-                          borderColor: 'rgba(30, 64, 175, 0.3)',
-                          color: '#a78bfa',
+                          borderColor: 'rgba(0,113,227, 0.3)',
+                          color: 'var(--secondary)',
                           '&:hover': {
-                            borderColor: '#1e40af',
-                            color: '#1e40af',
-                            bgcolor: 'rgba(30, 64, 175, 0.1)',
+                            borderColor: '#0077ED',
+                            color: '#0077ED',
+                            bgcolor: 'rgba(0,113,227, 0.1)',
                           },
                         }}
                       >
@@ -275,11 +275,11 @@ export default function ShippingTracker({
                         endIcon={<OpenInNew size={16} />}
                         onClick={openExternalTracking}
                         sx={{
-                          borderColor: 'rgba(255, 255, 255, 0.2)',
-                          color: '#94a3b8',
+                          borderColor: 'var(--glass-border)',
+                          color: 'var(--text-muted)',
                           '&:hover': {
-                            borderColor: '#1e40af',
-                            color: '#1e40af',
+                            borderColor: '#0077ED',
+                            color: '#0077ED',
                           },
                         }}
                       >
@@ -294,7 +294,7 @@ export default function ShippingTracker({
             {/* Tracking Timeline */}
             {trackingInfo.events.length > 0 ? (
               <Box>
-                <Typography variant="subtitle2" sx={{ mb: 2, color: '#94a3b8' }}>
+                <Typography variant="subtitle2" sx={{ mb: 2, color: 'var(--text-muted)' }}>
                   ประวัติการเคลื่อนไหว
                 </Typography>
                 <Stepper orientation="vertical" sx={{ ml: 1 }}>
@@ -306,13 +306,13 @@ export default function ShippingTracker({
                             width: 32,
                             height: 32,
                             borderRadius: '50%',
-                            bgcolor: index === 0 ? `${STATUS_COLORS[event.status]}33` : 'rgba(255, 255, 255, 0.05)',
-                            border: `2px solid ${index === 0 ? STATUS_COLORS[event.status] : 'rgba(255, 255, 255, 0.1)'}`,
+                            bgcolor: index === 0 ? `${STATUS_COLORS[event.status]}33` : 'var(--surface-2)',
+                            border: `2px solid ${index === 0 ? STATUS_COLORS[event.status] : 'var(--glass-border)'}`,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                           }}>
-                            <Box sx={{ color: index === 0 ? STATUS_COLORS[event.status] : '#94a3b8' }}>
+                            <Box sx={{ color: index === 0 ? STATUS_COLORS[event.status] : 'var(--text-muted)' }}>
                               {STATUS_ICONS[event.status]}
                             </Box>
                           </Box>
@@ -336,8 +336,8 @@ export default function ShippingTracker({
               <Alert 
                 severity="info" 
                 sx={{ 
-                  bgcolor: 'rgba(59, 130, 246, 0.1)', 
-                  border: '1px solid rgba(59, 130, 246, 0.3)',
+                  bgcolor: 'rgba(0,113,227, 0.1)', 
+                  border: '1px solid rgba(0,113,227, 0.3)',
                 }}
               >
                 <Typography variant="body2">
@@ -348,7 +348,7 @@ export default function ShippingTracker({
                     <Button
                       size="small"
                       onClick={() => window.open(trackingInfo.track123Url, '_blank')}
-                      sx={{ color: '#a78bfa' }}
+                      sx={{ color: 'var(--secondary)' }}
                     >
                       ดูที่ Track123 →
                     </Button>
@@ -357,7 +357,7 @@ export default function ShippingTracker({
                     <Button
                       size="small"
                       onClick={openExternalTracking}
-                      sx={{ color: '#60a5fa' }}
+                      sx={{ color: '#64d2ff' }}
                     >
                       ไปที่เว็บไซต์ขนส่ง →
                     </Button>
@@ -373,7 +373,7 @@ export default function ShippingTracker({
           <Box sx={{ 
             mt: 3, 
             pt: 3, 
-            borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+            borderTop: '1px solid var(--glass-border)',
           }}>
             <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 2 }}>
               ลิงก์ติดตามพัสดุโดยตรง:
@@ -388,8 +388,8 @@ export default function ShippingTracker({
                   target="_blank"
                   sx={{
                     fontSize: '0.75rem',
-                    color: '#94a3b8',
-                    '&:hover': { color: '#1e40af' },
+                    color: 'var(--text-muted)',
+                    '&:hover': { color: 'var(--primary)' },
                   }}
                 >
                   {info.nameThai} ↗

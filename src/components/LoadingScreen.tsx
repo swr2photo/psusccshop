@@ -73,7 +73,7 @@ export default function LoadingScreen(props: LoadingScreenProps) {
             position: 'absolute',
             inset: -8,
             borderRadius: '20px',
-            background: 'radial-gradient(circle, rgba(37,99,235,0.3) 0%, transparent 70%)',
+            background: 'radial-gradient(circle, rgba(0,113,227,0.3) 0%, transparent 70%)',
             filter: 'blur(16px)',
             animation: `${pulse} 2s ease-in-out infinite`,
           }} />
@@ -83,8 +83,8 @@ export default function LoadingScreen(props: LoadingScreenProps) {
             width: logoSize + 24,
             height: logoSize + 24,
             borderRadius: '18px',
-            background: 'linear-gradient(135deg, rgba(37,99,235,0.15) 0%, rgba(30,64,175,0.15) 100%)',
-            border: '2px solid rgba(37,99,235,0.3)',
+            background: 'linear-gradient(135deg, rgba(0,113,227,0.15) 0%, rgba(0,113,227,0.15) 100%)',
+            border: '2px solid rgba(0,113,227,0.3)',
             display: 'grid',
             placeItems: 'center',
             position: 'relative',
@@ -95,6 +95,7 @@ export default function LoadingScreen(props: LoadingScreenProps) {
               alt="SCC Shop"
               width={logoSize}
               height={logoSize}
+              className="theme-logo"
               style={{ objectFit: 'contain' }}
               priority
             />
@@ -115,7 +116,7 @@ export default function LoadingScreen(props: LoadingScreenProps) {
       <Typography sx={{
         fontWeight: 800,
         fontSize: textSize,
-        background: 'linear-gradient(135deg, #2563eb 0%, #60a5fa 50%, #2563eb 100%)',
+        background: 'linear-gradient(135deg, #0071e3 0%, #64d2ff 50%, #0071e3 100%)',
         backgroundSize: '200% auto',
         backgroundClip: 'text',
         WebkitBackgroundClip: 'text',
@@ -140,10 +141,10 @@ export default function LoadingScreen(props: LoadingScreenProps) {
               width: 4,
               height: '100%',
               borderRadius: 2,
-              bgcolor: '#2563eb',
+              bgcolor: '#0071e3',
               animation: `${wave} 1s ease-in-out infinite`,
               animationDelay: `${i * 0.1}s`,
-              boxShadow: '0 0 8px rgba(37,99,235,0.5)',
+              boxShadow: '0 0 8px rgba(0,113,227,0.5)',
             }}
           />
         ))}
@@ -151,7 +152,7 @@ export default function LoadingScreen(props: LoadingScreenProps) {
 
       {/* Loading Message */}
       <Typography sx={{
-        color: 'text.secondary',
+        color: 'var(--text-muted)',
         fontSize: '0.85rem',
         fontWeight: 500,
         animation: `${pulse} 2s ease-in-out infinite`,
@@ -182,7 +183,7 @@ export default function LoadingScreen(props: LoadingScreenProps) {
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        bgcolor: 'rgba(10,15,26,0.85)',
+        bgcolor: 'rgba(0,0,0,0.85)',
         backdropFilter: 'blur(8px)',
         zIndex: 100,
       }}>
@@ -199,11 +200,11 @@ export default function LoadingScreen(props: LoadingScreenProps) {
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      bgcolor: 'background.default',
+      bgcolor: 'var(--background)',
       zIndex: 9999,
       backgroundImage: `
-        radial-gradient(circle at 20% 30%, rgba(37,99,235,0.08) 0%, transparent 40%),
-        radial-gradient(circle at 80% 70%, rgba(30,64,175,0.08) 0%, transparent 40%)
+        radial-gradient(circle at 20% 30%, rgba(0,113,227,0.08) 0%, transparent 40%),
+        radial-gradient(circle at 80% 70%, rgba(0,113,227,0.08) 0%, transparent 40%)
       `,
     }}>
       {content}
@@ -282,7 +283,7 @@ export function ProductCardSkeleton() {
   return (
     <Box sx={{
       borderRadius: '16px',
-      bgcolor: 'rgba(30,41,59,0.5)',
+      bgcolor: 'rgba(29,29,31,0.5)',
       border: '1px solid rgba(255,255,255,0.06)',
       overflow: 'hidden',
     }}>
@@ -306,7 +307,7 @@ export function OrderCardSkeleton() {
     <Box sx={{
       p: 2,
       borderRadius: '18px',
-      bgcolor: 'rgba(30,41,59,0.5)',
+      bgcolor: 'rgba(29,29,31,0.5)',
       border: '1px solid rgba(255,255,255,0.06)',
     }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
@@ -339,7 +340,7 @@ export function CartItemSkeleton() {
     <Box sx={{
       p: 2,
       borderRadius: '16px',
-      bgcolor: 'rgba(30,41,59,0.5)',
+      bgcolor: 'rgba(29,29,31,0.5)',
       border: '1px solid rgba(255,255,255,0.06)',
       display: 'flex',
       gap: 2,

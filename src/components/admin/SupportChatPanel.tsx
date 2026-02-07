@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
+import { useNotification } from '../NotificationContext';
 import {
   Box,
   Typography,
@@ -118,6 +119,7 @@ interface ChatSettings {
 
 export default function SupportChatPanel() {
   const { data: session } = useSession();
+  const { warning: toastWarning, error: toastError } = useNotification();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   
@@ -331,8 +333,8 @@ export default function SupportChatPanel() {
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith('image/')) { alert('กรุณาเลือกไฟล์รูปภาพเท่านั้น'); return; }
-    if (file.size > 5 * 1024 * 1024) { alert('ไฟล์ต้องมีขนาดไม่เกิน 5MB'); return; }
+    if (!file.type.startsWith('image/')) { toastWarning('กรุณาเลือกไฟล์รูปภาพเท่านั้น'); return; }
+    if (file.size > 5 * 1024 * 1024) { toastWarning('ไฟล์ต้องมีขนาดไม่เกิน 5MB'); return; }
     const reader = new FileReader();
     reader.onload = (ev) => setPreviewImage(ev.target?.result as string);
     reader.readAsDataURL(file);
@@ -363,11 +365,11 @@ export default function SupportChatPanel() {
         setMessage('');
         setPreviewImage(null);
       } else {
-        alert('ไม่สามารถอัปโหลดรูปภาพได้');
+        toastError('ไม่สามารถอัปโหลดรูปภาพได้');
       }
     } catch (error) {
       console.error('Error uploading image:', error);
-      alert('เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ');
+      toastError('เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ');
     } finally {
       setUploadingImage(false);
       if (fileInputRef.current) fileInputRef.current.value = '';

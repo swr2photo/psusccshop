@@ -42,16 +42,16 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, ErrorBounda
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: 'var(--surface, #0f172a)',
-          color: 'var(--foreground, #f1f5f9)',
+          backgroundColor: 'var(--surface, #1d1d1f)',
+          color: 'var(--foreground, #f5f5f7)',
           padding: 24,
           fontFamily: 'system-ui, -apple-system, sans-serif',
           textAlign: 'center'
         }}>
-          <h1 style={{ fontSize: 24, marginBottom: 16, color: 'var(--error, #ef4444)' }}>
+          <h1 style={{ fontSize: 24, marginBottom: 16, color: 'var(--error, #ff453a)' }}>
             เกิดข้อผิดพลาด / Something went wrong
           </h1>
-          <p style={{ fontSize: 16, marginBottom: 24, maxWidth: 400, lineHeight: 1.6, color: 'var(--text-muted, #94a3b8)' }}>
+          <p style={{ fontSize: 16, marginBottom: 24, maxWidth: 400, lineHeight: 1.6, color: 'var(--text-muted, #86868b)' }}>
             กรุณาลองรีเฟรชหน้าเว็บ หรืออัปเดต browser เป็นเวอร์ชันใหม่
             <br /><br />
             Please try refreshing the page or update your browser to the latest version.
@@ -62,7 +62,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, ErrorBounda
               padding: '12px 32px',
               fontSize: 16,
               fontWeight: 600,
-              backgroundColor: '#3b82f6',
+              backgroundColor: '#0071e3',
               color: 'white',
               border: 'none',
               borderRadius: 8,
@@ -73,7 +73,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, ErrorBounda
             รีเฟรช / Refresh
           </button>
           {this.state.error && (
-            <details style={{ marginTop: 16, fontSize: 12, color: '#64748b', maxWidth: 500 }}>
+            <details style={{ marginTop: 16, fontSize: 12, color: '#86868b', maxWidth: 500 }}>
               <summary style={{ cursor: 'pointer' }}>รายละเอียด Error</summary>
               <pre style={{ 
                 textAlign: 'left', 
@@ -117,34 +117,34 @@ function ScreenshotProtectionProvider({ children }: { children: React.ReactNode 
   return <>{children}</>;
 }
 
-// ==================== SHARED THEME CONFIG ====================
+// ==================== SHARED THEME CONFIG — Apple-inspired ====================
 
 const sharedTypography = {
-  fontFamily: '"Noto Sans Thai", "Inter", system-ui, -apple-system, sans-serif',
+  fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Noto Sans Thai", system-ui, sans-serif',
   button: {
-    fontWeight: 700,
-    letterSpacing: 0.2,
+    fontWeight: 600,
+    letterSpacing: 0,
   },
 };
 
-const sharedShape = { borderRadius: 14 };
+const sharedShape = { borderRadius: 12 };
 
-// ==================== DARK THEME ====================
+// ==================== DARK THEME — Apple-inspired ====================
 
 const darkTheme = createTheme({
   cssVariables: true,
   palette: {
     mode: 'dark',
-    primary: { main: '#3b82f6', light: '#60a5fa', dark: '#2563eb' },
-    secondary: { main: '#60a5fa', light: '#93c5fd', dark: '#3b82f6' },
-    success: { main: '#34d399' },
-    error: { main: '#ef4444' },
-    warning: { main: '#f59e0b' },
-    background: { default: '#0c1529', paper: '#162036' },
+    primary: { main: '#2997ff', light: '#64d2ff', dark: '#0071e3' },
+    secondary: { main: '#64d2ff', light: '#99e9f2', dark: '#2997ff' },
+    success: { main: '#30d158' },
+    error: { main: '#ff453a' },
+    warning: { main: '#ffd60a' },
+    background: { default: '#000000', paper: '#1d1d1f' },
     text: {
-      primary: '#f8fafc',
-      secondary: '#cbd5e1',
-      disabled: 'rgba(241,245,249,0.5)',
+      primary: '#f5f5f7',
+      secondary: '#86868b',
+      disabled: 'rgba(245,245,247,0.3)',
     },
   },
   typography: sharedTypography,
@@ -157,10 +157,10 @@ const darkTheme = createTheme({
       styleOverrides: {
         root: {
           backgroundImage: 'none',
-          backdropFilter: 'blur(36px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(36px) saturate(180%)',
-          border: '1px solid rgba(255,255,255,0.08)',
-          boxShadow: '0 18px 60px rgba(0,0,0,0.35), 0 1px 0 rgba(255,255,255,0.05)',
+          backdropFilter: 'blur(20px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+          border: '1px solid rgba(255,255,255,0.06)',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.3)',
         },
       },
     },
@@ -168,11 +168,10 @@ const darkTheme = createTheme({
       styleOverrides: {
         root: {
           textTransform: 'none',
-          fontWeight: 700,
-          borderRadius: 14,
-          boxShadow: '0 10px 30px rgba(30,64,175,0.25)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
+          fontWeight: 600,
+          borderRadius: 12,
+          boxShadow: 'none',
+          '&:hover': { boxShadow: 'none' },
         },
       },
     },
@@ -180,70 +179,66 @@ const darkTheme = createTheme({
       styleOverrides: {
         root: {
           backgroundImage: 'none',
-          borderRadius: 18,
-          border: '1px solid rgba(255,255,255,0.08)',
-          backdropFilter: 'blur(28px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(28px) saturate(180%)',
+          borderRadius: 16,
+          border: '1px solid rgba(255,255,255,0.06)',
+          backdropFilter: 'blur(20px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(20px) saturate(180%)',
         },
       },
     },
     MuiDialog: {
       styleOverrides: {
         paper: {
-          borderRadius: 22,
-          backgroundColor: 'rgba(10,15,30,0.75)',
-          border: '1px solid rgba(255,255,255,0.08)',
-          backdropFilter: 'blur(36px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(36px) saturate(180%)',
-          boxShadow: '0 26px 80px rgba(0,0,0,0.45)',
+          borderRadius: 18,
+          backgroundColor: 'rgba(29,29,31,0.92)',
+          border: '1px solid rgba(255,255,255,0.06)',
+          backdropFilter: 'blur(20px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+          boxShadow: '0 8px 40px rgba(0,0,0,0.5)',
         },
       },
     },
     MuiChip: {
       styleOverrides: {
         root: {
-          fontWeight: 700,
-          backdropFilter: 'blur(10px)',
-          WebkitBackdropFilter: 'blur(10px)',
-          backgroundColor: 'rgba(255,255,255,0.08)',
-          border: '1px solid rgba(255,255,255,0.08)',
+          fontWeight: 600,
+          backgroundColor: 'rgba(255,255,255,0.06)',
+          border: '1px solid rgba(255,255,255,0.06)',
         },
       },
     },
     MuiTextField: {
       styleOverrides: {
-        root: { background: 'rgba(255,255,255,0.04)', borderRadius: 14 },
+        root: { background: 'rgba(255,255,255,0.04)', borderRadius: 12 },
       },
     },
     MuiOutlinedInput: {
       styleOverrides: {
         root: {
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-          fieldset: { borderColor: 'rgba(255,255,255,0.16)' },
-          '&:hover fieldset': { borderColor: 'rgba(59,130,246,0.6)' },
+          fieldset: { borderColor: 'rgba(255,255,255,0.12)' },
+          '&:hover fieldset': { borderColor: 'rgba(41,151,255,0.5)' },
         },
       },
     },
   },
 });
 
-// ==================== LIGHT THEME ====================
+// ==================== LIGHT THEME — Apple-inspired ====================
 
 const lightTheme = createTheme({
   cssVariables: true,
   palette: {
     mode: 'light',
-    primary: { main: '#1e40af', light: '#3b82f6', dark: '#1e3a8a' },
-    secondary: { main: '#2563eb', light: '#60a5fa', dark: '#1d4ed8' },
-    success: { main: '#059669' },
-    error: { main: '#dc2626' },
-    warning: { main: '#d97706' },
-    background: { default: '#f8fafc', paper: '#ffffff' },
+    primary: { main: '#0071e3', light: '#2997ff', dark: '#0058b0' },
+    secondary: { main: '#0077ed', light: '#2997ff', dark: '#005bb5' },
+    success: { main: '#34c759' },
+    error: { main: '#ff3b30' },
+    warning: { main: '#ff9f0a' },
+    background: { default: '#ffffff', paper: '#f5f5f7' },
     text: {
-      primary: '#0f172a',
-      secondary: '#475569',
-      disabled: 'rgba(15,23,42,0.4)',
+      primary: '#1d1d1f',
+      secondary: '#86868b',
+      disabled: 'rgba(29,29,31,0.3)',
     },
   },
   typography: sharedTypography,
@@ -256,10 +251,10 @@ const lightTheme = createTheme({
       styleOverrides: {
         root: {
           backgroundImage: 'none',
-          backdropFilter: 'blur(36px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(36px) saturate(180%)',
-          border: '1px solid rgba(0,0,0,0.06)',
-          boxShadow: '0 4px 24px rgba(0,0,0,0.06), 0 1px 0 rgba(255,255,255,0.8)',
+          backdropFilter: 'blur(20px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+          border: '1px solid rgba(0,0,0,0.04)',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
         },
       },
     },
@@ -267,9 +262,10 @@ const lightTheme = createTheme({
       styleOverrides: {
         root: {
           textTransform: 'none',
-          fontWeight: 700,
-          borderRadius: 14,
-          boxShadow: '0 4px 16px rgba(37,99,235,0.15)',
+          fontWeight: 600,
+          borderRadius: 12,
+          boxShadow: 'none',
+          '&:hover': { boxShadow: 'none' },
         },
       },
     },
@@ -277,45 +273,41 @@ const lightTheme = createTheme({
       styleOverrides: {
         root: {
           backgroundImage: 'none',
-          borderRadius: 18,
-          border: '1px solid rgba(0,0,0,0.06)',
-          backdropFilter: 'blur(28px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(28px) saturate(180%)',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
+          borderRadius: 16,
+          border: '1px solid rgba(0,0,0,0.04)',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
         },
       },
     },
     MuiDialog: {
       styleOverrides: {
         paper: {
-          borderRadius: 22,
-          backgroundColor: 'rgba(255,255,255,0.97)',
-          border: '1px solid rgba(0,0,0,0.08)',
-          backdropFilter: 'blur(36px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(36px) saturate(180%)',
-          boxShadow: '0 26px 80px rgba(0,0,0,0.15)',
+          borderRadius: 18,
+          backgroundColor: '#ffffff',
+          border: '1px solid rgba(0,0,0,0.06)',
+          boxShadow: '0 8px 40px rgba(0,0,0,0.12)',
         },
       },
     },
     MuiChip: {
       styleOverrides: {
         root: {
-          fontWeight: 700,
-          backgroundColor: 'rgba(0,0,0,0.04)',
-          border: '1px solid rgba(0,0,0,0.06)',
+          fontWeight: 600,
+          backgroundColor: 'rgba(0,0,0,0.03)',
+          border: '1px solid rgba(0,0,0,0.04)',
         },
       },
     },
     MuiTextField: {
       styleOverrides: {
-        root: { background: 'rgba(0,0,0,0.02)', borderRadius: 14 },
+        root: { background: 'rgba(0,0,0,0.02)', borderRadius: 12 },
       },
     },
     MuiOutlinedInput: {
       styleOverrides: {
         root: {
-          fieldset: { borderColor: 'rgba(0,0,0,0.12)' },
-          '&:hover fieldset': { borderColor: 'rgba(37,99,235,0.5)' },
+          fieldset: { borderColor: 'rgba(0,0,0,0.08)' },
+          '&:hover fieldset': { borderColor: 'rgba(0,113,227,0.4)' },
         },
       },
     },

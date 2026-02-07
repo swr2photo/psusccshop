@@ -236,7 +236,7 @@ function OptimizedImageComponent({
                 content: '""',
                 position: 'absolute',
                 inset: 0,
-                background: 'linear-gradient(90deg, transparent 0%, rgba(37,99,235,0.15) 50%, transparent 100%)',
+                background: 'linear-gradient(90deg, transparent 0%, rgba(0,113,227,0.15) 50%, transparent 100%)',
                 animation: 'shimmer 1.5s infinite',
                 '@keyframes shimmer': {
                   '0%': { transform: 'translateX(-100%)' },
@@ -251,7 +251,7 @@ function OptimizedImageComponent({
               top: '50%',
               left: '50%',
               transform: 'translate(-50%, -50%)',
-              color: 'rgba(37,99,235,0.3)',
+              color: 'rgba(0,113,227,0.3)',
               fontSize: '2rem',
             }}>
               
@@ -296,7 +296,7 @@ function OptimizedImageComponent({
           justifyContent: 'center',
           gap: 1,
           bgcolor: 'var(--glass-bg)',
-          color: '#64748b',
+          color: '#86868b',
           fontSize: '0.75rem',
           cursor: 'pointer',
           transition: 'all 0.2s ease',
@@ -320,7 +320,7 @@ function OptimizedImageComponent({
         </Box>
         <Box sx={{ textAlign: 'center', px: 1 }}>
           โหลดรูปไม่สำเร็จ
-          <Box component="span" sx={{ display: 'block', fontSize: '0.65rem', color: '#2563eb', mt: 0.5 }}>
+          <Box component="span" sx={{ display: 'block', fontSize: '0.65rem', color: '#0071e3', mt: 0.5 }}>
             แตะเพื่อลองใหม่
           </Box>
         </Box>
@@ -349,7 +349,7 @@ function OptimizedImageComponent({
                   content: '""',
                   position: 'absolute',
                   inset: 0,
-                  background: 'linear-gradient(90deg, transparent 0%, rgba(37,99,235,0.2) 50%, transparent 100%)',
+                  background: 'linear-gradient(90deg, transparent 0%, rgba(0,113,227,0.2) 50%, transparent 100%)',
                   animation: 'shimmer 1.5s infinite',
                   '@keyframes shimmer': {
                     '0%': { transform: 'translateX(-100%)' },
@@ -370,7 +370,7 @@ function OptimizedImageComponent({
                     size={32} 
                     thickness={3}
                     sx={{ 
-                      color: '#2563eb',
+                      color: '#0071e3',
                       '& .MuiCircularProgress-circle': {
                         strokeLinecap: 'round',
                       },
@@ -385,7 +385,7 @@ function OptimizedImageComponent({
                   top: '50%',
                   left: '50%',
                   transform: 'translate(-50%, -50%)',
-                  color: 'rgba(37,99,235,0.4)',
+                  color: 'rgba(0,113,227,0.4)',
                   fontSize: '2rem',
                   animation: 'pulse 2s ease-in-out infinite',
                   '@keyframes pulse': {

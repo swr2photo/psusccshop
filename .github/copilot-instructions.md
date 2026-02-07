@@ -7,7 +7,7 @@
 - UI components in src/components
 
 ## Auth & Access Control
-- Google OAuth via NextAuth in src/app/api/auth
+- Multi-provider OAuth via NextAuth (Google, Microsoft, Facebook, Apple, LINE) in src/app/api/auth
 - Auth helpers in src/lib (requireAuth/requireAdmin for API routes)
 - Email ownership via isResourceOwner + SHA-256 hashed keys
 
@@ -31,6 +31,7 @@
 
 ## Environment Variables
 Required: NEXTAUTH_SECRET, NEXTAUTH_URL, GOOGLE_CLIENT_ID/SECRET, FILEBASE_*, NEXT_PUBLIC_GAS_URL, PROMPTPAY_ID, SLIPOK_API_KEY/BRANCH_ID, GOOGLE_CLIENT_EMAIL/PRIVATE_KEY
+Optional OAuth: AZURE_AD_CLIENT_ID/CLIENT_SECRET/TENANT_ID, FACEBOOK_CLIENT_ID/CLIENT_SECRET, APPLE_ID/APPLE_SECRET, LINE_CLIENT_ID/CLIENT_SECRET
 
 ## Dev Commands
 - npm run dev, npm run build, npm run start, npm run lint

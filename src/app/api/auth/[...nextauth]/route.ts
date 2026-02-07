@@ -1,6 +1,10 @@
 // src/app/api/auth/[...nextauth]/route.ts
 import NextAuth, { NextAuthOptions, Session } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+import AzureADProvider from "next-auth/providers/azure-ad";
+import FacebookProvider from "next-auth/providers/facebook";
+import AppleProvider from "next-auth/providers/apple";
+import LineProvider from "next-auth/providers/line";
 import { JWT } from "next-auth/jwt";
 import { putJson } from "@/lib/filebase";
 
@@ -47,6 +51,7 @@ declare module "next-auth/jwt" {
     refreshToken?: string;
     accessTokenExpires?: number;
     error?: string;
+    provider?: string;
   }
 }
 
@@ -90,6 +95,15 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
 }
 
 // ==================== AUTH OPTIONS ====================
+// ==================== PROVIDER NAME MAP ====================
+const providerNameMap: Record<string, string> = {
+  google: 'Google',
+  'azure-ad': 'Microsoft',
+  facebook: 'Facebook',
+  apple: 'Apple',
+  line: 'LINE',
+};
+
 export const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
@@ -103,6 +117,43 @@ export const authOptions: NextAuthOptions = {
         },
       },
     }),
+    // Microsoft (Azure AD)
+    ...(process.env.AZURE_AD_CLIENT_ID && process.env.AZURE_AD_CLIENT_SECRET
+      ? [
+          AzureADProvider({
+            clientId: process.env.AZURE_AD_CLIENT_ID!,
+            clientSecret: process.env.AZURE_AD_CLIENT_SECRET!,
+            tenantId: process.env.AZURE_AD_TENANT_ID || 'common',
+          }),
+        ]
+      : []),
+    // Facebook
+    ...(process.env.FACEBOOK_CLIENT_ID && process.env.FACEBOOK_CLIENT_SECRET
+      ? [
+          FacebookProvider({
+            clientId: process.env.FACEBOOK_CLIENT_ID!,
+            clientSecret: process.env.FACEBOOK_CLIENT_SECRET!,
+          }),
+        ]
+      : []),
+    // Apple
+    ...(process.env.APPLE_ID && process.env.APPLE_SECRET
+      ? [
+          AppleProvider({
+            clientId: process.env.APPLE_ID!,
+            clientSecret: process.env.APPLE_SECRET!,
+          }),
+        ]
+      : []),
+    // LINE
+    ...(process.env.LINE_CLIENT_ID && process.env.LINE_CLIENT_SECRET
+      ? [
+          LineProvider({
+            clientId: process.env.LINE_CLIENT_ID!,
+            clientSecret: process.env.LINE_CLIENT_SECRET!,
+          }),
+        ]
+      : []),
   ],
   
   // Custom pages
@@ -122,12 +173,13 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, account, user }) {
       // Initial sign in
       if (account && user) {
-        console.log("[NextAuth] Initial sign in for:", user.email);
+        console.log("[NextAuth] Initial sign in for:", user.email, "via", account.provider);
         return {
           ...token,
           accessToken: account.access_token,
           refreshToken: account.refresh_token,
           accessTokenExpires: account.expires_at ? account.expires_at * 1000 : Date.now() + 3600 * 1000,
+          provider: account.provider,
           user,
         };
       }
@@ -137,9 +189,14 @@ export const authOptions: NextAuthOptions = {
         return token;
       }
 
-      // Access token has expired, try to refresh it
-      console.log("[NextAuth] Access token expired, refreshing...");
-      return refreshAccessToken(token);
+      // Only refresh Google tokens (other providers don't support refresh the same way)
+      if (token.provider === 'google' && token.refreshToken) {
+        console.log("[NextAuth] Access token expired, refreshing...");
+        return refreshAccessToken(token);
+      }
+
+      // For non-Google providers, just return the token as-is
+      return token;
     },
     
     async session({ session, token }): Promise<Session> {
@@ -162,8 +219,9 @@ export const authOptions: NextAuthOptions = {
         timestamp: new Date().toISOString(),
       });
       
-      // Allow all Google sign-ins
-      if (account?.provider === "google") {
+      // Allow all OAuth sign-ins
+      const allowedProviders = ['google', 'azure-ad', 'facebook', 'apple', 'line'];
+      if (account?.provider && allowedProviders.includes(account.provider)) {
         return true;
       }
       
@@ -171,11 +229,20 @@ export const authOptions: NextAuthOptions = {
     },
     
     async redirect({ url, baseUrl }) {
-      // Allows relative callback URLs
-      if (url.startsWith("/")) return `${baseUrl}${url}`;
-      // Allows callback URLs on the same origin
-      else if (new URL(url).origin === baseUrl) return url;
-      return baseUrl;
+      // Normalize: remove trailing slash
+      const clean = (u: string) => u.replace(/\/+$/, '') || u;
+      const base = clean(baseUrl);
+      
+      // Root callback → go to base URL
+      if (url === '/' || url === baseUrl || url === base) return base;
+      // Relative callback URLs
+      if (url.startsWith('/')) return `${base}${url}`;
+      // Same origin
+      try {
+        const target = clean(url);
+        if (new URL(target).origin === new URL(base).origin) return target;
+      } catch {}
+      return base;
     },
   },
   
@@ -194,7 +261,7 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: user.name || undefined,
           action: 'login',
-          details: `เข้าสู่ระบบด้วย ${account?.provider || 'Google'}`,
+          details: `เข้าสู่ระบบด้วย ${providerNameMap[account?.provider || ''] || account?.provider || 'Unknown'}`,
           metadata: { provider: account?.provider },
         });
       }
@@ -227,7 +294,7 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: user.name || undefined,
           action: 'login',
-          details: 'สมัครสมาชิกใหม่ด้วย Google',
+          details: 'สมัครสมาชิกใหม่',
           metadata: { isNewUser: true },
         });
       }

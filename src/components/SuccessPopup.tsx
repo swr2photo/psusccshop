@@ -64,7 +64,7 @@ export default function SuccessPopup({
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 99999,
-        bgcolor: 'rgba(10, 15, 26, 0.85)',
+        bgcolor: 'rgba(0,0,0, 0.85)',
         backdropFilter: 'blur(12px)',
         animation: 'fadeIn 0.3s ease',
         '@keyframes fadeIn': {
@@ -92,7 +92,7 @@ export default function SuccessPopup({
               width: 100,
               height: 100,
               borderRadius: '50%',
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              background: 'linear-gradient(135deg, #34c759 0%, #34c759 100%)',
               display: 'grid',
               placeItems: 'center',
               color: 'white',
@@ -128,7 +128,7 @@ export default function SuccessPopup({
                   top: '50%',
                   left: '50%',
                   transform: `rotate(${angle}deg) translateY(-70px)`,
-                  color: '#6ee7b7',
+                  color: '#30d158',
                   opacity: 0.7,
                 }}
               >
@@ -176,7 +176,7 @@ export default function SuccessPopup({
             <Box
               sx={{
                 height: '100%',
-                bgcolor: '#10b981',
+                bgcolor: '#34c759',
                 borderRadius: 2,
                 animation: `progressShrink ${duration}ms linear`,
                 '@keyframes progressShrink': {
@@ -187,7 +187,7 @@ export default function SuccessPopup({
             />
           </Box>
 
-          <Typography sx={{ fontSize: '0.75rem', color: '#64748b', mt: 0.5 }}>
+          <Typography sx={{ fontSize: '0.75rem', color: '#86868b', mt: 0.5 }}>
             แตะเพื่อปิด
           </Typography>
         </Box>

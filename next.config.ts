@@ -21,6 +21,11 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'ipfs.filebase.io' },
       // Supabase Storage
       { protocol: 'https', hostname: '**.supabase.co' },
+      // OAuth provider avatars
+      { protocol: 'https', hostname: 'profile.line-scdn.net' },
+      { protocol: 'https', hostname: 'platform-lookaside.fbsbx.com' },
+      { protocol: 'https', hostname: '**.fbcdn.net' },
+      { protocol: 'https', hostname: 'graph.microsoft.com' },
     ],
   },
   // Security: Hide server info
@@ -55,7 +60,7 @@ const nextConfig: NextConfig = {
             // 'unsafe-eval' needed for Next.js (both dev HMR and production hydration in some cases)
             "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://static.cloudflareinsights.com;",
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;",
-            "img-src 'self' data: blob: https://*.filebase.io https://*.filebase.com https://*.googleusercontent.com https://ui-avatars.com https://*.supabase.co;",
+            "img-src 'self' data: blob: https://*.filebase.io https://*.filebase.com https://*.googleusercontent.com https://ui-avatars.com https://*.supabase.co https://profile.line-scdn.net https://platform-lookaside.fbsbx.com https://*.fbcdn.net https://graph.microsoft.com;",
             "font-src 'self' https://fonts.gstatic.com;",
             "connect-src 'self' https://*.filebase.com https://*.filebase.io https://api.resend.com https://challenges.cloudflare.com https://*.supabase.co wss://*.supabase.co;",
             "media-src 'self';",

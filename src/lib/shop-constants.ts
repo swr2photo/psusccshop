@@ -18,6 +18,7 @@ export const STATUS_LABELS: Record<string, string> = {
   REJECTED: 'สลิปไม่ผ่าน',
   FAILED: 'สลิปไม่ผ่าน',
   REFUNDED: 'คืนเงินแล้ว',
+  REFUND_REQUESTED: 'ขอคืนเงิน',
 };
 
 export const STATUS_COLORS: Record<string, string> = {
@@ -36,6 +37,7 @@ export const STATUS_COLORS: Record<string, string> = {
   REJECTED: '#ef4444',
   FAILED: '#ef4444',
   REFUNDED: '#1e40af',
+  REFUND_REQUESTED: '#7c3aed',
 };
 
 // ==================== STATUS HELPERS ====================
@@ -50,7 +52,7 @@ export const getStatusCategory = (status: string): 'WAITING_PAYMENT' | 'COMPLETE
   if (['PAID', 'VERIFYING', 'WAITING_SLIP'].includes(key)) return 'COMPLETED';
   if (['SHIPPED'].includes(key)) return 'SHIPPED';
   if (['READY', 'COMPLETED', 'RECEIVED'].includes(key)) return 'RECEIVED';
-  if (['CANCELLED', 'REFUNDED', 'REJECTED', 'FAILED'].includes(key)) return 'CANCELLED';
+  if (['CANCELLED', 'REFUNDED', 'REFUND_REQUESTED', 'REJECTED', 'FAILED'].includes(key)) return 'CANCELLED';
   return 'OTHER';
 };
 
@@ -212,6 +214,8 @@ export type OrderHistoryItem = {
   };
 };
 
+export const REFUNDABLE_STATUSES = ['PAID', 'READY', 'COMPLETED', 'SHIPPED'];
+
 export type OrderHistory = {
   ref: string;
   status: string;
@@ -225,6 +229,12 @@ export type OrderHistory = {
   shippingProvider?: string;
   shippingMethod?: string;
   shippingOption?: string; // pickup, delivery, thailand_post_ems, etc.
+  // Refund info
+  refundStatus?: string;
+  refundReason?: string;
+  refundAmount?: number;
+  refundRequestedAt?: string;
+  refundAdminNote?: string;
 };
 
 export type LeanProduct = {

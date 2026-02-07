@@ -29,24 +29,24 @@ interface TrackingTimelineProps {
 }
 
 const STATUS_ICONS: Record<TrackingStatus, React.ReactNode> = {
-  pending: <Schedule size={24} color="#f59e0b" />,
-  picked_up: <Inventory size={24} color="#3b82f6" />,
-  in_transit: <ShippingIcon size={24} color="#3b82f6" />,
-  out_for_delivery: <DeliveryDining size={24} color="#1e40af" />,
-  delivered: <Home size={24} color="#10b981" />,
-  returned: <ErrorIcon size={24} color="#ef4444" />,
-  failed: <ErrorIcon size={24} color="#ef4444" />,
+  pending: <Schedule size={24} color="#ff9f0a" />,
+  picked_up: <Inventory size={24} color="#0071e3" />,
+  in_transit: <ShippingIcon size={24} color="#0071e3" />,
+  out_for_delivery: <DeliveryDining size={24} color="#0077ED" />,
+  delivered: <Home size={24} color="#34c759" />,
+  returned: <ErrorIcon size={24} color="#ff453a" />,
+  failed: <ErrorIcon size={24} color="#ff453a" />,
   unknown: <Schedule size={24} color="#6b7280" />,
 };
 
 const STATUS_COLORS: Record<TrackingStatus, string> = {
-  pending: '#f59e0b',
-  picked_up: '#3b82f6',
-  in_transit: '#3b82f6',
-  out_for_delivery: '#1e40af',
-  delivered: '#10b981',
-  returned: '#ef4444',
-  failed: '#ef4444',
+  pending: '#ff9f0a',
+  picked_up: '#0071e3',
+  in_transit: '#0071e3',
+  out_for_delivery: '#0077ED',
+  delivered: '#34c759',
+  returned: '#ff453a',
+  failed: '#ff453a',
   unknown: '#6b7280',
 };
 
@@ -120,8 +120,8 @@ export default function TrackingTimeline({
     return (
       <Box sx={{ p: 2, bgcolor: 'rgba(16, 185, 129, 0.1)', borderRadius: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <CheckCircle size={24} color="#10b981" />
-          <Typography sx={{ color: '#10b981', fontWeight: 600 }}>
+          <CheckCircle size={24} color="#34c759" />
+          <Typography sx={{ color: '#34c759', fontWeight: 600 }}>
             รับสินค้าหน้าร้าน
           </Typography>
         </Box>
@@ -133,8 +133,8 @@ export default function TrackingTimeline({
   if (loading) {
     return (
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2 }}>
-        <CircularProgress size={24} sx={{ color: '#3b82f6' }} />
-        <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 14 }}>
+        <CircularProgress size={24} sx={{ color: 'var(--primary)' }} />
+        <Typography sx={{ color: 'var(--text-muted)', fontSize: 14 }}>
           กำลังโหลดข้อมูลติดตาม...
         </Typography>
       </Box>
@@ -148,27 +148,27 @@ export default function TrackingTimeline({
       <Box sx={{ p: 2, bgcolor: 'rgba(239, 68, 68, 0.1)', borderRadius: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <ErrorIcon size={20} color="#ef4444" />
-            <Typography sx={{ color: '#ef4444', fontSize: 14 }}>
+            <ErrorIcon size={20} color="#ff453a" />
+            <Typography sx={{ color: '#ff453a', fontSize: 14 }}>
               {error}
             </Typography>
           </Box>
           <IconButton 
             size="small" 
             onClick={() => fetchTracking(true)}
-            sx={{ color: 'rgba(255,255,255,0.6)' }}
+            sx={{ color: 'var(--text-muted)' }}
           >
             <Refresh size={20} />
           </IconButton>
         </Box>
-        <Typography sx={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, mt: 1 }}>
+        <Typography sx={{ color: 'var(--text-muted)', fontSize: 12, mt: 1 }}>
           หมายเลขพัสดุ: {trackingNumber}
         </Typography>
         
         {/* Fallback link to courier website */}
         {trackingUrl && (
-          <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-            <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, mb: 1 }}>
+          <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid var(--glass-border)' }}>
+            <Typography sx={{ color: 'var(--text-muted)', fontSize: 12, mb: 1 }}>
               ไม่สามารถโหลดข้อมูลได้? ตรวจสอบสถานะโดยตรงที่เว็บขนส่ง:
             </Typography>
             <Box
@@ -183,16 +183,16 @@ export default function TrackingTimeline({
                 px: 2,
                 py: 1,
                 borderRadius: '10px',
-                bgcolor: 'rgba(59, 130, 246, 0.15)',
-                border: '1px solid rgba(59, 130, 246, 0.3)',
-                color: '#60a5fa',
+                bgcolor: 'rgba(0,113,227, 0.15)',
+                border: '1px solid rgba(0,113,227, 0.3)',
+                color: '#64d2ff',
                 fontSize: 13,
                 fontWeight: 600,
                 textDecoration: 'none',
                 transition: 'all 0.2s ease',
                 '&:hover': {
-                  bgcolor: 'rgba(59, 130, 246, 0.25)',
-                  borderColor: 'rgba(59, 130, 246, 0.5)',
+                  bgcolor: 'rgba(0,113,227, 0.25)',
+                  borderColor: 'rgba(0,113,227, 0.5)',
                 },
               }}
             >
@@ -212,11 +212,11 @@ export default function TrackingTimeline({
       <Box sx={{ p: 2, bgcolor: 'rgba(107, 114, 128, 0.1)', borderRadius: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Schedule size={24} color="#6b7280" />
-          <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 14 }}>
+          <Typography sx={{ color: 'var(--text-muted)', fontSize: 14 }}>
             รอข้อมูลจากขนส่ง
           </Typography>
         </Box>
-        <Typography sx={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, mt: 1 }}>
+        <Typography sx={{ color: 'var(--text-muted)', fontSize: 12, mt: 1 }}>
           หมายเลขพัสดุ: {trackingNumber}
         </Typography>
       </Box>
@@ -228,7 +228,7 @@ export default function TrackingTimeline({
 
   return (
     <Box sx={{ 
-      bgcolor: 'rgba(30, 41, 59, 0.5)', 
+      bgcolor: 'var(--surface-2)', 
       borderRadius: 2,
       overflow: 'hidden',
     }}>
@@ -240,7 +240,7 @@ export default function TrackingTimeline({
           alignItems: 'center', 
           justifyContent: 'space-between',
           cursor: compact ? 'pointer' : 'default',
-          '&:hover': compact ? { bgcolor: 'rgba(255,255,255,0.03)' } : {},
+          '&:hover': compact ? { bgcolor: 'var(--glass-bg)' } : {},
         }}
         onClick={() => compact && setExpanded(!expanded)}
       >
@@ -259,15 +259,15 @@ export default function TrackingTimeline({
                 label={providerInfo?.nameThai || shippingProvider}
                 size="small"
                 sx={{
-                  bgcolor: 'rgba(59, 130, 246, 0.1)',
-                  color: '#3b82f6',
+                  bgcolor: 'rgba(0,113,227, 0.1)',
+                  color: '#0071e3',
                   fontSize: 11,
                   height: 20,
                 }}
               />
             </Box>
             <Typography sx={{ 
-              color: 'rgba(255,255,255,0.5)', 
+              color: 'var(--text-muted)', 
               fontSize: 12,
               mt: 0.5,
               overflow: 'hidden',
@@ -280,18 +280,18 @@ export default function TrackingTimeline({
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           {refreshing ? (
-            <CircularProgress size={18} sx={{ color: 'rgba(255,255,255,0.4)' }} />
+            <CircularProgress size={18} sx={{ color: 'var(--text-muted)' }} />
           ) : (
             <IconButton 
               size="small" 
               onClick={(e) => { e.stopPropagation(); fetchTracking(true); }}
-              sx={{ color: 'rgba(255,255,255,0.4)' }}
+              sx={{ color: 'var(--text-muted)' }}
             >
               <Refresh size={20} />
             </IconButton>
           )}
           {compact && (
-            <IconButton size="small" sx={{ color: 'rgba(255,255,255,0.4)' }}>
+            <IconButton size="small" sx={{ color: 'var(--text-muted)' }}>
               {expanded ? <ExpandLess size={24} /> : <ExpandMore size={24} />}
             </IconButton>
           )}
@@ -316,7 +316,7 @@ export default function TrackingTimeline({
                 left: '10%',
                 right: '10%',
                 height: 2,
-                bgcolor: 'rgba(255,255,255,0.1)',
+                bgcolor: 'var(--glass-border)',
                 zIndex: 0,
               }}>
                 <Box sx={{
@@ -352,7 +352,7 @@ export default function TrackingTimeline({
                       borderRadius: '50%',
                       bgcolor: isCompleted || isCurrent 
                         ? STATUS_COLORS[currentStatus] 
-                        : 'rgba(255,255,255,0.1)',
+                        : 'var(--glass-border)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -360,14 +360,14 @@ export default function TrackingTimeline({
                       boxShadow: isCurrent ? `0 0 8px ${STATUS_COLORS[currentStatus]}50` : 'none',
                     }}>
                       {isCompleted && (
-                        <CheckCircle size={16} color="#fff" />
+                        <CheckCircle size={16} color="var(--surface)" />
                       )}
                     </Box>
                     <Typography sx={{
                       fontSize: 10,
                       color: isCompleted || isCurrent 
                         ? STATUS_COLORS[currentStatus] 
-                        : 'rgba(255,255,255,0.4)',
+                        : 'var(--text-muted)',
                       mt: 0.5,
                       fontWeight: isCurrent ? 600 : 400,
                     }}>
@@ -385,7 +385,7 @@ export default function TrackingTimeline({
               ))}
               {events.length > 10 && (
                 <Typography sx={{ 
-                  color: 'rgba(255,255,255,0.4)', 
+                  color: 'var(--text-muted)', 
                   fontSize: 11, 
                   textAlign: 'center',
                   mt: 1,
@@ -397,7 +397,7 @@ export default function TrackingTimeline({
           </Box>
         ) : (
           <Box sx={{ px: 2, pb: 2 }}>
-            <Typography sx={{ color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>
+            <Typography sx={{ color: 'var(--text-muted)', fontSize: 13 }}>
               ยังไม่มีข้อมูลการเคลื่อนไหวพัสดุ
             </Typography>
           </Box>
@@ -408,10 +408,10 @@ export default function TrackingTimeline({
           <Box sx={{ 
             px: 2, 
             py: 1, 
-            bgcolor: 'rgba(0,0,0,0.2)',
-            borderTop: '1px solid rgba(255,255,255,0.05)',
+            bgcolor: 'var(--surface)',
+            borderTop: '1px solid var(--glass-border)',
           }}>
-            <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>
+            <Typography sx={{ color: 'var(--text-muted)', fontSize: 11 }}>
               อัปเดตล่าสุด: {formatDate(trackingInfo.lastUpdate)}
             </Typography>
           </Box>
@@ -428,20 +428,20 @@ function EventItem({ event, isLatest }: { event: TrackingEvent; isLatest: boolea
       display: 'flex', 
       gap: 2, 
       py: 1,
-      borderBottom: '1px solid rgba(255,255,255,0.05)',
+      borderBottom: '1px solid var(--glass-border)',
       '&:last-child': { borderBottom: 'none' },
     }}>
       <Box sx={{ 
         width: 8, 
         height: 8, 
         borderRadius: '50%', 
-        bgcolor: isLatest ? STATUS_COLORS[event.status] : 'rgba(255,255,255,0.3)',
+        bgcolor: isLatest ? STATUS_COLORS[event.status] : 'var(--text-muted)',
         mt: 0.5,
         flexShrink: 0,
       }} />
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Typography sx={{ 
-          color: isLatest ? '#fff' : 'rgba(255,255,255,0.7)', 
+          color: isLatest ? 'var(--foreground)' : 'var(--text-muted)', 
           fontSize: 13,
           fontWeight: isLatest ? 500 : 400,
           lineHeight: 1.4,
@@ -449,11 +449,11 @@ function EventItem({ event, isLatest }: { event: TrackingEvent; isLatest: boolea
           {event.descriptionThai || event.description}
         </Typography>
         <Box sx={{ display: 'flex', gap: 2, mt: 0.5 }}>
-          <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>
+          <Typography sx={{ color: 'var(--text-muted)', fontSize: 11 }}>
             {formatDate(event.timestamp)}
           </Typography>
           {event.location && (
-            <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>
+            <Typography sx={{ color: 'var(--text-muted)', fontSize: 11 }}>
               {event.location}
             </Typography>
           )}

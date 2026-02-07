@@ -452,6 +452,9 @@ export async function submitOrder(data: {
   shippingOptionId?: string;
   paymentOptionId?: string;
   shippingFee?: number;
+  // Promo code
+  promoCode?: string;
+  promoDiscount?: number;
 }): Promise<APIResponse> {
   return fetchJson('/api/orders', { method: 'POST', body: data });
 }
@@ -495,6 +498,7 @@ export async function saveProfile(
     instagram?: string;
     profileImage?: string;
     theme?: string;
+    savedAddresses?: Array<{ id: string; label: string; address: string; isDefault: boolean }>;
   }
 ): Promise<APIResponse> {
   return fetchJson('/api/profile', {

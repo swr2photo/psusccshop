@@ -27,10 +27,10 @@ const TOAST_STYLES = {
     shadow: '0 8px 32px rgba(245, 158, 11, 0.3)',
   },
   info: {
-    bg: 'linear-gradient(135deg, rgba(59, 130, 246, 0.95) 0%, rgba(37, 99, 235, 0.95) 100%)',
-    border: 'rgba(59, 130, 246, 0.5)',
+    bg: 'linear-gradient(135deg, rgba(0,113,227, 0.95) 0%, rgba(0,113,227, 0.95) 100%)',
+    border: 'rgba(0,113,227, 0.5)',
     icon: <Info size={20} />,
-    shadow: '0 8px 32px rgba(59, 130, 246, 0.3)',
+    shadow: '0 8px 32px rgba(0,113,227, 0.3)',
   },
 };
 
@@ -276,8 +276,8 @@ export function FloatingActionToast({ show, type = 'success', icon, message, act
   if (!show) return null;
 
   const bgColor = type === 'success' 
-    ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-    : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)';
+    ? 'linear-gradient(135deg, #34c759 0%, #34c759 100%)'
+    : 'linear-gradient(135deg, #0071e3 0%, #0071e3 100%)';
 
   return (
     <Box
