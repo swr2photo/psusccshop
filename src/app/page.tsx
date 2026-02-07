@@ -2890,6 +2890,51 @@ export default function HomePage() {
     loadCart();
   }, [session]);
 
+  // Recalculate cart prices when events change (auto-revert discounts when event ends)
+  useEffect(() => {
+    if (!config?.products?.length || cart.length === 0) return;
+    const events = config.events as ShopEvent[] | undefined;
+    let needsUpdate = false;
+    const updatedCart = cart.map(item => {
+      const product = config.products.find(p => p.id === item.productId);
+      if (!product) return item;
+
+      // Determine base price from size/variant
+      let basePrice: number;
+      if (item.options?.variantId) {
+        const variant = (product as any).variants?.find((v: any) => v.id === item.options?.variantId);
+        basePrice = variant?.price || product.basePrice;
+      } else if (item.size && item.size !== '-') {
+        basePrice = product.sizePricing?.[item.size] ?? product.basePrice;
+      } else {
+        basePrice = product.basePrice;
+      }
+
+      // Apply event discount if still active
+      const discount = getEventDiscount(product.id, events);
+      if (discount) {
+        basePrice = discount.discountedPrice(basePrice);
+      }
+
+      // Add long sleeve fee
+      const longSleeveFee = item.options?.isLongSleeve
+        ? (product.options?.longSleevePrice ?? 50)
+        : 0;
+
+      const correctPrice = basePrice + longSleeveFee;
+      if (item.unitPrice !== correctPrice) {
+        needsUpdate = true;
+        return { ...item, unitPrice: correctPrice };
+      }
+      return item;
+    });
+
+    if (needsUpdate) {
+      saveCart(updatedCart);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config?.events, config?.products, cart.length]);
+
   // Auto-save theme to DB when user changes it
   useEffect(() => {
     // Skip if ref hasn't been initialized yet (profile not loaded)

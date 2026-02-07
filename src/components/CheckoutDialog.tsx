@@ -72,6 +72,7 @@ interface Product {
   id: string;
   name: string;
   images?: string[];
+  coverImage?: string;
 }
 
 interface CheckoutDialogProps {
@@ -414,7 +415,7 @@ export default function CheckoutDialog({
             }}>
               {cart.map((item) => {
                 const productInfo = products?.find(p => p.id === item.productId);
-                const productImage = productInfo?.images?.[0];
+                const productImage = productInfo?.coverImage || productInfo?.images?.[0];
                 
                 return (
                   <Box key={item.id} sx={{ 
@@ -426,20 +427,33 @@ export default function CheckoutDialog({
                     border: '1px solid var(--glass-border)',
                   }}>
                     <Box sx={{
-                      width: 48,
-                      height: 48,
+                      width: 56,
+                      height: 56,
                       borderRadius: '10px',
                       bgcolor: 'var(--surface-2)',
-                      backgroundImage: productImage ? `url(${productImage})` : undefined,
-                      backgroundSize: 'cover',
-                      backgroundPosition: 'center',
                       flexShrink: 0,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       border: '1px solid var(--glass-border)',
+                      overflow: 'hidden',
+                      position: 'relative',
                     }}>
-                      {!productImage && <Package size={18} style={{ color: 'var(--text-muted)' }} />}
+                      {productImage ? (
+                        <img
+                          src={productImage}
+                          alt={item.productName}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            display: 'block',
+                          }}
+                          loading="lazy"
+                        />
+                      ) : (
+                        <Package size={20} style={{ color: 'var(--text-muted)' }} />
+                      )}
                     </Box>
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Typography sx={{ 
@@ -461,9 +475,21 @@ export default function CheckoutDialog({
                         <Box sx={{ px: 0.6, py: 0.1, borderRadius: '4px', bgcolor: 'var(--glass-bg)', fontSize: '0.65rem', color: 'var(--text-muted)' }}>
                           x{item.quantity}
                         </Box>
+                        {item.options?.isLongSleeve && (
+                          <Box sx={{ px: 0.6, py: 0.1, borderRadius: '4px', bgcolor: 'rgba(99,102,241,0.15)', fontSize: '0.65rem', color: '#818cf8' }}>
+                            แขนยาว
+                          </Box>
+                        )}
                       </Box>
+                      {(item.options?.customName || item.options?.customNumber) && (
+                        <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)', mt: 0.3 }}>
+                          {item.options.customName ? `ชื่อ: ${item.options.customName}` : ''}
+                          {item.options.customName && item.options.customNumber ? ' · ' : ''}
+                          {item.options.customNumber ? `เบอร์: ${item.options.customNumber}` : ''}
+                        </Typography>
+                      )}
                     </Box>
-                    <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#34c759' }}>
+                    <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#34c759', flexShrink: 0 }}>
                       ฿{(item.unitPrice * item.quantity).toLocaleString()}
                     </Typography>
                   </Box>

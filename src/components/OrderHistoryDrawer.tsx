@@ -467,7 +467,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                       <Box sx={{ mb: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                         {orderItems.slice(0, 3).map((item: any, itemIdx: number) => {
                           const productInfo = config?.products?.find((p) => p.id === item.productId);
-                          const productImage = productInfo?.images?.[0];
+                          const productImage = productInfo?.coverImage || productInfo?.images?.[0];
                           const itemName = item.name || item.productName || productInfo?.name || 'ไม่ทราบชื่อสินค้า';
                           const itemQty = item.qty || item.quantity || 1;
                           const itemIsLongSleeve = item.isLongSleeve || item.options?.isLongSleeve;
@@ -492,16 +492,28 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                                 height: 60,
                                 borderRadius: '12px',
                                 bgcolor: 'var(--surface-2)',
-                                backgroundImage: productImage ? `url(${productImage})` : undefined,
-                                backgroundSize: 'cover',
-                                backgroundPosition: 'center',
                                 flexShrink: 0,
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 border: '1px solid var(--glass-border)',
+                                overflow: 'hidden',
                               }}>
-                                {!productImage && <Package size={20} style={{ color: 'var(--text-muted)' }} />}
+                                {productImage ? (
+                                  <img
+                                    src={productImage}
+                                    alt={itemName}
+                                    style={{
+                                      width: '100%',
+                                      height: '100%',
+                                      objectFit: 'cover',
+                                      display: 'block',
+                                    }}
+                                    loading="lazy"
+                                  />
+                                ) : (
+                                  <Package size={20} style={{ color: 'var(--text-muted)' }} />
+                                )}
                               </Box>
                               <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
                                 {/* Product Name */}
