@@ -6070,3 +6070,1572 @@ export default function HomePage() {
                       const productStatus = getProductStatus(product);
                       const isProductAvailable = productStatus === 'OPEN' && isShopOpen;
                       const isProductClosed = productStatus !== 'OPEN'; // Product is closed/coming soon/ended
+                      const eventDiscount = getEventDiscount(product.id, config?.events as ShopEvent[] | undefined);
+                      
+                      return (
+                      <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={product.id}>
+                        <Box
+                          onClick={() => {
+                            if (!isShopOpen) {
+                              showToast('warning', 'ร้านค้าปิดชั่วคราว ไม่สามารถสั่งซื้อได้');
+                              return;
+                            }
+                            if (productStatus !== 'OPEN') {
+                              const statusConfig = SHOP_STATUS_CONFIG[productStatus];
+                              showToast('info', `${product.name} - ${statusConfig.label}`);
+                              return;
+                            }
+                            setSelectedProduct(product);
+                            setProductDialogOpen(true);
+                          }}
+                          sx={{
+                            height: '100%',
+                            display: 'flex',
+                            flexDirection: 'column', // Always vertical
+                            cursor: isProductAvailable ? 'pointer' : 'default',
+                            borderRadius: '20px',
+                            overflow: 'hidden',
+                            bgcolor: 'var(--surface)',
+                            border: `1px solid ${isProductClosed ? SHOP_STATUS_CONFIG[productStatus].borderColor : 'var(--glass-bg)'}`,
+                            transition: 'all 0.25s ease',
+                            position: 'relative',
+                            opacity: isProductClosed ? 0.85 : 1,
+                            '&:hover': isProductAvailable ? {
+                              transform: 'translateY(-4px)',
+                              boxShadow: '0 20px 40px rgba(0,113,227,0.2)',
+                              borderColor: 'rgba(0,113,227,0.4)',
+                            } : {},
+                          }}
+                        >
+                          {/* Product Image Area */}
+                          <Box sx={{
+                            position: 'relative',
+                            width: '100%',
+                            aspectRatio: '1 / 1',
+                            bgcolor: 'var(--surface-2)',
+                            overflow: 'hidden',
+                          }}>
+                            {/* Optimized product image with lazy loading - ใช้ coverImage ก่อน */}
+                            {(product.coverImage || product.images?.[0]) ? (
+                              <OptimizedImage
+                                src={product.coverImage ?? (product.images && product.images[0]) ?? ''}
+                                alt={product.name}
+                                width="100%"
+                                height="100%"
+                                objectFit="cover"
+                                priority={productIdx < 4} // First 4 products load eagerly
+                                placeholder="shimmer"
+                                showLoadingIndicator={productIdx < 4}
+                                style={{
+                                  position: 'absolute',
+                                  inset: 0,
+                                  filter: isProductClosed ? 'grayscale(40%) brightness(0.7)' : 'none',
+                                  transition: 'filter 0.3s ease',
+                                }}
+                              />
+                            ) : (
+                              <Box sx={{ 
+                                position: 'absolute', 
+                                inset: 0, 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'center', 
+                                color: 'var(--text-muted)',
+                                fontSize: '0.8rem',
+                              }}>
+                                ไม่มีรูป
+                              </Box>
+                            )}
+                            {/* Status Overlay for closed products */}
+                            {isProductClosed && (
+                              <Box sx={{
+                                position: 'absolute',
+                                inset: 0,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                background: 'rgba(0,0,0,0.6)',
+                                backdropFilter: 'blur(2px)',
+                              }}>
+                                <Box
+                                  sx={{
+                                    width: 48,
+                                    height: 48,
+                                    borderRadius: '14px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    background: `linear-gradient(135deg, ${SHOP_STATUS_CONFIG[productStatus].color}40 0%, ${SHOP_STATUS_CONFIG[productStatus].color}20 100%)`,
+                                    border: `2px solid ${SHOP_STATUS_CONFIG[productStatus].color}`,
+                                    color: SHOP_STATUS_CONFIG[productStatus].color,
+                                    mb: 1,
+                                    boxShadow: `0 0 20px ${SHOP_STATUS_CONFIG[productStatus].color}40`,
+                                  }}
+                                >
+                                  {(() => {
+                                    const IconComponent = SHOP_STATUS_CONFIG[productStatus].icon;
+                                    return <IconComponent size={24} />;
+                                  })()}
+                                </Box>
+                                <Typography
+                                  sx={{
+                                    fontSize: '0.8rem',
+                                    fontWeight: 800,
+                                    color: SHOP_STATUS_CONFIG[productStatus].color,
+                                    textAlign: 'center',
+                                    px: 2,
+                                    textShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                                  }}
+                                >
+                                  {SHOP_STATUS_CONFIG[productStatus].label}
+                                </Typography>
+                                {/* Show date info */}
+                                {product.startDate && productStatus === 'COMING_SOON' && (
+                                  <Typography sx={{ fontSize: '0.65rem', color: 'var(--foreground)', mt: 0.5, textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
+                                    เปิด {new Date(product.startDate).toLocaleDateString('th-TH')}
+                                  </Typography>
+                                )}
+                              </Box>
+                            )}
+                            
+                            {/* Feature badges */}
+                            {!isProductClosed && (
+                              <Box sx={{ 
+                                position: 'absolute', 
+                                top: 8, 
+                                left: 8, 
+                                display: 'flex', 
+                                flexDirection: 'column', 
+                                gap: 0.5 
+                              }}>
+                                {/* Countdown timer if has endDate */}
+                                {product.endDate && new Date(product.endDate) > new Date() && (
+                                  <Box sx={{
+                                    px: 0.8,
+                                    py: 0.4,
+                                    borderRadius: '6px',
+                                    bgcolor: 'rgba(239,68,68,0.9)',
+                                    fontSize: '0.58rem',
+                                    fontWeight: 700,
+                                    color: 'white',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 0.5,
+                                  }}>
+                                    <Clock size={10} />
+                                    {(() => {
+                                      const end = new Date(product.endDate!);
+                                      const now = new Date();
+                                      const diff = end.getTime() - now.getTime();
+                                      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                                      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                                      if (days > 0) return `เหลือ ${days} วัน`;
+                                      if (hours > 0) return `เหลือ ${hours} ชม.`;
+                                      return 'ใกล้ปิด!';
+                                    })()}
+                                  </Box>
+                                )}
+                              </Box>
+                            )}
+                            
+                            {/* Price badge */}
+                            <Box sx={{
+                              position: 'absolute',
+                              bottom: 8,
+                              right: 8,
+                              px: 1.2,
+                              py: 0.5,
+                              borderRadius: '10px',
+                              bgcolor: isProductClosed ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.7)',
+                              backdropFilter: 'blur(8px)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 0.5,
+                            }}>
+                              {eventDiscount && !isProductClosed ? (
+                                <>
+                                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#86868b', textDecoration: 'line-through' }}>
+                                    ฿{product.basePrice.toLocaleString()}
+                                  </Typography>
+                                  <Typography sx={{ fontSize: '0.9rem', fontWeight: 800, color: '#ff453a' }}>
+                                    ฿{eventDiscount.discountedPrice(product.basePrice).toLocaleString()}
+                                  </Typography>
+                                </>
+                              ) : (
+                                <Typography sx={{ 
+                                  fontSize: '0.9rem', 
+                                  fontWeight: 800, 
+                                  color: isProductClosed ? 'var(--text-muted)' : '#34c759',
+                                }}>
+                                  ฿{product.basePrice.toLocaleString()}
+                                </Typography>
+                              )}
+                            </Box>
+
+                            {/* Event discount badge */}
+                            {eventDiscount && !isProductClosed && (
+                              <Box sx={{
+                                position: 'absolute',
+                                top: 8,
+                                right: 8,
+                                px: 0.8,
+                                py: 0.4,
+                                borderRadius: '8px',
+                                bgcolor: 'rgba(255,69,58,0.9)',
+                                fontSize: '0.6rem',
+                                fontWeight: 800,
+                                color: 'white',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 0.3,
+                                backdropFilter: 'blur(4px)',
+                              }}>
+                                <Tag size={10} />
+                                {eventDiscount.discountLabel}
+                              </Box>
+                            )}
+
+                            {/* Share button */}
+                            <IconButton
+                              size="small"
+                              onClick={(e) => { e.stopPropagation(); handleShareProduct(product); }}
+                              sx={{
+                                position: 'absolute',
+                                bottom: 8,
+                                left: 8,
+                                bgcolor: 'rgba(0,0,0,0.5)',
+                                backdropFilter: 'blur(8px)',
+                                color: 'white',
+                                width: 30,
+                                height: 30,
+                                '&:hover': { bgcolor: 'rgba(0,113,227,0.7)' },
+                              }}
+                            >
+                              <Share2 size={14} />
+                            </IconButton>
+                          </Box>
+
+                          {/* Product Info */}
+                          <Box sx={{ 
+                            p: 2, 
+                            flex: 1, 
+                            display: 'flex', 
+                            flexDirection: 'column',
+                          }}>
+                            <Typography sx={{ 
+                              fontSize: '0.95rem', 
+                              fontWeight: 700, 
+                              color: isProductClosed ? 'var(--text-muted)' : 'var(--foreground)',
+                              mb: 0.5,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                              lineHeight: 1.3,
+                            }}>
+                              {product.name}
+                            </Typography>
+                            
+                            {/* Description - Show more lines */}
+                            <Typography sx={{ 
+                              fontSize: '0.75rem', 
+                              color: 'var(--text-muted)',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                              lineHeight: 1.4,
+                              mb: 1,
+                            }}>
+                              {product.description || TYPE_LABELS[product.type] || product.type}
+                            </Typography>
+
+                            {/* Product Tags - from customTags or auto-generated */}
+                            {(() => {
+                              // Use customTags if defined, otherwise auto-generate from options
+                              const tags = product.customTags && product.customTags.length > 0 
+                                ? product.customTags 
+                                : [
+                                    // Auto-generate from endDate
+                                    ...(product.endDate && new Date(product.endDate) > new Date() ? [{
+                                      text: `ถึง ${new Date(product.endDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}`,
+                                      color: 'var(--error)',
+                                      bgColor: 'rgba(239,68,68,0.15)',
+                                      borderColor: 'rgba(239,68,68,0.3)',
+                                      icon: 'clock'
+                                    }] : []),
+                                    // Auto-generate from options
+                                    ...(product.options?.hasCustomName ? [{
+                                      text: 'สกรีนชื่อได้',
+                                      color: 'var(--success)',
+                                      bgColor: 'rgba(16,185,129,0.15)',
+                                      borderColor: 'rgba(16,185,129,0.3)'
+                                    }] : []),
+                                    ...(product.options?.hasCustomNumber ? [{
+                                      text: 'สกรีนเบอร์ได้',
+                                      color: 'var(--secondary)',
+                                      bgColor: 'rgba(0,113,227,0.15)',
+                                      borderColor: 'rgba(0,113,227,0.3)'
+                                    }] : []),
+                                  ];
+                              
+                              if (tags.length === 0) return null;
+                              
+                              return (
+                                <Box sx={{ 
+                                  display: 'flex', 
+                                  flexWrap: 'wrap', 
+                                  gap: 0.5, 
+                                  mb: 1,
+                                }}>
+                                  {tags.map((tag, idx) => (
+                                    <Box key={idx} sx={{
+                                      px: 0.8,
+                                      py: 0.2,
+                                      borderRadius: '6px',
+                                      bgcolor: (tag as any).bgColor || `${tag.color}20`,
+                                      border: `1px solid ${(tag as any).borderColor || `${tag.color}40`}`,
+                                      fontSize: '0.6rem',
+                                      fontWeight: 600,
+                                      color: tag.color,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: 0.3,
+                                    }}>
+                                      {(tag as any).icon === 'clock' && <Clock size={10} />}
+                                      {tag.text}
+                                    </Box>
+                                  ))}
+                                </Box>
+                              );
+                            })()}
+                            
+                            {/* Status/Action Button */}
+                            <Box sx={{ mt: 'auto' }}>
+                              {!isProductClosed ? (
+                                <Button
+                                  fullWidth
+                                  disabled={!isProductAvailable}
+                                  sx={{
+                                    py: 0.8,
+                                    borderRadius: '10px',
+                                    background: isProductAvailable 
+                                      ? 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)' 
+                                      : 'rgba(100,116,139,0.2)',
+                                    color: isProductAvailable ? 'white' : '#86868b',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 700,
+                                    textTransform: 'none',
+                                    '&:hover': {
+                                      background: isProductAvailable 
+                                        ? 'linear-gradient(135deg, #0071e3 0%, #0071e3 100%)' 
+                                        : 'rgba(100,116,139,0.2)',
+                                    },
+                                  }}
+                                >
+                                  {isShopOpen ? 'ดูรายละเอียด' : 'ร้านปิดชั่วคราว'}
+                                </Button>
+                              ) : (
+                                <Box
+                                  sx={{
+                                    py: 0.8,
+                                    px: 1.5,
+                                    borderRadius: '10px',
+                                    background: SHOP_STATUS_CONFIG[productStatus].bgGradient,
+                                    border: `1px solid ${SHOP_STATUS_CONFIG[productStatus].borderColor}`,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: 0.75,
+                                  }}
+                                >
+                                  {(() => {
+                                    const IconComponent = SHOP_STATUS_CONFIG[productStatus].icon;
+                                    return <IconComponent size={14} color={SHOP_STATUS_CONFIG[productStatus].color} />;
+                                  })()}
+                                  <Typography 
+                                    sx={{ 
+                                      fontSize: '0.75rem', 
+                                      fontWeight: 700, 
+                                      color: SHOP_STATUS_CONFIG[productStatus].color,
+                                    }}
+                                  >
+                                    {SHOP_STATUS_CONFIG[productStatus].label}
+                                  </Typography>
+                                </Box>
+                              )}
+                            </Box>
+                          </Box>
+                        </Box>
+                      </Grid>
+                    );
+                    })}
+                  </Grid>
+                </Box>
+              ))
+            ) : (
+              <Box sx={{ textAlign: 'center', py: 8 }}>
+                <Store size={64} style={{ color: 'var(--text-muted)', marginBottom: 16 }} />
+                <Typography variant="h6" sx={{ color: 'var(--text-muted)', mb: 1 }}>
+                  {totalProductCount > 0 ? 'ไม่พบสินค้าที่ค้นหา' : 'ยังไม่มีสินค้า'}
+                </Typography>
+                {totalProductCount === 0 && (
+                  <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                    รอติดตามสินค้าใหม่เร็วๆ นี้
+                  </Typography>
+                )}
+              </Box>
+            )}
+          </Container>
+        </Box>
+
+        {cart.length > 0 && (
+          <Box sx={{ display: { xs: 'none', md: 'block' }, width: 350, p: 2, bgcolor: 'var(--background)', borderLeft: (theme) => `1px solid ${theme.palette.divider}`, overflow: 'auto', maxHeight: 'calc(100vh - 64px)' }}>
+            <Card sx={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', backdropFilter: 'blur(16px)' }}>
+              <CardContent>
+                <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, color: 'var(--foreground)' }}>
+                  สรุปคำสั่งซื้อ
+                </Typography>
+                {cart.map((item) => (
+                  <Box key={item.id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, pb: 2, borderBottom: '1px solid var(--glass-border)' }}>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'var(--foreground)' }}>
+                        {item.productName}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: 'var(--text-muted)' }}>
+                        {item.size} × {item.quantity}
+                      </Typography>
+                      {(item.options.customName || item.options.customNumber || item.options.isLongSleeve) && (
+                        <Typography variant="caption" sx={{ color: 'var(--text-muted)', display: 'block' }}>
+                          {item.options.customName && `ชื่อ: ${item.options.customName}`} {item.options.customNumber && `เบอร์: ${item.options.customNumber}`} {item.options.isLongSleeve && '(แขนยาว)'}
+                        </Typography>
+                      )}
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
+                        <IconButton
+                          size="small"
+                          onClick={() => updateCartQuantity(item.id, item.quantity - 1)}
+                          onMouseDown={() => startCartHold(item.id, -1)}
+                          onMouseUp={() => stopCartHold(item.id)}
+                          onMouseLeave={() => stopCartHold(item.id)}
+                          onTouchStart={() => startCartHold(item.id, -1)}
+                          onTouchEnd={() => stopCartHold(item.id)}
+                          sx={{ bgcolor: 'var(--surface-2)', color: 'var(--foreground)' }}
+                        >
+                          <Minus size={14} />
+                        </IconButton>
+                        <Typography sx={{ color: 'var(--foreground)', minWidth: 20, textAlign: 'center' }}>{item.quantity}</Typography>
+                        <IconButton
+                          size="small"
+                          onClick={() => updateCartQuantity(item.id, item.quantity + 1)}
+                          onMouseDown={() => startCartHold(item.id, 1)}
+                          onMouseUp={() => stopCartHold(item.id)}
+                          onMouseLeave={() => stopCartHold(item.id)}
+                          onTouchStart={() => startCartHold(item.id, 1)}
+                          onTouchEnd={() => stopCartHold(item.id)}
+                          sx={{ bgcolor: 'var(--surface-2)', color: 'var(--foreground)' }}
+                        >
+                          <Plus size={14} />
+                        </IconButton>
+                      </Box>
+                    </Box>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'var(--success)' }}>
+                        {(item.unitPrice * item.quantity).toLocaleString()}฿
+                      </Typography>
+                      <IconButton size="small" onClick={() => removeFromCart(item.id)} sx={{ color: '#ff453a' }}>
+                        <X size={14} />
+                      </IconButton>
+                    </Box>
+                  </Box>
+                ))}
+                <Divider sx={{ my: 2, borderColor: 'var(--glass-border)' }} />
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+                  <Typography sx={{ fontWeight: 'bold', color: 'var(--foreground)' }}>รวม:</Typography>
+                  <Typography sx={{ fontWeight: 'bold', fontSize: 18, color: 'var(--success)' }}>
+                    {getTotalPrice().toLocaleString()}฿
+                  </Typography>
+                </Box>
+                <Button
+                  variant="contained"
+                  fullWidth
+                  onClick={() => {
+                    if (!requireProfileBeforeCheckout()) return;
+                    setShowOrderDialog(true);
+                  }}
+                  disabled={!isShopOpen}
+                  sx={{
+                    background: 'linear-gradient(135deg, #34c759 0%, #64d2ff 100%)',
+                    fontWeight: 700,
+                    borderRadius: 2,
+                    py: 1,
+                    boxShadow: '0 12px 30px rgba(16, 185, 129, 0.35)',
+                    '&:hover': { background: 'linear-gradient(135deg, #0ea472 0%, #0591b5 100%)', boxShadow: '0 12px 34px rgba(16, 185, 129, 0.45)' },
+                  }}
+                >
+                  ดำเนินการสั่งซื้อ
+                </Button>
+              </CardContent>
+            </Card>
+          </Box>
+        )}
+      </Box>
+
+      <Footer />
+
+      <PaymentFlow
+        registerOpener={(opener) => {
+          paymentOpenerRef.current = opener;
+        }}
+        onPaymentSuccess={(ref) => {
+          // Update local state to reflect successful payment verification
+          setOrderHistory((prev) => {
+            const orderExists = prev.some((order) => order.ref === ref);
+            if (orderExists) {
+              return prev.map((order) =>
+                order.ref === ref ? { ...order, status: 'PAID' } : order
+              );
+            }
+            // If order doesn't exist in history yet, add it
+            return [{ ref, status: 'PAID', date: new Date().toISOString(), total: 0 }, ...prev];
+          });
+          setActiveTab('history');
+          showToast('success', 'ชำระเงินสำเร็จ!');
+          
+          // Refresh order history from server to get complete data
+          setTimeout(() => {
+            loadOrderHistory();
+          }, 500);
+        }}
+      />
+
+      {showProfileModal && (
+        <ProfileModal
+          initialData={{ name: orderData.name, phone: orderData.phone, address: orderData.address, instagram: orderData.instagram, profileImage: orderData.profileImage, savedAddresses }}
+          onClose={() => { setShowProfileModal(false); setActiveTab('home'); }}
+          onSave={handleSaveProfile}
+          userImage={session?.user?.image || ''}
+          userEmail={session?.user?.email || ''}
+        />
+      )}
+
+
+      {/* ===== Cart Drawer with Edit Dialog ===== */}
+      <CartDrawer
+        open={showCart}
+        onClose={() => setShowCart(false)}
+        cart={cart}
+        config={config}
+        shippingConfig={shippingConfig}
+        isShopOpen={isShopOpen}
+        onClearCart={() => {
+          if (confirm('ล้างตะกร้าทั้งหมด?')) {
+            saveCart([]);
+            showToast('success', 'ล้างตะกร้าแล้ว');
+          }
+        }}
+        onUpdateQuantity={(itemId, quantity) => updateCartQuantity(itemId, quantity)}
+        onRemoveItem={(itemId) => removeFromCart(itemId)}
+        onEditItem={(item) => openEditCartItem(item)}
+        onCheckout={() => {
+          if (!requireProfileBeforeCheckout()) return;
+          setShowCart(false);
+          setShowOrderDialog(true);
+        }}
+        onStartHold={(itemId, direction) => startCartHold(itemId, direction)}
+        onStopHold={(itemId) => stopCartHold(itemId)}
+        onGoHome={() => { setShowCart(false); setActiveTab('home'); }}
+        getTotalPrice={getTotalPrice}
+        editingCartItem={editingCartItem}
+        onSetEditingCartItem={setEditingCartItem}
+        onUpdateCartItem={(itemId, item) => updateCartItem(itemId, item)}
+      />
+      {renderProductDialog()}
+
+      {/* ===== Size Chart Dialog - Modern Design ===== */}
+      <Dialog
+        open={showSizeChart}
+        onClose={() => setShowSizeChart(false)}
+        maxWidth="sm"
+        fullWidth
+        sx={{ zIndex: 1500 }}
+        PaperProps={{
+          sx: {
+            bgcolor: 'var(--background)',
+            color: 'var(--foreground)',
+            borderRadius: '20px',
+            border: (theme) => `1px solid ${theme.palette.divider}`,
+            mx: 2,
+            my: 'auto',
+            maxHeight: '85vh',
+          },
+        }}
+        slotProps={{
+          backdrop: {
+            sx: { backdropFilter: 'blur(8px)', bgcolor: 'rgba(0,0,0,0.6)' },
+          },
+        }}
+      >
+        {/* Header */}
+        <Box sx={{
+          px: 2.5,
+          py: 2,
+          borderBottom: '1px solid var(--glass-border)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Box sx={{
+              width: 40,
+              height: 40,
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
+              display: 'grid',
+              placeItems: 'center',
+            }}>
+              <Ruler size={20} color="white" />
+            </Box>
+            <Box>
+              <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--foreground)' }}>ตารางไซส์</Typography>
+              <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>สัดส่วนรอบอก/ความยาว (นิ้ว)</Typography>
+            </Box>
+          </Box>
+        </Box>
+
+        {/* Content */}
+        <Box sx={{ px: 2.5, py: 2, overflow: 'auto' }}>
+          {/* Info Badges */}
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.8, mb: 2.5 }}>
+            <Box sx={{
+              px: 1.2,
+              py: 0.4,
+              borderRadius: '8px',
+              bgcolor: 'rgba(0,113,227,0.15)',
+              border: '1px solid rgba(0,113,227,0.3)',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              color: 'var(--secondary)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.5,
+            }}>
+              <Ruler size={14} /> อก / ความยาว (นิ้ว)
+            </Box>
+            <Box sx={{
+              px: 1.2,
+              py: 0.4,
+              borderRadius: '8px',
+              bgcolor: 'rgba(245,158,11,0.15)',
+              border: '1px solid rgba(245,158,11,0.3)',
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              color: 'var(--warning)',
+            }}>
+              แขนยาว +{selectedProduct?.options?.longSleevePrice ?? 50}฿
+            </Box>
+          </Box>
+
+          {/* Size Cards Grid */}
+          <Box sx={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(2, 1fr)', 
+            gap: 1.2,
+          }}>
+            {SIZE_ORDER.map((size) => {
+              const measurements = SIZE_MEASUREMENTS[size];
+              const row = sizeChartRows.find((r) => r.size === size);
+              return (
+                <Box 
+                  key={size} 
+                  sx={{ 
+                    p: 1.5,
+                    borderRadius: '14px',
+                    bgcolor: 'var(--surface-2)',
+                    border: '1px solid var(--glass-border)',
+                    transition: 'all 0.2s ease',
+                    '&:hover': {
+                      bgcolor: 'var(--glass-bg)',
+                      borderColor: 'rgba(0,113,227,0.3)',
+                    },
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                    <Box sx={{
+                      px: 1,
+                      py: 0.3,
+                      borderRadius: '8px',
+                      background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      color: 'white',
+                    }}>
+                      {size}
+                    </Box>
+                    <Typography sx={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--success)' }}>
+                      {row ? `฿${row.price.toLocaleString()}` : '—'}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', gap: 1.5 }}>
+                    <Box>
+                      <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)', mb: 0.2 }}>รอบอก</Typography>
+                      <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                        {measurements ? `${measurements.chest}"` : '—'}
+                      </Typography>
+                    </Box>
+                    <Box>
+                      <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)', mb: 0.2 }}>ความยาว</Typography>
+                      <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                        {measurements ? `${measurements.length}"` : '—'}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Box>
+              );
+            })}
+          </Box>
+        </Box>
+
+        {/* Footer */}
+        <Box sx={{ 
+          px: 2.5, 
+          py: 2, 
+          borderTop: '1px solid var(--glass-border)',
+        }}>
+          <Button
+            fullWidth
+            onClick={() => setShowSizeChart(false)}
+            sx={{
+              py: 1.3,
+              borderRadius: '12px',
+              bgcolor: 'var(--glass-bg)',
+              color: 'var(--text-muted)',
+              fontSize: '0.9rem',
+              fontWeight: 600,
+              '&:hover': {
+                bgcolor: 'var(--glass-bg)',
+              },
+            }}
+          >
+            ปิด
+          </Button>
+        </Box>
+      </Dialog>
+
+      {/* Checkout Dialog with Shipping & Payment Selection */}
+      <CheckoutDialog
+        open={showOrderDialog}
+        onClose={() => setShowOrderDialog(false)}
+        cart={cart}
+        orderData={orderData}
+        profileComplete={profileComplete}
+        processing={processing}
+        turnstileToken={turnstileToken}
+        setTurnstileToken={setTurnstileToken}
+        onSubmitOrder={submitOrder}
+        onEditProfile={() => { setShowProfileModal(true); setPendingCheckout(true); }}
+        products={config?.products}
+        isMobile={isMobile}
+        savedAddresses={savedAddresses}
+        onAddressChange={(address) => setOrderData(prev => ({ ...prev, address }))}
+      />
+
+      <Dialog
+        open={!!confirmCancelRef}
+        onClose={() => setConfirmCancelRef(null)}
+        fullScreen={isMobile}
+        PaperProps={{
+          sx: {
+            width: { xs: '100%', sm: 420 },
+            maxWidth: 'calc(100% - 24px)',
+            bgcolor: 'var(--surface)',
+            color: 'var(--foreground)',
+            borderRadius: 2,
+            p: 1,
+          },
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <AlertTriangle size={20} color="#ffd60a" />
+          ยืนยันยกเลิกคำสั่งซื้อ
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ color: 'var(--text-muted)', mb: 1 }}>
+            ต้องการยกเลิกคำสั่งซื้อหมายเลข {confirmCancelRef ? `#${confirmCancelRef}` : ''} หรือไม่?
+          </Typography>
+          <Typography variant="caption" sx={{ color: 'var(--text-muted)' }}>
+            การยกเลิกจะไม่สามารถย้อนกลับได้ และสถานะจะเปลี่ยนเป็น ยกเลิก
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+          <Button
+            variant="outlined"
+            onClick={() => setConfirmCancelRef(null)}
+            sx={{ color: 'var(--text-muted)', borderColor: 'var(--glass-border)' }}
+          >
+            ไม่ยกเลิก
+          </Button>
+          <Button
+            variant="contained"
+            disabled={!confirmCancelRef || processing}
+            onClick={async () => {
+              if (!confirmCancelRef) return;
+              const ref = confirmCancelRef;
+              setConfirmCancelRef(null);
+              await cancelOrderByRef(ref);
+            }}
+            sx={{
+              background: '#ff453a',
+              '&:hover': { background: '#ff3b30' },
+              fontWeight: 800,
+              px: 2.5,
+            }}
+          >
+            ยืนยันยกเลิก
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+
+      {/* ===== Order History Drawer ===== */}
+      <OrderHistoryDrawer
+        open={showHistoryDialog}
+        onClose={() => setShowHistoryDialog(false)}
+        orderHistory={orderHistory}
+        loadingHistory={loadingHistory}
+        loadingHistoryMore={loadingHistoryMore}
+        historyHasMore={historyHasMore}
+        historyFilter={historyFilter}
+        onFilterChange={(filter) => setHistoryFilter(filter)}
+        onLoadMore={() => loadOrderHistory({ append: true })}
+        onOpenPayment={(ref) => openPaymentFlow(ref)}
+        onCancelOrder={(ref) => handleCancelOrder(ref)}
+        onShowQR={(ref) => setShowQRFullscreen(ref)}
+        cancellingRef={cancellingRef}
+        isShopOpen={isShopOpen}
+        realtimeConnected={realtimeConnected}
+        config={config}
+      />
+
+      <Box
+        sx={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.96)' : 'rgba(255,255,255,0.94)',
+          borderTop: (theme) => `1px solid ${theme.palette.divider}`,
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+          boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 -4px 24px rgba(0,0,0,0.5)' : '0 -2px 16px rgba(0,0,0,0.08)',
+          display: { xs: 'flex', md: 'none' },
+          justifyContent: 'space-around',
+          alignItems: 'flex-end',
+          py: 0.5,
+          px: 0.5,
+          touchAction: 'pan-y',
+          WebkitOverflowScrolling: 'touch',
+          paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))',
+          zIndex: 1100,
+          transform: hideNavBars ? 'translateY(120%)' : 'translateY(0)',
+          opacity: hideNavBars ? 0 : 1,
+          transition: 'transform 0.32s ease, opacity 0.28s ease',
+        }}
+      >
+        {bottomTabs.map((tab) => {
+          const isActive = tab.key === 'chat' ? chatbotOpen : activeTab === tab.key;
+
+          // Center chat button - prominent raised design
+          if (tab.center) {
+            return (
+              <Box
+                key={tab.key}
+                onClick={(e: React.MouseEvent<HTMLElement>) => setChatMenuAnchor(e.currentTarget)}
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 0.2,
+                  cursor: 'pointer',
+                  mt: -2.5,
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <Box
+                  sx={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #0071e3 0%, #bf5af2 100%)',
+                    display: 'grid',
+                    placeItems: 'center',
+                    color: 'white',
+                    boxShadow: '0 4px 20px rgba(0,113,227,0.45), 0 0 0 4px rgba(0,113,227,0.12)',
+                    transition: 'all 0.25s ease',
+                    '&:hover': {
+                      transform: 'scale(1.08)',
+                      boxShadow: '0 6px 28px rgba(0,113,227,0.55), 0 0 0 4px rgba(0,113,227,0.18)',
+                    },
+                    '&:active': {
+                      transform: 'scale(0.95)',
+                    },
+                  }}
+                >
+                  {tab.icon}
+                </Box>
+                <Typography sx={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--primary)', mt: 0.3 }}>
+                  {tab.label}
+                </Typography>
+              </Box>
+            );
+          }
+
+          // Regular nav tabs
+          return (
+            <IconButton
+              key={tab.key}
+              data-tab-key={tab.key}
+              onClick={() => handleTabChange(tab.key)}
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 0.2,
+                color: (theme) => isActive ? 'var(--primary)' : theme.palette.text.secondary,
+                borderRadius: '14px',
+                px: 1.8,
+                py: 0.6,
+                minWidth: 56,
+                background: (theme) => isActive
+                  ? (theme.palette.mode === 'dark' ? 'rgba(0,113,227,0.12)' : 'rgba(0,113,227,0.08)')
+                  : 'transparent',
+                border: 'none',
+                boxShadow: 'none',
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  background: (theme) => theme.palette.mode === 'dark' ? 'rgba(0,113,227,0.08)' : 'rgba(0,113,227,0.06)',
+                },
+                touchAction: 'manipulation',
+              }}
+            >
+              <Box sx={{
+                transition: 'transform 0.2s ease',
+                transform: isActive ? 'scale(1.1)' : 'scale(1)',
+              }}>
+                {tab.icon}
+              </Box>
+              <Typography
+                variant="caption"
+                sx={{
+                  fontSize: '0.62rem',
+                  fontWeight: isActive ? 800 : 500,
+                  color: (theme) => isActive ? 'var(--primary)' : theme.palette.text.secondary,
+                  lineHeight: 1.2,
+                }}
+              >
+                {tab.label}
+              </Typography>
+            </IconButton>
+          );
+        })}
+      </Box>
+
+      {showRefreshDroplet && (
+        <Box className="refresh-droplet">
+          <span className="droplet" />
+          <span className="droplet-ripple" />
+        </Box>
+      )}
+
+      {/* Enhanced Modern Toast Container */}
+      {toasts.length > 0 && (
+        <Box
+          sx={{
+            position: 'fixed',
+            bottom: { xs: 90, sm: 32 },
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 99999,
+            display: 'flex',
+            flexDirection: 'column-reverse',
+            gap: 1.5,
+            width: { xs: 'calc(100% - 32px)', sm: 'auto' },
+            maxWidth: 420,
+            pointerEvents: 'none',
+          }}
+        >
+          {toasts.map((t) => {
+            const colors = {
+              success: { 
+                bg: 'linear-gradient(135deg, rgba(16, 185, 129, 0.98) 0%, rgba(5, 150, 105, 0.98) 100%)', 
+                icon: <CheckCircle2 size={18} />,
+                shadow: '0 8px 32px rgba(16, 185, 129, 0.35)',
+              },
+              error: { 
+                bg: 'linear-gradient(135deg, rgba(239, 68, 68, 0.98) 0%, rgba(220, 38, 38, 0.98) 100%)', 
+                icon: <AlertCircle size={18} />,
+                shadow: '0 8px 32px rgba(239, 68, 68, 0.35)',
+              },
+              warning: { 
+                bg: 'linear-gradient(135deg, rgba(245, 158, 11, 0.98) 0%, rgba(234, 88, 12, 0.98) 100%)', 
+                icon: <AlertTriangle size={18} />,
+                shadow: '0 8px 32px rgba(245, 158, 11, 0.35)',
+              },
+              info: { 
+                bg: 'linear-gradient(135deg, rgba(0,113,227, 0.98) 0%, rgba(0,113,227, 0.98) 100%)', 
+                icon: <Info size={18} />,
+                shadow: '0 8px 32px rgba(0,113,227, 0.35)',
+              },
+            };
+            return (
+              <Slide key={t.id} in direction="up" timeout={350}>
+                <Box
+                  sx={{
+                    background: colors[t.type].bg,
+                    backdropFilter: 'blur(16px)',
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                    borderRadius: '16px',
+                    py: 1.5,
+                    px: 2,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1.5,
+                    boxShadow: colors[t.type].shadow,
+                    cursor: 'pointer',
+                    pointerEvents: 'auto',
+                    animation: 'toastEnterBottom 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
+                    '@keyframes toastEnterBottom': {
+                      '0%': { opacity: 0, transform: 'translateY(12px) scale(0.96)' },
+                      '100%': { opacity: 1, transform: 'translateY(0) scale(1)' },
+                    },
+                    transition: 'all 0.2s ease',
+                    '&:hover': {
+                      transform: 'scale(1.02)',
+                      boxShadow: `${colors[t.type].shadow}, 0 0 0 2px rgba(255, 255, 255, 0.1)`,
+                    },
+                  }}
+                  onClick={() => setToasts((prev) => prev.filter((toast) => toast.id !== t.id))}
+                >
+                  <Box 
+                    sx={{ 
+                      width: 32,
+                      height: 32,
+                      borderRadius: '10px',
+                      bgcolor: 'rgba(255, 255, 255, 0.2)',
+                      display: 'grid',
+                      placeItems: 'center',
+                      color: '#fff', 
+                      flexShrink: 0,
+                    }}
+                  >
+                    {colors[t.type].icon}
+                  </Box>
+                  <Typography
+                    sx={{
+                      color: '#fff',
+                      fontSize: '0.9rem',
+                      fontWeight: 600,
+                      flex: 1,
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    {t.message}
+                  </Typography>
+                  <Box
+                    sx={{
+                      color: 'var(--foreground)',
+                      p: 0.5,
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      '&:hover': { 
+                        color: '#fff',
+                        bgcolor: 'rgba(255, 255, 255, 0.15)',
+                      },
+                    }}
+                  >
+                    <X size={16} />
+                  </Box>
+                </Box>
+              </Slide>
+            );
+          })}
+        </Box>
+      )}
+
+      <Backdrop
+        open={processing || savingProfile}
+        sx={{ color: '#fff', zIndex: (theme) => theme.zIndex.drawer + 10, backdropFilter: 'blur(2px)', bgcolor: 'var(--glass-bg)' }}
+      >
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+          <CircularProgress color="inherit" size={36} />
+          <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>
+            {savingProfile ? 'กำลังบันทึกข้อมูล...' : 'กำลังประมวลผล...'}
+          </Typography>
+        </Box>
+      </Backdrop>
+
+      {/* Fullscreen QR Code Dialog */}
+      <Dialog
+        open={!!showQRFullscreen}
+        onClose={() => setShowQRFullscreen(null)}
+        fullScreen
+        PaperProps={{
+          sx: {
+            bgcolor: 'var(--background)',
+            backgroundImage: (theme) => theme.palette.mode === 'dark' ? 'radial-gradient(circle at 50% 50%, rgba(6, 182, 212, 0.1) 0%, transparent 50%)' : 'radial-gradient(circle at 50% 50%, rgba(0,113,227, 0.06) 0%, transparent 50%)',
+          },
+        }}
+      >
+        <Box sx={{
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          p: 3,
+          position: 'relative',
+        }}>
+          {/* Close Button */}
+          <IconButton
+            onClick={() => setShowQRFullscreen(null)}
+            sx={{
+              position: 'absolute',
+              top: 16,
+              right: 16,
+              bgcolor: 'var(--glass-bg)',
+              color: 'var(--foreground)',
+              '&:hover': { bgcolor: 'var(--glass-bg)' },
+            }}
+          >
+            <X size={24} />
+          </IconButton>
+
+          {/* Header */}
+          <Box sx={{ textAlign: 'center', mb: 4 }}>
+            <Box sx={{
+              width: 64,
+              height: 64,
+              borderRadius: '20px',
+              background: 'linear-gradient(135deg, #64d2ff 0%, #34c759 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              mx: 'auto',
+              mb: 2,
+              boxShadow: '0 8px 32px rgba(6, 182, 212, 0.3)',
+            }}>
+              <Package size={32} color="white" />
+            </Box>
+            <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--foreground)', mb: 0.5 }}>
+              QR Code รับสินค้า
+            </Typography>
+            <Typography sx={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+              แสดง QR Code นี้ให้พนักงาน
+            </Typography>
+          </Box>
+
+          {/* QR Code */}
+          <Box sx={{
+            p: 4,
+            borderRadius: '24px',
+            bgcolor: 'white',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+            mb: 3,
+          }}>
+            <QRCodeSVG
+              value={`ORDER:${showQRFullscreen || ''}`}
+              size={Math.min(280, typeof window !== 'undefined' ? window.innerWidth - 100 : 280)}
+              level="H"
+              includeMargin={false}
+            />
+          </Box>
+
+          {/* Order Ref */}
+          <Box sx={{
+            px: 3,
+            py: 1.5,
+            borderRadius: '16px',
+            bgcolor: 'var(--glass-bg)',
+            border: '1px solid var(--glass-border)',
+            mb: 4,
+          }}>
+            <Typography sx={{ 
+              fontSize: '0.75rem', 
+              color: 'var(--text-muted)', 
+              textAlign: 'center',
+              mb: 0.5,
+            }}>
+              หมายเลขคำสั่งซื้อ
+            </Typography>
+            <Typography sx={{ 
+              fontSize: '1.3rem', 
+              fontWeight: 800, 
+              color: 'var(--secondary)',
+              fontFamily: 'monospace',
+              textAlign: 'center',
+              letterSpacing: '0.05em',
+            }}>
+              {showQRFullscreen}
+            </Typography>
+          </Box>
+
+          {/* Pickup Location - Per Product */}
+          {(() => {
+            // Find the order to get product IDs
+            const targetOrder = orderHistory.find((o: any) => o.ref === showQRFullscreen);
+            if (!targetOrder) return null;
+            
+            const orderItems = targetOrder.items || targetOrder.cart || [];
+            const productIds = orderItems.map((item: any) => item.productId || item.id).filter(Boolean);
+            const productsWithPickup = config?.products?.filter(
+              (p) => p.pickup?.enabled && productIds.includes(p.id)
+            ) || [];
+            
+            if (productsWithPickup.length === 0) return null;
+            
+            const uniqueLocations = [...new Set(productsWithPickup.map(p => p.pickup?.location).filter(Boolean))];
+            const firstPickup = productsWithPickup[0]?.pickup;
+            
+            return (
+              <Box sx={{ 
+                maxWidth: 360,
+                width: '100%',
+                p: 2.5, 
+                borderRadius: '16px', 
+                bgcolor: 'rgba(16,185,129,0.1)',
+                border: '1px solid rgba(16,185,129,0.3)',
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <MapPin size={18} style={{ color: 'var(--success)' }} />
+                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--success)' }}>
+                    สถานที่รับสินค้า
+                  </Typography>
+                </Box>
+                {uniqueLocations.map((loc, idx) => (
+                  <Typography key={idx} sx={{ fontSize: '1rem', color: 'var(--foreground)', fontWeight: 600, mb: 0.5 }}>
+                    {loc}
+                  </Typography>
+                ))}
+                {firstPickup && (firstPickup.startDate || firstPickup.endDate) && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 1 }}>
+                    <Clock size={14} style={{ color: 'var(--text-muted)' }} />
+                    <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      {firstPickup.startDate && new Date(firstPickup.startDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      {firstPickup.startDate && firstPickup.endDate && ' - '}
+                      {firstPickup.endDate && new Date(firstPickup.endDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    </Typography>
+                  </Box>
+                )}
+                {firstPickup?.notes && (
+                  <Typography sx={{ fontSize: '0.8rem', color: 'var(--warning)', mt: 1 }}>
+                     {firstPickup.notes}
+                  </Typography>
+                )}
+              </Box>
+            );
+          })()}
+
+          {/* Close Button at Bottom */}
+          <Button
+            onClick={() => setShowQRFullscreen(null)}
+            sx={{
+              mt: 4,
+              px: 4,
+              py: 1.5,
+              borderRadius: '12px',
+              bgcolor: 'var(--glass-bg)',
+              color: 'var(--foreground)',
+              fontSize: '1rem',
+              fontWeight: 600,
+              textTransform: 'none',
+              '&:hover': { bgcolor: 'var(--glass-bg)' },
+            }}
+          >
+            ปิด
+          </Button>
+        </Box>
+      </Dialog>
+
+      {/* Logout Confirmation Dialog */}
+      <Dialog
+        open={logoutConfirmOpen}
+        onClose={() => setLogoutConfirmOpen(false)}
+        PaperProps={{
+          sx: {
+            borderRadius: '16px',
+            bgcolor: 'var(--surface)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid var(--glass-border)',
+            maxWidth: 360,
+          },
+        }}
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, pb: 1, color: 'var(--foreground)' }}>
+          <TriangleAlert size={22} color="#ff9f0a" />
+          ยืนยันการออกจากระบบ
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ color: 'var(--text-muted)' }}>
+            คุณต้องการออกจากระบบใช่หรือไม่?
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button
+            onClick={() => setLogoutConfirmOpen(false)}
+            sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 600, color: 'var(--foreground)' }}
+          >
+            ยกเลิก
+          </Button>
+          <Button
+            onClick={() => signOut()}
+            variant="contained"
+            color="error"
+            sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 600 }}
+          >
+            ออกจากระบบ
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Switch Account Dialog */}
+      <Dialog
+        open={switchAccountOpen}
+        onClose={() => setSwitchAccountOpen(false)}
+        fullWidth
+        maxWidth="xs"
+        PaperProps={{
+          sx: {
+            borderRadius: '20px',
+            bgcolor: 'var(--surface)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid var(--glass-border)',
+            overflow: 'hidden',
+          },
+        }}
+      >
+        <DialogTitle sx={{ 
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          borderBottom: '1px solid var(--glass-border)',
+          color: 'var(--foreground)',
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <ArrowLeftRight size={20} />
+            สลับบัญชี
+          </Box>
+          <IconButton onClick={() => setSwitchAccountOpen(false)} sx={{ color: 'var(--text-muted)' }}>
+            <X size={20} />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {/* Current Account */}
+          {session && (
+            <Box sx={{
+              p: 2, borderRadius: '14px',
+              bgcolor: 'rgba(0,113,227,0.08)',
+              border: '1px solid rgba(0,113,227,0.2)',
+              display: 'flex', alignItems: 'center', gap: 1.5,
+            }}>
+              <Avatar src={orderData.profileImage || session?.user?.image || ''} sx={{ width: 40, height: 40 }} />
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography sx={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--foreground)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {session?.user?.name}
+                </Typography>
+                <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {session?.user?.email}
+                </Typography>
+              </Box>
+              <Chip label="ปัจจุบัน" size="small" sx={{ bgcolor: 'rgba(0,113,227,0.15)', color: '#0071e3', fontWeight: 600, fontSize: '0.7rem' }} />
+            </Box>
+          )}
+
+          <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem', mt: 1 }}>
+            เลือกวิธีเข้าสู่ระบบด้วยบัญชีอื่น
+          </Typography>
+
+          {/* Provider Buttons */}
+          <Button
+            fullWidth
+            onClick={() => { setSwitchAccountOpen(false); signIn('google', { redirect: true, callbackUrl: '/', prompt: 'select_account' }); }}
+            sx={{
+              py: 1.3, borderRadius: '12px', fontWeight: 600, fontSize: '0.9rem', textTransform: 'none',
+              background: '#ffffff', color: '#1d1d1f',
+              border: '1px solid rgba(0,0,0,0.1)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5,
+              '&:hover': { background: '#f5f5f7', boxShadow: '0 4px 14px rgba(0,0,0,0.1)' },
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+            Google
+          </Button>
+
+          {availableProviders.includes('azure-ad') && (
+            <Button
+              fullWidth
+              onClick={() => { setSwitchAccountOpen(false); signIn('azure-ad', { redirect: true, callbackUrl: '/' }); }}
+              sx={{
+                py: 1.3, borderRadius: '12px', fontWeight: 600, fontSize: '0.9rem', textTransform: 'none',
+                background: '#2f2f2f', color: '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5,
+                '&:hover': { background: '#404040', boxShadow: '0 4px 14px rgba(0,0,0,0.15)' },
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 23 23">
+                <path fill="#f35325" d="M1 1h10v10H1z"/>
+                <path fill="#81bc06" d="M12 1h10v10H12z"/>
+                <path fill="#05a6f0" d="M1 12h10v10H1z"/>
+                <path fill="#ffba08" d="M12 12h10v10H12z"/>
+              </svg>
+              Microsoft
+            </Button>
+          )}
+
+          {availableProviders.includes('facebook') && (
+            <Button
+              fullWidth
+              onClick={() => { setSwitchAccountOpen(false); signIn('facebook', { redirect: true, callbackUrl: '/' }); }}
+              sx={{
+                py: 1.3, borderRadius: '12px', fontWeight: 600, fontSize: '0.9rem', textTransform: 'none',
+                background: '#1877F2', color: '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5,
+                '&:hover': { background: '#166FE5', boxShadow: '0 4px 14px rgba(24,119,242,0.3)' },
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+              </svg>
+              Facebook
+            </Button>
+          )}
+
+          {availableProviders.includes('apple') && (
+            <Button
+              fullWidth
+              onClick={() => { setSwitchAccountOpen(false); signIn('apple', { redirect: true, callbackUrl: '/' }); }}
+              sx={{
+                py: 1.3, borderRadius: '12px', fontWeight: 600, fontSize: '0.9rem', textTransform: 'none',
+                background: '#000', color: '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5,
+                '&:hover': { background: '#1a1a1a', boxShadow: '0 4px 14px rgba(0,0,0,0.2)' },
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+                <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.52-3.23 0-1.44.62-2.2.44-3.06-.4C4.24 16.76 4.89 10.87 8.88 10.6c1.24.07 2.1.72 2.83.78.99-.2 1.94-.78 3-.84 1.28-.08 2.25.48 2.88 1.22-2.65 1.58-2.02 5.07.36 6.04-.47 1.2-.97 2.4-1.9 3.48zM12.07 10.5c-.16-2.3 1.74-4.2 3.93-4.5.32 2.5-2.25 4.64-3.93 4.5z"/>
+              </svg>
+              Apple
+            </Button>
+          )}
+
+          {availableProviders.includes('line') && (
+            <Button
+              fullWidth
+              onClick={() => { setSwitchAccountOpen(false); signIn('line', { redirect: true, callbackUrl: '/' }); }}
+              sx={{
+                py: 1.3, borderRadius: '12px', fontWeight: 600, fontSize: '0.9rem', textTransform: 'none',
+                background: '#06C755', color: '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5,
+                '&:hover': { background: '#05B34C', boxShadow: '0 4px 14px rgba(6,199,85,0.3)' },
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
+                <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .348-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .349-.281.63-.63.63h-2.386c-.348 0-.63-.281-.63-.63V8.108c0-.348.282-.63.63-.63h2.386c.349 0 .63.282.63.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .349-.282.63-.631.63-.345 0-.627-.281-.627-.63V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.348.279-.63.63-.63.346 0 .627.282.627.63v4.771zm-5.741 0c0 .349-.282.63-.631.63-.345 0-.627-.281-.627-.63V8.108c0-.348.282-.63.627-.63.349 0 .631.282.631.63v4.771zm-2.466.63H4.917c-.348 0-.63-.281-.63-.63V8.108c0-.348.282-.63.63-.63.349 0 .63.282.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .349-.281.63-.629.63M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/>
+              </svg>
+              LINE
+            </Button>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Chat Selection Popover */}
+      <Popover
+        open={Boolean(chatMenuAnchor)}
+        anchorEl={chatMenuAnchor}
+        onClose={() => setChatMenuAnchor(null)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        transformOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        slotProps={{
+          paper: {
+            sx: {
+              bgcolor: (theme: any) => theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.97)' : 'rgba(255,255,255,0.98)',
+              color: (theme: any) => theme.palette.mode === 'dark' ? '#f5f5f7' : '#1d1d1f',
+              borderRadius: 3,
+              minWidth: 220,
+              border: (theme: any) => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}`,
+              boxShadow: (theme: any) => theme.palette.mode === 'dark'
+                ? '0 8px 30px rgba(0,0,0,0.5)'
+                : '0 8px 30px rgba(0,0,0,0.12)',
+              mb: 1,
+              overflow: 'hidden',
+            },
+          },
+        }}
+      >
+        <Box
+          onClick={() => {
+            setChatMenuAnchor(null);
+            setChatbotOpen(true);
+          }}
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+            px: 2.5,
+            py: 1.8,
+            cursor: 'pointer',
+            transition: 'background 0.15s',
+            '&:hover': { bgcolor: (theme: any) => theme.palette.mode === 'dark' ? 'rgba(34,197,94,0.12)' : 'rgba(34,197,94,0.08)' },
+          }}
+        >
+          <Bot size={24} color="#30d158" />
+          <Box>
+            <Typography sx={{ fontSize: '0.9rem', fontWeight: 600 }}>ถามแชทบอท</Typography>
+            <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>ตอบคำถามอัตโนมัติ 24 ชม.</Typography>
+          </Box>
+        </Box>
+        <Divider sx={{ borderColor: (theme: any) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }} />
+        <Box
+          onClick={() => {
+            setChatMenuAnchor(null);
+            setSupportChatOpen(true);
+          }}
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+            px: 2.5,
+            py: 1.8,
+            cursor: 'pointer',
+            transition: 'background 0.15s',
+            '&:hover': { bgcolor: (theme: any) => theme.palette.mode === 'dark' ? 'rgba(0,113,227,0.12)' : 'rgba(0,113,227,0.08)' },
+          }}
+        >
+          <Headphones size={24} color="#0071e3" />
+          <Box>
+            <Typography sx={{ fontSize: '0.9rem', fontWeight: 600 }}>ติดต่อแอดมิน</Typography>
+            <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>แชทกับทีมงานโดยตรง</Typography>
+          </Box>
+        </Box>
+      </Popover>
+
+      {/* Chatbot */}
+      <ShirtChatBot open={chatbotOpen} setOpen={setChatbotOpen} />
+
+      {/* Support Chat Widget - ปุ่มแชทสนับสนุน */}
+      <SupportChatWidget
+        onOpenChatbot={() => setChatbotOpen(true)}
+        hideMobileFab
+        externalOpen={supportChatOpen}
+        onExternalOpenHandled={() => setSupportChatOpen(false)}
+      />
+    </Box>
+  );
+}
