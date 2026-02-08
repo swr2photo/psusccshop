@@ -1,7 +1,7 @@
 // src/lib/sanitize.ts
 // Data sanitization utilities for API responses
 
-import { ShopConfig, Product } from './config';
+import { ShopConfig, Product, NameValidationConfig, ShirtNameConfig } from './config';
 import { encryptImageUrl } from './image-crypto';
 
 // ==================== IMAGE URL PROXY ====================
@@ -123,11 +123,17 @@ export function maskPhone(phone: string | null | undefined): string {
 
 /**
  * Public config fields that are safe for frontend
- * SECURITY: ไม่รวม sheetUrl, sheetId, vendorSheetUrl, vendorSheetId
+ * SECURITY: ไม่รวม sheetUrl, sheetId, vendorSheetUrl, vendorSheetId, adminEmails, adminPermissions
  */
 interface PublicShopConfig {
   isOpen: boolean;
   closeDate: string;
+  openDate?: string;
+  closedMessage?: string;
+  paymentEnabled?: boolean;
+  paymentDisabledMessage?: string;
+  nameValidation?: NameValidationConfig;
+  shirtNameConfig?: ShirtNameConfig;
   products: Product[];
   announcement?: {
     enabled: boolean;
@@ -151,13 +157,68 @@ interface PublicShopConfig {
     type?: 'text' | 'image' | 'both';
     showLogo?: boolean;
     priority?: number;
+    isSpecial?: boolean;
+    specialIcon?: string;
+    link?: string;
+    linkText?: string;
+  }>;
+  announcementHistory?: Array<{
+    id: string;
+    message: string;
+    color: string;
+    imageUrl?: string;
+    displayName?: string;
+    postedAt: string;
+    type?: 'text' | 'image' | 'both';
+    deletedAt?: string;
   }>;
   bankAccount?: {
     bankName: string;
     accountName: string;
-    // SECURITY: Mask account number for security
     accountNumberMasked: string;
   };
+  pickup?: {
+    enabled: boolean;
+    location: string;
+    startDate?: string;
+    endDate?: string;
+    notes?: string;
+    updatedAt?: string;
+  };
+  events?: Array<{
+    id: string;
+    enabled: boolean;
+    title: string;
+    description?: string;
+    imageUrl?: string;
+    color: string;
+    type: 'event' | 'promotion' | 'sale' | 'announcement';
+    startDate?: string;
+    endDate?: string;
+    ctaText?: string;
+    ctaLink?: string;
+    badge?: string;
+    priority?: number;
+    linkedProducts?: string[];
+    discountType?: 'percent' | 'fixed';
+    discountValue?: number;
+    createdAt: string;
+    updatedAt?: string;
+  }>;
+  promoCodes?: Array<{
+    id: string;
+    code: string;
+    enabled: boolean;
+    discountType: 'percent' | 'fixed';
+    discountValue: number;
+    minOrderAmount?: number;
+    maxDiscount?: number;
+    usageLimit?: number | null;
+    usageCount?: number;
+    expiresAt?: string;
+    description?: string;
+    createdAt: string;
+  }>;
 }
 
 /**
@@ -181,13 +242,19 @@ function maskAccountNumber(accountNumber: string | null | undefined): string {
 export function sanitizeConfigForPublic(config: ShopConfig | null): PublicShopConfig | null {
   if (!config) return null;
   
-  // SECURITY: Explicitly pick only safe fields - NO sheet URLs!
+  // SECURITY: Explicitly pick only safe fields - NO sheet URLs, admin info!
   // SECURITY: Encode all image URLs
   const sanitized: PublicShopConfig = {
     isOpen: config.isOpen,
     closeDate: config.closeDate,
+    openDate: config.openDate,
+    closedMessage: config.closedMessage,
+    paymentEnabled: config.paymentEnabled,
+    paymentDisabledMessage: config.paymentDisabledMessage,
+    nameValidation: config.nameValidation,
+    shirtNameConfig: config.shirtNameConfig,
     products: (config.products || []).map(sanitizeProductImages),
-    // REMOVED: sheetUrl, vendorSheetUrl - ไม่ส่งให้ frontend
+    // REMOVED: sheetUrl, vendorSheetUrl, adminEmails, adminPermissions - ไม่ส่งให้ frontend
   };
   
   // Copy announcement without postedBy email, encode image URLs
@@ -218,6 +285,25 @@ export function sanitizeConfigForPublic(config: ShopConfig | null): PublicShopCo
       type: a.type,
       showLogo: a.showLogo,
       priority: a.priority,
+      isSpecial: a.isSpecial,
+      specialIcon: a.specialIcon,
+      link: a.link,
+      linkText: a.linkText,
+    }));
+  }
+  
+  // Copy announcement history without postedBy, encode image URLs
+  if (config.announcementHistory) {
+    sanitized.announcementHistory = config.announcementHistory.map(h => ({
+      id: h.id,
+      message: h.message,
+      color: h.color,
+      imageUrl: encodeImageUrl(h.imageUrl),
+      displayName: h.displayName,
+      postedAt: h.postedAt,
+      type: h.type,
+      deletedAt: h.deletedAt,
+      // SECURITY: postedBy and deletedBy removed - admin emails hidden
     }));
   }
   
@@ -228,6 +314,63 @@ export function sanitizeConfigForPublic(config: ShopConfig | null): PublicShopCo
       accountName: config.bankAccount.accountName,
       accountNumberMasked: maskAccountNumber(config.bankAccount.accountNumber),
     };
+  }
+  
+  // Pickup info (remove updatedBy admin email)
+  if (config.pickup) {
+    sanitized.pickup = {
+      enabled: config.pickup.enabled,
+      location: config.pickup.location,
+      startDate: config.pickup.startDate,
+      endDate: config.pickup.endDate,
+      notes: config.pickup.notes,
+      updatedAt: config.pickup.updatedAt,
+      // SECURITY: updatedBy removed - admin email hidden
+    };
+  }
+  
+  // Events - encode image URLs, remove createdBy admin email
+  if (config.events) {
+    sanitized.events = config.events.map(e => ({
+      id: e.id,
+      enabled: e.enabled,
+      title: e.title,
+      description: e.description,
+      imageUrl: encodeImageUrl(e.imageUrl),
+      color: e.color,
+      type: e.type,
+      startDate: e.startDate,
+      endDate: e.endDate,
+      ctaText: e.ctaText,
+      ctaLink: e.ctaLink,
+      badge: e.badge,
+      priority: e.priority,
+      linkedProducts: e.linkedProducts,
+      discountType: e.discountType,
+      discountValue: e.discountValue,
+      createdAt: e.createdAt,
+      updatedAt: e.updatedAt,
+      // SECURITY: createdBy removed - admin email hidden
+    }));
+  }
+  
+  // Promo codes - remove createdBy admin email
+  if (config.promoCodes) {
+    sanitized.promoCodes = config.promoCodes.map(p => ({
+      id: p.id,
+      code: p.code,
+      enabled: p.enabled,
+      discountType: p.discountType,
+      discountValue: p.discountValue,
+      minOrderAmount: p.minOrderAmount,
+      maxDiscount: p.maxDiscount,
+      usageLimit: p.usageLimit,
+      usageCount: p.usageCount,
+      expiresAt: p.expiresAt,
+      description: p.description,
+      createdAt: p.createdAt,
+      // SECURITY: createdBy removed - admin email hidden
+    }));
   }
   
   return sanitized;

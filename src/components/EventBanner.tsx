@@ -92,6 +92,7 @@ function useCountdown(targetDate?: string) {
   useEffect(() => {
     if (!targetDate) return;
     const target = new Date(targetDate).getTime();
+    if (isNaN(target)) return;
 
     const tick = () => {
       const now = Date.now();
@@ -117,13 +118,23 @@ function useCountdown(targetDate?: string) {
   return { timeLeft, isExpired };
 }
 
+/** Re-renders every 30s so date-based conditions (active, expired, countdown phase) stay current */
+function useTimeTick(intervalMs = 30000) {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+  return tick;
+}
+
 // ==================== Sub-components ====================
 
 function CountdownUnit({ value, label }: { value: number; label: string }) {
   return (
-    <Box sx={{ textAlign: 'center', minWidth: 40 }}>
+    <Box sx={{ textAlign: 'center', minWidth: { xs: 28, sm: 40 } }}>
       <Box sx={{
-        fontSize: '1.2rem',
+        fontSize: { xs: '0.9rem', sm: '1.2rem' },
         fontWeight: 800,
         lineHeight: 1,
         color: '#fff',
@@ -132,7 +143,7 @@ function CountdownUnit({ value, label }: { value: number; label: string }) {
       }}>
         {String(value).padStart(2, '0')}
       </Box>
-      <Typography sx={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.7)', mt: 0.25, fontWeight: 600 }}>
+      <Typography sx={{ fontSize: { xs: '0.45rem', sm: '0.55rem' }, color: 'rgba(255,255,255,0.7)', mt: 0.25, fontWeight: 600 }}>
         {label}
       </Typography>
     </Box>
@@ -166,8 +177,8 @@ function CountdownTimer({ targetDate }: { targetDate: string }) {
     <Box sx={{
       display: 'flex',
       alignItems: 'center',
-      gap: 0.5,
-      px: 1.5,
+      gap: { xs: 0.25, sm: 0.5 },
+      px: { xs: 1, sm: 1.5 },
       py: 0.75,
       borderRadius: '12px',
       bgcolor: 'rgba(0,0,0,0.25)',
@@ -176,11 +187,11 @@ function CountdownTimer({ targetDate }: { targetDate: string }) {
     }}>
       <Clock size={12} color="rgba(255,255,255,0.7)" />
       <CountdownUnit value={timeLeft.days} label="วัน" />
-      <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontWeight: 700, fontSize: '1rem', mx: -0.3 }}>:</Typography>
+      <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontWeight: 700, fontSize: { xs: '0.8rem', sm: '1rem' }, mx: -0.3 }}>:</Typography>
       <CountdownUnit value={timeLeft.hours} label="ชม." />
-      <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontWeight: 700, fontSize: '1rem', mx: -0.3 }}>:</Typography>
+      <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontWeight: 700, fontSize: { xs: '0.8rem', sm: '1rem' }, mx: -0.3 }}>:</Typography>
       <CountdownUnit value={timeLeft.minutes} label="นาที" />
-      <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontWeight: 700, fontSize: '1rem', mx: -0.3 }}>:</Typography>
+      <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontWeight: 700, fontSize: { xs: '0.8rem', sm: '1rem' }, mx: -0.3 }}>:</Typography>
       <CountdownUnit value={timeLeft.seconds} label="วินาที" />
     </Box>
   );
@@ -194,6 +205,9 @@ export default function EventBanner({ events, onEventClick, compact = false }: E
   const [isPaused, setIsPaused] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Re-evaluate every 30s so expired events drop out & countdown phase transitions update
+  const tick = useTimeTick(30000);
+
   // Filter enabled & not-expired events, sorted by priority
   const activeEvents = useMemo(() => {
     const now = Date.now();
@@ -204,7 +218,8 @@ export default function EventBanner({ events, onEventClick, compact = false }: E
         return true;
       })
       .sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99));
-  }, [events]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [events, tick]);
 
   const currentEvent = activeEvents[currentIndex % activeEvents.length];
 
@@ -239,8 +254,11 @@ export default function EventBanner({ events, onEventClick, compact = false }: E
 
   // Has both image and text content?
   const hasImage = !!currentEvent.imageUrl;
-  const hasCountdown = !!currentEvent.startDate && new Date(currentEvent.startDate).getTime() > Date.now();
-  const hasEndCountdown = !!currentEvent.endDate && new Date(currentEvent.endDate).getTime() > Date.now() && (!currentEvent.startDate || new Date(currentEvent.startDate).getTime() <= Date.now());
+  const now = Date.now();
+  const startMs = currentEvent.startDate ? new Date(currentEvent.startDate).getTime() : NaN;
+  const endMs = currentEvent.endDate ? new Date(currentEvent.endDate).getTime() : NaN;
+  const hasCountdown = !isNaN(startMs) && startMs > now;
+  const hasEndCountdown = !isNaN(endMs) && endMs > now && (isNaN(startMs) || startMs <= now);
 
   if (compact) {
     // Compact mode — single-line strip
@@ -434,13 +452,17 @@ export default function EventBanner({ events, onEventClick, compact = false }: E
 
         {/* Title */}
         <Typography sx={{
-          fontSize: { xs: '1.2rem', sm: '1.5rem' },
+          fontSize: { xs: '1.1rem', sm: '1.5rem' },
           fontWeight: 800,
           color: '#fff',
           lineHeight: 1.2,
           mb: 0.5,
           textShadow: '0 2px 12px rgba(0,0,0,0.4)',
-          maxWidth: '80%',
+          maxWidth: { xs: '90%', sm: '80%' },
+          display: '-webkit-box',
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: 'vertical',
+          overflow: 'hidden',
         }}>
           {currentEvent.title}
         </Typography>
@@ -519,12 +541,13 @@ export default function EventBanner({ events, onEventClick, compact = false }: E
         </Box>
       </Box>
 
-      {/* Navigation arrows */}
+      {/* Navigation arrows — hidden on xs to avoid overlapping content */}
       {activeEvents.length > 1 && (
         <>
           <IconButton
             onClick={(e) => { e.stopPropagation(); goTo('prev'); }}
             sx={{
+              display: { xs: 'none', sm: 'flex' },
               position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', zIndex: 2,
               bgcolor: 'rgba(0,0,0,0.3)', color: '#fff',
               backdropFilter: 'blur(8px)',
@@ -537,6 +560,7 @@ export default function EventBanner({ events, onEventClick, compact = false }: E
           <IconButton
             onClick={(e) => { e.stopPropagation(); goTo('next'); }}
             sx={{
+              display: { xs: 'none', sm: 'flex' },
               position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', zIndex: 2,
               bgcolor: 'rgba(0,0,0,0.3)', color: '#fff',
               backdropFilter: 'blur(8px)',

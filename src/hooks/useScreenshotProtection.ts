@@ -11,7 +11,7 @@ const detectPlatform = () => {
   }
 
   const ua = navigator.userAgent;
-  const platform = navigator.platform;
+  const platform = navigator.platform || '';
 
   return {
     isIOS: /iPad|iPhone|iPod/.test(ua) || (platform === 'MacIntel' && navigator.maxTouchPoints > 1),
@@ -31,7 +31,17 @@ interface ScreenshotProtectionOptions {
 }
 
 /**
- * useScreenshotProtection - รองรับ iOS, macOS, Windows, Android
+ * useScreenshotProtection - Advanced multi-platform protection
+ * 
+ * Protection layers:
+ * - Visibility API (tab switch / app switch)
+ * - Window blur/focus (alt-tab, screenshot tools)
+ * - Keyboard shortcuts (PrintScreen, Cmd+Shift+3/4/5, Win+Shift+S)
+ * - iOS gestures (multi-touch, orientation change)
+ * - Context menu + drag prevention on images
+ * - Clipboard interception (copy events clear sensitive data)
+ * - DevTools detection via window size differential
+ * - CSS body class for instant blackout via stylesheets
  */
 export function useScreenshotProtection(options: ScreenshotProtectionOptions = {}) {
   const {
@@ -202,6 +212,50 @@ export function useScreenshotProtection(options: ScreenshotProtectionOptions = {
     };
   }, [enabled]);
 
+  // Clipboard interception — prevent copying protected content
+  useEffect(() => {
+    if (!enabled) return;
+
+    const handleCopy = (e: ClipboardEvent) => {
+      const sel = window.getSelection();
+      const target = document.activeElement as HTMLElement;
+      // If copying from within a protected area, replace with warning text
+      if (target?.closest?.('.protected-image-container') || target?.closest?.('.protected-content') || target?.closest?.('.no-copy')) {
+        e.preventDefault();
+        e.clipboardData?.setData('text/plain', '⚠️ เนื้อหานี้ได้รับการป้องกัน');
+      }
+    };
+
+    document.addEventListener('copy', handleCopy);
+    return () => document.removeEventListener('copy', handleCopy);
+  }, [enabled]);
+
+  // DevTools detection via window size differential
+  useEffect(() => {
+    if (!enabled) return;
+
+    const checkDevTools = () => {
+      const widthDiff = window.outerWidth - window.innerWidth;
+      const heightDiff = window.outerHeight - window.innerHeight;
+      if (widthDiff > 160 || heightDiff > 160) {
+        document.body.classList.add('page-hidden');
+      } else {
+        // Only remove if not already triggered by other reasons
+        if (isProtected) {
+          document.body.classList.remove('page-hidden');
+        }
+      }
+    };
+
+    const interval = setInterval(checkDevTools, 2500);
+    window.addEventListener('resize', checkDevTools);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('resize', checkDevTools);
+    };
+  }, [enabled, isProtected]);
+
   // Cleanup
   useEffect(() => {
     return () => {
@@ -260,14 +314,21 @@ export function ScreenshotProtectionProvider({
       body.page-hidden video {
         filter: brightness(0) !important;
         opacity: 0 !important;
+        transition: none !important;
       }
       @media print {
-        body { display: none !important; }
+        body { display: none !important; visibility: hidden !important; }
         img, canvas, video { display: none !important; }
       }
       .no-copy, .protected-content {
         -webkit-user-select: none !important;
         user-select: none !important;
+      }
+      /* Prevent image Save-As in Edge/Chrome context menu */
+      img { -ms-user-select: none; }
+      /* iOS callout override */
+      @supports (-webkit-touch-callout: none) {
+        img, canvas, video { -webkit-touch-callout: none !important; touch-action: manipulation; }
       }
     `;
   }, [enabled]);

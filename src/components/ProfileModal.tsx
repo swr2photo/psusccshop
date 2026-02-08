@@ -1438,8 +1438,8 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
               width={560}
               height={560}
               style={{
-                width: 280,
-                height: 280,
+                width: 'min(280px, calc(100vw - 80px))',
+                height: 'min(280px, calc(100vw - 80px))',
                 borderRadius: '16px',
                 cursor: isDragging ? 'grabbing' : 'grab',
                 userSelect: 'none',

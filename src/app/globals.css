@@ -74,6 +74,8 @@
 
 html {
   scroll-behavior: smooth;
+  /* Enable hardware acceleration for smoother scrolling */
+  -webkit-overflow-scrolling: touch;
 }
 
 body {

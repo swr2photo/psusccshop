@@ -58,7 +58,7 @@ export default function SidebarMenu(props: SidebarMenuProps) {
         sx: {
           bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.92)' : 'rgba(255,255,255,0.95)',
           color: 'var(--foreground)',
-          width: 320,
+          width: 'min(320px, 85vw)',
           maxHeight: '100vh',
           overflowY: 'auto',
           WebkitOverflowScrolling: 'touch',
@@ -216,7 +216,7 @@ export default function SidebarMenu(props: SidebarMenuProps) {
           borderRadius: '16px',
           bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.95)' : '#fff',
           backdropFilter: 'blur(20px)',
-          maxWidth: 360,
+          maxWidth: 'min(360px, calc(100vw - 32px))',
         },
       }}
     >

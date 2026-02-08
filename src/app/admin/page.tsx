@@ -452,10 +452,23 @@ function isoToLocalDatetime(iso?: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-/** Convert local datetime-local value to ISO string */
+/** Convert local datetime-local value to ISO string (Safari-safe).
+ *  datetime-local gives "YYYY-MM-DDTHH:MM" with no timezone.
+ *  Parsing that as-is can differ across browsers (Chrome = local, Safari = UTC).
+ *  We explicitly construct a local Date to avoid the discrepancy. */
 function localDatetimeToIso(local: string): string | undefined {
   if (!local) return undefined;
-  const d = new Date(local);
+  // Parse "YYYY-MM-DDTHH:MM" or "YYYY-MM-DDTHH:MM:SS" manually
+  const parts = local.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/);
+  if (!parts) return undefined;
+  const d = new Date(
+    Number(parts[1]),     // year
+    Number(parts[2]) - 1, // month (0-based)
+    Number(parts[3]),     // day
+    Number(parts[4]),     // hours
+    Number(parts[5]),     // minutes
+    Number(parts[6] || 0) // seconds
+  );
   if (isNaN(d.getTime())) return undefined;
   return d.toISOString();
 }
@@ -2249,8 +2262,10 @@ const EventsView = React.memo(function EventsView({
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
           {events.sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99)).map((event) => {
             const typeInfo = EVENT_TYPE_OPTIONS.find(t => t.value === event.type) || EVENT_TYPE_OPTIONS[0];
-            const isActive = event.enabled && (!event.endDate || new Date(event.endDate) > new Date());
-            const isExpired = event.endDate && new Date(event.endDate) < new Date();
+            const nowMs = Date.now();
+            const endMs = event.endDate ? new Date(event.endDate).getTime() : NaN;
+            const isExpired = !isNaN(endMs) && endMs <= nowMs;
+            const isActive = event.enabled && !isExpired;
 
             return (
               <Box key={event.id} sx={{
@@ -2261,11 +2276,11 @@ const EventsView = React.memo(function EventsView({
                 transition: 'all 0.2s ease',
                 '&:hover': { borderColor: event.color + '50' },
               }}>
-                <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
+                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, alignItems: { xs: 'stretch', sm: 'flex-start' } }}>
                   {/* Thumbnail */}
                   {event.imageUrl && (
                     <Box sx={{
-                      width: 80, height: 56, borderRadius: '10px', overflow: 'hidden',
+                      width: { xs: '100%', sm: 80 }, height: { xs: 120, sm: 56 }, borderRadius: '10px', overflow: 'hidden',
                       flexShrink: 0, border: '1px solid var(--glass-border)',
                     }}>
                       <img src={event.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -2329,19 +2344,21 @@ const EventsView = React.memo(function EventsView({
                     <Box sx={{ display: 'flex', gap: 1.5, mt: 0.5, flexWrap: 'wrap' }}>
                       {event.startDate && (
                         <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 0.3 }}>
-                          <CalendarIcon size={11} /> เริ่ม: {new Date(event.startDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          <CalendarIcon size={11} /> เริ่ม: {new Date(event.startDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}{' '}
+                          {new Date(event.startDate).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
                         </Typography>
                       )}
                       {event.endDate && (
                         <Typography sx={{ fontSize: '0.7rem', color: isExpired ? '#ef4444' : 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 0.3 }}>
-                          <AccessTime size={11} /> สิ้นสุด: {new Date(event.endDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          <AccessTime size={11} /> สิ้นสุด: {new Date(event.endDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}{' '}
+                          {new Date(event.endDate).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
                         </Typography>
                       )}
                     </Box>
                   </Box>
 
                   {/* Actions */}
-                  <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
+                  <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0, alignSelf: { xs: 'flex-end', sm: 'flex-start' } }}>
                     <Tooltip title={event.enabled ? 'ปิดอีเวนต์' : 'เปิดอีเวนต์'}>
                       <IconButton size="small" onClick={() => handleToggle(event)}
                         sx={{ color: event.enabled ? '#10b981' : 'var(--text-muted)' }}>
@@ -2496,7 +2513,7 @@ const EventsView = React.memo(function EventsView({
               />
 
               {/* CTA */}
-              <Box sx={{ display: 'flex', gap: 1.5 }}>
+              <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 1.5 }}>
                 <TextField
                   fullWidth
                   label="ข้อความปุ่ม"
@@ -2530,7 +2547,7 @@ const EventsView = React.memo(function EventsView({
               </Box>
 
               {/* Dates */}
-              <Box sx={{ display: 'flex', gap: 1.5 }}>
+              <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 1.5 }}>
                 <TextField
                   fullWidth
                   label="วันเริ่มต้น"
@@ -2572,7 +2589,7 @@ const EventsView = React.memo(function EventsView({
                 <Typography sx={{ fontWeight: 700, fontSize: '0.9rem', color: '#ff453a', mb: 1.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>
                   🏷️ ส่วนลดสินค้า (ลดราคาอัตโนมัติเมื่ออีเวนต์เปิด)
                 </Typography>
-                <Box sx={{ display: 'flex', gap: 1.5, mb: 1.5 }}>
+                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 1.5, mb: 1.5 }}>
                   <Box sx={{ display: 'flex', gap: 0.5 }}>
                     {([{ value: 'percent', label: 'ลด %' }, { value: 'fixed', label: 'ลด ฿' }] as const).map(opt => (
                       <Chip

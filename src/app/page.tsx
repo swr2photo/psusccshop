@@ -2688,21 +2688,25 @@ export default function HomePage() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    let rafId: number | null = null;
     const onScroll = () => {
-      const currentY = window.scrollY;
-      const delta = Math.abs(currentY - lastScrollYRef.current);
-      lastScrollYRef.current = currentY;
-
-      if (delta < 2) return;
-
-      setNavHidden(true);
-      if (scrollIdleTimer.current) clearTimeout(scrollIdleTimer.current);
-      scrollIdleTimer.current = setTimeout(() => setNavHidden(false), 220);
+      if (rafId) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        const currentY = window.scrollY;
+        const delta = Math.abs(currentY - lastScrollYRef.current);
+        lastScrollYRef.current = currentY;
+        if (delta < 2) return;
+        setNavHidden(true);
+        if (scrollIdleTimer.current) clearTimeout(scrollIdleTimer.current);
+        scrollIdleTimer.current = setTimeout(() => setNavHidden(false), 220);
+      });
     };
 
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => {
       window.removeEventListener('scroll', onScroll);
+      if (rafId) cancelAnimationFrame(rafId);
       if (scrollIdleTimer.current) clearTimeout(scrollIdleTimer.current);
     };
   }, []);
@@ -2834,8 +2838,7 @@ export default function HomePage() {
       generateSlug(p.name, p.id) === decoded
     );
     if (found && isProductCurrentlyOpen(found)) {
-      setSelectedProduct(found);
-      setProductDialogOpen(true);
+      handleSelectProduct(found);
       // Clean URL without reload
       window.history.replaceState({}, '', window.location.pathname);
     }
@@ -2995,9 +2998,15 @@ export default function HomePage() {
     }
   }, [orderData]);
 
-  useEffect(() => {
-    if (selectedProduct) setActiveImageIndex(0);
-  }, [selectedProduct]);
+  // Unified product select handler — batches all state into one render
+  const handleSelectProduct = useCallback((product: Product) => {
+    const sizeKeys = Object.keys(product.sizePricing || {});
+    const defaultSize = sizeKeys.length > 0 ? sizeKeys[0] : 'ฟรีไซส์';
+    setSelectedProduct(product);
+    setActiveImageIndex(0);
+    setProductOptions({ size: defaultSize, quantity: 1, customName: '', customNumber: '', isLongSleeve: false });
+    setProductDialogOpen(true);
+  }, []);
 
   //  Auto-cycle through announcements
   useEffect(() => {
@@ -3163,13 +3172,6 @@ export default function HomePage() {
       if (configPollTimer.current) clearInterval(configPollTimer.current);
     };
   }, [refreshConfig, realtimeConnected]);
-
-  useEffect(() => {
-    if (!selectedProduct) return;
-    const sizeKeys = Object.keys(selectedProduct.sizePricing || {});
-    const defaultSize = sizeKeys.length > 0 ? sizeKeys[0] : 'ฟรีไซส์';
-    setProductOptions((prev) => ({ ...prev, size: defaultSize }));
-  }, [selectedProduct]);
 
 
   const showToast = (type: ToastSeverity, message: string) => {
@@ -3440,7 +3442,7 @@ export default function HomePage() {
     stopProductHold();
     productHoldTimer.current = setInterval(() => {
       setProductOptions((prev) => ({ ...prev, quantity: clampQty(prev.quantity + delta) }));
-    }, 120);
+    }, 200);
   };
 
   const stopCartHold = (id: string) => {
@@ -3460,7 +3462,7 @@ export default function HomePage() {
         return;
       }
       updateCartQuantity(id, target.quantity + delta);
-    }, 140);
+    }, 200);
   };
 
   const getTotalPrice = useCallback(() => {
@@ -4035,7 +4037,7 @@ export default function HomePage() {
                   ข้อมูลค่าย
                 </Typography>
               </Box>
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1.5 }}>
                 {(selectedProduct as any).campInfo.campName && (
                   <Box>
                     <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>ชื่อค่าย</Typography>
@@ -4097,7 +4099,7 @@ export default function HomePage() {
                   ข้อมูลอีเวนต์
                 </Typography>
               </Box>
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1.5 }}>
                 {(selectedProduct as any).eventInfo.eventName && (
                   <Box sx={{ gridColumn: 'span 2' }}>
                     <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>ชื่ออีเวนต์</Typography>
@@ -5817,8 +5819,7 @@ export default function HomePage() {
                               key={product.id}
                               onClick={() => {
                                 if (isProductCurrentlyOpen(product)) {
-                                  setSelectedProduct(product);
-                                  setProductDialogOpen(true);
+                                  handleSelectProduct(product);
                                   setShowSearchBar(false);
                                   setProductSearch('');
                                 }
@@ -6326,8 +6327,7 @@ export default function HomePage() {
                               showToast('info', `${product.name} - ${statusConfig.label}`);
                               return;
                             }
-                            setSelectedProduct(product);
-                            setProductDialogOpen(true);
+                            handleSelectProduct(product);
                           }}
                           sx={{
                             height: '100%',
@@ -6983,7 +6983,7 @@ export default function HomePage() {
           {/* Size Cards Grid */}
           <Box sx={{ 
             display: 'grid', 
-            gridTemplateColumns: 'repeat(2, 1fr)', 
+            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' }, 
             gap: 1.2,
           }}>
             {SIZE_ORDER.map((size) => {

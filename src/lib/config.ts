@@ -264,7 +264,7 @@ export const DEFAULT_NAME_VALIDATION: NameValidationConfig = {
   minLength: 2,
   maxLength: 100,
   allowThai: true,
-  allowEnglish: false,
+  allowEnglish: true,
   allowSpecialChars: false,
   allowedSpecialChars: ".-'",
 };
@@ -290,7 +290,7 @@ export interface ShirtNameConfig {
 export const DEFAULT_SHIRT_NAME: ShirtNameConfig = {
   minLength: 1,
   maxLength: 7,
-  allowThai: false,
+  allowThai: true,
   allowEnglish: true,
   autoUppercase: true,
   allowSpecialChars: false,
