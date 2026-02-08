@@ -247,7 +247,7 @@ export function useScreenshotProtection(options: ScreenshotProtectionOptions = {
       }
     };
 
-    const interval = setInterval(checkDevTools, 2500);
+    const interval = setInterval(checkDevTools, 5000);
     window.addEventListener('resize', checkDevTools);
 
     return () => {

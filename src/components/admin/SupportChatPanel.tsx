@@ -162,6 +162,14 @@ export default function SupportChatPanel() {
   const [customerOrders, setCustomerOrders] = useState<any[]>([]);
   const [loadingCustomerOrders, setLoadingCustomerOrders] = useState(false);
 
+  // Detect touch device for mobile-friendly Enter key behavior
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
+  useEffect(() => {
+    setIsTouchDevice(
+      'ontouchstart' in window || navigator.maxTouchPoints > 0
+    );
+  }, []);
+
   const scrollToBottom = useCallback((force = false) => {
     if (!isUserScrollingRef.current || force) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -197,18 +205,27 @@ export default function SupportChatPanel() {
   }, [fetchChats]);
 
   useEffect(() => {
-    pollIntervalRef.current = setInterval(() => {
-      fetchChats();
-      if (selectedChat) {
-        fetchChatDetails(selectedChat.id);
-        // Auto mark as read when admin is viewing the chat
-        fetch('/api/support-chat/' + selectedChat.id + '/read', { method: 'POST' }).catch(() => {});
-        fetch('/api/support-chat/' + selectedChat.id + '/typing')
-          .then(res => res.json())
-          .then(data => setOtherTyping(data.isTyping || false))
-          .catch(() => setOtherTyping(false));
+    let isPolling = false;
+    pollIntervalRef.current = setInterval(async () => {
+      if (isPolling) return; // Skip if previous poll still running
+      isPolling = true;
+      try {
+        await fetchChats();
+        if (selectedChat) {
+          // Run read, details, and typing in parallel
+          await Promise.all([
+            fetchChatDetails(selectedChat.id),
+            fetch('/api/support-chat/' + selectedChat.id + '/read', { method: 'POST' }).catch(() => {}),
+            fetch('/api/support-chat/' + selectedChat.id + '/typing')
+              .then(res => res.json())
+              .then(data => setOtherTyping(data.isTyping || false))
+              .catch(() => setOtherTyping(false)),
+          ]);
+        }
+      } catch {} finally {
+        isPolling = false;
       }
-    }, 3000);
+    }, 5000);
     return () => { if (pollIntervalRef.current) clearInterval(pollIntervalRef.current); };
   }, [fetchChats, fetchChatDetails, selectedChat?.id]);
 
@@ -1142,10 +1159,10 @@ export default function SupportChatPanel() {
                     sx={{ color: ADMIN_THEME.textMuted, '&:hover': { color: '#2563eb' } }}>
                     <ImageIcon />
                   </IconButton>
-                  <TextField fullWidth size="small" placeholder="พิมพ์ข้อความ... (Shift+Enter = ขึ้นบรรทัดใหม่)" value={message}
+                  <TextField fullWidth size="small" placeholder={isTouchDevice ? "พิมพ์ข้อความ..." : "พิมพ์ข้อความ... (Shift+Enter = ขึ้นบรรทัดใหม่)"} value={message}
                     multiline maxRows={5}
                     onChange={(e) => { setMessage(e.target.value); sendTypingIndicator(); }}
-                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !isTouchDevice) { e.preventDefault(); handleSendMessage(); } }}
                     disabled={sending || uploadingImage}
                     sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'var(--surface)', color: ADMIN_THEME.text, fontSize: '0.9rem', '& fieldset': { borderColor: ADMIN_THEME.border }, '&:hover fieldset': { borderColor: '#2563eb' }, '&.Mui-focused fieldset': { borderColor: '#2563eb' } } }} />
                   <IconButton onClick={handleSendMessage} disabled={(!message.trim() && !previewImage) || sending || uploadingImage}

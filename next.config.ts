@@ -151,6 +151,20 @@ const nextConfig: NextConfig = {
         },
       ],
     },
+    // Service Worker — no cache so browsers always get the latest version
+    {
+      source: '/sw.js',
+      headers: [
+        {
+          key: 'Cache-Control',
+          value: 'no-cache, no-store, must-revalidate',
+        },
+        {
+          key: 'Service-Worker-Allowed',
+          value: '/',
+        },
+      ],
+    },
   ],
   // Redirects - block common attack vectors
   redirects: async () => [

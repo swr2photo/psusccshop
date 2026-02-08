@@ -151,7 +151,7 @@ function _startDevToolsDetection() {
     }
   };
   checkSize();
-  _devToolsInterval = setInterval(checkSize, 3000);
+  _devToolsInterval = setInterval(checkSize, 5000);
   window.addEventListener('resize', checkSize);
   // Store for cleanup
   (_startDevToolsDetection as any)._resizeHandler = checkSize;

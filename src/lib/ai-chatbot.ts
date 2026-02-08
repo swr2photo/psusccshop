@@ -1055,13 +1055,17 @@ async function callGeminiAPI(
       console.log(`[AI] Request body keys:`, Object.keys(requestBody));
       console.log(`[AI] User parts count:`, userParts.length, userParts.map(p => p.inlineData ? 'image' : 'text'));
       
+      const abortCtl = new AbortController();
+      const fetchTimeout = setTimeout(() => abortCtl.abort(), 25000);
       const response = await fetch(`${model.url}?key=${GEMINI_API_KEY}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(requestBody),
+        signal: abortCtl.signal,
       });
+      clearTimeout(fetchTimeout);
 
       if (!response.ok) {
         const errorText = await response.text();

@@ -60,10 +60,15 @@ export function usePushNotification(): UsePushNotificationReturn {
         // Check current permission
         setPermission(Notification.permission as PushPermissionState);
 
-        // Register service worker
+        // Register service worker (update on each page load to pick up new versions)
         const reg = await navigator.serviceWorker.register('/sw.js', {
           scope: '/',
+          updateViaCache: 'none',
         });
+        
+        // Force update check to clear old caches
+        reg.update().catch(() => {});
+        
         setRegistration(reg);
 
         // Check existing subscription
@@ -81,14 +86,22 @@ export function usePushNotification(): UsePushNotificationReturn {
   useEffect(() => {
     if (!isSupported) return;
 
-    // Some browsers support the 'change' event on permission status
     const checkPermission = () => {
       setPermission(Notification.permission as PushPermissionState);
     };
 
-    // Poll permission state (some browsers don't fire events)
-    const interval = setInterval(checkPermission, 5000);
-    return () => clearInterval(interval);
+    // Check on visibility change (user returns to tab) instead of aggressive polling
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') checkPermission();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    // Fallback: poll very infrequently (permission changes are user-initiated)
+    const interval = setInterval(checkPermission, 60000);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [isSupported]);
 
   const subscribe = useCallback(async (): Promise<boolean> => {

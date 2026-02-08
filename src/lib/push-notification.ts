@@ -40,6 +40,7 @@ export async function sendPushNotification(
     .eq('email', email);
 
   if (error || !subscriptions?.length) {
+    console.log(`[Push] No subscriptions found for ${email}`, error?.message || '');
     return { sent: 0, failed: 0 };
   }
 
@@ -48,12 +49,14 @@ export async function sendPushNotification(
   const expiredEndpoints: string[] = [];
 
   // Dynamic import web-push (optional dependency)
+  // Handle CJS/ESM interop: web-push is CJS, dynamic import wraps it as { default: ... }
   let webpush: any;
   try {
-    webpush = await import('web-push');
+    const webpushModule = await import('web-push');
+    webpush = webpushModule.default || webpushModule;
     webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
-  } catch {
-    console.log('[Push] web-push library not available, skipping');
+  } catch (err) {
+    console.error('[Push] web-push library not available:', err);
     return { sent: 0, failed: 0 };
   }
 

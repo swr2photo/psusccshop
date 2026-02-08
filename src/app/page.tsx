@@ -74,6 +74,8 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
   } | null>(null);
   // New states for enhanced features
   const [lightboxImage, setLightboxImage] = React.useState<string | null>(null);
+  const [lightboxImages, setLightboxImages] = React.useState<string[]>([]);
+  const [lightboxIndex, setLightboxIndex] = React.useState(0);
   const [uploadedImage, setUploadedImage] = React.useState<{ base64: string; preview: string } | null>(null);
   const [isUploading, setIsUploading] = React.useState(false);
   const [replyToMessage, setReplyToMessage] = React.useState<{ id: string; text: string; sender: 'user' | 'bot' } | null>(null);
@@ -1171,7 +1173,11 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                     {msg.productImages.map((product, idx) => (
                       <Box
                         key={idx}
-                        onClick={() => setLightboxImage(product.image)}
+                        onClick={() => {
+                          setLightboxImages([product.image]);
+                          setLightboxIndex(0);
+                          setLightboxImage(product.image);
+                        }}
                         sx={{
                           position: 'relative',
                           width: 72,
@@ -1839,44 +1845,181 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
         </Box>
       </Dialog>
 
-      {/* Image Lightbox */}
+      {/* Image Lightbox - Fullscreen Gallery */}
       <Dialog
         open={!!lightboxImage}
-        onClose={() => setLightboxImage(null)}
-        maxWidth="lg"
+        onClose={() => { setLightboxImage(null); setLightboxImages([]); }}
+        maxWidth={false}
+        fullScreen
         PaperProps={{
           sx: {
-            background: 'rgba(0,0,0,0.95)',
-            borderRadius: 2,
-            overflow: 'hidden',
+            background: 'rgba(0,0,0,0.97)',
+            boxShadow: 'none',
           }
         }}
+        sx={{
+          '& .MuiDialog-container': {
+            alignItems: 'center',
+            justifyContent: 'center',
+          },
+        }}
       >
+        {/* Close Button */}
         <IconButton
-          onClick={() => setLightboxImage(null)}
+          onClick={() => { setLightboxImage(null); setLightboxImages([]); }}
           sx={{
             position: 'absolute',
-            top: 8,
-            right: 8,
+            top: { xs: 12, sm: 16 },
+            right: { xs: 12, sm: 16 },
             color: 'white',
-            bgcolor: 'rgba(0,0,0,0.5)',
-            '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' },
-            zIndex: 1,
+            bgcolor: 'rgba(255,255,255,0.12)',
+            backdropFilter: 'blur(8px)',
+            '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' },
+            zIndex: 10,
+            width: 44,
+            height: 44,
           }}
         >
           <CloseIcon size={24} />
         </IconButton>
+
+        {/* Image Counter */}
+        {lightboxImages.length > 1 && (
+          <Box sx={{
+            position: 'absolute',
+            top: { xs: 16, sm: 20 },
+            left: '50%',
+            transform: 'translateX(-50%)',
+            px: 2.5,
+            py: 0.75,
+            borderRadius: '24px',
+            bgcolor: 'rgba(255,255,255,0.12)',
+            backdropFilter: 'blur(8px)',
+            zIndex: 10,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 0.75,
+          }}>
+            <Typography sx={{ fontSize: '0.85rem', color: 'white', fontWeight: 600 }}>
+              {lightboxIndex + 1} / {lightboxImages.length}
+            </Typography>
+          </Box>
+        )}
+
+        {/* Navigation Arrows */}
+        {lightboxImages.length > 1 && (
+          <>
+            <IconButton
+              onClick={() => setLightboxIndex((prev) => (prev - 1 + lightboxImages.length) % lightboxImages.length)}
+              sx={{
+                position: 'absolute',
+                top: '50%',
+                left: { xs: 8, sm: 24 },
+                transform: 'translateY(-50%)',
+                bgcolor: 'rgba(255,255,255,0.12)',
+                backdropFilter: 'blur(8px)',
+                color: 'white',
+                zIndex: 10,
+                width: { xs: 40, sm: 48 },
+                height: { xs: 40, sm: 48 },
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.2)', transform: 'translateY(-50%) scale(1.05)' },
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <ChevronLeft size={24} />
+            </IconButton>
+            <IconButton
+              onClick={() => setLightboxIndex((prev) => (prev + 1) % lightboxImages.length)}
+              sx={{
+                position: 'absolute',
+                top: '50%',
+                right: { xs: 8, sm: 24 },
+                transform: 'translateY(-50%)',
+                bgcolor: 'rgba(255,255,255,0.12)',
+                backdropFilter: 'blur(8px)',
+                color: 'white',
+                zIndex: 10,
+                width: { xs: 40, sm: 48 },
+                height: { xs: 40, sm: 48 },
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.2)', transform: 'translateY(-50%) scale(1.05)' },
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <ChevronRight size={24} />
+            </IconButton>
+          </>
+        )}
+
+        {/* Main Image */}
         {lightboxImage && (
           <Box
-            component="img"
-            src={lightboxImage}
-            alt="Full size"
             sx={{
-              maxWidth: '90vw',
-              maxHeight: '90vh',
-              objectFit: 'contain',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '100%',
+              height: '100%',
+              p: { xs: 2, sm: 4 },
             }}
-          />
+          >
+            <Box
+              component="img"
+              src={lightboxImages.length > 1 ? lightboxImages[lightboxIndex] : lightboxImage}
+              alt="Full size"
+              sx={{
+                maxWidth: '100%',
+                maxHeight: '100%',
+                objectFit: 'contain',
+                borderRadius: '8px',
+                userSelect: 'none',
+              }}
+            />
+          </Box>
+        )}
+
+        {/* Thumbnail strip */}
+        {lightboxImages.length > 1 && (
+          <Box sx={{
+            position: 'absolute',
+            bottom: { xs: 16, sm: 24 },
+            left: '50%',
+            transform: 'translateX(-50%)',
+            display: 'flex',
+            gap: 1,
+            px: 2,
+            py: 1,
+            borderRadius: '16px',
+            bgcolor: 'rgba(0,0,0,0.5)',
+            backdropFilter: 'blur(12px)',
+            maxWidth: '90vw',
+            overflowX: 'auto',
+          }}>
+            {lightboxImages.map((img, idx) => (
+              <Box
+                key={idx}
+                onClick={() => setLightboxIndex(idx)}
+                sx={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: '10px',
+                  border: lightboxIndex === idx ? '2px solid white' : '2px solid transparent',
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                  opacity: lightboxIndex === idx ? 1 : 0.5,
+                  transition: 'all 0.2s ease',
+                  flexShrink: 0,
+                  '&:hover': { opacity: 1 },
+                }}
+              >
+                <Box
+                  component="img"
+                  src={img}
+                  alt={`Thumbnail ${idx + 1}`}
+                  sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                />
+              </Box>
+            ))}
+          </Box>
         )}
       </Dialog>
     </>
@@ -1932,6 +2075,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Copy,
+  Expand,
   History,
   Home,
   LogIn,
@@ -2548,6 +2692,9 @@ export default function HomePage() {
     isLongSleeve: false,
   });
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [lightboxImages, setLightboxImages] = useState<string[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
   const sizeSelectorRef = useRef<HTMLDivElement>(null);
   const customNameInputRef = useRef<HTMLInputElement>(null);
   const customNumberInputRef = useRef<HTMLInputElement>(null);
@@ -3392,15 +3539,38 @@ export default function HomePage() {
 
   const handleShareProduct = async (product: Product) => {
     const url = getProductLink(product);
+    const shareText = `${product.name} - ฿${product.basePrice.toLocaleString()}`;
+
+    // Try to fetch product image as a File for sharing
+    const getImageFile = async (): Promise<File | null> => {
+      const imgUrl = product.coverImage || product.images?.[0];
+      if (!imgUrl) return null;
+      try {
+        const res = await fetch(imgUrl, { cache: 'force-cache' });
+        if (!res.ok) return null;
+        const blob = await res.blob();
+        const ext = blob.type.split('/')[1] || 'jpg';
+        return new File([blob], `${product.name}.${ext}`, { type: blob.type });
+      } catch {
+        return null;
+      }
+    };
+
     try {
       if (navigator.share) {
-        await navigator.share({ title: product.name, text: `${product.name} - ฿${product.basePrice.toLocaleString()}`, url });
+        // Try sharing with image file first
+        const file = await getImageFile();
+        if (file && navigator.canShare?.({ files: [file] })) {
+          await navigator.share({ title: product.name, text: shareText, url, files: [file] });
+        } else {
+          await navigator.share({ title: product.name, text: shareText, url });
+        }
       } else {
-        await navigator.clipboard.writeText(url);
+        await navigator.clipboard.writeText(`${shareText}\n${url}`);
         showToast('success', 'คัดลอกลิงก์สินค้าแล้ว');
       }
     } catch {
-      try { await navigator.clipboard.writeText(url); showToast('success', 'คัดลอกลิงก์สินค้าแล้ว'); } catch { /* ignore */ }
+      try { await navigator.clipboard.writeText(`${shareText}\n${url}`); showToast('success', 'คัดลอกลิงก์สินค้าแล้ว'); } catch { /* ignore */ }
     }
   };
 
@@ -3684,17 +3854,25 @@ export default function HomePage() {
             {productImages.length > 0 ? (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {/* Main Image with loading state */}
-                <Box sx={{ 
-                  position: 'relative', 
-                  borderRadius: '24px', 
-                  overflow: 'hidden',
-                  bgcolor: 'var(--surface-2)',
-                  border: '1px solid var(--glass-border)',
-                  boxShadow: (theme: any) => theme.palette.mode === 'dark'
-                    ? '0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)'
-                    : '0 8px 32px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.8)',
-                  height: { xs: 300, sm: 380, md: 440 },
-                }}>
+                <Box 
+                  onClick={() => {
+                    setLightboxImages(productImages);
+                    setLightboxIndex(activeImageIndex);
+                    setLightboxImage(productImages[activeImageIndex] || productImages[0]);
+                  }}
+                  sx={{ 
+                    position: 'relative', 
+                    borderRadius: '24px', 
+                    overflow: 'hidden',
+                    bgcolor: 'var(--surface-2)',
+                    border: '1px solid var(--glass-border)',
+                    boxShadow: (theme: any) => theme.palette.mode === 'dark'
+                      ? '0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)'
+                      : '0 8px 32px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.8)',
+                    height: { xs: 300, sm: 380, md: 440 },
+                    cursor: 'pointer',
+                    '&:hover .expand-icon': { opacity: 1 },
+                  }}>
                   <OptimizedImage
                     src={productImages[activeImageIndex] || productImages[0]}
                     alt={`${selectedProduct.name} - รูปที่ ${activeImageIndex + 1}`}
@@ -3709,6 +3887,29 @@ export default function HomePage() {
                       inset: 0,
                     }}
                   />
+                  {/* Expand Icon Overlay */}
+                  <Box
+                    className="expand-icon"
+                    sx={{
+                      position: 'absolute',
+                      top: 12,
+                      left: 12,
+                      width: 40,
+                      height: 40,
+                      borderRadius: '12px',
+                      bgcolor: 'rgba(0,0,0,0.55)',
+                      backdropFilter: 'blur(8px)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      opacity: { xs: 0.85, sm: 0 },
+                      transition: 'opacity 0.2s ease',
+                      zIndex: 3,
+                      border: '1px solid rgba(255,255,255,0.15)',
+                    }}
+                  >
+                    <Expand size={18} color="white" />
+                  </Box>
                   {/* Gradient overlay at bottom */}
                   <Box sx={{
                     position: 'absolute',
@@ -5950,6 +6151,24 @@ export default function HomePage() {
       <AnnouncementBar
         announcements={announcements || []}
         history={announcementHistory}
+        socialMediaNews={config?.socialMediaNews}
+        onProductClick={(productId) => {
+          const products = config?.products || [];
+          let product = null;
+          if (productId && productId !== '__default__') {
+            product = products.find(p => p.id === productId)
+              || products.find(p => p.id?.includes(productId) || productId?.includes(p.id));
+          }
+          // Fallback: open first product if only one, or scroll to grid
+          if (!product && products.length > 0) {
+            product = products[0];
+          }
+          if (product) {
+            handleSelectProduct(product);
+          } else {
+            document.getElementById('product-grid')?.scrollIntoView({ behavior: 'smooth' });
+          }
+        }}
       />
 
       {/* Event / Promotion Banners */}
@@ -5957,13 +6176,20 @@ export default function HomePage() {
         events={config?.events || []}
         onEventClick={(event) => {
           if (event.ctaLink) {
-            // If it looks like a product ID, scroll to products
             if (event.ctaLink.startsWith('http')) {
               window.open(event.ctaLink, '_blank');
             } else {
-              // Treat as product ID — scroll to product grid
-              const el = document.getElementById('product-grid');
-              if (el) el.scrollIntoView({ behavior: 'smooth' });
+              // Treat as product ID — find and open the product
+              const products = config?.products || [];
+              const product = products.find(p => p.id === event.ctaLink)
+                || products.find(p => p.id?.includes(event.ctaLink!) || event.ctaLink!.includes(p.id));
+              if (product) {
+                handleSelectProduct(product);
+              } else if (products.length > 0) {
+                handleSelectProduct(products[0]);
+              } else {
+                document.getElementById('product-grid')?.scrollIntoView({ behavior: 'smooth' });
+              }
             }
           }
         }}
@@ -6306,8 +6532,44 @@ export default function HomePage() {
                     <Typography sx={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                       {items.length} รายการ
                     </Typography>
+                    {items.length > 1 && (
+                      <Typography sx={{ 
+                        display: { xs: 'flex', sm: 'none' }, 
+                        alignItems: 'center',
+                        gap: 0.5,
+                        fontSize: '0.7rem', 
+                        color: 'var(--text-muted)',
+                        ml: 'auto',
+                      }}>
+                        เลื่อนดูเพิ่ม →
+                      </Typography>
+                    )}
                   </Box>
-                  <Grid container spacing={2} sx={{ width: '100%', m: 0 }}>
+                  <Box sx={{ position: 'relative', overflow: 'hidden', mx: { xs: -2, sm: 0 } }}>
+                    {/* Right fade hint on mobile */}
+                    <Box sx={{
+                      display: { xs: 'block', sm: 'none' },
+                      position: 'absolute',
+                      top: 0,
+                      right: 0,
+                      bottom: 0,
+                      width: 32,
+                      background: 'linear-gradient(to right, transparent, var(--background))',
+                      zIndex: 2,
+                      pointerEvents: 'none',
+                    }} />
+                  <Box sx={{
+                    display: { xs: 'flex', sm: 'grid' },
+                    gridTemplateColumns: { sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)', lg: 'repeat(4, 1fr)' },
+                    gap: 2,
+                    overflowX: { xs: 'auto', sm: 'visible' },
+                    scrollSnapType: { xs: 'x mandatory', sm: 'none' },
+                    WebkitOverflowScrolling: 'touch',
+                    '&::-webkit-scrollbar': { display: 'none' },
+                    scrollbarWidth: 'none',
+                    px: { xs: 2, sm: 0 },
+                    pb: { xs: 1, sm: 0 },
+                  }}>
                     {items.map((product, productIdx) => {
                       const productStatus = getProductStatus(product);
                       const isProductAvailable = productStatus === 'OPEN' && isShopOpen;
@@ -6315,7 +6577,12 @@ export default function HomePage() {
                       const eventDiscount = getEventDiscount(product.id, config?.events as ShopEvent[] | undefined);
                       
                       return (
-                      <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={product.id}>
+                      <Box key={product.id} sx={{
+                        minWidth: { xs: '68vw', sm: 'auto' },
+                        maxWidth: { xs: '68vw', sm: 'none' },
+                        flex: { xs: '0 0 auto', sm: '1 1 auto' },
+                        scrollSnapAlign: { xs: 'start', sm: 'unset' },
+                      }}>
                         <Box
                           onClick={() => {
                             if (!isShopOpen) {
@@ -6711,10 +6978,11 @@ export default function HomePage() {
                             </Box>
                           </Box>
                         </Box>
-                      </Grid>
+                      </Box>
                     );
                     })}
-                  </Grid>
+                  </Box>
+                  </Box>
                 </Box>
               ))
             ) : (
@@ -7159,6 +7427,11 @@ export default function HomePage() {
         isShopOpen={isShopOpen}
         realtimeConnected={realtimeConnected}
         config={config}
+        onImageClick={(image) => {
+          setLightboxImages([image]);
+          setLightboxIndex(0);
+          setLightboxImage(image);
+        }}
       />
 
       <Box
@@ -7204,6 +7477,7 @@ export default function HomePage() {
                   mt: -2.5,
                   touchAction: 'manipulation',
                   WebkitTapHighlightColor: 'transparent',
+                  userSelect: 'none',
                 }}
               >
                 <Box
@@ -7215,14 +7489,11 @@ export default function HomePage() {
                     display: 'grid',
                     placeItems: 'center',
                     color: 'white',
-                    boxShadow: '0 4px 20px rgba(0,113,227,0.45), 0 0 0 4px rgba(0,113,227,0.12)',
-                    transition: 'all 0.25s ease',
-                    '&:hover': {
-                      transform: 'scale(1.08)',
-                      boxShadow: '0 6px 28px rgba(0,113,227,0.55), 0 0 0 4px rgba(0,113,227,0.18)',
-                    },
+                    boxShadow: '0 4px 16px rgba(0,113,227,0.4), 0 0 0 3px rgba(0,113,227,0.1)',
+                    willChange: 'transform',
+                    transition: 'transform 0.15s cubic-bezier(0.2, 0, 0, 1)',
                     '&:active': {
-                      transform: 'scale(0.95)',
+                      transform: 'scale(0.92)',
                     },
                   }}
                 >
@@ -7804,6 +8075,8 @@ export default function HomePage() {
         onClose={() => setChatMenuAnchor(null)}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
         transformOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        transitionDuration={{ enter: 150, exit: 100 }}
+        disableScrollLock
         slotProps={{
           paper: {
             sx: {
@@ -7813,8 +8086,8 @@ export default function HomePage() {
               minWidth: 220,
               border: (theme: any) => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}`,
               boxShadow: (theme: any) => theme.palette.mode === 'dark'
-                ? '0 8px 30px rgba(0,0,0,0.5)'
-                : '0 8px 30px rgba(0,0,0,0.12)',
+                ? '0 8px 24px rgba(0,0,0,0.5)'
+                : '0 8px 24px rgba(0,0,0,0.12)',
               mb: 1,
               overflow: 'hidden',
             },
@@ -7833,8 +8106,10 @@ export default function HomePage() {
             px: 2.5,
             py: 1.8,
             cursor: 'pointer',
-            transition: 'background 0.15s',
-            '&:hover': { bgcolor: (theme: any) => theme.palette.mode === 'dark' ? 'rgba(34,197,94,0.12)' : 'rgba(34,197,94,0.08)' },
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            transition: 'background 0.1s',
+            '&:active': { bgcolor: (theme: any) => theme.palette.mode === 'dark' ? 'rgba(34,197,94,0.15)' : 'rgba(34,197,94,0.1)' },
           }}
         >
           <Bot size={24} color="#30d158" />
@@ -7856,8 +8131,10 @@ export default function HomePage() {
             px: 2.5,
             py: 1.8,
             cursor: 'pointer',
-            transition: 'background 0.15s',
-            '&:hover': { bgcolor: (theme: any) => theme.palette.mode === 'dark' ? 'rgba(0,113,227,0.12)' : 'rgba(0,113,227,0.08)' },
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            transition: 'background 0.1s',
+            '&:active': { bgcolor: (theme: any) => theme.palette.mode === 'dark' ? 'rgba(0,113,227,0.15)' : 'rgba(0,113,227,0.1)' },
           }}
         >
           <Headphones size={24} color="#0071e3" />
@@ -7878,6 +8155,130 @@ export default function HomePage() {
         externalOpen={supportChatOpen}
         onExternalOpenHandled={() => setSupportChatOpen(false)}
       />
+
+      {/* Image Lightbox - Fullscreen Gallery (HomePage) */}
+      <Dialog
+        open={!!lightboxImage}
+        onClose={() => { setLightboxImage(null); setLightboxImages([]); }}
+        maxWidth={false}
+        fullScreen
+        PaperProps={{
+          sx: {
+            background: 'rgba(0,0,0,0.97)',
+            boxShadow: 'none',
+          }
+        }}
+        sx={{
+          zIndex: 99999,
+          '& .MuiDialog-container': {
+            alignItems: 'center',
+            justifyContent: 'center',
+          },
+        }}
+      >
+        <IconButton
+          onClick={() => { setLightboxImage(null); setLightboxImages([]); }}
+          sx={{
+            position: 'absolute',
+            top: { xs: 12, sm: 16 },
+            right: { xs: 12, sm: 16 },
+            color: 'white',
+            bgcolor: 'rgba(255,255,255,0.12)',
+            backdropFilter: 'blur(8px)',
+            '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' },
+            zIndex: 10,
+            width: 44,
+            height: 44,
+          }}
+        >
+          <X size={24} />
+        </IconButton>
+        {lightboxImages.length > 1 && (
+          <Box sx={{
+            position: 'absolute',
+            top: { xs: 16, sm: 20 },
+            left: '50%',
+            transform: 'translateX(-50%)',
+            px: 2.5,
+            py: 0.75,
+            borderRadius: '24px',
+            bgcolor: 'rgba(255,255,255,0.12)',
+            backdropFilter: 'blur(8px)',
+            zIndex: 10,
+          }}>
+            <Typography sx={{ fontSize: '0.85rem', color: 'white', fontWeight: 600 }}>
+              {lightboxIndex + 1} / {lightboxImages.length}
+            </Typography>
+          </Box>
+        )}
+        {lightboxImages.length > 1 && (
+          <>
+            <IconButton
+              onClick={() => setLightboxIndex((prev) => (prev - 1 + lightboxImages.length) % lightboxImages.length)}
+              sx={{
+                position: 'absolute', top: '50%', left: { xs: 8, sm: 24 },
+                transform: 'translateY(-50%)',
+                bgcolor: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(8px)',
+                color: 'white', zIndex: 10,
+                width: { xs: 40, sm: 48 }, height: { xs: 40, sm: 48 },
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.2)', transform: 'translateY(-50%) scale(1.05)' },
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <ChevronLeft size={24} />
+            </IconButton>
+            <IconButton
+              onClick={() => setLightboxIndex((prev) => (prev + 1) % lightboxImages.length)}
+              sx={{
+                position: 'absolute', top: '50%', right: { xs: 8, sm: 24 },
+                transform: 'translateY(-50%)',
+                bgcolor: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(8px)',
+                color: 'white', zIndex: 10,
+                width: { xs: 40, sm: 48 }, height: { xs: 40, sm: 48 },
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.2)', transform: 'translateY(-50%) scale(1.05)' },
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <ChevronRight size={24} />
+            </IconButton>
+          </>
+        )}
+        {lightboxImage && (
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', p: { xs: 2, sm: 4 } }}>
+            <Box
+              component="img"
+              src={lightboxImages.length > 1 ? lightboxImages[lightboxIndex] : lightboxImage}
+              alt="Full size"
+              sx={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '8px', userSelect: 'none' }}
+            />
+          </Box>
+        )}
+        {lightboxImages.length > 1 && (
+          <Box sx={{
+            position: 'absolute', bottom: { xs: 16, sm: 24 }, left: '50%', transform: 'translateX(-50%)',
+            display: 'flex', gap: 1, px: 2, py: 1, borderRadius: '16px',
+            bgcolor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(12px)',
+            maxWidth: '90vw', overflowX: 'auto',
+          }}>
+            {lightboxImages.map((img, idx) => (
+              <Box
+                key={idx}
+                onClick={() => setLightboxIndex(idx)}
+                sx={{
+                  width: 48, height: 48, borderRadius: '10px',
+                  border: lightboxIndex === idx ? '2px solid white' : '2px solid transparent',
+                  overflow: 'hidden', cursor: 'pointer',
+                  opacity: lightboxIndex === idx ? 1 : 0.5,
+                  transition: 'all 0.2s ease', flexShrink: 0,
+                  '&:hover': { opacity: 1 },
+                }}
+              >
+                <Box component="img" src={img} alt={`Thumbnail ${idx + 1}`} sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              </Box>
+            ))}
+          </Box>
+        )}
+      </Dialog>
     </Box>
   );
 }

@@ -108,6 +108,14 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
   const [pushBannerDismissed, setPushBannerDismissed] = useState(false);
   const [adminDisplayName, setAdminDisplayName] = useState(DEFAULT_ADMIN_NAME);
   
+  // Detect touch device for mobile-friendly Enter key behavior
+  const [isTouchDevice, setIsTouchDevice] = useState(false);
+  useEffect(() => {
+    setIsTouchDevice(
+      'ontouchstart' in window || navigator.maxTouchPoints > 0
+    );
+  }, []);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -252,10 +260,13 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
     }, 3000);
   }, [chat?.id, chat?.status]);
 
-  // Poll for new messages and typing indicator
+  // Poll for new messages and typing indicator (consolidated into single poll)
   useEffect(() => {
     if (open && chat && chat.status !== 'closed') {
+      let isPolling = false;
       pollIntervalRef.current = setInterval(async () => {
+        if (isPolling) return; // Skip if previous poll still running
+        isPolling = true;
         try {
           // Fetch chat messages
           const res = await fetch(`/api/support-chat/${chat.id}`);
@@ -268,19 +279,24 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
             }
           }
 
-          // Auto mark as read when customer is viewing the chat
+          // Auto mark as read + fetch typing in parallel (fire-and-forget)
+          const promises: Promise<any>[] = [];
           if (chat.status === 'active' && !showHistory && !showNewChat && !showRating) {
-            fetch(`/api/support-chat/${chat.id}/read`, { method: 'POST' }).catch(() => {});
+            promises.push(fetch(`/api/support-chat/${chat.id}/read`, { method: 'POST' }).catch(() => {}));
           }
-
-          // Fetch typing indicator
-          const typingRes = await fetch(`/api/support-chat/${chat.id}/typing`);
-          const typingData = await typingRes.json();
-          setAdminTyping(typingData.isTyping || false);
+          promises.push(
+            fetch(`/api/support-chat/${chat.id}/typing`)
+              .then(r => r.json())
+              .then(d => setAdminTyping(d.isTyping || false))
+              .catch(() => {})
+          );
+          await Promise.all(promises);
         } catch (error) {
           console.error('Error polling chat:', error);
+        } finally {
+          isPolling = false;
         }
-      }, 3000); // Poll every 3 seconds
+      }, 5000); // Poll every 5 seconds (was 3s with sequential calls)
       
       return () => {
         if (pollIntervalRef.current) {
@@ -769,44 +785,150 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
         onChange={handleImageSelect}
       />
 
-      {/* Floating Chat Button */}
+      {/* Floating Chat Button — Modern Animated */}
       <Zoom in={!open}>
         <Box
           sx={{
             position: 'fixed',
-            bottom: 24,
-            right: 24,
+            bottom: { xs: 20, sm: 24 },
+            right: { xs: 16, sm: 24 },
             zIndex: 1200,
             display: hideMobileFab ? { xs: 'none', md: 'block' } : 'block',
+            // Container for glow rings + button
+            width: { xs: 58, sm: 64 },
+            height: { xs: 58, sm: 64 },
           }}
         >
+          {/* Outer aurora glow ring — slow spin */}
+          <Box
+            sx={{
+              position: 'absolute',
+              inset: { xs: -5, sm: -7 },
+              borderRadius: '50%',
+              background: 'conic-gradient(from 0deg, #6366f1, #8b5cf6, #a78bfa, #c084fc, #e879f9, #f472b6, #fb7185, #f97316, #fbbf24, #34d399, #22d3ee, #60a5fa, #6366f1)',
+              opacity: unreadCount > 0 ? 0.85 : 0.35,
+              animation: 'chatGlowSpin 8s linear infinite',
+              filter: { xs: 'blur(6px)', sm: 'blur(10px)' },
+              willChange: 'transform',
+              '@keyframes chatGlowSpin': {
+                '0%': { transform: 'rotate(0deg)' },
+                '100%': { transform: 'rotate(360deg)' },
+              },
+            }}
+          />
+          {/* Inner accent ring — reverse spin, tighter */}
+          <Box
+            sx={{
+              position: 'absolute',
+              inset: { xs: -1, sm: -2 },
+              borderRadius: '50%',
+              background: 'conic-gradient(from 90deg, #818cf8 0%, #c084fc 25%, #f0abfc 50%, #818cf8 75%, #60a5fa 100%)',
+              opacity: unreadCount > 0 ? 0.7 : 0.25,
+              animation: 'chatGlowReverse 5s linear infinite',
+              willChange: 'transform',
+              '@keyframes chatGlowReverse': {
+                '0%': { transform: 'rotate(360deg)' },
+                '100%': { transform: 'rotate(0deg)' },
+              },
+            }}
+          />
+          {/* Pulse ring — expands outward when unread */}
+          {unreadCount > 0 && (
+            <Box
+              sx={{
+                position: 'absolute',
+                inset: 0,
+                borderRadius: '50%',
+                border: '2px solid rgba(139, 92, 246, 0.5)',
+                animation: 'chatPulseRing 2s cubic-bezier(0, 0, 0.2, 1) infinite',
+                '@keyframes chatPulseRing': {
+                  '0%': { transform: 'scale(1)', opacity: 0.6 },
+                  '100%': { transform: 'scale(1.6)', opacity: 0 },
+                },
+              }}
+            />
+          )}
           <Badge
             badgeContent={unreadCount}
-            color="error"
             overlap="circular"
             sx={{
+              width: '100%',
+              height: '100%',
               '& .MuiBadge-badge': {
-                right: 8,
-                top: 8,
+                right: { xs: 4, sm: 6 },
+                top: { xs: 4, sm: 6 },
+                fontWeight: 800,
+                fontSize: '0.72rem',
+                minWidth: 21,
+                height: 21,
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #ef4444 0%, #f97316 100%)',
+                color: '#fff',
+                border: '2px solid var(--background)',
+                boxShadow: '0 2px 12px rgba(239,68,68,0.6)',
+                animation: unreadCount > 0 ? 'chatBadgePop 1.8s ease-in-out infinite' : 'none',
+                '@keyframes chatBadgePop': {
+                  '0%, 100%': { transform: 'scale(1) translateY(0)' },
+                  '30%': { transform: 'scale(1.25) translateY(-2px)' },
+                  '60%': { transform: 'scale(0.95) translateY(0)' },
+                },
               },
             }}
           >
             <IconButton
               onClick={handleOpenMenu}
+              aria-label="เปิดแชท"
               sx={{
-                width: 60,
-                height: 60,
-                bgcolor: '#0071e3',
+                position: 'relative',
+                width: '100%',
+                height: '100%',
+                background: 'linear-gradient(145deg, #7c3aed 0%, #6d28d9 40%, #5b21b6 100%)',
                 color: 'white',
-                boxShadow: '0 4px 20px rgba(0,113,227, 0.4)',
-                '&:hover': {
-                  bgcolor: '#1d4ed8',
-                  transform: 'scale(1.05)',
+                boxShadow: '0 8px 30px rgba(109,40,217,0.5), 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255,255,255,0.2), inset 0 -1px 2px rgba(0,0,0,0.15)',
+                overflow: 'hidden',
+                borderRadius: '50%',
+                // Sheen sweep
+                '&::before': {
+                  content: '""',
+                  position: 'absolute',
+                  top: 0,
+                  left: '-150%',
+                  width: '80%',
+                  height: '100%',
+                  background: 'linear-gradient(105deg, transparent 20%, rgba(255,255,255,0.25) 50%, transparent 80%)',
+                  animation: 'chatSheen 4s ease-in-out infinite',
+                  pointerEvents: 'none',
+                  '@keyframes chatSheen': {
+                    '0%, 100%': { left: '-150%' },
+                    '40%': { left: '150%' },
+                    '41%': { left: '-150%' },
+                  },
                 },
-                transition: 'all 0.2s ease',
+                // Top highlight arc
+                '&::after': {
+                  content: '""',
+                  position: 'absolute',
+                  top: 2,
+                  left: '20%',
+                  right: '20%',
+                  height: '40%',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(180deg, rgba(255,255,255,0.2) 0%, transparent 100%)',
+                  pointerEvents: 'none',
+                },
+                '&:hover': {
+                  background: 'linear-gradient(145deg, #8b5cf6 0%, #7c3aed 40%, #6d28d9 100%)',
+                  transform: 'scale(1.1)',
+                  boxShadow: '0 12px 40px rgba(124,58,237,0.6), 0 4px 12px rgba(0,0,0,0.25), inset 0 1px 1px rgba(255,255,255,0.25)',
+                },
+                '&:active': {
+                  transform: 'scale(0.92)',
+                  boxShadow: '0 4px 16px rgba(109,40,217,0.4), inset 0 2px 4px rgba(0,0,0,0.2)',
+                },
+                transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
               }}
             >
-              <ChatIcon size={28} />
+              <ChatIcon size={26} strokeWidth={2.3} />
             </IconButton>
           </Badge>
         </Box>
@@ -1690,7 +1812,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                   }}>
                     <BellIcon size={16} color="#0071e3" />
                     <Typography sx={{ flex: 1, fontSize: '0.75rem', color: 'var(--foreground)', lineHeight: 1.3 }}>
-                      เปิดการแจ้งเตือนเพื่อไม่พลาดข้อความจากแอดมิน
+                      รับการแจ้งเตือนเมื่อมีข้อความใหม่หรือสถานะออเดอร์อัปเดต
                     </Typography>
                     <Button
                       size="small"
@@ -2123,14 +2245,16 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                       size="small"
                       multiline
                       maxRows={4}
-                      placeholder={replyToMessage ? "พิมพ์ข้อความตอบกลับ..." : "พิมพ์ข้อความ... (Shift+Enter = ขึ้นบรรทัด)"}
+                      placeholder={replyToMessage ? "พิมพ์ข้อความตอบกลับ..." : (isTouchDevice ? "พิมพ์ข้อความ..." : "พิมพ์ข้อความ... (Shift+Enter = ขึ้นบรรทัด)")}
                       value={message}
                       onChange={(e) => {
                         setMessage(e.target.value);
                         sendTypingIndicator();
                       }}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
+                        // On mobile/touch devices: Enter = new line, use send button to send
+                        // On desktop: Enter = send, Shift+Enter = new line
+                        if (e.key === 'Enter' && !e.shiftKey && !isTouchDevice) {
                           e.preventDefault();
                           handleSendMessage();
                         }

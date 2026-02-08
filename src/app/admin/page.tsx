@@ -291,6 +291,8 @@ interface Announcement {
   link?: string;
   /** ข้อความปุ่มลิงก์ */
   linkText?: string;
+  /** สินค้าที่เชื่อมโยง */
+  linkedProductId?: string;
 }
 
 const ADMIN_CACHE_KEY = 'psusccshop-admin-cache';
@@ -2558,7 +2560,7 @@ const EventsView = React.memo(function EventsView({
               />
 
               {/* CTA */}
-              <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 1.5 }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                 <TextField
                   fullWidth
                   label="ข้อความปุ่ม"
@@ -2574,21 +2576,50 @@ const EventsView = React.memo(function EventsView({
                     '& .MuiInputLabel-root': { color: 'var(--text-muted)' },
                   }}
                 />
-                <TextField
-                  fullWidth
-                  label="ลิงก์ / Product ID"
-                  value={editingEvent.ctaLink || ''}
-                  onChange={e => setEditingEvent(prev => prev ? { ...prev, ctaLink: e.target.value } : null)}
-                  placeholder="https://... หรือ product_id"
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '12px',
-                      bgcolor: 'var(--surface)',
-                      color: 'var(--foreground)',
-                    },
-                    '& .MuiInputLabel-root': { color: 'var(--text-muted)' },
-                  }}
-                />
+                <Box>
+                  <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)', mb: 1 }}>เชื่อมโยงสินค้า (คลิกปุ่มจะเปิดหน้าสินค้า)</Typography>
+                  <Autocomplete
+                    size="small"
+                    options={config.products || []}
+                    getOptionLabel={(option: any) => option.name || ''}
+                    value={(config.products || []).find((p: any) => p.id === editingEvent.ctaLink) || null}
+                    onChange={(_, newVal: any) => {
+                      setEditingEvent(prev => prev ? { ...prev, ctaLink: newVal?.id || '' } : null);
+                    }}
+                    renderOption={({ key, ...props }, option: any) => (
+                      <Box component="li" key={key} {...props} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 1 }}>
+                        {(option.coverImage || option.images?.[0]) && (
+                          <Box
+                            component="img"
+                            src={option.coverImage || option.images?.[0]}
+                            alt=""
+                            sx={{ width: 36, height: 36, borderRadius: '8px', objectFit: 'cover', flexShrink: 0 }}
+                          />
+                        )}
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>{option.name}</Typography>
+                          <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>฿{option.basePrice?.toLocaleString()}</Typography>
+                        </Box>
+                      </Box>
+                    )}
+                    renderInput={(params) => (
+                      <TextField {...params} placeholder="ค้นหาสินค้า..." sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: '12px',
+                          bgcolor: 'var(--surface)',
+                          color: 'var(--foreground)',
+                        },
+                        '& .MuiInputLabel-root': { color: 'var(--text-muted)' },
+                      }} />
+                    )}
+                    noOptionsText="ไม่พบสินค้า"
+                  />
+                  {editingEvent.ctaLink && !editingEvent.ctaLink.startsWith('http') && (
+                    <Typography sx={{ fontSize: '0.7rem', color: '#10b981', mt: 0.5 }}>
+                      ✓ เชื่อมโยงกับสินค้า: {(config.products || []).find((p: any) => p.id === editingEvent.ctaLink)?.name || editingEvent.ctaLink}
+                    </Typography>
+                  )}
+                </Box>
               </Box>
 
               {/* Dates */}
@@ -3480,20 +3511,76 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
                       helperText="เลือก emoji ที่ต้องการแสดง (ว่าง = ✨)"
                       sx={inputSx}
                     />
-                    <TextField
-                      label="ลิงก์แนบ (ไม่บังคับ)"
-                      value={editingAnn.link || ''}
-                      onChange={(e) => setEditingAnn({ ...editingAnn, link: e.target.value })}
-                      placeholder="https://..."
-                      size="small"
-                      sx={inputSx}
-                    />
-                    {editingAnn.link && (
+
+                    {/* Product Picker */}
+                    <Box>
+                      <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)', mb: 1 }}>เชื่อมโยงสินค้า (เลือกแทนการใส่ลิงก์)</Typography>
+                      <Autocomplete
+                        size="small"
+                        options={config.products || []}
+                        getOptionLabel={(option: any) => option.name || ''}
+                        value={(config.products || []).find((p: any) => p.id === editingAnn.linkedProductId) || null}
+                        onChange={(_, newVal: any) => {
+                          if (newVal) {
+                            const imgUrl = newVal.coverImage || newVal.images?.[0] || '';
+                            setEditingAnn({ 
+                              ...editingAnn, 
+                              linkedProductId: newVal.id,
+                              link: '', // clear manual link when product is selected
+                              linkText: editingAnn.linkText || 'ดูสินค้า →',
+                              // Auto-set image if not already set
+                              ...(!editingAnn.imageUrl && imgUrl ? { imageUrl: imgUrl, type: editingAnn.message ? 'both' : 'image' } : {}),
+                            });
+                          } else {
+                            setEditingAnn({ ...editingAnn, linkedProductId: undefined });
+                          }
+                        }}
+                        renderOption={({ key, ...props }, option: any) => (
+                          <Box component="li" key={key} {...props} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 1 }}>
+                            {(option.coverImage || option.images?.[0]) && (
+                              <Box
+                                component="img"
+                                src={option.coverImage || option.images?.[0]}
+                                alt=""
+                                sx={{ width: 36, height: 36, borderRadius: '8px', objectFit: 'cover', flexShrink: 0 }}
+                              />
+                            )}
+                            <Box sx={{ minWidth: 0 }}>
+                              <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>{option.name}</Typography>
+                              <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>฿{option.basePrice?.toLocaleString()}</Typography>
+                            </Box>
+                          </Box>
+                        )}
+                        renderInput={(params) => (
+                          <TextField {...params} placeholder="ค้นหาสินค้า..." sx={inputSx} />
+                        )}
+                        noOptionsText="ไม่พบสินค้า"
+                        sx={{ '& .MuiAutocomplete-listbox': { bgcolor: 'var(--surface-2)' } }}
+                      />
+                      {editingAnn.linkedProductId && (
+                        <Typography sx={{ fontSize: '0.7rem', color: '#10b981', mt: 0.5 }}>
+                          ✓ เชื่อมโยงกับสินค้า — คลิกที่ประกาศจะเปิดหน้าสินค้าโดยตรง
+                        </Typography>
+                      )}
+                    </Box>
+
+                    {/* Manual Link (when no product selected) */}
+                    {!editingAnn.linkedProductId && (
                       <TextField
-                        label="ข้อความปุ่มลิงก์"
+                        label="ลิงก์แนบ (ไม่บังคับ)"
+                        value={editingAnn.link || ''}
+                        onChange={(e) => setEditingAnn({ ...editingAnn, link: e.target.value })}
+                        placeholder="https://..."
+                        size="small"
+                        sx={inputSx}
+                      />
+                    )}
+                    {(editingAnn.link || editingAnn.linkedProductId) && (
+                      <TextField
+                        label="ข้อความปุ่ม"
                         value={editingAnn.linkText || ''}
                         onChange={(e) => setEditingAnn({ ...editingAnn, linkText: e.target.value })}
-                        placeholder="ดูเพิ่มเติม →"
+                        placeholder={editingAnn.linkedProductId ? "ดูสินค้า →" : "ดูเพิ่มเติม →"}
                         size="small"
                         sx={inputSx}
                       />
@@ -3714,6 +3801,196 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
           <Button onClick={() => setShowHistory(false)} sx={secondaryButtonSx}>ปิด</Button>
         </DialogActions>
       </Dialog>
+
+      {/* ==================== Social Media News Section ==================== */}
+      <Box sx={{ mt: 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Box>
+            <Typography sx={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--foreground)', display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Radio size={22} />
+              อัพเดตข่าวสาร / โซเชียลมีเดีย
+            </Typography>
+            <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              แจ้งเตือนลูกค้าเมื่อมีโพสต์ใหม่บน IG, Facebook, TikTok
+            </Typography>
+          </Box>
+          <Button
+            onClick={() => {
+              const newNews = {
+                id: `news_${Date.now()}`,
+                platform: 'instagram' as const,
+                title: '',
+                description: '',
+                postUrl: '',
+                imageUrl: '',
+                postedAt: new Date().toISOString(),
+                enabled: true,
+                createdBy: userEmail || 'แอดมิน',
+              };
+              const current = config.socialMediaNews || [];
+              saveConfig({ ...config, socialMediaNews: [newNews, ...current] });
+            }}
+            sx={{ ...gradientButtonSx, gap: 1 }}
+          >
+            <Add size={20} />
+            เพิ่มข่าว
+          </Button>
+        </Box>
+
+        {(config.socialMediaNews || []).length === 0 ? (
+          <Box sx={{ ...glassCardSx, p: 4, textAlign: 'center' }}>
+            <Radio size={48} color="#334155" style={{ marginBottom: 12 }} />
+            <Typography sx={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+              ยังไม่มีข่าวสาร — เพิ่มข่าวเมื่อมีโพสต์ใหม่บนโซเชียลมีเดีย
+            </Typography>
+          </Box>
+        ) : (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            {(config.socialMediaNews || []).map((news, idx) => {
+              const platformMap: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
+                instagram: { label: 'Instagram', icon: <ImageLucide size={14} />, color: '#E4405F' },
+                facebook: { label: 'Facebook', icon: <Groups size={14} />, color: '#1877F2' },
+                tiktok: { label: 'TikTok', icon: <Radio size={14} />, color: '#ff0050' },
+                line: { label: 'LINE', icon: <Send size={14} />, color: '#06C755' },
+              };
+              const pf = platformMap[news.platform] || platformMap.instagram;
+              return (
+                <Box key={news.id} sx={{
+                  ...glassCardSx,
+                  p: 2,
+                  opacity: news.enabled ? 1 : 0.5,
+                  borderLeft: `3px solid ${pf.color}`,
+                }}>
+                  <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
+                    {/* Image */}
+                    {news.imageUrl && (
+                      <Box component="img" src={news.imageUrl} alt="" sx={{ width: 60, height: 60, borderRadius: '10px', objectFit: 'cover', flexShrink: 0 }} />
+                    )}
+                    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                      {/* Platform + title row */}
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                        <Select
+                          size="small"
+                          value={news.platform}
+                          onChange={(e) => {
+                            const updated = [...(config.socialMediaNews || [])];
+                            updated[idx] = { ...news, platform: e.target.value as any };
+                            saveConfig({ ...config, socialMediaNews: updated });
+                          }}
+                          sx={{ minWidth: 130, fontSize: '0.8rem', ...inputSx }}
+                        >
+                          {Object.entries(platformMap).map(([k, v]) => (
+                            <MenuItem key={k} value={k} sx={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', color: v.color }}>{v.icon}</Box> {v.label}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                        <Box sx={{
+                          px: 1, py: 0.25, borderRadius: '6px',
+                          bgcolor: news.enabled ? 'rgba(16,185,129,0.15)' : 'rgba(100,116,139,0.15)',
+                          color: news.enabled ? '#10b981' : '#64748b',
+                          fontSize: '0.7rem', fontWeight: 600,
+                        }}>
+                          {news.enabled ? 'เปิด' : 'ปิด'}
+                        </Box>
+                      </Box>
+
+                      {/* Title */}
+                      <TextField
+                        size="small"
+                        placeholder="หัวข้อข่าว เช่น 'โพสต์ใหม่! เสื้อคอลเลคชันใหม่'"
+                        value={news.title}
+                        onChange={(e) => {
+                          const updated = [...(config.socialMediaNews || [])];
+                          updated[idx] = { ...news, title: e.target.value };
+                          saveConfig({ ...config, socialMediaNews: updated });
+                        }}
+                        fullWidth
+                        sx={inputSx}
+                      />
+
+                      {/* URL + Image URL */}
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                        <TextField
+                          size="small"
+                          placeholder="ลิงก์โพสต์ https://..."
+                          value={news.postUrl}
+                          onChange={(e) => {
+                            const updated = [...(config.socialMediaNews || [])];
+                            updated[idx] = { ...news, postUrl: e.target.value };
+                            saveConfig({ ...config, socialMediaNews: updated });
+                          }}
+                          sx={{ flex: 1, minWidth: 200, ...inputSx }}
+                        />
+                        <TextField
+                          size="small"
+                          placeholder="URL รูปภาพ (ไม่บังคับ)"
+                          value={news.imageUrl || ''}
+                          onChange={(e) => {
+                            const updated = [...(config.socialMediaNews || [])];
+                            updated[idx] = { ...news, imageUrl: e.target.value };
+                            saveConfig({ ...config, socialMediaNews: updated });
+                          }}
+                          sx={{ flex: 1, minWidth: 200, ...inputSx }}
+                        />
+                      </Box>
+
+                      {/* Description */}
+                      <TextField
+                        size="small"
+                        placeholder="คำอธิบายสั้น ๆ (ไม่บังคับ)"
+                        value={news.description || ''}
+                        onChange={(e) => {
+                          const updated = [...(config.socialMediaNews || [])];
+                          updated[idx] = { ...news, description: e.target.value };
+                          saveConfig({ ...config, socialMediaNews: updated });
+                        }}
+                        fullWidth
+                        sx={inputSx}
+                      />
+                    </Box>
+
+                    {/* Actions */}
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flexShrink: 0 }}>
+                      <Tooltip title={news.enabled ? 'ปิด' : 'เปิด'}>
+                        <IconButton size="small" onClick={() => {
+                          const updated = [...(config.socialMediaNews || [])];
+                          updated[idx] = { ...news, enabled: !news.enabled };
+                          saveConfig({ ...config, socialMediaNews: updated });
+                        }} sx={{ color: news.enabled ? '#10b981' : '#64748b' }}>
+                          {news.enabled ? <ToggleOn /> : <ToggleOff />}
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="ลบ">
+                        <IconButton size="small" onClick={async () => {
+                          const result = await Swal.fire({
+                            title: 'ลบข่าวนี้?',
+                            icon: 'warning',
+                            showCancelButton: true,
+                            confirmButtonColor: '#ef4444',
+                            cancelButtonColor: '#64748b',
+                            confirmButtonText: 'ลบ',
+                            cancelButtonText: 'ยกเลิก',
+                            background: 'var(--surface-2)',
+                            color: 'var(--foreground)',
+                          });
+                          if (result.isConfirmed) {
+                            const updated = (config.socialMediaNews || []).filter(n => n.id !== news.id);
+                            saveConfig({ ...config, socialMediaNews: updated });
+                            showToast('success', 'ลบข่าวสำเร็จ');
+                          }
+                        }} sx={{ color: '#ef4444' }}>
+                          <Delete size={18} />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                  </Box>
+                </Box>
+              );
+            })}
+          </Box>
+        )}
+      </Box>
     </Box>
   );
 });
@@ -10119,8 +10396,8 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any
               const label = CATEGORY_LABELS[option] || option;
               return label;
             }}
-            renderOption={(props, option) => (
-              <li {...props} key={option} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            renderOption={({ key, ...props }, option) => (
+              <li key={key} {...props} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 {CATEGORY_ICON_COMPONENTS[option] || <Inventory size={16} />} {CATEGORY_LABELS[option] || option}
               </li>
             )}
@@ -10162,8 +10439,8 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any
               }
             }}
             getOptionLabel={(option) => SUBTYPE_LABELS[option] || option}
-            renderOption={(props, option) => (
-              <li {...props} key={option}>
+            renderOption={({ key, ...props }, option) => (
+              <li key={key} {...props}>
                 {SUBTYPE_LABELS[option] || option}
               </li>
             )}

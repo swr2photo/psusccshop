@@ -247,13 +247,17 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
   React.useEffect(() => {
     if (open) {
       setShowPulse(false);
-      fetch('/api/chatbot')
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+      fetch('/api/chatbot', { signal: controller.signal })
         .then(res => res.json())
         .then(data => {
           setAiEnabled(data.aiEnabled || false);
           setShopInfo(data.shopInfo || null);
         })
-        .catch(() => setAiEnabled(false));
+        .catch(() => setAiEnabled(false))
+        .finally(() => clearTimeout(timeout));
+      return () => { clearTimeout(timeout); controller.abort(); };
     }
   }, [open]);
 
@@ -328,6 +332,8 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
           content: msg.text,
         }));
         
+        const editController = new AbortController();
+        const editTimeout = setTimeout(() => editController.abort(), 30000);
         const res = await fetch('/api/chatbot', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -335,7 +341,9 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
             message: msgToSend,
             conversationHistory: historyForEdit,
           }),
+          signal: editController.signal,
         });
+        clearTimeout(editTimeout);
         const data = await res.json();
         
         const botMsg: ChatMessage = {
@@ -352,11 +360,12 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
         };
         
         setMessages((prev) => [...prev, botMsg]);
-      } catch (e) {
+      } catch (e: any) {
+        const isTimeout = e?.name === 'AbortError';
         const errorMsg: ChatMessage = {
           id: generateId(),
           sender: 'bot',
-          text: 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้งค่ะ',
+          text: isTimeout ? 'ขอโทษค่ะ ใช้เวลานานเกินไป กรุณาลองใหม่อีกครั้งนะคะ' : 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้งค่ะ',
           timestamp: new Date(),
           suggestions: QUICK_QUESTIONS,
         };
@@ -385,6 +394,8 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
         ? `(ตอบกลับ: "${replyToMessage.text}") ${msgToSend}`
         : msgToSend;
       
+      const sendController = new AbortController();
+      const sendTimeout = setTimeout(() => sendController.abort(), 30000);
       const res = await fetch('/api/chatbot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -392,7 +403,9 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
           message: contextMessage,
           conversationHistory: getConversationHistory(),
         }),
+        signal: sendController.signal,
       });
+      clearTimeout(sendTimeout);
       const data = await res.json();
       
       const botMsg: ChatMessage = {
@@ -409,11 +422,12 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
       };
       
       setMessages((prev) => [...prev, botMsg]);
-    } catch (e) {
+    } catch (e: any) {
+      const isTimeout = e?.name === 'AbortError';
       const errorMsg: ChatMessage = {
         id: generateId(),
         sender: 'bot',
-        text: 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้งค่ะ',
+        text: isTimeout ? 'ขอโทษค่ะ ใช้เวลานานเกินไป กรุณาลองใหม่อีกครั้งนะคะ' : 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้งค่ะ',
         timestamp: new Date(),
         suggestions: QUICK_QUESTIONS,
       };

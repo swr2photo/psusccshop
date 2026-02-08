@@ -8,6 +8,7 @@ import CssBaseline from '@mui/material/CssBaseline';
 import { NotificationProvider } from './NotificationContext';
 import ToastContainer from './ToastContainer';
 import CookieConsentBanner from './CookieConsentBanner';
+import NotificationPrompt from './NotificationPrompt';
 import { useScreenshotProtection } from '@/hooks';
 import { SWRProvider } from '@/hooks/useSWRConfig';
 import { TanStackQueryProvider } from '@/hooks/useTanStackQuery';
@@ -436,6 +437,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
                 </ScreenshotProtectionProvider>
                 <ToastContainer />
                 <CookieConsentBanner />
+                <NotificationPrompt />
               </NotificationProvider>
             </ThemeProvider>
           </SWRProvider>

@@ -363,6 +363,20 @@ export interface ShopConfig {
     link?: string;
     /** ข้อความปุ่ม (ถ้ามี link) */
     linkText?: string;
+    /** สินค้าที่เชื่อมโยง (product ID) */
+    linkedProductId?: string;
+  }>;
+  /** Social media news feed */
+  socialMediaNews?: Array<{
+    id: string;
+    platform: 'instagram' | 'facebook' | 'tiktok' | 'line';
+    title: string;
+    description?: string;
+    postUrl: string;
+    imageUrl?: string;
+    postedAt: string;
+    enabled: boolean;
+    createdBy?: string;
   }>;
   /** Announcement history (last 50) */
   announcementHistory?: Array<{

@@ -19,11 +19,16 @@ import {
 } from '@mui/material';
 import {
   CheckCircle,
+  ChevronDown,
+  ChevronUp,
   Clock,
+  CreditCard,
+  Expand,
   ExternalLink,
   MapPin,
   Package,
   RotateCcw,
+  ShoppingBag,
   Truck,
   X,
   XCircle,
@@ -65,6 +70,7 @@ interface OrderHistoryDrawerProps {
   isShopOpen: boolean;
   realtimeConnected: boolean;
   config: ShopConfig | null;
+  onImageClick?: (image: string) => void;
 }
 
 const historyFilters: HistoryFilter[] = [
@@ -94,9 +100,21 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
     isShopOpen,
     realtimeConnected,
     config,
+    onImageClick,
   } = props;
 
   const { success: toastSuccess, error: toastError } = useNotification();
+
+  // Expanded order cards
+  const [expandedOrders, setExpandedOrders] = React.useState<Set<string>>(new Set());
+  const toggleExpanded = (ref: string) => {
+    setExpandedOrders(prev => {
+      const next = new Set(prev);
+      if (next.has(ref)) next.delete(ref);
+      else next.add(ref);
+      return next;
+    });
+  };
 
   // Refund request state
   const [refundDialogOpen, setRefundDialogOpen] = React.useState(false);
@@ -313,7 +331,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
       <Box sx={{
         flex: 1,
         overflow: 'auto',
-        px: { xs: 2, sm: 3 },
+        px: { xs: 1.5, sm: 2.5 },
         py: 2,
         WebkitOverflowScrolling: 'touch',
       }}>
@@ -340,7 +358,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
             </Typography>
           </Box>
         ) : (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {filteredOrders.map((order, idx) => {
               const statusKey = normalizeStatus(order.status);
               const statusLabel = getStatusLabel(statusKey);
@@ -349,10 +367,20 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
               const canPay = isShopOpen && PAYABLE_STATUSES.includes(statusKey);
               const canRequestRefund = REFUNDABLE_STATUSES.includes(statusKey) && !order.refundStatus;
               const category = getStatusCategory(statusKey);
+              const isExpanded = expandedOrders.has(order.ref);
+              const orderItems = order.items || order.cart || [];
+              const totalItems = orderItems.reduce((sum: number, item: any) => sum + (item.qty || item.quantity || 1), 0);
+              const firstProductImage = (() => {
+                const firstItem = orderItems[0];
+                if (!firstItem) return null;
+                const productInfo = config?.products?.find((p) => p.id === firstItem.productId);
+                return productInfo?.coverImage || productInfo?.images?.[0] || null;
+              })();
 
               const getStatusIcon = () => {
                 if (category === 'WAITING_PAYMENT') return <Clock size={14} />;
                 if (category === 'COMPLETED') return <CheckCircle size={14} />;
+                if (category === 'SHIPPED') return <Truck size={14} />;
                 if (category === 'RECEIVED') return <Package size={14} />;
                 if (category === 'CANCELLED') return <XCircle size={14} />;
                 return <span>•</span>;
@@ -362,508 +390,559 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                 <Box
                   key={order.ref || idx}
                   sx={{
-                    p: { xs: 2, sm: 2.5 },
-                    borderRadius: '18px',
+                    borderRadius: '16px',
                     bgcolor: 'var(--surface-2)',
                     border: '1px solid var(--glass-border)',
+                    overflow: 'hidden',
                     transition: 'all 0.2s ease',
-                    '&:hover': {
-                      bgcolor: 'var(--surface-2)',
-                      borderColor: 'var(--glass-border)',
-                    },
                   }}
                 >
-                  {/* Order Header */}
-                  <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2 }}>
-                    <Box>
-                      <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--foreground)', letterSpacing: '0.02em' }}>
-                        #{order.ref}
-                      </Typography>
-                      <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', mt: 0.3 }}>
-                        {new Date(order.date).toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short', year: '2-digit' })}
-                        {' • '}
-                        {new Date(order.date).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
-                      </Typography>
-                    </Box>
-                    <Box sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 0.6,
-                      px: 1.2,
-                      py: 0.4,
-                      borderRadius: '8px',
-                      bgcolor: `${statusColor}18`,
-                      border: `1px solid ${statusColor}30`,
-                    }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', color: statusColor }}>{getStatusIcon()}</Box>
-                      <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: statusColor }}>
-                        {statusLabel}
-                      </Typography>
-                    </Box>
-                  </Box>
+                  {/* Status Accent Bar */}
+                  <Box sx={{ height: 3, background: statusColor, opacity: 0.85 }} />
 
-                  {/* Refund Status Badge */}
-                  {order.refundStatus && (
-                    <Box sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 0.8,
-                      px: 1.5,
-                      py: 0.6,
-                      borderRadius: '10px',
-                      bgcolor: order.refundStatus === 'REJECTED' ? 'rgba(239,68,68,0.08)' :
-                               order.refundStatus === 'COMPLETED' ? 'rgba(16,185,129,0.08)' :
-                               'rgba(124,58,237,0.08)',
-                      border: `1px solid ${
-                        order.refundStatus === 'REJECTED' ? 'rgba(239,68,68,0.2)' :
-                        order.refundStatus === 'COMPLETED' ? 'rgba(16,185,129,0.2)' :
-                        'rgba(124,58,237,0.2)'
-                      }`,
-                      mb: 1,
-                    }}>
-                      <RotateCcw size={13} style={{
-                        color: order.refundStatus === 'REJECTED' ? 'var(--error)' :
-                               order.refundStatus === 'COMPLETED' ? 'var(--success)' : '#bf5af2',
-                      }} />
-                      <Typography sx={{
-                        fontSize: '0.73rem',
-                        fontWeight: 600,
-                        color: order.refundStatus === 'REJECTED' ? 'var(--error)' :
-                               order.refundStatus === 'COMPLETED' ? 'var(--success)' : '#bf5af2',
-                      }}>
-                        {order.refundStatus === 'REQUESTED' ? 'รอพิจารณาคืนเงิน' :
-                         order.refundStatus === 'APPROVED' ? 'อนุมัติคืนเงินแล้ว' :
-                         order.refundStatus === 'COMPLETED' ? 'คืนเงินเรียบร้อยแล้ว' :
-                         order.refundStatus === 'REJECTED' ? 'ปฏิเสธการคืนเงิน' :
-                         'คำขอคืนเงิน'}
-                      </Typography>
-                      {order.refundAmount && (
-                        <Typography sx={{ fontSize: '0.73rem', fontWeight: 700, color: 'var(--warning)', ml: 0.5 }}>
-                          ฿{order.refundAmount.toLocaleString()}
-                        </Typography>
-                      )}
-                    </Box>
-                  )}
-                  {order.refundStatus && order.refundAdminNote && (
-                    <Typography sx={{
-                      fontSize: '0.7rem',
-                      color: 'var(--text-muted)',
-                      mb: 1,
-                      px: 1.5,
-                      py: 0.5,
-                      bgcolor: 'rgba(100,116,139,0.06)',
-                      borderRadius: '8px',
-                    }}>
-                      หมายเหตุจากแอดมิน: {order.refundAdminNote}
-                    </Typography>
-                  )}
-
-                  {/* Product Items */}
-                  {(() => {
-                    const orderItems = order.items || order.cart || [];
-                    if (orderItems.length === 0) return null;
-                    
-                    return (
-                      <Box sx={{ mb: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                        {orderItems.slice(0, 3).map((item: any, itemIdx: number) => {
-                          const productInfo = config?.products?.find((p) => p.id === item.productId);
-                          const productImage = productInfo?.coverImage || productInfo?.images?.[0];
-                          const itemName = item.name || item.productName || productInfo?.name || 'ไม่ทราบชื่อสินค้า';
-                          const itemQty = item.qty || item.quantity || 1;
-                          const itemIsLongSleeve = item.isLongSleeve || item.options?.isLongSleeve;
-                          const itemCustomName = item.customName || item.options?.customName;
-                          const itemCustomNumber = item.customNumber || item.options?.customNumber;
-                          const itemSubtotal = item.subtotal || (item.unitPrice ? item.unitPrice * itemQty : 0);
-                          
-                          return (
-                            <Box
-                              key={itemIdx}
-                              sx={{
-                                display: 'flex',
-                                gap: 1.5,
-                                p: 1.5,
-                                borderRadius: '14px',
-                                bgcolor: 'var(--surface)',
-                                border: '1px solid var(--glass-border)',
-                              }}
-                            >
-                              <Box sx={{
-                                width: 60,
-                                height: 60,
-                                borderRadius: '12px',
-                                bgcolor: 'var(--surface-2)',
-                                flexShrink: 0,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                border: '1px solid var(--glass-border)',
-                                overflow: 'hidden',
-                              }}>
-                                {productImage ? (
-                                  <img
-                                    src={productImage}
-                                    alt={itemName}
-                                    style={{
-                                      width: '100%',
-                                      height: '100%',
-                                      objectFit: 'cover',
-                                      display: 'block',
-                                    }}
-                                    loading="lazy"
-                                  />
-                                ) : (
-                                  <Package size={20} style={{ color: 'var(--text-muted)' }} />
-                                )}
-                              </Box>
-                              <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
-                                {/* Product Name */}
-                                <Typography sx={{
-                                  fontSize: '0.85rem',
-                                  fontWeight: 700,
-                                  color: 'var(--foreground)',
-                                  lineHeight: 1.3,
-                                }}>
-                                  {itemName}
-                                </Typography>
-                                
-                                {/* Size & Quantity Row */}
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                  {item.size && (
-                                    <Box sx={{ 
-                                      px: 1, 
-                                      py: 0.3, 
-                                      borderRadius: '6px', 
-                                      bgcolor: 'rgba(0,113,227,0.15)', 
-                                      fontSize: '0.72rem', 
-                                      fontWeight: 600, 
-                                      color: 'var(--secondary)' 
-                                    }}>
-                                      ไซส์ {item.size}
-                                    </Box>
-                                  )}
-                                  <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                                    จำนวน {itemQty} ชิ้น
-                                  </Typography>
-                                </Box>
-                                
-                                {/* Custom Options Row */}
-                                {(itemIsLongSleeve || itemCustomName || itemCustomNumber) && (
-                                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.6 }}>
-                                    {itemIsLongSleeve && (
-                                      <Box sx={{ 
-                                        px: 0.8, 
-                                        py: 0.2, 
-                                        borderRadius: '5px', 
-                                        bgcolor: 'rgba(245,158,11,0.15)', 
-                                        fontSize: '0.68rem', 
-                                        fontWeight: 600, 
-                                        color: 'var(--warning)' 
-                                      }}>
-                                        แขนยาว
-                                      </Box>
-                                    )}
-                                    {itemCustomName && (
-                                      <Box sx={{ 
-                                        px: 0.8, 
-                                        py: 0.2, 
-                                        borderRadius: '5px', 
-                                        bgcolor: 'rgba(16,185,129,0.15)', 
-                                        fontSize: '0.68rem', 
-                                        fontWeight: 600, 
-                                        color: 'var(--success)' 
-                                      }}>
-                                        ชื่อ: {itemCustomName}
-                                      </Box>
-                                    )}
-                                    {itemCustomNumber && (
-                                      <Box sx={{ 
-                                        px: 0.8, 
-                                        py: 0.2, 
-                                        borderRadius: '5px', 
-                                        bgcolor: 'rgba(236,72,153,0.15)', 
-                                        fontSize: '0.68rem', 
-                                        fontWeight: 600, 
-                                        color: '#ec4899' 
-                                      }}>
-                                        เบอร์ #{itemCustomNumber}
-                                      </Box>
-                                    )}
-                                  </Box>
-                                )}
-                                
-                                {/* Price Row */}
-                                <Box sx={{ 
-                                  display: 'flex', 
-                                  alignItems: 'center', 
-                                  justifyContent: 'space-between',
-                                  pt: 0.5,
-                                  borderTop: '1px solid var(--glass-border)',
-                                }}>
-                                  <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                                    ราคาต่อชิ้น ฿{(itemSubtotal / itemQty).toLocaleString()}
-                                  </Typography>
-                                  <Typography sx={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--success)' }}>
-                                    ฿{itemSubtotal.toLocaleString()}
-                                  </Typography>
-                                </Box>
-                              </Box>
-                            </Box>
-                          );
-                        })}
-                        {orderItems.length > 3 && (
-                          <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', py: 0.5 }}>
-                            +{orderItems.length - 3} รายการ
-                          </Typography>
-                        )}
-                      </Box>
-                    );
-                  })()}
-
-                  {/* QR Code for Pickup - Only show when pickup (not delivery) and NOT shipped with tracking */}
-                  {['READY', 'SHIPPED', 'PAID'].includes(statusKey) && !order.trackingNumber && 
-                   ((!order.shippingOption && !order.shippingFee) || order.shippingOption === 'pickup' || order.shippingOption?.toLowerCase().includes('รับ')) && (
-                    <Box sx={{
-                      mt: 2,
-                      p: 2,
-                      borderRadius: '16px',
-                      background: 'linear-gradient(135deg, rgba(6,182,212,0.1) 0%, rgba(16,185,129,0.1) 100%)',
-                      border: '1px solid rgba(6,182,212,0.3)',
-                    }}>
-                      {(() => {
-                        const orderItems = order.items || order.cart || [];
-                        const productIds = orderItems.map((item: any) => item.productId || item.id).filter(Boolean);
-                        const productsWithPickup = config?.products?.filter(
-                          (p) => p.pickup?.enabled && productIds.includes(p.id)
-                        ) || [];
-                        
-                        if (productsWithPickup.length === 0) return null;
-                        
-                        const uniqueLocations = [...new Set(productsWithPickup.map(p => p.pickup?.location).filter(Boolean))];
-                        
-                        return (
-                          <Box sx={{ mb: 2, p: 1.5, borderRadius: '12px', bgcolor: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', textAlign: 'left' }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
-                              <MapPin size={14} style={{ color: 'var(--success)' }} />
-                              <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--success)' }}>สถานที่รับสินค้า</Typography>
-                            </Box>
-                            {uniqueLocations.map((loc, idx) => (
-                              <Typography key={idx} sx={{ fontSize: '0.85rem', color: 'var(--foreground)', fontWeight: 600 }}>{loc}</Typography>
-                            ))}
-                            {productsWithPickup[0]?.pickup && (productsWithPickup[0].pickup.startDate || productsWithPickup[0].pickup.endDate) && (
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 1 }}>
-                                <Clock size={14} style={{ color: 'var(--text-muted)' }} />
-                                <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                                  {productsWithPickup[0].pickup.startDate && new Date(productsWithPickup[0].pickup.startDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                                  {productsWithPickup[0].pickup.startDate && productsWithPickup[0].pickup.endDate && ' - '}
-                                  {productsWithPickup[0].pickup.endDate && new Date(productsWithPickup[0].pickup.endDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                                </Typography>
-                              </Box>
-                            )}
-                            {productsWithPickup[0]?.pickup?.notes && (
-                              <Typography sx={{ fontSize: '0.7rem', color: 'var(--warning)', mt: 0.5 }}>{productsWithPickup[0].pickup.notes}</Typography>
-                            )}
-                          </Box>
-                        );
-                      })()}
-                      
-                      <Button
-                        fullWidth
-                        onClick={() => onShowQR(order.ref)}
-                        sx={{
-                          py: 1.5,
-                          borderRadius: '12px',
-                          background: 'linear-gradient(135deg, #64d2ff 0%, #34c759 100%)',
-                          color: 'white',
-                          fontSize: '0.9rem',
-                          fontWeight: 700,
-                          textTransform: 'none',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: 1,
-                          boxShadow: '0 4px 14px rgba(6,182,212,0.3)',
-                          '&:hover': {
-                            background: 'linear-gradient(135deg, #0891b2 0%, #34c759 100%)',
-                            boxShadow: '0 6px 20px rgba(6,182,212,0.4)',
-                          },
-                        }}
-                      >
-                        <Package size={20} />
-                        แสดง QR รับสินค้า
-                      </Button>
-                      <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', textAlign: 'center', mt: 1 }}>
-                        กดเพื่อแสดง QR Code สำหรับรับสินค้า
-                      </Typography>
-                    </Box>
-                  )}
-
-                  {/* Delivery Status - Show for delivery orders (not pickup) that haven't shipped yet */}
-                  {['READY', 'PAID'].includes(statusKey) && !order.trackingNumber && 
-                   ((order.shippingOption && order.shippingOption !== 'pickup' && !order.shippingOption.toLowerCase().includes('รับ')) || 
-                    (!order.shippingOption && order.shippingFee && order.shippingFee > 0)) && (
-                    <Box sx={{
-                      mt: 2,
-                      p: 2,
-                      borderRadius: '16px',
-                      background: 'linear-gradient(135deg, rgba(0,113,227,0.1) 0%, rgba(0,113,227,0.1) 100%)',
-                      border: '1px solid rgba(0,113,227,0.3)',
-                    }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                        <Box sx={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: '10px',
-                          background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}>
-                          <Truck size={18} color="#fff" />
-                        </Box>
-                        <Box>
-                          <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--secondary)' }}>
-                            เตรียมจัดส่ง
-                          </Typography>
-                          <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                            รอทางร้านจัดส่งสินค้า
-                          </Typography>
-                        </Box>
-                      </Box>
-                      <Box sx={{ 
-                        p: 1.5, 
-                        borderRadius: '10px', 
-                        bgcolor: 'rgba(0,113,227,0.08)',
+                  {/* Order Summary (always visible) */}
+                  <Box
+                    onClick={() => toggleExpanded(order.ref)}
+                    sx={{
+                      p: { xs: 1.5, sm: 2 },
+                      cursor: 'pointer',
+                      '&:active': { bgcolor: 'rgba(0,0,0,0.02)' },
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      {/* Product Thumbnail Preview */}
+                      <Box sx={{
+                        width: 52,
+                        height: 52,
+                        borderRadius: '12px',
+                        bgcolor: 'var(--surface)',
+                        flexShrink: 0,
+                        overflow: 'hidden',
+                        border: '1px solid var(--glass-border)',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: 1,
+                        justifyContent: 'center',
+                        position: 'relative',
                       }}>
-                        <Package size={16} color="var(--primary)" />
-                        <Typography sx={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                          ออเดอร์ของคุณเข้าระบบแล้ว กำลังเตรียมของและจะจัดส่งเร็วๆนี้
-                        </Typography>
-                      </Box>
-                      <Typography sx={{ fontSize: '0.68rem', color: 'var(--text-muted)', textAlign: 'center', mt: 1.5 }}>
-                        เมื่อจัดส่งแล้วจะแจ้งเลขพัสดุให้ทราบ
-                      </Typography>
-                    </Box>
-                  )}
-
-                  {/* Tracking Info for Shipped Orders */}
-                  {order.trackingNumber && order.shippingProvider && (
-                    <Box sx={{ mt: 2 }}>
-                      <TrackingTimeline
-                        trackingNumber={order.trackingNumber}
-                        shippingProvider={order.shippingProvider as ShippingProvider}
-                        compact
-                      />
-                    </Box>
-                  )}
-
-                  {/* Order Total & Actions */}
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pt: 1.5, borderTop: '1px solid var(--glass-border)' }}>
-                    <Box>
-                      <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', mb: 0.2 }}>ยอดรวม</Typography>
-                      <Typography sx={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--success)' }}>
-                        ฿{order.total?.toLocaleString() || '0'}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                      {canPay && (
-                        <Button
-                          size="small"
-                          onClick={() => onOpenPayment(order.ref)}
-                          sx={{
-                            px: 2,
-                            py: 0.8,
-                            borderRadius: '10px',
-                            background: 'linear-gradient(135deg, #34c759 0%, #34c759 100%)',
+                        {firstProductImage ? (
+                          <img
+                            src={firstProductImage}
+                            alt=""
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                            loading="lazy"
+                          />
+                        ) : (
+                          <ShoppingBag size={22} style={{ color: 'var(--text-muted)' }} />
+                        )}
+                        {totalItems > 1 && (
+                          <Box sx={{
+                            position: 'absolute',
+                            bottom: -2,
+                            right: -2,
+                            width: 20,
+                            height: 20,
+                            borderRadius: '50%',
+                            bgcolor: 'var(--primary)',
                             color: 'white',
-                            fontSize: '0.8rem',
+                            fontSize: '0.65rem',
                             fontWeight: 700,
-                            textTransform: 'none',
-                            boxShadow: '0 4px 14px rgba(16,185,129,0.3)',
-                            '&:hover': {
-                              background: 'linear-gradient(135deg, #34c759 0%, #047857 100%)',
-                              boxShadow: '0 6px 20px rgba(16,185,129,0.4)',
-                            },
-                          }}
-                        >
-                          ชำระเงิน
-                        </Button>
-                      )}
-                      {!isShopOpen && PAYABLE_STATUSES.includes(statusKey) && (
-                        <Typography sx={{ 
-                          fontSize: '0.7rem', 
-                          color: 'var(--warning)',
-                          bgcolor: 'rgba(245,158,11,0.1)',
-                          px: 1.5,
-                          py: 0.5,
-                          borderRadius: '8px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 0.5,
-                        }}>
-                          <Clock size={12} />
-                          หมดเขตชำระเงิน
-                        </Typography>
-                      )}
-                      {canCancel && (
-                        <Button
-                          size="small"
-                          onClick={() => onCancelOrder(order.ref)}
-                          disabled={cancellingRef === order.ref}
-                          sx={{
-                            px: 2,
-                            py: 0.8,
-                            borderRadius: '10px',
-                            bgcolor: 'rgba(239,68,68,0.1)',
-                            border: '1px solid rgba(239,68,68,0.3)',
-                            color: 'var(--error)',
-                            fontSize: '0.8rem',
-                            fontWeight: 600,
-                            textTransform: 'none',
-                            '&:hover': {
-                              bgcolor: 'rgba(239,68,68,0.2)',
-                              borderColor: 'rgba(239,68,68,0.5)',
-                            },
-                            '&:disabled': {
-                              color: 'var(--text-muted)',
-                              borderColor: 'rgba(100,116,139,0.3)',
-                            },
-                          }}
-                        >
-                          {cancellingRef === order.ref ? 'กำลังยกเลิก...' : 'ยกเลิก'}
-                        </Button>
-                      )}
-                      {canRequestRefund && (
-                        <Button
-                          size="small"
-                          onClick={() => openRefundDialog(order.ref, order.total || 0)}
-                          sx={{
-                            px: 2,
-                            py: 0.8,
-                            borderRadius: '10px',
-                            bgcolor: 'rgba(124,58,237,0.1)',
-                            border: '1px solid rgba(124,58,237,0.3)',
-                            color: '#8b5cf6',
-                            fontSize: '0.8rem',
-                            fontWeight: 600,
-                            textTransform: 'none',
+                            display: 'grid',
+                            placeItems: 'center',
+                            border: '2px solid var(--surface-2)',
+                          }}>
+                            {totalItems}
+                          </Box>
+                        )}
+                      </Box>
+
+                      {/* Order Info */}
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.3 }}>
+                          <Typography sx={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                            #{order.ref}
+                          </Typography>
+                          <Box sx={{
                             display: 'flex',
                             alignItems: 'center',
                             gap: 0.5,
-                            '&:hover': {
-                              bgcolor: 'rgba(124,58,237,0.2)',
-                              borderColor: 'rgba(124,58,237,0.5)',
-                            },
-                          }}
-                        >
-                          <RotateCcw size={14} />
-                          ขอคืนเงิน
-                        </Button>
-                      )}
+                            px: 1,
+                            py: 0.3,
+                            borderRadius: '8px',
+                            bgcolor: `${statusColor}15`,
+                            border: `1px solid ${statusColor}25`,
+                          }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', color: statusColor }}>{getStatusIcon()}</Box>
+                            <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: statusColor }}>
+                              {statusLabel}
+                            </Typography>
+                          </Box>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                            {new Date(order.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })}
+                            {' • '}
+                            {totalItems} ชิ้น
+                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--success)' }}>
+                              ฿{order.total?.toLocaleString() || '0'}
+                            </Typography>
+                            {isExpanded ? <ChevronUp size={16} style={{ color: 'var(--text-muted)' }} /> : <ChevronDown size={16} style={{ color: 'var(--text-muted)' }} />}
+                          </Box>
+                        </Box>
+                      </Box>
                     </Box>
+
+                    {/* Quick Action Buttons (always visible for important actions) */}
+                    {(canPay || (canCancel && !canPay)) && (
+                      <Box sx={{ display: 'flex', gap: 1, mt: 1.5, ml: '68px' }}>
+                        {canPay && (
+                          <Button
+                            size="small"
+                            onClick={(e) => { e.stopPropagation(); onOpenPayment(order.ref); }}
+                            sx={{
+                              px: 2,
+                              py: 0.7,
+                              borderRadius: '10px',
+                              background: 'linear-gradient(135deg, #34c759 0%, #30d158 100%)',
+                              color: 'white',
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              textTransform: 'none',
+                              boxShadow: '0 2px 8px rgba(52,199,89,0.3)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 0.5,
+                              '&:hover': {
+                                background: 'linear-gradient(135deg, #30d158 0%, #28a745 100%)',
+                              },
+                            }}
+                          >
+                            <CreditCard size={14} />
+                            ชำระเงิน
+                          </Button>
+                        )}
+                        {!isShopOpen && PAYABLE_STATUSES.includes(statusKey) && (
+                          <Typography sx={{ 
+                            fontSize: '0.7rem', 
+                            color: 'var(--warning)',
+                            bgcolor: 'rgba(245,158,11,0.1)',
+                            px: 1.5,
+                            py: 0.5,
+                            borderRadius: '8px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 0.5,
+                          }}>
+                            <Clock size={12} />
+                            หมดเขตชำระเงิน
+                          </Typography>
+                        )}
+                      </Box>
+                    )}
                   </Box>
+
+                  {/* Expanded Details */}
+                  {isExpanded && (
+                    <Box sx={{ borderTop: '1px solid var(--glass-border)' }}>
+
+                      {/* Refund Status Badge */}
+                      {order.refundStatus && (
+                        <Box sx={{ px: { xs: 1.5, sm: 2 }, pt: 1.5 }}>
+                          <Box sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 0.8,
+                            px: 1.5,
+                            py: 0.7,
+                            borderRadius: '10px',
+                            bgcolor: order.refundStatus === 'REJECTED' ? 'rgba(239,68,68,0.08)' :
+                                     order.refundStatus === 'COMPLETED' ? 'rgba(16,185,129,0.08)' :
+                                     'rgba(124,58,237,0.08)',
+                            border: `1px solid ${
+                              order.refundStatus === 'REJECTED' ? 'rgba(239,68,68,0.2)' :
+                              order.refundStatus === 'COMPLETED' ? 'rgba(16,185,129,0.2)' :
+                              'rgba(124,58,237,0.2)'
+                            }`,
+                          }}>
+                            <RotateCcw size={13} style={{
+                              color: order.refundStatus === 'REJECTED' ? 'var(--error)' :
+                                     order.refundStatus === 'COMPLETED' ? 'var(--success)' : '#bf5af2',
+                            }} />
+                            <Typography sx={{
+                              fontSize: '0.73rem',
+                              fontWeight: 600,
+                              color: order.refundStatus === 'REJECTED' ? 'var(--error)' :
+                                     order.refundStatus === 'COMPLETED' ? 'var(--success)' : '#bf5af2',
+                            }}>
+                              {order.refundStatus === 'REQUESTED' ? 'รอพิจารณาคืนเงิน' :
+                               order.refundStatus === 'APPROVED' ? 'อนุมัติคืนเงินแล้ว' :
+                               order.refundStatus === 'COMPLETED' ? 'คืนเงินเรียบร้อยแล้ว' :
+                               order.refundStatus === 'REJECTED' ? 'ปฏิเสธการคืนเงิน' :
+                               'คำขอคืนเงิน'}
+                            </Typography>
+                            {order.refundAmount && (
+                              <Typography sx={{ fontSize: '0.73rem', fontWeight: 700, color: 'var(--warning)', ml: 0.5 }}>
+                                ฿{order.refundAmount.toLocaleString()}
+                              </Typography>
+                            )}
+                          </Box>
+                          {order.refundAdminNote && (
+                            <Typography sx={{
+                              fontSize: '0.7rem',
+                              color: 'var(--text-muted)',
+                              mt: 0.8,
+                              px: 1.5,
+                              py: 0.5,
+                              bgcolor: 'rgba(100,116,139,0.06)',
+                              borderRadius: '8px',
+                            }}>
+                              หมายเหตุจากแอดมิน: {order.refundAdminNote}
+                            </Typography>
+                          )}
+                        </Box>
+                      )}
+
+                      {/* ── Section: Products ── */}
+                      {orderItems.length > 0 && (
+                        <Box sx={{ px: { xs: 1.5, sm: 2 }, pt: 2, pb: 1 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, mb: 1.5 }}>
+                            <ShoppingBag size={14} style={{ color: 'var(--text-muted)' }} />
+                            <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                              สินค้า ({orderItems.length} รายการ)
+                            </Typography>
+                          </Box>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                            {orderItems.map((item: any, itemIdx: number) => {
+                              const productInfo = config?.products?.find((p) => p.id === item.productId);
+                              const productImage = productInfo?.coverImage || productInfo?.images?.[0];
+                              const itemName = item.name || item.productName || productInfo?.name || 'ไม่ทราบชื่อสินค้า';
+                              const itemQty = item.qty || item.quantity || 1;
+                              const itemIsLongSleeve = item.isLongSleeve || item.options?.isLongSleeve;
+                              const itemCustomName = item.customName || item.options?.customName;
+                              const itemCustomNumber = item.customNumber || item.options?.customNumber;
+                              const itemSubtotal = item.subtotal || (item.unitPrice ? item.unitPrice * itemQty : 0);
+                              
+                              return (
+                                <Box
+                                  key={itemIdx}
+                                  sx={{
+                                    display: 'flex',
+                                    gap: 1.5,
+                                    p: 1.2,
+                                    borderRadius: '12px',
+                                    bgcolor: 'var(--surface)',
+                                    border: '1px solid var(--glass-border)',
+                                  }}
+                                >
+                                  {/* Clickable Product Image */}
+                                  <Box
+                                    onClick={() => productImage && onImageClick?.(productImage)}
+                                    sx={{
+                                      width: 56,
+                                      height: 56,
+                                      borderRadius: '10px',
+                                      bgcolor: 'var(--surface-2)',
+                                      flexShrink: 0,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      border: '1px solid var(--glass-border)',
+                                      overflow: 'hidden',
+                                      cursor: productImage ? 'pointer' : 'default',
+                                      position: 'relative',
+                                      '&:hover .img-expand': { opacity: 1 },
+                                    }}
+                                  >
+                                    {productImage ? (
+                                      <>
+                                        <img
+                                          src={productImage}
+                                          alt={itemName}
+                                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                                          loading="lazy"
+                                        />
+                                        <Box
+                                          className="img-expand"
+                                          sx={{
+                                            position: 'absolute',
+                                            inset: 0,
+                                            bgcolor: 'rgba(0,0,0,0.35)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            opacity: 0,
+                                            transition: 'opacity 0.15s ease',
+                                          }}
+                                        >
+                                          <Expand size={16} color="white" />
+                                        </Box>
+                                      </>
+                                    ) : (
+                                      <Package size={20} style={{ color: 'var(--text-muted)' }} />
+                                    )}
+                                  </Box>
+                                  <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                    <Typography sx={{
+                                      fontSize: '0.82rem',
+                                      fontWeight: 700,
+                                      color: 'var(--foreground)',
+                                      lineHeight: 1.3,
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap',
+                                    }}>
+                                      {itemName}
+                                    </Typography>
+                                    
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, flexWrap: 'wrap' }}>
+                                      {item.size && (
+                                        <Box sx={{ 
+                                          px: 0.8, py: 0.2, borderRadius: '5px', 
+                                          bgcolor: 'rgba(0,113,227,0.12)', 
+                                          fontSize: '0.68rem', fontWeight: 600, color: 'var(--secondary)' 
+                                        }}>
+                                          {item.size}
+                                        </Box>
+                                      )}
+                                      <Typography sx={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                                        ×{itemQty}
+                                      </Typography>
+                                      {itemIsLongSleeve && (
+                                        <Box sx={{ px: 0.8, py: 0.2, borderRadius: '5px', bgcolor: 'rgba(245,158,11,0.12)', fontSize: '0.65rem', fontWeight: 600, color: 'var(--warning)' }}>
+                                          แขนยาว
+                                        </Box>
+                                      )}
+                                      {itemCustomName && (
+                                        <Box sx={{ px: 0.8, py: 0.2, borderRadius: '5px', bgcolor: 'rgba(16,185,129,0.12)', fontSize: '0.65rem', fontWeight: 600, color: 'var(--success)' }}>
+                                          {itemCustomName}
+                                        </Box>
+                                      )}
+                                      {itemCustomNumber && (
+                                        <Box sx={{ px: 0.8, py: 0.2, borderRadius: '5px', bgcolor: 'rgba(236,72,153,0.12)', fontSize: '0.65rem', fontWeight: 600, color: '#ec4899' }}>
+                                          #{itemCustomNumber}
+                                        </Box>
+                                      )}
+                                    </Box>
+                                    
+                                    <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--success)', mt: 'auto' }}>
+                                      ฿{itemSubtotal.toLocaleString()}
+                                    </Typography>
+                                  </Box>
+                                </Box>
+                              );
+                            })}
+                          </Box>
+                        </Box>
+                      )}
+
+                      {/* ── Section: Shipping / Pickup ── */}
+                      {/* QR Code for Pickup */}
+                      {['READY', 'SHIPPED', 'PAID'].includes(statusKey) && !order.trackingNumber && 
+                       ((!order.shippingOption && !order.shippingFee) || order.shippingOption === 'pickup' || order.shippingOption?.toLowerCase().includes('รับ')) && (
+                        <Box sx={{ px: { xs: 1.5, sm: 2 }, pt: 1.5 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, mb: 1 }}>
+                            <MapPin size={14} style={{ color: 'var(--text-muted)' }} />
+                            <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                              รับสินค้า
+                            </Typography>
+                          </Box>
+                          <Box sx={{
+                            p: 1.5,
+                            borderRadius: '12px',
+                            background: 'linear-gradient(135deg, rgba(6,182,212,0.08) 0%, rgba(16,185,129,0.08) 100%)',
+                            border: '1px solid rgba(6,182,212,0.2)',
+                          }}>
+                            {(() => {
+                              const productIds = orderItems.map((item: any) => item.productId || item.id).filter(Boolean);
+                              const productsWithPickup = config?.products?.filter(
+                                (p) => p.pickup?.enabled && productIds.includes(p.id)
+                              ) || [];
+                              if (productsWithPickup.length === 0) return null;
+                              const uniqueLocations = [...new Set(productsWithPickup.map(p => p.pickup?.location).filter(Boolean))];
+                              return (
+                                <Box sx={{ mb: 1.5 }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+                                    <MapPin size={14} style={{ color: 'var(--success)' }} />
+                                    <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--success)' }}>สถานที่รับสินค้า</Typography>
+                                  </Box>
+                                  {uniqueLocations.map((loc, locIdx) => (
+                                    <Typography key={locIdx} sx={{ fontSize: '0.82rem', color: 'var(--foreground)', fontWeight: 600 }}>{loc}</Typography>
+                                  ))}
+                                  {productsWithPickup[0]?.pickup && (productsWithPickup[0].pickup.startDate || productsWithPickup[0].pickup.endDate) && (
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.8 }}>
+                                      <Clock size={13} style={{ color: 'var(--text-muted)' }} />
+                                      <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                        {productsWithPickup[0].pickup.startDate && new Date(productsWithPickup[0].pickup.startDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                        {productsWithPickup[0].pickup.startDate && productsWithPickup[0].pickup.endDate && ' - '}
+                                        {productsWithPickup[0].pickup.endDate && new Date(productsWithPickup[0].pickup.endDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                      </Typography>
+                                    </Box>
+                                  )}
+                                  {productsWithPickup[0]?.pickup?.notes && (
+                                    <Typography sx={{ fontSize: '0.7rem', color: 'var(--warning)', mt: 0.5 }}>{productsWithPickup[0].pickup.notes}</Typography>
+                                  )}
+                                </Box>
+                              );
+                            })()}
+                            
+                            <Button
+                              fullWidth
+                              onClick={() => onShowQR(order.ref)}
+                              sx={{
+                                py: 1.2,
+                                borderRadius: '10px',
+                                background: 'linear-gradient(135deg, #64d2ff 0%, #34c759 100%)',
+                                color: 'white',
+                                fontSize: '0.85rem',
+                                fontWeight: 700,
+                                textTransform: 'none',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 0.8,
+                                boxShadow: '0 3px 10px rgba(6,182,212,0.25)',
+                                '&:hover': {
+                                  background: 'linear-gradient(135deg, #0891b2 0%, #34c759 100%)',
+                                },
+                              }}
+                            >
+                              <Package size={18} />
+                              แสดง QR รับสินค้า
+                            </Button>
+                          </Box>
+                        </Box>
+                      )}
+
+                      {/* Delivery Status - Preparing to ship */}
+                      {['READY', 'PAID'].includes(statusKey) && !order.trackingNumber && 
+                       ((order.shippingOption && order.shippingOption !== 'pickup' && !order.shippingOption.toLowerCase().includes('รับ')) || 
+                        (!order.shippingOption && order.shippingFee && order.shippingFee > 0)) && (
+                        <Box sx={{ px: { xs: 1.5, sm: 2 }, pt: 1.5 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, mb: 1 }}>
+                            <Truck size={14} style={{ color: 'var(--text-muted)' }} />
+                            <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                              การจัดส่ง
+                            </Typography>
+                          </Box>
+                          <Box sx={{
+                            p: 1.5,
+                            borderRadius: '12px',
+                            bgcolor: 'rgba(0,113,227,0.06)',
+                            border: '1px solid rgba(0,113,227,0.15)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1.5,
+                          }}>
+                            <Box sx={{
+                              width: 36,
+                              height: 36,
+                              borderRadius: '10px',
+                              background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
+                              display: 'grid',
+                              placeItems: 'center',
+                              flexShrink: 0,
+                            }}>
+                              <Truck size={18} color="#fff" />
+                            </Box>
+                            <Box>
+                              <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--secondary)' }}>
+                                เตรียมจัดส่ง
+                              </Typography>
+                              <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                กำลังเตรียมจัดส่ง จะแจ้งเลขพัสดุให้เร็วๆนี้
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </Box>
+                      )}
+
+                      {/* Tracking Info */}
+                      {order.trackingNumber && order.shippingProvider && (
+                        <Box sx={{ px: { xs: 1.5, sm: 2 }, pt: 1.5 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, mb: 1 }}>
+                            <Truck size={14} style={{ color: 'var(--text-muted)' }} />
+                            <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                              ติดตามพัสดุ
+                            </Typography>
+                          </Box>
+                          <TrackingTimeline
+                            trackingNumber={order.trackingNumber}
+                            shippingProvider={order.shippingProvider as ShippingProvider}
+                            compact
+                          />
+                        </Box>
+                      )}
+
+                      {/* ── Section: Total & Actions ── */}
+                      <Box sx={{
+                        px: { xs: 1.5, sm: 2 },
+                        py: 1.5,
+                        mt: 1,
+                        borderTop: '1px solid var(--glass-border)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}>
+                        <Box>
+                          <Typography sx={{ fontSize: '0.68rem', color: 'var(--text-muted)', mb: 0.1 }}>ยอดรวมทั้งหมด</Typography>
+                          <Typography sx={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--success)' }}>
+                            ฿{order.total?.toLocaleString() || '0'}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', gap: 0.8, alignItems: 'center' }}>
+                          {canCancel && (
+                            <Button
+                              size="small"
+                              onClick={() => onCancelOrder(order.ref)}
+                              disabled={cancellingRef === order.ref}
+                              sx={{
+                                px: 1.5,
+                                py: 0.6,
+                                borderRadius: '8px',
+                                bgcolor: 'rgba(239,68,68,0.08)',
+                                border: '1px solid rgba(239,68,68,0.2)',
+                                color: 'var(--error)',
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                textTransform: 'none',
+                                minWidth: 'auto',
+                                '&:hover': { bgcolor: 'rgba(239,68,68,0.15)' },
+                                '&:disabled': { color: 'var(--text-muted)', borderColor: 'rgba(100,116,139,0.2)' },
+                              }}
+                            >
+                              {cancellingRef === order.ref ? 'กำลังยกเลิก...' : 'ยกเลิก'}
+                            </Button>
+                          )}
+                          {canRequestRefund && (
+                            <Button
+                              size="small"
+                              onClick={() => openRefundDialog(order.ref, order.total || 0)}
+                              sx={{
+                                px: 1.5,
+                                py: 0.6,
+                                borderRadius: '8px',
+                                bgcolor: 'rgba(124,58,237,0.08)',
+                                border: '1px solid rgba(124,58,237,0.2)',
+                                color: '#8b5cf6',
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                textTransform: 'none',
+                                minWidth: 'auto',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 0.5,
+                                '&:hover': { bgcolor: 'rgba(124,58,237,0.15)' },
+                              }}
+                            >
+                              <RotateCcw size={12} />
+                              ขอคืนเงิน
+                            </Button>
+                          )}
+                        </Box>
+                      </Box>
+                    </Box>
+                  )}
                 </Box>
               );
             })}

@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions, isAdminEmail } from '@/lib/auth';
+import { authOptions, isAdminEmail, ADMIN_EMAILS } from '@/lib/auth';
 import { 
   getChatSession,
   addChatMessage 
@@ -132,15 +132,30 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
     
     // Send push notification to admin when customer sends message
-    if (sender === 'customer' && chat.admin_email) {
-      sendPushNotification(chat.admin_email, {
-        title: `ข้อความใหม่จาก ${session.user.name || 'ลูกค้า'}`,
-        body: message.trim().substring(0, 200),
-        icon: '/favicon.png',
-        url: '/admin',
-        tag: `chat-admin-${sessionId}`,
-        chatId: sessionId,
-      }).catch(err => console.error('[support-chat/message] Admin push failed:', err));
+    if (sender === 'customer') {
+      if (chat.admin_email) {
+        // Chat is assigned — notify the assigned admin
+        sendPushNotification(chat.admin_email, {
+          title: `ข้อความใหม่จาก ${displayName}`,
+          body: message.trim().substring(0, 200),
+          icon: '/favicon.png',
+          url: '/admin',
+          tag: `chat-admin-${sessionId}`,
+          chatId: sessionId,
+        }).catch(err => console.error('[support-chat/message] Admin push failed:', err));
+      } else {
+        // Chat is unassigned (pending) — notify ALL admins
+        for (const adminEmail of ADMIN_EMAILS) {
+          sendPushNotification(adminEmail, {
+            title: `แชทใหม่จาก ${displayName}`,
+            body: message.trim().substring(0, 200),
+            icon: '/favicon.png',
+            url: '/admin',
+            tag: `chat-new-${sessionId}`,
+            chatId: sessionId,
+          }).catch(err => console.error('[support-chat/message] Admin push (all) failed:', err));
+        }
+      }
     }
     
     return NextResponse.json({ 

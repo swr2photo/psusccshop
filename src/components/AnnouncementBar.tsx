@@ -21,6 +21,11 @@ import {
   Clock,
   Image as ImageIcon,
   Sparkles,
+  Instagram,
+  Facebook,
+  Music,
+  MessageCircle,
+  ExternalLink,
 } from 'lucide-react';
 import OptimizedImage from './OptimizedImage';
 
@@ -46,6 +51,8 @@ interface Announcement {
   link?: string;
   /** ข้อความปุ่มลิงก์ */
   linkText?: string;
+  /** สินค้าที่เชื่อมโยง */
+  linkedProductId?: string;
 }
 
 interface AnnouncementHistoryItem {
@@ -61,9 +68,22 @@ interface AnnouncementHistoryItem {
   deletedBy?: string;
 }
 
+interface SocialMediaNews {
+  id: string;
+  platform: 'instagram' | 'facebook' | 'tiktok' | 'line';
+  title: string;
+  description?: string;
+  postUrl: string;
+  imageUrl?: string;
+  postedAt: string;
+  enabled: boolean;
+}
+
 interface AnnouncementBarProps {
   announcements: Announcement[];
   history?: AnnouncementHistoryItem[];
+  socialMediaNews?: SocialMediaNews[];
+  onProductClick?: (productId: string) => void;
 }
 
 // ==================== Helpers ====================
@@ -85,7 +105,14 @@ const getColor = (c: string) => COLOR_MAP[c] || (c?.startsWith('#') ? c : '#0071
 
 // ==================== Component ====================
 
-export default function AnnouncementBar({ announcements, history }: AnnouncementBarProps) {
+const PLATFORM_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string; gradient: string }> = {
+  instagram: { label: 'Instagram', icon: <Instagram size={14} />, color: '#E4405F', gradient: 'linear-gradient(135deg, #833AB4 0%, #E4405F 50%, #FCAF45 100%)' },
+  facebook: { label: 'Facebook', icon: <Facebook size={14} />, color: '#1877F2', gradient: 'linear-gradient(135deg, #1877F2 0%, #42A5F5 100%)' },
+  tiktok: { label: 'TikTok', icon: <Music size={14} />, color: '#ff0050', gradient: 'linear-gradient(135deg, #010101 0%, #ff0050 100%)' },
+  line: { label: 'LINE', icon: <MessageCircle size={14} />, color: '#06C755', gradient: 'linear-gradient(135deg, #06C755 0%, #4CAF50 100%)' },
+};
+
+export default function AnnouncementBar({ announcements, history, socialMediaNews, onProductClick }: AnnouncementBarProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [dismissed, setDismissed] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -119,7 +146,81 @@ export default function AnnouncementBar({ announcements, history }: Announcement
     if (typeof window !== 'undefined') sessionStorage.setItem('ann_dismissed', '1');
   };
 
-  if (enabled.length === 0 || dismissed) return null;
+  if (enabled.length === 0 || dismissed) {
+    // Still show social media news even when no announcements
+    const activeNews = socialMediaNews?.filter(n => n.enabled) || [];
+    if (activeNews.length === 0) return null;
+    return (
+      <Box sx={{
+        mx: { xs: 1.5, sm: 2 },
+        mb: 1.5,
+        display: 'flex',
+        gap: 1,
+        overflowX: 'auto',
+        scrollSnapType: 'x mandatory',
+        WebkitOverflowScrolling: 'touch',
+        '&::-webkit-scrollbar': { display: 'none' },
+        scrollbarWidth: 'none',
+        pb: 0.5,
+      }}>
+        {activeNews.map((news) => {
+          const platform = PLATFORM_CONFIG[news.platform] || PLATFORM_CONFIG.instagram;
+          return (
+            <Box
+              key={news.id}
+              component="a"
+              href={news.postUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              sx={{
+                flex: '0 0 auto',
+                scrollSnapAlign: 'start',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.25,
+                px: 1.5,
+                py: 1,
+                borderRadius: '14px',
+                bgcolor: 'var(--glass-bg)',
+                border: `1px solid ${platform.color}20`,
+                textDecoration: 'none',
+                transition: 'all 0.2s ease',
+                minWidth: 0,
+                maxWidth: { xs: '85vw', sm: 320 },
+                '&:hover': { borderColor: `${platform.color}40`, transform: 'translateY(-1px)', boxShadow: `0 4px 12px ${platform.color}15` },
+              }}
+            >
+              <Box sx={{
+                width: 32,
+                height: 32,
+                borderRadius: '10px',
+                background: platform.gradient,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#fff',
+                flexShrink: 0,
+              }}>
+                {platform.icon}
+              </Box>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.15 }}>
+                  <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, color: platform.color }}>{platform.label}</Typography>
+                  <Typography sx={{ fontSize: '0.58rem', color: 'var(--text-muted)' }}>
+                    · {new Date(news.postedAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
+                  </Typography>
+                </Box>
+                <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--foreground)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {news.title}
+                </Typography>
+              </Box>
+              <ExternalLink size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+            </Box>
+          );
+        })}
+      </Box>
+    );
+  }
 
   const current = enabled[currentIndex % enabled.length];
   if (!current) return null;
@@ -131,7 +232,8 @@ export default function AnnouncementBar({ announcements, history }: Announcement
   return (
     <>
       {/* Modern floating announcement bar */}
-      <Box sx={{
+      <Box
+        sx={{
         mx: { xs: 1.5, sm: 2 },
         mb: 1.5,
         borderRadius: '16px',
@@ -217,9 +319,20 @@ export default function AnnouncementBar({ announcements, history }: Announcement
           )}
 
           {/* Message */}
-          <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Box
+            onClick={() => {
+              if (onProductClick) {
+                onProductClick(current.linkedProductId || '__default__');
+              }
+            }}
+            sx={{
+              flex: 1, minWidth: 0,
+              cursor: onProductClick ? 'pointer' : 'default',
+              '&:active': onProductClick ? { opacity: 0.7 } : {},
+            }}
+          >
             <Typography
-              onClick={isLongMessage ? () => setExpanded(!expanded) : (hasImage ? () => setShowImage(true) : undefined)}
+              onClick={isLongMessage ? (e: React.MouseEvent) => { e.stopPropagation(); setExpanded(!expanded); } : hasImage ? (e: React.MouseEvent) => { e.stopPropagation(); setShowImage(true); } : undefined}
               sx={{
                 fontSize: '0.85rem',
                 fontWeight: 600,
@@ -233,13 +346,41 @@ export default function AnnouncementBar({ announcements, history }: Announcement
                   WebkitBoxOrient: 'vertical',
                   overflow: 'hidden',
                 }),
-                cursor: isLongMessage || hasImage ? 'pointer' : 'default',
+                cursor: 'pointer',
               }}
             >
               {current.message || 'ประกาศจากทีมงาน'}
             </Typography>
-            {/* Link button for special announcements */}
-            {current.link && (
+            {/* Link / Product button */}
+            {current.linkedProductId && onProductClick ? (
+              <Box
+                component="button"
+                onClick={(e: React.MouseEvent) => { e.stopPropagation(); onProductClick(current.linkedProductId!); }}
+                sx={{
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  color: color,
+                  background: `${color}15`,
+                  border: `1px solid ${color}30`,
+                  borderRadius: '8px',
+                  px: 1.5,
+                  py: 0.5,
+                  mt: 0.5,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 0.5,
+                  cursor: 'pointer',
+                  minHeight: 28,
+                  fontFamily: 'inherit',
+                  WebkitTapHighlightColor: 'transparent',
+                  transition: 'all 0.2s ease',
+                  '&:hover': { background: `${color}25`, borderColor: `${color}50` },
+                  '&:active': { transform: 'scale(0.96)' },
+                }}
+              >
+                {current.linkText || 'ดูสินค้า →'}
+              </Box>
+            ) : current.link && (
               <Typography
                 component="a"
                 href={current.link}
@@ -324,6 +465,98 @@ export default function AnnouncementBar({ announcements, history }: Announcement
           </Box>
         )}
       </Box>
+
+      {/* Social Media News Feed */}
+      {socialMediaNews && socialMediaNews.filter(n => n.enabled).length > 0 && (
+        <Box sx={{
+          mx: { xs: 1.5, sm: 2 },
+          mb: 1.5,
+          display: 'flex',
+          gap: 1,
+          overflowX: 'auto',
+          scrollSnapType: 'x mandatory',
+          WebkitOverflowScrolling: 'touch',
+          '&::-webkit-scrollbar': { display: 'none' },
+          scrollbarWidth: 'none',
+          pb: 0.5,
+        }}>
+          {socialMediaNews.filter(n => n.enabled).map((news) => {
+            const platform = PLATFORM_CONFIG[news.platform] || PLATFORM_CONFIG.instagram;
+            return (
+              <Box
+                key={news.id}
+                component="a"
+                href={news.postUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                sx={{
+                  flex: '0 0 auto',
+                  scrollSnapAlign: 'start',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.25,
+                  px: 1.5,
+                  py: 1,
+                  borderRadius: '14px',
+                  bgcolor: 'var(--glass-bg)',
+                  border: `1px solid ${platform.color}20`,
+                  textDecoration: 'none',
+                  transition: 'all 0.2s ease',
+                  minWidth: 0,
+                  maxWidth: { xs: '85vw', sm: 320 },
+                  '&:hover': { borderColor: `${platform.color}40`, transform: 'translateY(-1px)', boxShadow: `0 4px 12px ${platform.color}15` },
+                }}
+              >
+                <Box sx={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: '10px',
+                  background: platform.gradient,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#fff',
+                  flexShrink: 0,
+                }}>
+                  {platform.icon}
+                </Box>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.15 }}>
+                    <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, color: platform.color }}>
+                      {platform.label}
+                    </Typography>
+                    <Typography sx={{ fontSize: '0.58rem', color: 'var(--text-muted)' }}>
+                      · {new Date(news.postedAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
+                    </Typography>
+                  </Box>
+                  <Typography sx={{
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                    color: 'var(--foreground)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {news.title}
+                  </Typography>
+                  {news.description && (
+                    <Typography sx={{
+                      fontSize: '0.68rem',
+                      color: 'var(--text-muted)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {news.description}
+                    </Typography>
+                  )}
+                </Box>
+                <ExternalLink size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+              </Box>
+            );
+          })}
+        </Box>
+      )}
 
       {/* Image Lightbox */}
       <Dialog
