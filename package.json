@@ -38,6 +38,7 @@
     "react-dom": "19.2.3",
     "sweetalert2": "^11.26.17",
     "swr": "^2.4.0",
+    "web-push": "^3.6.7",
     "zustand": "^5.0.10"
   },
   "devDependencies": {
@@ -46,6 +47,7 @@
     "@types/node-cron": "^3.0.11",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/web-push": "^3.6.4",
     "dotenv": "^17.2.3",
     "eslint": "^9",
     "eslint-config-next": "16.1.1",

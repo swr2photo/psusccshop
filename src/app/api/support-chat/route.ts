@@ -9,6 +9,7 @@ import {
   getCustomerActiveChat,
   getCustomerChats
 } from '@/lib/support-chat';
+import { getProfileName } from '@/lib/profile-utils';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -72,9 +73,13 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    // Use profile Thai name if available, fallback to OAuth name
+    const profileName = await getProfileName(session.user.email);
+    const customerName = profileName || session.user.name || 'ลูกค้า';
+    
     const chat = await createChatSession(
       session.user.email,
-      session.user.name || 'ลูกค้า',
+      customerName,
       subject?.trim() || 'สอบถามข้อมูล',
       message.trim(),
       session.user.image || undefined  // Pass customer avatar

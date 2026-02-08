@@ -64,6 +64,7 @@ const nextConfig: NextConfig = {
             "font-src 'self' https://fonts.gstatic.com;",
             "connect-src 'self' https://*.filebase.com https://*.filebase.io https://api.resend.com https://challenges.cloudflare.com https://*.supabase.co wss://*.supabase.co;",
             "media-src 'self';",
+            "worker-src 'self';",
             "frame-src https://challenges.cloudflare.com;",
             "frame-ancestors 'none';",
             "object-src 'none';",

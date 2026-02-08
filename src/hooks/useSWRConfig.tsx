@@ -26,7 +26,10 @@ interface SWRProviderProps {
  */
 export const fetcher = async (url: string) => {
   const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache',
+    },
   });
 
   if (!res.ok) {

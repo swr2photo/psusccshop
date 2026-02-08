@@ -10,6 +10,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const DEFAULT_SETTINGS = {
+  admin_display_name: 'ทีมงาน PSU SCC',
   auto_reply_enabled: true,
   auto_reply_message: 'ขอบคุณที่ติดต่อมา ทีมงานจะตอบกลับโดยเร็วที่สุดค่ะ',
   working_hours_enabled: false,

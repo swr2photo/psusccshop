@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useNotification } from '../NotificationContext';
+import { usePushNotification } from '@/hooks/usePushNotification';
 import {
   Box,
   Typography,
@@ -111,6 +112,7 @@ interface ChatStats {
 }
 
 interface ChatSettings {
+  admin_display_name: string;
   auto_reply_enabled: boolean;
   auto_reply_message: string;
   quick_replies: string[];
@@ -120,6 +122,7 @@ interface ChatSettings {
 export default function SupportChatPanel() {
   const { data: session } = useSession();
   const { warning: toastWarning, error: toastError } = useNotification();
+  const { isSupported: pushSupported, isSubscribed: pushSubscribed, subscribe: pushSubscribe } = usePushNotification();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   
@@ -136,6 +139,7 @@ export default function SupportChatPanel() {
   const [otherTyping, setOtherTyping] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [chatSettings, setChatSettings] = useState<ChatSettings>({
+    admin_display_name: 'ทีมงาน PSU SCC',
     auto_reply_enabled: true,
     auto_reply_message: 'ขอบคุณที่ติดต่อมา ทีมงานจะตอบกลับโดยเร็วที่สุดค่ะ',
     quick_replies: ['สวัสดีค่ะ', 'รอสักครู่นะคะ', 'ขอบคุณที่รอค่ะ', 'ยินดีให้บริการค่ะ'],
@@ -214,11 +218,41 @@ export default function SupportChatPanel() {
       // Only auto-scroll when new messages arrive (not on initial load)
       if (prevMessageCountRef.current > 0 && currentCount > prevMessageCountRef.current) {
         scrollToBottom();
+        
+        // Show browser notification if tab is hidden and new message is from customer
+        const latestMsg = selectedChat.messages[selectedChat.messages.length - 1];
+        if (document.hidden && latestMsg?.sender === 'customer') {
+          if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+            try {
+              const notif = new Notification(`ข้อความใหม่จาก ${latestMsg.sender_name || 'ลูกค้า'}`, {
+                body: latestMsg.message.substring(0, 100),
+                icon: '/favicon.png',
+                tag: `admin-chat-${selectedChat.id}`,
+              });
+              notif.onclick = () => {
+                window.focus();
+                notif.close();
+              };
+            } catch {
+              // Notification may fail in some contexts
+            }
+          }
+        }
       }
       // Don't force scroll on initial chat selection - let user see from top
       prevMessageCountRef.current = currentCount;
     }
   }, [selectedChat?.messages?.length, scrollToBottom]);
+
+  // Auto-request push notification permission for admin
+  useEffect(() => {
+    if (pushSupported && !pushSubscribed && session?.user?.email) {
+      // Auto-subscribe admin to push (will show permission prompt)
+      if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+        pushSubscribe().catch(() => {});
+      }
+    }
+  }, [pushSupported, pushSubscribed, session?.user?.email, pushSubscribe]);
 
   const sendTypingIndicator = useCallback(() => {
     if (!selectedChat) return;
@@ -1108,9 +1142,10 @@ export default function SupportChatPanel() {
                     sx={{ color: ADMIN_THEME.textMuted, '&:hover': { color: '#2563eb' } }}>
                     <ImageIcon />
                   </IconButton>
-                  <TextField fullWidth size="small" placeholder="พิมพ์ข้อความ..." value={message}
+                  <TextField fullWidth size="small" placeholder="พิมพ์ข้อความ... (Shift+Enter = ขึ้นบรรทัดใหม่)" value={message}
+                    multiline maxRows={5}
                     onChange={(e) => { setMessage(e.target.value); sendTypingIndicator(); }}
-                    onKeyPress={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
                     disabled={sending || uploadingImage}
                     sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'var(--surface)', color: ADMIN_THEME.text, fontSize: '0.9rem', '& fieldset': { borderColor: ADMIN_THEME.border }, '&:hover fieldset': { borderColor: '#2563eb' }, '&.Mui-focused fieldset': { borderColor: '#2563eb' } } }} />
                   <IconButton onClick={handleSendMessage} disabled={(!message.trim() && !previewImage) || sending || uploadingImage}
@@ -1262,6 +1297,11 @@ export default function SupportChatPanel() {
           ตั้งค่าแชท
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
+          <TextField fullWidth label="ชื่อทีมแอดมินที่แสดง" value={chatSettings.admin_display_name}
+            onChange={(e) => setChatSettings(s => ({ ...s, admin_display_name: e.target.value }))}
+            placeholder="เช่น ทีมงาน PSU SCC"
+            helperText="ชื่อที่ลูกค้าจะเห็นในหัวข้อแชท"
+            sx={{ mb: 2, '& .MuiOutlinedInput-root': { color: ADMIN_THEME.text, '& fieldset': { borderColor: ADMIN_THEME.border } }, '& .MuiInputLabel-root': { color: ADMIN_THEME.textMuted }, '& .MuiFormHelperText-root': { color: ADMIN_THEME.textMuted } }} />
           <FormControlLabel
             control={<Switch checked={chatSettings.auto_reply_enabled} onChange={(e) => setChatSettings(s => ({ ...s, auto_reply_enabled: e.target.checked }))} />}
             label="เปิดใช้ข้อความตอบอัตโนมัติ"

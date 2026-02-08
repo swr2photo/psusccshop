@@ -222,7 +222,7 @@ export function useScreenshotProtection(options: ScreenshotProtectionOptions = {
       // If copying from within a protected area, replace with warning text
       if (target?.closest?.('.protected-image-container') || target?.closest?.('.protected-content') || target?.closest?.('.no-copy')) {
         e.preventDefault();
-        e.clipboardData?.setData('text/plain', '⚠️ เนื้อหานี้ได้รับการป้องกัน');
+        e.clipboardData?.setData('text/plain', '[Protected] เนื้อหานี้ได้รับการป้องกัน');
       }
     };
 

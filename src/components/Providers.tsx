@@ -51,15 +51,28 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, ErrorBounda
           color: 'var(--foreground, #f5f5f7)',
           padding: 24,
           fontFamily: 'system-ui, -apple-system, sans-serif',
-          textAlign: 'center'
+          textAlign: 'center',
         }}>
-          <div style={{ 
-            fontSize: 48, marginBottom: 16, 
-            background: 'linear-gradient(135deg, #ff453a, #ff6b6b)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
+          <style dangerouslySetInnerHTML={{ __html: `
+            @keyframes errFadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+            @keyframes errIconPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+            .err-container { animation: errFadeIn 0.5s cubic-bezier(0.2, 0.6, 0.35, 1) both; }
+            .err-icon { animation: errIconPulse 2s ease-in-out infinite; }
+            .err-btn { transition: all 0.2s cubic-bezier(0.2, 0.6, 0.35, 1); }
+            .err-btn:hover { transform: translateY(-1px); filter: brightness(1.1); }
+            .err-btn:active { transform: translateY(0); filter: brightness(0.95); }
+          ` }} />
+          <div className="err-container" style={{ maxWidth: 400, width: '100%' }}>
+          <div className="err-icon" style={{ 
+            marginBottom: 16, 
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}>
-            ⚠️
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="url(#err-grad)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <defs><linearGradient id="err-grad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stopColor="#ff453a" /><stop offset="100%" stopColor="#ff6b6b" /></linearGradient></defs>
+              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/>
+            </svg>
           </div>
           <h1 style={{ fontSize: 22, marginBottom: 8, fontWeight: 700, color: 'var(--foreground, #f5f5f7)' }}>
             เกิดข้อผิดพลาด
@@ -69,8 +82,9 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, ErrorBounda
               ? 'ข้อมูลบางส่วนอาจล้าสมัย กรุณาล้างข้อมูลเก่าแล้วลองใหม่อีกครั้ง'
               : 'มีบางอย่างผิดพลาด กรุณารีเฟรชหน้าเว็บ หรืออัปเดต browser'}
           </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', maxWidth: 280 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', maxWidth: 280, margin: '0 auto' }}>
             <button
+              className="err-btn"
               onClick={function() { window.location.reload(); }}
               style={{
                 padding: '12px 32px',
@@ -81,12 +95,18 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, ErrorBounda
                 border: 'none',
                 borderRadius: 12,
                 cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
               }}
             >
-              🔄 รีเฟรชหน้าเว็บ
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
+              รีเฟรชหน้าเว็บ
             </button>
             {isDataError && (
               <button
+                className="err-btn"
                 onClick={function() {
                   try {
                     // Clear potentially corrupted cached data
@@ -112,12 +132,18 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, ErrorBounda
                   border: '1px solid rgba(255,69,58,0.3)',
                   borderRadius: 12,
                   cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
                 }}
               >
-                🗑️ ล้างข้อมูลเก่าแล้วรีเฟรช
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                ล้างข้อมูลเก่าแล้วรีเฟรช
               </button>
             )}
             <button
+              className="err-btn"
               onClick={function() { window.location.href = '/'; }}
               style={{
                 padding: '10px 32px',
@@ -128,14 +154,21 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, ErrorBounda
                 border: '1px solid rgba(134,134,139,0.3)',
                 borderRadius: 12,
                 cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
               }}
             >
-              🏠 กลับหน้าหลัก
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+              กลับหน้าหลัก
             </button>
           </div>
           {this.state.error && (
             <details style={{ marginTop: 24, fontSize: 12, color: '#86868b', maxWidth: 500, width: '100%' }}>
-              <summary style={{ cursor: 'pointer', userSelect: 'none' }}>📋 รายละเอียดทางเทคนิค</summary>
+              <summary style={{ cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>
+                รายละเอียดทางเทคนิค</summary>
               <pre style={{ 
                 textAlign: 'left', 
                 whiteSpace: 'pre-wrap', 
@@ -153,6 +186,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, ErrorBounda
               </pre>
             </details>
           )}
+          </div>
         </div>
       );
     }

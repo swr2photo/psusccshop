@@ -24,11 +24,12 @@ import {
   ListItemIcon,
   ListItemText,
 } from '@mui/material';
-import { Headphones as SupportAgentIcon, X as CloseIcon, Send as SendIcon, Clock as TimeIcon, CheckCircle2 as CheckCircleIcon, Star as StarIcon, Image as ImageIcon, Bot as ChatbotIcon, Check as DoneIcon, CheckCheck as DoneAllIcon, MessageCircle as ChatIcon, History as HistoryIcon, ArrowLeft as ArrowBackIcon, Plus as AddIcon, MoreVertical as MoreVertIcon, Trash2 as DeleteIcon, Reply as ReplyIcon, ZoomIn as ZoomInIcon, ZoomOut as ZoomOutIcon, Receipt as ReceiptIcon, ShoppingBag as ShoppingBagIcon } from 'lucide-react';
+import { Headphones as SupportAgentIcon, X as CloseIcon, Send as SendIcon, Clock as TimeIcon, CheckCircle2 as CheckCircleIcon, Star as StarIcon, Image as ImageIcon, Bot as ChatbotIcon, Check as DoneIcon, CheckCheck as DoneAllIcon, MessageCircle as ChatIcon, History as HistoryIcon, ArrowLeft as ArrowBackIcon, Plus as AddIcon, MoreVertical as MoreVertIcon, Trash2 as DeleteIcon, Reply as ReplyIcon, ZoomIn as ZoomInIcon, ZoomOut as ZoomOutIcon, Receipt as ReceiptIcon, ShoppingBag as ShoppingBagIcon, Bell as BellIcon, BellOff as BellOffIcon } from 'lucide-react';
 import { useNotification } from './NotificationContext';
+import { usePushNotification } from '@/hooks/usePushNotification';
 
-// ชื่อแอดมินที่แสดง (สามารถตั้งค่าได้)
-const ADMIN_DISPLAY_NAME = 'ทีมงาน PSU SCC';
+// ชื่อแอดมินเริ่มต้น (ดึงจากตั้งค่าแชท)
+const DEFAULT_ADMIN_NAME = 'ทีมงาน PSU SCC';
 
 interface SupportChatWidgetProps {
   onOpenChatbot?: () => void;
@@ -78,6 +79,7 @@ interface ChatWithMessages extends ChatSession {
 export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, externalOpen, onExternalOpenHandled }: SupportChatWidgetProps) {
   const { data: session, status: authStatus } = useSession();
   const { warning: toastWarning, error: toastError } = useNotification();
+  const { permission: pushPermission, isSupported: pushSupported, isSubscribed: pushSubscribed, loading: pushLoading, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotification();
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -103,10 +105,58 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
   const [orderHistory, setOrderHistory] = useState<any[]>([]);
   const [showOrderPicker, setShowOrderPicker] = useState(false);
   const [loadingOrders, setLoadingOrders] = useState(false);
+  const [pushBannerDismissed, setPushBannerDismissed] = useState(false);
+  const [adminDisplayName, setAdminDisplayName] = useState(DEFAULT_ADMIN_NAME);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const lastMessageCountRef = useRef(0);
+
+  // Fetch admin display name from chat settings
+  useEffect(() => {
+    fetch('/api/support-chat/settings/public')
+      .then(res => res.json())
+      .then(data => {
+        if (data.admin_display_name) setAdminDisplayName(data.admin_display_name);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Show browser Notification when tab is blurred and new admin message arrives
+  useEffect(() => {
+    if (!chat?.messages) return;
+    
+    const adminMessages = chat.messages.filter(m => m.sender === 'admin');
+    const currentCount = adminMessages.length;
+    
+    // Only notify for genuinely new messages (not on initial load)
+    if (lastMessageCountRef.current > 0 && currentCount > lastMessageCountRef.current) {
+      const latestMsg = adminMessages[adminMessages.length - 1];
+      
+      // If tab is not focused or chat is not open, show browser notification
+      if (document.hidden || !open) {
+        if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+          try {
+            const notif = new Notification('SCC Shop - ข้อความใหม่', {
+              body: latestMsg.message.substring(0, 100),
+              icon: '/favicon.png',
+              tag: `chat-${chat.id}`,
+            });
+            notif.onclick = () => {
+              window.focus();
+              setOpen(true);
+              notif.close();
+            };
+          } catch {
+            // Notification may fail in some contexts
+          }
+        }
+      }
+    }
+    
+    lastMessageCountRef.current = currentCount;
+  }, [chat?.messages, chat?.id, open]);
 
   // Scroll to bottom of messages
   const scrollToBottom = useCallback(() => {
@@ -1144,7 +1194,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
             />
             <Box sx={{ flex: 1 }}>
               <Typography sx={{ fontWeight: 700, fontSize: '1rem' }}>
-                {showHistory ? 'ประวัติการสนทนา' : ADMIN_DISPLAY_NAME}
+                {showHistory ? 'ประวัติการสนทนา' : adminDisplayName}
               </Typography>
               <Typography sx={{ fontSize: '0.75rem', opacity: 0.9 }}>
                 {showHistory 
@@ -1165,6 +1215,26 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                 title="ดูประวัติการสนทนา"
               >
                 <HistoryIcon size={24} />
+              </IconButton>
+            )}
+            {/* Push notification toggle */}
+            {pushSupported && !showHistory && (
+              <IconButton
+                onClick={async () => {
+                  if (pushSubscribed) {
+                    await pushUnsubscribe();
+                  } else {
+                    const ok = await pushSubscribe();
+                    if (!ok && pushPermission === 'denied') {
+                      toastWarning('กรุณาเปิดสิทธิ์การแจ้งเตือนในตั้งค่าเบราว์เซอร์');
+                    }
+                  }
+                }}
+                disabled={pushLoading}
+                sx={{ color: 'white', opacity: pushSubscribed ? 1 : 0.6 }}
+                title={pushSubscribed ? 'ปิดการแจ้งเตือน' : 'เปิดการแจ้งเตือน'}
+              >
+                {pushSubscribed ? <BellIcon size={20} /> : <BellOffIcon size={20} />}
               </IconButton>
             )}
             <IconButton
@@ -1605,6 +1675,55 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                     </Typography>
                   </Box>
                 )}
+
+                {/* Push Notification Banner */}
+                {pushSupported && !pushSubscribed && pushPermission !== 'denied' && !pushBannerDismissed && chat?.status !== 'closed' && (
+                  <Box sx={{ 
+                    px: 2, 
+                    py: 1, 
+                    background: 'linear-gradient(135deg, rgba(0,113,227,0.08) 0%, rgba(191,90,242,0.08) 100%)',
+                    borderBottom: '1px solid var(--glass-border)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    flexShrink: 0,
+                  }}>
+                    <BellIcon size={16} color="#0071e3" />
+                    <Typography sx={{ flex: 1, fontSize: '0.75rem', color: 'var(--foreground)', lineHeight: 1.3 }}>
+                      เปิดการแจ้งเตือนเพื่อไม่พลาดข้อความจากแอดมิน
+                    </Typography>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      disabled={pushLoading}
+                      onClick={async () => {
+                        const ok = await pushSubscribe();
+                        if (!ok && typeof Notification !== 'undefined' && Notification.permission === 'denied') {
+                          toastWarning('คุณได้ปิดสิทธิ์การแจ้งเตือน กรุณาเปิดในตั้งค่าเบราว์เซอร์');
+                        }
+                      }}
+                      sx={{
+                        fontSize: '0.7rem',
+                        px: 1.5,
+                        py: 0.3,
+                        textTransform: 'none',
+                        borderRadius: 2,
+                        background: '#0071e3',
+                        minWidth: 'auto',
+                        '&:hover': { background: '#1d4ed8' },
+                      }}
+                    >
+                      {pushLoading ? <CircularProgress size={14} sx={{ color: 'white' }} /> : 'เปิด'}
+                    </Button>
+                    <IconButton 
+                      size="small" 
+                      onClick={() => setPushBannerDismissed(true)}
+                      sx={{ p: 0.3 }}
+                    >
+                      <CloseIcon size={14} />
+                    </IconButton>
+                  </Box>
+                )}
                 
                 {/* Messages Area */}
                 <Box
@@ -2002,13 +2121,15 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                     <TextField
                       fullWidth
                       size="small"
-                      placeholder={replyToMessage ? "พิมพ์ข้อความตอบกลับ..." : "พิมพ์ข้อความ..."}
+                      multiline
+                      maxRows={4}
+                      placeholder={replyToMessage ? "พิมพ์ข้อความตอบกลับ..." : "พิมพ์ข้อความ... (Shift+Enter = ขึ้นบรรทัด)"}
                       value={message}
                       onChange={(e) => {
                         setMessage(e.target.value);
                         sendTypingIndicator();
                       }}
-                      onKeyPress={(e) => {
+                      onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
                           handleSendMessage();

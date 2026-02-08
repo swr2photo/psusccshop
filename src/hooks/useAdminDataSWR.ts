@@ -1,17 +1,35 @@
 'use client';
 
 /**
- * Admin Page Data Integration with SWR
+ * Admin Page Data Integration with SWR + Realtime
  * 
- * This hook bridges SWR data fetching with existing admin page state management.
- * It provides the benefits of SWR (caching, dedup, revalidation) while maintaining
- * compatibility with the existing admin page architecture.
+ * Optimized for fast initial load + instant realtime updates:
+ * - SWR handles initial fetch, caching, dedup, background revalidation
+ * - Realtime provides instant updates via Supabase postgres_changes
+ * - SWR polling is reduced to safety-net level when realtime is active
+ * - Realtime events update SWR cache directly for consistency
  */
 
 import { useCallback, useEffect, useRef } from 'react';
 import useSWR from 'swr';
-import { fetcher } from './useSWRConfig';
 import { CACHE_KEYS } from './useAdminData';
+
+// Admin-specific fetcher with cache-busting for always-fresh data
+const adminFetcher = async (url: string) => {
+  const res = await fetch(url, {
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache, no-store',
+      'Pragma': 'no-cache',
+    },
+  });
+  if (!res.ok) {
+    const error = new Error('Admin data fetch failed');
+    (error as any).status = res.status;
+    throw error;
+  }
+  return res.json();
+};
 
 interface AdminDataRaw {
   status: string;
@@ -31,15 +49,7 @@ interface UseAdminDataSWROptions {
 }
 
 /**
- * SWR-powered data fetching for admin page
- * 
- * This hook handles:
- * - Initial data fetch with SWR caching
- * - Background revalidation
- * - Network reconnection handling
- * - Deduplication of requests
- * - Error handling with fallback
- * - Optional no-cache mode for real-time admin data
+ * SWR-powered data fetching for admin page with realtime-aware polling
  */
 export function useAdminDataSWR(options: UseAdminDataSWROptions) {
   const { 
@@ -55,25 +65,12 @@ export function useAdminDataSWR(options: UseAdminDataSWROptions) {
   const onErrorRef = useRef(onError);
   const onLoadingChangeRef = useRef(onLoadingChange);
 
-  // Keep refs updated
-  useEffect(() => {
-    onDataReceivedRef.current = onDataReceived;
-  }, [onDataReceived]);
+  // Keep refs updated without triggering re-renders
+  useEffect(() => { onDataReceivedRef.current = onDataReceived; }, [onDataReceived]);
+  useEffect(() => { onErrorRef.current = onError; }, [onError]);
+  useEffect(() => { onLoadingChangeRef.current = onLoadingChange; }, [onLoadingChange]);
 
-  useEffect(() => {
-    onErrorRef.current = onError;
-  }, [onError]);
-
-  useEffect(() => {
-    onLoadingChangeRef.current = onLoadingChange;
-  }, [onLoadingChange]);
-
-  // Standard fetcher - SWR handles caching/dedup automatically
-  const adminFetcher = useCallback(async (url: string) => {
-    return fetcher(url);
-  }, []);
-
-  // SWR fetch with configuration
+  // SWR fetch with dynamic refresh interval based on realtime status
   const { 
     data, 
     error, 
@@ -84,44 +81,35 @@ export function useAdminDataSWR(options: UseAdminDataSWROptions) {
     enabled ? CACHE_KEYS.ADMIN_DATA : null,
     adminFetcher,
     {
-      // Revalidation settings - always fresh for admin
+      // Revalidation triggers
       revalidateOnFocus: true,
       revalidateOnReconnect: true,
       revalidateIfStale: true,
       
-      // When realtime is connected, reduce polling significantly
-      // Realtime pushes handle instant updates; SWR is just a safety net
-      refreshInterval: realtimeConnected ? 300000 : 30000, // 5min with realtime, 30s without
+      // Dynamic polling: when realtime is active, SWR is just a safety net
+      // 120s with realtime (backup sync), 15s without (primary polling)
+      refreshInterval: realtimeConnected ? 120_000 : 15_000,
       
-      // Standard deduplication
-      dedupingInterval: 5000,
+      // Deduplication: prevent duplicate requests within 3s
+      dedupingInterval: 3000,
       
       // Error handling
       errorRetryCount: 3,
-      errorRetryInterval: 3000, // Faster retry
+      errorRetryInterval: 3000,
       
-      // Keep showing stale data while revalidating (useful for smooth UX)
+      // Keep stale data visible during revalidation
       keepPreviousData: true,
-      
-      // Don't suspend - we handle loading state manually
       suspense: false,
       
-      // Use localStorage as fallback for instant display on page load
+      // Use localStorage as instant-display fallback
       fallbackData: (() => {
         if (typeof window === 'undefined') return undefined;
         try {
-          const cached = localStorage.getItem('admin_cache');
+          // Try primary admin cache first
+          const cached = localStorage.getItem('psusccshop-admin-cache');
           if (cached) {
-            const { data } = JSON.parse(cached);
-            if (data) {
-              return { status: 'success', data } as AdminDataRaw;
-            }
-          }
-          // Also try the SWR-specific cache key
-          const swrCached = localStorage.getItem('psusccshop_admin_cache_v2');
-          if (swrCached) {
-            const parsed = JSON.parse(swrCached);
-            if (parsed?.orders || parsed?.config) {
+            const parsed = JSON.parse(cached);
+            if (parsed?.config) {
               return { status: 'success', data: parsed } as AdminDataRaw;
             }
           }
@@ -131,7 +119,7 @@ export function useAdminDataSWR(options: UseAdminDataSWROptions) {
     }
   );
 
-  // Handle initial load and data updates
+  // Handle data updates — push to admin page state
   useEffect(() => {
     if (data?.status === 'success' && data.data) {
       onDataReceivedRef.current({
@@ -150,30 +138,53 @@ export function useAdminDataSWR(options: UseAdminDataSWROptions) {
     }
   }, [error]);
 
-  // Handle loading state
+  // Handle loading state — only show spinner on true initial load
   useEffect(() => {
     if (onLoadingChangeRef.current) {
-      // Only show loading on initial load when no data/cache, not on revalidation
-      // If we have fallback data, SWR considers it "not loading"
       const showLoading = isLoading && !initialLoadDone.current && !data;
       onLoadingChangeRef.current(showLoading);
     }
   }, [isLoading, data]);
 
-  // Manual refresh function
+  // Manual refresh
   const refresh = useCallback(async (options?: { silent?: boolean }) => {
-    if (options?.silent) {
-      // Silent refresh - don't show loading
-      await mutate();
-    } else {
-      // Normal refresh
-      await mutate();
-    }
+    await mutate();
   }, [mutate]);
 
-  // Invalidate and refetch
+  // Invalidate and refetch from server
   const invalidate = useCallback(() => {
     mutate(undefined, { revalidate: true });
+  }, [mutate]);
+
+  // Update SWR cache with realtime order change (no network request)
+  const applyRealtimeOrderChange = useCallback((change: {
+    type: 'INSERT' | 'UPDATE' | 'DELETE';
+    order?: any;
+    oldOrder?: any;
+  }) => {
+    mutate((current) => {
+      if (!current?.data?.orders) return current;
+      
+      let nextOrders = [...current.data.orders];
+      
+      if (change.type === 'UPDATE' && change.order) {
+        const idx = nextOrders.findIndex(o => o.ref === change.order.ref);
+        if (idx >= 0) {
+          nextOrders[idx] = { ...nextOrders[idx], ...change.order };
+        }
+      } else if (change.type === 'INSERT' && change.order) {
+        if (!nextOrders.some(o => o.ref === change.order.ref)) {
+          nextOrders = [change.order, ...nextOrders];
+        }
+      } else if (change.type === 'DELETE' && change.oldOrder) {
+        nextOrders = nextOrders.filter(o => o.ref !== change.oldOrder.ref);
+      }
+      
+      return {
+        ...current,
+        data: { ...current.data, orders: nextOrders },
+      };
+    }, { revalidate: false }); // Don't refetch — trust the realtime data
   }, [mutate]);
 
   return {
@@ -186,6 +197,7 @@ export function useAdminDataSWR(options: UseAdminDataSWROptions) {
     refresh,
     invalidate,
     mutate,
+    applyRealtimeOrderChange,
   };
 }
 

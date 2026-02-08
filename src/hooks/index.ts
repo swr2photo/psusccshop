@@ -1,6 +1,8 @@
 // Hooks exports
 export { useToast, TOAST_STYLES, TOAST_ANIMATION_CSS } from './useToast';
 export type { ToastType, ToastMessage, ToastOptions } from './useToast';
+export { usePushNotification } from './usePushNotification';
+export type { PushPermissionState } from './usePushNotification';
 
 // Screenshot protection hooks
 export { 

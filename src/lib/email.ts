@@ -614,3 +614,64 @@ export async function sendOrderCancelledEmail(order: {
   });
 }
 
+// ==================== CHAT REPLY EMAIL ====================
+
+export function generateChatReplyEmail(options: {
+  customerName: string;
+  adminName: string;
+  messagePreview: string;
+  chatId: string;
+}): EmailTemplate {
+  const { customerName, adminName, messagePreview, chatId } = options;
+  const escapedMessage = messagePreview.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+  
+  const content = `
+    <h2>มีข้อความใหม่จากทีมงาน</h2>
+    <p>สวัสดีคุณ ${customerName}</p>
+    <p>แอดมิน <strong>${adminName}</strong> ตอบกลับข้อความของคุณแล้ว</p>
+    
+    <div class="box box-info">
+      <p style="margin: 0 0 8px; color: #94a3b8; font-size: 12px;">ข้อความจากแอดมิน:</p>
+      <p style="margin: 0; color: #f1f5f9; line-height: 1.6; white-space: pre-wrap;">${escapedMessage}</p>
+    </div>
+    
+    <center>
+      <a href="${SHOP_URL}" class="btn">เปิดแชทเพื่อตอบกลับ</a>
+    </center>
+    
+    <div class="box">
+      <p style="margin: 0; color: #94a3b8; text-align: center; font-size: 13px;">
+        คุณสามารถเปิดเว็บไซต์และกดไอคอนแชทเพื่อดูข้อความเพิ่มเติม
+      </p>
+    </div>
+  `;
+
+  return {
+    subject: `แอดมินตอบกลับแชทของคุณ - ${SHOP_NAME}`,
+    html: baseTemplate(content, `${adminName} ตอบกลับข้อความของคุณ`),
+    text: `สวัสดีคุณ ${customerName} - แอดมิน ${adminName} ตอบกลับข้อความของคุณ: "${messagePreview.substring(0, 200)}" เปิดเว็บไซต์เพื่อดูข้อความเพิ่มเติม: ${SHOP_URL}`,
+  };
+}
+
+export async function sendChatReplyEmail(options: {
+  customerEmail: string;
+  customerName: string;
+  adminName: string;
+  messagePreview: string;
+  chatId: string;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const template = generateChatReplyEmail(options);
+    return await sendEmail({
+      to: options.customerEmail,
+      subject: template.subject,
+      html: template.html,
+      text: template.text,
+      type: 'custom',
+      metadata: { chatId: options.chatId, trigger: 'admin_chat_reply' },
+    });
+  } catch (error: any) {
+    console.error('[Email] Chat reply email failed:', error);
+    return { success: false, error: error.message };
+  }
+}

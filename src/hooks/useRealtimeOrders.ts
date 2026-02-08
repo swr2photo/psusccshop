@@ -21,13 +21,13 @@ const CONFIG = {
   // Reconnection settings
   RECONNECT_BASE_DELAY: 1000,      // 1 second
   RECONNECT_MAX_DELAY: 30000,      // 30 seconds max
-  RECONNECT_MAX_ATTEMPTS: 10,
+  RECONNECT_MAX_ATTEMPTS: 15,
   
   // Heartbeat settings
-  HEARTBEAT_INTERVAL: 30000,       // 30 seconds
+  HEARTBEAT_INTERVAL: 25000,       // 25 seconds (below Supabase 30s timeout)
   
   // Debounce settings
-  DEBOUNCE_DELAY: 100,             // 100ms debounce for rapid updates
+  DEBOUNCE_DELAY: 50,              // 50ms debounce for near-instant updates
   
   // Connection timeout
   CONNECTION_TIMEOUT: 10000,       // 10 seconds

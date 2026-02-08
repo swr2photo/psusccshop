@@ -8,6 +8,9 @@ import {
   getChatSession,
   addChatMessage 
 } from '@/lib/support-chat';
+import { sendChatReplyEmail } from '@/lib/email';
+import { sendPushNotification } from '@/lib/push-notification';
+import { getProfileName } from '@/lib/profile-utils';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -94,14 +97,51 @@ export async function POST(request: NextRequest, { params }: Params) {
     // Determine sender type - owner is always 'customer', even if they are also admin
     const sender = isOwner ? 'customer' : 'admin';
     
+    // Use profile Thai name if available, fallback to OAuth name
+    const profileName = await getProfileName(session.user.email);
+    const displayName = profileName || session.user.name || (sender === 'admin' ? 'แอดมิน' : 'ลูกค้า');
+    
     const newMessage = await addChatMessage(
       sessionId,
       sender,
       session.user.email,
-      session.user.name || (sender === 'admin' ? 'แอดมิน' : 'ลูกค้า'),
+      displayName,
       message.trim(),
       session.user.image || undefined // Pass avatar URL
     );
+    
+    // Send email notification to customer when admin replies (fire-and-forget)
+    if (sender === 'admin' && chat.customer_email) {
+      sendChatReplyEmail({
+        customerEmail: chat.customer_email,
+        customerName: chat.customer_name || 'ลูกค้า',
+        adminName: displayName,
+        messagePreview: message.trim().substring(0, 500),
+        chatId: sessionId,
+      }).catch(err => console.error('[support-chat/message] Email notification failed:', err));
+      
+      // Send push notification to customer (fire-and-forget)
+      sendPushNotification(chat.customer_email, {
+        title: `${displayName} ตอบกลับ - SCC Shop`,
+        body: message.trim().substring(0, 200),
+        icon: '/favicon.png',
+        url: '/',
+        tag: `chat-${sessionId}`,
+        chatId: sessionId,
+      }).catch(err => console.error('[support-chat/message] Push notification failed:', err));
+    }
+    
+    // Send push notification to admin when customer sends message
+    if (sender === 'customer' && chat.admin_email) {
+      sendPushNotification(chat.admin_email, {
+        title: `ข้อความใหม่จาก ${session.user.name || 'ลูกค้า'}`,
+        body: message.trim().substring(0, 200),
+        icon: '/favicon.png',
+        url: '/admin',
+        tag: `chat-admin-${sessionId}`,
+        chatId: sessionId,
+      }).catch(err => console.error('[support-chat/message] Admin push failed:', err));
+    }
     
     return NextResponse.json({ 
       message: newMessage,
