@@ -7,6 +7,7 @@ import {
   Slide, Avatar, Autocomplete, CircularProgress, Paper, Dialog, Slider, Chip,
 } from '@mui/material';
 import { useThaiAddress, type AddressSelection } from '@/hooks/useThaiAddress';
+import { type NameValidationConfig, DEFAULT_NAME_VALIDATION } from '@/lib/config';
 
 // ============== ADDRESS TYPES ==============
 
@@ -23,6 +24,7 @@ interface ProfileModalProps {
   onSave: (data: any) => void;
   userImage?: string;
   userEmail?: string;
+  nameValidation?: NameValidationConfig;
 }
 
 // ============== INLINE NOTIFICATION ==============
@@ -47,8 +49,9 @@ const NOTIFICATION_STYLES = {
   },
 };
 
-export default function ProfileModal({ initialData, onClose, onSave, userImage, userEmail }: ProfileModalProps) {
+export default function ProfileModal({ initialData, onClose, onSave, userImage, userEmail, nameValidation }: ProfileModalProps) {
   const isMobile = typeof window !== 'undefined' && window.innerWidth <= 640;
+  const nameConfig = { ...DEFAULT_NAME_VALIDATION, ...nameValidation };
   const [formData, setFormData] = useState({
     name: initialData.name,
     phone: initialData.phone,
@@ -170,7 +173,19 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
     setNotification({ type, message });
   };
 
-  const sanitizeThai = (value: string) => value.replace(/[^\u0E00-\u0E7F\s]/g, '').trimStart();
+  const sanitizeName = (value: string) => {
+    // Build allowed character regex dynamically from nameConfig
+    let pattern = '';
+    if (nameConfig.allowThai) pattern += '\u0E00-\u0E7F';
+    if (nameConfig.allowEnglish) pattern += 'a-zA-Z';
+    if (nameConfig.allowSpecialChars && nameConfig.allowedSpecialChars) {
+      // Escape special regex chars
+      pattern += nameConfig.allowedSpecialChars.replace(/[\\\]\^\-]/g, '\\$&');
+    }
+    pattern += '\\s';
+    const regex = new RegExp(`[^${pattern}]`, 'g');
+    return value.replace(regex, '').trimStart().slice(0, nameConfig.maxLength);
+  };
   const sanitizePhone = (value: string) => value.replace(/\D/g, '').slice(0, 12);
 
   // Derived address lists
@@ -319,8 +334,30 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
 
   const validate = () => {
     const nextErrors: Record<string, string> = {};
-    if (!formData.name || !/^[\u0E00-\u0E7F\s]+$/.test(formData.name.trim())) {
-      nextErrors.name = 'กรอกชื่อ-นามสกุลภาษาไทย';
+    const trimmedName = formData.name.trim();
+    if (!trimmedName) {
+      nextErrors.name = 'กรอกชื่อ-นามสกุล';
+    } else if (trimmedName.length < nameConfig.minLength) {
+      nextErrors.name = `ชื่อต้องมีอย่างน้อย ${nameConfig.minLength} ตัวอักษร`;
+    } else if (trimmedName.length > nameConfig.maxLength) {
+      nextErrors.name = `ชื่อยาวเกิน ${nameConfig.maxLength} ตัวอักษร`;
+    } else {
+      // Build validation regex from config
+      let charClass = '';
+      if (nameConfig.allowThai) charClass += '\u0E00-\u0E7F';
+      if (nameConfig.allowEnglish) charClass += 'a-zA-Z';
+      if (nameConfig.allowSpecialChars && nameConfig.allowedSpecialChars) {
+        charClass += nameConfig.allowedSpecialChars.replace(/[\\\]\^\-]/g, '\\$&');
+      }
+      charClass += '\\s';
+      const nameRegex = new RegExp(`^[${charClass}]+$`);
+      if (!nameRegex.test(trimmedName)) {
+        const langs: string[] = [];
+        if (nameConfig.allowThai) langs.push('ไทย');
+        if (nameConfig.allowEnglish) langs.push('อังกฤษ');
+        nextErrors.name = `กรอกชื่อ-นามสกุลภาษา${langs.join('หรือ')}`;
+        if (nameConfig.allowSpecialChars) nextErrors.name += ` (อนุญาต: ${nameConfig.allowedSpecialChars})`;
+      }
     }
     if (!formData.phone || formData.phone.length < 9) {
       nextErrors.phone = 'กรอกเบอร์โทรให้ถูกต้อง';
@@ -842,7 +879,15 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                   ชื่อ-นามสกุล
                 </Typography>
                 <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-                  กรุณากรอกเป็นภาษาไทย
+                  {(() => {
+                    const langs: string[] = [];
+                    if (nameConfig.allowThai) langs.push('ไทย');
+                    if (nameConfig.allowEnglish) langs.push('อังกฤษ');
+                    let hint = `กรุณากรอกเป็นภาษา${langs.join('หรือ')}`;
+                    if (nameConfig.allowSpecialChars) hint += ` (อนุญาต ${nameConfig.allowedSpecialChars})`;
+                    hint += ` · ${nameConfig.minLength}-${nameConfig.maxLength} ตัว`;
+                    return hint;
+                  })()}
                 </Typography>
               </Box>
               <Box sx={{
@@ -854,11 +899,12 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
             </Box>
             <TextField
               fullWidth
-              placeholder="เช่น สมชาย ใจดี"
+              placeholder={nameConfig.allowEnglish ? 'เช่น สมชาย ใจดี / Somchai Jaidee' : 'เช่น สมชาย ใจดี'}
               value={formData.name}
-              onChange={e => setFormData({ ...formData, name: sanitizeThai(e.target.value) })}
+              onChange={e => setFormData({ ...formData, name: sanitizeName(e.target.value) })}
               error={!!errors.name}
-              helperText={errors.name}
+              helperText={errors.name || `${formData.name.trim().length}/${nameConfig.maxLength}`}
+              inputProps={{ maxLength: nameConfig.maxLength }}
               sx={inputSx}
             />
           </Box>

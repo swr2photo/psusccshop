@@ -1989,6 +1989,8 @@ import {
   getCategoryLabel,
   getSubTypeLabel,
   getCategoryIcon,
+  DEFAULT_SHIRT_NAME,
+  type ShirtNameConfig,
 } from '@/lib/config';
 import { ShippingConfig } from '@/lib/shipping';
 import { useRealtimeOrdersByEmail } from '@/hooks/useRealtimeOrders';
@@ -2253,6 +2255,22 @@ const isProductCurrentlyOpen = (product: { isActive?: boolean; startDate?: strin
   return true;
 };
 const normalizeEngName = (value: string) => value.replace(/[^\x20-\x7E]/g, '').toUpperCase().slice(0, 7).trim();
+
+/** Normalize shirt custom name based on ShirtNameConfig */
+const normalizeShirtName = (value: string, cfg: ShirtNameConfig = DEFAULT_SHIRT_NAME): string => {
+  // Build allowed character pattern
+  let pattern = '';
+  if (cfg.allowEnglish) pattern += 'a-zA-Z';
+  if (cfg.allowThai) pattern += '\u0E00-\u0E7F';
+  if (cfg.allowSpecialChars && cfg.allowedSpecialChars) {
+    pattern += cfg.allowedSpecialChars.replace(/[\\\]\^\-]/g, '\\$&');
+  }
+  pattern += '\\s';
+  const regex = new RegExp(`[^${pattern}]`, 'g');
+  let result = value.replace(regex, '');
+  if (cfg.autoUppercase) result = result.toUpperCase();
+  return result.slice(0, cfg.maxLength).trim();
+};
 const normalizeDigits99 = (value: string) => {
   const digits = value.replace(/\D/g, '');
   if (!digits) return '';
@@ -3261,7 +3279,8 @@ export default function HomePage() {
       return null;
     }
 
-    const normalizedCustomName = normalizeEngName(productOptions.customName);
+    const shirtCfg = { ...DEFAULT_SHIRT_NAME, ...config?.shirtNameConfig };
+    const normalizedCustomName = normalizeShirtName(productOptions.customName, shirtCfg);
 
     if (selectedProduct.options?.hasCustomName && !normalizedCustomName) {
       // Scroll to customName input and focus
@@ -3271,6 +3290,17 @@ export default function HomePage() {
         customNameInputRef.current?.parentElement?.parentElement?.classList.add('shake-highlight');
         setTimeout(() => customNameInputRef.current?.parentElement?.parentElement?.classList.remove('shake-highlight'), 600);
       }, 300);
+      return null;
+    }
+
+    if (selectedProduct.options?.hasCustomName && normalizedCustomName.length < shirtCfg.minLength) {
+      customNameInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => {
+        customNameInputRef.current?.focus();
+        customNameInputRef.current?.parentElement?.parentElement?.classList.add('shake-highlight');
+        setTimeout(() => customNameInputRef.current?.parentElement?.parentElement?.classList.remove('shake-highlight'), 600);
+      }, 300);
+      showToast('warning', `ชื่อติดเสื้อต้องมีอย่างน้อย ${shirtCfg.minLength} ตัวอักษร`);
       return null;
     }
 
@@ -4434,28 +4464,37 @@ export default function HomePage() {
               </Box>
 
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {selectedProduct.options?.hasCustomName && (
-                  <TextField
-                    label="ชื่อติดเสื้อ (ภาษาอังกฤษ สูงสุด 7 ตัว)"
-                    fullWidth
-                    value={productOptions.customName}
-                    onChange={(e) => setProductOptions({ ...productOptions, customName: normalizeEngName(e.target.value) })}
-                    inputProps={{ maxLength: 7 }}
-                    inputRef={customNameInputRef}
-                    placeholder="เช่น JOHN"
-                    sx={{ 
-                      '& .MuiOutlinedInput-root': { 
-                        color: 'var(--foreground)',
-                        borderRadius: '12px',
-                        '& fieldset': { borderColor: 'var(--glass-border)' },
-                        '&:hover fieldset': { borderColor: 'rgba(0,113,227,0.5)' },
-                        '&.Mui-focused fieldset': { borderColor: '#0071e3' },
-                      }, 
-                      '& label': { color: 'var(--text-muted)' },
-                      '& label.Mui-focused': { color: 'var(--secondary)' },
-                    }}
-                  />
-                )}
+                {selectedProduct.options?.hasCustomName && (() => {
+                  const sc = { ...DEFAULT_SHIRT_NAME, ...config?.shirtNameConfig };
+                  const langs: string[] = [];
+                  if (sc.allowThai) langs.push('ไทย');
+                  if (sc.allowEnglish) langs.push('อังกฤษ');
+                  const langLabel = langs.join('/');
+                  const label = `ชื่อติดเสื้อ (${langLabel}${sc.allowSpecialChars ? ` + ${sc.allowedSpecialChars}` : ''}, ${sc.minLength}-${sc.maxLength} ตัว)`;
+                  return (
+                    <TextField
+                      label={label}
+                      fullWidth
+                      value={productOptions.customName}
+                      onChange={(e) => setProductOptions({ ...productOptions, customName: normalizeShirtName(e.target.value, sc) })}
+                      inputProps={{ maxLength: sc.maxLength }}
+                      inputRef={customNameInputRef}
+                      placeholder={sc.allowThai ? 'เช่น สมชาย' : 'เช่น JOHN'}
+                      helperText={`${productOptions.customName.length}/${sc.maxLength}`}
+                      sx={{ 
+                        '& .MuiOutlinedInput-root': { 
+                          color: 'var(--foreground)',
+                          borderRadius: '12px',
+                          '& fieldset': { borderColor: 'var(--glass-border)' },
+                          '&:hover fieldset': { borderColor: 'rgba(0,113,227,0.5)' },
+                          '&.Mui-focused fieldset': { borderColor: '#0071e3' },
+                        }, 
+                        '& label': { color: 'var(--text-muted)' },
+                        '& label.Mui-focused': { color: 'var(--secondary)' },
+                      }}
+                    />
+                  );
+                })()}
 
                 {selectedProduct.options?.hasCustomNumber && (
                   <TextField
@@ -6820,6 +6859,7 @@ export default function HomePage() {
           onSave={handleSaveProfile}
           userImage={session?.user?.image || ''}
           userEmail={session?.user?.email || ''}
+          nameValidation={config?.nameValidation}
         />
       )}
 

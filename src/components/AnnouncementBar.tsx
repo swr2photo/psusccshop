@@ -38,6 +38,14 @@ interface Announcement {
   type?: 'text' | 'image' | 'both';
   showLogo?: boolean;
   priority?: number;
+  /** ข้อความพิเศษ (ตัวหนา/ขีดเส้นใต้/สำคัญ) */
+  isSpecial?: boolean;
+  /** ไอคอน emoji */
+  specialIcon?: string;
+  /** ลิงก์แนบ */
+  link?: string;
+  /** ข้อความปุ่มลิงก์ */
+  linkText?: string;
 }
 
 interface AnnouncementHistoryItem {
@@ -118,6 +126,7 @@ export default function AnnouncementBar({ announcements, history }: Announcement
   const color = getColor(current.color);
   const hasImage = !!current.imageUrl;
   const isLongMessage = (current.message?.length || 0) > 80;
+  const isSpecial = !!current.isSpecial;
 
   return (
     <>
@@ -128,20 +137,37 @@ export default function AnnouncementBar({ announcements, history }: Announcement
         borderRadius: '16px',
         overflow: 'hidden',
         position: 'relative',
-        border: `1px solid ${color}30`,
+        border: `1px solid ${isSpecial ? color + '50' : color + '30'}`,
         transition: 'all 0.3s ease',
+        ...(isSpecial && {
+          boxShadow: `0 0 20px ${color}20, 0 0 40px ${color}10`,
+          animation: 'special-ann-glow 3s ease-in-out infinite',
+          '@keyframes special-ann-glow': {
+            '0%, 100%': { boxShadow: `0 0 20px ${color}20` },
+            '50%': { boxShadow: `0 0 30px ${color}35` },
+          },
+        }),
       }}>
         {/* Subtle gradient background */}
         <Box sx={{
           position: 'absolute', inset: 0,
-          background: `linear-gradient(135deg, ${color}12 0%, ${color}06 50%, transparent 100%)`,
+          background: isSpecial
+            ? `linear-gradient(135deg, ${color}20 0%, ${color}10 50%, ${color}05 100%)`
+            : `linear-gradient(135deg, ${color}12 0%, ${color}06 50%, transparent 100%)`,
         }} />
 
         {/* Left accent line */}
         <Box sx={{
-          position: 'absolute', top: 0, left: 0, bottom: 0, width: 4,
+          position: 'absolute', top: 0, left: 0, bottom: 0, width: isSpecial ? 5 : 4,
           background: `linear-gradient(180deg, ${color}, ${color}88)`,
           borderRadius: '4px 0 0 4px',
+          ...(isSpecial && {
+            animation: 'special-line-pulse 2s ease-in-out infinite',
+            '@keyframes special-line-pulse': {
+              '0%, 100%': { opacity: 1 },
+              '50%': { opacity: 0.7 },
+            },
+          }),
         }} />
 
         {/* Content row */}
@@ -163,7 +189,13 @@ export default function AnnouncementBar({ announcements, history }: Announcement
               '50%': { transform: 'scale(1.08)' },
             },
           }}>
-            <Megaphone size={14} style={{ color }} />
+            {isSpecial && current.specialIcon ? (
+              <Typography sx={{ fontSize: '1rem', lineHeight: 1 }}>{current.specialIcon}</Typography>
+            ) : isSpecial ? (
+              <Sparkles size={14} style={{ color }} />
+            ) : (
+              <Megaphone size={14} style={{ color }} />
+            )}
           </Box>
 
           {/* Thumbnail */}
@@ -206,6 +238,28 @@ export default function AnnouncementBar({ announcements, history }: Announcement
             >
               {current.message || 'ประกาศจากทีมงาน'}
             </Typography>
+            {/* Link button for special announcements */}
+            {current.link && (
+              <Typography
+                component="a"
+                href={current.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                sx={{
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  color: color,
+                  textDecoration: 'none',
+                  mt: 0.5,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 0.5,
+                  '&:hover': { textDecoration: 'underline' },
+                }}
+              >
+                {current.linkText || 'ดูเพิ่มเติม →'}
+              </Typography>
+            )}
             {current.displayName && (
               <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)', mt: 0.15 }}>
                 — {current.displayName}

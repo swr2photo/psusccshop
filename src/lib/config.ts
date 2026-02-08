@@ -244,6 +244,59 @@ export const DEFAULT_ADMIN_PERMISSIONS: AdminPermissions = {
   canSendEmail: false,
 };
 
+/** ตั้งค่าการตรวจสอบชื่อ */
+export interface NameValidationConfig {
+  /** ความยาวขั้นต่ำ (default: 2) */
+  minLength: number;
+  /** ความยาวสูงสุด (default: 100) */
+  maxLength: number;
+  /** อนุญาตภาษาไทย (default: true) */
+  allowThai: boolean;
+  /** อนุญาตภาษาอังกฤษ (default: false) */
+  allowEnglish: boolean;
+  /** อนุญาตอักษรพิเศษ เช่น . - ' (default: false) */
+  allowSpecialChars: boolean;
+  /** รูปแบบอักษรพิเศษที่อนุญาต (default: ".-'") */
+  allowedSpecialChars: string;
+}
+
+export const DEFAULT_NAME_VALIDATION: NameValidationConfig = {
+  minLength: 2,
+  maxLength: 100,
+  allowThai: true,
+  allowEnglish: false,
+  allowSpecialChars: false,
+  allowedSpecialChars: ".-'",
+};
+
+/** ตั้งค่าชื่อบนเสื้อ (Custom Name on Shirt) */
+export interface ShirtNameConfig {
+  /** ความยาวขั้นต่ำ (default: 1) */
+  minLength: number;
+  /** ความยาวสูงสุด (default: 7) */
+  maxLength: number;
+  /** อนุญาตภาษาไทย (default: false) */
+  allowThai: boolean;
+  /** อนุญาตภาษาอังกฤษ (default: true) */
+  allowEnglish: boolean;
+  /** แปลงเป็นตัวพิมพ์ใหญ่อัตโนมัติ (default: true) */
+  autoUppercase: boolean;
+  /** อนุญาตอักษรพิเศษ (default: false) */
+  allowSpecialChars: boolean;
+  /** รูปแบบอักษรพิเศษที่อนุญาต (default: ".-") */
+  allowedSpecialChars: string;
+}
+
+export const DEFAULT_SHIRT_NAME: ShirtNameConfig = {
+  minLength: 1,
+  maxLength: 7,
+  allowThai: false,
+  allowEnglish: true,
+  autoUppercase: true,
+  allowSpecialChars: false,
+  allowedSpecialChars: '.-',
+};
+
 export interface ShopConfig {
   isOpen: boolean;
   closeDate: string;
@@ -255,6 +308,10 @@ export interface ShopConfig {
   paymentEnabled?: boolean;
   /** ข้อความแสดงเมื่อปิดระบบชำระเงิน */
   paymentDisabledMessage?: string;
+  /** ตั้งค่าการตรวจสอบชื่อ */
+  nameValidation?: NameValidationConfig;
+  /** ตั้งค่าชื่อบนเสื้อ */
+  shirtNameConfig?: ShirtNameConfig;
   products: Product[];
     /**
      * Firestore/Storage key for products (optional, for large data)
@@ -298,6 +355,14 @@ export interface ShopConfig {
     showLogo?: boolean;
     /** Priority/order for display */
     priority?: number;
+    /** ข้อความพิเศษ (เช่น ตัวหนา, ขีดเส้นใต้, หรือข้อความสำคัญ) */
+    isSpecial?: boolean;
+    /** ไอคอน emoji หรือ icon สำหรับข้อความพิเศษ */
+    specialIcon?: string;
+    /** ลิงก์แนบ (ถ้ามี) */
+    link?: string;
+    /** ข้อความปุ่ม (ถ้ามี link) */
+    linkText?: string;
   }>;
   /** Announcement history (last 50) */
   announcementHistory?: Array<{

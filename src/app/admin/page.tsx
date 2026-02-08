@@ -142,7 +142,7 @@ import {
   Ticket,
 } from 'lucide-react';
 
-import { isAdmin, isSuperAdmin, setDynamicAdminEmails, SUPER_ADMIN_EMAIL, Product, ShopConfig, SIZES, AdminPermissions, DEFAULT_ADMIN_PERMISSIONS } from '@/lib/config';
+import { isAdmin, isSuperAdmin, setDynamicAdminEmails, SUPER_ADMIN_EMAIL, Product, ShopConfig, SIZES, AdminPermissions, DEFAULT_ADMIN_PERMISSIONS, DEFAULT_NAME_VALIDATION, type NameValidationConfig, DEFAULT_SHIRT_NAME, type ShirtNameConfig } from '@/lib/config';
 import { deleteOrderAdmin, saveShopConfig, syncOrdersSheet, updateOrderAdmin, updateOrderStatusAPI } from '@/lib/api-client';
 import SupportChatPanel from '@/components/admin/SupportChatPanel';
 import EmailManagement from '@/components/admin/EmailManagement';
@@ -261,6 +261,14 @@ interface Announcement {
   type?: 'text' | 'image' | 'both';
   showLogo?: boolean;
   priority?: number;
+  /** ข้อความพิเศษ (ตัวหนา/ขีดเส้นใต้/สำคัญ) */
+  isSpecial?: boolean;
+  /** ไอคอน emoji สำหรับข้อความพิเศษ */
+  specialIcon?: string;
+  /** ลิงก์แนบ */
+  link?: string;
+  /** ข้อความปุ่มลิงก์ */
+  linkText?: string;
 }
 
 const ADMIN_CACHE_KEY = 'psusccshop-admin-cache';
@@ -433,6 +441,24 @@ const CATEGORY_ICONS: Record<string, string> = {
   SERVICE: '🛠️',
   OTHER: '📦',
 };
+
+// ============== DATETIME HELPERS ==============
+/** Convert ISO string to local datetime-local value (YYYY-MM-DDTHH:MM) */
+function isoToLocalDatetime(iso?: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** Convert local datetime-local value to ISO string */
+function localDatetimeToIso(local: string): string | undefined {
+  if (!local) return undefined;
+  const d = new Date(local);
+  if (isNaN(d.getTime())) return undefined;
+  return d.toISOString();
+}
 
 // ============== NEW MODERN THEME ==============
 const ADMIN_THEME = {
@@ -893,6 +919,277 @@ const SettingsView = React.memo(function SettingsView({
               />
             </Box>
           )}
+        </SettingSection>
+      )}
+
+      {/* Name Validation Settings */}
+      {canManageShop && (
+        <SettingSection icon={<Person size={20} />} title="ตั้งค่าชื่อ-นามสกุล">
+          {(() => {
+            const nv = { ...DEFAULT_NAME_VALIDATION, ...localConfig.nameValidation };
+            const updateNV = (patch: Partial<NameValidationConfig>) => {
+              onConfigChange({ ...localConfig, nameValidation: { ...nv, ...patch } });
+            };
+            return (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {/* Length settings */}
+                <Box sx={{ display: 'flex', gap: 1.5 }}>
+                  <TextField
+                    type="number"
+                    label="ความยาวขั้นต่ำ"
+                    value={nv.minLength}
+                    onChange={e => updateNV({ minLength: Math.max(1, Number(e.target.value) || 1) })}
+                    inputProps={{ min: 1, max: 200 }}
+                    size="small"
+                    sx={{
+                      flex: 1,
+                      ...inputSx,
+                      '& .MuiOutlinedInput-root': { ...inputSx['& .MuiOutlinedInput-root'], borderRadius: '10px' },
+                    }}
+                  />
+                  <TextField
+                    type="number"
+                    label="ความยาวสูงสุด"
+                    value={nv.maxLength}
+                    onChange={e => updateNV({ maxLength: Math.max(nv.minLength, Number(e.target.value) || 10) })}
+                    inputProps={{ min: nv.minLength, max: 500 }}
+                    size="small"
+                    sx={{
+                      flex: 1,
+                      ...inputSx,
+                      '& .MuiOutlinedInput-root': { ...inputSx['& .MuiOutlinedInput-root'], borderRadius: '10px' },
+                    }}
+                  />
+                </Box>
+
+                {/* Language toggles */}
+                <Box sx={{
+                  p: 2,
+                  borderRadius: '12px',
+                  bgcolor: 'rgba(99,102,241,0.08)',
+                  border: '1px solid rgba(99,102,241,0.2)',
+                }}>
+                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#818cf8', mb: 1.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    🌐 ภาษาที่อนุญาต
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                    {[
+                      { key: 'allowThai' as const, label: '🇹🇭 ภาษาไทย', color: '#0071e3' },
+                      { key: 'allowEnglish' as const, label: '🇬🇧 English', color: '#10b981' },
+                    ].map(lang => (
+                      <Box
+                        key={lang.key}
+                        onClick={() => {
+                          // Don't allow disabling all languages
+                          if (nv[lang.key] && !Object.entries(nv).some(([k, v]) => k !== lang.key && k.startsWith('allow') && k !== 'allowSpecialChars' && v === true)) return;
+                          updateNV({ [lang.key]: !nv[lang.key] });
+                        }}
+                        sx={{
+                          px: 2,
+                          py: 1,
+                          borderRadius: '10px',
+                          cursor: 'pointer',
+                          fontSize: '0.85rem',
+                          fontWeight: 600,
+                          bgcolor: nv[lang.key] ? `${lang.color}15` : 'rgba(255,255,255,0.05)',
+                          color: nv[lang.key] ? lang.color : '#64748b',
+                          border: `1.5px solid ${nv[lang.key] ? lang.color : 'transparent'}`,
+                          transition: 'all 0.2s ease',
+                          '&:hover': {
+                            bgcolor: nv[lang.key] ? `${lang.color}25` : 'rgba(255,255,255,0.1)',
+                          },
+                        }}
+                      >
+                        {lang.label}
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
+
+                {/* Special characters */}
+                <SettingToggleRow
+                  label="อนุญาตอักษรพิเศษ"
+                  description={nv.allowSpecialChars ? `ตัวอักษรที่อนุญาต: ${nv.allowedSpecialChars}` : 'ปิดใช้งาน'}
+                  checked={nv.allowSpecialChars}
+                  onChange={checked => updateNV({ allowSpecialChars: checked })}
+                />
+                {nv.allowSpecialChars && (
+                  <TextField
+                    label="อักษรพิเศษที่อนุญาต"
+                    value={nv.allowedSpecialChars}
+                    onChange={e => updateNV({ allowedSpecialChars: e.target.value })}
+                    placeholder=".-'"
+                    helperText="กรอกตัวอักษรพิเศษที่ต้องการอนุญาต เช่น . - ' ( )"
+                    size="small"
+                    sx={{
+                      ...inputSx,
+                      '& .MuiOutlinedInput-root': { ...inputSx['& .MuiOutlinedInput-root'], borderRadius: '10px' },
+                    }}
+                  />
+                )}
+
+                {/* Preview */}
+                <Box sx={{
+                  p: 1.5,
+                  borderRadius: '10px',
+                  bgcolor: 'rgba(16,185,129,0.08)',
+                  border: '1px solid rgba(16,185,129,0.2)',
+                }}>
+                  <Typography sx={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 600, mb: 0.5 }}>
+                    ✅ ตัวอย่างที่ระบบจะยอมรับ:
+                  </Typography>
+                  <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    {[
+                      nv.allowThai && 'สมชาย ใจดี',
+                      nv.allowEnglish && 'John Smith',
+                      (nv.allowThai && nv.allowEnglish) && 'สมชาย Smith',
+                      nv.allowSpecialChars && (nv.allowThai ? `สมชาย ใจ${nv.allowedSpecialChars[0] || '.'}ดี` : `John O${nv.allowedSpecialChars[0] || "'"}Brien`),
+                    ].filter(Boolean).join(' / ')}
+                    {` (${nv.minLength}-${nv.maxLength} ตัว)`}
+                  </Typography>
+                </Box>
+              </Box>
+            );
+          })()}
+        </SettingSection>
+      )}
+
+      {/* Shirt Custom Name Settings */}
+      {canManageShop && (
+        <SettingSection icon={<ShoppingBag size={20} />} title="ชื่อบนเสื้อ (Custom Name)">
+          {(() => {
+            const sn = { ...DEFAULT_SHIRT_NAME, ...localConfig.shirtNameConfig };
+            const updateSN = (patch: Partial<ShirtNameConfig>) => {
+              onConfigChange({ ...localConfig, shirtNameConfig: { ...sn, ...patch } });
+            };
+            return (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {/* Length settings */}
+                <Box sx={{ display: 'flex', gap: 1.5 }}>
+                  <TextField
+                    type="number"
+                    label="ความยาวขั้นต่ำ"
+                    value={sn.minLength}
+                    onChange={e => updateSN({ minLength: Math.max(1, Number(e.target.value) || 1) })}
+                    inputProps={{ min: 1, max: 50 }}
+                    size="small"
+                    sx={{
+                      flex: 1,
+                      ...inputSx,
+                      '& .MuiOutlinedInput-root': { ...inputSx['& .MuiOutlinedInput-root'], borderRadius: '10px' },
+                    }}
+                  />
+                  <TextField
+                    type="number"
+                    label="ความยาวสูงสุด"
+                    value={sn.maxLength}
+                    onChange={e => updateSN({ maxLength: Math.max(sn.minLength, Number(e.target.value) || 7) })}
+                    inputProps={{ min: sn.minLength, max: 50 }}
+                    size="small"
+                    sx={{
+                      flex: 1,
+                      ...inputSx,
+                      '& .MuiOutlinedInput-root': { ...inputSx['& .MuiOutlinedInput-root'], borderRadius: '10px' },
+                    }}
+                  />
+                </Box>
+
+                {/* Language toggles */}
+                <Box sx={{
+                  p: 2,
+                  borderRadius: '12px',
+                  bgcolor: 'rgba(99,102,241,0.08)',
+                  border: '1px solid rgba(99,102,241,0.2)',
+                }}>
+                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#818cf8', mb: 1.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    🌐 ภาษาที่อนุญาต
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                    {[
+                      { key: 'allowThai' as const, label: '🇹🇭 ภาษาไทย', color: '#0071e3' },
+                      { key: 'allowEnglish' as const, label: '🇬🇧 English', color: '#10b981' },
+                    ].map(lang => (
+                      <Box
+                        key={lang.key}
+                        onClick={() => {
+                          // Don't allow disabling all languages
+                          if (sn[lang.key] && !['allowThai', 'allowEnglish'].some(k => k !== lang.key && sn[k as keyof ShirtNameConfig] === true)) return;
+                          updateSN({ [lang.key]: !sn[lang.key] });
+                        }}
+                        sx={{
+                          px: 2,
+                          py: 1,
+                          borderRadius: '10px',
+                          cursor: 'pointer',
+                          fontSize: '0.85rem',
+                          fontWeight: 600,
+                          bgcolor: sn[lang.key] ? `${lang.color}15` : 'rgba(255,255,255,0.05)',
+                          color: sn[lang.key] ? lang.color : '#64748b',
+                          border: `1.5px solid ${sn[lang.key] ? lang.color : 'transparent'}`,
+                          transition: 'all 0.2s ease',
+                          '&:hover': {
+                            bgcolor: sn[lang.key] ? `${lang.color}25` : 'rgba(255,255,255,0.1)',
+                          },
+                        }}
+                      >
+                        {lang.label}
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
+
+                {/* Auto uppercase toggle */}
+                <SettingToggleRow
+                  label="แปลงเป็นตัวพิมพ์ใหญ่อัตโนมัติ"
+                  description={sn.autoUppercase ? 'john → JOHN' : 'ปิดใช้งาน'}
+                  checked={sn.autoUppercase}
+                  onChange={checked => updateSN({ autoUppercase: checked })}
+                />
+
+                {/* Special characters */}
+                <SettingToggleRow
+                  label="อนุญาตอักษรพิเศษ"
+                  description={sn.allowSpecialChars ? `ตัวอักษรที่อนุญาต: ${sn.allowedSpecialChars}` : 'ปิดใช้งาน'}
+                  checked={sn.allowSpecialChars}
+                  onChange={checked => updateSN({ allowSpecialChars: checked })}
+                />
+                {sn.allowSpecialChars && (
+                  <TextField
+                    label="อักษรพิเศษที่อนุญาต"
+                    value={sn.allowedSpecialChars}
+                    onChange={e => updateSN({ allowedSpecialChars: e.target.value })}
+                    placeholder=".-"
+                    helperText="กรอกตัวอักษรพิเศษที่ต้องการอนุญาต เช่น . - _ +"
+                    size="small"
+                    sx={{
+                      ...inputSx,
+                      '& .MuiOutlinedInput-root': { ...inputSx['& .MuiOutlinedInput-root'], borderRadius: '10px' },
+                    }}
+                  />
+                )}
+
+                {/* Preview */}
+                <Box sx={{
+                  p: 1.5,
+                  borderRadius: '10px',
+                  bgcolor: 'rgba(16,185,129,0.08)',
+                  border: '1px solid rgba(16,185,129,0.2)',
+                }}>
+                  <Typography sx={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 600, mb: 0.5 }}>
+                    👕 ตัวอย่างที่ใช้ได้:
+                  </Typography>
+                  <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    {[
+                      sn.allowEnglish && (sn.autoUppercase ? 'JOHN' : 'John'),
+                      sn.allowThai && 'สมชาย',
+                      sn.allowSpecialChars && (sn.allowEnglish ? `O${sn.allowedSpecialChars[0] || '.'}BRIEN` : `สม${sn.allowedSpecialChars[0] || '.'}ชาย`),
+                    ].filter(Boolean).join(' / ')}
+                    {` (${sn.minLength}-${sn.maxLength} ตัว)`}
+                  </Typography>
+                </Box>
+              </Box>
+            );
+          })()}
         </SettingSection>
       )}
 
@@ -1717,7 +2014,7 @@ const PromoCodesView = React.memo(function PromoCodesView({ config, saveConfig, 
                   <TextField type="number" label="ลดสูงสุด (฿)" value={editingCode.maxDiscount || ''} onChange={e => setEditingCode({ ...editingCode, maxDiscount: Number(e.target.value) || undefined })} inputProps={{ min: 0 }} size="small" sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px', bgcolor: 'var(--surface)', color: 'var(--foreground)' }, '& .MuiInputLabel-root': { color: 'var(--text-muted)' } }} />
                 )}
                 <TextField type="number" label="จำนวนครั้งที่ใช้ได้ (0 = ไม่จำกัด)" value={editingCode.usageLimit ?? ''} onChange={e => setEditingCode({ ...editingCode, usageLimit: e.target.value === '' || e.target.value === '0' ? null : Number(e.target.value) })} inputProps={{ min: 0 }} size="small" sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px', bgcolor: 'var(--surface)', color: 'var(--foreground)' }, '& .MuiInputLabel-root': { color: 'var(--text-muted)' } }} />
-                <TextField type="datetime-local" label="วันหมดอายุ" value={editingCode.expiresAt?.slice(0, 16) || ''} onChange={e => setEditingCode({ ...editingCode, expiresAt: e.target.value ? new Date(e.target.value).toISOString() : undefined })} InputLabelProps={{ shrink: true }} size="small" sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px', bgcolor: 'var(--surface)', color: 'var(--foreground)' }, '& .MuiInputLabel-root': { color: 'var(--text-muted)' }, '& input': { color: 'var(--foreground)' } }} />
+                <TextField type="datetime-local" label="วันหมดอายุ" value={isoToLocalDatetime(editingCode.expiresAt)} onChange={e => setEditingCode({ ...editingCode, expiresAt: localDatetimeToIso(e.target.value) })} InputLabelProps={{ shrink: true }} size="small" sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px', bgcolor: 'var(--surface)', color: 'var(--foreground)' }, '& .MuiInputLabel-root': { color: 'var(--text-muted)' }, '& input': { color: 'var(--foreground)' } }} />
               </Box>
 
               <FormControlLabel control={<Switch checked={editingCode.enabled} onChange={e => setEditingCode({ ...editingCode, enabled: e.target.checked })} />} label="เปิดใช้งาน" sx={{ color: 'var(--foreground)' }} />
@@ -2238,8 +2535,8 @@ const EventsView = React.memo(function EventsView({
                   fullWidth
                   label="วันเริ่มต้น"
                   type="datetime-local"
-                  value={editingEvent.startDate?.slice(0, 16) || ''}
-                  onChange={e => setEditingEvent(prev => prev ? { ...prev, startDate: e.target.value ? new Date(e.target.value).toISOString() : undefined } : null)}
+                  value={isoToLocalDatetime(editingEvent.startDate)}
+                  onChange={e => setEditingEvent(prev => prev ? { ...prev, startDate: localDatetimeToIso(e.target.value) } : null)}
                   InputLabelProps={{ shrink: true }}
                   sx={{
                     '& .MuiOutlinedInput-root': {
@@ -2255,8 +2552,8 @@ const EventsView = React.memo(function EventsView({
                   fullWidth
                   label="วันสิ้นสุด"
                   type="datetime-local"
-                  value={editingEvent.endDate?.slice(0, 16) || ''}
-                  onChange={e => setEditingEvent(prev => prev ? { ...prev, endDate: e.target.value ? new Date(e.target.value).toISOString() : undefined } : null)}
+                  value={isoToLocalDatetime(editingEvent.endDate)}
+                  onChange={e => setEditingEvent(prev => prev ? { ...prev, endDate: localDatetimeToIso(e.target.value) } : null)}
                   InputLabelProps={{ shrink: true }}
                   sx={{
                     '& .MuiOutlinedInput-root': {
@@ -3090,6 +3387,55 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
                 checked={editingAnn.showLogo ?? true}
                 onChange={(checked) => setEditingAnn({ ...editingAnn, showLogo: checked })}
               />
+
+              {/* Special Announcement */}
+              <Box sx={{
+                p: 2,
+                borderRadius: '12px',
+                bgcolor: 'rgba(251,191,36,0.08)',
+                border: `1px solid rgba(251,191,36,0.2)`,
+              }}>
+                <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#fbbf24', mb: 1.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  ✨ ข้อความพิเศษ
+                </Typography>
+                <SettingToggleRow
+                  label="ประกาศพิเศษ"
+                  description="เน้นการแสดงผล ขอบเรืองแสง + ไอคอนพิเศษ"
+                  checked={editingAnn.isSpecial ?? false}
+                  onChange={(checked) => setEditingAnn({ ...editingAnn, isSpecial: checked })}
+                />
+                {editingAnn.isSpecial && (
+                  <Box sx={{ mt: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                    <TextField
+                      label="ไอคอน Emoji"
+                      value={editingAnn.specialIcon || ''}
+                      onChange={(e) => setEditingAnn({ ...editingAnn, specialIcon: e.target.value.slice(0, 4) })}
+                      placeholder="🔥 🎉 ⚡ 🎊 💥 📢"
+                      size="small"
+                      helperText="เลือก emoji ที่ต้องการแสดง (ว่าง = ✨)"
+                      sx={inputSx}
+                    />
+                    <TextField
+                      label="ลิงก์แนบ (ไม่บังคับ)"
+                      value={editingAnn.link || ''}
+                      onChange={(e) => setEditingAnn({ ...editingAnn, link: e.target.value })}
+                      placeholder="https://..."
+                      size="small"
+                      sx={inputSx}
+                    />
+                    {editingAnn.link && (
+                      <TextField
+                        label="ข้อความปุ่มลิงก์"
+                        value={editingAnn.linkText || ''}
+                        onChange={(e) => setEditingAnn({ ...editingAnn, linkText: e.target.value })}
+                        placeholder="ดูเพิ่มเติม →"
+                        size="small"
+                        sx={inputSx}
+                      />
+                    )}
+                  </Box>
+                )}
+              </Box>
 
               {/* Color Picker */}
               <Box>
@@ -7039,24 +7385,44 @@ export default function AdminPage(): JSX.Element {
                     {/* Custom Options */}
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                       {/* Custom Name */}
-                      <TextField
-                        label="ชื่อติดเสื้อ (ภาษาอังกฤษ)"
-                        value={item.options?.customName || ''}
-                        onChange={(e) => {
-                          const newOptions = { ...item.options, customName: e.target.value.replace(/[^\x20-\x7E]/g, '').toUpperCase().slice(0, 7) };
-                          updateCartItem(idx, { options: newOptions });
-                        }}
-                        size="small"
-                        inputProps={{ maxLength: 7 }}
-                        placeholder="เช่น JOHN"
-                        sx={{
-                          ...inputSx,
-                          '& .MuiOutlinedInput-root': {
-                            ...inputSx['& .MuiOutlinedInput-root'],
-                            borderRadius: '10px',
-                          },
-                        }}
-                      />
+                      {(() => {
+                        const sc = { ...DEFAULT_SHIRT_NAME, ...config?.shirtNameConfig };
+                        const langs: string[] = [];
+                        if (sc.allowThai) langs.push('ไทย');
+                        if (sc.allowEnglish) langs.push('อังกฤษ');
+                        const langLabel = langs.join('/');
+                        return (
+                          <TextField
+                            label={`ชื่อติดเสื้อ (${langLabel}, ${sc.minLength}-${sc.maxLength} ตัว)`}
+                            value={item.options?.customName || ''}
+                            onChange={(e) => {
+                              let pattern = '';
+                              if (sc.allowEnglish) pattern += 'a-zA-Z';
+                              if (sc.allowThai) pattern += '\u0E00-\u0E7F';
+                              if (sc.allowSpecialChars && sc.allowedSpecialChars) {
+                                pattern += sc.allowedSpecialChars.replace(/[\\\]\^\-]/g, '\\$&');
+                              }
+                              pattern += '\\s';
+                              const regex = new RegExp(`[^${pattern}]`, 'g');
+                              let val = e.target.value.replace(regex, '');
+                              if (sc.autoUppercase) val = val.toUpperCase();
+                              val = val.slice(0, sc.maxLength);
+                              const newOptions = { ...item.options, customName: val };
+                              updateCartItem(idx, { options: newOptions });
+                            }}
+                            size="small"
+                            inputProps={{ maxLength: sc.maxLength }}
+                            placeholder={sc.allowThai ? 'เช่น สมชาย' : 'เช่น JOHN'}
+                            sx={{
+                              ...inputSx,
+                              '& .MuiOutlinedInput-root': {
+                                ...inputSx['& .MuiOutlinedInput-root'],
+                                borderRadius: '10px',
+                              },
+                            }}
+                          />
+                        );
+                      })()}
                       
                       {/* Custom Number */}
                       <TextField
