@@ -65,8 +65,7 @@ export function usePushNotification(): UsePushNotificationReturn {
   const isSupported = typeof window !== 'undefined' &&
     'serviceWorker' in navigator &&
     'PushManager' in window &&
-    'Notification' in window &&
-    !!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    'Notification' in window;
 
   // Initialize: register service worker and check subscription state
   useEffect(() => {
