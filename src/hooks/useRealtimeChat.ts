@@ -101,6 +101,7 @@ export function useRealtimeChat(sessionId: string | null, userEmail: string | nu
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
   const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
   const [error, setError] = useState<string | null>(null);
+  const [reconnectKey, setReconnectKey] = useState(0);
 
   const channelRef = useRef<RealtimeChannel | null>(null);
   const typingChannelRef = useRef<RealtimeChannel | null>(null);
@@ -332,7 +333,7 @@ export function useRealtimeChat(sessionId: string | null, userEmail: string | nu
       cleanup();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId, userEmail]);
+  }, [sessionId, userEmail, reconnectKey]);
 
   // Reconnect with exponential backoff
   const attemptReconnect = useCallback(() => {
@@ -350,10 +351,9 @@ export function useRealtimeChat(sessionId: string | null, userEmail: string | nu
 
     reconnectTimerRef.current = setTimeout(() => {
       if (!mountedRef.current) return;
-      // Re-subscribe by triggering effect cleanup+re-run
+      // Re-subscribe by incrementing reconnectKey, which re-triggers the useEffect
       cleanup();
-      setConnectionState('connecting');
-      // The effect will re-run because we cleanup channels
+      setReconnectKey(k => k + 1);
     }, delay);
   }, [cleanup]);
 

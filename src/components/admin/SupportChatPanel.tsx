@@ -139,6 +139,7 @@ export default function SupportChatPanel() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [mobileShowChat, setMobileShowChat] = useState(false);
+  const [fallbackTyping, setFallbackTyping] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [chatSettings, setChatSettings] = useState<ChatSettings>({
     admin_display_name: 'ทีมงาน PSU SCC',
@@ -160,7 +161,7 @@ export default function SupportChatPanel() {
     setMessages: setRealtimeMessages,
     session: realtimeSession,
     connectionState,
-    isOtherTyping: otherTyping,
+    isOtherTyping: rtOtherTyping,
     typingDisplay,
     sendTyping: rtSendTyping,
     addOptimisticMessage,
@@ -171,6 +172,9 @@ export default function SupportChatPanel() {
     session?.user?.email || null,
     'admin'
   );
+  
+  // Merge typing from realtime + API fallback
+  const otherTyping = rtOtherTyping || fallbackTyping;
 
   // Realtime chat list — live updates to sidebar
   const {
@@ -295,13 +299,49 @@ export default function SupportChatPanel() {
     }
   }, [selectedChat?.id, selectedChat?.messages?.length, broadcastRead]);
 
-  // Lightweight fallback poll for stats only (every 30s instead of 5s)
+  // Fallback polling: when Realtime is not connected (publication/RLS not set up,
+  // or connection dropped), poll the API to keep everything fresh.
+  // When Realtime IS connected, only refresh stats every 30s.
   useEffect(() => {
-    const interval = setInterval(() => {
-      fetchChats();
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [fetchChats]);
+    const isRealtimeUp = connectionState === 'connected' && listConnectionState === 'connected';
+    const pollInterval = isRealtimeUp ? 30000 : 5000;
+    
+    let cancelled = false;
+    const poll = async () => {
+      if (cancelled) return;
+      try {
+        await fetchChats();
+        // When realtime isn't working, also refresh the active chat details
+        if (!isRealtimeUp && selectedChat) {
+          const res = await fetch('/api/support-chat/' + selectedChat.id);
+          const data = await res.json();
+          if (!cancelled && data.chat) {
+            const newLen = data.chat.messages?.length || 0;
+            const oldLen = selectedChat.messages?.length || 0;
+            if (newLen !== oldLen || data.chat.status !== selectedChat.status) {
+              setSelectedChat(data.chat);
+              setRealtimeMessages(data.chat.messages || []);
+            }
+          }
+          // Also check typing via API when realtime broadcast isn't available
+          if (!cancelled) {
+            fetch('/api/support-chat/' + selectedChat.id + '/typing')
+              .then(res => res.json())
+              .then(data => {
+                if (!cancelled) setFallbackTyping(data.isTyping || false);
+              })
+              .catch(() => { if (!cancelled) setFallbackTyping(false); });
+          }
+          // Mark as read
+          if (!cancelled) {
+            fetch('/api/support-chat/' + selectedChat.id + '/read', { method: 'POST' }).catch(() => {});
+          }
+        }
+      } catch {}
+    };
+    const interval = setInterval(poll, pollInterval);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [fetchChats, connectionState, listConnectionState, selectedChat?.id, selectedChat?.messages?.length, selectedChat?.status, setRealtimeMessages]);
 
   useEffect(() => {
     if (selectedChat?.messages) {
@@ -345,15 +385,35 @@ export default function SupportChatPanel() {
     }
   }, [pushSupported, pushSubscribed, session?.user?.email, pushSubscribe]);
 
-  // Typing indicator via Supabase Realtime broadcast (no DB writes)
+  // Typing indicator: Realtime broadcast when connected, API fallback otherwise
   const sendTypingIndicator = useCallback(() => {
     const adminName = chatSettings.admin_display_name || session?.user?.name || 'แอดมิน';
-    rtSendTyping(true, adminName);
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    typingTimeoutRef.current = setTimeout(() => {
-      rtSendTyping(false, adminName);
-    }, 3000);
-  }, [rtSendTyping, chatSettings.admin_display_name, session?.user?.name]);
+    if (connectionState === 'connected') {
+      // Fast path: Realtime broadcast (no DB writes)
+      rtSendTyping(true, adminName);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        rtSendTyping(false, adminName);
+      }, 3000);
+    } else if (selectedChat) {
+      // Fallback: API call
+      fetch('/api/support-chat/' + selectedChat.id + '/typing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isTyping: true }),
+      }).catch(() => {});
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        if (selectedChat) {
+          fetch('/api/support-chat/' + selectedChat.id + '/typing', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ isTyping: false }),
+          }).catch(() => {});
+        }
+      }, 3000);
+    }
+  }, [rtSendTyping, chatSettings.admin_display_name, session?.user?.name, connectionState, selectedChat?.id]);
 
   // Removed redundant /read call - now handled by fetchChatDetails with markRead=true
 

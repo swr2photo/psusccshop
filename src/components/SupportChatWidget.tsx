@@ -107,6 +107,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [pushBannerDismissed, setPushBannerDismissed] = useState(false);
   const [adminDisplayName, setAdminDisplayName] = useState(DEFAULT_ADMIN_NAME);
+  const [fallbackTyping, setFallbackTyping] = useState(false);
   
   // === Supabase Realtime: live messages, typing, read receipts ===
   const {
@@ -115,7 +116,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
     session: realtimeSession,
     setSession: setRealtimeSession,
     connectionState,
-    isOtherTyping: adminTyping,
+    isOtherTyping: rtAdminTyping,
     typingDisplay,
     sendTyping: rtSendTyping,
     addOptimisticMessage,
@@ -127,6 +128,9 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
     session?.user?.email || null,
     'customer'
   );
+
+  // Merge typing from realtime + API fallback
+  const adminTyping = rtAdminTyping || fallbackTyping;
 
   // Sync realtime messages into chat state
   useEffect(() => {
@@ -292,11 +296,28 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
 
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Send typing indicator via Realtime broadcast (no DB writes)
+  // Send typing indicator: Realtime broadcast when connected, API fallback otherwise
   const sendTypingIndicator = useCallback(() => {
     if (!chat || chat.status !== 'active') return;
-    rtSendTyping(true, session?.user?.name || undefined);
-  }, [chat?.id, chat?.status, rtSendTyping, session?.user?.name]);
+    if (connectionState === 'connected') {
+      rtSendTyping(true, session?.user?.name || undefined);
+    } else {
+      // Fallback: API call
+      fetch(`/api/support-chat/${chat.id}/typing`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isTyping: true }),
+      }).catch(() => {});
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        fetch(`/api/support-chat/${chat.id}/typing`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ isTyping: false }),
+        }).catch(() => {});
+      }, 3000);
+    }
+  }, [chat?.id, chat?.status, rtSendTyping, session?.user?.name, connectionState]);
 
   // === Realtime replaces polling ===
   // Instead of polling every 5s, Supabase Realtime pushes changes instantly.
@@ -309,6 +330,50 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
       broadcastRead();
     }
   }, [open, chat?.id, showHistory, showNewChat, showRating, chat?.status, broadcastRead]);
+
+  // Fallback polling: when Realtime is not connected/available,
+  // poll the API to keep chat data fresh. Stops when Realtime connects.
+  useEffect(() => {
+    if (!open || !chat?.id || showHistory || showNewChat || showRating) return;
+    // Only poll when realtime is NOT connected
+    if (connectionState === 'connected') return;
+
+    let cancelled = false;
+    const poll = async () => {
+      if (cancelled) return;
+      try {
+        const res = await fetch(`/api/support-chat/${chat.id}`);
+        const data = await res.json();
+        if (!cancelled && data.chat) {
+          setChat(prev => {
+            if (!prev) return prev;
+            // Only update if messages actually changed
+            const newLen = data.chat.messages?.length || 0;
+            const oldLen = prev.messages?.length || 0;
+            if (newLen !== oldLen || data.chat.status !== prev.status) {
+              // Seed realtime with fresh data
+              setRealtimeMessages(data.chat.messages || []);
+              return { ...prev, ...data.chat };
+            }
+            return prev;
+          });
+        }
+        // Also check typing via API fallback
+        if (!cancelled && chat.status === 'active') {
+          fetch(`/api/support-chat/${chat.id}/typing`)
+            .then(res => res.json())
+            .then(data => {
+              if (!cancelled) setFallbackTyping(data.isTyping || false);
+            })
+            .catch(() => { if (!cancelled) setFallbackTyping(false); });
+        }
+      } catch {}
+    };
+    // Poll immediately then every 5s
+    poll();
+    const interval = setInterval(poll, 5000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [open, chat?.id, showHistory, showNewChat, showRating, connectionState, chat?.status, setRealtimeMessages]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
