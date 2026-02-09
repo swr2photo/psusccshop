@@ -156,7 +156,7 @@ export async function OPTIONS(request: NextRequest) {
       headers: {
         'Access-Control-Allow-Origin': allowedOrigin,
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Internal-Request',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
         'Cache-Control': 'no-cache',
       },
     }

@@ -14,42 +14,6 @@ import { SWRProvider } from '@/hooks/useSWRConfig';
 import { TanStackQueryProvider } from '@/hooks/useTanStackQuery';
 import { useThemeStore } from '@/store/themeStore';
 
-// --- Fetch Interceptor ---
-// Patches global fetch to add X-Internal-Request header on all /api/* calls
-// This prevents direct browser URL access to API routes while allowing app requests
-let _fetchPatched = false;
-function patchGlobalFetch() {
-  if (_fetchPatched || typeof window === 'undefined') return;
-  _fetchPatched = true;
-
-  const _originalFetch = window.fetch;
-  window.fetch = function patchedFetch(
-    input: RequestInfo | URL,
-    init?: RequestInit,
-  ): Promise<Response> {
-    // Determine the URL string
-    let url = '';
-    if (typeof input === 'string') {
-      url = input;
-    } else if (input instanceof URL) {
-      url = input.pathname;
-    } else if (input instanceof Request) {
-      url = new URL(input.url).pathname;
-    }
-
-    // Add internal header for /api/* requests (relative or same-origin)
-    if (url.startsWith('/api/') || url.startsWith('/api/')) {
-      const headers = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined));
-      if (!headers.has('X-Internal-Request')) {
-        headers.set('X-Internal-Request', '1');
-      }
-      init = { ...init, headers };
-    }
-
-    return _originalFetch.call(this, input, init);
-  };
-}
-
 // Error Boundary for catching client-side errors (especially on older browsers)
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -459,11 +423,6 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     document.documentElement.setAttribute('data-theme', resolvedMode);
     document.documentElement.style.colorScheme = resolvedMode;
   }, [resolvedMode]);
-
-  // Patch global fetch to add internal request header
-  useEffect(() => {
-    patchGlobalFetch();
-  }, []);
 
   return (
     <ErrorBoundary>

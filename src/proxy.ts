@@ -207,14 +207,20 @@ export default function proxy(request: NextRequest) {
     return response;
   }
 
-  // --- Internal Request Header Check ---
-  // Block direct browser access to API routes (typing URL directly)
-  // Only allow requests from our app (which include X-Internal-Request header)
+  // --- Block Direct Browser Navigation to API Routes ---
+  // Modern browsers send Sec-Fetch-Mode header:
+  //   "navigate" = user typed URL / clicked link / bookmark
+  //   "cors" / "same-origin" / "no-cors" = JavaScript fetch/XHR
+  // Server-side calls (Next.js internal) don't send Sec-Fetch-Mode at all.
+  // This blocks people from viewing API responses by typing URLs in browser.
   if (pathname.startsWith('/api/')) {
-    const isExternalRoute = EXTERNAL_API_ROUTES.some(route => pathname.startsWith(route));
-    if (!isExternalRoute) {
-      const internalHeader = request.headers.get('x-internal-request');
-      if (!internalHeader) {
+    const secFetchMode = request.headers.get('sec-fetch-mode');
+    const secFetchDest = request.headers.get('sec-fetch-dest');
+    // Block only direct browser navigation (typing URL, clicking link)
+    // Allow: fetch/XHR (mode=cors/same-origin/no-cors), server calls (no header)
+    if (secFetchMode === 'navigate' || secFetchDest === 'document') {
+      const isExternalRoute = EXTERNAL_API_ROUTES.some(route => pathname.startsWith(route));
+      if (!isExternalRoute) {
         return new NextResponse(
           JSON.stringify({ status: 'error', message: 'Direct API access is not allowed' }),
           {
