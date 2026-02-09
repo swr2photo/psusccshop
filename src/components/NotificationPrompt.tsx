@@ -1,7 +1,7 @@
 // src/components/NotificationPrompt.tsx
 // Global notification permission prompt — shows once per session for logged-in users
 // Registers service worker for push notifications independently of the chat widget
-// Supports iOS (PWA) + Android + Desktop
+// Supports iOS 16.4+ PWA, iOS 26+ (all home-screen sites are web apps), Android + Desktop
 // Handles denied permission with guidance to re-enable via device settings
 
 'use client';
@@ -32,13 +32,19 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return outputArray;
 }
 
-/** Detect iOS device — works on all iOS versions including 16+ */
+/** Detect iOS device — works on all iOS versions including iOS 26+ (frozen UA) */
 function isIOSDevice(): boolean {
   if (typeof navigator === 'undefined') return false;
-  // Check user agent first (covers most cases)
+  // Check user agent first (covers most cases including iOS 26 frozen UA)
+  // iOS 26 freezes the UA version string but still includes iPhone/iPad/iPod
   if (/iPad|iPhone|iPod/.test(navigator.userAgent)) return true;
   // iPadOS 13+ reports as Mac but has touch
   if (navigator.userAgent.includes('Macintosh') && navigator.maxTouchPoints > 1) return true;
+  // Check User-Agent Client Hints (future-proof for when UA string changes entirely)
+  if ('userAgentData' in navigator) {
+    const uaData = (navigator as any).userAgentData;
+    if (uaData?.platform === 'iOS' || uaData?.platform === 'iPadOS') return true;
+  }
   // Fallback: deprecated platform check
   if (typeof navigator.platform === 'string' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) return true;
   return false;
@@ -47,36 +53,54 @@ function isIOSDevice(): boolean {
 /** Detect Android device */
 function isAndroidDevice(): boolean {
   if (typeof navigator === 'undefined') return false;
-  return /Android/i.test(navigator.userAgent);
+  if (/Android/i.test(navigator.userAgent)) return true;
+  // User-Agent Client Hints fallback
+  if ('userAgentData' in navigator) {
+    const uaData = (navigator as any).userAgentData;
+    if (uaData?.platform === 'Android') return true;
+  }
+  return false;
 }
 
 /** Detect if running as installed PWA (standalone mode) */
 function isStandaloneMode(): boolean {
   if (typeof window === 'undefined') return false;
   return window.matchMedia('(display-mode: standalone)').matches ||
+    // iOS 26: all home-screen sites report as standalone, also check fullscreen
+    window.matchMedia('(display-mode: fullscreen)').matches ||
     (window.navigator as any).standalone === true;
 }
 
-/** Cross-browser requestPermission that handles both callback and Promise patterns */
-async function requestNotificationPermission(): Promise<NotificationPermission> {
-  return new Promise((resolve) => {
-    try {
-      // Modern browsers return a Promise
-      const result = Notification.requestPermission((permission) => {
-        // Callback pattern for older browsers (Safari <15, older Android WebView)
-        resolve(permission);
-      });
-      // If it returned a Promise, use that instead
-      if (result && typeof result.then === 'function') {
-        result.then(resolve).catch(() => resolve('default'));
-      }
-    } catch {
-      resolve('default');
-    }
-  });
+/**
+ * Detect if iOS version supports push notifications natively.
+ * iOS 16.4+ supports Web Push in PWA standalone mode.
+ * iOS 26+: Every home-screen site is a web app, so push APIs are more broadly available.
+ * We use feature detection rather than version parsing since iOS 26 freezes the UA string.
+ */
+function iosSupportsPush(): boolean {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
+  // If push APIs are available, iOS supports push (iOS 16.4+ in PWA, or iOS 26+ in any context)
+  return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 }
 
-type PromptMode = 'ask' | 'denied' | 'ios-guide';
+/** Cross-browser requestPermission — uses modern Promise API first, callback fallback */
+async function requestNotificationPermission(): Promise<NotificationPermission> {
+  try {
+    // Modern API (all current browsers including iOS 16.4+ PWA)
+    const result = Notification.requestPermission();
+    if (result && typeof result.then === 'function') {
+      return await result;
+    }
+    // Very old callback-only browsers (Safari <15) — shouldn't reach here in practice
+    return await new Promise<NotificationPermission>((resolve) => {
+      Notification.requestPermission((permission) => resolve(permission));
+    });
+  } catch {
+    return 'default';
+  }
+}
+
+type PromptMode = 'ask' | 'denied' | 'ios-guide' | 'unsupported';
 
 export default function NotificationPrompt() {
   const { data: session } = useSession();
@@ -101,26 +125,47 @@ export default function NotificationPrompt() {
     setIsAndroid(android);
     setIsStandalone(standalone);
 
-    // iOS in Safari (not PWA) — show PWA install guide instead
+    // iOS in Safari (not PWA/standalone)
+    // iOS 26+: push APIs are available even in Safari since all home-screen sites become web apps
+    // iOS 16.4-18.x: push only works in standalone PWA mode — show install guide
     if (ios && !standalone) {
-      // Check if dismissed recently
+      // Feature detect: if push APIs are available in Safari, iOS 26+ — proceed to normal push flow
+      const pushAvailable = iosSupportsPush();
+      if (!pushAvailable) {
+        // Pre-iOS 16.4 or push not available in this context — show home screen guide
+        try {
+          const dismissed = localStorage.getItem(DISMISS_KEY + '-ios');
+          if (dismissed) {
+            const dismissedAt = parseInt(dismissed, 10);
+            if (Date.now() - dismissedAt < DISMISS_DURATION) return;
+          }
+        } catch {}
+        setPromptMode('ios-guide');
+        const timer = setTimeout(() => setShow(true), 5000);
+        return () => clearTimeout(timer);
+      }
+      // iOS 26+: push APIs available in Safari — fall through to normal push flow below
+      // On iOS 26, adding to home screen makes it a web app automatically,
+      // so we can still suggest it for better experience but allow direct push subscription
+    }
+
+    // Standard push notification flow (Android, Desktop, iOS PWA)
+    const hasSW = 'serviceWorker' in navigator;
+    const hasPush = 'PushManager' in window;
+    const hasNotif = 'Notification' in window;
+    if (!hasSW || !hasPush || !hasNotif || !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
+      // Show unsupported state instead of silently returning
       try {
-        const dismissed = localStorage.getItem(DISMISS_KEY + '-ios');
+        const dismissed = localStorage.getItem(DISMISS_KEY + '-unsupported');
         if (dismissed) {
           const dismissedAt = parseInt(dismissed, 10);
           if (Date.now() - dismissedAt < DISMISS_DURATION) return;
         }
       } catch {}
-      setPromptMode('ios-guide');
+      setPromptMode('unsupported');
       const timer = setTimeout(() => setShow(true), 5000);
       return () => clearTimeout(timer);
     }
-
-    // Standard push notification flow (Android, Desktop, iOS PWA)
-    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return;
-
-    // Check VAPID key
-    if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) return;
 
     const currentPermission = Notification.permission;
 
@@ -195,6 +240,8 @@ export default function NotificationPrompt() {
         localStorage.setItem(DISMISS_KEY + '-ios', Date.now().toString());
       } else if (promptMode === 'denied') {
         localStorage.setItem(DISMISS_KEY + '-denied', Date.now().toString());
+      } else if (promptMode === 'unsupported') {
+        localStorage.setItem(DISMISS_KEY + '-unsupported', Date.now().toString());
       } else {
         localStorage.setItem(DISMISS_KEY, Date.now().toString());
       }
@@ -276,6 +323,11 @@ export default function NotificationPrompt() {
   // Determine prompt content based on mode
   const getDeniedGuidance = (): string => {
     if (isIOS) {
+      if (isStandalone) {
+        // In PWA/home-screen web app
+        return 'การแจ้งเตือนถูกปิดอยู่ ไปที่ ตั้งค่า > แอป SCC Shop > การแจ้งเตือน แล้วเปิดอนุญาตการแจ้งเตือน';
+      }
+      // In Safari on iOS 26+ (push available in browser)
       return 'การแจ้งเตือนถูกปิดอยู่ ไปที่ ตั้งค่า > Safari > เว็บไซต์ > การแจ้งเตือน แล้วเปิดการแจ้งเตือนสำหรับเว็บนี้';
     }
     if (isAndroid) {
@@ -284,10 +336,25 @@ export default function NotificationPrompt() {
     return 'การแจ้งเตือนถูกปิดอยู่ กดที่ 🔒 ข้างแถบที่อยู่ แล้วเปิดการแจ้งเตือนสำหรับเว็บนี้';
   };
 
+  const getUnsupportedGuidance = (): string => {
+    if (isIOS && isStandalone) {
+      return 'อุปกรณ์ของคุณอาจต้องอัปเดต iOS เป็นเวอร์ชัน 16.4 ขึ้นไป เพื่อรองรับการแจ้งเตือน';
+    }
+    if (isIOS) {
+      // iOS 26+: any home screen site is a web app — simpler guidance
+      return 'กดปุ่ม แชร์ (Share) ⬆ แล้วเลือก "เพิ่มไปที่หน้าจอหลัก" — iOS จะเปิดเป็นเว็บแอปอัตโนมัติพร้อมรองรับการแจ้งเตือน';
+    }
+    if (isAndroid) {
+      return 'เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือน ลองเปิดใน Google Chrome หรือ Samsung Internet แล้วลองใหม่';
+    }
+    return 'เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือน ลองเปิดใน Google Chrome หรือ Microsoft Edge แล้วลองใหม่';
+  };
+
   const getTitle = (): string => {
     switch (promptMode) {
       case 'ios-guide': return 'เพิ่มไปที่หน้าจอหลัก';
       case 'denied': return 'เปิดการแจ้งเตือนอีกครั้ง';
+      case 'unsupported': return 'อุปกรณ์ยังไม่รองรับ';
       default: return 'เปิดรับการแจ้งเตือน';
     }
   };
@@ -295,9 +362,11 @@ export default function NotificationPrompt() {
   const getDescription = (): string => {
     switch (promptMode) {
       case 'ios-guide':
-        return 'กดปุ่ม แชร์ (Share) แล้วเลือก "เพิ่มไปที่หน้าจอหลัก" เพื่อรับการแจ้งเตือนบน iPhone/iPad';
+        return 'กดปุ่ม แชร์ (Share) ⬆ แล้วเลือก "เพิ่มไปที่หน้าจอหลัก" จากนั้น iOS จะเปิดเป็นเว็บแอปอัตโนมัติพร้อมรับการแจ้งเตือน';
       case 'denied':
         return getDeniedGuidance();
+      case 'unsupported':
+        return getUnsupportedGuidance();
       default:
         return NOTIFICATION_DESC;
     }
@@ -307,6 +376,7 @@ export default function NotificationPrompt() {
     switch (promptMode) {
       case 'ios-guide': return <PhoneIcon size={20} color="white" />;
       case 'denied': return <SettingsIcon size={20} color="white" />;
+      case 'unsupported': return <PhoneIcon size={20} color="white" />;
       default: return <BellIcon size={20} color="white" />;
     }
   };
@@ -315,6 +385,7 @@ export default function NotificationPrompt() {
     switch (promptMode) {
       case 'ios-guide': return 'linear-gradient(135deg, #5ac8fa 0%, #34c759 100%)';
       case 'denied': return 'linear-gradient(135deg, #ff9500 0%, #ff3b30 100%)';
+      case 'unsupported': return 'linear-gradient(135deg, #8e8e93 0%, #636366 100%)';
       default: return 'linear-gradient(135deg, #0071e3 0%, #5ac8fa 100%)';
     }
   };
@@ -413,7 +484,7 @@ export default function NotificationPrompt() {
                 color: 'var(--text-muted)',
               }}
             >
-              {promptMode === 'ios-guide' ? 'เข้าใจแล้ว' : 'ไม่ใช่ตอนนี้'}
+              {promptMode === 'ios-guide' || promptMode === 'unsupported' ? 'เข้าใจแล้ว' : 'ไม่ใช่ตอนนี้'}
             </Button>
           </Box>
         </Box>

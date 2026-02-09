@@ -1,4 +1,5 @@
 {
+  "id": "/",
   "name": "SCC Shop - ร้านค้าชุมนุมคอมพิวเตอร์",
   "short_name": "SCC Shop",
   "description": "ร้านค้าในชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ มหาวิทยาลัยสงขลานครินทร์",
@@ -11,6 +12,7 @@
   "lang": "th",
   "dir": "ltr",
   "categories": ["shopping", "education"],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/favicon.png",

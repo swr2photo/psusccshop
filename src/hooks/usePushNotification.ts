@@ -18,20 +18,21 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return outputArray;
 }
 
-/** Cross-browser requestPermission that handles both callback and Promise patterns */
+/** Cross-browser requestPermission — uses modern Promise API first, callback fallback */
 async function requestNotificationPermission(): Promise<NotificationPermission> {
-  return new Promise((resolve) => {
-    try {
-      const result = Notification.requestPermission((permission) => {
-        resolve(permission);
-      });
-      if (result && typeof result.then === 'function') {
-        result.then(resolve).catch(() => resolve('default'));
-      }
-    } catch {
-      resolve('default');
+  try {
+    // Modern API (all current browsers including iOS 16.4+ PWA and iOS 26+)
+    const result = Notification.requestPermission();
+    if (result && typeof result.then === 'function') {
+      return await result;
     }
-  });
+    // Very old callback-only browsers — shouldn't reach here in practice
+    return await new Promise<NotificationPermission>((resolve) => {
+      Notification.requestPermission((permission) => resolve(permission));
+    });
+  } catch {
+    return 'default';
+  }
 }
 
 export type PushPermissionState = 'default' | 'granted' | 'denied' | 'unsupported';

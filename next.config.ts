@@ -1,8 +1,10 @@
 import type { NextConfig } from "next";
 
-// Generate build version from timestamp
+// Semantic versioning — matches package.json
+const pkg = require('./package.json');
 const buildTime = new Date().toISOString();
-const buildVersion = `v1.0.${Math.floor(Date.now() / 1000).toString().slice(-6)}`;
+const buildHash = Math.floor(Date.now() / 1000).toString(36);
+const buildVersion = `v${pkg.version}+${buildHash}`;
 
 const nextConfig: NextConfig = {
   // Enable standalone output for Docker
@@ -11,6 +13,7 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_BUILD_TIME: buildTime,
     NEXT_PUBLIC_BUILD_VERSION: buildVersion,
+    NEXT_PUBLIC_APP_VERSION: pkg.version,
   },
   images: {
     remotePatterns: [

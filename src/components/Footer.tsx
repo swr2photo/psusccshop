@@ -7,6 +7,7 @@ import { useState } from 'react';
 // Build info from environment (set at build time)
 const BUILD_VERSION = process.env.NEXT_PUBLIC_BUILD_VERSION || 'dev';
 const BUILD_TIME = process.env.NEXT_PUBLIC_BUILD_TIME || new Date().toISOString();
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || '2.1.0';
 
 export default function Footer() {
   const [showBuildInfo, setShowBuildInfo] = useState(false);
@@ -97,12 +98,12 @@ export default function Footer() {
             title="ข้อมูลเวอร์ชัน"
           >
             <Info size={12} />
-            <span className="font-mono">{BUILD_VERSION}</span>
+            <span className="font-mono">v{APP_VERSION}</span>
           </button>
           
           {showBuildInfo && (
             <span className="text-slate-600 font-mono animate-fade-in">
-              • อัปเดต: {formatBuildTime(BUILD_TIME)}
+              • build {BUILD_VERSION} • {formatBuildTime(BUILD_TIME)}
             </span>
           )}
         </div>

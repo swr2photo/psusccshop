@@ -8564,7 +8564,7 @@ export default function AdminPage(): JSX.Element {
               color: '#475569',
             }}
           >
-            PSUSCC Shop Admin v2.0
+            PSUSCC Shop Admin v{process.env.NEXT_PUBLIC_APP_VERSION || '2.1.0'}
           </Typography>
         </Box>
       </Box>

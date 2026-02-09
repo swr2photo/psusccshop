@@ -1,8 +1,9 @@
 // Service Worker for SCC Shop Push Notifications
 // This file MUST be in /public to be served at the root scope
-// v3 — cross-platform (iOS + Android) with cache clearing
+// v2.1.0 — cross-platform (iOS 16.4+ / iOS 26+ / Android / Desktop)
 
-const CACHE_VERSION = 'scc-shop-v3';
+const SW_VERSION = '2.1.0';
+const CACHE_VERSION = `scc-shop-v${SW_VERSION}`;
 
 // Install event — activate immediately, clear old caches
 self.addEventListener('install', (event) => {
@@ -43,12 +44,13 @@ self.addEventListener('push', (event) => {
     }
   }
 
-  // Base options that work on ALL platforms (iOS, Android, Desktop)
+  // Base options that work on ALL platforms (iOS 16.4+, iOS 26+, Android, Desktop)
   const options = {
     body: data.body,
     icon: data.icon || '/favicon.png',
     badge: '/favicon.png',
     tag: data.tag || 'scc-chat',
+    // iOS 26+ respects requireInteraction; keep false for non-intrusive behavior
     requireInteraction: false,
     silent: false,
     data: {
@@ -57,7 +59,7 @@ self.addEventListener('push', (event) => {
     },
   };
 
-  // Android/Desktop-only features (iOS ignores these but they won't cause errors)
+  // Android/Desktop features (iOS ignores unsupported fields gracefully)
   try {
     options.vibrate = [200, 100, 200];
     options.renotify = true;

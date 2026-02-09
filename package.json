@@ -1,9 +1,9 @@
 {
-  "name": "cs-shop",
-  "version": "0.1.0",
+  "name": "psuscc-shop",
+  "version": "2.1.0",
   "private": true,
   "engines": {
-    "node": ">=20.9.0"
+    "node": ">=22.0.0"
   },
   "scripts": {
     "dev": "next dev --webpack",
@@ -15,42 +15,42 @@
     "cron:dev": "tsx watch scripts/cron-worker.ts"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.744.0",
+    "@aws-sdk/client-s3": "^3.985.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@mui/icons-material": "^7.3.7",
     "@mui/material": "^7.3.7",
-    "@supabase/supabase-js": "^2.91.0",
+    "@supabase/supabase-js": "^2.95.3",
     "@tanstack/react-query": "^5.90.20",
     "@tanstack/react-query-devtools": "^5.91.3",
     "@zxing/browser": "^0.1.5",
     "@zxing/library": "^0.21.3",
-    "axios": "^1.13.2",
-    "firebase-admin": "^13.6.0",
+    "axios": "^1.13.5",
+    "firebase-admin": "^13.6.1",
     "form-data": "^4.0.5",
-    "googleapis": "^170.0.0",
-    "lucide-react": "^0.562.0",
-    "next": "16.1.0",
+    "googleapis": "^171.4.0",
+    "lucide-react": "^0.563.0",
+    "next": "16.1.6",
     "next-auth": "^4.24.13",
     "node-cron": "^4.2.1",
     "qrcode.react": "^4.2.0",
-    "react": "19.2.3",
-    "react-dom": "19.2.3",
-    "sweetalert2": "^11.26.17",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "sweetalert2": "^11.26.18",
     "swr": "^2.4.0",
     "web-push": "^3.6.7",
-    "zustand": "^5.0.10"
+    "zustand": "^5.0.11"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^20.19.29",
+    "@types/node": "^22",
     "@types/node-cron": "^3.0.11",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/web-push": "^3.6.4",
-    "dotenv": "^17.2.3",
+    "dotenv": "^17.2.4",
     "eslint": "^9",
-    "eslint-config-next": "16.1.1",
+    "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5"
@@ -59,7 +59,7 @@
     ">0.3%",
     "not dead",
     "not op_mini all",
-    "iOS >= 12",
-    "Safari >= 12"
+    "iOS >= 16.4",
+    "Safari >= 16.4"
   ]
 }
