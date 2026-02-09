@@ -18,6 +18,22 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return outputArray;
 }
 
+/** Cross-browser requestPermission that handles both callback and Promise patterns */
+async function requestNotificationPermission(): Promise<NotificationPermission> {
+  return new Promise((resolve) => {
+    try {
+      const result = Notification.requestPermission((permission) => {
+        resolve(permission);
+      });
+      if (result && typeof result.then === 'function') {
+        result.then(resolve).catch(() => resolve('default'));
+      }
+    } catch {
+      resolve('default');
+    }
+  });
+}
+
 export type PushPermissionState = 'default' | 'granted' | 'denied' | 'unsupported';
 
 interface UsePushNotificationReturn {
@@ -115,8 +131,8 @@ export function usePushNotification(): UsePushNotificationReturn {
 
     setLoading(true);
     try {
-      // Request permission
-      const result = await Notification.requestPermission();
+      // Request permission (cross-browser: handles callback + Promise patterns)
+      const result = await requestNotificationPermission();
       setPermission(result as PushPermissionState);
 
       if (result !== 'granted') {

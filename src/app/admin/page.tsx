@@ -2142,8 +2142,16 @@ const EventsView = React.memo(function EventsView({
   const [editingEvent, setEditingEvent] = React.useState<ShopEvent | null>(null);
   const [saving, setSaving] = React.useState(false);
   const [uploadingImage, setUploadingImage] = React.useState(false);
+  // Track the latest config ref to avoid stale closures in handleSave
+  const configRef = React.useRef(config);
+  configRef.current = config;
+
+  // Track if we're saving to avoid SWR overwriting optimistic state
+  const savingRef = React.useRef(false);
 
   React.useEffect(() => {
+    // Don't overwrite local state while saving (prevents SWR race condition)
+    if (savingRef.current) return;
     setEvents(config.events || []);
   }, [config.events]);
 
@@ -2164,15 +2172,19 @@ const EventsView = React.memo(function EventsView({
 
   const handleSave = async (event: ShopEvent) => {
     setSaving(true);
+    savingRef.current = true;
     try {
-      const existingIndex = events.findIndex(e => e.id === event.id);
+      // Use latest config from ref to avoid stale closure
+      const latestConfig = configRef.current;
+      const latestEvents = latestConfig.events || [];
+      const existingIndex = latestEvents.findIndex(e => e.id === event.id);
       let newEvents: ShopEvent[];
       if (existingIndex >= 0) {
-        newEvents = events.map(e => e.id === event.id ? { ...event, updatedAt: new Date().toISOString() } : e);
+        newEvents = latestEvents.map(e => e.id === event.id ? { ...event, updatedAt: new Date().toISOString() } : e);
       } else {
-        newEvents = [...events, event];
+        newEvents = [...latestEvents, event];
       }
-      await saveConfig({ ...config, events: newEvents });
+      await saveConfig({ ...latestConfig, events: newEvents });
       setEvents(newEvents);
       setEditingEvent(null);
       showToast('success', existingIndex >= 0 ? 'อัปเดตอีเวนต์แล้ว' : 'สร้างอีเวนต์แล้ว');
@@ -2180,6 +2192,8 @@ const EventsView = React.memo(function EventsView({
       showToast('error', 'บันทึกไม่สำเร็จ');
     } finally {
       setSaving(false);
+      // Delay clearing savingRef to let SWR settle with new data
+      setTimeout(() => { savingRef.current = false; }, 2000);
     }
   };
 
@@ -2199,27 +2213,35 @@ const EventsView = React.memo(function EventsView({
     if (!result.isConfirmed) return;
 
     setSaving(true);
+    savingRef.current = true;
     try {
-      const newEvents = events.filter(e => e.id !== event.id);
-      await saveConfig({ ...config, events: newEvents });
+      const latestConfig = configRef.current;
+      const newEvents = (latestConfig.events || []).filter(e => e.id !== event.id);
+      await saveConfig({ ...latestConfig, events: newEvents });
       setEvents(newEvents);
       showToast('success', 'ลบอีเวนต์แล้ว');
     } catch {
       showToast('error', 'ลบไม่สำเร็จ');
     } finally {
       setSaving(false);
+      setTimeout(() => { savingRef.current = false; }, 2000);
     }
   };
 
   const handleToggle = async (event: ShopEvent) => {
-    const newEvents = events.map(e => e.id === event.id ? { ...e, enabled: !e.enabled } : e);
+    savingRef.current = true;
+    const latestConfig = configRef.current;
+    const currentEvents = latestConfig.events || [];
+    const newEvents = currentEvents.map(e => e.id === event.id ? { ...e, enabled: !e.enabled } : e);
     setEvents(newEvents);
     try {
-      await saveConfig({ ...config, events: newEvents });
+      await saveConfig({ ...latestConfig, events: newEvents });
       showToast('success', event.enabled ? 'ปิดอีเวนต์แล้ว' : 'เปิดอีเวนต์แล้ว');
     } catch {
       showToast('error', 'บันทึกไม่สำเร็จ');
-      setEvents(events); // rollback
+      setEvents(currentEvents); // rollback
+    } finally {
+      setTimeout(() => { savingRef.current = false; }, 2000);
     }
   };
 
@@ -2305,7 +2327,7 @@ const EventsView = React.memo(function EventsView({
         </Box>
       ) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-          {events.sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99)).map((event) => {
+          {[...events].sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99)).map((event) => {
             const typeInfo = EVENT_TYPE_OPTIONS.find(t => t.value === event.type) || EVENT_TYPE_OPTIONS[0];
             const nowMs = Date.now();
             const endMs = event.endDate ? new Date(event.endDate).getTime() : NaN;
