@@ -65,7 +65,8 @@ export function usePushNotification(): UsePushNotificationReturn {
   const isSupported = typeof window !== 'undefined' &&
     'serviceWorker' in navigator &&
     'PushManager' in window &&
-    'Notification' in window;
+    'Notification' in window &&
+    !!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 
   // Initialize: register service worker and check subscription state
   useEffect(() => {
@@ -126,7 +127,7 @@ export function usePushNotification(): UsePushNotificationReturn {
 
     const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
     if (!vapidPublicKey) {
-      console.error('[Push] VAPID public key not configured');
+      console.warn('[Push] VAPID public key not configured — push notifications disabled');
       return false;
     }
 

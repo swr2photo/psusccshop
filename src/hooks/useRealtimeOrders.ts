@@ -178,6 +178,7 @@ export function useRealtimeOrders(options: UseRealtimeOrdersOptions = {}) {
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const pendingQueueRef = useRef<OrderChange[]>([]);
   const isUnmountedRef = useRef(false);
+  const isReconnectingRef = useRef(false);
   const onOrderChangeRef = useRef(onOrderChange);
   const onConfigChangeRef = useRef(onConfigChange);
   const onStateChangeRef = useRef(onStateChange);
@@ -271,6 +272,7 @@ export function useRealtimeOrders(options: UseRealtimeOrdersOptions = {}) {
 
           switch (status) {
             case 'SUBSCRIBED':
+              isReconnectingRef.current = false;
               updateState({
                 connectionState: 'connected',
                 isConnected: true,
@@ -284,6 +286,7 @@ export function useRealtimeOrders(options: UseRealtimeOrdersOptions = {}) {
 
             case 'CHANNEL_ERROR':
             case 'TIMED_OUT':
+              isReconnectingRef.current = false;
               updateState({
                 connectionState: 'error',
                 isConnected: false,
@@ -293,6 +296,7 @@ export function useRealtimeOrders(options: UseRealtimeOrdersOptions = {}) {
               break;
 
             case 'CLOSED':
+              isReconnectingRef.current = false;
               updateState({
                 connectionState: 'disconnected',
                 isConnected: false,
@@ -351,12 +355,22 @@ export function useRealtimeOrders(options: UseRealtimeOrdersOptions = {}) {
     if (isUnmountedRef.current) return;
     
     setState(prev => {
+      // Prevent scheduling if already reconnecting or max attempts reached
+      if (prev.connectionState === 'reconnecting' || prev.connectionState === 'connecting') {
+        return prev;
+      }
+
       if (prev.reconnectAttempts >= CONFIG.RECONNECT_MAX_ATTEMPTS) {
         return {
           ...prev,
           connectionState: 'error' as const,
           error: 'Max reconnection attempts reached',
         };
+      }
+
+      // Clear any existing reconnect timer
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
       }
 
       const delay = getReconnectDelay(prev.reconnectAttempts);
@@ -376,20 +390,32 @@ export function useRealtimeOrders(options: UseRealtimeOrdersOptions = {}) {
     });
   }, [getReconnectDelay]);
 
-  // Reconnect
+  // Reconnect — guarded against duplicate calls
   const reconnect = useCallback(() => {
+    if (isUnmountedRef.current) return;
+    if (isReconnectingRef.current) return; // Prevent overlapping reconnects
+    isReconnectingRef.current = true;
+
     console.log('[Realtime] Reconnecting...');
+
+    // Clear any pending reconnect timer
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
     
     // Cleanup existing channels
     if (channelRef.current) {
       try {
         channelRef.current.unsubscribe();
       } catch {}
+      channelRef.current = null;
     }
     if (configChannelRef.current) {
       try {
         configChannelRef.current.unsubscribe();
       } catch {}
+      configChannelRef.current = null;
     }
 
     // Create new subscriptions
@@ -404,6 +430,10 @@ export function useRealtimeOrders(options: UseRealtimeOrdersOptions = {}) {
     if (configChannel) {
       configChannelRef.current = configChannel;
     }
+
+    // Release the reconnection lock after a short delay
+    // (allows the subscription callbacks to fire first)
+    setTimeout(() => { isReconnectingRef.current = false; }, 2000);
   }, [subscribeToOrders, subscribeToConfig, updateState]);
 
   // Force reconnect (manual)
@@ -418,10 +448,13 @@ export function useRealtimeOrders(options: UseRealtimeOrdersOptions = {}) {
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        console.log('[Realtime] Tab became visible, checking connection...');
         setState(prev => {
-          if (prev.connectionState !== 'connected') {
-            reconnect();
+          // Only reconnect if actually disconnected or errored — 
+          // NOT if already connecting/reconnecting (prevents duplicate attempts)
+          if (prev.connectionState === 'disconnected' || prev.connectionState === 'error') {
+            console.log('[Realtime] Tab became visible, reconnecting...');
+            // Use setTimeout to avoid calling reconnect inside setState
+            setTimeout(() => reconnect(), 100);
           }
           return prev;
         });
@@ -439,8 +472,13 @@ export function useRealtimeOrders(options: UseRealtimeOrdersOptions = {}) {
     if (typeof window === 'undefined') return;
 
     const handleOnline = () => {
-      console.log('[Realtime] Network online, reconnecting...');
-      reconnect();
+      setState(prev => {
+        if (prev.connectionState !== 'connected' && prev.connectionState !== 'connecting') {
+          console.log('[Realtime] Network online, reconnecting...');
+          setTimeout(() => reconnect(), 500);
+        }
+        return prev;
+      });
     };
 
     const handleOffline = () => {
@@ -471,9 +509,11 @@ export function useRealtimeOrders(options: UseRealtimeOrdersOptions = {}) {
         // Check if channel is still joined
         const isSubscribed = orderChannel.state === 'joined';
         setState(prev => {
+          // Only trigger reconnect if we THINK we're connected but actually aren't
+          // Skip if already reconnecting/connecting to avoid loops
           if (!isSubscribed && prev.connectionState === 'connected') {
             console.log('[Realtime] Heartbeat: Connection lost, reconnecting...');
-            reconnect();
+            setTimeout(() => reconnect(), 100);
           }
           return prev;
         });
