@@ -1,18 +1,30 @@
-// Service Worker for SCC Shop Push Notifications
+// Service Worker for SCC Shop
 // This file MUST be in /public to be served at the root scope
-// v2.1.0 — cross-platform (iOS 16.4+ / iOS 26+ / Android / Desktop)
+// v2.2.0 — PWA navigation + push notifications
+// Cross-platform: iOS 16.4+ / iOS 26+ / Android / Desktop
 
-const SW_VERSION = '2.1.0';
+const SW_VERSION = '2.2.0';
 const CACHE_VERSION = `scc-shop-v${SW_VERSION}`;
 
-// Install event — activate immediately, clear old caches
+// Minimal shell to cache for offline/instant start
+const PRECACHE_URLS = [
+  '/',
+  '/offline.html',
+  '/favicon.png',
+];
+
+// Install event — precache shell, activate immediately
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames
-          .filter((name) => name !== CACHE_VERSION)
-          .map((name) => caches.delete(name))
+    caches.open(CACHE_VERSION).then((cache) => {
+      return cache.addAll(PRECACHE_URLS).catch(() => {
+        // If precaching fails (e.g. offline install), continue anyway
+        return cache.add('/offline.html').catch(() => {});
+      });
+    }).then(() => {
+      // Clean old caches
+      return caches.keys().then((names) =>
+        Promise.all(names.filter((n) => n !== CACHE_VERSION).map((n) => caches.delete(n)))
       );
     })
   );
@@ -30,6 +42,72 @@ self.addEventListener('activate', (event) => {
       );
     }).then(() => self.clients.claim())
   );
+});
+
+// ============== FETCH HANDLER ==============
+// Network-first for navigations (always get fresh HTML)
+// Network-only for API calls (never cache dynamic data)
+// Stale-while-revalidate for static assets (fast load + background update)
+self.addEventListener('fetch', (event) => {
+  const { request } = event;
+  const url = new URL(request.url);
+
+  // Skip non-GET requests and cross-origin requests
+  if (request.method !== 'GET') return;
+  if (url.origin !== self.location.origin) return;
+
+  // Skip API routes, auth, and Next.js internals — always go to network
+  if (url.pathname.startsWith('/api/') ||
+      url.pathname.startsWith('/auth/') ||
+      url.pathname.startsWith('/_next/webpack') ||
+      url.pathname.includes('__nextjs')) {
+    return;
+  }
+
+  // Navigation requests (HTML pages) — network-first with offline fallback
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          // Cache a copy of successful navigations for offline support
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_VERSION).then((cache) => {
+              cache.put(request, clone);
+            });
+          }
+          return response;
+        })
+        .catch(() => {
+          // Offline — try cache first, then offline fallback
+          return caches.match(request).then((cached) => {
+            return cached || caches.match('/offline.html');
+          });
+        })
+    );
+    return;
+  }
+
+  // Static assets (_next/static, images, fonts) — stale-while-revalidate
+  if (url.pathname.startsWith('/_next/static/') ||
+      url.pathname.match(/\.(png|jpg|jpeg|svg|webp|ico|woff2?|ttf|css|js)$/)) {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        const networkFetch = fetch(request).then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_VERSION).then((cache) => cache.put(request, clone));
+          }
+          return response;
+        }).catch(() => cached);
+
+        return cached || networkFetch;
+      })
+    );
+    return;
+  }
+
+  // Everything else — network only (don't cache)
 });
 
 // Push notification received — cross-platform compatible
