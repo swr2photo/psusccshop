@@ -160,7 +160,20 @@ self.addEventListener('notificationclick', (event) => {
 
   if (event.action === 'dismiss') return;
 
-  const urlToOpen = event.notification.data?.url || '/';
+  let urlToOpen = event.notification.data?.url || '/';
+  const chatId = event.notification.data?.chatId;
+
+  // If this is a chat notification, append chatId to URL for deep linking
+  if (chatId) {
+    const separator = urlToOpen.includes('?') ? '&' : '?';
+    if (urlToOpen.startsWith('/admin')) {
+      // Admin: navigate to support tab with chatId
+      urlToOpen = `/admin?chatId=${chatId}#support`;
+    } else {
+      // Customer: navigate to home with chat param
+      urlToOpen = `/?chat=${chatId}`;
+    }
+  }
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {

@@ -385,25 +385,25 @@ export async function addChatMessage(
     updated_at: now,
   };
   
-  // Increment unread count for the other party
+  // Atomically increment unread count for the other party using RPC or raw update
   if (sender === 'customer') {
-    // Customer sent message, increment admin unread
-    const { data: session } = await db
-      .from('support_chats')
-      .select('unread_count')
-      .eq('id', sessionId)
-      .single();
-    
-    updateData.unread_count = (session?.unread_count || 0) + 1;
+    // Customer sent message, atomically increment admin unread
+    try {
+      await db.rpc('increment_unread', { chat_id: sessionId, field_name: 'unread_count' });
+    } catch {
+      // Fallback: non-atomic increment if RPC doesn't exist
+      const { data: s } = await db.from('support_chats').select('unread_count').eq('id', sessionId).single();
+      updateData.unread_count = (s?.unread_count || 0) + 1;
+    }
   } else if (sender === 'admin') {
-    // Admin sent message, increment customer unread
-    const { data: session } = await db
-      .from('support_chats')
-      .select('customer_unread_count')
-      .eq('id', sessionId)
-      .single();
-    
-    updateData.customer_unread_count = (session?.customer_unread_count || 0) + 1;
+    // Admin sent message, atomically increment customer unread
+    try {
+      await db.rpc('increment_unread', { chat_id: sessionId, field_name: 'customer_unread_count' });
+    } catch {
+      // Fallback: non-atomic increment if RPC doesn't exist
+      const { data: s } = await db.from('support_chats').select('customer_unread_count').eq('id', sessionId).single();
+      updateData.customer_unread_count = (s?.customer_unread_count || 0) + 1;
+    }
   }
   
   await db
@@ -474,6 +474,7 @@ export async function markMessagesAsRead(
 
 /**
  * Get chat statistics for admin dashboard
+ * Optimized: uses fewer queries with conditional counts
  */
 export async function getChatStatistics(): Promise<{
   pendingCount: number;
@@ -486,39 +487,23 @@ export async function getChatStatistics(): Promise<{
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   
-  // Get pending count
-  const { count: pendingCount } = await db
-    .from('support_chats')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'pending');
+  // Parallel queries for better performance
+  const [pendingRes, activeRes, todayRes, ratingRes] = await Promise.all([
+    db.from('support_chats').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+    db.from('support_chats').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+    db.from('support_chats').select('*', { count: 'exact', head: true }).gte('created_at', today.toISOString()),
+    db.from('support_chats').select('rating').not('rating', 'is', null),
+  ]);
   
-  // Get active count
-  const { count: activeCount } = await db
-    .from('support_chats')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'active');
-  
-  // Get today's chat count
-  const { count: todayCount } = await db
-    .from('support_chats')
-    .select('*', { count: 'exact', head: true })
-    .gte('created_at', today.toISOString());
-  
-  // Get average rating
-  const { data: ratingData } = await db
-    .from('support_chats')
-    .select('rating')
-    .not('rating', 'is', null);
-  
-  const ratings = (ratingData || []).map(r => r.rating).filter(r => r != null);
+  const ratings = (ratingRes.data || []).map(r => r.rating).filter(r => r != null);
   const avgRating = ratings.length > 0 
-    ? ratings.reduce((a, b) => a + b, 0) / ratings.length 
+    ? ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length 
     : 0;
   
   return {
-    pendingCount: pendingCount || 0,
-    activeCount: activeCount || 0,
-    todayCount: todayCount || 0,
+    pendingCount: pendingRes.count || 0,
+    activeCount: activeRes.count || 0,
+    todayCount: todayRes.count || 0,
     avgRating: Math.round(avgRating * 10) / 10,
   };
 }

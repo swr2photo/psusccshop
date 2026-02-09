@@ -27,6 +27,7 @@ import {
 import { Headphones as SupportAgentIcon, X as CloseIcon, Send as SendIcon, Clock as TimeIcon, CheckCircle2 as CheckCircleIcon, Star as StarIcon, Image as ImageIcon, Bot as ChatbotIcon, Check as DoneIcon, CheckCheck as DoneAllIcon, MessageCircle as ChatIcon, History as HistoryIcon, ArrowLeft as ArrowBackIcon, Plus as AddIcon, MoreVertical as MoreVertIcon, Trash2 as DeleteIcon, Reply as ReplyIcon, ZoomIn as ZoomInIcon, ZoomOut as ZoomOutIcon, Receipt as ReceiptIcon, ShoppingBag as ShoppingBagIcon, Bell as BellIcon, BellOff as BellOffIcon } from 'lucide-react';
 import { useNotification } from './NotificationContext';
 import { usePushNotification } from '@/hooks/usePushNotification';
+import { useRealtimeChat } from '@/hooks/useRealtimeChat';
 
 // ชื่อแอดมินเริ่มต้น (ดึงจากตั้งค่าแชท)
 const DEFAULT_ADMIN_NAME = 'ทีมงาน PSU SCC';
@@ -96,7 +97,6 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
   const [unreadCount, setUnreadCount] = useState(0);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const [adminTyping, setAdminTyping] = useState(false);
   const [messageMenuAnchor, setMessageMenuAnchor] = useState<null | HTMLElement>(null);
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const [unsending, setUnsending] = useState(false);
@@ -108,6 +108,55 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
   const [pushBannerDismissed, setPushBannerDismissed] = useState(false);
   const [adminDisplayName, setAdminDisplayName] = useState(DEFAULT_ADMIN_NAME);
   
+  // === Supabase Realtime: live messages, typing, read receipts ===
+  const {
+    messages: realtimeMessages,
+    setMessages: setRealtimeMessages,
+    session: realtimeSession,
+    setSession: setRealtimeSession,
+    connectionState,
+    isOtherTyping: adminTyping,
+    typingDisplay,
+    sendTyping: rtSendTyping,
+    addOptimisticMessage,
+    resolveOptimistic,
+    broadcastRead,
+    removeMessage: rtRemoveMessage,
+  } = useRealtimeChat(
+    chat?.id || null,
+    session?.user?.email || null,
+    'customer'
+  );
+
+  // Sync realtime messages into chat state
+  useEffect(() => {
+    if (realtimeMessages.length > 0 && chat) {
+      setChat(prev => prev ? { ...prev, messages: realtimeMessages as ChatMessage[] } : prev);
+    }
+  }, [realtimeMessages]);
+
+  // Sync realtime session updates (status changes, admin accepts, etc.)
+  useEffect(() => {
+    if (realtimeSession && chat) {
+      setChat(prev => {
+        if (!prev) return prev;
+        return { ...prev, ...realtimeSession, messages: prev.messages };
+      });
+      // Show rating dialog if chat just closed
+      if (realtimeSession.status === 'closed' && !realtimeSession.rating) {
+        setShowRating(true);
+      }
+    }
+  }, [realtimeSession]);
+
+  // Seed realtime messages on initial chat load
+  useEffect(() => {
+    if (chat?.messages && chat.messages.length > 0 && realtimeMessages.length === 0) {
+      setRealtimeMessages(chat.messages as any);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chat?.id]);
+  
   // Detect touch device for mobile-friendly Enter key behavior
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   useEffect(() => {
@@ -117,7 +166,6 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
   }, []);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastMessageCountRef = useRef(0);
 
@@ -188,6 +236,10 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
         
         if (chatData.chat) {
           setChat(chatData.chat);
+          // Seed realtime messages from initial fetch
+          if (chatData.chat.messages) {
+            setRealtimeMessages(chatData.chat.messages);
+          }
           setUnreadCount(chatData.chat.customer_unread_count || 0);
           setShowHistory(false);
           
@@ -227,93 +279,36 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
       const data = await res.json();
       if (data.chat) {
         setChat(data.chat);
+        if (data.chat.messages) {
+          setRealtimeMessages(data.chat.messages);
+        }
         setShowHistory(false);
         setShowNewChat(false);
       }
     } catch (error) {
       console.error('Error viewing chat:', error);
     }
-  }, []);
+  }, [setRealtimeMessages]);
 
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Send typing indicator to server
+  // Send typing indicator via Realtime broadcast (no DB writes)
   const sendTypingIndicator = useCallback(() => {
     if (!chat || chat.status !== 'active') return;
-    
-    fetch(`/api/support-chat/${chat.id}/typing`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ isTyping: true }),
-    }).catch(() => {});
+    rtSendTyping(true, session?.user?.name || undefined);
+  }, [chat?.id, chat?.status, rtSendTyping, session?.user?.name]);
 
-    // Clear previous timeout and set new one to stop typing
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    typingTimeoutRef.current = setTimeout(() => {
-      if (chat) {
-        fetch(`/api/support-chat/${chat.id}/typing`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ isTyping: false }),
-        }).catch(() => {});
-      }
-    }, 3000);
-  }, [chat?.id, chat?.status]);
-
-  // Poll for new messages and typing indicator (consolidated into single poll)
-  useEffect(() => {
-    if (open && chat && chat.status !== 'closed') {
-      let isPolling = false;
-      pollIntervalRef.current = setInterval(async () => {
-        if (isPolling) return; // Skip if previous poll still running
-        isPolling = true;
-        try {
-          // Fetch chat messages
-          const res = await fetch(`/api/support-chat/${chat.id}`);
-          const data = await res.json();
-          
-          if (data.chat) {
-            setChat(data.chat);
-            if (data.chat.status === 'closed' && !data.chat.rating) {
-              setShowRating(true);
-            }
-          }
-
-          // Auto mark as read + fetch typing in parallel (fire-and-forget)
-          const promises: Promise<any>[] = [];
-          if (chat.status === 'active' && !showHistory && !showNewChat && !showRating) {
-            promises.push(fetch(`/api/support-chat/${chat.id}/read`, { method: 'POST' }).catch(() => {}));
-          }
-          promises.push(
-            fetch(`/api/support-chat/${chat.id}/typing`)
-              .then(r => r.json())
-              .then(d => setAdminTyping(d.isTyping || false))
-              .catch(() => {})
-          );
-          await Promise.all(promises);
-        } catch (error) {
-          console.error('Error polling chat:', error);
-        } finally {
-          isPolling = false;
-        }
-      }, 5000); // Poll every 5 seconds (was 3s with sequential calls)
-      
-      return () => {
-        if (pollIntervalRef.current) {
-          clearInterval(pollIntervalRef.current);
-        }
-      };
-    }
-  }, [open, chat?.id, chat?.status, showHistory, showNewChat, showRating]);
-
+  // === Realtime replaces polling ===
+  // Instead of polling every 5s, Supabase Realtime pushes changes instantly.
   // Mark messages as read when user is actively viewing chat
-  // This is triggered when user switches from history/new chat view back to active chat
   useEffect(() => {
     if (open && chat?.id && !showHistory && !showNewChat && !showRating && chat.status === 'active') {
-      // Call read API when user is actively viewing the chat
+      // Mark read via API (one-time, not polling)
       fetch(`/api/support-chat/${chat.id}/read`, { method: 'POST' }).catch(() => {});
+      // Broadcast read receipt via Realtime
+      broadcastRead();
     }
-  }, [open, chat?.id, showHistory, showNewChat, showRating, chat?.status]);
+  }, [open, chat?.id, showHistory, showNewChat, showRating, chat?.status, broadcastRead]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -355,6 +350,10 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
         
         if (chatData.chat) {
           setChat(chatData.chat);
+          // Seed realtime with initial messages
+          if (chatData.chat.messages) {
+            setRealtimeMessages(chatData.chat.messages);
+          }
           setShowNewChat(false);
           setMessage('');
           setSubject('');
@@ -429,17 +428,21 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
         const imageUrl = uploadData.data.url;
         const msgContent = message.trim() ? `${message.trim()}\n[รูปภาพ: ${imageUrl}]` : `[รูปภาพ: ${imageUrl}]`;
         
-        await fetch(`/api/support-chat/${chat.id}/message`, {
+        // Optimistic UI: show image message instantly
+        const tempId = `temp_img_${Date.now()}`;
+        addOptimisticMessage(tempId, msgContent, session?.user?.name || undefined, session?.user?.image || undefined);
+        
+        const res = await fetch(`/api/support-chat/${chat.id}/message`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: msgContent }),
         });
-
-        // Refresh chat
-        const chatRes = await fetch(`/api/support-chat/${chat.id}`);
-        const chatData = await chatRes.json();
-        if (chatData.chat) {
-          setChat(chatData.chat);
+        
+        const data = await res.json();
+        if (data.success && data.message) {
+          resolveOptimistic(tempId, data.message);
+        } else {
+          resolveOptimistic(tempId, null);
         }
 
         setMessage('');
@@ -479,6 +482,15 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
         finalMessage = `[ตอบกลับ: "${replyPreview}"]\n${finalMessage}`;
       }
       
+      // Optimistic UI: show message instantly
+      const tempId = `temp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      addOptimisticMessage(tempId, finalMessage, session?.user?.name || undefined, session?.user?.image || undefined);
+      setMessage('');
+      setReplyToMessage(null);
+      
+      // Stop typing indicator
+      rtSendTyping(false);
+      
       const res = await fetch(`/api/support-chat/${chat.id}/message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -487,17 +499,12 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
       
       const data = await res.json();
       
-      if (data.success) {
-        // Refresh chat
-        const chatRes = await fetch(`/api/support-chat/${chat.id}`);
-        const chatData = await chatRes.json();
-        
-        if (chatData.chat) {
-          setChat(chatData.chat);
-        }
-        
-        setMessage('');
-        setReplyToMessage(null);
+      if (data.success && data.message) {
+        // Realtime will handle merging the real message
+        resolveOptimistic(tempId, data.message);
+      } else {
+        // Mark optimistic as failed
+        resolveOptimistic(tempId, null);
       }
     } catch (error) {
       console.error('Error sending message:', error);
@@ -628,6 +635,24 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [externalOpen]);
+
+  // Deep link: open specific chat from push notification (?chat=<sessionId>)
+  useEffect(() => {
+    if (!session?.user?.email) return;
+    const params = new URLSearchParams(window.location.search);
+    const chatParam = params.get('chat');
+    if (chatParam) {
+      // Clean the URL without reloading
+      const url = new URL(window.location.href);
+      url.searchParams.delete('chat');
+      window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+      // Open the specific chat
+      setOpen(true);
+      setLoading(true);
+      viewChatHistory(chatParam).finally(() => setLoading(false));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user?.email]);
 
   // Handle opening with mode selection
   const handleOpenMenu = (event: React.MouseEvent<HTMLElement>) => {
@@ -1318,7 +1343,26 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
               <Typography sx={{ fontWeight: 700, fontSize: '1rem' }}>
                 {showHistory ? 'ประวัติการสนทนา' : adminDisplayName}
               </Typography>
-              <Typography sx={{ fontSize: '0.75rem', opacity: 0.9 }}>
+              <Typography sx={{ fontSize: '0.75rem', opacity: 0.9, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                {/* Realtime connection indicator */}
+                {chat && !showHistory && (
+                  <Box
+                    component="span"
+                    sx={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: '50%',
+                      display: 'inline-block',
+                      flexShrink: 0,
+                      bgcolor: connectionState === 'connected' ? '#30d158'
+                        : connectionState === 'connecting' ? '#ff9f0a'
+                        : '#ff453a',
+                      boxShadow: connectionState === 'connected' ? '0 0 4px #30d158' : 'none',
+                      animation: connectionState === 'connecting' ? 'pulse 1.2s ease-in-out infinite' : 'none',
+                      '@keyframes pulse': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.3 } },
+                    }}
+                  />
+                )}
                 {showHistory 
                   ? 'เลือกดูการสนทนาที่ผ่านมา'
                   : chat?.status === 'active' 
@@ -1938,13 +1982,14 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                                 sx={{
                                   px: 1.5,
                                   py: 0.75,
-                                  bgcolor: msg.sender === 'customer' ? '#0071e3' : 'var(--surface)',
+                                  bgcolor: (msg as any)._failed ? '#ff453a' : msg.sender === 'customer' ? '#0071e3' : 'var(--surface)',
                                   color: msg.sender === 'customer' ? '#ffffff' : 'var(--foreground)',
                                   borderRadius: '18px',
                                   borderBottomRightRadius: msg.sender === 'customer' ? '6px' : '18px',
                                   borderBottomLeftRadius: msg.sender === 'admin' ? '6px' : '18px',
                                   boxShadow: msg.sender === 'admin' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
                                   cursor: canUnsend ? 'pointer' : 'default',
+                                  opacity: (msg as any)._optimistic ? 0.6 : 1,
                                   transition: 'all 0.15s ease',
                                   '&:hover': canUnsend ? {
                                     opacity: 0.9,

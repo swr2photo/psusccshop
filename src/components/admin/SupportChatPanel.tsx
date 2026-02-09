@@ -7,6 +7,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useNotification } from '../NotificationContext';
 import { usePushNotification } from '@/hooks/usePushNotification';
+import { useRealtimeChat, useRealtimeChatList } from '@/hooks/useRealtimeChat';
 import {
   Box,
   Typography,
@@ -57,6 +58,8 @@ import {
   Pencil as EditIcon,
   ShoppingBag as ShoppingBagIcon,
   ZoomIn as ZoomInIcon,
+  Wifi as WifiIcon,
+  WifiOff as WifiOffIcon,
 } from 'lucide-react';
 
 const ADMIN_THEME = {
@@ -136,7 +139,6 @@ export default function SupportChatPanel() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [mobileShowChat, setMobileShowChat] = useState(false);
-  const [otherTyping, setOtherTyping] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [chatSettings, setChatSettings] = useState<ChatSettings>({
     admin_display_name: 'ทีมงาน PSU SCC',
@@ -147,11 +149,35 @@ export default function SupportChatPanel() {
   });
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const prevMessageCountRef = useRef<number>(0);
   const isUserScrollingRef = useRef<boolean>(false);
+  
+  // === Supabase Realtime: live messages, typing, read receipts ===
+  const {
+    messages: realtimeMessages,
+    setMessages: setRealtimeMessages,
+    session: realtimeSession,
+    connectionState,
+    isOtherTyping: otherTyping,
+    typingDisplay,
+    sendTyping: rtSendTyping,
+    addOptimisticMessage,
+    resolveOptimistic,
+    broadcastRead,
+  } = useRealtimeChat(
+    selectedChat?.id || null,
+    session?.user?.email || null,
+    'admin'
+  );
+
+  // Realtime chat list — live updates to sidebar
+  const {
+    sessions: realtimeSessions,
+    setSessions: setRealtimeSessions,
+    connectionState: listConnectionState,
+  } = useRealtimeChatList(session?.user?.email || null);
   
   // New states for order lookup and image lightbox
   const [orderLookupOpen, setOrderLookupOpen] = useState(false);
@@ -174,6 +200,31 @@ export default function SupportChatPanel() {
     if (!isUserScrollingRef.current || force) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
+  }, []);
+
+  // Deep link: auto-open a specific chat from push notification (?chatId=<id>)
+  const deepLinkHandledRef = useRef(false);
+  useEffect(() => {
+    if (deepLinkHandledRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const chatIdParam = params.get('chatId');
+    if (chatIdParam) {
+      deepLinkHandledRef.current = true;
+      // Clean the URL without reloading
+      const url = new URL(window.location.href);
+      url.searchParams.delete('chatId');
+      window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+      // Fetch and open the specific chat
+      fetchChatDetails(chatIdParam, true).then(() => {
+        // After fetching, also seed realtime
+        fetch('/api/support-chat/' + chatIdParam + '?markRead=true')
+          .then(res => res.json())
+          .then(data => { if (data.chat) setRealtimeMessages(data.chat.messages || []); })
+          .catch(() => {});
+      });
+      if (isMobile) setMobileShowChat(true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchChats = useCallback(async () => {
@@ -204,30 +255,53 @@ export default function SupportChatPanel() {
     fetchChats().finally(() => setLoading(false));
   }, [fetchChats]);
 
+  // Sync realtime messages into selectedChat state
   useEffect(() => {
-    let isPolling = false;
-    pollIntervalRef.current = setInterval(async () => {
-      if (isPolling) return; // Skip if previous poll still running
-      isPolling = true;
-      try {
-        await fetchChats();
-        if (selectedChat) {
-          // Run read, details, and typing in parallel
-          await Promise.all([
-            fetchChatDetails(selectedChat.id),
-            fetch('/api/support-chat/' + selectedChat.id + '/read', { method: 'POST' }).catch(() => {}),
-            fetch('/api/support-chat/' + selectedChat.id + '/typing')
-              .then(res => res.json())
-              .then(data => setOtherTyping(data.isTyping || false))
-              .catch(() => setOtherTyping(false)),
-          ]);
+    if (realtimeMessages.length > 0 && selectedChat) {
+      setSelectedChat(prev => prev ? { ...prev, messages: realtimeMessages as ChatMessage[] } : prev);
+    }
+  }, [realtimeMessages]);
+
+  // Sync realtime session status updates
+  useEffect(() => {
+    if (realtimeSession && selectedChat) {
+      setSelectedChat(prev => prev ? { ...prev, ...realtimeSession } : prev);
+    }
+  }, [realtimeSession]);
+
+  // Sync realtime chat list updates into sidebar
+  useEffect(() => {
+    if (realtimeSessions.length > 0) {
+      setChats(prev => {
+        const merged = [...prev];
+        for (const rt of realtimeSessions) {
+          const idx = merged.findIndex(c => c.id === rt.id);
+          if (idx >= 0) {
+            merged[idx] = { ...merged[idx], ...rt } as ChatSession;
+          } else {
+            merged.unshift(rt as ChatSession);
+          }
         }
-      } catch {} finally {
-        isPolling = false;
-      }
-    }, 5000);
-    return () => { if (pollIntervalRef.current) clearInterval(pollIntervalRef.current); };
-  }, [fetchChats, fetchChatDetails, selectedChat?.id]);
+        return merged;
+      });
+    }
+  }, [realtimeSessions]);
+
+  // Mark messages as read when viewing a chat  
+  useEffect(() => {
+    if (selectedChat?.id) {
+      fetch('/api/support-chat/' + selectedChat.id + '/read', { method: 'POST' }).catch(() => {});
+      broadcastRead();
+    }
+  }, [selectedChat?.id, selectedChat?.messages?.length, broadcastRead]);
+
+  // Lightweight fallback poll for stats only (every 30s instead of 5s)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchChats();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [fetchChats]);
 
   useEffect(() => {
     if (selectedChat?.messages) {
@@ -271,24 +345,15 @@ export default function SupportChatPanel() {
     }
   }, [pushSupported, pushSubscribed, session?.user?.email, pushSubscribe]);
 
+  // Typing indicator via Supabase Realtime broadcast (no DB writes)
   const sendTypingIndicator = useCallback(() => {
-    if (!selectedChat) return;
-    fetch('/api/support-chat/' + selectedChat.id + '/typing', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ isTyping: true }),
-    }).catch(() => {});
+    const adminName = chatSettings.admin_display_name || session?.user?.name || 'แอดมิน';
+    rtSendTyping(true, adminName);
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = setTimeout(() => {
-      if (selectedChat) {
-        fetch('/api/support-chat/' + selectedChat.id + '/typing', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ isTyping: false }),
-        }).catch(() => {});
-      }
+      rtSendTyping(false, adminName);
     }, 3000);
-  }, [selectedChat?.id]);
+  }, [rtSendTyping, chatSettings.admin_display_name, session?.user?.name]);
 
   // Removed redundant /read call - now handled by fetchChatDetails with markRead=true
 
@@ -304,9 +369,16 @@ export default function SupportChatPanel() {
     isUserScrollingRef.current = false;
     prevMessageCountRef.current = 0;
     // Fetch with markRead=true when user explicitly selects a chat
-    await fetchChatDetails(chatId, true);
+    const res = await fetch('/api/support-chat/' + chatId + '?markRead=true');
+    const data = await res.json();
+    if (data.chat) {
+      setSelectedChat(data.chat);
+      // Seed realtime hook with initial messages
+      setRealtimeMessages(data.chat.messages || []);
+    }
     // Refresh chat list to update unread counts
     fetchChats();
+    broadcastRead();
     if (isMobile) setMobileShowChat(true);
   };
 
@@ -337,7 +409,12 @@ export default function SupportChatPanel() {
       const data = await res.json();
       if (data.chat) {
         await fetchChats();
-        await fetchChatDetails(chatId);
+        const detailRes = await fetch('/api/support-chat/' + chatId);
+        const detailData = await detailRes.json();
+        if (detailData.chat) {
+          setSelectedChat(detailData.chat);
+          setRealtimeMessages(detailData.chat.messages || []);
+        }
       }
     } catch (error) {
       console.error('Error accepting chat:', error);
@@ -362,20 +439,31 @@ export default function SupportChatPanel() {
   const handleSendMessage = async () => {
     if (previewImage) { await handleSendWithImage(); return; }
     if (!message.trim() || !selectedChat) return;
+    
+    const msgText = message.trim();
+    const tempId = `opt_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    
+    // Optimistic: show message instantly
+    addOptimisticMessage(tempId, msgText, session?.user?.name || chatSettings.admin_display_name, session?.user?.image || undefined);
+    setMessage('');
+    rtSendTyping(false, chatSettings.admin_display_name || 'แอดมิน');
+    scrollToBottom(true);
+    
     setSending(true);
     try {
       const res = await fetch('/api/support-chat/' + selectedChat.id + '/message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: message.trim() }),
+        body: JSON.stringify({ message: msgText }),
       });
       const data = await res.json();
-      if (data.success) {
-        await fetchChatDetails(selectedChat.id);
-        setMessage('');
+      if (data.success && data.message) {
+        resolveOptimistic(tempId, data.message);
+      } else {
+        resolveOptimistic(tempId, null); // Mark as failed
       }
-    } catch (error) {
-      console.error('Error sending message:', error);
+    } catch {
+      resolveOptimistic(tempId, null); // Mark as failed
     } finally {
       setSending(false);
     }
@@ -394,6 +482,14 @@ export default function SupportChatPanel() {
   const handleSendWithImage = async () => {
     if (!previewImage || !selectedChat) return;
     setUploadingImage(true);
+    
+    const tempId = `opt_img_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const msgText = message.trim() ? message.trim() + '\n[กำลังอัปโหลดรูปภาพ...]' : '[กำลังอัปโหลดรูปภาพ...]';
+    addOptimisticMessage(tempId, msgText, session?.user?.name || chatSettings.admin_display_name, session?.user?.image || undefined);
+    setPreviewImage(null);
+    setMessage('');
+    scrollToBottom(true);
+    
     try {
       const mimeMatch = previewImage.match(/data:([^;]+);/);
       const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
@@ -414,20 +510,25 @@ export default function SupportChatPanel() {
       }
       if (uploadData.status === 'success' && uploadData.data?.url) {
         const imageUrl = uploadData.data.url;
-        const msgContent = message.trim() ? message.trim() + '\n[รูปภาพ: ' + imageUrl + ']' : '[รูปภาพ: ' + imageUrl + ']';
-        await fetch('/api/support-chat/' + selectedChat.id + '/message', {
+        const finalMsg = message.trim() ? message.trim() + '\n[รูปภาพ: ' + imageUrl + ']' : '[รูปภาพ: ' + imageUrl + ']';
+        const res = await fetch('/api/support-chat/' + selectedChat.id + '/message', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: msgContent }),
+          body: JSON.stringify({ message: finalMsg }),
         });
-        await fetchChatDetails(selectedChat.id);
-        setMessage('');
-        setPreviewImage(null);
+        const data = await res.json();
+        if (data.success && data.message) {
+          resolveOptimistic(tempId, data.message);
+        } else {
+          resolveOptimistic(tempId, null);
+        }
       } else {
+        resolveOptimistic(tempId, null);
         toastError('ไม่สามารถอัปโหลดรูปภาพได้');
       }
     } catch (error: any) {
       console.error('Error uploading image:', error);
+      resolveOptimistic(tempId, null);
       toastError(error?.message || 'เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ');
     } finally {
       setUploadingImage(false);
@@ -531,15 +632,25 @@ export default function SupportChatPanel() {
 [ORDER_REF:${order.ref}]`;
     
     setSending(true);
+    const tempId = `opt_order_${Date.now()}`;
+    addOptimisticMessage(tempId, orderMsg, session?.user?.name || chatSettings.admin_display_name, session?.user?.image || undefined);
+    scrollToBottom(true);
+    
     try {
-      await fetch('/api/support-chat/' + selectedChat.id + '/message', {
+      const res = await fetch('/api/support-chat/' + selectedChat.id + '/message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: orderMsg }),
       });
-      await fetchChatDetails(selectedChat.id);
+      const data = await res.json();
+      if (data.success && data.message) {
+        resolveOptimistic(tempId, data.message);
+      } else {
+        resolveOptimistic(tempId, null);
+      }
     } catch (error) {
       console.error('Error sending order ref:', error);
+      resolveOptimistic(tempId, null);
     } finally {
       setSending(false);
       setOrderLookupOpen(false);
@@ -834,6 +945,24 @@ export default function SupportChatPanel() {
               <Typography sx={{ fontWeight: 700, color: ADMIN_THEME.text, fontSize: { xs: '0.9rem', sm: '1rem' } }}>
                 <SupportAgentIcon size={24} style={{ marginRight: 8, verticalAlign: 'middle' }} />
                 แชทสนับสนุน
+                <Box
+                  component="span"
+                  sx={{
+                    display: 'inline-block',
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    ml: 1,
+                    verticalAlign: 'middle',
+                    bgcolor: listConnectionState === 'connected' ? '#30d158'
+                      : listConnectionState === 'connecting' ? '#ff9f0a'
+                      : '#ff453a',
+                    boxShadow: listConnectionState === 'connected' ? '0 0 4px #30d158' : 'none',
+                    animation: listConnectionState === 'connecting' ? 'pulse-dot 1.2s ease-in-out infinite' : 'none',
+                    '@keyframes pulse-dot': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.3 } },
+                  }}
+                  title={listConnectionState === 'connected' ? 'เชื่อมต่อแบบ Realtime' : listConnectionState === 'connecting' ? 'กำลังเชื่อมต่อ...' : 'ไม่ได้เชื่อมต่อ'}
+                />
               </Typography>
               <Box>
                 <IconButton size="small" onClick={() => setSettingsOpen(true)} sx={{ color: ADMIN_THEME.textMuted }}>
@@ -955,8 +1084,23 @@ export default function SupportChatPanel() {
                 </Avatar>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography sx={{ fontWeight: 700, color: ADMIN_THEME.text, fontSize: '0.9rem' }}>{selectedChat.customer_name}</Typography>
-                  <Typography sx={{ fontSize: '0.7rem', color: ADMIN_THEME.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {selectedChat.subject}
+                  <Typography sx={{ fontSize: '0.7rem', color: ADMIN_THEME.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Box
+                      component="span"
+                      sx={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: '50%',
+                        flexShrink: 0,
+                        bgcolor: connectionState === 'connected' ? '#30d158'
+                          : connectionState === 'connecting' ? '#ff9f0a'
+                          : '#ff453a',
+                        boxShadow: connectionState === 'connected' ? '0 0 3px #30d158' : 'none',
+                      }}
+                    />
+                    {otherTyping 
+                      ? (typingDisplay || 'ลูกค้ากำลังพิมพ์...')
+                      : selectedChat.subject}
                   </Typography>
                 </Box>
                 {/* Order Lookup Button */}
@@ -1023,11 +1167,13 @@ export default function SupportChatPanel() {
                           <Box sx={{ minWidth: 0 }}>
                             <Paper elevation={0} sx={{
                               px: 1.5, py: 1,
-                              bgcolor: msg.sender === 'admin' ? '#2563eb' : ADMIN_THEME.bgCard,
+                              bgcolor: (msg as any)._failed ? '#ff453a' : msg.sender === 'admin' ? '#2563eb' : ADMIN_THEME.bgCard,
                               color: ADMIN_THEME.text,
                               borderRadius: 2,
                               borderBottomRightRadius: msg.sender === 'admin' ? 4 : 16,
                               borderBottomLeftRadius: msg.sender === 'customer' ? 4 : 16,
+                              opacity: (msg as any)._optimistic ? 0.6 : 1,
+                              transition: 'opacity 0.3s ease',
                             }}>
                               {text && <Typography sx={{ fontSize: '0.85rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.4 }}>{text}</Typography>}
                               {/* Order Reference Card */}
