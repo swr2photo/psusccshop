@@ -129,7 +129,7 @@ export default function NotificationPrompt() {
       // Silently register SW and ensure subscription is active
       navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' })
         .then(async (reg) => {
-          await reg.ready;
+          await navigator.serviceWorker.ready;
           const existingSub = await reg.pushManager.getSubscription();
           if (!existingSub) {
             // Permission granted but no subscription (e.g., cleared data) — re-subscribe silently
