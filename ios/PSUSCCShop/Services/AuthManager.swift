@@ -1,5 +1,6 @@
 import SwiftUI
 import AuthenticationServices
+import Security
 
 // MARK: - Auth Manager
 
@@ -102,7 +103,7 @@ final class AuthManager: ObservableObject {
         await withCheckedContinuation { continuation in
             let session = ASWebAuthenticationSession(
                 url: signInURL,
-                callback: .https(callbackURL.host() ?? "localhost")
+                callback: .https(host: callbackURL.host() ?? "localhost")
             ) { callbackURL, error in
                 if let error {
                     if (error as? ASWebAuthenticationSessionError)?.code == .canceledLogin {
@@ -182,6 +183,7 @@ final class AuthManager: ObservableObject {
 
 // MARK: - Keychain Helper
 
+@MainActor
 final class KeychainHelper {
     static let shared = KeychainHelper()
     private let service = "com.psusccshop.ios"

@@ -49,7 +49,7 @@ enum APIError: LocalizedError {
 // MARK: - API Client
 
 @MainActor
-final class APIClient: ObservableObject, Sendable {
+final class APIClient: ObservableObject {
     static let shared = APIClient()
 
     private let session: URLSession
@@ -183,7 +183,7 @@ final class APIClient: ObservableObject, Sendable {
 
 // MARK: - Empty data placeholder
 
-struct EmptyData: Decodable {}
+struct EmptyData: Codable {}
 
 // MARK: - Shop API
 

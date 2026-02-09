@@ -20,6 +20,7 @@ settings:
     MARKETING_VERSION: "1.0.0"
     CURRENT_PROJECT_VERSION: "1"
     PRODUCT_BUNDLE_IDENTIFIER: com.psusccshop.ios
+    SWIFT_STRICT_CONCURRENCY: targeted
   configs:
     Debug:
       SWIFT_OPTIMIZATION_LEVEL: "-Onone"

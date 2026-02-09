@@ -3,11 +3,11 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var cartStore: CartStore
-    @State private var selectedTab: Tab = .shop
+    @State private var selectedTab: AppTab = .shop
     @State private var showCart = false
     @State private var showProfile = false
 
-    enum Tab: Hashable {
+    enum AppTab: Hashable {
         case shop, orders, chat, settings
     }
 
@@ -27,7 +27,7 @@ struct ContentView: View {
     @ViewBuilder
     private var mainTabView: some View {
         TabView(selection: $selectedTab) {
-            Tab(.shop) {
+            SwiftUI.Tab("Shop", systemImage: "bag.fill", value: AppTab.shop) {
                 NavigationStack {
                     ShopView()
                         .toolbar {
@@ -39,32 +39,24 @@ struct ContentView: View {
                             }
                         }
                 }
-            } label: {
-                Label("Shop", systemImage: "bag.fill")
             }
 
-            Tab(.orders) {
+            SwiftUI.Tab("Orders", systemImage: "list.clipboard.fill", value: AppTab.orders) {
                 NavigationStack {
                     OrderHistoryView()
                 }
-            } label: {
-                Label("Orders", systemImage: "list.clipboard.fill")
             }
 
-            Tab(.chat) {
+            SwiftUI.Tab("Chat", systemImage: "bubble.left.and.bubble.right.fill", value: AppTab.chat) {
                 NavigationStack {
                     SupportChatView()
                 }
-            } label: {
-                Label("Chat", systemImage: "bubble.left.and.bubble.right.fill")
             }
 
-            Tab(.settings) {
+            SwiftUI.Tab("Settings", systemImage: "gearshape.fill", value: AppTab.settings) {
                 NavigationStack {
                     SettingsView()
                 }
-            } label: {
-                Label("Settings", systemImage: "gearshape.fill")
             }
         }
         .sheet(isPresented: $showCart) {

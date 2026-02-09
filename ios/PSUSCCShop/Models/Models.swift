@@ -480,7 +480,7 @@ struct TrackingInfo: Decodable {
     let track123Url: String?
 }
 
-struct TrackingEvent: Decodable, Identifiable {
+struct TrackingEvent: Decodable, Identifiable, Equatable {
     var id = UUID()
     let timestamp: String?
     let status: String?
@@ -490,6 +490,13 @@ struct TrackingEvent: Decodable, Identifiable {
 
     enum CodingKeys: String, CodingKey {
         case timestamp, status, description, descriptionThai, location
+    }
+
+    static func == (lhs: TrackingEvent, rhs: TrackingEvent) -> Bool {
+        lhs.timestamp == rhs.timestamp &&
+        lhs.status == rhs.status &&
+        lhs.description == rhs.description &&
+        lhs.location == rhs.location
     }
 }
 
