@@ -101,11 +101,10 @@ export function useAdminDataSWR(options: UseAdminDataSWROptions) {
       keepPreviousData: true,
       suspense: false,
       
-      // Use localStorage as instant-display fallback
+      // Use localStorage as instant-display fallback (same key as admin page cache)
       fallbackData: (() => {
         if (typeof window === 'undefined') return undefined;
         try {
-          // Try primary admin cache first
           const cached = localStorage.getItem('psusccshop-admin-cache');
           if (cached) {
             const parsed = JSON.parse(cached);

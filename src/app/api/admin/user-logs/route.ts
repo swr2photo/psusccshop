@@ -111,14 +111,26 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST: Log user action (can be called from client)
+// POST: Log user action (requires authentication)
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { email, name, action, details, metadata } = body;
+    // Verify the user is authenticated
+    const { getServerSession } = await import('next-auth');
+    const { authOptions } = await import('@/lib/auth');
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-    if (!email || !action) {
-      return NextResponse.json({ error: 'Missing email or action' }, { status: 400 });
+    const body = await request.json();
+    const { action, details, metadata } = body;
+
+    // Use session email to prevent spoofing
+    const email = session.user.email;
+    const name = session.user.name || undefined;
+
+    if (!action) {
+      return NextResponse.json({ error: 'Missing action' }, { status: 400 });
     }
 
     // Get IP and User Agent

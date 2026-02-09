@@ -40,9 +40,6 @@ export {
   invalidateAll,
   updateOrderInCache,
   removeOrderFromCache,
-  saveAdminCacheSWR,
-  loadAdminCacheSWR,
-  clearAdminCacheSWR,
   CACHE_KEYS,
 } from './useAdminData';
 export type { AdminOrder, ShopConfig, AdminDataResponse } from './useAdminData';

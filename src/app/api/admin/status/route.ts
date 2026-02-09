@@ -3,6 +3,7 @@ import { getJson, putJson, listKeys } from '@/lib/filebase';
 import { requireAdminWithPermission } from '@/lib/auth';
 import { triggerSheetSync } from '@/lib/sheet-sync';
 import { sendOrderStatusEmail } from '@/lib/email';
+import { sendPushNotification } from '@/lib/push-notification';
 import { ShopConfig } from '@/lib/config';
 import crypto from 'crypto';
 
@@ -174,6 +175,32 @@ export async function POST(req: NextRequest) {
     }
     // Auto sync to Google Sheets
     triggerSheetSync().catch(() => {});
+
+    // Send push notification to customer
+    const customerEmail = order?.customerEmail || order?.email;
+    if (customerEmail && order) {
+      const statusLabelsForPush: Record<string, string> = {
+        'PENDING': 'รอดำเนินการ',
+        'PAID': 'ชำระเงินแล้ว',
+        'PROCESSING': 'กำลังดำเนินการ',
+        'READY': 'พร้อมรับสินค้า',
+        'SHIPPED': 'จัดส่งแล้ว',
+        'COMPLETED': 'เสร็จสิ้น',
+        'CANCELLED': 'ยกเลิก',
+        'REFUNDED': 'คืนเงินแล้ว',
+      };
+      const statusLabel = statusLabelsForPush[status!] || status;
+      const pushBody = status === 'SHIPPED' && body.trackingNumber
+        ? `ออเดอร์ ${ref} ${statusLabel} — เลขพัสดุ: ${body.trackingNumber}`
+        : `ออเดอร์ ${ref} สถานะเปลี่ยนเป็น "${statusLabel}"`;
+      sendPushNotification(customerEmail, {
+        title: 'อัปเดตสถานะออเดอร์',
+        body: pushBody,
+        icon: '/icon-192.png',
+        url: '/',
+        tag: `order-${ref}`,
+      }).catch((err) => console.error('[Status API] Push notification error:', err));
+    }
     
     return NextResponse.json({ status: 'success' });
   } catch (error: any) {

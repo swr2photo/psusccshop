@@ -6,21 +6,7 @@ import { useSession, signIn, signOut } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useConfirmDialog, useAlertDialog } from '@/hooks/useConfirmDialog';
 import { useRealtimeAdminOrders } from '@/hooks/useRealtimeOrders';
-import { 
-  useAdminData, 
-  useUpdateOrderStatus, 
-  useUpdateConfig, 
-  useBatchUpdateStatus,
-  useDeleteOrder,
-  useUpdateOrder,
-  useSyncSheet,
-  updateOrderInCache,
-  removeOrderFromCache,
-  invalidateAdminData,
-  saveAdminCacheSWR,
-  loadAdminCacheSWR,
-} from '@/hooks/useAdminData';
-import { useAdminDataSWR, useOptimisticOrderUpdate, useOptimisticBatchUpdate } from '@/hooks/useAdminDataSWR';
+import { useAdminDataSWR } from '@/hooks/useAdminDataSWR';
 
 import {
   Box,
@@ -4169,13 +4155,13 @@ export default function AdminPage(): JSX.Element {
     setLogs((prev) => {
       const next = [entry, ...prev].slice(0, 200);
       saveAdminCache({
-        config: overrides?.config ?? config,
-        orders: overrides?.orders ?? orders,
+        config: overrides?.config ?? configRef.current,
+        orders: overrides?.orders ?? ordersRef.current,
         logs: next,
       });
       return next;
     });
-  }, [session?.user?.email, config, orders]);
+  }, [session?.user?.email]);
 
   // 📥 SWR Data Handler - processes data from SWR hook
   const handleSWRDataReceived = useCallback((data: { orders: any[]; config: any; logs: any[] }) => {
@@ -4194,23 +4180,35 @@ export default function AdminPage(): JSX.Element {
       ]);
     }
     
-    // Only update state if data actually changed to prevent flickering
+    // Efficient diffing: compare lightweight fingerprints instead of full JSON.stringify
     setConfig(prev => {
-      const prevJson = JSON.stringify(prev);
-      const nextJson = JSON.stringify(nextConfig);
-      return prevJson === nextJson ? prev : nextConfig;
+      // Quick check: compare key scalar fields first before falling back to JSON
+      if (prev.isOpen === nextConfig.isOpen &&
+          prev.sheetId === nextConfig.sheetId &&
+          (prev.products?.length ?? 0) === (nextConfig.products?.length ?? 0) &&
+          (prev.adminEmails?.length ?? 0) === (nextConfig.adminEmails?.length ?? 0)) {
+        // Fields match — do deeper check only if shallow looks same
+        const prevJson = JSON.stringify(prev);
+        const nextJson = JSON.stringify(nextConfig);
+        if (prevJson === nextJson) return prev;
+      }
+      return nextConfig;
     });
     setDynamicAdminEmails(nextConfig.adminEmails || []);
     setOrders(prev => {
-      const prevKey = prev.map(o => `${o.ref}:${o.status}:${o.slip?.base64 || o.slip?.imageUrl ? '1' : '0'}`).join(',');
-      const nextKey = normalizedOrders.map(o => `${o.ref}:${o.status}:${o.slip?.base64 || o.slip?.imageUrl ? '1' : '0'}`).join(',');
+      // Fast path: length changed → definitely different
+      if (prev.length !== normalizedOrders.length) return normalizedOrders;
+      // Lightweight fingerprint: ref + status + slip presence
+      const prevKey = prev.map(o => `${o.ref}:${o.status}`).join(',');
+      const nextKey = normalizedOrders.map(o => `${o.ref}:${o.status}`).join(',');
       return prevKey === nextKey ? prev : normalizedOrders;
     });
     setLogs(prev => {
       if (prev.length === nextLogs.length && prev.length > 0) {
-        const prevFirst = JSON.stringify(prev[0]);
-        const nextFirst = JSON.stringify(nextLogs[0]);
-        if (prevFirst === nextFirst) return prev;
+        // Compare only first entry timestamp
+        const prevTs = prev[0]?.[0];
+        const nextTs = nextLogs[0]?.[0];
+        if (prevTs === nextTs) return prev;
       }
       return nextLogs;
     });
@@ -4734,8 +4732,10 @@ export default function AdminPage(): JSX.Element {
   // Stable refs for realtime handler to avoid stale closures
   const configRef = useRef(config);
   const logsRef = useRef(logs);
+  const ordersRef = useRef(orders);
   useEffect(() => { configRef.current = config; }, [config]);
   useEffect(() => { logsRef.current = logs; }, [logs]);
+  useEffect(() => { ordersRef.current = orders; }, [orders]);
 
   // Handle realtime order changes - immediate UI update + SWR cache sync
   const handleRealtimeOrderChange = useCallback((change: { type: string; order: any; oldOrder?: any }) => {
@@ -4801,9 +4801,15 @@ export default function AdminPage(): JSX.Element {
     console.log('[Admin Realtime] Config updated by another admin');
     if (newConfig) {
       setConfig(prev => {
-        const prevJson = JSON.stringify(prev);
-        const nextJson = JSON.stringify(newConfig);
-        return prevJson === nextJson ? prev : newConfig;
+        // Quick scalar check first
+        if (prev.isOpen === newConfig.isOpen &&
+            prev.sheetId === newConfig.sheetId &&
+            (prev.products?.length ?? 0) === (newConfig.products?.length ?? 0)) {
+          const prevJson = JSON.stringify(prev);
+          const nextJson = JSON.stringify(newConfig);
+          if (prevJson === nextJson) return prev;
+        }
+        return newConfig;
       });
     }
   }, []);
@@ -4824,9 +4830,15 @@ export default function AdminPage(): JSX.Element {
   useEffect(() => {
     if (!settingsHasChanges) {
       setSettingsLocalConfig(prev => {
-        const prevJson = JSON.stringify(prev);
-        const nextJson = JSON.stringify(config);
-        return prevJson === nextJson ? prev : config;
+        // Quick check before expensive stringify
+        if (prev.isOpen === config.isOpen &&
+            prev.sheetId === config.sheetId &&
+            (prev.products?.length ?? 0) === (config.products?.length ?? 0)) {
+          const prevJson = JSON.stringify(prev);
+          const nextJson = JSON.stringify(config);
+          if (prevJson === nextJson) return prev;
+        }
+        return config;
       });
     }
   }, [config, settingsHasChanges]);

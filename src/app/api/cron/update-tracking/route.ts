@@ -21,7 +21,10 @@ const TRACKING_TO_ORDER_STATUS: Partial<Record<TrackingStatus, string>> = {
 // Verify cron secret
 function verifyCronSecret(request: NextRequest): boolean {
   const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) return true; // Allow if not configured
+  if (!cronSecret) {
+    console.error('[Cron] CRON_SECRET not configured - blocking request');
+    return false; // Block if not configured
+  }
   
   const authHeader = request.headers.get('authorization');
   if (authHeader === `Bearer ${cronSecret}`) return true;

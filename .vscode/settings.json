@@ -1,3 +1,9 @@
 {
-  "css.lint.unknownAtRules": "ignore"
+  "css.lint.unknownAtRules": "ignore",
+  "chat.tools.terminal.autoApprove": {
+    "/^cd /workspaces/psusccshop && npx next build 2>&1 \\| grep -E \"error\\|Error\\|✓\\|✗\\|Failed\" \\| head -20$/": {
+      "approve": true,
+      "matchCommandLine": true
+    }
+  }
 }

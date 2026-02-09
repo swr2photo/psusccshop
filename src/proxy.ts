@@ -165,6 +165,17 @@ const BOT_PROTECTED_ROUTES = [
   '/api/profile',
 ];
 
+/**
+ * API routes that are called externally (webhooks, OAuth, cron, images)
+ * These are excluded from the internal-request header check.
+ */
+const EXTERNAL_API_ROUTES = [
+  '/api/auth/',           // NextAuth OAuth callbacks
+  '/api/payment/webhook/', // Stripe/Omise webhook callbacks
+  '/api/cron/',           // Cron jobs (have their own CRON_SECRET)
+  '/api/image/',          // Image proxy (called from <img> tags)
+];
+
 export default function proxy(request: NextRequest) {
   const origin = request.headers.get('origin');
   const pathname = request.nextUrl.pathname;
@@ -194,6 +205,28 @@ export default function proxy(request: NextRequest) {
     pathname.includes('.') // files with extensions
   ) {
     return response;
+  }
+
+  // --- Internal Request Header Check ---
+  // Block direct browser access to API routes (typing URL directly)
+  // Only allow requests from our app (which include X-Internal-Request header)
+  if (pathname.startsWith('/api/')) {
+    const isExternalRoute = EXTERNAL_API_ROUTES.some(route => pathname.startsWith(route));
+    if (!isExternalRoute) {
+      const internalHeader = request.headers.get('x-internal-request');
+      if (!internalHeader) {
+        return new NextResponse(
+          JSON.stringify({ status: 'error', message: 'Direct API access is not allowed' }),
+          {
+            status: 403,
+            headers: {
+              'Content-Type': 'application/json',
+              ...securityHeaders,
+            },
+          }
+        );
+      }
+    }
   }
   
   // Block suspicious bots on protected routes

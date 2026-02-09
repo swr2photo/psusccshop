@@ -3,6 +3,7 @@ import { getJson, putJson, listKeys } from '@/lib/filebase';
 import { requireAdminWithPermission } from '@/lib/auth';
 import { ShopConfig } from '@/lib/config';
 import { sendOrderStatusEmail } from '@/lib/email';
+import { sendPushNotification } from '@/lib/push-notification';
 import crypto from 'crypto';
 
 export const runtime = 'nodejs';
@@ -129,6 +130,17 @@ export async function POST(req: NextRequest) {
             } catch (emailErr) {
               console.error('[Pickup Enable] Email send error:', emailErr);
             }
+            
+            // Send push notification
+            sendPushNotification(customerEmail, {
+              title: 'พร้อมรับสินค้าแล้ว!',
+              body: pickupSettings.location
+                ? `ออเดอร์ ${order.ref} พร้อมรับที่: ${pickupSettings.location}`
+                : `ออเดอร์ ${order.ref} พร้อมรับสินค้าแล้ว`,
+              icon: '/icon-192.png',
+              url: '/',
+              tag: `pickup-${order.ref}`,
+            }).catch(() => {});
           }
           
           updatedCount++;

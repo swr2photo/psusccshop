@@ -15,6 +15,17 @@ import {
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+// Auth helper
+async function requireSession() {
+  const { getServerSession } = await import('next-auth');
+  const { authOptions } = await import('@/lib/auth');
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.email) {
+    return null;
+  }
+  return session;
+}
+
 interface TrackRequest {
   provider?: ShippingProvider;
   trackingNumber?: string;
@@ -24,6 +35,11 @@ interface TrackRequest {
 }
 
 export async function POST(request: NextRequest) {
+  const session = await requireSession();
+  if (!session) {
+    return NextResponse.json({ success: false, error: 'Unauthorized', errorCode: 'AUTH_REQUIRED' }, { status: 401 });
+  }
+
   try {
     const body: TrackRequest = await request.json();
     const { provider, trackingNumber, trackingNumbers, courierCode, useFallback = true } = body;
@@ -121,6 +137,11 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  const session = await requireSession();
+  if (!session) {
+    return NextResponse.json({ success: false, error: 'Unauthorized', errorCode: 'AUTH_REQUIRED' }, { status: 401 });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const provider = searchParams.get('provider') as ShippingProvider | null;

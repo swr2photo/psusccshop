@@ -89,37 +89,12 @@ export function useAdminData(options: UseAdminDataOptions = {}) {
       revalidateOnMount: true,
       keepPreviousData: true, // Show stale data immediately while revalidating
       onSuccess: (data) => {
-        if (data?.status === 'success') {
-          // Save to localStorage as backup
-          try {
-            localStorage.setItem('admin_cache', JSON.stringify({
-              timestamp: Date.now(),
-              data: data.data,
-            }));
-          } catch {}
-        }
         onSuccess?.(data);
       },
       onError: (err) => {
-        // Try to load from localStorage on error
-        console.warn('[useAdminData] Error, attempting to load from cache');
+        console.warn('[useAdminData] Error fetching data');
         onError?.(err);
       },
-      // Use localStorage as fallback - always use available cache for instant display
-      fallbackData: (() => {
-        if (typeof window === 'undefined') return undefined;
-        try {
-          const cached = localStorage.getItem('admin_cache');
-          if (cached) {
-            const { data } = JSON.parse(cached);
-            // Always use cache for instant display; SWR will revalidate in background
-            if (data) {
-              return { status: 'success', data };
-            }
-          }
-        } catch {}
-        return undefined;
-      })(),
     }
   );
 
@@ -632,43 +607,6 @@ export function useSyncSheet() {
     isSyncing: isMutating,
     error,
   };
-}
-
-// ============== LOCAL STORAGE CACHE HELPERS ==============
-
-const ADMIN_CACHE_KEY = 'psusccshop_admin_cache_v2';
-
-export function saveAdminCacheSWR(data: { config?: any; orders?: any[]; logs?: any[] }) {
-  if (typeof window === 'undefined') return;
-  try {
-    const existing = loadAdminCacheSWR() || {};
-    const merged = {
-      ...existing,
-      ...data,
-      timestamp: Date.now(),
-    };
-    localStorage.setItem(ADMIN_CACHE_KEY, JSON.stringify(merged));
-  } catch (e) {
-    console.warn('[Cache] Failed to save:', e);
-  }
-}
-
-export function loadAdminCacheSWR(): { config?: any; orders?: any[]; logs?: any[]; timestamp?: number } | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const cached = localStorage.getItem(ADMIN_CACHE_KEY);
-    if (!cached) return null;
-    return JSON.parse(cached);
-  } catch {
-    return null;
-  }
-}
-
-export function clearAdminCacheSWR() {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.removeItem(ADMIN_CACHE_KEY);
-  } catch {}
 }
 
 // ============== GLOBAL MUTATE HELPERS ==============

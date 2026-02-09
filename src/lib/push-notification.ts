@@ -9,6 +9,21 @@ const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '';
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || '';
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:psuscc@psusci.club';
 
+// Cache webpush module to avoid re-importing and re-setting VAPID on every call
+let _webpush: any = null;
+async function getWebPush() {
+  if (_webpush) return _webpush;
+  try {
+    const mod = await import('web-push');
+    _webpush = mod.default || mod;
+    _webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+    return _webpush;
+  } catch (err) {
+    console.error('[Push] web-push library not available:', err);
+    return null;
+  }
+}
+
 interface PushPayload {
   title: string;
   body: string;
@@ -48,17 +63,8 @@ export async function sendPushNotification(
   let failed = 0;
   const expiredEndpoints: string[] = [];
 
-  // Dynamic import web-push (optional dependency)
-  // Handle CJS/ESM interop: web-push is CJS, dynamic import wraps it as { default: ... }
-  let webpush: any;
-  try {
-    const webpushModule = await import('web-push');
-    webpush = webpushModule.default || webpushModule;
-    webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
-  } catch (err) {
-    console.error('[Push] web-push library not available:', err);
-    return { sent: 0, failed: 0 };
-  }
+  const webpush = await getWebPush();
+  if (!webpush) return { sent: 0, failed: 0 };
 
   for (const sub of subscriptions) {
     try {

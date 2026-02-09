@@ -3,6 +3,7 @@ import { requireAuth, requireAdmin, requireAdminWithPermission, isResourceOwner 
 import { getOrderByRef } from '@/lib/supabase';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { triggerSheetSync } from '@/lib/sheet-sync';
+import { sendPushNotification } from '@/lib/push-notification';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -433,6 +434,34 @@ export async function PUT(req: NextRequest) {
 
     if (action === 'complete') {
       triggerSheetSync().catch(() => {});
+    }
+
+    // Push notification to customer about refund status
+    const customerEmail = order.customerEmail;
+    if (customerEmail) {
+      const pushMessages: Record<string, { title: string; body: string }> = {
+        approve: {
+          title: 'คำขอคืนเงินได้รับการอนุมัติ',
+          body: `ออเดอร์ ${ref} คำขอคืนเงินได้รับการอนุมัติแล้ว`,
+        },
+        reject: {
+          title: 'คำขอคืนเงินถูกปฏิเสธ',
+          body: `ออเดอร์ ${ref} คำขอคืนเงินถูกปฏิเสธ${adminNote ? ` — ${adminNote}` : ''}`,
+        },
+        complete: {
+          title: 'คืนเงินเรียบร้อยแล้ว',
+          body: `ออเดอร์ ${ref} คืนเงินเรียบร้อยแล้ว กรุณาตรวจสอบบัญชีธนาคาร`,
+        },
+      };
+      const msg = pushMessages[action];
+      if (msg) {
+        sendPushNotification(customerEmail, {
+          ...msg,
+          icon: '/icon-192.png',
+          url: '/',
+          tag: `refund-${ref}`,
+        }).catch(() => {});
+      }
     }
 
     const actionLabels: Record<string, string> = {

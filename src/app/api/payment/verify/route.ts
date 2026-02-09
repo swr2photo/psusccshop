@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { listKeys, getJson, putJson } from '@/lib/filebase';
 import { calculateOrderTotal } from '@/lib/payment-utils';
-import { requireAuth, isResourceOwner, isAdminEmail } from '@/lib/auth';
+import { requireAuth, isResourceOwner, isAdminEmail, ADMIN_EMAILS } from '@/lib/auth';
 import { triggerSheetSync } from '@/lib/sheet-sync';
 import { sendPaymentReceivedEmail } from '@/lib/email';
+import { sendPushNotification } from '@/lib/push-notification';
 import crypto from 'crypto';
 
 // Helper to save user log server-side
@@ -412,6 +413,17 @@ export async function POST(req: NextRequest) {
 
     // Auto sync to Google Sheets
     triggerSheetSync().catch(() => {});
+
+    // Push notification to all admin devices that a payment was received
+    for (const adminEmail of ADMIN_EMAILS) {
+      sendPushNotification(adminEmail, {
+        title: 'มีการชำระเงินใหม่',
+        body: `ออเดอร์ ${ref} ชำระ ${slipCheck.slipData?.amount || expectedAmount} บาท`,
+        icon: '/icon-192.png',
+        url: '/admin#orders',
+        tag: `payment-${ref}`,
+      }).catch(() => {});
+    }
 
     // ส่งข้อมูลกลับ
     return NextResponse.json({

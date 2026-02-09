@@ -113,13 +113,12 @@ function isAllowedUrl(url: string): boolean {
       parsed.hostname === domain || parsed.hostname.endsWith(`.${domain}`)
     );
     if (!isAllowed) {
-      // Log but ALLOW for now - we'll see what domains are being used
-      console.log('[Image Proxy] URL domain (allowing):', parsed.hostname);
-      return true; // Allow all for debugging
+      console.warn('[Image Proxy] Blocked domain:', parsed.hostname);
+      return false;
     }
     return true;
   } catch (e) {
-    console.log('[Image Proxy] Invalid URL:', url);
+    console.warn('[Image Proxy] Invalid URL:', url);
     return false;
   }
 }
