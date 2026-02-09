@@ -47,6 +47,12 @@ function isIOSDevice(): boolean {
   }
   // Fallback: deprecated platform check
   if (typeof navigator.platform === 'string' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) return true;
+  // iOS 26+: GestureEvent is a WebKit-only API that only ships on iOS/iPadOS Safari
+  if (typeof window !== 'undefined' && 'GestureEvent' in window) return true;
+  // Safari-only ontouchend combined with WebKit (excludes Android Chrome)
+  if (typeof document !== 'undefined' && 'ontouchend' in document &&
+      navigator.maxTouchPoints > 0 && /AppleWebKit/.test(navigator.userAgent) &&
+      !/Android/i.test(navigator.userAgent)) return true;
   return false;
 }
 
@@ -69,18 +75,6 @@ function isStandaloneMode(): boolean {
     // iOS 26: all home-screen sites report as standalone, also check fullscreen
     window.matchMedia('(display-mode: fullscreen)').matches ||
     (window.navigator as any).standalone === true;
-}
-
-/**
- * Detect if iOS version supports push notifications natively.
- * iOS 16.4+ supports Web Push in PWA standalone mode.
- * iOS 26+: Every home-screen site is a web app, so push APIs are more broadly available.
- * We use feature detection rather than version parsing since iOS 26 freezes the UA string.
- */
-function iosSupportsPush(): boolean {
-  if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
-  // If push APIs are available, iOS supports push (iOS 16.4+ in PWA, or iOS 26+ in any context)
-  return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 }
 
 /** Cross-browser requestPermission — uses modern Promise API first, callback fallback */
@@ -125,14 +119,33 @@ export default function NotificationPrompt() {
     setIsAndroid(android);
     setIsStandalone(standalone);
 
-    // iOS in Safari (not PWA/standalone)
-    // iOS 26+: push APIs are available even in Safari since all home-screen sites become web apps
-    // iOS 16.4-18.x: push only works in standalone PWA mode — show install guide
+    // Missing VAPID key = server config issue — don't bother the user
+    if (!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) return;
+
+    // iOS devices: push only works in standalone/PWA mode (iOS 16.4+).
+    // iOS 26+ makes every home-screen site a web app, but the Notification API
+    // is still only exposed in standalone context, NOT Safari.
+    // → Always show add-to-home-screen guidance when not standalone.
     if (ios && !standalone) {
-      // Feature detect: if push APIs are available in Safari, iOS 26+ — proceed to normal push flow
-      const pushAvailable = iosSupportsPush();
-      if (!pushAvailable) {
-        // Pre-iOS 16.4 or push not available in this context — show home screen guide
+      try {
+        const dismissed = localStorage.getItem(DISMISS_KEY + '-ios');
+        if (dismissed) {
+          const dismissedAt = parseInt(dismissed, 10);
+          if (Date.now() - dismissedAt < DISMISS_DURATION) return;
+        }
+      } catch {}
+      setPromptMode('ios-guide');
+      const timer = setTimeout(() => setShow(true), 5000);
+      return () => clearTimeout(timer);
+    }
+
+    // Standard push notification flow (Android, Desktop, iOS PWA/standalone)
+    const hasSW = 'serviceWorker' in navigator;
+    const hasPush = 'PushManager' in window;
+    const hasNotif = 'Notification' in window;
+    if (!hasSW || !hasPush || !hasNotif) {
+      // iOS in standalone but APIs somehow unavailable — suggest iOS update
+      if (ios) {
         try {
           const dismissed = localStorage.getItem(DISMISS_KEY + '-ios');
           if (dismissed) {
@@ -144,17 +157,7 @@ export default function NotificationPrompt() {
         const timer = setTimeout(() => setShow(true), 5000);
         return () => clearTimeout(timer);
       }
-      // iOS 26+: push APIs available in Safari — fall through to normal push flow below
-      // On iOS 26, adding to home screen makes it a web app automatically,
-      // so we can still suggest it for better experience but allow direct push subscription
-    }
-
-    // Standard push notification flow (Android, Desktop, iOS PWA)
-    const hasSW = 'serviceWorker' in navigator;
-    const hasPush = 'PushManager' in window;
-    const hasNotif = 'Notification' in window;
-    if (!hasSW || !hasPush || !hasNotif || !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
-      // Show unsupported state instead of silently returning
+      // Non-iOS device with missing push APIs — truly unsupported
       try {
         const dismissed = localStorage.getItem(DISMISS_KEY + '-unsupported');
         if (dismissed) {
@@ -337,13 +340,7 @@ export default function NotificationPrompt() {
   };
 
   const getUnsupportedGuidance = (): string => {
-    if (isIOS && isStandalone) {
-      return 'อุปกรณ์ของคุณอาจต้องอัปเดต iOS เป็นเวอร์ชัน 16.4 ขึ้นไป เพื่อรองรับการแจ้งเตือน';
-    }
-    if (isIOS) {
-      // iOS 26+: any home screen site is a web app — simpler guidance
-      return 'กดปุ่ม แชร์ (Share) ⬆ แล้วเลือก "เพิ่มไปที่หน้าจอหลัก" — iOS จะเปิดเป็นเว็บแอปอัตโนมัติพร้อมรองรับการแจ้งเตือน';
-    }
+
     if (isAndroid) {
       return 'เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือน ลองเปิดใน Google Chrome หรือ Samsung Internet แล้วลองใหม่';
     }
@@ -352,9 +349,9 @@ export default function NotificationPrompt() {
 
   const getTitle = (): string => {
     switch (promptMode) {
-      case 'ios-guide': return 'เพิ่มไปที่หน้าจอหลัก';
+      case 'ios-guide': return isStandalone ? 'อัปเดต iOS เพื่อรับการแจ้งเตือน' : 'เพิ่มไปที่หน้าจอหลัก';
       case 'denied': return 'เปิดการแจ้งเตือนอีกครั้ง';
-      case 'unsupported': return 'อุปกรณ์ยังไม่รองรับ';
+      case 'unsupported': return 'เบราว์เซอร์ไม่รองรับ';
       default: return 'เปิดรับการแจ้งเตือน';
     }
   };
@@ -362,7 +359,10 @@ export default function NotificationPrompt() {
   const getDescription = (): string => {
     switch (promptMode) {
       case 'ios-guide':
-        return 'กดปุ่ม แชร์ (Share) ⬆ แล้วเลือก "เพิ่มไปที่หน้าจอหลัก" จากนั้น iOS จะเปิดเป็นเว็บแอปอัตโนมัติพร้อมรับการแจ้งเตือน';
+        if (isStandalone) {
+          return 'อุปกรณ์ของคุณอาจต้องอัพเดต iOS เป็นเวอร์ชัน 16.4 ขึ้นไปเพื่อรองรับการแจ้งเตือน (ตั้งค่า > ทั่วไป > อัพเดตซอฟต์แวร์)';
+        }
+        return 'กดปุ่ม แชร์ (Share) ⬆ แล้วเลือก "เพิ่มไปที่หน้าจอหลัก" จากนั้นเปิดแอปจากหน้าจอหลักเพื่อรับการแจ้งเตือน';
       case 'denied':
         return getDeniedGuidance();
       case 'unsupported':

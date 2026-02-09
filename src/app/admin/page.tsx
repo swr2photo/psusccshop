@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { JSX } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Swal from 'sweetalert2';
+import { useConfirmDialog, useAlertDialog } from '@/hooks/useConfirmDialog';
 import { useRealtimeAdminOrders } from '@/hooks/useRealtimeOrders';
 import { 
   useAdminData, 
@@ -1906,6 +1906,7 @@ const PromoCodesView = React.memo(function PromoCodesView({ config, saveConfig, 
   const [codes, setCodes] = React.useState<PromoCode[]>((config.promoCodes || []) as PromoCode[]);
   const [editingCode, setEditingCode] = React.useState<PromoCode | null>(null);
   const [saving, setSaving] = React.useState(false);
+  const { confirm, ConfirmDialog } = useConfirmDialog();
 
   React.useEffect(() => {
     setCodes((config.promoCodes || []) as PromoCode[]);
@@ -1943,24 +1944,21 @@ const PromoCodesView = React.memo(function PromoCodesView({ config, saveConfig, 
     }
   };
 
-  const handleDelete = (id: string) => {
-    Swal.fire({
+  const handleDelete = async (id: string) => {
+    const ok = await confirm({
       title: 'ลบโค้ดส่วนลด?',
-      text: 'โค้ดนี้จะถูกลบถาวร',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#dc2626',
-      cancelButtonColor: '#475569',
-      confirmButtonText: 'ลบ',
-      cancelButtonText: 'ยกเลิก',
-    }).then(async (result) => {
-      if (result.isConfirmed) {
-        const newCodes = codes.filter(c => c.id !== id);
-        await saveConfig({ ...config, promoCodes: newCodes as any });
-        setCodes(newCodes);
-        showToast('success', 'ลบโค้ดแล้ว');
-      }
+      message: 'โค้ดนี้จะถูกลบถาวร',
+      variant: 'warning',
+      confirmText: 'ลบ',
+      cancelText: 'ยกเลิก',
+      destructive: true,
     });
+    if (ok) {
+      const newCodes = codes.filter(c => c.id !== id);
+      await saveConfig({ ...config, promoCodes: newCodes as any });
+      setCodes(newCodes);
+      showToast('success', 'ลบโค้ดแล้ว');
+    }
   };
 
   const toggleEnabled = async (id: string) => {
@@ -1971,6 +1969,7 @@ const PromoCodesView = React.memo(function PromoCodesView({ config, saveConfig, 
 
   return (
     <Box>
+      <ConfirmDialog />
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Box>
           <Typography variant="h5" sx={{ fontWeight: 800, color: ADMIN_THEME.text, display: 'flex', alignItems: 'center', gap: 1 }}><Ticket size={22} /> โค้ดส่วนลด</Typography>
@@ -2142,6 +2141,7 @@ const EventsView = React.memo(function EventsView({
   const [editingEvent, setEditingEvent] = React.useState<ShopEvent | null>(null);
   const [saving, setSaving] = React.useState(false);
   const [uploadingImage, setUploadingImage] = React.useState(false);
+  const { confirm, ConfirmDialog } = useConfirmDialog();
   // Track the latest config ref to avoid stale closures in handleSave
   const configRef = React.useRef(config);
   configRef.current = config;
@@ -2198,19 +2198,15 @@ const EventsView = React.memo(function EventsView({
   };
 
   const handleDelete = async (event: ShopEvent) => {
-    const result = await Swal.fire({
+    const ok = await confirm({
       title: 'ยืนยันการลบ?',
-      text: `ลบ "${event.title}" ออกจากระบบ`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#64748b',
-      confirmButtonText: 'ลบ',
-      cancelButtonText: 'ยกเลิก',
-      background: 'var(--surface-2)',
-      color: 'var(--foreground)',
+      message: `ลบ "${event.title}" ออกจากระบบ`,
+      variant: 'warning',
+      confirmText: 'ลบ',
+      cancelText: 'ยกเลิก',
+      destructive: true,
     });
-    if (!result.isConfirmed) return;
+    if (!ok) return;
 
     setSaving(true);
     savingRef.current = true;
@@ -2268,6 +2264,7 @@ const EventsView = React.memo(function EventsView({
 
   return (
     <Box sx={{ maxWidth: 900, mx: 'auto' }}>
+      <ConfirmDialog />
       {/* Header */}
       <Box sx={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -2910,6 +2907,7 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
   const [showHistory, setShowHistory] = React.useState(false);
   const [uploadingImage, setUploadingImage] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
+  const { confirm, ConfirmDialog } = useConfirmDialog();
 
   // Sync from config
   React.useEffect(() => {
@@ -2939,20 +2937,16 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
   };
 
   const handleDelete = async (ann: Announcement) => {
-    const result = await Swal.fire({
+    const ok = await confirm({
       title: 'ยืนยันการลบ?',
-      text: 'ประกาศนี้จะถูกย้ายไปประวัติ',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#64748b',
-      confirmButtonText: 'ลบ',
-      cancelButtonText: 'ยกเลิก',
-      background: 'var(--surface-2)',
-      color: 'var(--foreground)',
+      message: 'ประกาศนี้จะถูกย้ายไปประวัติ',
+      variant: 'warning',
+      confirmText: 'ลบ',
+      cancelText: 'ยกเลิก',
+      destructive: true,
     });
 
-    if (result.isConfirmed) {
+    if (ok) {
       setSaving(true);
       try {
         const newAnnouncements = announcements.filter(a => a.id !== ann.id);
@@ -3062,20 +3056,16 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
   };
 
   const handleRestoreFromHistory = async (histItem: typeof history[0]) => {
-    const result = await Swal.fire({
+    const ok = await confirm({
       title: 'กู้คืนประกาศ?',
-      text: 'ประกาศนี้จะถูกเพิ่มกลับไปยังรายการประกาศ',
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonColor: '#10b981',
-      cancelButtonColor: '#64748b',
-      confirmButtonText: 'กู้คืน',
-      cancelButtonText: 'ยกเลิก',
-      background: 'var(--surface-2)',
-      color: 'var(--foreground)',
+      message: 'ประกาศนี้จะถูกเพิ่มกลับไปยังรายการประกาศ',
+      variant: 'question',
+      confirmText: 'กู้คืน',
+      cancelText: 'ยกเลิก',
+      confirmColor: '#10b981',
     });
 
-    if (result.isConfirmed) {
+    if (ok) {
       setSaving(true);
       try {
         const restored: Announcement = {
@@ -3112,20 +3102,16 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
   };
 
   const handleDeleteFromHistory = async (histItem: typeof history[0]) => {
-    const result = await Swal.fire({
+    const ok = await confirm({
       title: 'ลบถาวร?',
-      text: 'ประกาศนี้จะถูกลบออกจากประวัติอย่างถาวร',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#64748b',
-      confirmButtonText: 'ลบถาวร',
-      cancelButtonText: 'ยกเลิก',
-      background: 'var(--surface-2)',
-      color: 'var(--foreground)',
+      message: 'ประกาศนี้จะถูกลบออกจากประวัติอย่างถาวร',
+      variant: 'warning',
+      confirmText: 'ลบถาวร',
+      cancelText: 'ยกเลิก',
+      destructive: true,
     });
 
-    if (result.isConfirmed) {
+    if (ok) {
       setSaving(true);
       try {
         const newHistory = history.filter(h => h.id !== histItem.id);
@@ -3144,6 +3130,7 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, maxWidth: 900 }}>
+      <ConfirmDialog />
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 2 }}>
         <Box>
@@ -3985,18 +3972,14 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
                       </Tooltip>
                       <Tooltip title="ลบ">
                         <IconButton size="small" onClick={async () => {
-                          const result = await Swal.fire({
+                          const ok = await confirm({
                             title: 'ลบข่าวนี้?',
-                            icon: 'warning',
-                            showCancelButton: true,
-                            confirmButtonColor: '#ef4444',
-                            cancelButtonColor: '#64748b',
-                            confirmButtonText: 'ลบ',
-                            cancelButtonText: 'ยกเลิก',
-                            background: 'var(--surface-2)',
-                            color: 'var(--foreground)',
+                            variant: 'warning',
+                            confirmText: 'ลบ',
+                            cancelText: 'ยกเลิก',
+                            destructive: true,
                           });
-                          if (result.isConfirmed) {
+                          if (ok) {
                             const updated = (config.socialMediaNews || []).filter(n => n.id !== news.id);
                             saveConfig({ ...config, socialMediaNews: updated });
                             showToast('success', 'ลบข่าวสำเร็จ');
@@ -4112,6 +4095,8 @@ export default function AdminPage(): JSX.Element {
   const [batchStatusDialogOpen, setBatchStatusDialogOpen] = useState(false);
   const [batchNewStatus, setBatchNewStatus] = useState('PAID');
   const [batchUpdating, setBatchUpdating] = useState(false);
+  const { confirm: confirmDialog, ConfirmDialog } = useConfirmDialog();
+  const { alert: alertDialog, AlertDialog } = useAlertDialog();
   // Orders filter state (moved from OrdersView to prevent re-render issues)
   const [orderFilterStatus, setOrderFilterStatus] = useState<string>('ALL');
   // Slip viewer state
@@ -4665,16 +4650,16 @@ export default function AdminPage(): JSX.Element {
   };
 
   const deleteOrder = async (order: AdminOrder, hard = false) => {
-    const confirmation = await Swal.fire({
-      icon: 'warning',
+    const ok = await confirmDialog({
       title: hard ? 'ลบออเดอร์ถาวร?' : 'ยกเลิกออเดอร์?',
-      text: hard ? 'ข้อมูลจะถูกลบออกจากระบบถาวร' : 'สถานะจะถูกเปลี่ยนเป็น CANCELLED',
-      showCancelButton: true,
-      confirmButtonText: hard ? 'ลบเลย' : 'ยืนยัน',
-      cancelButtonText: 'ปิด',
-      confirmButtonColor: hard ? '#ef4444' : '#22c55e',
+      message: hard ? 'ข้อมูลจะถูกลบออกจากระบบถาวร' : 'สถานะจะถูกเปลี่ยนเป็น CANCELLED',
+      variant: 'warning',
+      confirmText: hard ? 'ลบเลย' : 'ยืนยัน',
+      cancelText: 'ปิด',
+      destructive: hard,
+      confirmColor: hard ? '#ef4444' : '#22c55e',
     });
-    if (!confirmation.isConfirmed) return;
+    if (!ok) return;
 
     setOrderProcessingRef(order.ref);
     try {
@@ -4732,12 +4717,12 @@ export default function AdminPage(): JSX.Element {
     const dynamicAdmin = dynamicAdmins.includes(email);
     
     if (!staticAdmin && !dynamicAdmin) {
-      Swal.fire({
-        icon: 'error',
+      alertDialog({
         title: 'ไม่มีสิทธิ์เข้าถึง',
-        text: 'บัญชีของคุณไม่มีสิทธิ์เข้าถึงหน้านี้',
-        confirmButtonText: 'กลับหน้าหลัก',
-        didClose: () => router.push('/')
+        message: 'บัญชีของคุณไม่มีสิทธิ์เข้าถึงหน้านี้',
+        variant: 'error',
+        confirmText: 'กลับหน้าหลัก',
+        onClose: () => router.push('/'),
       });
     }
   }, [status, session, loading, config.adminEmails, router]);
@@ -8571,7 +8556,7 @@ export default function AdminPage(): JSX.Element {
     );
   }
 
-  // Access Denied - logged in but not admin - just redirect (Swal already shown in useEffect)
+  // Access Denied - logged in but not admin - alert shown in useEffect
   if (!isAuthorized) {
     return (
       <Box
@@ -8586,6 +8571,7 @@ export default function AdminPage(): JSX.Element {
                        var(--background)`,
         }}
       >
+        <AlertDialog />
         <CircularProgress size={48} sx={{ color: '#8b5cf6' }} />
         <Typography sx={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
           กำลังตรวจสอบสิทธิ์...
@@ -8674,6 +8660,8 @@ export default function AdminPage(): JSX.Element {
         position: 'relative',
       }}
     >
+      <ConfirmDialog />
+      <AlertDialog />
       {/* Data Loading Overlay - non-blocking */}
       {isDataLoading && (
         <Box
@@ -9760,6 +9748,7 @@ function ProductsView({ config, searchTerm, setSearchTerm, saveFullConfig, showT
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [pickupSettingProduct, setPickupSettingProduct] = useState<Product | null>(null);
   const [pickupSaving, setPickupSaving] = useState(false);
+  const { confirm, ConfirmDialog: ProductConfirmDialog } = useConfirmDialog();
 
   const filteredProducts = useMemo(() => {
     const term = searchTerm.toLowerCase();
@@ -9788,23 +9777,20 @@ function ProductsView({ config, searchTerm, setSearchTerm, saveFullConfig, showT
     setEditingProduct(newP);
   };
 
-  const handleDelete = (id: string) => {
-    Swal.fire({
+  const handleDelete = async (id: string) => {
+    const ok = await confirm({
       title: 'Delete Product?',
-      text: 'This action cannot be undone',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#dc2626',
-      cancelButtonColor: '#475569',
-      confirmButtonText: 'Delete',
-      cancelButtonText: 'Cancel'
-    }).then((res) => {
-      if (res.isConfirmed) {
-        const newProducts = config.products.filter((p) => p.id !== id);
-        saveFullConfig({ ...config, products: newProducts });
-        showToast('success', 'Product deleted');
-      }
+      message: 'This action cannot be undone',
+      variant: 'warning',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      destructive: true,
     });
+    if (ok) {
+      const newProducts = config.products.filter((p) => p.id !== id);
+      saveFullConfig({ ...config, products: newProducts });
+      showToast('success', 'Product deleted');
+    }
   };
 
   const handleToggleActive = (id: string) => {
@@ -9860,6 +9846,7 @@ function ProductsView({ config, searchTerm, setSearchTerm, saveFullConfig, showT
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, height: '100%' }}>
+      <ProductConfirmDialog />
       {/* Sticky Header */}
       <Box sx={{ 
         position: 'sticky',
