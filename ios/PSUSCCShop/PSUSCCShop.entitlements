@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Entitlements>
+    <!-- Sign in with Apple -->
+    <key>com.apple.developer.applesignin</key>
+    <array>
+        <string>Default</string>
+    </array>
+
+    <!-- Push Notifications -->
+    <key>aps-environment</key>
+    <string>development</string>
+
+    <!-- Associated Domains (Universal Links) -->
+    <key>com.apple.developer.associated-domains</key>
+    <array>
+        <string>applinks:psusccshop.vercel.app</string>
+        <string>webcredentials:psusccshop.vercel.app</string>
+    </array>
+
+    <!-- Keychain Sharing -->
+    <key>keychain-access-groups</key>
+    <array>
+        <string>$(AppIdentifierPrefix)com.psusccshop.ios</string>
+    </array>
+</Entitlements>

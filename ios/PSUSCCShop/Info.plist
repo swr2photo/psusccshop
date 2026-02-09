@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- App Transport Security -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsArbitraryLoads</key>
+        <false/>
+        <key>NSExceptionDomains</key>
+        <dict>
+            <key>localhost</key>
+            <dict>
+                <key>NSExceptionAllowsInsecureHTTPLoads</key>
+                <true/>
+                <key>NSIncludesSubdomains</key>
+                <true/>
+            </dict>
+        </dict>
+    </dict>
+
+    <!-- Camera & Photo Library -->
+    <key>NSCameraUsageDescription</key>
+    <string>ใช้สำหรับถ่ายรูปสลิปการชำระเงิน</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>ใช้สำหรับเลือกรูปสลิปการชำระเงินจากคลังภาพ</string>
+
+    <!-- Push Notifications -->
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>remote-notification</string>
+    </array>
+
+    <!-- URL Schemes for OAuth -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>psusccshop</string>
+            </array>
+            <key>CFBundleURLName</key>
+            <string>com.psusccshop.ios</string>
+        </dict>
+    </array>
+
+    <!-- Associated Domains (for Universal Links) -->
+    <!-- Configure in Signing & Capabilities -->
+
+    <!-- Scene Configuration -->
+    <key>UIApplicationSceneManifest</key>
+    <dict>
+        <key>UIApplicationSupportsMultipleScenes</key>
+        <true/>
+    </dict>
+
+    <!-- Status Bar -->
+    <key>UIViewControllerBasedStatusBarAppearance</key>
+    <true/>
+
+    <!-- Supported Orientations -->
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+
+    <!-- Bundle Display Name -->
+    <key>CFBundleDisplayName</key>
+    <string>PSU SCC Shop</string>
+
+    <!-- Bundle Identifier -->
+    <key>CFBundleIdentifier</key>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+
+    <!-- Version -->
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+</dict>
+</plist>
