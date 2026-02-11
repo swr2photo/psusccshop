@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { Box, Typography, Grow } from '@mui/material';
 import { CheckCircle2, PartyPopper, Sparkles, Heart, ShoppingBag, CreditCard } from 'lucide-react';
+import { useTranslation } from '@/hooks/useTranslation';
 
 // ============== TYPES ==============
 
@@ -37,11 +38,16 @@ export default function SuccessPopup({
   duration = 2500,
   onClose,
 }: SuccessPopupProps) {
+  const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const startY = useRef(0);
 
   useEffect(() => {
     if (show) {
       setVisible(true);
+      setDragOffset(0);
       const timer = setTimeout(() => {
         setVisible(false);
         onClose?.();
@@ -49,6 +55,35 @@ export default function SuccessPopup({
       return () => clearTimeout(timer);
     }
   }, [show, duration, onClose]);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    startY.current = e.touches[0].clientY;
+    setIsDragging(true);
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isDragging) return;
+    const delta = e.touches[0].clientY - startY.current;
+    // Allow both up and down swipe
+    const absDelta = Math.abs(delta);
+    const dampened = absDelta > 60 ? 60 + (absDelta - 60) * 0.3 : absDelta;
+    setDragOffset(delta > 0 ? dampened : -dampened);
+  }, [isDragging]);
+
+  const handleTouchEnd = useCallback(() => {
+    if (!isDragging) return;
+    setIsDragging(false);
+    if (Math.abs(dragOffset) >= 60) {
+      setDragOffset(dragOffset > 0 ? window.innerHeight : -window.innerHeight);
+      setTimeout(() => {
+        setVisible(false);
+        onClose?.();
+        setDragOffset(0);
+      }, 200);
+    } else {
+      setDragOffset(0);
+    }
+  }, [isDragging, dragOffset, onClose]);
 
   if (!visible) return null;
 
@@ -67,12 +102,17 @@ export default function SuccessPopup({
         bgcolor: 'rgba(0,0,0, 0.85)',
         backdropFilter: 'blur(12px)',
         animation: 'fadeIn 0.3s ease',
+        opacity: isDragging ? Math.max(0.3, 1 - Math.abs(dragOffset) / 150) : 1,
+        transition: isDragging ? 'none' : 'opacity 0.3s ease',
         '@keyframes fadeIn': {
           '0%': { opacity: 0 },
           '100%': { opacity: 1 },
         },
       }}
       onClick={onClose}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
     >
       <Grow in={visible} timeout={400}>
         <Box
@@ -84,6 +124,8 @@ export default function SuccessPopup({
             p: 4,
             maxWidth: 320,
             textAlign: 'center',
+            transform: dragOffset !== 0 ? `translateY(${dragOffset}px)` : undefined,
+            transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)',
           }}
         >
           {/* Animated Icon Container */}
@@ -188,7 +230,7 @@ export default function SuccessPopup({
           </Box>
 
           <Typography sx={{ fontSize: '0.75rem', color: '#86868b', mt: 0.5 }}>
-            แตะเพื่อปิด
+            {t.successPopup.tapOrSwipe}
           </Typography>
         </Box>
       </Grow>

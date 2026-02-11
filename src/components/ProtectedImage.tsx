@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, CSSProperties, useCallback } from 'react';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface ProtectedImageProps {
   src: string;
@@ -295,6 +296,7 @@ export default function ProtectedImage({
   const [isProtected, setIsProtected] = useState(true);
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState(false);
+  const { t } = useTranslation();
 
   const isAdvanced = level === 'high' || level === 'maximum';
   const isMaximum = level === 'maximum';
@@ -529,7 +531,7 @@ export default function ProtectedImage({
             zIndex: 1,
           }}
         >
-          ไม่สามารถโหลดรูปภาพได้
+          {t.misc.cannotLoadImage}
         </div>
       )}
 

@@ -37,6 +37,16 @@ export const CATEGORY_LABELS: Record<string, string> = {
   OTHER: 'อื่นๆ',
 };
 
+/** Category labels in English */
+export const CATEGORY_LABELS_EN: Record<string, string> = {
+  APPAREL: 'Apparel',
+  MERCHANDISE: 'Merchandise',
+  CAMP_FEE: 'Camp Fee',
+  EVENT: 'Events',
+  SERVICE: 'Service',
+  OTHER: 'Other',
+};
+
 /** SubType labels in Thai */
 export const SUBTYPE_LABELS: Record<string, string> = {
   // Apparel
@@ -62,6 +72,27 @@ export const SUBTYPE_LABELS: Record<string, string> = {
   OTHER: 'อื่นๆ',
 };
 
+/** SubType labels in English */
+export const SUBTYPE_LABELS_EN: Record<string, string> = {
+  JERSEY: 'Jersey',
+  CREW: 'Crew Neck',
+  HOODIE: 'Hoodie',
+  TSHIRT: 'T-Shirt',
+  POLO: 'Polo',
+  JACKET: 'Jacket',
+  CAP: 'Cap',
+  STICKER: 'Sticker',
+  KEYCHAIN: 'Keychain',
+  MUG: 'Mug',
+  BADGE: 'Badge/Pin',
+  POSTER: 'Poster',
+  NOTEBOOK: 'Notebook',
+  CAMP_REGISTRATION: 'Camp Registration',
+  EVENT_TICKET: 'Event Ticket',
+  CUSTOM: 'Custom',
+  OTHER: 'Other',
+};
+
 /** Category icons */
 export const CATEGORY_ICONS: Record<string, string> = {
   APPAREL: '',
@@ -82,13 +113,50 @@ export const CATEGORY_SUBTYPES: Record<string, string[]> = {
   OTHER: ['OTHER'],
 };
 
+/**
+ * Thai → English mapping for custom categories created by admin.
+ * Add new entries here when admin creates categories in Thai.
+ */
+export const CUSTOM_CATEGORY_TRANSLATIONS: Record<string, string> = {
+  'เสื้อผ้า': 'Apparel',
+  'ของที่ระลึก': 'Merchandise',
+  'ค่าสมัครค่าย': 'Camp Fee',
+  'กิจกรรม/อีเวนต์': 'Events',
+  'บริการ': 'Service',
+  'อื่นๆ': 'Other',
+  'อุปกรณ์กีฬา': 'Sports Equipment',
+  'กระเป๋า': 'Bags',
+  'เครื่องเขียน': 'Stationery',
+  'อาหาร': 'Food',
+  'เครื่องดื่ม': 'Beverages',
+  'หนังสือ': 'Books',
+  'ของแจก': 'Giveaway',
+  'ชุดกีฬา': 'Sportswear',
+  'รองเท้า': 'Shoes',
+  'หมวก': 'Hats',
+  'ผ้าพันคอ': 'Scarves',
+  'เข็มกลัด': 'Pins',
+  'โปสเตอร์': 'Posters',
+  'สติกเกอร์': 'Stickers',
+  'พวงกุญแจ': 'Keychains',
+  'แก้วน้ำ': 'Cups',
+  'สมุด': 'Notebooks',
+};
+
 /** Helper: Get category label (returns custom value if not in predefined list) */
-export const getCategoryLabel = (category: string): string => {
+export const getCategoryLabel = (category: string, lang?: 'th' | 'en'): string => {
+  if (lang === 'en') {
+    return CATEGORY_LABELS_EN[category]
+      || CUSTOM_CATEGORY_TRANSLATIONS[category]
+      || CATEGORY_LABELS[category]
+      || category;
+  }
   return CATEGORY_LABELS[category] || category;
 };
 
 /** Helper: Get subtype label (returns custom value if not in predefined list) */
-export const getSubTypeLabel = (subType: string): string => {
+export const getSubTypeLabel = (subType: string, lang?: 'th' | 'en'): string => {
+  if (lang === 'en') return SUBTYPE_LABELS_EN[subType] || SUBTYPE_LABELS[subType] || subType;
   return SUBTYPE_LABELS[subType] || subType;
 };
 
@@ -102,7 +170,11 @@ export const getCategoryIcon = (category: string): string => {
 export interface Product {
   id: string;
   name: string;
+  /** English product name (optional, for i18n) */
+  nameEn?: string;
   description?: string;
+  /** English description (optional, for i18n) */
+  descriptionEn?: string;
   /** หมวดหมู่หลัก - ใช้สำหรับกรองและแสดงผล */
   category?: ProductCategory;
   /** Legacy type - backward compatible */
@@ -137,6 +209,7 @@ export interface Product {
   /** Custom tags to display on product card */
   customTags?: Array<{
     text: string;
+    textEn?: string;
     color: string;
     bgColor?: string;
   }>;
@@ -176,6 +249,18 @@ export interface Product {
   /** วันที่อัปเดตล่าสุด */
   updatedAt?: string;
 }
+
+/** Get product name in the active language */
+export const getProductName = (product: Product, lang?: 'th' | 'en'): string => {
+  if (lang === 'en' && (product as any).nameEn) return (product as any).nameEn;
+  return product.name;
+};
+
+/** Get product description in the active language */
+export const getProductDescription = (product: Product, lang?: 'th' | 'en'): string => {
+  if (lang === 'en' && (product as any).descriptionEn) return (product as any).descriptionEn;
+  return product.description || '';
+};
 
 /** ตัวเลือกสินค้า (สำหรับของที่ระลึก) */
 export interface ProductVariant {

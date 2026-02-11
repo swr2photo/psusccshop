@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import type { JSX } from 'react';
 import { X, Upload, Check, Loader2, AlertCircle, CheckCircle2, Image, Clock3, Download, CreditCard, QrCode, Copy, Smartphone, ArrowRight, Sparkles, AlertTriangle, Info, ShoppingBag, Tag, Hash, Shirt, Clock } from 'lucide-react';
 import { Drawer, Box, Typography, Button, IconButton, Skeleton, useMediaQuery, LinearProgress, Slide, Collapse } from '@mui/material';
 import { QRCodeSVG } from 'qrcode.react';
+import { PaymentCountdown } from './OrderCountdown';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface PaymentModalProps {
   orderRef: string;
@@ -190,11 +192,12 @@ function PaymentToastContainer({
   );
 }
 
-// สถานะที่ถือว่าชำระเงินแล้ว
+// Statuses considered as paid
 const PAID_STATUSES = ['PAID', 'COMPLETED', 'SHIPPED', 'READY', 'VERIFYING'];
 
 export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentModalProps): JSX.Element {
   const { toasts, addToast, removeToast } = usePaymentToast();
+  const { t, lang } = useTranslation();
   const isMobile = useMediaQuery('(max-width: 640px)');
   const [loading, setLoading] = useState(true);
   const [verifying, setVerifying] = useState(false);
@@ -208,12 +211,13 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [showCartDetails, setShowCartDetails] = useState(false);
   const [orderStatus, setOrderStatus] = useState<string>('PENDING');
+  const [orderDate, setOrderDate] = useState<string | null>(null);
   
-  // สถานะระบบชำระเงิน
+  // Payment system status
   const [paymentEnabled, setPaymentEnabled] = useState(true);
   const [paymentDisabledMessage, setPaymentDisabledMessage] = useState<string | null>(null);
   
-  // ตรวจสอบว่าชำระเงินแล้วหรือยัง
+  // Check if already paid
   const isPaid = PAID_STATUSES.includes(orderStatus.toUpperCase());
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -226,6 +230,34 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
 
   const hasSlip = Boolean(selectedFile);
   const discountValue = Math.abs(discount);
+
+  // Swipe-to-dismiss state
+  const [swipeDragOffset, setSwipeDragOffset] = useState(0);
+  const [isSwipeDragging, setIsSwipeDragging] = useState(false);
+  const swipeStartY = useRef(0);
+
+  const handleSwipeStart = useCallback((e: React.TouchEvent) => {
+    swipeStartY.current = e.touches[0].clientY;
+    setIsSwipeDragging(true);
+  }, []);
+
+  const handleSwipeMove = useCallback((e: React.TouchEvent) => {
+    if (!isSwipeDragging) return;
+    const delta = e.touches[0].clientY - swipeStartY.current;
+    if (delta < 0) { setSwipeDragOffset(0); return; }
+    setSwipeDragOffset(delta > 80 ? 80 + (delta - 80) * 0.3 : delta);
+  }, [isSwipeDragging]);
+
+  const handleSwipeEnd = useCallback(() => {
+    if (!isSwipeDragging) return;
+    setIsSwipeDragging(false);
+    if (swipeDragOffset >= 80) {
+      setSwipeDragOffset(window.innerHeight);
+      setTimeout(() => { onClose(); setSwipeDragOffset(0); }, 200);
+    } else {
+      setSwipeDragOffset(0);
+    }
+  }, [isSwipeDragging, swipeDragOffset, onClose]);
 
   useEffect(() => {
     fetchPaymentInfo();
@@ -251,14 +283,15 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
         setDiscount(Number(info.discount ?? 0));
         setCartItems(info.cart || []);
         setOrderStatus(info.status || 'PENDING');
-        // สถานะระบบชำระเงิน
+        setOrderDate(info.orderDate || info.date || info.createdAt || null);
+        // Payment system status
         setPaymentEnabled(info.paymentEnabled !== false);
         setPaymentDisabledMessage(info.paymentDisabledMessage || null);
       } else {
-        addToast('error', 'ข้อผิดพลาด', data.message || 'ไม่พบข้อมูลชำระเงิน');
+        addToast('error', t.common.error, data.message || t.payment.noPaymentInfo);
       }
     } catch (error) {
-      addToast('error', 'เชื่อมต่อไม่ได้', 'ลองใหม่อีกครั้ง');
+      addToast('error', t.payment.connectionError, t.payment.tryAgain);
     } finally {
       setLoading(false);
     }
@@ -266,11 +299,11 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
 
   const processFile = (file: File) => {
     if (!file.type.startsWith('image/')) {
-      addToast('error', 'ไฟล์ไม่ถูกต้อง', 'เลือกรูปภาพ');
+      addToast('error', t.payment.invalidFile, t.payment.selectImage);
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      addToast('error', 'ไฟล์ใหญ่เกินไป', 'ขนาดสูงสุด 5MB');
+      addToast('error', t.payment.fileTooLarge, t.payment.maxSize5MB);
       return;
     }
 
@@ -282,7 +315,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
 
   const handleConfirmPayment = async () => {
     if (!selectedFile) {
-      addToast('warning', 'กรุณาแนบสลิป');
+      addToast('warning', t.payment.pleaseAttachSlip);
       return;
     }
 
@@ -305,44 +338,44 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
         const data: any = await res.json();
 
         if (data.status === 'success') {
-          // แสดงชื่อผู้โอนถ้ามี
+          // Show sender name if available
           const senderName = data.data?.senderName;
           const successMsg = senderName 
-            ? `ขอบคุณ ${senderName}` 
-            : 'ระบบได้รับสลิปแล้ว';
-          addToast('success', 'ชำระเงินสำเร็จ', successMsg);
+            ? `${t.payment.thankYouPrefix} ${senderName}` 
+            : t.payment.slipReceived;
+          addToast('success', t.payment.paymentSuccessToast, successMsg);
           setTimeout(() => {
             onSuccess();
             onClose();
           }, 1800);
         } else {
-          // แสดงข้อความ error ที่เฉพาะเจาะจง
+          // Show specific error message
           const errorCode = data.code;
-          let title = 'ตรวจสอบไม่ผ่าน';
-          let message = data.message || 'กรุณาตรวจสอบสลิปและลองใหม่';
+          let title: string = t.payment.verifyFailed;
+          let message: string = data.message || t.payment.checkSlipRetry;
 
-          // ปรับ title ตาม error code
+          // Adjust title based on error code
           if (errorCode === 1012) {
-            title = 'สลิปซ้ำ';
-            message = 'สลิปนี้เคยใช้แล้ว กรุณาโอนเงินใหม่';
+            title = t.payment.duplicateSlip;
+            message = t.payment.duplicateSlipDesc;
           } else if (errorCode === 1013) {
-            title = 'ยอดเงินไม่ตรง';
+            title = t.payment.amountMismatch;
           } else if (errorCode === 1014) {
-            title = 'บัญชีผิด';
-            message = 'กรุณาโอนเข้าบัญชีที่ถูกต้อง';
+            title = t.payment.wrongAccount;
+            message = t.payment.wrongAccountDesc;
           } else if (errorCode === 1007 || errorCode === 1008) {
-            title = 'QR ไม่ถูกต้อง';
+            title = t.payment.invalidQR;
           } else if (errorCode === 'PAYMENT_DISABLED') {
-            title = 'ระบบชำระเงินปิด';
-            message = data.message || 'ระบบชำระเงินปิดชั่วคราว กรุณารอแอดมินเปิดระบบ';
-            // อัปเดตสถานะเพื่อแสดง UI ที่ถูกต้อง
+            title = t.payment.systemClosed;
+            message = data.message || t.payment.systemClosedDesc;
+            // Update state to show correct UI
             setPaymentEnabled(false);
             setPaymentDisabledMessage(data.message);
           }
 
           addToast('error', title, message);
           
-          // ถ้าสลิปซ้ำหรือบัญชีผิด ให้ reset slip
+          // If duplicate slip or wrong account, reset slip
           if (errorCode === 1012 || errorCode === 1014) {
             setSelectedFile(null);
             setPreviewUrl(null);
@@ -350,7 +383,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
           }
         }
       } catch (error) {
-        addToast('error', 'เกิดข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้');
+        addToast('error', t.common.error, t.payment.serverError);
       } finally {
         setVerifying(false);
       }
@@ -367,7 +400,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
         // Find the QR SVG element by ID
         const svgElement = document.getElementById('promptpay-qr-svg');
         if (!svgElement) {
-          addToast('error', 'ไม่พบ QR Code');
+          addToast('error', t.payment.noQRCode);
           setDownloading(false);
           setDownloadProgress(0);
           return;
@@ -390,7 +423,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
         const ctx = canvas.getContext('2d');
         
         if (!ctx) {
-          addToast('error', 'ไม่สามารถสร้างรูปได้');
+          addToast('error', t.payment.cannotCreateImage);
           setDownloading(false);
           setDownloadProgress(0);
           return;
@@ -433,7 +466,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
           ctx.fillStyle = '#ffffff';
           ctx.font = 'bold 20px Arial, sans-serif';
           ctx.textAlign = 'center';
-          ctx.fillText(`฿${amount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}`, totalSize / 2, totalSize + 35);
+          ctx.fillText(`฿${amount.toLocaleString(lang === 'th' ? 'th-TH' : 'en-US', { minimumFractionDigits: 2 })}`, totalSize / 2, totalSize + 35);
           
           // Draw "PromptPay" text
           ctx.font = '12px Arial, sans-serif';
@@ -452,9 +485,9 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
               link.click();
               URL.revokeObjectURL(url);
               setDownloadProgress(100);
-              addToast('success', 'บันทึก QR Code แล้ว');
+              addToast('success', t.payment.savedQR);
             } else {
-              addToast('error', 'บันทึกไม่สำเร็จ');
+              addToast('error', t.payment.saveFailed);
             }
             setDownloading(false);
             setTimeout(() => setDownloadProgress(0), 500);
@@ -464,7 +497,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
         };
         
         img.onerror = () => {
-          addToast('error', 'โหลด QR ไม่สำเร็จ');
+          addToast('error', t.payment.loadQRFailed);
           setDownloading(false);
           setDownloadProgress(0);
           URL.revokeObjectURL(svgUrl);
@@ -472,7 +505,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
         
         img.src = svgUrl;
       } catch (error) {
-        addToast('error', 'บันทึกไม่สำเร็จ', 'ลองใหม่อีกครั้ง');
+        addToast('error', t.payment.saveFailed, t.payment.tryAgain);
         setDownloading(false);
         setDownloadProgress(0);
       }
@@ -481,7 +514,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
     
     // Legacy: download from qrUrl
     if (!qrUrl) {
-      addToast('warning', 'ยังไม่มี QR');
+      addToast('warning', t.payment.noQR);
       return;
     }
     try {
@@ -508,21 +541,21 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
           link.click();
           URL.revokeObjectURL(blobUrl);
           setDownloadProgress(100);
-          addToast('success', 'บันทึกคิวอาร์แล้ว');
+          addToast('success', t.payment.savedQRToast);
         } else {
-          addToast('error', 'บันทึกไม่สำเร็จ', 'ลองใหม่อีกครั้ง');
+          addToast('error', t.payment.saveFailed, t.payment.tryAgain);
         }
         setDownloading(false);
         setTimeout(() => setDownloadProgress(0), 500);
       };
       xhr.onerror = () => {
-        addToast('error', 'บันทึกไม่สำเร็จ', 'ลองใหม่อีกครั้ง');
+        addToast('error', t.payment.saveFailed, t.payment.tryAgain);
         setDownloading(false);
         setDownloadProgress(0);
       };
       xhr.send();
     } catch (error) {
-      addToast('error', 'บันทึกไม่สำเร็จ', 'ลองใหม่อีกครั้ง');
+      addToast('error', t.payment.saveFailed, t.payment.tryAgain);
       setDownloading(false);
       setDownloadProgress(0);
     }
@@ -530,10 +563,10 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
 
   const copyAmount = () => {
     navigator.clipboard.writeText(amount.toString());
-    addToast('success', 'คัดลอกยอดเงินแล้ว');
+    addToast('success', t.payment.copiedAmount);
   };
 
-  const steps = ['สแกน QR', 'แนบสลิป', 'ยืนยัน'];
+  const steps = [t.payment.scanQR, t.payment.attachSlip, t.payment.confirmPay];
 
   return (
     <Drawer
@@ -548,6 +581,8 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
           borderTopRightRadius: { xs: 20, sm: 24 },
           bgcolor: 'var(--background)',
           overflow: 'hidden',
+          transform: swipeDragOffset > 0 ? `translateY(${swipeDragOffset}px) !important` : undefined,
+          transition: isSwipeDragging ? 'none !important' : 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1) !important',
         },
       }}
     >
@@ -564,8 +599,15 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
         top: 0,
         zIndex: 10,
       }}>
-        {/* Drag Handle */}
-        <Box sx={{ width: 36, height: 4, bgcolor: 'var(--glass-bg)', borderRadius: 3, mx: 'auto', mb: 1.5 }} />
+        {/* Drag Handle - Swipe to dismiss */}
+        <Box
+          onTouchStart={handleSwipeStart}
+          onTouchMove={handleSwipeMove}
+          onTouchEnd={handleSwipeEnd}
+          sx={{ width: '100%', display: 'flex', justifyContent: 'center', py: 0.5, cursor: 'grab', touchAction: 'none' }}
+        >
+          <Box sx={{ width: isSwipeDragging ? 48 : 36, height: 4, bgcolor: isSwipeDragging ? 'var(--text-muted)' : 'var(--glass-bg)', borderRadius: 3, transition: 'all 0.2s ease' }} />
+        </Box>
         
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -582,7 +624,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
             </Box>
             <Box>
               <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--foreground)', lineHeight: 1.2 }}>
-                ชำระเงิน
+                {t.payment.title}
               </Typography>
               <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
                 #{orderRef}
@@ -719,10 +761,10 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
               </Box>
               
               <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, mb: 1 }}>
-                ชำระเงินสำเร็จแล้ว!
+                {t.payment.paymentSuccess}
               </Typography>
               <Typography sx={{ fontSize: '0.9rem', opacity: 0.9, mb: 2 }}>
-                คำสั่งซื้อนี้ได้รับการชำระเงินเรียบร้อยแล้ว
+                {t.payment.paymentSuccessDesc}
               </Typography>
               
               {/* Order Reference */}
@@ -736,7 +778,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                 bgcolor: 'var(--glass-bg)',
               }}>
                 <Typography sx={{ fontSize: '0.8rem', opacity: 0.9 }}>
-                  หมายเลขคำสั่งซื้อ:
+                  {t.payment.orderRef}
                 </Typography>
                 <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, fontFamily: 'monospace' }}>
                   {orderRef}
@@ -764,10 +806,10 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                 </Box>
                 <Box>
                   <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                    สถานะคำสั่งซื้อ
+                    {t.payment.orderStatus}
                   </Typography>
                   <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    อัปเดตล่าสุด
+                    {t.payment.lastUpdated}
                   </Typography>
                 </Box>
               </Box>
@@ -793,15 +835,15 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                 </Box>
                 <Box>
                   <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--success)' }}>
-                    {orderStatus === 'PAID' && 'ซื้อสำเร็จ - รอรับสินค้า'}
-                    {orderStatus === 'READY' && 'พร้อมรับสินค้า'}
-                    {orderStatus === 'SHIPPED' && 'จัดส่งแล้ว'}
-                    {orderStatus === 'COMPLETED' && 'สำเร็จ'}
-                    {orderStatus === 'VERIFYING' && 'กำลังตรวจสอบสลิป'}
-                    {!['PAID', 'READY', 'SHIPPED', 'COMPLETED', 'VERIFYING'].includes(orderStatus) && 'ดำเนินการแล้ว'}
+                    {orderStatus === 'PAID' && t.payment.paidWaiting}
+                    {orderStatus === 'READY' && t.payment.readyForPickup}
+                    {orderStatus === 'SHIPPED' && t.payment.shipped}
+                    {orderStatus === 'COMPLETED' && t.payment.completed}
+                    {orderStatus === 'VERIFYING' && t.payment.verifyingSlipStatus}
+                    {!['PAID', 'READY', 'SHIPPED', 'COMPLETED', 'VERIFYING'].includes(orderStatus) && t.payment.processed}
                   </Typography>
                   <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                    รอแอดมินเตรียมสินค้า
+                    {t.payment.waitingAdmin}
                   </Typography>
                 </Box>
               </Box>
@@ -816,7 +858,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
             }}>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Typography sx={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                  ยอดที่ชำระแล้ว
+                  {t.payment.amountPaid}
                 </Typography>
                 <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: '#34c759' }}>
                   ฿{amount.toLocaleString()}
@@ -842,7 +884,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                 },
               }}
             >
-              ปิด
+              {t.common.close}
             </Button>
           </Box>
         ) : (
@@ -879,7 +921,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
               }} />
               
               <Typography sx={{ fontSize: '0.85rem', opacity: 0.9, mb: 1, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'center' }}>
-                <CreditCard size={16} /> ยอดที่ต้องชำระ
+                <CreditCard size={16} /> {t.payment.amountToPay}
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5 }}>
                 <Typography sx={{ fontSize: '3rem', fontWeight: 900, letterSpacing: '-2px' }}>
@@ -911,11 +953,21 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                   <Typography sx={{ opacity: 0.9, textDecoration: 'line-through' }}>฿{baseAmount.toLocaleString()}</Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     <Sparkles size={12} />
-                    <Typography sx={{ color: 'var(--success)', fontWeight: 600 }}>ลด ฿{discountValue.toLocaleString()}</Typography>
+                    <Typography sx={{ color: 'var(--success)', fontWeight: 600 }}>{t.payment.discount} ฿{discountValue.toLocaleString()}</Typography>
                   </Box>
                 </Box>
               )}
             </Box>
+
+            {/* Payment Countdown Timer */}
+            {orderDate && !isPaid && (
+              <PaymentCountdown
+                orderDate={orderDate}
+                onExpired={() => {
+                  addToast('warning', t.payment.expiredPayment, t.payment.autoCancel);
+                }}
+              />
+            )}
 
             {/* Payment Disabled Alert */}
             {!paymentEnabled && (
@@ -946,14 +998,14 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                     color: 'var(--error)', 
                     mb: 0.5 
                   }}>
-                    ระบบชำระเงินปิดชั่วคราว
+                    {t.payment.paymentDisabled}
                   </Typography>
                   <Typography sx={{ 
                     fontSize: '0.85rem', 
                     color: 'var(--error)',
                     lineHeight: 1.6,
                   }}>
-                    {paymentDisabledMessage || 'ขณะนี้ระบบชำระเงินปิดให้บริการชั่วคราว กรุณารอแอดมินเปิดระบบก่อนทำการชำระเงิน'}
+                    {paymentDisabledMessage || t.payment.waitAdminOpenPayment}
                   </Typography>
                 </Box>
               </Box>
@@ -995,10 +1047,10 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                     </Box>
                     <Box>
                       <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                        รายการสินค้า
+                        {t.payment.cartItems}
                       </Typography>
                       <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        {cartItems.length} รายการ • {cartItems.reduce((sum, item) => sum + item.quantity, 0)} ชิ้น
+                        {cartItems.length} {t.common.items} • {cartItems.reduce((sum, item) => sum + item.quantity, 0)} {t.common.pieces}
                       </Typography>
                     </Box>
                   </Box>
@@ -1011,7 +1063,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                       border: '1px solid rgba(0,113,227,0.2)',
                     }}>
                       <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--secondary)' }}>
-                        {showCartDetails ? 'ซ่อน' : 'ดูรายละเอียด'}
+                        {showCartDetails ? t.payment.hideDetail : t.payment.showDetail}
                       </Typography>
                     </Box>
                   </Box>
@@ -1038,7 +1090,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                             </Typography>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
                               <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                ไซส์ {item.size}
+                                {t.payment.sizeLabel} {item.size}
                               </Typography>
                               <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>•</Typography>
                               <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
@@ -1084,7 +1136,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                               }}>
                                 <Hash size={12} style={{ color: '#ffd60a' }} />
                                 <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#ffd60a' }}>
-                                  เบอร์ {item.customNumber}
+                                  {t.payment.numberLabel} {item.customNumber}
                                 </Typography>
                               </Box>
                             )}
@@ -1101,7 +1153,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                               }}>
                                 <Shirt size={12} style={{ color: '#64d2ff' }} />
                                 <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#64d2ff' }}>
-                                  แขนยาว
+                                  {t.common.longSleeve}
                                 </Typography>
                               </Box>
                             )}
@@ -1143,7 +1195,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                   </Box>
                   <Box>
                     <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                      สแกนเพื่อโอนเงิน
+                      {t.payment.scanToTransfer}
                     </Typography>
                     <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                       PromptPay / Mobile Banking
@@ -1158,7 +1210,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                   border: '1px solid rgba(16,185,129,0.2)',
                 }}>
                   <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#30d158' }}>
-                    ขั้นตอนที่ 1
+                    {t.payment.step1}
                   </Typography>
                 </Box>
               </Box>
@@ -1182,10 +1234,10 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                   }}>
                     <AlertCircle size={40} style={{ color: '#f87171' }} />
                     <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: '#fca5a5', textAlign: 'center', px: 2 }}>
-                      ระบบชำระเงินปิดอยู่
+                      {t.payment.paymentDisabledOverlay}
                     </Typography>
                     <Typography sx={{ fontSize: '0.75rem', color: '#fb7185', textAlign: 'center', px: 2 }}>
-                      รอแอดมินเปิดระบบก่อน
+                      {t.payment.waitAdminOpen}
                     </Typography>
                   </Box>
                 ) : qrPayload ? (
@@ -1202,7 +1254,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                     {/* PromptPay Header */}
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
                       <Typography sx={{ color: '#fff', fontWeight: 700, letterSpacing: 1, textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
-                        พร้อมเพย์
+                        {t.payment.promptPay}
                       </Typography>
                       <Box component="span" sx={{ bgcolor: '#fff', color: '#1a237e', px: 1, py: 0.25, borderRadius: 1, fontSize: '0.65rem', fontWeight: 700 }}>
                         PROMPTPAY
@@ -1223,26 +1275,26 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                     {/* Amount */}
                     <Box sx={{ mt: 1.5, textAlign: 'center' }}>
                       <Typography sx={{ color: 'var(--foreground)', fontSize: '0.75rem', mb: 0.25 }}>
-                        จำนวนเงิน
+                        {t.payment.amount}
                       </Typography>
                       <Typography sx={{ color: '#fff', fontWeight: 700, fontSize: '1.25rem', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
-                        ฿{amount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
+                        ฿{amount.toLocaleString(lang === 'th' ? 'th-TH' : 'en-US', { minimumFractionDigits: 2 })}
                       </Typography>
                     </Box>
                     {/* Account Name */}
                     <Box sx={{ mt: 1, textAlign: 'center', bgcolor: 'var(--glass-bg)', borderRadius: 1.5, px: 2, py: 0.75 }}>
                       <Typography sx={{ color: 'var(--foreground)', fontSize: '0.65rem' }}>
-                        ชื่อบัญชี
+                        {t.payment.accountName}
                       </Typography>
                       <Typography sx={{ color: '#fff', fontWeight: 600, fontSize: '0.8rem' }}>
-                        นายวีรชาติ แก้วขำ
+                        {t.payment.accountHolderName}
                       </Typography>
                       <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.6rem' }}>
-                        (เลขานุการชุมนุมคอมพิวเตอร์)
+                        {t.payment.secretaryRole}
                       </Typography>
                     </Box>
                     <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.65rem', mt: 1, textAlign: 'center' }}>
-                      สแกน QR Code ด้วยแอปธนาคาร
+                      {t.payment.scanInstruction}
                     </Typography>
                   </Box>
                 ) : qrUrl ? (
@@ -1297,7 +1349,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                     '&:disabled': { opacity: 0.5 },
                   }}
                 >
-                  {downloading ? `บันทึก... ${downloadProgress}%` : 'บันทึก QR ลงเครื่อง'}
+                  {downloading ? `${t.payment.savingQR} ${downloadProgress}%` : t.payment.saveQR}
                 </Button>
                 {downloading && (
                   <LinearProgress 
@@ -1347,10 +1399,10 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                   </Box>
                   <Box>
                     <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                      {hasSlip ? 'แนบสลิปแล้ว' : 'แนบสลิปโอนเงิน'}
+                      {hasSlip ? t.payment.slipAttached : t.payment.attachSlipBtn}
                     </Typography>
                     <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                      {hasSlip ? 'พร้อมยืนยันการชำระ' : 'อัปโหลดหลักฐานการโอน'}
+                      {hasSlip ? t.payment.readyToConfirm : t.payment.uploadSlipInstruction}
                     </Typography>
                   </Box>
                 </Box>
@@ -1362,7 +1414,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                   border: `1px solid ${hasSlip ? 'rgba(16,185,129,0.3)' : 'rgba(6,182,212,0.2)'}`,
                 }}>
                   <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: hasSlip ? '#30d158' : '#64d2ff' }}>
-                    ขั้นตอนที่ 2
+                    {t.payment.step2}
                   </Typography>
                 </Box>
               </Box>
@@ -1390,10 +1442,10 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                       <AlertCircle size={28} style={{ color: '#f87171' }} />
                     </Box>
                     <Typography sx={{ color: '#fca5a5', fontWeight: 600, mb: 0.5, fontSize: '1rem' }}>
-                      ระบบชำระเงินปิดอยู่
+                      {t.payment.paymentDisabledOverlay}
                     </Typography>
                     <Typography sx={{ color: '#fb7185', fontSize: '0.8rem' }}>
-                      รอแอดมินเปิดระบบก่อนทำการชำระเงิน
+                      {t.payment.waitAdminOpenPayment}
                     </Typography>
                   </Box>
                 ) : !previewUrl ? (
@@ -1436,10 +1488,10 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                       <Upload size={28} style={{ color: '#64d2ff' }} />
                     </Box>
                     <Typography sx={{ color: 'var(--foreground)', fontWeight: 600, mb: 0.5, fontSize: '1rem' }}>
-                      คลิกหรือลากไฟล์มาวาง
+                      {t.payment.clickOrDrag}
                     </Typography>
                     <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                      รูปสลิปที่คมชัด เห็นยอดและเวลา
+                      {t.payment.slipHint}
                     </Typography>
                     <Box sx={{ 
                       display: 'flex', 
@@ -1451,7 +1503,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                       fontSize: '0.75rem',
                     }}>
                       <Smartphone size={14} />
-                      <Typography sx={{ fontSize: 'inherit' }}>PNG, JPG ไม่เกิน 5MB</Typography>
+                      <Typography sx={{ fontSize: 'inherit' }}>{t.payment.fileHint}</Typography>
                     </Box>
                   </Box>
                 ) : (
@@ -1489,7 +1541,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                       }}>
                         <CheckCircle2 size={18} />
                         <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'white' }}>
-                          พร้อมส่งตรวจสอบ
+                          {t.payment.readyToSubmit}
                         </Typography>
                       </Box>
                     </Box>
@@ -1510,7 +1562,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                         '&:hover': { bgcolor: 'rgba(245,158,11,0.2)' },
                       }}
                     >
-                      เปลี่ยนสลิป
+                      {t.payment.changeSlip}
                     </Button>
                   </Box>
                 )}
@@ -1538,7 +1590,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
             }}>
               <Clock3 size={18} style={{ color: '#ffd60a', flexShrink: 0 }} />
               <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                อัปโหลดสลิปภายใน 15 นาที • ระบบตรวจอัตโนมัติ
+                {t.payment.uploadSlipFooter}
               </Typography>
             </Box>
           </Box>
@@ -1574,7 +1626,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                 },
               }}
             >
-              ปิดหน้าต่าง
+              {t.payment.closeWindow}
             </Button>
           ) : !paymentEnabled ? (
             /* Payment Disabled - Show Disabled Button */
@@ -1596,7 +1648,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                 },
               }}
             >
-              ระบบชำระเงินปิดอยู่
+              {t.payment.paymentDisabledOverlay}
             </Button>
           ) : (
             /* Normal Payment Button */
@@ -1630,12 +1682,12 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                 },
               }}
             >
-              {verifying ? 'กำลังตรวจสอบสลิป...' : hasSlip ? 'ยืนยันการชำระเงิน' : 'แนบสลิปเพื่อชำระเงิน'}
+              {verifying ? t.payment.verifyingSlip : hasSlip ? t.payment.confirmPayment : t.payment.attachFirst}
             </Button>
           )}
           {!hasSlip && paymentEnabled && !isPaid && (
             <Typography sx={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)', mt: 1.5 }}>
-              กรุณาแนบสลิปก่อนกดยืนยัน
+              {t.payment.attachBeforeConfirm}
             </Typography>
           )}
 
@@ -1657,7 +1709,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
               '&:hover': { bgcolor: 'rgba(100,116,139,0.25)' },
             }}
           >
-            ปิด
+            {t.common.close}
           </Button>
         </Box>
       </Box>

@@ -106,6 +106,8 @@ export async function GET(req: NextRequest) {
         qrUrl,     // Legacy URL fallback
         cart: cartItems,
         status: order.status || 'PENDING',
+        // วันที่สั่งซื้อ สำหรับ countdown timer
+        orderDate: order.date || order.createdAt || null,
         // ไม่ส่ง slip data ให้ frontend - เฉพาะ admin เท่านั้นที่เห็น slip
         hasSlip: !!(order.slip && order.slip.base64),
         // สถานะระบบชำระเงิน

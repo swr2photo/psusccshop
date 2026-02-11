@@ -5,6 +5,7 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { TURNSTILE_SITE_KEY } from '@/lib/cloudflare';
+import { useTranslation } from '@/hooks/useTranslation';
 
 declare global {
   interface Window {
@@ -104,6 +105,7 @@ export default function TurnstileWidget({
   const [isReady, setIsReady] = useState(false);
   const [devMode, setDevMode] = useState(false);
   const initializedRef = useRef(false);
+  const { t } = useTranslation();
   
   // Store callbacks in refs to avoid re-renders
   const onSuccessRef = useRef(onSuccess);
@@ -248,7 +250,7 @@ export default function TurnstileWidget({
       {!isReady && (
         <div className="flex items-center gap-2 text-sm text-slate-400 py-2">
           <div className="animate-spin w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full" />
-          <span>กำลังโหลดระบบป้องกัน...</span>
+          <span>{t.misc.loadingProtection}</span>
         </div>
       )}
     </div>
@@ -259,6 +261,7 @@ export default function TurnstileWidget({
  * Hook to use Turnstile in forms
  */
 export function useTurnstile() {
+  const { t } = useTranslation();
   const [token, setToken] = useState<string | null>(null);
   const [isVerified, setIsVerified] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -275,9 +278,9 @@ export function useTurnstile() {
   }, []);
 
   const handleError = useCallback((err: any) => {
-    setError('การยืนยันล้มเหลว กรุณาลองใหม่');
+    setError(t.misc.verifyFailed);
     setIsVerified(false);
-  }, []);
+  }, [t.misc.verifyFailed]);
 
   const reset = useCallback(() => {
     setToken(null);

@@ -25,6 +25,7 @@ export interface PaymentOption {
   gateway?: PaymentGateway;
   name: string;
   nameThai: string;
+  descriptionThai?: string;
   description?: string;
   /** Is this option enabled */
   enabled: boolean;
@@ -268,6 +269,7 @@ export const DEFAULT_PAYMENT_CONFIG: PaymentConfig = {
       name: 'Bank Transfer / PromptPay',
       nameThai: 'โอนเงิน / พร้อมเพย์',
       description: 'Scan QR code and transfer',
+      descriptionThai: 'สแกน QR แล้วโอนเงิน',
       enabled: true,
       sortOrder: 1,
     },
@@ -298,6 +300,7 @@ export const DEFAULT_PAYMENT_CONFIG: PaymentConfig = {
       name: 'Cash on Delivery',
       nameThai: 'เก็บเงินปลายทาง',
       description: 'Pay when you receive',
+      descriptionThai: 'จ่ายเงินเมื่อรับสินค้า',
       enabled: false,
       feeType: 'fixed',
       feeAmount: 30,

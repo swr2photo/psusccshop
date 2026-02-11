@@ -3,6 +3,7 @@
 import React from 'react';
 import { Box, Typography, keyframes } from '@mui/material';
 import Image from 'next/image';
+import { useTranslation } from '@/hooks/useTranslation';
 
 // Animations
 const pulse = keyframes`
@@ -44,7 +45,8 @@ interface LoadingScreenProps {
 }
 
 export default function LoadingScreen(props: LoadingScreenProps) {
-  const message = props.message ?? 'กำลังโหลด...';
+  const { t } = useTranslation();
+  const message = props.message ?? t.common.loading;
   const showLogo = props.showLogo ?? true;
   const variant = props.variant ?? 'fullscreen';
   const size = props.size ?? 'md';

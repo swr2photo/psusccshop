@@ -28,6 +28,8 @@ import {
   ArrowLeftRight,
 } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
+import LanguageToggle from './LanguageToggle';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface SidebarMenuProps {
   open: boolean;
@@ -47,6 +49,7 @@ export default function SidebarMenu(props: SidebarMenuProps) {
   const { data: session } = useSession();
   const [logoutConfirmOpen, setLogoutConfirmOpen] = React.useState(false);
   const [switchAccountOpen, setSwitchAccountOpen] = React.useState(false);
+  const { t } = useTranslation();
 
   return (
     <>
@@ -70,8 +73,9 @@ export default function SidebarMenu(props: SidebarMenuProps) {
     >
       <Box sx={{ p: 2 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>เมนู</Typography>
+          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>{t.nav.menu}</Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <LanguageToggle size="small" />
             <ThemeToggle size="small" />
             <IconButton onClick={onClose}>
               <X style={{ color: 'inherit' }} size={24} />
@@ -111,7 +115,7 @@ export default function SidebarMenu(props: SidebarMenuProps) {
               }}
               startIcon={<User size={20} />}
             >
-              ข้อมูลจัดส่งของฉัน
+              {t.nav.myShippingInfo}
             </Button>
             <Button
               fullWidth
@@ -134,7 +138,7 @@ export default function SidebarMenu(props: SidebarMenuProps) {
               }}
               startIcon={<History size={20} />}
             >
-              ประวัติคำสั่งซื้อ
+              {t.nav.orderHistory}
             </Button>
             <Button
               fullWidth
@@ -157,7 +161,7 @@ export default function SidebarMenu(props: SidebarMenuProps) {
               }}
               startIcon={<ArrowLeftRight size={20} />}
             >
-              สลับบัญชี
+              {t.nav.switchAccount}
             </Button>
             <Button
               fullWidth
@@ -177,7 +181,7 @@ export default function SidebarMenu(props: SidebarMenuProps) {
               }}
               startIcon={<LogOut size={20} />}
             >
-              ออกจากระบบ
+              {t.nav.logout}
             </Button>
           </>
         )}
@@ -202,7 +206,7 @@ export default function SidebarMenu(props: SidebarMenuProps) {
           }}
           startIcon={<Home size={20} />}
         >
-          หน้าแรก
+          {t.nav.home}
         </Button>
       </Box>
     </Drawer>
@@ -222,11 +226,11 @@ export default function SidebarMenu(props: SidebarMenuProps) {
     >
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, pb: 1 }}>
         <TriangleAlert size={22} color="#ff9f0a" />
-        ยืนยันการออกจากระบบ
+        {t.nav.confirmLogout}
       </DialogTitle>
       <DialogContent>
         <DialogContentText sx={{ color: 'var(--text-muted)' }}>
-          คุณต้องการออกจากระบบใช่หรือไม่?
+          {t.nav.logoutConfirmMessage}
         </DialogContentText>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2.5 }}>
@@ -234,7 +238,7 @@ export default function SidebarMenu(props: SidebarMenuProps) {
           onClick={() => setLogoutConfirmOpen(false)}
           sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 600 }}
         >
-          ยกเลิก
+          {t.common.cancel}
         </Button>
         <Button
           onClick={() => signOut()}
@@ -242,7 +246,7 @@ export default function SidebarMenu(props: SidebarMenuProps) {
           color="error"
           sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 600 }}
         >
-          ออกจากระบบ
+          {t.nav.logout}
         </Button>
       </DialogActions>
     </Dialog>
@@ -265,7 +269,7 @@ export default function SidebarMenu(props: SidebarMenuProps) {
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid', borderColor: 'divider' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <ArrowLeftRight size={20} />
-          สลับบัญชี
+          {t.nav.switchAccount}
         </Box>
         <IconButton onClick={() => setSwitchAccountOpen(false)} size="small">
           <X size={18} />
@@ -292,7 +296,7 @@ export default function SidebarMenu(props: SidebarMenuProps) {
         )}
 
         <Typography variant="body2" sx={{ color: 'var(--text-muted)', mt: 1 }}>
-          เลือกวิธีเข้าสู่ระบบด้วยบัญชีอื่น
+          {t.nav.selectLoginMethod}
         </Typography>
 
         <Button

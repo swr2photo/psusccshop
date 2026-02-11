@@ -15,6 +15,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import OptimizedImage from './OptimizedImage';
+import { useTranslation } from '@/hooks/useTranslation';
 
 // ==================== Types ====================
 
@@ -65,22 +66,22 @@ const getColor = (c: string) => EVENT_COLORS[c] || c || '#0071e3';
 const EVENT_TYPE_CONFIG: Record<string, { icon: React.ReactNode; label: string; gradient: string }> = {
   event: {
     icon: <PartyPopper size={14} />,
-    label: 'อีเวนท์',
+    label: 'event',
     gradient: 'linear-gradient(135deg, #bf5af2 0%, #5e5ce6 100%)',
   },
   promotion: {
     icon: <Sparkles size={14} />,
-    label: 'โปรโมชั่น',
+    label: 'promotion',
     gradient: 'linear-gradient(135deg, #ff9f0a 0%, #ff375f 100%)',
   },
   sale: {
     icon: <Tag size={14} />,
-    label: 'ลดราคา',
+    label: 'sale',
     gradient: 'linear-gradient(135deg, #ff453a 0%, #ff375f 100%)',
   },
   announcement: {
     icon: <Megaphone size={14} />,
-    label: 'ประกาศ',
+    label: 'announcement',
     gradient: 'linear-gradient(135deg, #0071e3 0%, #5e5ce6 100%)',
   },
 };
@@ -151,13 +152,14 @@ function CountdownUnit({ value, label }: { value: number; label: string }) {
 }
 
 function CountdownTimer({ targetDate }: { targetDate: string }) {
+  const { t } = useTranslation();
   const { timeLeft, isExpired } = useCountdown(targetDate);
 
   if (isExpired) {
     return (
       <Chip
         icon={<Zap size={12} />}
-        label="กำลังดำเนินการ"
+        label={t.eventBanner.inProgress}
         size="small"
         sx={{
           bgcolor: 'rgba(48,209,88,0.2)',
@@ -186,13 +188,13 @@ function CountdownTimer({ targetDate }: { targetDate: string }) {
       border: '1px solid rgba(255,255,255,0.1)',
     }}>
       <Clock size={12} color="rgba(255,255,255,0.7)" />
-      <CountdownUnit value={timeLeft.days} label="วัน" />
+      <CountdownUnit value={timeLeft.days} label={t.common.days} />
       <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontWeight: 700, fontSize: { xs: '0.8rem', sm: '1rem' }, mx: -0.3 }}>:</Typography>
-      <CountdownUnit value={timeLeft.hours} label="ชม." />
+      <CountdownUnit value={timeLeft.hours} label={t.common.hours} />
       <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontWeight: 700, fontSize: { xs: '0.8rem', sm: '1rem' }, mx: -0.3 }}>:</Typography>
-      <CountdownUnit value={timeLeft.minutes} label="นาที" />
+      <CountdownUnit value={timeLeft.minutes} label={t.common.minutes} />
       <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontWeight: 700, fontSize: { xs: '0.8rem', sm: '1rem' }, mx: -0.3 }}>:</Typography>
-      <CountdownUnit value={timeLeft.seconds} label="วินาที" />
+      <CountdownUnit value={timeLeft.seconds} label={t.common.seconds} />
     </Box>
   );
 }
@@ -200,6 +202,7 @@ function CountdownTimer({ targetDate }: { targetDate: string }) {
 // ==================== Main Component ====================
 
 export default function EventBanner({ events, onEventClick, compact = false }: EventBannerProps) {
+  const { t, lang } = useTranslation();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -252,6 +255,15 @@ export default function EventBanner({ events, onEventClick, compact = false }: E
   const color = getColor(currentEvent.color);
   const typeConfig = EVENT_TYPE_CONFIG[currentEvent.type] || EVENT_TYPE_CONFIG.announcement;
 
+  // Translated type labels
+  const typeLabelsMap: Record<string, string> = {
+    event: t.eventBanner.event,
+    promotion: t.eventBanner.promotion,
+    sale: t.eventBanner.sale,
+    announcement: t.eventBanner.announcement,
+  };
+  const translatedTypeLabel = typeLabelsMap[typeConfig.label] || typeConfig.label;
+
   // Has both image and text content?
   const hasImage = !!currentEvent.imageUrl;
   const now = Date.now();
@@ -292,7 +304,7 @@ export default function EventBanner({ events, onEventClick, compact = false }: E
           {/* Type badge */}
           <Chip
             icon={typeConfig.icon as React.ReactElement}
-            label={typeConfig.label}
+            label={translatedTypeLabel}
             size="small"
             sx={{
               background: typeConfig.gradient,
@@ -436,7 +448,7 @@ export default function EventBanner({ events, onEventClick, compact = false }: E
         <Box sx={{ position: 'absolute', top: { xs: 12, sm: 16 }, left: { xs: 12, sm: 16 } }}>
           <Chip
             icon={typeConfig.icon as React.ReactElement}
-            label={typeConfig.label}
+            label={translatedTypeLabel}
             size="small"
             sx={{
               background: typeConfig.gradient,
@@ -524,7 +536,7 @@ export default function EventBanner({ events, onEventClick, compact = false }: E
           {currentEvent.startDate && !hasCountdown && !hasEndCountdown && (
             <Chip
               icon={<Calendar size={12} />}
-              label={new Date(currentEvent.startDate).toLocaleDateString('th-TH', {
+              label={new Date(currentEvent.startDate).toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-US', {
                 day: 'numeric', month: 'short', year: 'numeric',
               })}
               size="small"

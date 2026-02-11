@@ -3,6 +3,7 @@
 import React from 'react';
 import { IconButton, Tooltip, Menu, MenuItem, ListItemIcon, ListItemText } from '@mui/material';
 import { useThemeStore, type ThemeMode } from '@/store/themeStore';
+import { useTranslation } from '@/hooks/useTranslation';
 
 // SVG icons (no import needed)
 const SunIcon = () => (
@@ -45,6 +46,7 @@ interface ThemeToggleProps {
  */
 export default function ThemeToggle({ compact = true, size = 'medium' }: ThemeToggleProps) {
   const { mode, resolvedMode, setMode } = useThemeStore();
+  const { t } = useTranslation();
   const [anchorEl, setAnchorEl] = React.useState<HTMLElement | null>(null);
   const open = Boolean(anchorEl);
 
@@ -62,7 +64,7 @@ export default function ThemeToggle({ compact = true, size = 'medium' }: ThemeTo
   };
 
   const CurrentIcon = resolvedMode === 'dark' ? MoonIcon : SunIcon;
-  const label = mode === 'system' ? 'ตามระบบ' : resolvedMode === 'dark' ? 'ธีมมืด' : 'ธีมสว่าง';
+  const label = mode === 'system' ? t.theme.auto : resolvedMode === 'dark' ? t.theme.darkTheme : t.theme.lightTheme;
 
   return (
     <>
@@ -70,7 +72,7 @@ export default function ThemeToggle({ compact = true, size = 'medium' }: ThemeTo
         <IconButton
           onClick={handleClick}
           size={size}
-          aria-label="เปลี่ยนธีม"
+          aria-label={t.theme.changeTheme}
           sx={{
             color: 'inherit',
             transition: 'all 0.2s ease',
@@ -108,7 +110,7 @@ export default function ThemeToggle({ compact = true, size = 'medium' }: ThemeTo
           <ListItemIcon sx={{ color: 'inherit', minWidth: 36 }}>
             <SunIcon />
           </ListItemIcon>
-          <ListItemText>สว่าง</ListItemText>
+          <ListItemText>{t.theme.light}</ListItemText>
         </MenuItem>
 
         <MenuItem
@@ -119,7 +121,7 @@ export default function ThemeToggle({ compact = true, size = 'medium' }: ThemeTo
           <ListItemIcon sx={{ color: 'inherit', minWidth: 36 }}>
             <MoonIcon />
           </ListItemIcon>
-          <ListItemText>มืด</ListItemText>
+          <ListItemText>{t.theme.dark}</ListItemText>
         </MenuItem>
 
         <MenuItem
@@ -130,7 +132,7 @@ export default function ThemeToggle({ compact = true, size = 'medium' }: ThemeTo
           <ListItemIcon sx={{ color: 'inherit', minWidth: 36 }}>
             <SystemIcon />
           </ListItemIcon>
-          <ListItemText>ตามระบบ</ListItemText>
+          <ListItemText>{t.theme.auto}</ListItemText>
         </MenuItem>
       </Menu>
     </>

@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   Box,
   Button,
@@ -23,6 +23,7 @@ import {
   X,
 } from 'lucide-react';
 import OptimizedImage from '@/components/OptimizedImage';
+import { useTranslation } from '@/hooks/useTranslation';
 import { 
   normalizeEngName, 
   normalizeDigits99,
@@ -75,6 +76,38 @@ export default function CartDrawer(props: CartDrawerProps) {
     onUpdateCartItem,
   } = props;
 
+  const { t } = useTranslation();
+
+  // Swipe-to-dismiss state
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const swipeStartY = useRef(0);
+
+  const handleSwipeStart = useCallback((e: React.TouchEvent) => {
+    swipeStartY.current = e.touches[0].clientY;
+    setIsDragging(true);
+  }, []);
+
+  const handleSwipeMove = useCallback((e: React.TouchEvent) => {
+    if (!isDragging) return;
+    const delta = e.touches[0].clientY - swipeStartY.current;
+    if (delta < 0) { setDragOffset(0); return; }
+    setDragOffset(delta > 80 ? 80 + (delta - 80) * 0.3 : delta);
+  }, [isDragging]);
+
+  const handleSwipeEnd = useCallback(() => {
+    if (!isDragging) return;
+    setIsDragging(false);
+    if (dragOffset >= 80) {
+      setDragOffset(window.innerHeight);
+      setTimeout(() => { onClose(); setDragOffset(0); }, 200);
+    } else {
+      setDragOffset(0);
+    }
+  }, [isDragging, dragOffset, onClose]);
+
+  React.useEffect(() => { if (!open) { setDragOffset(0); setIsDragging(false); } }, [open]);
+
   // Get enabled shipping options info
   const enabledShippingOptions = shippingConfig?.options?.filter(o => o.enabled) || [];
   const lowestShippingFee = enabledShippingOptions.length > 0
@@ -101,6 +134,8 @@ export default function CartDrawer(props: CartDrawerProps) {
             bgcolor: 'var(--background)',
             color: 'var(--foreground)',
             overflow: 'hidden',
+            transform: dragOffset > 0 ? `translateY(${dragOffset}px) !important` : undefined,
+            transition: isDragging ? 'none !important' : 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1) !important',
           },
         }}
       >
@@ -114,7 +149,15 @@ export default function CartDrawer(props: CartDrawerProps) {
           top: 0,
           zIndex: 10,
         }}>
-          <Box sx={{ width: 36, height: 4, bgcolor: 'var(--glass-bg)', borderRadius: 2, mx: 'auto', mb: 2 }} />
+          {/* Drag Handle - Swipe to dismiss */}
+          <Box
+            onTouchStart={handleSwipeStart}
+            onTouchMove={handleSwipeMove}
+            onTouchEnd={handleSwipeEnd}
+            sx={{ width: '100%', display: 'flex', justifyContent: 'center', py: 0.5, cursor: 'grab', touchAction: 'none' }}
+          >
+            <Box sx={{ width: isDragging ? 48 : 36, height: 4, bgcolor: isDragging ? 'var(--text-muted)' : 'var(--glass-bg)', borderRadius: 2, transition: 'all 0.2s ease' }} />
+          </Box>
           
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -131,10 +174,10 @@ export default function CartDrawer(props: CartDrawerProps) {
               </Box>
               <Box>
                 <Typography sx={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--foreground)' }}>
-                  ตะกร้าสินค้า
+                  {t.cart.title}
                 </Typography>
                 <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  {cart.length} รายการ · {cart.reduce((sum, item) => sum + item.quantity, 0)} ชิ้น
+                  {cart.length} {t.common.items} · {cart.reduce((sum, item) => sum + item.quantity, 0)} {t.common.pieces}
                 </Typography>
               </Box>
             </Box>
@@ -143,7 +186,7 @@ export default function CartDrawer(props: CartDrawerProps) {
                 <Button
                   size="small"
                   onClick={() => {
-                    if (confirm('ล้างตะกร้าทั้งหมด?')) {
+                    if (confirm(t.cart.clearAllConfirm)) {
                       onClearCart();
                     }
                   }}
@@ -154,7 +197,7 @@ export default function CartDrawer(props: CartDrawerProps) {
                     '&:hover': { bgcolor: 'rgba(239,68,68,0.1)' },
                   }}
                 >
-                  ล้างทั้งหมด
+                  {t.cart.clearAll}
                 </Button>
               )}
               <IconButton onClick={onClose} sx={{ color: 'var(--text-muted)', bgcolor: 'var(--glass-bg)', '&:hover': { bgcolor: 'var(--glass-bg)' } }}>
@@ -178,8 +221,8 @@ export default function CartDrawer(props: CartDrawerProps) {
               }}>
                 <ShoppingCart size={36} style={{ color: 'var(--text-muted)' }} />
               </Box>
-              <Typography sx={{ color: 'var(--text-muted)', fontSize: '1rem', fontWeight: 600 }}>ตะกร้าว่างเปล่า</Typography>
-              <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>เลือกสินค้าที่ต้องการแล้วเพิ่มลงตะกร้า</Typography>
+              <Typography sx={{ color: 'var(--text-muted)', fontSize: '1rem', fontWeight: 600 }}>{t.cart.empty}</Typography>
+              <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{t.cart.emptyDesc}</Typography>
               <Button
                 onClick={onGoHome}
                 sx={{
@@ -193,7 +236,7 @@ export default function CartDrawer(props: CartDrawerProps) {
                   textTransform: 'none',
                 }}
               >
-                เลือกซื้อสินค้า
+                {t.cart.shopNow}
               </Button>
             </Box>
           ) : (
@@ -244,7 +287,7 @@ export default function CartDrawer(props: CartDrawerProps) {
                           </Box>
                           {item.options?.isLongSleeve && (
                             <Box sx={{ px: 1, py: 0.2, borderRadius: '6px', bgcolor: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)' }}>
-                              <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--warning)' }}>แขนยาว</Typography>
+                              <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--warning)' }}>{t.common.longSleeve}</Typography>
                             </Box>
                           )}
                           {item.options?.customName && (
@@ -353,13 +396,13 @@ export default function CartDrawer(props: CartDrawerProps) {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                   <Truck size={16} style={{ color: '#fb923c' }} />
                   <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#fb923c' }}>
-                    ค่าจัดส่ง
+                    {t.cart.shippingFee}
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
                   {lowestShippingFee !== null && lowestShippingFee > 0 && (
                     <Typography sx={{ fontSize: '0.75rem', color: '#fb923c' }}>
-                      เริ่มต้น ฿{lowestShippingFee.toLocaleString()}
+                      {t.cart.shippingStart} ฿{lowestShippingFee.toLocaleString()}
                     </Typography>
                   )}
                   {hasFreeShipping ? (
@@ -371,12 +414,12 @@ export default function CartDrawer(props: CartDrawerProps) {
                       border: '1px solid rgba(34,197,94,0.3)' 
                     }}>
                       <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--success)' }}>
-                        ส่งฟรี!
+                        {t.cart.freeShipping}
                       </Typography>
                     </Box>
                   ) : remainingForFreeShipping && remainingForFreeShipping > 0 ? (
                     <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                      อีก ฿{remainingForFreeShipping.toLocaleString()} ส่งฟรี
+                      {t.cart.moreForFree} ฿{remainingForFreeShipping.toLocaleString()} {t.cart.moreForFreeSuffix}
                     </Typography>
                   ) : null}
                 </Box>
@@ -392,20 +435,20 @@ export default function CartDrawer(props: CartDrawerProps) {
             }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Box>
-                  <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', mb: 0.3 }}>ยอดรวมสินค้า</Typography>
+                  <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', mb: 0.3 }}>{t.cart.subtotal}</Typography>
                   <Typography sx={{ fontSize: '1.6rem', fontWeight: 900, color: 'var(--success)' }}>
                     ฿{getTotalPrice().toLocaleString()}
                   </Typography>
                   {!hasFreeShipping && lowestShippingFee !== null && lowestShippingFee > 0 && (
                     <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                      + ค่าส่ง (คำนวณตอนยืนยัน)
+                      {t.cart.shippingCalcNote}
                     </Typography>
                   )}
                 </Box>
                 <Box sx={{ textAlign: 'right' }}>
-                  <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{cart.length} รายการ</Typography>
+                  <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{cart.length} {t.common.items}</Typography>
                   <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                    {cart.reduce((sum, item) => sum + item.quantity, 0)} ชิ้น
+                    {cart.reduce((sum, item) => sum + item.quantity, 0)} {t.common.pieces}
                   </Typography>
                 </Box>
               </Box>
@@ -437,7 +480,7 @@ export default function CartDrawer(props: CartDrawerProps) {
                 },
               }}
             >
-              {isShopOpen ? 'ยืนยันและดำเนินการสั่งซื้อ' : 'ร้านค้าปิดชั่วคราว'}
+              {isShopOpen ? t.cart.checkout : t.cart.shopClosed}
             </Button>
 
             <Button
@@ -457,7 +500,7 @@ export default function CartDrawer(props: CartDrawerProps) {
                 '&:hover': { bgcolor: 'rgba(100,116,139,0.25)' },
               }}
             >
-              ปิด
+              {t.common.close}
             </Button>
           </Box>
         )}
@@ -486,7 +529,7 @@ export default function CartDrawer(props: CartDrawerProps) {
                 '&:hover': { bgcolor: 'rgba(100,116,139,0.25)' },
               }}
             >
-              ปิด
+              {t.common.close}
             </Button>
           </Box>
         )}
@@ -531,7 +574,7 @@ export default function CartDrawer(props: CartDrawerProps) {
               }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                   <Edit size={20} color="#0071e3" />
-                  <Typography sx={{ fontWeight: 700 }}>แก้ไขสินค้า</Typography>
+                  <Typography sx={{ fontWeight: 700 }}>{t.cart.editItem}</Typography>
                 </Box>
               </DialogTitle>
               <DialogContent sx={{ pt: 3 }}>
@@ -539,7 +582,7 @@ export default function CartDrawer(props: CartDrawerProps) {
                   {editingCartItem.productName}
                 </Typography>
 
-                <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', mb: 1 }}>ขนาด</Typography>
+                <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', mb: 1 }}>{t.cart.size}</Typography>
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}>
                   {displaySizes.map((size) => {
                     const basePrice = product?.sizePricing?.[size] ?? product?.basePrice ?? editingCartItem.unitPrice;
@@ -576,7 +619,7 @@ export default function CartDrawer(props: CartDrawerProps) {
 
                 {product?.options?.hasCustomName && (
                   <TextField
-                    label="ชื่อติดเสื้อ"
+                    label={t.cart.customName}
                     fullWidth
                     value={editingCartItem.options?.customName || ''}
                     onChange={(e) => onSetEditingCartItem({
@@ -595,7 +638,7 @@ export default function CartDrawer(props: CartDrawerProps) {
 
                 {product?.options?.hasCustomNumber && (
                   <TextField
-                    label="หมายเลขเสื้อ"
+                    label={t.cart.customNumber}
                     fullWidth
                     value={editingCartItem.options?.customNumber || ''}
                     onChange={(e) => onSetEditingCartItem({
@@ -636,12 +679,12 @@ export default function CartDrawer(props: CartDrawerProps) {
                       justifyContent: 'space-between',
                     }}
                   >
-                    <Typography sx={{ color: 'var(--foreground)', fontWeight: 600 }}>แขนยาว (+฿{product?.options?.longSleevePrice ?? 50})</Typography>
+                    <Typography sx={{ color: 'var(--foreground)', fontWeight: 600 }}>{t.common.longSleeve} (+฿{product?.options?.longSleevePrice ?? 50})</Typography>
                     <Switch checked={editingCartItem.options?.isLongSleeve || false} color="warning" sx={{ pointerEvents: 'none' }} />
                   </Box>
                 )}
 
-                <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', mb: 1 }}>จำนวน</Typography>
+                <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', mb: 1 }}>{t.cart.quantity}</Typography>
                 <Box sx={{
                   display: 'flex',
                   alignItems: 'center',
@@ -669,7 +712,7 @@ export default function CartDrawer(props: CartDrawerProps) {
               </DialogContent>
               <DialogActions sx={{ p: 3, borderTop: '1px solid var(--glass-border)' }}>
                 <Button onClick={() => onSetEditingCartItem(null)} sx={{ color: 'var(--text-muted)' }}>
-                  ยกเลิก
+                  {t.common.cancel}
                 </Button>
                 <Button
                   variant="contained"
@@ -681,7 +724,7 @@ export default function CartDrawer(props: CartDrawerProps) {
                     px: 3,
                   }}
                 >
-                  บันทึกการแก้ไข
+                  {t.cart.saveEdit}
                 </Button>
               </DialogActions>
             </>

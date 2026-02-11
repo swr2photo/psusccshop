@@ -21,6 +21,25 @@ export const STATUS_LABELS: Record<string, string> = {
   REFUND_REQUESTED: 'ขอคืนเงิน',
 };
 
+export const STATUS_LABELS_EN: Record<string, string> = {
+  PENDING: 'Pending',
+  PAID: 'Paid',
+  READY: 'Ready for Pickup',
+  SHIPPED: 'Shipped',
+  COMPLETED: 'Completed',
+  CANCELLED: 'Cancelled',
+  WAITING_PAYMENT: 'Awaiting Payment',
+  AWAITING_PAYMENT: 'Awaiting Payment',
+  UNPAID: 'Unpaid',
+  DRAFT: 'Unpaid',
+  VERIFYING: 'Verifying Slip',
+  WAITING_SLIP: 'Verifying Slip',
+  REJECTED: 'Slip Rejected',
+  FAILED: 'Slip Rejected',
+  REFUNDED: 'Refunded',
+  REFUND_REQUESTED: 'Refund Requested',
+};
+
 export const STATUS_COLORS: Record<string, string> = {
   PENDING: '#f59e0b',
   PAID: '#10b981',
@@ -56,7 +75,11 @@ export const getStatusCategory = (status: string): 'WAITING_PAYMENT' | 'COMPLETE
   return 'OTHER';
 };
 
-export const getStatusLabel = (status: string): string => STATUS_LABELS[normalizeStatus(status)] || status;
+export const getStatusLabel = (status: string, lang?: 'th' | 'en'): string => {
+  const key = normalizeStatus(status);
+  if (lang === 'en') return STATUS_LABELS_EN[key] || STATUS_LABELS[key] || status;
+  return STATUS_LABELS[key] || status;
+};
 export const getStatusColor = (status: string): string => STATUS_COLORS[normalizeStatus(status)] || '#475569';
 
 // ==================== TYPE LABELS ====================
@@ -82,6 +105,28 @@ export const TYPE_LABELS: Record<string, string> = {
   CAMP_REGISTRATION: 'ค่าสมัครค่าย',
   EVENT_TICKET: 'ตั๋วเข้างาน',
   CUSTOM: 'กำหนดเอง',
+};
+
+export const TYPE_LABELS_EN: Record<string, string> = {
+  CREW: 'Crew Neck',
+  HOODIE: 'Hoodie',
+  SHIRT: 'Shirt',
+  TSHIRT: 'T-Shirt',
+  POLO: 'Polo',
+  JACKET: 'Jacket',
+  CAP: 'Cap',
+  ACCESSORY: 'Accessory',
+  OTHER: 'Other',
+  JERSEY: 'Jersey',
+  STICKER: 'Sticker',
+  KEYCHAIN: 'Keychain',
+  MUG: 'Mug',
+  BADGE: 'Badge/Pin',
+  POSTER: 'Poster',
+  NOTEBOOK: 'Notebook',
+  CAMP_REGISTRATION: 'Camp Registration',
+  EVENT_TICKET: 'Event Ticket',
+  CUSTOM: 'Custom',
 };
 
 // ==================== CATEGORY HELPERS ====================

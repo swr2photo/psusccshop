@@ -5,8 +5,10 @@ import { X, Cookie, Shield, Check, ChevronDown, ChevronUp, Settings2 } from 'luc
 import { Box, Typography, Button, IconButton, Collapse, Switch, Slide } from '@mui/material';
 import { useNotification, COOKIE_CATEGORIES, CookieCategory } from './NotificationContext';
 import Link from 'next/link';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export default function CookieConsentBanner() {
+  const { t } = useTranslation();
   const { showConsentBanner, acceptAll, acceptEssential, updateConsent } = useNotification();
   const [showDetails, setShowDetails] = useState(false);
   const [customConsent, setCustomConsent] = useState({
@@ -88,7 +90,7 @@ export default function CookieConsentBanner() {
                   mb: 0.5,
                 }}
               >
-                เราใช้คุกกี้
+                {t.cookie.title}
               </Typography>
               <Typography
                 sx={{
@@ -97,7 +99,7 @@ export default function CookieConsentBanner() {
                   lineHeight: 1.5,
                 }}
               >
-                เพื่อมอบประสบการณ์ที่ดีที่สุดในการใช้งาน เราจะเก็บข้อมูลการใช้งานและตะกร้าสินค้าของคุณ
+                {t.cookie.description}
               </Typography>
             </Box>
           </Box>
@@ -122,7 +124,7 @@ export default function CookieConsentBanner() {
                 },
               }}
             >
-              ตั้งค่าคุกกี้
+              {t.cookie.settings}
             </Button>
           </Box>
 
@@ -189,7 +191,7 @@ export default function CookieConsentBanner() {
                                   color: '#30d158',
                                 }}
                               >
-                                จำเป็น
+                                {t.cookie.essential}
                               </Typography>
                             </Box>
                           )}
@@ -265,7 +267,7 @@ export default function CookieConsentBanner() {
                     },
                   }}
                 >
-                  เฉพาะที่จำเป็น
+                  {t.cookie.essentialOnly}
                 </Button>
                 <Button
                   fullWidth
@@ -285,7 +287,7 @@ export default function CookieConsentBanner() {
                     },
                   }}
                 >
-                  บันทึกการตั้งค่า
+                  {t.cookie.saveSettings}
                 </Button>
               </>
             ) : (
@@ -307,7 +309,7 @@ export default function CookieConsentBanner() {
                     },
                   }}
                 >
-                  ปฏิเสธ
+                  {t.cookie.reject}
                 </Button>
                 <Button
                   fullWidth
@@ -327,7 +329,7 @@ export default function CookieConsentBanner() {
                     },
                   }}
                 >
-                  ยอมรับทั้งหมด
+                  {t.cookie.acceptAll}
                 </Button>
               </>
             )}
@@ -348,7 +350,7 @@ export default function CookieConsentBanner() {
                 color: '#86868b',
               }}
             >
-              อ่านเพิ่มเติม:{' '}
+              {t.cookie.readMore}{' '}
               <Link
                 href="/privacy"
                 style={{
@@ -356,7 +358,7 @@ export default function CookieConsentBanner() {
                   textDecoration: 'none',
                 }}
               >
-                นโยบายความเป็นส่วนตัว
+                {t.cookie.privacyPolicy}
               </Link>
             </Typography>
           </Box>

@@ -2,6 +2,7 @@
 
 import { QRCodeSVG } from 'qrcode.react';
 import { Box, Typography, Paper } from '@mui/material';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface PromptPayQRProps {
   payload: string;
@@ -14,10 +15,12 @@ interface PromptPayQRProps {
  * Generates beautiful QR code for PromptPay payments
  */
 export default function PromptPayQR({ payload, amount, size = 256 }: PromptPayQRProps) {
+  const { t, lang } = useTranslation();
+
   if (!payload) {
     return (
       <Box sx={{ textAlign: 'center', p: 2 }}>
-        <Typography color="error">ไม่สามารถสร้าง QR Code ได้</Typography>
+        <Typography color="error">{t.misc.cannotCreateQR}</Typography>
       </Box>
     );
   }
@@ -47,7 +50,7 @@ export default function PromptPayQR({ payload, amount, size = 256 }: PromptPayQR
             textShadow: '0 1px 2px rgba(0,0,0,0.3)',
           }}
         >
-          พร้อมเพย์
+          {t.payment.promptPay}
         </Typography>
         <Box
           component="span"
@@ -99,7 +102,7 @@ export default function PromptPayQR({ payload, amount, size = 256 }: PromptPayQR
           variant="body2"
           sx={{ color: 'var(--foreground)', mb: 0.5 }}
         >
-          จำนวนเงิน
+          {t.payment.amount}
         </Typography>
         <Typography
           variant="h5"
@@ -109,7 +112,7 @@ export default function PromptPayQR({ payload, amount, size = 256 }: PromptPayQR
             textShadow: '0 1px 2px rgba(0,0,0,0.3)',
           }}
         >
-          ฿{amount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
+          ฿{amount.toLocaleString(lang === 'th' ? 'th-TH' : 'en-US', { minimumFractionDigits: 2 })}
         </Typography>
       </Box>
 
@@ -123,9 +126,9 @@ export default function PromptPayQR({ payload, amount, size = 256 }: PromptPayQR
           lineHeight: 1.4,
         }}
       >
-        สแกน QR Code ด้วยแอปธนาคาร
+        {t.payment.scanInstruction}
         <br />
-        เพื่อชำระเงิน
+        {t.misc.payToComplete}
       </Typography>
     </Paper>
   );

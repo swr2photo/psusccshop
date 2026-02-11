@@ -15,7 +15,9 @@ export interface ShippingOption {
   id: string;
   provider: ShippingProvider;
   name: string;
+  nameEn?: string;
   description?: string;
+  descriptionEn?: string;
   /** Base shipping fee */
   baseFee: number;
   /** Additional fee per item */
@@ -256,7 +258,9 @@ export const DEFAULT_SHIPPING_CONFIG: ShippingConfig = {
       id: 'pickup',
       provider: 'pickup',
       name: 'รับหน้าร้าน',
+      nameEn: 'Pickup',
       description: 'รับสินค้าที่ชุมนุมคอมพิวเตอร์',
+      descriptionEn: 'Pick up at Computer Club',
       baseFee: 0,
       enabled: true,
     },
@@ -264,7 +268,9 @@ export const DEFAULT_SHIPPING_CONFIG: ShippingConfig = {
       id: 'thailand_post_ems',
       provider: 'thailand_post',
       name: 'EMS ไปรษณีย์ไทย',
+      nameEn: 'EMS Thailand Post',
       description: '1-3 วันทำการ',
+      descriptionEn: '1-3 business days',
       baseFee: 50,
       estimatedDays: { min: 1, max: 3 },
       enabled: true,
@@ -275,7 +281,9 @@ export const DEFAULT_SHIPPING_CONFIG: ShippingConfig = {
       id: 'thailand_post_reg',
       provider: 'thailand_post',
       name: 'ลงทะเบียน ไปรษณีย์ไทย',
+      nameEn: 'Registered Mail Thailand Post',
       description: '3-7 วันทำการ',
+      descriptionEn: '3-7 business days',
       baseFee: 30,
       estimatedDays: { min: 3, max: 7 },
       enabled: true,
@@ -286,7 +294,9 @@ export const DEFAULT_SHIPPING_CONFIG: ShippingConfig = {
       id: 'kerry',
       provider: 'kerry',
       name: 'Kerry Express',
+      nameEn: 'Kerry Express',
       description: '1-2 วันทำการ',
+      descriptionEn: '1-2 business days',
       baseFee: 60,
       estimatedDays: { min: 1, max: 2 },
       enabled: false,
@@ -297,7 +307,9 @@ export const DEFAULT_SHIPPING_CONFIG: ShippingConfig = {
       id: 'jandt',
       provider: 'jandt',
       name: 'J&T Express',
+      nameEn: 'J&T Express',
       description: '2-4 วันทำการ',
+      descriptionEn: '2-4 business days',
       baseFee: 45,
       estimatedDays: { min: 2, max: 4 },
       enabled: false,
@@ -308,7 +320,9 @@ export const DEFAULT_SHIPPING_CONFIG: ShippingConfig = {
       id: 'flash',
       provider: 'flash',
       name: 'Flash Express',
+      nameEn: 'Flash Express',
       description: '1-3 วันทำการ',
+      descriptionEn: '1-3 business days',
       baseFee: 55,
       estimatedDays: { min: 1, max: 3 },
       enabled: false,

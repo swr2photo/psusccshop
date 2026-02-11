@@ -18,6 +18,7 @@ import {
   SHIPPING_PROVIDERS,
   ShippingProvider,
 } from '@/lib/shipping';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface TrackingTimelineProps {
   trackingNumber: string;
@@ -56,6 +57,7 @@ export default function TrackingTimeline({
   initialData,
   compact = false,
 }: TrackingTimelineProps) {
+  const { t, lang } = useTranslation();
   const [trackingInfo, setTrackingInfo] = React.useState<TrackingInfo | null>(initialData || null);
   const [loading, setLoading] = React.useState(!initialData);
   const [error, setError] = React.useState<string | null>(null);
@@ -84,7 +86,7 @@ export default function TrackingTimeline({
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || 'ไม่สามารถดึงข้อมูลติดตามได้');
+        throw new Error(errorData.error || t.shipping.cannotFetchTracking);
       }
 
       const result = await res.json();
@@ -100,7 +102,7 @@ export default function TrackingTimeline({
       }
     } catch (err) {
       console.error('Fetch tracking error:', err);
-      setError(err instanceof Error ? err.message : 'เกิดข้อผิดพลาด');
+      setError(err instanceof Error ? err.message : t.common.error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -122,7 +124,7 @@ export default function TrackingTimeline({
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <CheckCircle size={24} color="#34c759" />
           <Typography sx={{ color: '#34c759', fontWeight: 600 }}>
-            รับสินค้าหน้าร้าน
+            {t.shipping.pickup}
           </Typography>
         </Box>
       </Box>
@@ -135,7 +137,7 @@ export default function TrackingTimeline({
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2 }}>
         <CircularProgress size={24} sx={{ color: 'var(--primary)' }} />
         <Typography sx={{ color: 'var(--text-muted)', fontSize: 14 }}>
-          กำลังโหลดข้อมูลติดตาม...
+          {t.shipping.loadingTracking}
         </Typography>
       </Box>
     );
@@ -162,14 +164,14 @@ export default function TrackingTimeline({
           </IconButton>
         </Box>
         <Typography sx={{ color: 'var(--text-muted)', fontSize: 12, mt: 1 }}>
-          หมายเลขพัสดุ: {trackingNumber}
+          {t.shipping.trackingNumber}: {trackingNumber}
         </Typography>
         
         {/* Fallback link to courier website */}
         {trackingUrl && (
           <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid var(--glass-border)' }}>
             <Typography sx={{ color: 'var(--text-muted)', fontSize: 12, mb: 1 }}>
-              ไม่สามารถโหลดข้อมูลได้? ตรวจสอบสถานะโดยตรงที่เว็บขนส่ง:
+              {t.shipping.cannotLoadTracking}
             </Typography>
             <Box
               component="a"
@@ -197,7 +199,7 @@ export default function TrackingTimeline({
               }}
             >
               <ShippingIcon size={18} />
-              ตรวจสอบที่ {SHIPPING_PROVIDERS[shippingProvider]?.nameThai || 'ขนส่ง'}
+              {t.shipping.checkAtCarrier} {lang === 'th' ? (SHIPPING_PROVIDERS[shippingProvider]?.nameThai || t.shipping.carrier) : (SHIPPING_PROVIDERS[shippingProvider]?.name || 'Carrier')}
               <OpenInNew size={14} />
             </Box>
           </Box>
@@ -213,11 +215,11 @@ export default function TrackingTimeline({
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Schedule size={24} color="#6b7280" />
           <Typography sx={{ color: 'var(--text-muted)', fontSize: 14 }}>
-            รอข้อมูลจากขนส่ง
+            {t.shipping.awaitingCarrier}
           </Typography>
         </Box>
         <Typography sx={{ color: 'var(--text-muted)', fontSize: 12, mt: 1 }}>
-          หมายเลขพัสดุ: {trackingNumber}
+          {t.shipping.trackingNumber}: {trackingNumber}
         </Typography>
       </Box>
     );
@@ -329,10 +331,10 @@ export default function TrackingTimeline({
               
               {/* Steps */}
               {[
-                { status: 'picked_up' as TrackingStatus, label: 'รับพัสดุ' },
-                { status: 'in_transit' as TrackingStatus, label: 'กำลังส่ง' },
-                { status: 'out_for_delivery' as TrackingStatus, label: 'นำส่ง' },
-                { status: 'delivered' as TrackingStatus, label: 'สำเร็จ' },
+                { status: 'picked_up' as TrackingStatus, label: t.shipping.received },
+                { status: 'in_transit' as TrackingStatus, label: t.shipping.inTransit },
+                { status: 'out_for_delivery' as TrackingStatus, label: t.shipping.outForDelivery },
+                { status: 'delivered' as TrackingStatus, label: t.shipping.delivered },
               ].map((step, idx) => {
                 const isCompleted = isStatusCompleted(currentStatus, step.status);
                 const isCurrent = currentStatus === step.status;
@@ -381,7 +383,7 @@ export default function TrackingTimeline({
             {/* Event List */}
             <Box sx={{ maxHeight: 200, overflowY: 'auto' }}>
               {events.slice(0, 10).map((event, idx) => (
-                <EventItem key={idx} event={event} isLatest={idx === 0} />
+                <EventItem key={idx} event={event} isLatest={idx === 0} t={t} lang={lang} />
               ))}
               {events.length > 10 && (
                 <Typography sx={{ 
@@ -390,7 +392,7 @@ export default function TrackingTimeline({
                   textAlign: 'center',
                   mt: 1,
                 }}>
-                  +{events.length - 10} รายการก่อนหน้า
+                  +{events.length - 10} {t.shipping.previousItems}
                 </Typography>
               )}
             </Box>
@@ -398,7 +400,7 @@ export default function TrackingTimeline({
         ) : (
           <Box sx={{ px: 2, pb: 2 }}>
             <Typography sx={{ color: 'var(--text-muted)', fontSize: 13 }}>
-              ยังไม่มีข้อมูลการเคลื่อนไหวพัสดุ
+              {t.shipping.noMovementData}
             </Typography>
           </Box>
         )}
@@ -412,7 +414,7 @@ export default function TrackingTimeline({
             borderTop: '1px solid var(--glass-border)',
           }}>
             <Typography sx={{ color: 'var(--text-muted)', fontSize: 11 }}>
-              อัปเดตล่าสุด: {formatDate(trackingInfo.lastUpdate)}
+              {t.shipping.lastUpdate}: {formatDate(trackingInfo.lastUpdate, t, lang)}
             </Typography>
           </Box>
         )}
@@ -422,7 +424,7 @@ export default function TrackingTimeline({
 }
 
 // Helper Components
-function EventItem({ event, isLatest }: { event: TrackingEvent; isLatest: boolean }) {
+function EventItem({ event, isLatest, t, lang }: { event: TrackingEvent; isLatest: boolean; t: any; lang: string }) {
   return (
     <Box sx={{ 
       display: 'flex', 
@@ -450,7 +452,7 @@ function EventItem({ event, isLatest }: { event: TrackingEvent; isLatest: boolea
         </Typography>
         <Box sx={{ display: 'flex', gap: 2, mt: 0.5 }}>
           <Typography sx={{ color: 'var(--text-muted)', fontSize: 11 }}>
-            {formatDate(event.timestamp)}
+            {formatDate(event.timestamp, t, lang)}
           </Typography>
           {event.location && (
             <Typography sx={{ color: 'var(--text-muted)', fontSize: 11 }}>
@@ -486,7 +488,7 @@ function isStatusCompleted(current: TrackingStatus, target: TrackingStatus): boo
   return currentIdx > targetIdx;
 }
 
-function formatDate(dateStr: string): string {
+function formatDate(dateStr: string, t?: any, lang?: string): string {
   try {
     const date = new Date(dateStr);
     const now = new Date();
@@ -495,11 +497,16 @@ function formatDate(dateStr: string): string {
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-    if (diffMins < 60) return `${diffMins} นาทีที่แล้ว`;
-    if (diffHours < 24) return `${diffHours} ชั่วโมงที่แล้ว`;
-    if (diffDays < 7) return `${diffDays} วันที่แล้ว`;
+    const minAgo = t?.supportChat?.minutesAgo ?? 'minutes ago';
+    const hrAgo = t?.supportChat?.hoursAgo ?? 'hours ago';
+    const dayAgo = t?.supportChat?.daysAgo ?? 'days ago';
+    const locale = lang === 'en' ? 'en-US' : 'th-TH';
+
+    if (diffMins < 60) return `${diffMins} ${minAgo}`;
+    if (diffHours < 24) return `${diffHours} ${hrAgo}`;
+    if (diffDays < 7) return `${diffDays} ${dayAgo}`;
     
-    return date.toLocaleDateString('th-TH', {
+    return date.toLocaleDateString(locale, {
       day: 'numeric',
       month: 'short',
       hour: '2-digit',

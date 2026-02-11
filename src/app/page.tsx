@@ -4,15 +4,15 @@ import React from 'react';
 import { MessageCircle as ChatIcon, Send as SendIcon, X as CloseIcon, Bot as SmartToyIcon, RotateCcw as RefreshIcon, Sparkles as AutoAwesomeIcon, Store as StorefrontIcon, Copy as ContentCopyIcon, Check as CheckIcon, Maximize2 as FullscreenIcon, Minimize2 as FullscreenExitIcon, ImagePlus as AddPhotoAlternateIcon, ShoppingCart as ShoppingCartOutlinedIcon, Coins as PaidOutlinedIcon, Ruler as StraightenOutlinedIcon, Truck as LocalShippingOutlinedIcon, Wallet as AccountBalanceWalletOutlinedIcon, HelpCircle as HelpOutlineOutlinedIcon, Image as ImageOutlinedIcon, User as PersonOutlineIcon, BadgeCheck as VerifiedIcon, BookOpen as MenuBookOutlinedIcon, Hand as WavingHandIcon, Reply as ReplyIcon, Pencil as EditIcon, ClipboardList as ClipboardListIcon, Tag as TagIcon } from 'lucide-react';
 
 // ==================== CHATBOT COMPONENT (Enhanced with Logo & AI) ====================
-const QUICK_QUESTIONS_DATA = [
-  { icon: 'cart', label: 'วิธีสั่งซื้อ' },
-  { icon: 'price', label: 'ราคาสินค้า' },
-  { icon: 'size', label: 'ไซซ์และขนาด' },
-  { icon: 'order', label: 'เช็คสถานะออเดอร์' },
-  { icon: 'shipping', label: 'การจัดส่ง' },
-  { icon: 'payment', label: 'วิธีชำระเงิน' },
-  { icon: 'promo', label: 'โค้ดส่วนลด' },
-  { icon: 'help', label: 'ติดต่อร้าน' },
+const QUICK_QUESTIONS_KEYS = [
+  { icon: 'cart', key: 'howToOrder' as const },
+  { icon: 'price', key: 'pricing' as const },
+  { icon: 'size', key: 'sizeAndFit' as const },
+  { icon: 'order', key: 'checkOrder' as const },
+  { icon: 'shipping', key: 'shipping' as const },
+  { icon: 'payment', key: 'paymentMethod' as const },
+  { icon: 'promo', key: 'promoCode' as const },
+  { icon: 'help', key: 'contactShop' as const },
 ];
 
 // Helper to render quick question icon
@@ -30,7 +30,7 @@ const QuickQuestionIcon = ({ type, size = 14 }: { type: string; size?: number })
   }
 };
 
-const QUICK_QUESTIONS = QUICK_QUESTIONS_DATA.map(q => q.label);
+const QUICK_QUESTIONS = QUICK_QUESTIONS_KEYS.map(q => q.key);
 
 interface ChatMessage {
   id: string;
@@ -58,6 +58,7 @@ interface ShirtChatBotProps {
 }
 
 function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
+  const { t, lang } = useTranslation();
   const { warning: toastWarning, error: toastError } = useNotification();
   const [input, setInput] = React.useState('');
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
@@ -324,7 +325,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
         const errorMsg: ChatMessage = {
           id: generateId(),
           sender: 'bot',
-          text: 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้งค่ะ',
+          text: t.chatbot.errorRetry,
           timestamp: new Date(),
           suggestions: QUICK_QUESTIONS,
         };
@@ -382,7 +383,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
       const errorMsg: ChatMessage = {
         id: generateId(),
         sender: 'bot',
-        text: 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้งค่ะ',
+        text: t.chatbot.errorRetry,
         timestamp: new Date(),
         suggestions: QUICK_QUESTIONS,
       };
@@ -438,11 +439,11 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
     // Validate file type and size
     const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
-      toastWarning('รองรับเฉพาะไฟล์รูปภาพ (PNG, JPG, WEBP)');
+      toastWarning(t.chatbot.imageOnly);
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      toastWarning('ไฟล์ต้องมีขนาดไม่เกิน 5MB');
+      toastWarning(t.chatbot.maxFileSize);
       return;
     }
     
@@ -455,7 +456,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
         setIsUploading(false);
       };
       reader.onerror = () => {
-        toastError('ไม่สามารถอ่านไฟล์ได้');
+        toastError(t.chatbot.cannotReadFile);
         setIsUploading(false);
       };
       reader.readAsDataURL(file);
@@ -472,13 +473,13 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
   const handleSendWithImage = async () => {
     if (!uploadedImage && !input.trim()) return;
     
-    const msgText = input.trim() || 'ช่วยดูรูปนี้หน่อยค่ะ';
+    const msgText = input.trim() || t.chatbot.defaultImageQuery;
     const userMsg: ChatMessage = {
       id: generateId(),
       sender: 'user',
       text: uploadedImage ? `[รูปภาพ] ${msgText}` : msgText,
       timestamp: new Date(),
-      productImages: uploadedImage ? [{ name: 'รูปที่อัปโหลด', image: uploadedImage.preview }] : undefined,
+      productImages: uploadedImage ? [{ name: t.chatbot.uploadedImage, image: uploadedImage.preview }] : undefined,
       replyTo: replyToMessage || undefined,
     };
     
@@ -524,7 +525,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
       const errorMsg: ChatMessage = {
         id: generateId(),
         sender: 'bot',
-        text: 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้งค่ะ',
+        text: t.chatbot.errorRetry,
         timestamp: new Date(),
         suggestions: QUICK_QUESTIONS,
       };
@@ -551,7 +552,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
   };
 
   const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString(lang === 'th' ? 'th-TH' : 'en-US', { hour: '2-digit', minute: '2-digit' });
   };
 
   // Parse and render markdown tables
@@ -858,7 +859,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 {loading ? (
                   <>
                     <AutoAwesomeIcon size={14} color="#2997ff" style={{ animation: 'shimmer 1.5s infinite' }} />
-                    กำลังคิด...
+                    {t.chatbot.thinking}
                   </>
                 ) : (
                   <>
@@ -869,7 +870,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       bgcolor: '#30d158',
                       boxShadow: '0 0 6px #30d158',
                     }} />
-                    ออนไลน์
+                    {t.chatbot.online}
                   </>
                 )}
               </Typography>
@@ -888,7 +889,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                   transform: 'rotate(180deg)',
                 } 
               }}
-              title="ล้างแชท"
+              title={t.chatbot.clearChat}
             >
               <RefreshIcon size={20} />
             </IconButton>
@@ -903,7 +904,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                   bgcolor: 'var(--glass-bg)' 
                 } 
               }}
-              title={isFullscreen ? "ย่อหน้าต่าง" : "ขยายเต็มจอ"}
+              title={isFullscreen ? t.chatbot.minimize : t.chatbot.maximize}
             >
               {isFullscreen ? <FullscreenExitIcon size={20} /> : <FullscreenIcon size={20} />}
             </IconButton>
@@ -994,7 +995,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 justifyContent: 'center',
                 gap: 0.75,
               }}>
-                สวัสดีค่ะ! <WavingHandIcon size={20} color="#ffd60a" />
+                {t.chatbot.welcome} <WavingHandIcon size={20} color="#ffd60a" />
               </Typography>
               
               {aiEnabled && (
@@ -1013,12 +1014,12 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                   mb: 1.5,
                 }}>
                   <AutoAwesomeIcon size={12} />
-                  ขับเคลื่อนด้วย Gemini AI
+                  {t.chatbot.poweredBy}
                 </Box>
               )}
               
               <Typography sx={{ color: 'var(--text-muted)', fontSize: 13, mb: 2 }}>
-                ถามเกี่ยวกับสินค้า ราคา ไซซ์ ได้เลยค่ะ
+                {t.chatbot.askAbout}
               </Typography>
 
               {/* Shop Stats */}
@@ -1043,7 +1044,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                     borderRadius: 1,
                   }}>
                     <StorefrontIcon size={13} />
-                    {shopInfo.totalProducts} สินค้า
+                    {shopInfo.totalProducts} {t.chatbot.products}
                   </Box>
                   {typeof shopInfo.availableProducts === 'number' && shopInfo.availableProducts > 0 && (
                     <Box sx={{
@@ -1058,7 +1059,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       py: 0.4,
                       borderRadius: 1,
                     }}>
-                      <VerifiedIcon size={12} /> {shopInfo.availableProducts} พร้อมขาย
+                      <VerifiedIcon size={12} /> {shopInfo.availableProducts} {t.chatbot.available}
                     </Box>
                   )}
                   {shopInfo.priceRange && shopInfo.priceRange.max > 0 && (
@@ -1084,15 +1085,15 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
               
               {/* Quick Questions */}
               <Typography sx={{ color: 'var(--text-muted)', fontSize: 11, mb: 1.5, textAlign: 'left' }}>
-                ลองถาม:
+                {t.chatbot.trySuggestion}
               </Typography>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, justifyContent: 'center' }}>
-                {QUICK_QUESTIONS_DATA.map((q, i) => (
+                {QUICK_QUESTIONS_KEYS.map((q, i) => (
                   <Chip
                     key={i}
                     icon={<QuickQuestionIcon type={q.icon} />}
-                    label={q.label}
-                    onClick={() => handleQuickQuestion(q.label)}
+                    label={t.chatbot[q.key]}
+                    onClick={() => handleQuickQuestion(q.key)}
                     sx={{
                       background: 'var(--glass-bg)',
                       border: '1px solid var(--glass-border)',
@@ -1306,7 +1307,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       flex: 1,
                     }}>
                       <Box component="span" sx={{ fontWeight: 500, mr: 0.5 }}>
-                        {msg.replyTo.sender === 'user' ? 'คุณ' : 'Bot'}:
+                        {msg.replyTo.sender === 'user' ? t.chatbot.you : t.chatbot.bot}:
                       </Box>
                       {msg.replyTo.text}
                     </Box>
@@ -1357,7 +1358,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       color: 'var(--text-muted)',
                       fontStyle: 'italic',
                     }}>
-                      (แก้ไขแล้ว)
+                      {t.chatbot.edited}
                     </Box>
                   )}
                   {msg.sender === 'bot' && msg.source === 'ai' && (
@@ -1404,7 +1405,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                         color: 'var(--text-muted)',
                         '&:hover': { color: 'var(--warning)', bgcolor: 'transparent' },
                       }}
-                      title="แก้ไขข้อความ"
+                      title={t.chatbot.editMessage}
                     >
                       <EditIcon size={12} />
                     </IconButton>
@@ -1418,7 +1419,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       color: 'var(--text-muted)',
                       '&:hover': { color: 'var(--secondary)', bgcolor: 'transparent' },
                     }}
-                    title="ตอบกลับ"
+                    title={t.chatbot.reply}
                   >
                     <ReplyIcon size={12} style={{ transform: 'scaleX(-1)' }} />
                   </IconButton>
@@ -1432,7 +1433,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                         color: copiedMessageId === msg.id ? '#30d158' : 'var(--text-muted)',
                         '&:hover': { color: 'var(--foreground)', bgcolor: 'transparent' },
                       }}
-                      title="คัดลอก"
+                      title={t.chatbot.copy}
                     >
                       {copiedMessageId === msg.id ? (
                         <CheckIcon size={12} />
@@ -1474,7 +1475,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 {msg.sender === 'bot' && msg.relatedQuestions && msg.relatedQuestions.length > 0 && (
                   <Box sx={{ mt: 1.5 }}>
                     <Typography sx={{ fontSize: 10, color: 'var(--text-muted)', mb: 0.75 }}>
-                      คำถามที่เกี่ยวข้อง:
+                      {t.chatbot.relatedQuestions}
                     </Typography>
                     {msg.relatedQuestions.map((q, i) => (
                       <Box 
@@ -1577,7 +1578,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 whiteSpace: 'nowrap',
               }}>
                 <Box component="span" sx={{ color: 'var(--secondary)', fontWeight: 500, mr: 0.5 }}>
-                  ตอบกลับ {replyToMessage.sender === 'user' ? 'คุณ' : 'Bot'}:
+                  {t.chatbot.replyTo} {replyToMessage.sender === 'user' ? t.chatbot.you : t.chatbot.bot}:
                 </Box>
                 {replyToMessage.text}
               </Typography>
@@ -1622,7 +1623,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 whiteSpace: 'nowrap',
               }}>
                 <Box component="span" sx={{ color: 'var(--warning)', fontWeight: 500, mr: 0.5 }}>
-                  แก้ไขข้อความ
+                  {t.chatbot.editMode}
                 </Box>
                 {editingMessage.text.slice(0, 50) + (editingMessage.text.length > 50 ? '...' : '')}
               </Typography>
@@ -1680,7 +1681,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                   color: 'var(--text-muted)',
                 },
               }}
-              title="อัปโหลดรูปภาพ"
+              title={t.chatbot.uploadImage}
             >
               {isUploading ? (
                 <CircularProgress size={18} sx={{ color: 'var(--text-muted)' }} />
@@ -1761,7 +1762,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 multiline
                 minRows={1}
                 maxRows={3}
-                placeholder={editingMessage ? "แก้ไขข้อความ..." : uploadedImage ? "พิมพ์คำถามเกี่ยวกับรูป..." : "พิมพ์คำถามของคุณ..."}
+                placeholder={editingMessage ? t.chatbot.editPlaceholder : uploadedImage ? t.chatbot.imagePlaceholder : t.chatbot.defaultPlaceholder}
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -1839,7 +1840,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
             </Box>
             <Box component="span" sx={{ mx: 0.5 }}>•</Box>
             <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
-              <ImageOutlinedIcon size={10} /> รองรับรูปภาพ
+              <ImageOutlinedIcon size={10} /> {t.chatbot.imageSupported}
             </Box>
           </Typography>
         </Box>
@@ -2117,6 +2118,20 @@ import EventBanner, { type ShopEvent } from '@/components/EventBanner';
 import Footer from '@/components/Footer';
 import TurnstileWidget from '@/components/TurnstileWidget';
 import { ShopStatusBanner, getProductStatus, getShopStatus, SHOP_STATUS_CONFIG, type ShopStatusType } from '@/components/ShopStatusCard';
+
+// Common tag translations for well-known tags
+const TAG_TRANSLATIONS_TH_TO_EN: Record<string, string> = {
+  'ขายดี': 'Best Seller',
+  'สินค้าใหม่': 'New',
+  'แนะนำ': 'Recommended',
+  'ลดราคา': 'On Sale',
+  'หมดแล้ว': 'Sold Out',
+  'พรีออเดอร์': 'Pre-order',
+  'จำนวนจำกัด': 'Limited Edition',
+  'สั่งผลิต': 'Made to Order',
+  'สินค้าพิเศษ': 'Special',
+  'ของใหม่': 'New Arrival',
+};
 import OptimizedImage, { preloadImages, OptimizedBackground } from '@/components/OptimizedImage';
 import CartDrawer from '@/components/CartDrawer';
 import OrderHistoryDrawer from '@/components/OrderHistoryDrawer';
@@ -2124,6 +2139,7 @@ import CheckoutDialog from '@/components/CheckoutDialog';
 import LoadingScreen from '@/components/LoadingScreen';
 import SupportChatWidget from '@/components/SupportChatWidget';
 import ThemeToggle from '@/components/ThemeToggle';
+import LanguageToggle from '@/components/LanguageToggle';
 import { 
   Product, 
   ShopConfig, 
@@ -2133,6 +2149,8 @@ import {
   getCategoryLabel,
   getSubTypeLabel,
   getCategoryIcon,
+  getProductName,
+  getProductDescription,
   DEFAULT_SHIRT_NAME,
   type ShirtNameConfig,
 } from '@/lib/config';
@@ -2149,6 +2167,7 @@ import {
   submitOrder as submitOrderApi,
 } from '@/lib/api-client';
 import { useThemeStore, ThemeMode } from '@/store/themeStore';
+import { useTranslation } from '@/hooks/useTranslation';
 
 const STATUS_LABELS: Record<string, string> = {
   PENDING: 'รอดำเนินการ',
@@ -2493,7 +2512,9 @@ export default function HomePage() {
     {
       id: 'dev-jersey-1',
       name: '[DEV] เสื้อกีฬา SCC 2026',
+      nameEn: '[DEV] SCC Jersey 2026',
       description: 'เสื้อกีฬารุ่นใหม่ล่าสุด\nเนื้อผ้า Cool Elite\nระบายอากาศดี',
+      descriptionEn: 'Latest jersey model\nCool Elite fabric\nGreat breathability',
       category: 'APPAREL',
       subType: 'JERSEY',
       type: 'JERSEY',
@@ -2507,7 +2528,9 @@ export default function HomePage() {
     {
       id: 'dev-crew-1',
       name: '[DEV] เสื้อ Crew Neck รุ่น Classic',
+      nameEn: '[DEV] Crew Neck Classic',
       description: 'เสื้อ Crew Neck สไตล์คลาสสิค',
+      descriptionEn: 'Classic style Crew Neck',
       category: 'APPAREL',
       subType: 'CREW',
       type: 'CREW',
@@ -2521,7 +2544,9 @@ export default function HomePage() {
     {
       id: 'dev-merch-1',
       name: '[DEV] แก้วน้ำ SCC Limited',
+      nameEn: '[DEV] SCC Limited Tumbler',
       description: 'แก้วน้ำเก็บความเย็น 24 ชม.\nขนาด 600ml',
+      descriptionEn: 'Insulated tumbler, keeps cold 24 hrs\n600ml capacity',
       category: 'MERCHANDISE',
       subType: 'MUG',
       type: 'OTHER',
@@ -2538,7 +2563,9 @@ export default function HomePage() {
     {
       id: 'dev-merch-2',
       name: '[DEV] พวงกุญแจ SCC',
+      nameEn: '[DEV] SCC Keychain',
       description: 'พวงกุญแจโลหะ พร้อมสายคล้อง',
+      descriptionEn: 'Metal keychain with lanyard',
       category: 'MERCHANDISE',
       subType: 'KEYCHAIN',
       type: 'OTHER',
@@ -2553,7 +2580,9 @@ export default function HomePage() {
     {
       id: 'dev-merch-3',
       name: '[DEV] สติกเกอร์ SCC Set',
+      nameEn: '[DEV] SCC Sticker Set',
       description: 'เซ็ตสติกเกอร์ 10 ชิ้น\nกันน้ำ กันแดด',
+      descriptionEn: '10-piece sticker set\nWaterproof & UV resistant',
       category: 'MERCHANDISE',
       subType: 'STICKER',
       type: 'OTHER',
@@ -2565,7 +2594,9 @@ export default function HomePage() {
     {
       id: 'dev-camp-1',
       name: '[DEV] ค่ายอาสา SCC รุ่น 15',
+      nameEn: '[DEV] SCC Volunteer Camp #15',
       description: 'ค่ายอาสาพัฒนาชุมชน\nรวมอาหาร ที่พัก และเสื้อค่าย',
+      descriptionEn: 'Community volunteer camp\nIncludes meals, lodging & camp shirt',
       category: 'CAMP_FEE',
       subType: 'CAMP_REGISTRATION',
       type: 'OTHER',
@@ -2591,7 +2622,9 @@ export default function HomePage() {
     {
       id: 'dev-event-1',
       name: '[DEV] บัตรงาน SCC Night',
+      nameEn: '[DEV] SCC Night Ticket',
       description: 'งานเลี้ยงสังสรรค์ประจำปี\nรวมอาหารและเครื่องดื่ม',
+      descriptionEn: 'Annual party\nIncludes food and drinks',
       category: 'EVENT',
       subType: 'EVENT_TICKET',
       type: 'OTHER',
@@ -2614,7 +2647,9 @@ export default function HomePage() {
     {
       id: 'dev-custom-1',
       name: '[DEV] อุปกรณ์กีฬา SCC',
+      nameEn: '[DEV] SCC Sports Equipment',
       description: 'ลูกฟุตบอล มาตรฐาน FIFA',
+      descriptionEn: 'FIFA standard football',
       category: 'อุปกรณ์กีฬา', // Custom category
       subType: 'ลูกฟุตบอล', // Custom subType
       type: 'OTHER',
@@ -2629,7 +2664,9 @@ export default function HomePage() {
     {
       id: 'dev-custom-2',
       name: '[DEV] กระเป๋า SCC Bag',
+      nameEn: '[DEV] SCC Bag',
       description: 'กระเป๋าสะพายข้าง\nกันน้ำ ทนทาน',
+      descriptionEn: 'Crossbody bag\nWaterproof & durable',
       category: 'กระเป๋า', // Custom category
       subType: 'กระเป๋าสะพายข้าง', // Custom subType
       type: 'OTHER',
@@ -2741,6 +2778,10 @@ export default function HomePage() {
   const themeMode = useThemeStore((s) => s.mode);
   const prevThemeModeRef = useRef<ThemeMode | null>(null);
 
+  const { t, lang } = useTranslation();
+  const STATUS_LABELS_I18N: Record<string, string> = t.status as unknown as Record<string, string>;
+  const TYPE_LABELS_I18N: Record<string, string> = t.type as unknown as Record<string, string>;
+
   const [navHidden, setNavHidden] = useState(false);
   const lastScrollYRef = useRef(0);
   const scrollIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -2754,10 +2795,10 @@ export default function HomePage() {
 
   const bottomTabs = useMemo(() => {
     const leftTabs = [
-      { key: 'home', label: 'หน้าแรก', icon: <Home size={24} />, center: false },
+      { key: 'home', label: t.nav.home, icon: <Home size={24} />, center: false },
       {
         key: 'cart',
-        label: 'ตะกร้า',
+        label: t.nav.cart,
         icon: (
           <Badge badgeContent={cart.length} color="error">
             <ShoppingCart size={24} />
@@ -2766,17 +2807,17 @@ export default function HomePage() {
         center: false,
       },
     ];
-    const centerTab = { key: 'chat', label: 'แชท', icon: <Headphones size={28} />, center: true };
+    const centerTab = { key: 'chat', label: t.nav.chat, icon: <Headphones size={28} />, center: true };
     const rightTabs = [
-      { key: 'history', label: 'ประวัติ', icon: <History size={24} />, center: false },
-      { key: 'profile', label: 'โปรไฟล์', icon: <User size={24} />, center: false },
+      { key: 'history', label: t.nav.history, icon: <History size={24} />, center: false },
+      { key: 'profile', label: t.nav.profile, icon: <User size={24} />, center: false },
     ];
     // For left-handed: swap sides so primary actions are on the left
     if (navHandedness === 'left') {
       return [...rightTabs.reverse(), centerTab, ...leftTabs.reverse()];
     }
     return [...leftTabs, centerTab, ...rightTabs];
-  }, [cart.length, navHandedness]);
+  }, [cart.length, navHandedness, t, lang]);
 
 
   const BrandMark = ({ size = 36, showText = true }: { size?: number; showText?: boolean }) => (
@@ -3148,7 +3189,7 @@ export default function HomePage() {
   // Unified product select handler — batches all state into one render
   const handleSelectProduct = useCallback((product: Product) => {
     const sizeKeys = Object.keys(product.sizePricing || {});
-    const defaultSize = sizeKeys.length > 0 ? sizeKeys[0] : 'ฟรีไซส์';
+    const defaultSize = sizeKeys.length > 0 ? sizeKeys[0] : t.common.freeSize;
     setSelectedProduct(product);
     setActiveImageIndex(0);
     setProductOptions({ size: defaultSize, quantity: 1, customName: '', customNumber: '', isLongSleeve: false });
@@ -3182,12 +3223,12 @@ export default function HomePage() {
       setProductDialogOpen(false);
       setSelectedProduct(null);
       setProductOptions({ size: '', quantity: 1, customName: '', customNumber: '', isLongSleeve: false });
-      showToast('warning', 'ร้านค้าปิดชั่วคราว ไม่สามารถสั่งซื้อได้');
+      showToast('warning', t.checkout.shopClosedWarning);
     }
     // Also close order dialog if shop is closed
     if (!isShopOpen && showOrderDialog) {
       setShowOrderDialog(false);
-      showToast('warning', 'ร้านค้าปิดชั่วคราว ไม่สามารถสั่งซื้อได้');
+      showToast('warning', t.checkout.shopClosedWarning);
     }
   }, [isShopOpen, productDialogOpen, showOrderDialog]);
 
@@ -3407,7 +3448,7 @@ export default function HomePage() {
   const buildCartItem = (): CartItem | null => {
     // Block cart operations when shop is closed
     if (!isShopOpen) {
-      showToast('warning', 'ร้านค้าปิดชั่วคราว ไม่สามารถสั่งซื้อได้');
+      showToast('warning', t.checkout.shopClosedWarning);
       return null;
     }
     
@@ -3449,7 +3490,7 @@ export default function HomePage() {
         customNameInputRef.current?.parentElement?.parentElement?.classList.add('shake-highlight');
         setTimeout(() => customNameInputRef.current?.parentElement?.parentElement?.classList.remove('shake-highlight'), 600);
       }, 300);
-      showToast('warning', `ชื่อติดเสื้อต้องมีอย่างน้อย ${shirtCfg.minLength} ตัวอักษร`);
+      showToast('warning', `${t.product.customNameMinLength} ${shirtCfg.minLength} ${t.profile.characters}`);
       return null;
     }
 
@@ -3514,7 +3555,7 @@ export default function HomePage() {
   const commitCartItem = (item: CartItem, options?: { goCheckout?: boolean }) => {
     const newCart = [...cart, item];
     saveCart(newCart);
-    showToast('success', options?.goCheckout ? 'เพิ่มแล้ว ไปชำระเงิน' : 'เพิ่มสินค้าลงตะกร้าแล้ว');
+    showToast('success', options?.goCheckout ? t.cart.addedGoCheckout : t.cart.addedToCart);
     resetProductDialog();
 
     if (options?.goCheckout) {
@@ -3539,7 +3580,7 @@ export default function HomePage() {
 
   const handleShareProduct = async (product: Product) => {
     const url = getProductLink(product);
-    const shareText = `${product.name} - ฿${product.basePrice.toLocaleString()}`;
+    const shareText = `${getProductName(product, lang)} - ฿${product.basePrice.toLocaleString()}`;
 
     // Try to fetch product image as a File for sharing
     const getImageFile = async (): Promise<File | null> => {
@@ -3561,23 +3602,23 @@ export default function HomePage() {
         // Try sharing with image file first
         const file = await getImageFile();
         if (file && navigator.canShare?.({ files: [file] })) {
-          await navigator.share({ title: product.name, text: shareText, url, files: [file] });
+          await navigator.share({ title: getProductName(product, lang), text: shareText, url, files: [file] });
         } else {
-          await navigator.share({ title: product.name, text: shareText, url });
+          await navigator.share({ title: getProductName(product, lang), text: shareText, url });
         }
       } else {
         await navigator.clipboard.writeText(`${shareText}\n${url}`);
-        showToast('success', 'คัดลอกลิงก์สินค้าแล้ว');
+        showToast('success', t.product.linkCopied);
       }
     } catch {
-      try { await navigator.clipboard.writeText(`${shareText}\n${url}`); showToast('success', 'คัดลอกลิงก์สินค้าแล้ว'); } catch { /* ignore */ }
+      try { await navigator.clipboard.writeText(`${shareText}\n${url}`); showToast('success', t.product.linkCopied); } catch { /* ignore */ }
     }
   };
 
   const removeFromCart = (id: string) => {
     const newCart = cart.filter((item) => item.id !== id);
     saveCart(newCart);
-    showToast('success', 'ลบสินค้าออกจากตะกร้าแล้ว');
+    showToast('success', t.cart.removed);
   };
 
   const updateCartQuantity = (id: string, quantity: number) => {
@@ -3594,7 +3635,7 @@ export default function HomePage() {
     const newCart = cart.map((item) => (item.id === id ? { ...item, ...updates } : item));
     saveCart(newCart);
     setEditingCartItem(null);
-    showToast('success', 'อัปเดตสินค้าในตะกร้าแล้ว');
+    showToast('success', t.cart.updated);
   };
 
   const openEditCartItem = (item: CartItem) => {
@@ -3639,7 +3680,7 @@ export default function HomePage() {
     return cart.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
   }, [cart]);
 
-  const getStatusLabel = (status: string): string => STATUS_LABELS[normalizeStatus(status)] || status;
+  const getStatusLabel = (status: string): string => STATUS_LABELS_I18N[normalizeStatus(status)] || STATUS_LABELS[normalizeStatus(status)] || status;
   const getStatusColor = (status: string): string => STATUS_COLORS[normalizeStatus(status)] || '#86868b';
 
   // Calculate current price for product dialog
@@ -3713,7 +3754,7 @@ export default function HomePage() {
                 whiteSpace: 'nowrap',
                 letterSpacing: '-0.02em',
               }}>
-                {selectedProduct.name}
+                {getProductName(selectedProduct, lang)}
               </Typography>
               {/* Custom Tags from config - only show if customTags is defined */}
               {selectedProduct.customTags && selectedProduct.customTags.length > 0 && (
@@ -3727,7 +3768,9 @@ export default function HomePage() {
                       border: `1px solid ${(tag as any).borderColor || `${tag.color}40`}`,
                     }}>
                       <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: tag.color }}>
-                        {tag.text}
+                        {lang === 'en' 
+                          ? ((tag as any).textEn || TAG_TRANSLATIONS_TH_TO_EN[tag.text] || tag.text)
+                          : tag.text}
                       </Typography>
                     </Box>
                   ))}
@@ -4064,14 +4107,14 @@ export default function HomePage() {
                   <Store size={28} color="#86868b" />
                 </Box>
                 <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.9rem', fontWeight: 500 }}>
-                  ไม่มีรูปภาพสินค้า
+                  {t.product.noImages}
                 </Typography>
               </Box>
             )}
           </Box>
 
           {/* Description - Enhanced Premium Design */}
-          {selectedProduct.description && (
+          {(getProductDescription(selectedProduct, lang) || selectedProduct.description) && (
             <Box sx={{
               p: 0,
               mb: 3,
@@ -4112,13 +4155,13 @@ export default function HomePage() {
                   color: 'var(--foreground)',
                   letterSpacing: '0.02em',
                 }}>
-                  รายละเอียดสินค้า
+                  {t.product.description}
                 </Typography>
               </Box>
               
               {/* Content */}
               <Box sx={{ p: 2.5 }}>
-                {selectedProduct.description.split('\n').map((line, idx) => {
+                {(getProductDescription(selectedProduct, lang) || selectedProduct.description || '').split('\n').map((line, idx) => {
                   const trimmedLine = line.trim();
                   if (!trimmedLine) return <Box key={idx} sx={{ height: 12 }} />;
                   
@@ -4235,13 +4278,13 @@ export default function HomePage() {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
                 <span style={{ fontSize: '1.5rem' }}></span>
                 <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--warning)' }}>
-                  ข้อมูลค่าย
+                  {t.product.campInfo}
                 </Typography>
               </Box>
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1.5 }}>
                 {(selectedProduct as any).campInfo.campName && (
                   <Box>
-                    <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>ชื่อค่าย</Typography>
+                    <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{t.product.campName}</Typography>
                     <Typography sx={{ fontSize: '0.9rem', color: 'var(--foreground)', fontWeight: 600 }}>
                       {(selectedProduct as any).campInfo.campName}
                     </Typography>
@@ -4249,9 +4292,9 @@ export default function HomePage() {
                 )}
                 {(selectedProduct as any).campInfo.campDate && (
                   <Box>
-                    <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>วันที่จัดค่าย</Typography>
+                    <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{t.product.campDate}</Typography>
                     <Typography sx={{ fontSize: '0.9rem', color: 'var(--foreground)', fontWeight: 600 }}>
-                      {new Date((selectedProduct as any).campInfo.campDate).toLocaleDateString('th-TH', { 
+                      {new Date((selectedProduct as any).campInfo.campDate).toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-US', { 
                         day: 'numeric', month: 'long', year: 'numeric' 
                       })}
                     </Typography>
@@ -4259,7 +4302,7 @@ export default function HomePage() {
                 )}
                 {(selectedProduct as any).campInfo.location && (
                   <Box>
-                    <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>สถานที่</Typography>
+                    <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{t.product.campLocation}</Typography>
                     <Typography sx={{ fontSize: '0.9rem', color: 'var(--foreground)', fontWeight: 600 }}>
                       {(selectedProduct as any).campInfo.location}
                     </Typography>
@@ -4267,7 +4310,7 @@ export default function HomePage() {
                 )}
                 {(selectedProduct as any).campInfo.organizer && (
                   <Box>
-                    <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>ผู้จัด</Typography>
+                    <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{t.product.campOrganizer}</Typography>
                     <Typography sx={{ fontSize: '0.9rem', color: 'var(--foreground)', fontWeight: 600 }}>
                       {(selectedProduct as any).campInfo.organizer}
                     </Typography>
@@ -4275,9 +4318,9 @@ export default function HomePage() {
                 )}
                 {(selectedProduct as any).campInfo.maxParticipants > 0 && (
                   <Box sx={{ gridColumn: 'span 2' }}>
-                    <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>จำนวนรับ</Typography>
+                    <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{t.product.campCapacity}</Typography>
                     <Typography sx={{ fontSize: '0.9rem', color: 'var(--foreground)', fontWeight: 600 }}>
-                      {(selectedProduct as any).campInfo.currentParticipants || 0} / {(selectedProduct as any).campInfo.maxParticipants} คน
+                      {(selectedProduct as any).campInfo.currentParticipants || 0} / {(selectedProduct as any).campInfo.maxParticipants} {t.common.people}
                     </Typography>
                   </Box>
                 )}
@@ -4297,13 +4340,13 @@ export default function HomePage() {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
                 <span style={{ fontSize: '1.5rem' }}></span>
                 <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--error)' }}>
-                  ข้อมูลอีเวนต์
+                  {t.product.eventInfo}
                 </Typography>
               </Box>
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1.5 }}>
                 {(selectedProduct as any).eventInfo.eventName && (
                   <Box sx={{ gridColumn: 'span 2' }}>
-                    <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>ชื่ออีเวนต์</Typography>
+                    <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{t.product.eventName}</Typography>
                     <Typography sx={{ fontSize: '0.9rem', color: 'var(--foreground)', fontWeight: 600 }}>
                       {(selectedProduct as any).eventInfo.eventName}
                     </Typography>
@@ -4311,9 +4354,9 @@ export default function HomePage() {
                 )}
                 {(selectedProduct as any).eventInfo.eventDate && (
                   <Box>
-                    <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>วันเวลา</Typography>
+                    <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{t.product.eventDate}</Typography>
                     <Typography sx={{ fontSize: '0.9rem', color: 'var(--foreground)', fontWeight: 600 }}>
-                      {new Date((selectedProduct as any).eventInfo.eventDate).toLocaleDateString('th-TH', { 
+                      {new Date((selectedProduct as any).eventInfo.eventDate).toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-US', { 
                         day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
                       })}
                     </Typography>
@@ -4321,7 +4364,7 @@ export default function HomePage() {
                 )}
                 {(selectedProduct as any).eventInfo.venue && (
                   <Box>
-                    <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>สถานที่</Typography>
+                    <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{t.product.eventLocation}</Typography>
                     <Typography sx={{ fontSize: '0.9rem', color: 'var(--foreground)', fontWeight: 600 }}>
                       {(selectedProduct as any).eventInfo.venue}
                     </Typography>
@@ -4354,7 +4397,7 @@ export default function HomePage() {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
                 <Ruler size={16} color="#2997ff" />
                 <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--secondary)' }}>
-                  ตารางไซส์ (นิ้ว)
+                  {t.product.sizeChart}
                 </Typography>
               </Box>
               
@@ -4397,13 +4440,13 @@ export default function HomePage() {
                       </Typography>
                       <Box sx={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 0.5 }}>
-                          <span>อก</span>
+                          <span>{t.product.chest}</span>
                           <span style={{ color: isSelected ? 'var(--primary)' : 'var(--text-muted)', fontWeight: 600 }}>
                             {measurement?.chest || '-'}
                           </span>
                         </Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 0.5 }}>
-                          <span>ยาว</span>
+                          <span>{t.product.length}</span>
                           <span style={{ color: isSelected ? 'var(--primary)' : 'var(--text-muted)', fontWeight: 600 }}>
                             {measurement?.length || '-'}
                           </span>
@@ -4429,7 +4472,7 @@ export default function HomePage() {
                 },
               }}>
                 {/* Header Row */}
-                <Box sx={{ bgcolor: 'rgba(0,113,227,0.15)', fontWeight: 700, color: 'var(--secondary)', borderRadius: '6px 0 0 0' }}>ขนาด</Box>
+                <Box sx={{ bgcolor: 'rgba(0,113,227,0.15)', fontWeight: 700, color: 'var(--secondary)', borderRadius: '6px 0 0 0' }}>{t.product.sizeLabel}</Box>
                 <Box sx={{ display: 'grid !important', gridTemplateColumns: `repeat(${displaySizes.length}, 1fr)`, bgcolor: 'rgba(0,113,227,0.08)' }}>
                   {displaySizes.map((size, idx) => (
                     <Box key={size} sx={{ 
@@ -4443,7 +4486,7 @@ export default function HomePage() {
                   ))}
                 </Box>
                 {/* Chest Row */}
-                <Box sx={{ bgcolor: 'var(--glass-bg)', color: 'var(--text-muted)', fontWeight: 600 }}>รอบอก</Box>
+                <Box sx={{ bgcolor: 'var(--glass-bg)', color: 'var(--text-muted)', fontWeight: 600 }}>{t.product.chestFull}</Box>
                 <Box sx={{ display: 'grid !important', gridTemplateColumns: `repeat(${displaySizes.length}, 1fr)` }}>
                   {displaySizes.map((size, idx) => {
                     const sizeKey = size as keyof typeof SIZE_MEASUREMENTS;
@@ -4460,7 +4503,7 @@ export default function HomePage() {
                   })}
                 </Box>
                 {/* Length Row */}
-                <Box sx={{ bgcolor: 'var(--glass-bg)', color: 'var(--text-muted)', fontWeight: 600, borderRadius: '0 0 0 6px', borderBottom: 'none !important' }}>ความยาว</Box>
+                <Box sx={{ bgcolor: 'var(--glass-bg)', color: 'var(--text-muted)', fontWeight: 600, borderRadius: '0 0 0 6px', borderBottom: 'none !important' }}>{t.product.lengthFull}</Box>
                 <Box sx={{ display: 'grid !important', gridTemplateColumns: `repeat(${displaySizes.length}, 1fr)`, borderBottom: 'none !important' }}>
                   {displaySizes.map((size, idx) => {
                     const sizeKey = size as keyof typeof SIZE_MEASUREMENTS;
@@ -4493,7 +4536,7 @@ export default function HomePage() {
                 <Tag size={18} color="#2997ff" />
               </Box>
               <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                เลือกขนาด
+                {t.product.selectSize}
               </Typography>
             </Box>
 
@@ -4570,7 +4613,7 @@ export default function HomePage() {
                   <span style={{ fontSize: '1.1rem' }}></span>
                 </Box>
                 <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--secondary)' }}>
-                  เลือกตัวเลือก
+                  {t.product.selectOption}
                 </Typography>
               </Box>
 
@@ -4620,7 +4663,7 @@ export default function HomePage() {
                             fontWeight: 700,
                             color: 'white',
                           }}>
-                            หมด
+                            {t.common.outOfStock}
                           </Box>
                         )}
                         <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: active ? 'var(--secondary)' : 'var(--foreground)' }}>
@@ -4631,7 +4674,7 @@ export default function HomePage() {
                         </Typography>
                         {variant.stock !== null && variant.stock !== undefined && variant.stock > 0 && (
                           <Typography sx={{ fontSize: '0.6rem', color: 'var(--text-muted)', mt: 0.3 }}>
-                            เหลือ {variant.stock}
+                            {t.common.remaining} {variant.stock}
                           </Typography>
                         )}
                       </Box>
@@ -4662,7 +4705,7 @@ export default function HomePage() {
                   <Tag size={18} color="#30d158" />
                 </Box>
                 <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                  ตัวเลือกเพิ่มเติม
+                  {t.product.additionalOptions}
                 </Typography>
               </Box>
 
@@ -4670,10 +4713,10 @@ export default function HomePage() {
                 {selectedProduct.options?.hasCustomName && (() => {
                   const sc = { ...DEFAULT_SHIRT_NAME, ...config?.shirtNameConfig };
                   const langs: string[] = [];
-                  if (sc.allowThai) langs.push('ไทย');
-                  if (sc.allowEnglish) langs.push('อังกฤษ');
+                  if (sc.allowThai) langs.push(t.profile.langThai);
+                  if (sc.allowEnglish) langs.push(t.profile.langEnglish);
                   const langLabel = langs.join('/');
-                  const label = `ชื่อติดเสื้อ (${langLabel}${sc.allowSpecialChars ? ` + ${sc.allowedSpecialChars}` : ''}, ${sc.minLength}-${sc.maxLength} ตัว)`;
+                  const label = `${t.product.customNameLabel} (${langLabel}${sc.allowSpecialChars ? ` + ${sc.allowedSpecialChars}` : ''}, ${sc.minLength}-${sc.maxLength} ${t.profile.characters})`;
                   return (
                     <TextField
                       label={label}
@@ -4682,7 +4725,7 @@ export default function HomePage() {
                       onChange={(e) => setProductOptions({ ...productOptions, customName: normalizeShirtName(e.target.value, sc) })}
                       inputProps={{ maxLength: sc.maxLength }}
                       inputRef={customNameInputRef}
-                      placeholder={sc.allowThai ? 'เช่น สมชาย' : 'เช่น JOHN'}
+                      placeholder={sc.allowThai ? t.product.customNameExample : t.product.customNameExampleEN}
                       helperText={`${productOptions.customName.length}/${sc.maxLength}`}
                       sx={{ 
                         '& .MuiOutlinedInput-root': { 
@@ -4701,13 +4744,13 @@ export default function HomePage() {
 
                 {selectedProduct.options?.hasCustomNumber && (
                   <TextField
-                    label="หมายเลขเสื้อ (0-99) *จำเป็น"
+                    label={t.product.customNumberLabel}
                     fullWidth
                     value={productOptions.customNumber}
                     onChange={(e) => setProductOptions({ ...productOptions, customNumber: normalizeDigits99(e.target.value) })}
                     inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
                     inputRef={customNumberInputRef}
-                    placeholder="เช่น 10"
+                    placeholder={t.product.customNumberExample}
                     sx={{ 
                       '& .MuiOutlinedInput-root': { 
                         color: 'var(--foreground)',
@@ -4740,10 +4783,10 @@ export default function HomePage() {
                   >
                     <Box>
                       <Typography sx={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--foreground)' }}>
-                        แขนยาว
+                        {t.product.longSleeveOption}
                       </Typography>
                       <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        เพิ่ม ฿{selectedProduct.options?.longSleevePrice ?? 50} ต่อตัว
+                        {t.product.addPerPiece} ฿{selectedProduct.options?.longSleevePrice ?? 50} {t.product.perPiece}
                       </Typography>
                     </Box>
                     <Switch
@@ -4780,7 +4823,7 @@ export default function HomePage() {
                   <Package size={20} color="#2997ff" />
                 </Box>
                 <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                  จำนวน
+                  {t.product.quantity}
                 </Typography>
               </Box>
               <Box sx={{
@@ -4869,7 +4912,7 @@ export default function HomePage() {
             }} />
             <Box sx={{ position: 'relative', zIndex: 1 }}>
               <Typography sx={{ fontSize: '0.78rem', color: 'var(--success)', fontWeight: 600, mb: 0.3 }}>
-                ราคารวม
+                {t.product.totalPrice}
                 {(() => {
                   const d = getEventDiscount(selectedProduct.id, config?.events as ShopEvent[] | undefined);
                   return d ? <Typography component="span" sx={{ fontSize: '0.68rem', color: '#ff453a', fontWeight: 700, ml: 0.5 }}>({d.discountLabel} {d.eventTitle})</Typography> : null;
@@ -4899,7 +4942,7 @@ export default function HomePage() {
                 </Typography>
               </Box>
               {productOptions.isLongSleeve && selectedProduct && (
-                <Typography sx={{ fontSize: '0.72rem', color: 'var(--warning)', fontWeight: 600 }}>+ แขนยาว ฿{selectedProduct.options?.longSleevePrice ?? 50}</Typography>
+                <Typography sx={{ fontSize: '0.72rem', color: 'var(--warning)', fontWeight: 600 }}>+ {t.common.longSleeve} ฿{selectedProduct.options?.longSleevePrice ?? 50}</Typography>
               )}
             </Box>
           </Box>
@@ -4932,7 +4975,7 @@ export default function HomePage() {
                 '&:disabled': { color: 'var(--text-muted)', borderColor: 'rgba(100,116,139,0.2)' },
               }}
             >
-              เพิ่มลงตะกร้า
+              {t.product.addToCart}
             </Button>
             <Button
               onClick={handleBuyNow}
@@ -4961,7 +5004,7 @@ export default function HomePage() {
                 '&:disabled': { background: 'rgba(100,116,139,0.15)', color: 'var(--text-muted)' },
               }}
             >
-              ซื้อเลย
+              {t.product.buyNow}
             </Button>
           </Box>
         </Box>
@@ -5024,7 +5067,7 @@ export default function HomePage() {
       const res = await cancelOrder(ref);
 
       if (res.status === 'success') {
-        showToast('success', 'ยกเลิกคำสั่งซื้อแล้ว');
+        showToast('success', t.orderHistory.cancelledOrder);
         // Update local state immediately for instant UI feedback
         setOrderHistory((prev) =>
           prev.map((order) =>
@@ -5036,10 +5079,10 @@ export default function HomePage() {
           loadOrderHistory();
         }, 500);
       } else {
-        showToast('error', res.message || 'ยกเลิกคำสั่งซื้อไม่สำเร็จ');
+        showToast('error', res.message || t.orderHistory.cancelFailed);
       }
     } catch (error: any) {
-      showToast('error', error.message || 'ยกเลิกคำสั่งซื้อไม่สำเร็จ');
+      showToast('error', error.message || t.orderHistory.cancelFailed);
     } finally {
       setCancellingRef(null);
       setProcessing(false);
@@ -5057,11 +5100,11 @@ export default function HomePage() {
   const requireProfileBeforeCheckout = () => {
     // Block checkout if shop is closed
     if (!isShopOpen) {
-      showToast('warning', 'ร้านค้าปิดชั่วคราว ไม่สามารถสั่งซื้อได้');
+      showToast('warning', t.checkout.shopClosedWarning);
       return false;
     }
     if (!profileComplete) {
-      showToast('warning', 'กรุณาบันทึกโปรไฟล์ก่อนชำระเงิน');
+      showToast('warning', t.profile.profileSaveRequired);
       setShowProfileModal(true);
       setPendingCheckout(true);
       return false;
@@ -5078,20 +5121,20 @@ export default function HomePage() {
   }) => {
     // Block submission if shop is closed
     if (!isShopOpen) {
-      showToast('warning', 'ร้านค้าปิดชั่วคราว ไม่สามารถสั่งซื้อได้');
+      showToast('warning', t.checkout.shopClosedWarning);
       setShowOrderDialog(false);
       return;
     }
     
     if (!profileComplete) {
-      showToast('warning', 'กรุณาบันทึกโปรไฟล์ให้ครบก่อนยืนยันคำสั่งซื้อ');
+      showToast('warning', t.checkout.profileRequired);
       setShowProfileModal(true);
       setPendingCheckout(true);
       return;
     }
 
     if (cart.length === 0) {
-      showToast('warning', 'ตะกร้าสินค้าว่างเปล่า');
+      showToast('warning', t.cart.emptyWarning);
       return;
     }
 
@@ -5121,7 +5164,7 @@ export default function HomePage() {
       });
 
       if (res.status === 'success') {
-        showToast('success', `สั่งซื้อสำเร็จ หมายเลข: ${res.ref}`);
+        showToast('success', `${t.checkout.orderSuccess} ${res.ref}`);
         
         // Add new order to history immediately with full item details
         if (res.ref) {
@@ -5164,10 +5207,10 @@ export default function HomePage() {
 
         if (res.ref) openPaymentFlow(res.ref);
       } else {
-        throw new Error(res.message || 'เกิดข้อผิดพลาด');
+        throw new Error(res.message || t.common.error);
       }
     } catch (error: any) {
-      showToast('error', error.message || 'เกิดข้อผิดพลาดในการสั่งซื้อ');
+      showToast('error', error.message || t.checkout.orderError);
     } finally {
       setProcessing(false);
     }
@@ -5237,15 +5280,47 @@ export default function HomePage() {
       }
     } catch (error) {
       console.error('Failed to load history:', error);
-      showToast('error', 'ไม่สามารถโหลดประวัติได้');
+      showToast('error', t.misc.cannotLoadHistory);
     } finally {
       append ? setLoadingHistoryMore(false) : setLoadingHistory(false);
     }
   };
 
+  // ===== Auto-cancel expired unpaid orders (24h) =====
+  // Check if waiting_payment orders have expired and auto-cancel them client-side
+  useEffect(() => {
+    if (orderHistory.length === 0) return;
+    
+    const EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+    const expiredOrders = orderHistory.filter((order) => {
+      const status = normalizeStatus(order.status);
+      if (!PAYABLE_STATUSES.includes(status)) return false;
+      if (!order.date) return false;
+      const created = new Date(order.date).getTime();
+      return Date.now() - created >= EXPIRY_MS;
+    });
+
+    if (expiredOrders.length > 0) {
+      // Update local state immediately for UI feedback
+      setOrderHistory((prev) =>
+        prev.map((order) => {
+          const isExpired = expiredOrders.some((e) => e.ref === order.ref);
+          return isExpired ? { ...order, status: 'CANCELLED' } : order;
+        })
+      );
+
+      // Trigger server-side cancel for each expired order (fire and forget)
+      expiredOrders.forEach((order) => {
+        cancelOrder(order.ref).catch((err) =>
+          console.error(`[auto-cancel] Failed to cancel expired order ${order.ref}:`, err)
+        );
+      });
+    }
+  }, [orderHistory.length]); // Only run when history count changes (not on every render)
+
   const handleSaveProfile = async (data: Partial<typeof orderData> & { savedAddresses?: SavedAddress[] }) => {
     if (!session?.user?.email) {
-      showToast('error', 'กรุณาเข้าสู่ระบบ');
+      showToast('error', t.misc.pleaseLogin);
       return;
     }
 
@@ -5274,14 +5349,14 @@ export default function HomePage() {
         ...(data.savedAddresses && { savedAddresses: data.savedAddresses }),
       });
 
-      showToast('success', 'บันทึกข้อมูลจัดส่งแล้ว');
+      showToast('success', t.profile.savedProfile);
       setShowProfileModal(false);
       if (pendingCheckout && isThaiText(sanitized.name) && sanitized.phone && sanitized.instagram) {
         setShowOrderDialog(true);
         setPendingCheckout(false);
       }
     } catch (error: any) {
-      showToast('error', error.message || 'บันทึกข้อมูลไม่สำเร็จ');
+      showToast('error', error.message || t.profile.saveProfileFailed);
     } finally {
       setSavingProfile(false);
     }
@@ -5328,7 +5403,7 @@ export default function HomePage() {
   const displaySizes = useMemo(() => {
     if (!selectedProduct) return [] as string[];
     const sizeKeys = Object.keys(selectedProduct.sizePricing || {});
-    if (sizeKeys.length === 0) return ['ฟรีไซส์'];
+    if (sizeKeys.length === 0) return [t.common.freeSize];
     // Sort sizes according to standard size order (XS, S, M, L, XL, etc.)
     return sizeKeys.sort((a, b) => {
       const indexA = SIZES.indexOf(a);
@@ -5398,10 +5473,10 @@ export default function HomePage() {
 
   const categoryMeta = useMemo(
     () => [
-      { key: 'ALL', label: 'ทั้งหมด', count: totalProductCount, icon: '' },
+      { key: 'ALL', label: t.common.all, count: totalProductCount, icon: '' },
       ...Object.entries(allGroupedProducts).map(([key, items]) => ({ 
         key, 
-        label: getCategoryLabel(key) || TYPE_LABELS[key] || key || 'อื่นๆ', 
+        label: (t.category as Record<string, string>)[key] || getCategoryLabel(key, lang) || TYPE_LABELS_I18N[key] || key || t.type.OTHER, 
         count: items.length,
         icon: getCategoryIcon(key),
       })),
@@ -5416,11 +5491,12 @@ export default function HomePage() {
       .filter(([key]) => categoryFilter === 'ALL' || key === categoryFilter)
       .map(([key, items]) => {
         const bySearch = term ? items.filter((p) => {
-          const name = p.name?.toLowerCase() || '';
-          const desc = p.description?.toLowerCase() || '';
-          const type = (TYPE_LABELS[p.type] || p.type || '').toLowerCase();
-          const cat = (getCategoryLabel(key) || key || '').toLowerCase();
-          return name.includes(term) || desc.includes(term) || type.includes(term) || cat.includes(term);
+          const name = getProductName(p, lang).toLowerCase();
+          const nameAlt = p.name?.toLowerCase() || ''; // always search Thai name too
+          const desc = getProductDescription(p, lang).toLowerCase();
+          const type = (TYPE_LABELS_I18N[p.type] || p.type || '').toLowerCase();
+          const cat = ((t.category as Record<string, string>)[key] || getCategoryLabel(key, lang) || key || '').toLowerCase();
+          return name.includes(term) || nameAlt.includes(term) || desc.includes(term) || type.includes(term) || cat.includes(term);
         }) : items;
         const byPrice = bySearch.filter((p) => {
           const price = getBasePrice(p);
@@ -5462,6 +5538,8 @@ export default function HomePage() {
           <Toolbar>
             <BrandMark />
             <Box sx={{ flexGrow: 1 }} />
+            <LanguageToggle size="small" />
+            <ThemeToggle size="small" />
           </Toolbar>
         </AppBar>
 
@@ -5493,18 +5571,16 @@ export default function HomePage() {
                   </Box>
                   <Box>
                     <Typography sx={{ color: 'var(--warning)', fontWeight: 700, fontSize: '0.95rem', mb: 0.5 }}>
-                      แนะนำให้เปิดในเบราว์เซอร์
+                      {t.nav.openInBrowser}
                     </Typography>
                     <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.8rem', lineHeight: 1.6 }}>
-                      Google ไม่รองรับการเข้าสู่ระบบจากแอปนี้โดยตรง 
-                      กรุณากดปุ่ม <strong>⋮</strong> หรือ <strong>...</strong> แล้วเลือก 
-                      <strong> "เปิดในเบราว์เซอร์"</strong> หรือ <strong>"Open in Browser"</strong>
+                      {t.nav.openInBrowserDesc}
                     </Typography>
                     <Button
                       size="small"
                       onClick={() => {
                         navigator.clipboard?.writeText(currentUrl);
-                        showToast('info', 'คัดลอกลิงก์แล้ว! กรุณาวางในเบราว์เซอร์');
+                        showToast('info', t.nav.linkCopied);
                       }}
                       sx={{
                         mt: 1.5,
@@ -5515,7 +5591,7 @@ export default function HomePage() {
                       }}
                       startIcon={<Copy size={14} />}
                     >
-                      คัดลอกลิงก์
+                      {t.nav.copyLink}
                     </Button>
                   </Box>
                 </Box>
@@ -5576,13 +5652,13 @@ export default function HomePage() {
                 SCC Shop
               </Typography>
               <Typography sx={{ color: 'var(--text-muted)', mb: 4, fontSize: '1rem' }}>
-                ร้านค้าชุมนุมคอมพิวเตอร์ ม.อ.
+                {t.nav.shopTitle}
               </Typography>
               
               <Divider sx={{ borderColor: 'var(--glass-border)', mb: 4 }} />
               
               <Typography sx={{ color: 'var(--text-muted)', mb: 3, fontSize: '0.9rem' }}>
-                เข้าสู่ระบบเพื่อเริ่มช้อปปิ้ง
+                {t.nav.loginToShop}
               </Typography>
               
               {/* Google Sign In */}
@@ -5622,7 +5698,7 @@ export default function HomePage() {
                   <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
                   <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                 </svg>
-                เข้าสู่ระบบด้วย Google
+                {`${t.nav.loginWith} Google`}
               </Button>
 
               {/* Microsoft Sign In */}
@@ -5660,7 +5736,7 @@ export default function HomePage() {
                   <path fill="#05a6f0" d="M1 12h10v10H1z"/>
                   <path fill="#ffba08" d="M12 12h10v10H12z"/>
                 </svg>
-                เข้าสู่ระบบด้วย Microsoft
+                {`${t.nav.loginWith} Microsoft`}
               </Button>}
 
               {/* Facebook Sign In */}
@@ -5695,7 +5771,7 @@ export default function HomePage() {
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
                   <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
                 </svg>
-                เข้าสู่ระบบด้วย Facebook
+                {`${t.nav.loginWith} Facebook`}
               </Button>}
 
               {/* Apple Sign In */}
@@ -5730,7 +5806,7 @@ export default function HomePage() {
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
                   <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.52-3.23 0-1.44.62-2.2.44-3.06-.4C4.24 16.76 4.89 10.87 8.88 10.6c1.24.07 2.1.72 2.83.78.99-.2 1.94-.78 3-.84 1.28-.08 2.25.48 2.88 1.22-2.65 1.58-2.02 5.07.36 6.04-.47 1.2-.97 2.4-1.9 3.48zM12.07 10.5c-.16-2.3 1.74-4.2 3.93-4.5.32 2.5-2.25 4.64-3.93 4.5z"/>
                 </svg>
-                เข้าสู่ระบบด้วย Apple
+                {`${t.nav.loginWith} Apple`}
               </Button>}
 
               {/* LINE Sign In */}
@@ -5765,11 +5841,11 @@ export default function HomePage() {
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
                   <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .348-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .349-.281.63-.63.63h-2.386c-.348 0-.63-.281-.63-.63V8.108c0-.348.282-.63.63-.63h2.386c.349 0 .63.282.63.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .349-.282.63-.631.63-.345 0-.627-.281-.627-.63V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.348.279-.63.63-.63.346 0 .627.282.627.63v4.771zm-5.741 0c0 .349-.282.63-.631.63-.345 0-.627-.281-.627-.63V8.108c0-.348.282-.63.627-.63.349 0 .631.282.631.63v4.771zm-2.466.63H4.917c-.348 0-.63-.281-.63-.63V8.108c0-.348.282-.63.63-.63.349 0 .63.282.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .349-.281.63-.629.63M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/>
                 </svg>
-                เข้าสู่ระบบด้วย LINE
+                {`${t.nav.loginWith} LINE`}
               </Button>}
               
               <Typography sx={{ color: 'var(--text-muted)', mt: 4, fontSize: '0.75rem' }}>
-                โดยการเข้าสู่ระบบ คุณยอมรับ<br/>ข้อกำหนดและเงื่อนไขการใช้งาน
+                {t.nav.termsAgreement}
               </Typography>
             </Card>
           </Container>
@@ -5817,7 +5893,7 @@ export default function HomePage() {
                 borderRadius: 1.5,
               }}
             >
-              ค้นหา
+              {t.nav.search}
             </Button>
           </Box>
           <IconButton
@@ -5843,7 +5919,7 @@ export default function HomePage() {
                 '&:hover': { borderColor: '#0071e3', backgroundColor: 'rgba(0,113,227,0.16)' },
               }}
             >
-              หน้าแรก
+              {t.nav.home}
             </Button>
             <Button
               variant="outlined"
@@ -5861,7 +5937,7 @@ export default function HomePage() {
                 '&:hover': { borderColor: '#0071e3', backgroundColor: 'rgba(0,113,227,0.16)' },
               }}
             >
-              ประวัติ
+              {t.nav.history}
             </Button>
             <Button
               variant="outlined"
@@ -5879,7 +5955,7 @@ export default function HomePage() {
                 '&:hover': { borderColor: '#0071e3', backgroundColor: 'rgba(0,113,227,0.16)' },
               }}
             >
-              โปรไฟล์
+              {t.nav.profile}
             </Button>
             <Button
               variant="outlined"
@@ -5901,17 +5977,21 @@ export default function HomePage() {
                 '&:hover': { borderColor: '#0071e3', backgroundColor: 'rgba(0,113,227,0.16)' },
               }}
             >
-              ตะกร้า
+              {t.nav.cart}
             </Button>
           </Box>
           {session && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <LanguageToggle size="small" />
               <ThemeToggle size="small" />
               <Avatar src={orderData.profileImage || session?.user?.image || ''} sx={{ width: 32, height: 32, cursor: 'pointer' }} onClick={() => setSidebarOpen(true)} />
             </Box>
           )}
           {!session && (
-            <ThemeToggle size="small" />
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <LanguageToggle size="small" />
+              <ThemeToggle size="small" />
+            </Box>
           )}
         </Toolbar>
         {showSearchBar && (
@@ -5932,7 +6012,7 @@ export default function HomePage() {
                   value={productSearch}
                   onChange={(e) => setProductSearch(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Escape') { setProductSearch(''); setShowSearchBar(false); } }}
-                  placeholder="ค้นหาสินค้า, ประเภท, คำอธิบาย..."
+                  placeholder={t.search.placeholder}
                   inputProps={{ maxLength: 50 }}
                   fullWidth
                   sx={{
@@ -6003,10 +6083,10 @@ export default function HomePage() {
                     {/* Results header */}
                     <Box sx={{ px: 2, pt: 1.5, pb: 0.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                        ผลการค้นหา
+                        {t.search.results}
                       </Typography>
                       <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                        {allResults.length} รายการ
+                        {allResults.length} {t.common.items}
                       </Typography>
                     </Box>
 
@@ -6051,10 +6131,10 @@ export default function HomePage() {
                               {/* Info */}
                               <Box sx={{ flex: 1, minWidth: 0 }}>
                                 <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {product.name}
+                                  {getProductName(product, lang)}
                                 </Typography>
                                 <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {TYPE_LABELS[product.type] || product.type}
+                                  {TYPE_LABELS_I18N[product.type] || product.type}
                                 </Typography>
                               </Box>
                               {/* Price */}
@@ -6081,7 +6161,7 @@ export default function HomePage() {
                           <Typography sx={{ textAlign: 'center', fontSize: '0.72rem', color: '#0071e3', fontWeight: 600, py: 1, cursor: 'pointer' }}
                             onClick={() => { setShowSearchBar(false); document.getElementById('product-grid')?.scrollIntoView({ behavior: 'smooth' }); }}
                           >
-                            ดูทั้งหมด {allResults.length} รายการ →
+                            {t.search.viewAll} {allResults.length} {t.common.items} →
                           </Typography>
                         )}
                       </Box>
@@ -6089,10 +6169,10 @@ export default function HomePage() {
                       <Box sx={{ textAlign: 'center', py: 3, px: 2 }}>
                         <Search size={32} style={{ color: 'var(--text-muted)', opacity: 0.2, marginBottom: 8 }} />
                         <Typography sx={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                          ไม่พบสินค้าที่ค้นหา
+                          {t.search.noResults}
                         </Typography>
                         <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', opacity: 0.6, mt: 0.5 }}>
-                          ลองค้นหาด้วยคำอื่น หรือเลือกหมวดหมู่
+                          {t.search.tryOther}
                         </Typography>
                       </Box>
                     )}
@@ -6104,13 +6184,13 @@ export default function HomePage() {
               {!productSearch.trim() && totalProductCount > 0 && (
                 <Box sx={{ borderTop: '1px solid', borderColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', px: 2, py: 1.5 }}>
                   <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', mb: 1 }}>
-                    ค้นหายอดนิยม
+                    {t.search.popular}
                   </Typography>
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.6 }}>
-                    {['เสื้อกีฬา', 'เสื้อยืด', 'สติกเกอร์', 'พวงกุญแจ', 'หมวก'].filter(s => {
+                    {[t.type.JERSEY, t.type.TSHIRT, t.type.STICKER, t.type.KEYCHAIN, t.type.CAP].filter(s => {
                       const term = s.toLowerCase();
                       return Object.values(allGroupedProducts).flat().some(p => 
-                        p.name?.toLowerCase().includes(term) || (TYPE_LABELS[p.type] || '').toLowerCase().includes(term)
+                        p.name?.toLowerCase().includes(term) || (TYPE_LABELS_I18N[p.type] || '').toLowerCase().includes(term)
                       );
                     }).map(suggestion => (
                       <Chip
@@ -6222,7 +6302,7 @@ export default function HomePage() {
       >
         <Box sx={{ p: 2 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>เมนู</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>{t.nav.menu}</Typography>
             <IconButton onClick={() => setSidebarOpen(false)}>
               <X style={{ color: 'var(--foreground)' }} size={24} />
             </IconButton>
@@ -6257,7 +6337,7 @@ export default function HomePage() {
                 }}
                 startIcon={<User size={20} />}
               >
-                ข้อมูลจัดส่งของฉัน
+                {t.nav.myShippingInfo}
               </Button>
               <Button
                 fullWidth
@@ -6277,7 +6357,7 @@ export default function HomePage() {
                 }}
                 startIcon={<History size={20} />}
               >
-                ประวัติคำสั่งซื้อ
+                {t.nav.orderHistory}
               </Button>
               <Button
                 fullWidth
@@ -6297,7 +6377,7 @@ export default function HomePage() {
                 }}
                 startIcon={<ArrowLeftRight size={20} />}
               >
-                สลับบัญชี
+                {t.nav.switchAccount}
               </Button>
               <Button
                 fullWidth
@@ -6317,7 +6397,7 @@ export default function HomePage() {
                 }}
                 startIcon={<HandMetal size={20} style={{ transform: navHandedness === 'left' ? 'scaleX(-1)' : 'none' }} />}
               >
-                {navHandedness === 'right' ? 'สลับมุมมอง: คนถนัดขวา' : 'สลับมุมมอง: คนถนัดซ้าย'}
+                {navHandedness === 'right' ? t.nav.switchViewRight : t.nav.switchViewLeft}
               </Button>
               <Button
                 fullWidth
@@ -6336,7 +6416,7 @@ export default function HomePage() {
                 }}
                 startIcon={<LogOut size={20} />}
               >
-                ออกจากระบบ
+                {t.nav.logout}
               </Button>
             </>
           )}
@@ -6362,7 +6442,7 @@ export default function HomePage() {
             }}
             startIcon={<Home size={20} />}
           >
-            หน้าแรก
+            {t.nav.home}
           </Button>
         </Box>
       </Drawer>
@@ -6398,10 +6478,10 @@ export default function HomePage() {
                       </Box>
                       <Box>
                         <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                          สินค้าทั้งหมด
+                          {t.product.allProducts}
                         </Typography>
                         <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                          พบ {filteredProductCount} รายการ ({activeProductCount} เปิดขาย)
+                          {t.product.foundItems} {filteredProductCount} {t.common.items} ({activeProductCount} {t.product.openForSale})
                         </Typography>
                       </Box>
                     </Box>
@@ -6478,7 +6558,7 @@ export default function HomePage() {
                     <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid var(--glass-border)' }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
                         <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-                          กรองตามราคา
+                          {t.product.filterByPrice}
                         </Typography>
                         <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--success)' }}>
                           ฿{priceRange[0].toLocaleString()} - ฿{priceRange[1].toLocaleString()}
@@ -6526,11 +6606,11 @@ export default function HomePage() {
                     }}>
                       <span style={{ fontSize: '0.9rem' }}>{getCategoryIcon(category)}</span>
                       <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: 'white' }}>
-                        {getCategoryLabel(category) || TYPE_LABELS[category] || category || 'อื่นๆ'}
+                        {(t.category as Record<string, string>)[category] || getCategoryLabel(category, lang) || TYPE_LABELS_I18N[category] || category || t.type.OTHER}
                       </Typography>
                     </Box>
                     <Typography sx={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                      {items.length} รายการ
+                      {items.length} {t.common.items}
                     </Typography>
                     {items.length > 1 && (
                       <Typography sx={{ 
@@ -6541,7 +6621,7 @@ export default function HomePage() {
                         color: 'var(--text-muted)',
                         ml: 'auto',
                       }}>
-                        เลื่อนดูเพิ่ม →
+                        {t.product.scrollMore}
                       </Typography>
                     )}
                   </Box>
@@ -6586,12 +6666,19 @@ export default function HomePage() {
                         <Box
                           onClick={() => {
                             if (!isShopOpen) {
-                              showToast('warning', 'ร้านค้าปิดชั่วคราว ไม่สามารถสั่งซื้อได้');
+                              showToast('warning', t.checkout.shopClosedWarning);
                               return;
                             }
                             if (productStatus !== 'OPEN') {
                               const statusConfig = SHOP_STATUS_CONFIG[productStatus];
-                              showToast('info', `${product.name} - ${statusConfig.label}`);
+                              const statusLabelsMap: Record<ShopStatusType, string> = {
+                                OPEN: t.shopStatus.open,
+                                COMING_SOON: t.shopStatus.comingSoon,
+                                ORDER_ENDED: t.shopStatus.closedEnded,
+                                TEMPORARILY_CLOSED: t.shopStatus.closed,
+                                WAITING_TO_OPEN: t.shopStatus.waitingToOpen,
+                              };
+                              showToast('info', `${getProductName(product, lang)} - ${statusLabelsMap[productStatus]}`);
                               return;
                             }
                             handleSelectProduct(product);
@@ -6651,7 +6738,7 @@ export default function HomePage() {
                                 color: 'var(--text-muted)',
                                 fontSize: '0.8rem',
                               }}>
-                                ไม่มีรูป
+                                {t.common.noImage}
                               </Box>
                             )}
                             {/* Status Overlay for closed products */}
@@ -6696,12 +6783,18 @@ export default function HomePage() {
                                     textShadow: '0 2px 8px rgba(0,0,0,0.5)',
                                   }}
                                 >
-                                  {SHOP_STATUS_CONFIG[productStatus].label}
+                                  {({
+                                    OPEN: t.shopStatus.open,
+                                    COMING_SOON: t.shopStatus.comingSoon,
+                                    ORDER_ENDED: t.shopStatus.closedEnded,
+                                    TEMPORARILY_CLOSED: t.shopStatus.closed,
+                                    WAITING_TO_OPEN: t.shopStatus.waitingToOpen,
+                                  } as Record<ShopStatusType, string>)[productStatus]}
                                 </Typography>
                                 {/* Show date info */}
                                 {product.startDate && productStatus === 'COMING_SOON' && (
                                   <Typography sx={{ fontSize: '0.65rem', color: 'var(--foreground)', mt: 0.5, textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
-                                    เปิด {new Date(product.startDate).toLocaleDateString('th-TH')}
+                                    {t.product.opensOn} {new Date(product.startDate).toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-US')}
                                   </Typography>
                                 )}
                               </Box>
@@ -6738,9 +6831,9 @@ export default function HomePage() {
                                       const diff = end.getTime() - now.getTime();
                                       const days = Math.floor(diff / (1000 * 60 * 60 * 24));
                                       const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                                      if (days > 0) return `เหลือ ${days} วัน`;
-                                      if (hours > 0) return `เหลือ ${hours} ชม.`;
-                                      return 'ใกล้ปิด!';
+                                      if (days > 0) return `${t.common.remaining} ${days} ${t.common.days}`;
+                                      if (hours > 0) return `${t.common.remaining} ${hours} ${t.common.hours}`;
+                                      return t.product.closingSoon;
                                     })()}
                                   </Box>
                                 )}
@@ -6843,7 +6936,7 @@ export default function HomePage() {
                               WebkitBoxOrient: 'vertical',
                               lineHeight: 1.3,
                             }}>
-                              {product.name}
+                              {getProductName(product, lang)}
                             </Typography>
                             
                             {/* Description - Show more lines */}
@@ -6858,7 +6951,7 @@ export default function HomePage() {
                               lineHeight: 1.4,
                               mb: 1,
                             }}>
-                              {product.description || TYPE_LABELS[product.type] || product.type}
+                              {getProductDescription(product, lang) || TYPE_LABELS_I18N[product.type] || product.type}
                             </Typography>
 
                             {/* Product Tags - from customTags or auto-generated */}
@@ -6869,7 +6962,7 @@ export default function HomePage() {
                                 : [
                                     // Auto-generate from endDate
                                     ...(product.endDate && new Date(product.endDate) > new Date() ? [{
-                                      text: `ถึง ${new Date(product.endDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}`,
+                                      text: `${t.product.until} ${new Date(product.endDate).toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-US', { day: 'numeric', month: 'short' })}`,
                                       color: 'var(--error)',
                                       bgColor: 'rgba(239,68,68,0.15)',
                                       borderColor: 'rgba(239,68,68,0.3)',
@@ -6877,13 +6970,13 @@ export default function HomePage() {
                                     }] : []),
                                     // Auto-generate from options
                                     ...(product.options?.hasCustomName ? [{
-                                      text: 'สกรีนชื่อได้',
+                                      text: t.product.customNameAvailable,
                                       color: 'var(--success)',
                                       bgColor: 'rgba(16,185,129,0.15)',
                                       borderColor: 'rgba(16,185,129,0.3)'
                                     }] : []),
                                     ...(product.options?.hasCustomNumber ? [{
-                                      text: 'สกรีนเบอร์ได้',
+                                      text: t.product.customNumberAvailable,
                                       color: 'var(--secondary)',
                                       bgColor: 'rgba(0,113,227,0.15)',
                                       borderColor: 'rgba(0,113,227,0.3)'
@@ -6914,7 +7007,9 @@ export default function HomePage() {
                                       gap: 0.3,
                                     }}>
                                       {(tag as any).icon === 'clock' && <Clock size={10} />}
-                                      {tag.text}
+                                      {lang === 'en' 
+                                        ? ((tag as any).textEn || TAG_TRANSLATIONS_TH_TO_EN[tag.text] || tag.text)
+                                        : tag.text}
                                     </Box>
                                   ))}
                                 </Box>
@@ -6944,7 +7039,7 @@ export default function HomePage() {
                                     },
                                   }}
                                 >
-                                  {isShopOpen ? 'ดูรายละเอียด' : 'ร้านปิดชั่วคราว'}
+                                  {isShopOpen ? t.product.viewDetail : t.product.shopClosedTemp}
                                 </Button>
                               ) : (
                                 <Box
@@ -6971,7 +7066,13 @@ export default function HomePage() {
                                       color: SHOP_STATUS_CONFIG[productStatus].color,
                                     }}
                                   >
-                                    {SHOP_STATUS_CONFIG[productStatus].label}
+                                    {({
+                                      OPEN: t.shopStatus.open,
+                                      COMING_SOON: t.shopStatus.comingSoon,
+                                      ORDER_ENDED: t.shopStatus.closedEnded,
+                                      TEMPORARILY_CLOSED: t.shopStatus.closed,
+                                      WAITING_TO_OPEN: t.shopStatus.waitingToOpen,
+                                    } as Record<ShopStatusType, string>)[productStatus]}
                                   </Typography>
                                 </Box>
                               )}
@@ -6989,11 +7090,11 @@ export default function HomePage() {
               <Box sx={{ textAlign: 'center', py: 8 }}>
                 <Store size={64} style={{ color: 'var(--text-muted)', marginBottom: 16 }} />
                 <Typography variant="h6" sx={{ color: 'var(--text-muted)', mb: 1 }}>
-                  {totalProductCount > 0 ? 'ไม่พบสินค้าที่ค้นหา' : 'ยังไม่มีสินค้า'}
+                  {totalProductCount > 0 ? t.product.noProductsSearch : t.product.noProductsYet}
                 </Typography>
                 {totalProductCount === 0 && (
                   <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-                    รอติดตามสินค้าใหม่เร็วๆ นี้
+                    {t.product.comingSoon}
                   </Typography>
                 )}
               </Box>
@@ -7006,7 +7107,7 @@ export default function HomePage() {
             <Card sx={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', backdropFilter: 'blur(16px)' }}>
               <CardContent>
                 <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, color: 'var(--foreground)' }}>
-                  สรุปคำสั่งซื้อ
+                  {t.misc.orderSummary}
                 </Typography>
                 {cart.map((item) => (
                   <Box key={item.id} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, pb: 2, borderBottom: '1px solid var(--glass-border)' }}>
@@ -7019,7 +7120,7 @@ export default function HomePage() {
                       </Typography>
                       {(item.options?.customName || item.options?.customNumber || item.options?.isLongSleeve) && (
                         <Typography variant="caption" sx={{ color: 'var(--text-muted)', display: 'block' }}>
-                          {item.options?.customName && `ชื่อ: ${item.options.customName}`} {item.options?.customNumber && `เบอร์: ${item.options.customNumber}`} {item.options?.isLongSleeve && '(แขนยาว)'}
+                          {item.options?.customName && `${t.cart.customName}: ${item.options.customName}`} {item.options?.customNumber && `${t.cart.customNumber}: ${item.options.customNumber}`} {item.options?.isLongSleeve && '(' + t.common.longSleeve + ')'}
                         </Typography>
                       )}
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
@@ -7062,7 +7163,7 @@ export default function HomePage() {
                 ))}
                 <Divider sx={{ my: 2, borderColor: 'var(--glass-border)' }} />
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                  <Typography sx={{ fontWeight: 'bold', color: 'var(--foreground)' }}>รวม:</Typography>
+                  <Typography sx={{ fontWeight: 'bold', color: 'var(--foreground)' }}>{t.common.total}:</Typography>
                   <Typography sx={{ fontWeight: 'bold', fontSize: 18, color: 'var(--success)' }}>
                     {getTotalPrice().toLocaleString()}฿
                   </Typography>
@@ -7084,7 +7185,7 @@ export default function HomePage() {
                     '&:hover': { background: 'linear-gradient(135deg, #0ea472 0%, #0591b5 100%)', boxShadow: '0 12px 34px rgba(16, 185, 129, 0.45)' },
                   }}
                 >
-                  ดำเนินการสั่งซื้อ
+                  {t.misc.proceedOrder}
                 </Button>
               </CardContent>
             </Card>
@@ -7111,7 +7212,7 @@ export default function HomePage() {
             return [{ ref, status: 'PAID', date: new Date().toISOString(), total: 0 }, ...prev];
           });
           setActiveTab('history');
-          showToast('success', 'ชำระเงินสำเร็จ!');
+          showToast('success', t.payment.paymentSuccessToast);
           
           // Refresh order history from server to get complete data
           setTimeout(() => {
@@ -7141,9 +7242,9 @@ export default function HomePage() {
         shippingConfig={shippingConfig}
         isShopOpen={isShopOpen}
         onClearCart={() => {
-          if (confirm('ล้างตะกร้าทั้งหมด?')) {
+          if (confirm(t.cart.clearAllConfirm)) {
             saveCart([]);
-            showToast('success', 'ล้างตะกร้าแล้ว');
+            showToast('success', t.cart.cleared);
           }
         }}
         onUpdateQuantity={(itemId, quantity) => updateCartQuantity(itemId, quantity)}
@@ -7209,8 +7310,8 @@ export default function HomePage() {
               <Ruler size={20} color="white" />
             </Box>
             <Box>
-              <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--foreground)' }}>ตารางไซส์</Typography>
-              <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>สัดส่วนรอบอก/ความยาว (นิ้ว)</Typography>
+              <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--foreground)' }}>{t.product.sizeChartTitle}</Typography>
+              <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t.product.sizeChartSubtitle}</Typography>
             </Box>
           </Box>
         </Box>
@@ -7232,7 +7333,7 @@ export default function HomePage() {
               alignItems: 'center',
               gap: 0.5,
             }}>
-              <Ruler size={14} /> อก / ความยาว (นิ้ว)
+              <Ruler size={14} /> {t.misc.sizeChartInch}
             </Box>
             <Box sx={{
               px: 1.2,
@@ -7244,7 +7345,7 @@ export default function HomePage() {
               fontWeight: 600,
               color: 'var(--warning)',
             }}>
-              แขนยาว +{selectedProduct?.options?.longSleevePrice ?? 50}฿
+              {t.common.longSleeve} +{selectedProduct?.options?.longSleevePrice ?? 50}฿
             </Box>
           </Box>
 
@@ -7290,13 +7391,13 @@ export default function HomePage() {
                   </Box>
                   <Box sx={{ display: 'flex', gap: 1.5 }}>
                     <Box>
-                      <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)', mb: 0.2 }}>รอบอก</Typography>
+                      <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)', mb: 0.2 }}>{t.product.chestFull}</Typography>
                       <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--foreground)' }}>
                         {measurements ? `${measurements.chest}"` : '—'}
                       </Typography>
                     </Box>
                     <Box>
-                      <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)', mb: 0.2 }}>ความยาว</Typography>
+                      <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)', mb: 0.2 }}>{t.product.lengthFull}</Typography>
                       <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--foreground)' }}>
                         {measurements ? `${measurements.length}"` : '—'}
                       </Typography>
@@ -7329,7 +7430,7 @@ export default function HomePage() {
               },
             }}
           >
-            ปิด
+            {t.common.close}
           </Button>
         </Box>
       </Dialog>
@@ -7369,14 +7470,14 @@ export default function HomePage() {
       >
         <DialogTitle sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
           <AlertTriangle size={20} color="#ffd60a" />
-          ยืนยันยกเลิกคำสั่งซื้อ
+          {t.orderHistory.confirmCancelTitle}
         </DialogTitle>
         <DialogContent>
           <Typography sx={{ color: 'var(--text-muted)', mb: 1 }}>
-            ต้องการยกเลิกคำสั่งซื้อหมายเลข {confirmCancelRef ? `#${confirmCancelRef}` : ''} หรือไม่?
+            {t.orderHistory.confirmCancelMessage} {confirmCancelRef ? `#${confirmCancelRef}` : ''} {t.orderHistory.confirmCancelAsk}
           </Typography>
           <Typography variant="caption" sx={{ color: 'var(--text-muted)' }}>
-            การยกเลิกจะไม่สามารถย้อนกลับได้ และสถานะจะเปลี่ยนเป็น ยกเลิก
+            {t.orderHistory.cancelWarning}
           </Typography>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
@@ -7385,7 +7486,7 @@ export default function HomePage() {
             onClick={() => setConfirmCancelRef(null)}
             sx={{ color: 'var(--text-muted)', borderColor: 'var(--glass-border)' }}
           >
-            ไม่ยกเลิก
+            {t.orderHistory.dontCancel}
           </Button>
           <Button
             variant="contained"
@@ -7403,7 +7504,7 @@ export default function HomePage() {
               px: 2.5,
             }}
           >
-            ยืนยันยกเลิก
+            {t.orderHistory.confirmCancel}
           </Button>
         </DialogActions>
       </Dialog>
@@ -7687,7 +7788,7 @@ export default function HomePage() {
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
           <CircularProgress color="inherit" size={36} />
           <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>
-            {savingProfile ? 'กำลังบันทึกข้อมูล...' : 'กำลังประมวลผล...'}
+            {savingProfile ? t.misc.processingData : t.misc.processingOrder}
           </Typography>
         </Box>
       </Backdrop>
@@ -7745,10 +7846,10 @@ export default function HomePage() {
               <Package size={32} color="white" />
             </Box>
             <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--foreground)', mb: 0.5 }}>
-              QR Code รับสินค้า
+              {t.qrDialog.title}
             </Typography>
             <Typography sx={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-              แสดง QR Code นี้ให้พนักงาน
+              {t.qrDialog.instruction}
             </Typography>
           </Box>
 
@@ -7783,7 +7884,7 @@ export default function HomePage() {
               textAlign: 'center',
               mb: 0.5,
             }}>
-              หมายเลขคำสั่งซื้อ
+              {t.qrDialog.orderNumber}
             </Typography>
             <Typography sx={{ 
               fontSize: '1.3rem', 
@@ -7826,7 +7927,7 @@ export default function HomePage() {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                   <MapPin size={18} style={{ color: 'var(--success)' }} />
                   <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--success)' }}>
-                    สถานที่รับสินค้า
+                    {t.qrDialog.pickupLocation}
                   </Typography>
                 </Box>
                 {uniqueLocations.map((loc, idx) => (
@@ -7838,9 +7939,9 @@ export default function HomePage() {
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 1 }}>
                     <Clock size={14} style={{ color: 'var(--text-muted)' }} />
                     <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      {firstPickup.startDate && new Date(firstPickup.startDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      {firstPickup.startDate && new Date(firstPickup.startDate).toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                       {firstPickup.startDate && firstPickup.endDate && ' - '}
-                      {firstPickup.endDate && new Date(firstPickup.endDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      {firstPickup.endDate && new Date(firstPickup.endDate).toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                     </Typography>
                   </Box>
                 )}
@@ -7869,7 +7970,7 @@ export default function HomePage() {
               '&:hover': { bgcolor: 'var(--glass-bg)' },
             }}
           >
-            ปิด
+            {t.common.close}
           </Button>
         </Box>
       </Dialog>
@@ -7890,11 +7991,11 @@ export default function HomePage() {
       >
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, pb: 1, color: 'var(--foreground)' }}>
           <TriangleAlert size={22} color="#ff9f0a" />
-          ยืนยันการออกจากระบบ
+          {t.nav.confirmLogout}
         </DialogTitle>
         <DialogContent>
           <Typography variant="body2" sx={{ color: 'var(--text-muted)' }}>
-            คุณต้องการออกจากระบบใช่หรือไม่?
+            {t.nav.logoutConfirmMessage}
           </Typography>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5 }}>
@@ -7902,7 +8003,7 @@ export default function HomePage() {
             onClick={() => setLogoutConfirmOpen(false)}
             sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 600, color: 'var(--foreground)' }}
           >
-            ยกเลิก
+            {t.common.cancel}
           </Button>
           <Button
             onClick={() => signOut()}
@@ -7910,7 +8011,7 @@ export default function HomePage() {
             color="error"
             sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 600 }}
           >
-            ออกจากระบบ
+            {t.nav.logout}
           </Button>
         </DialogActions>
       </Dialog>
@@ -7938,7 +8039,7 @@ export default function HomePage() {
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <ArrowLeftRight size={20} />
-            สลับบัญชี
+            {t.nav.switchAccount}
           </Box>
           <IconButton onClick={() => setSwitchAccountOpen(false)} sx={{ color: 'var(--text-muted)' }}>
             <X size={20} />
@@ -7962,12 +8063,12 @@ export default function HomePage() {
                   {session?.user?.email}
                 </Typography>
               </Box>
-              <Chip label="ปัจจุบัน" size="small" sx={{ bgcolor: 'rgba(0,113,227,0.15)', color: '#0071e3', fontWeight: 600, fontSize: '0.7rem' }} />
+              <Chip label={t.common.current} size="small" sx={{ bgcolor: 'rgba(0,113,227,0.15)', color: '#0071e3', fontWeight: 600, fontSize: '0.7rem' }} />
             </Box>
           )}
 
           <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem', mt: 1 }}>
-            เลือกวิธีเข้าสู่ระบบด้วยบัญชีอื่น
+            {t.nav.selectLoginMethod}
           </Typography>
 
           {/* Provider Buttons */}
@@ -8114,8 +8215,8 @@ export default function HomePage() {
         >
           <Bot size={24} color="#30d158" />
           <Box>
-            <Typography sx={{ fontSize: '0.9rem', fontWeight: 600 }}>ถามแชทบอท</Typography>
-            <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>ตอบคำถามอัตโนมัติ 24 ชม.</Typography>
+            <Typography sx={{ fontSize: '0.9rem', fontWeight: 600 }}>{t.help.askChatbot}</Typography>
+            <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{t.help.chatbotDesc}</Typography>
           </Box>
         </Box>
         <Divider sx={{ borderColor: (theme: any) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }} />
@@ -8139,8 +8240,8 @@ export default function HomePage() {
         >
           <Headphones size={24} color="#0071e3" />
           <Box>
-            <Typography sx={{ fontSize: '0.9rem', fontWeight: 600 }}>ติดต่อแอดมิน</Typography>
-            <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>แชทกับทีมงานโดยตรง</Typography>
+            <Typography sx={{ fontSize: '0.9rem', fontWeight: 600 }}>{t.help.contactAdmin}</Typography>
+            <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{t.help.contactAdminDesc}</Typography>
           </Box>
         </Box>
       </Popover>

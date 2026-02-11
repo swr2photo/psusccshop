@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -41,6 +41,7 @@ import {
 import { ShippingConfig, ShippingOption } from '@/lib/shipping';
 import { PaymentConfig, PaymentOption } from '@/lib/payment';
 import TurnstileWidget from './TurnstileWidget';
+import { useTranslation } from '@/hooks/useTranslation';
 
 // ==================== TYPES ====================
 
@@ -71,6 +72,7 @@ interface OrderData {
 interface Product {
   id: string;
   name: string;
+  nameEn?: string;
   images?: string[];
   coverImage?: string;
 }
@@ -156,6 +158,48 @@ export default function CheckoutDialog({
   const [promoLoading, setPromoLoading] = useState(false);
   const [promoResult, setPromoResult] = useState<{ valid: boolean; code: string; discount: number; description: string } | null>(null);
   const [promoError, setPromoError] = useState('');
+
+  const { t, lang } = useTranslation();
+
+  // i18n helpers for shipping/payment option names
+  const getShippingName = (option: ShippingOption) => lang === 'en' && option.nameEn ? option.nameEn : option.name;
+  const getShippingDesc = (option: ShippingOption) => lang === 'en' && option.descriptionEn ? option.descriptionEn : option.description;
+  const getPaymentName = (option: PaymentOption) => lang === 'en' ? option.name : (option.nameThai || option.name);
+  const getPaymentDesc = (option: PaymentOption) => lang === 'en' ? option.description : (option.descriptionThai || option.description);
+
+  // Swipe-to-dismiss (mobile fullscreen)
+  const [dialogDragOffset, setDialogDragOffset] = useState(0);
+  const [isDialogDragging, setIsDialogDragging] = useState(false);
+  const dialogSwipeStartY = useRef(0);
+  const dialogScrollRef = useRef<HTMLElement | null>(null);
+
+  const handleDialogSwipeStart = useCallback((e: React.TouchEvent) => {
+    if (!isMobile) return;
+    // Only start drag if content is scrolled to top
+    if (dialogScrollRef.current && dialogScrollRef.current.scrollTop > 5) return;
+    dialogSwipeStartY.current = e.touches[0].clientY;
+    setIsDialogDragging(true);
+  }, [isMobile]);
+
+  const handleDialogSwipeMove = useCallback((e: React.TouchEvent) => {
+    if (!isDialogDragging) return;
+    const delta = e.touches[0].clientY - dialogSwipeStartY.current;
+    if (delta < 0) { setDialogDragOffset(0); return; }
+    setDialogDragOffset(delta > 80 ? 80 + (delta - 80) * 0.3 : delta);
+  }, [isDialogDragging]);
+
+  const handleDialogSwipeEnd = useCallback(() => {
+    if (!isDialogDragging) return;
+    setIsDialogDragging(false);
+    if (dialogDragOffset >= 80) {
+      setDialogDragOffset(window.innerHeight);
+      setTimeout(() => { onClose(); setDialogDragOffset(0); }, 200);
+    } else {
+      setDialogDragOffset(0);
+    }
+  }, [isDialogDragging, dialogDragOffset, onClose]);
+
+  useEffect(() => { if (!open) { setDialogDragOffset(0); setIsDialogDragging(false); } }, [open]);
 
   // Reset promo when dialog closes
   useEffect(() => {
@@ -270,11 +314,11 @@ export default function CheckoutDialog({
         setPromoResult(data);
         setPromoError('');
       } else {
-        setPromoError(data.error || 'รหัสไม่ถูกต้อง');
+        setPromoError(data.error || t.checkout.invalidCode);
         setPromoResult(null);
       }
     } catch {
-      setPromoError('ไม่สามารถตรวจสอบรหัสได้');
+      setPromoError(t.checkout.cannotVerifyCode);
     } finally {
       setPromoLoading(false);
     }
@@ -336,9 +380,22 @@ export default function CheckoutDialog({
           borderRadius: isMobile ? 0 : '20px',
           border: isMobile ? 'none' : '1px solid var(--glass-border)',
           maxHeight: isMobile ? '100vh' : '90vh',
+          transform: dialogDragOffset > 0 ? `translateY(${dialogDragOffset}px) !important` : undefined,
+          transition: isDialogDragging ? 'none !important' : 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1) !important',
         },
       }}
     >
+      {/* Swipe Handle for mobile */}
+      {isMobile && (
+        <Box
+          onTouchStart={handleDialogSwipeStart}
+          onTouchMove={handleDialogSwipeMove}
+          onTouchEnd={handleDialogSwipeEnd}
+          sx={{ width: '100%', display: 'flex', justifyContent: 'center', pt: 1, pb: 0.5, cursor: 'grab', touchAction: 'none', bgcolor: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)' }}
+        >
+          <Box sx={{ width: isDialogDragging ? 48 : 36, height: 4, bgcolor: 'rgba(255,255,255,0.4)', borderRadius: 2, transition: 'all 0.2s ease' }} />
+        </Box>
+      )}
       {/* Header */}
       <DialogTitle sx={{ 
         background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)', 
@@ -350,8 +407,8 @@ export default function CheckoutDialog({
       }}>
         <ShoppingCart size={22} />
         <Box>
-          <Typography sx={{ fontWeight: 700, fontSize: '1.1rem' }}>ยืนยันการสั่งซื้อ</Typography>
-          <Typography sx={{ fontSize: '0.75rem', opacity: 0.85 }}>{cart.length} รายการ</Typography>
+          <Typography sx={{ fontWeight: 700, fontSize: '1.1rem' }}>{t.checkout.title}</Typography>
+          <Typography sx={{ fontSize: '0.75rem', opacity: 0.85 }}>{cart.length} {t.common.items}</Typography>
         </Box>
       </DialogTitle>
 
@@ -382,7 +439,7 @@ export default function CheckoutDialog({
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Package size={18} color="var(--text-muted)" />
               <Typography sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '0.95rem' }}>
-                สรุปคำสั่งซื้อ
+                {t.checkout.summary}
               </Typography>
               <Box sx={{
                 px: 1,
@@ -393,7 +450,7 @@ export default function CheckoutDialog({
                 fontWeight: 600,
                 color: 'var(--secondary)',
               }}>
-                {cart.reduce((sum, item) => sum + item.quantity, 0)} ชิ้น
+                {cart.reduce((sum, item) => sum + item.quantity, 0)} {t.common.pieces}
               </Box>
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -416,6 +473,7 @@ export default function CheckoutDialog({
               {cart.map((item) => {
                 const productInfo = products?.find(p => p.id === item.productId);
                 const productImage = productInfo?.coverImage || productInfo?.images?.[0];
+                const displayName = (lang === 'en' && productInfo?.nameEn) ? productInfo.nameEn : (productInfo?.name || item.productName);
                 
                 return (
                   <Box key={item.id} sx={{ 
@@ -442,7 +500,7 @@ export default function CheckoutDialog({
                       {productImage ? (
                         <img
                           src={productImage}
-                          alt={item.productName}
+                          alt={displayName}
                           style={{
                             width: '100%',
                             height: '100%',
@@ -464,7 +522,7 @@ export default function CheckoutDialog({
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
                       }}>
-                        {item.productName}
+                        {displayName}
                       </Typography>
                       <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.5 }}>
                         {item.size && item.size !== '-' && (
@@ -477,15 +535,15 @@ export default function CheckoutDialog({
                         </Box>
                         {item.options?.isLongSleeve && (
                           <Box sx={{ px: 0.6, py: 0.1, borderRadius: '4px', bgcolor: 'rgba(99,102,241,0.15)', fontSize: '0.65rem', color: '#818cf8' }}>
-                            แขนยาว
+                            {t.common.longSleeve}
                           </Box>
                         )}
                       </Box>
                       {(item.options?.customName || item.options?.customNumber) && (
                         <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)', mt: 0.3 }}>
-                          {item.options?.customName ? `ชื่อ: ${item.options.customName}` : ''}
+                          {item.options?.customName ? `${t.common.name}: ${item.options.customName}` : ''}
                           {item.options?.customName && item.options?.customNumber ? ' · ' : ''}
-                          {item.options?.customNumber ? `เบอร์: ${item.options.customNumber}` : ''}
+                          {item.options?.customNumber ? `${t.payment.numberLabel}: ${item.options.customNumber}` : ''}
                         </Typography>
                       )}
                     </Box>
@@ -522,13 +580,13 @@ export default function CheckoutDialog({
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Truck size={18} color="#64d2ff" />
                 <Typography sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '0.95rem' }}>
-                  วิธีจัดส่ง
+                  {t.checkout.shippingMethod}
                 </Typography>
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 {selectedShippingOption && (
                   <Typography sx={{ fontSize: '0.8rem', color: '#64d2ff' }}>
-                    {selectedShippingOption.name}
+                    {getShippingName(selectedShippingOption)}
                   </Typography>
                 )}
                 {showShippingOptions ? <ChevronUp size={18} color="var(--text-muted)" /> : <ChevronDown size={18} color="var(--text-muted)" />}
@@ -572,15 +630,15 @@ export default function CheckoutDialog({
                             </Box>
                             <Box>
                               <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>
-                                {option.name}
+                                {getShippingName(option)}
                               </Typography>
                               {option.estimatedDays && (
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.3 }}>
                                   <Clock size={12} color="var(--text-muted)" />
                                   <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                                     {option.estimatedDays.min === option.estimatedDays.max 
-                                      ? `${option.estimatedDays.min} วัน`
-                                      : `${option.estimatedDays.min}-${option.estimatedDays.max} วัน`
+                                      ? `${option.estimatedDays.min} ${t.checkout.estimatedDays}`
+                                      : `${option.estimatedDays.min}-${option.estimatedDays.max} ${t.checkout.estimatedDays}`
                                     }
                                   </Typography>
                                 </Box>
@@ -591,7 +649,7 @@ export default function CheckoutDialog({
                             {isFreeShipping ? (
                               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                 <Typography sx={{ fontSize: '0.8rem', color: '#34c759', fontWeight: 700 }}>
-                                  ฟรี
+                                  {t.common.free}
                                 </Typography>
                                 <Box sx={{
                                   px: 0.8,
@@ -601,7 +659,7 @@ export default function CheckoutDialog({
                                   fontSize: '0.6rem',
                                   color: '#30d158',
                                 }}>
-                                  ส่งฟรี
+                                  {t.checkout.freeShipping}
                                 </Box>
                               </Box>
                             ) : (
@@ -653,13 +711,13 @@ export default function CheckoutDialog({
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <CreditCard size={18} color="#34c759" />
                 <Typography sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '0.95rem' }}>
-                  วิธีชำระเงิน
+                  {t.checkout.paymentMethod}
                 </Typography>
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 {selectedPaymentOption && (
                   <Typography sx={{ fontSize: '0.8rem', color: '#34c759' }}>
-                    {selectedPaymentOption.nameThai || selectedPaymentOption.name}
+                    {getPaymentName(selectedPaymentOption)}
                   </Typography>
                 )}
                 {showPaymentOptions ? <ChevronUp size={18} color="var(--text-muted)" /> : <ChevronDown size={18} color="var(--text-muted)" />}
@@ -702,11 +760,11 @@ export default function CheckoutDialog({
                             </Box>
                             <Box>
                               <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>
-                                {option.nameThai || option.name}
+                                {getPaymentName(option)}
                               </Typography>
                               {option.description && (
                                 <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                                  {option.description}
+                                  {getPaymentDesc(option)}
                                 </Typography>
                               )}
                             </Box>
@@ -746,7 +804,7 @@ export default function CheckoutDialog({
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <User size={18} color="#2997ff" />
-              <Typography sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '0.95rem' }}>ข้อมูลผู้รับสินค้า</Typography>
+              <Typography sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '0.95rem' }}>{t.checkout.recipientInfo}</Typography>
             </Box>
             <Button 
               size="small" 
@@ -761,15 +819,15 @@ export default function CheckoutDialog({
                 '&:hover': { bgcolor: 'rgba(0,113,227,0.25)' },
               }}
             >
-              แก้ไข
+              {t.common.edit}
             </Button>
           </Box>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
             <Typography sx={{ color: 'var(--foreground)', fontSize: '0.9rem' }}>
-              <Box component="span" sx={{ color: 'var(--text-muted)', mr: 1 }}>ชื่อ:</Box>{orderData.name || '—'}
+              <Box component="span" sx={{ color: 'var(--text-muted)', mr: 1 }}>{`${t.common.name}:`}</Box>{orderData.name || '—'}
             </Typography>
             <Typography sx={{ color: 'var(--foreground)', fontSize: '0.9rem' }}>
-              <Box component="span" sx={{ color: 'var(--text-muted)', mr: 1 }}>โทร:</Box>{orderData.phone || '—'}
+              <Box component="span" sx={{ color: 'var(--text-muted)', mr: 1 }}>{`${t.common.phone}:`}</Box>{orderData.phone || '—'}
             </Typography>
             <Typography sx={{ color: 'var(--foreground)', fontSize: '0.9rem' }}>
               <Box component="span" sx={{ color: 'var(--text-muted)', mr: 1 }}>IG:</Box>{orderData.instagram || '—'}
@@ -778,7 +836,7 @@ export default function CheckoutDialog({
             {savedAddresses.length > 1 && requiresAddress ? (
               <Box sx={{ mt: 0.5 }}>
                 <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem', mb: 0.5 }}>
-                  ที่อยู่จัดส่ง:<Box component="span" sx={{ color: '#ff453a', ml: 0.3 }}>*</Box>
+                  {t.checkout.address}<Box component="span" sx={{ color: '#ff453a', ml: 0.3 }}>*</Box>
                 </Typography>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                   {savedAddresses.map((addr) => (
@@ -801,7 +859,7 @@ export default function CheckoutDialog({
                         </Typography>
                         {addr.isDefault && (
                           <Typography sx={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--success)', bgcolor: 'rgba(16,185,129,0.1)', px: 0.5, borderRadius: '4px' }}>
-                            หลัก
+                            {t.common.default}
                           </Typography>
                         )}
                       </Box>
@@ -815,10 +873,10 @@ export default function CheckoutDialog({
             ) : (
               <Typography sx={{ color: 'var(--foreground)', fontSize: '0.9rem', display: 'flex', alignItems: 'flex-start' }}>
                 <Box component="span" sx={{ color: 'var(--text-muted)', mr: 1, flexShrink: 0 }}>
-                  ที่อยู่:{requiresAddress && <Box component="span" sx={{ color: '#ff453a', ml: 0.3 }}>*</Box>}
+                  {`${t.common.address}:`}{requiresAddress && <Box component="span" sx={{ color: '#ff453a', ml: 0.3 }}>*</Box>}
                 </Box>
                 <Box component="span" sx={{ color: orderData.address ? 'var(--foreground)' : 'var(--text-muted)' }}>
-                  {orderData.address || (requiresAddress ? 'กรุณากรอกที่อยู่จัดส่ง' : '—')}
+                  {orderData.address || (requiresAddress ? t.checkout.addressEmpty : '—')}
                 </Box>
               </Typography>
             )}
@@ -833,7 +891,7 @@ export default function CheckoutDialog({
               border: '1px solid rgba(249,115,22,0.3)',
             }}>
               <Typography sx={{ color: '#fb923c', fontSize: '0.8rem', fontWeight: 600 }}>
-                กรุณาบันทึกโปรไฟล์ (ชื่อไทย, เบอร์, IG) ก่อนยืนยัน
+                {t.checkout.profileWarning}
               </Typography>
             </Box>
           )}
@@ -851,7 +909,7 @@ export default function CheckoutDialog({
             }}>
               <MapPin size={16} color="#f87171" />
               <Typography sx={{ color: '#f87171', fontSize: '0.8rem', fontWeight: 600 }}>
-                กรุณากรอกที่อยู่สำหรับจัดส่งสินค้า
+                {t.checkout.addressRequired}
               </Typography>
             </Box>
           )}
@@ -868,7 +926,7 @@ export default function CheckoutDialog({
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
             <Ticket size={16} style={{ color: promoResult?.valid ? '#34c759' : 'var(--text-muted)' }} />
             <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>
-              รหัสส่วนลด
+              {t.checkout.promoCode}
             </Typography>
           </Box>
           {promoResult?.valid ? (
@@ -899,7 +957,7 @@ export default function CheckoutDialog({
             <Box sx={{ display: 'flex', gap: 1 }}>
               <TextField
                 size="small"
-                placeholder="กรอกรหัสส่วนลด"
+                placeholder={t.checkout.promoPlaceholder}
                 value={promoCode}
                 onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setPromoError(''); }}
                 onKeyDown={(e) => e.key === 'Enter' && applyPromoCode()}
@@ -941,7 +999,7 @@ export default function CheckoutDialog({
                   '&:hover': { bgcolor: 'rgba(0,113,227,0.25)' },
                 }}
               >
-                {promoLoading ? <CircularProgress size={16} /> : 'ใช้โค้ด'}
+                {promoLoading ? <CircularProgress size={16} /> : t.checkout.applyCode}
               </Button>
             </Box>
           )}
@@ -955,36 +1013,36 @@ export default function CheckoutDialog({
           border: '1px solid var(--glass-border)',
         }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-            <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>ราคาสินค้า</Typography>
+            <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{t.checkout.productPrice}</Typography>
             <Typography sx={{ color: 'var(--foreground)', fontSize: '0.85rem' }}>฿{subtotal.toLocaleString()}</Typography>
           </Box>
           {shippingFee > 0 && (
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-              <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>ค่าจัดส่ง</Typography>
+              <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{t.checkout.shippingFee}</Typography>
               <Typography sx={{ color: 'var(--foreground)', fontSize: '0.85rem' }}>฿{shippingFee.toLocaleString()}</Typography>
             </Box>
           )}
           {shippingFee === 0 && selectedShippingOption && selectedShippingOption.baseFee > 0 && (
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-              <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>ค่าจัดส่ง</Typography>
+              <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{t.checkout.shippingFee}</Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                 <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.8rem', textDecoration: 'line-through' }}>
                   ฿{selectedShippingOption.baseFee}
                 </Typography>
-                <Typography sx={{ color: '#34c759', fontSize: '0.85rem', fontWeight: 600 }}>ฟรี</Typography>
+                <Typography sx={{ color: '#34c759', fontSize: '0.85rem', fontWeight: 600 }}>{t.common.free}</Typography>
               </Box>
             </Box>
           )}
           {paymentFee > 0 && (
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-              <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>ค่าธรรมเนียม</Typography>
+              <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{t.checkout.processingFee}</Typography>
               <Typography sx={{ color: '#ff9f0a', fontSize: '0.85rem' }}>฿{paymentFee.toLocaleString()}</Typography>
             </Box>
           )}
           {promoDiscount > 0 && (
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
               <Typography sx={{ color: '#34c759', fontSize: '0.85rem', fontWeight: 600 }}>
-                ส่วนลด ({promoResult?.code})
+                {t.checkout.discount} ({promoResult?.code})
               </Typography>
               <Typography sx={{ color: '#34c759', fontSize: '0.85rem', fontWeight: 700 }}>
                 -฿{promoDiscount.toLocaleString()}
@@ -993,7 +1051,7 @@ export default function CheckoutDialog({
           )}
           <Divider sx={{ my: 1.5, borderColor: 'var(--glass-border)' }} />
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '1rem' }}>ยอดรวมทั้งหมด</Typography>
+            <Typography sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '1rem' }}>{t.checkout.grandTotal}</Typography>
             <Typography sx={{ fontWeight: 900, color: '#34c759', fontSize: '1.4rem' }}>
               ฿{total.toLocaleString()}
             </Typography>
@@ -1032,7 +1090,7 @@ export default function CheckoutDialog({
             '&:hover': { bgcolor: 'var(--glass-bg)' },
           }}
         >
-          ยกเลิก
+          {t.common.cancel}
         </Button>
         <Button
           onClick={handleSubmit}
@@ -1059,7 +1117,7 @@ export default function CheckoutDialog({
             },
           }}
         >
-          {processing ? 'กำลังดำเนินการ...' : `ยืนยันสั่งซื้อ ฿${total.toLocaleString()}`}
+          {processing ? t.checkout.processing : `${t.checkout.confirmOrder} ฿${total.toLocaleString()}`}
         </Button>
       </DialogActions>
     </Dialog>

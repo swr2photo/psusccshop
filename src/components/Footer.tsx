@@ -3,6 +3,7 @@
 import { Facebook, Instagram, Mail, Shield, Info } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
+import { useTranslation } from '@/hooks/useTranslation';
 
 // Build info from environment (set at build time)
 const BUILD_VERSION = process.env.NEXT_PUBLIC_BUILD_VERSION || 'dev';
@@ -10,6 +11,7 @@ const BUILD_TIME = process.env.NEXT_PUBLIC_BUILD_TIME || new Date().toISOString(
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || '2.1.0';
 
 export default function Footer() {
+  const { t } = useTranslation();
   const [showBuildInfo, setShowBuildInfo] = useState(false);
   
   // Format build time for display
@@ -37,33 +39,33 @@ export default function Footer() {
             PSUSCCSHOP
           </h3>
           <p className="text-sm">
-            ร้านค้าในชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ มหาวิทยาลัยสงขลานครินทร์
+            {t.footer.description}
           </p>
         </div>
 
         {/* Links */}
         <div>
-          <h4 className="font-bold text-slate-800 dark:text-white mb-4">เมนู</h4>
+          <h4 className="font-bold text-slate-800 dark:text-white mb-4">{t.footer.menuTitle}</h4>
           <ul className="space-y-2 text-sm">
             <li>
               <Link href="/" className="hover:text-indigo-400 transition flex items-center gap-2">
-                หน้าแรก
+                {t.footer.home}
               </Link>
             </li>
             <li>
               <Link href="/#payment" className="hover:text-indigo-400 transition flex items-center gap-2">
-                แจ้งชำระเงิน
+                {t.footer.payment}
               </Link>
             </li>
             <li>
               <Link href="/#history" className="hover:text-indigo-400 transition flex items-center gap-2">
-                ตรวจสอบสถานะ
+                {t.footer.checkStatus}
               </Link>
             </li>
             <li>
               <Link href="/privacy" className="hover:text-indigo-400 transition flex items-center gap-2">
                 <Shield size={14} />
-                นโยบายความเป็นส่วนตัว
+                {t.footer.privacyPolicy}
               </Link>
             </li>
           </ul>
@@ -71,7 +73,7 @@ export default function Footer() {
 
         {/* Contact */}
         <div>
-          <h4 className="font-bold text-slate-800 dark:text-white mb-4">ติดต่อเรา</h4>
+          <h4 className="font-bold text-slate-800 dark:text-white mb-4">{t.footer.contactUs}</h4>
           <div className="flex gap-4 mb-4">
             <a href="https://facebook.com/psuscc" className="hover:text-indigo-500 transition" title="Facebook">
               <Facebook size={20} />
@@ -95,7 +97,7 @@ export default function Footer() {
           <button
             onClick={() => setShowBuildInfo(!showBuildInfo)}
             className="flex items-center gap-1.5 text-slate-500 hover:text-slate-400 transition-colors"
-            title="ข้อมูลเวอร์ชัน"
+            title={t.footer.versionInfo}
           >
             <Info size={12} />
             <span className="font-mono">v{APP_VERSION}</span>

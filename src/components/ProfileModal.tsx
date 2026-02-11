@@ -8,6 +8,7 @@ import {
 } from '@mui/material';
 import { useThaiAddress, type AddressSelection } from '@/hooks/useThaiAddress';
 import { type NameValidationConfig, DEFAULT_NAME_VALIDATION } from '@/lib/config';
+import { useTranslation } from '@/hooks/useTranslation';
 
 // ============== ADDRESS TYPES ==============
 
@@ -52,6 +53,36 @@ const NOTIFICATION_STYLES = {
 export default function ProfileModal({ initialData, onClose, onSave, userImage, userEmail, nameValidation }: ProfileModalProps) {
   const isMobile = typeof window !== 'undefined' && window.innerWidth <= 640;
   const nameConfig = { ...DEFAULT_NAME_VALIDATION, ...nameValidation };
+  const { t } = useTranslation();
+
+  // Swipe-to-dismiss state
+  const [pmDragOffset, setPmDragOffset] = useState(0);
+  const [pmIsDragging, setPmIsDragging] = useState(false);
+  const pmSwipeStartY = useRef(0);
+
+  const handlePmSwipeStart = useCallback((e: React.TouchEvent) => {
+    pmSwipeStartY.current = e.touches[0].clientY;
+    setPmIsDragging(true);
+  }, []);
+
+  const handlePmSwipeMove = useCallback((e: React.TouchEvent) => {
+    if (!pmIsDragging) return;
+    const delta = e.touches[0].clientY - pmSwipeStartY.current;
+    if (delta < 0) { setPmDragOffset(0); return; }
+    setPmDragOffset(delta > 80 ? 80 + (delta - 80) * 0.3 : delta);
+  }, [pmIsDragging]);
+
+  const handlePmSwipeEnd = useCallback(() => {
+    if (!pmIsDragging) return;
+    setPmIsDragging(false);
+    if (pmDragOffset >= 80) {
+      setPmDragOffset(window.innerHeight);
+      setTimeout(() => { onClose(); setPmDragOffset(0); }, 200);
+    } else {
+      setPmDragOffset(0);
+    }
+  }, [pmIsDragging, pmDragOffset, onClose]);
+
   const [formData, setFormData] = useState({
     name: initialData.name,
     phone: initialData.phone,
@@ -254,17 +285,17 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
   const handleSaveAddress = useCallback(() => {
     const composed = composeAddress(addressFields);
     if (!composed.trim()) {
-      showNotification('warning', 'กรุณากรอกที่อยู่');
+      showNotification('warning', t.profile.fillAddress);
       return;
     }
-    const label = addressLabel.trim() || (savedAddresses.length === 0 ? 'บ้าน' : `ที่อยู่ ${savedAddresses.length + 1}`);
+    const label = addressLabel.trim() || (savedAddresses.length === 0 ? t.profile.homeDefault : `${t.profile.addressN} ${savedAddresses.length + 1}`);
 
     if (editingAddressId) {
       // Update existing
       setSavedAddresses(prev => prev.map(a =>
         a.id === editingAddressId ? { ...a, label, address: composed } : a
       ));
-      showNotification('success', 'อัปเดตที่อยู่แล้ว');
+      showNotification('success', t.profile.updatedAddress);
     } else {
       // Add new
       const newAddr: SavedAddress = {
@@ -274,7 +305,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
         isDefault: savedAddresses.length === 0, // First address is default
       };
       setSavedAddresses(prev => [...prev, newAddr]);
-      showNotification('success', 'เพิ่มที่อยู่แล้ว');
+      showNotification('success', t.profile.addedAddress);
     }
 
     // Reset form
@@ -282,7 +313,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
     setAddressLabel('');
     setEditingAddressId(null);
     setShowAddressForm(false);
-  }, [addressFields, addressLabel, composeAddress, editingAddressId, savedAddresses.length]);
+  }, [addressFields, addressLabel, composeAddress, editingAddressId, savedAddresses.length, t]);
 
   const handleEditAddress = useCallback((addr: SavedAddress) => {
     setEditingAddressId(addr.id);
@@ -324,23 +355,23 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
       }
       return filtered;
     });
-    showNotification('success', 'ลบที่อยู่แล้ว');
-  }, []);
+    showNotification('success', t.profile.deletedAddress);
+  }, [t]);
 
   const handleSetDefaultAddress = useCallback((id: string) => {
     setSavedAddresses(prev => prev.map(a => ({ ...a, isDefault: a.id === id })));
-    showNotification('success', 'ตั้งเป็นที่อยู่หลักแล้ว');
-  }, []);
+    showNotification('success', t.profile.setAsDefault);
+  }, [t]);
 
   const validate = () => {
     const nextErrors: Record<string, string> = {};
     const trimmedName = formData.name.trim();
     if (!trimmedName) {
-      nextErrors.name = 'กรอกชื่อ-นามสกุล';
+      nextErrors.name = t.profile.fillName;
     } else if (trimmedName.length < nameConfig.minLength) {
-      nextErrors.name = `ชื่อต้องมีอย่างน้อย ${nameConfig.minLength} ตัวอักษร`;
+      nextErrors.name = `${t.profile.nameMinLength} ${nameConfig.minLength} ${t.profile.characters}`;
     } else if (trimmedName.length > nameConfig.maxLength) {
-      nextErrors.name = `ชื่อยาวเกิน ${nameConfig.maxLength} ตัวอักษร`;
+      nextErrors.name = `${t.profile.nameMaxLength} ${nameConfig.maxLength} ${t.profile.characters}`;
     } else {
       // Build validation regex from config
       let charClass = '';
@@ -353,20 +384,20 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
       const nameRegex = new RegExp(`^[${charClass}]+$`);
       if (!nameRegex.test(trimmedName)) {
         const langs: string[] = [];
-        if (nameConfig.allowThai) langs.push('ไทย');
-        if (nameConfig.allowEnglish) langs.push('อังกฤษ');
-        nextErrors.name = `กรอกชื่อ-นามสกุลภาษา${langs.join('หรือ')}`;
-        if (nameConfig.allowSpecialChars) nextErrors.name += ` (อนุญาต: ${nameConfig.allowedSpecialChars})`;
+        if (nameConfig.allowThai) langs.push(t.profile.langThai);
+        if (nameConfig.allowEnglish) langs.push(t.profile.langEnglish);
+        nextErrors.name = `${t.profile.nameLanguageHint}${langs.join('/')}`;
+        if (nameConfig.allowSpecialChars) nextErrors.name += ` (${nameConfig.allowedSpecialChars})`;
       }
     }
     if (!formData.phone || formData.phone.length < 9) {
-      nextErrors.phone = 'กรอกเบอร์โทรให้ถูกต้อง';
+      nextErrors.phone = t.profile.fillPhone;
     }
     if (!formData.instagram.trim()) {
-      nextErrors.instagram = 'กรอก Instagram (จำเป็น)';
+      nextErrors.instagram = t.profile.fillIG;
     }
     if (!pdpaAccepted) {
-      nextErrors.pdpa = 'กรุณายืนยันการใช้ข้อมูล';
+      nextErrors.pdpa = t.profile.pdpaAcceptRequired;
     }
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
@@ -381,11 +412,11 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      showNotification('error', 'กรุณาเลือกไฟล์รูปภาพ');
+      showNotification('error', t.profile.selectImageFile);
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      showNotification('error', 'ไฟล์ใหญ่เกินไป (สูงสุด 5MB)');
+      showNotification('error', t.profile.fileTooLarge);
       return;
     }
 
@@ -400,7 +431,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
     };
     reader.readAsDataURL(file);
     if (fileInputRef.current) fileInputRef.current.value = '';
-  }, []);
+  }, [t]);
 
   // Draw crop preview on canvas
   const drawCropPreview = useCallback(() => {
@@ -614,18 +645,18 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
           // Ignore - image is still set locally, will be saved on form submit
         }
 
-        showNotification('success', 'บันทึกรูปโปรไฟล์แล้ว');
+        showNotification('success', t.profile.profileImageSaved);
       } else {
-        showNotification('error', json.message || 'อัปโหลดไม่สำเร็จ');
+        showNotification('error', json.message || t.profile.uploadFailed);
       }
     } catch (err) {
-      showNotification('error', 'อัปโหลดไม่สำเร็จ กรุณาลองใหม่');
+      showNotification('error', t.profile.uploadFailedRetry);
     } finally {
       setUploadingImage(false);
       setCropPreview(null);
       cropImageRef.current = null;
     }
-  }, [cropScale, cropOffset, cropRotation, cropFileName, userEmail, formData, composeAddress, addressFields]);
+  }, [cropScale, cropOffset, cropRotation, cropFileName, userEmail, formData, composeAddress, addressFields, t]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -698,6 +729,8 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
           bgcolor: 'var(--background)',
           color: 'var(--foreground)',
           overflow: 'hidden',
+          transform: pmDragOffset > 0 ? `translateY(${pmDragOffset}px) !important` : undefined,
+          transition: pmIsDragging ? 'none !important' : 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1) !important',
         },
       }}
     >
@@ -776,6 +809,13 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
         zIndex: 10,
       }}>
         <Box sx={{ width: 36, height: 4, bgcolor: 'var(--glass-bg)', borderRadius: 3, mx: 'auto', mb: 1.5 }} />
+        {/* Drag Handle Area - Swipe to dismiss */}
+        <Box
+          onTouchStart={handlePmSwipeStart}
+          onTouchMove={handlePmSwipeMove}
+          onTouchEnd={handlePmSwipeEnd}
+          sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: 32, cursor: 'grab', touchAction: 'none', zIndex: 15 }}
+        />
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             {/* Clickable Avatar with camera overlay */}
@@ -824,10 +864,10 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
             </Box>
             <Box>
               <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--foreground)', lineHeight: 1.2 }}>
-                ข้อมูลผู้ติดต่อ
+                {t.profile.contactInfo}
               </Typography>
               <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {userEmail || 'กรอกข้อมูลเพื่อดำเนินการสั่งซื้อ'}
+                {userEmail || t.profile.contactDesc}
               </Typography>
             </Box>
           </Box>
@@ -876,16 +916,16 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
               </Box>
               <Box>
                 <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                  ชื่อ-นามสกุล
+                  {t.profile.fullName}
                 </Typography>
                 <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
                   {(() => {
                     const langs: string[] = [];
-                    if (nameConfig.allowThai) langs.push('ไทย');
-                    if (nameConfig.allowEnglish) langs.push('อังกฤษ');
-                    let hint = `กรุณากรอกเป็นภาษา${langs.join('หรือ')}`;
-                    if (nameConfig.allowSpecialChars) hint += ` (อนุญาต ${nameConfig.allowedSpecialChars})`;
-                    hint += ` · ${nameConfig.minLength}-${nameConfig.maxLength} ตัว`;
+                    if (nameConfig.allowThai) langs.push(t.profile.langThai);
+                    if (nameConfig.allowEnglish) langs.push(t.profile.langEnglish);
+                    let hint = `${t.profile.nameLanguageHint}${langs.join('/')}`;
+                    if (nameConfig.allowSpecialChars) hint += ` (${nameConfig.allowedSpecialChars})`;
+                    hint += ` · ${nameConfig.minLength}-${nameConfig.maxLength} ${t.profile.characters}`;
                     return hint;
                   })()}
                 </Typography>
@@ -894,12 +934,12 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                 ml: 'auto', px: 1, py: 0.3, borderRadius: '6px',
                 bgcolor: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.2)',
               }}>
-                <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--error)' }}>จำเป็น</Typography>
+                <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--error)' }}>{t.common.required}</Typography>
               </Box>
             </Box>
             <TextField
               fullWidth
-              placeholder={nameConfig.allowEnglish ? 'เช่น สมชาย ใจดี / Somchai Jaidee' : 'เช่น สมชาย ใจดี'}
+              placeholder={nameConfig.allowEnglish ? t.profile.nameExampleBilingual : t.profile.nameExample}
               value={formData.name}
               onChange={e => setFormData({ ...formData, name: sanitizeName(e.target.value) })}
               error={!!errors.name}
@@ -925,13 +965,13 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                 <Phone size={16} style={{ color: 'var(--success)' }} />
               </Box>
               <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                ข้อมูลติดต่อ
+                {t.profile.contactSection}
               </Typography>
             </Box>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <TextField
                 fullWidth
-                placeholder="เบอร์โทรศัพท์ เช่น 0812345678"
+                placeholder={t.profile.phoneNumber}
                 value={formData.phone}
                 onChange={e => setFormData({ ...formData, phone: sanitizePhone(e.target.value) })}
                 error={!!errors.phone}
@@ -947,7 +987,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
               />
               <TextField
                 fullWidth
-                placeholder="Instagram เช่น @username"
+                placeholder={t.profile.instagram}
                 value={formData.instagram}
                 onChange={e => setFormData({ ...formData, instagram: e.target.value.trimStart() })}
                 error={!!errors.instagram}
@@ -982,10 +1022,10 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                 </Box>
                 <Box>
                   <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                    ที่อยู่จัดส่ง
+                    {t.profile.shippingAddress}
                   </Typography>
                   <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-                    {savedAddresses.length > 0 ? `${savedAddresses.length} ที่อยู่` : 'กรอกรหัสไปรษณีย์เพื่อค้นหาอัตโนมัติ'}
+                    {savedAddresses.length > 0 ? `${savedAddresses.length} ${t.profile.addressCount}` : t.profile.zipCodeHint}
                   </Typography>
                 </Box>
               </Box>
@@ -1007,7 +1047,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                     fontWeight: 600,
                   }}
                 >
-                  เพิ่มที่อยู่
+                  {t.profile.addAddress}
                 </Button>
               )}
             </Box>
@@ -1043,7 +1083,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                         {addr.isDefault && (
                           <Chip
                             icon={<Star size={10} />}
-                            label="หลัก"
+                            label={t.common.default}
                             size="small"
                             sx={{
                               fontSize: '0.65rem',
@@ -1059,16 +1099,16 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                       </Box>
                       <Box sx={{ display: 'flex', gap: 0.5 }}>
                         {!addr.isDefault && (
-                          <IconButton size="small" onClick={() => handleSetDefaultAddress(addr.id)} title="ตั้งเป็นที่อยู่หลัก"
+                          <IconButton size="small" onClick={() => handleSetDefaultAddress(addr.id)} title={t.profile.setDefault}
                             sx={{ color: 'var(--text-muted)', '&:hover': { color: 'var(--primary)' } }}>
                             <Star size={14} />
                           </IconButton>
                         )}
-                        <IconButton size="small" onClick={() => handleEditAddress(addr)} title="แก้ไข"
+                        <IconButton size="small" onClick={() => handleEditAddress(addr)} title={t.common.edit}
                           sx={{ color: 'var(--text-muted)', '&:hover': { color: 'var(--primary)' } }}>
                           <Edit size={14} />
                         </IconButton>
-                        <IconButton size="small" onClick={() => handleDeleteAddress(addr.id)} title="ลบ"
+                        <IconButton size="small" onClick={() => handleDeleteAddress(addr.id)} title={t.common.delete}
                           sx={{ color: 'var(--text-muted)', '&:hover': { color: '#ef4444' } }}>
                           <Trash2 size={14} />
                         </IconButton>
@@ -1088,7 +1128,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                 {/* Address Label */}
                 <TextField
                   fullWidth
-                  placeholder="ชื่อที่อยู่ เช่น บ้าน, ที่ทำงาน, หอพัก"
+                  placeholder={t.profile.addressLabel}
                   value={addressLabel}
                   onChange={e => setAddressLabel(e.target.value)}
                   InputProps={{
@@ -1105,7 +1145,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                 {/* Zip Code → auto-fill */}
                 <TextField
                   fullWidth
-                  placeholder="รหัสไปรษณีย์ เช่น 90110"
+                  placeholder={t.profile.zipCode}
                   value={addressFields.zipCode}
                   onChange={e => handleZipCodeChange(e.target.value)}
                   InputProps={{
@@ -1140,12 +1180,12 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                     value={addressFields.province || null}
                     onChange={(_, val) => handleProvinceChange(val)}
                     loading={addressLoading}
-                    noOptionsText="ไม่พบจังหวัด"
-                    loadingText="กำลังโหลด..."
+                    noOptionsText={t.profile.noProvince}
+                    loadingText={t.common.loading}
                     renderInput={(params) => (
                       <TextField
                         {...params}
-                        placeholder="จังหวัด"
+                        placeholder={t.profile.province}
                         sx={autocompleteSx}
                         InputProps={{
                           ...params.InputProps,
@@ -1167,9 +1207,9 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                     value={addressFields.district || null}
                     onChange={(_, val) => handleDistrictChange(val)}
                     disabled={!addressFields.province}
-                    noOptionsText="เลือกจังหวัดก่อน"
+                    noOptionsText={t.profile.selectProvince}
                     renderInput={(params) => (
-                      <TextField {...params} placeholder="อำเภอ/เขต" sx={autocompleteSx} />
+                      <TextField {...params} placeholder={t.profile.district} sx={autocompleteSx} />
                     )}
                     PaperComponent={dropdownPaper}
                     sx={{ flex: 1 }}
@@ -1183,9 +1223,9 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                   value={addressFields.subDistrict || null}
                   onChange={(_, val) => handleSubDistrictChange(val)}
                   disabled={!addressFields.district}
-                  noOptionsText="เลือกอำเภอ/เขตก่อน"
+                  noOptionsText={t.profile.selectDistrict}
                   renderInput={(params) => (
-                    <TextField {...params} placeholder="ตำบล/แขวง" sx={autocompleteSx} />
+                    <TextField {...params} placeholder={t.profile.subDistrict} sx={autocompleteSx} />
                   )}
                   PaperComponent={dropdownPaper}
                 />
@@ -1195,7 +1235,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                   fullWidth
                   multiline
                   rows={2}
-                  placeholder="บ้านเลขที่ หมู่บ้าน ซอย ถนน"
+                  placeholder={t.profile.addressDetail}
                   value={addressFields.detail}
                   onChange={e => setAddressFields(prev => ({ ...prev, detail: e.target.value }))}
                   sx={inputSx}
@@ -1210,7 +1250,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                     border: '1px solid rgba(0,113,227,0.15)',
                   }}>
                     <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--primary)', mb: 0.3 }}>
-                      ที่อยู่ที่จะบันทึก:
+                      {t.profile.addressPreview}
                     </Typography>
                     <Typography sx={{ fontSize: '0.8rem', color: 'var(--foreground)', lineHeight: 1.5 }}>
                       {composeAddress(addressFields) || '—'}
@@ -1235,7 +1275,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                       boxShadow: '0 4px 16px rgba(0,113,227,0.25)',
                     }}
                   >
-                    {editingAddressId ? 'อัปเดตที่อยู่' : 'บันทึกที่อยู่'}
+                    {editingAddressId ? t.profile.updateAddress : t.profile.saveAddress}
                   </Button>
                   {savedAddresses.length > 0 && (
                     <Button
@@ -1255,7 +1295,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                         minWidth: 80,
                       }}
                     >
-                      ยกเลิก
+                      {t.common.cancel}
                     </Button>
                   )}
                 </Box>
@@ -1291,10 +1331,10 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
               </Box>
               <Box sx={{ flex: 1 }}>
                 <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: pdpaAccepted ? 'var(--success)' : 'var(--foreground)', mb: 0.3 }}>
-                  {pdpaAccepted ? 'ยินยอมแล้ว' : 'นโยบายความเป็นส่วนตัว'}
+                  {pdpaAccepted ? t.profile.pdpaAccepted : t.profile.privacyPolicy}
                 </Typography>
                 <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                  ข้อมูลของท่านจะถูกใช้เพื่อการจัดส่งและติดต่อเท่านั้น
+                  {t.profile.pdpaDesc}
                 </Typography>
               </Box>
             </Box>
@@ -1322,7 +1362,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                 {pdpaAccepted && <Check size={12} style={{ color: 'white' }} />}
               </Box>
               <Typography sx={{ fontSize: '0.8rem', color: pdpaAccepted ? 'var(--success)' : 'var(--foreground)', fontWeight: 600 }}>
-                ยินยอมให้ใช้ข้อมูลตามนโยบาย
+                {t.profile.pdpaConsent}
               </Typography>
             </Box>
             {errors.pdpa && (
@@ -1384,11 +1424,11 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
               },
             }}
           >
-            {isFormValid ? 'บันทึกและดำเนินการต่อ' : 'กรอกข้อมูลให้ครบถ้วน'}
+            {isFormValid ? t.profile.saveAndContinue : t.profile.fillAllInfo}
           </Button>
           {!pdpaAccepted && (
             <Typography sx={{ textAlign: 'center', fontSize: '0.7rem', color: 'var(--text-muted)', mt: 1 }}>
-              กรุณายินยอมนโยบายความเป็นส่วนตัวก่อนดำเนินการ
+              {t.profile.pdpaRequired}
             </Typography>
           )}
         </Box>
@@ -1416,7 +1456,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
           borderBottom: '1px solid var(--glass-border)',
         }}>
           <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--foreground)' }}>
-            ครอปรูปโปรไฟล์
+            {t.profile.cropProfile}
           </Typography>
           <IconButton
             size="small"
@@ -1460,7 +1500,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
             }}>
               <Move size={12} color="white" />
               <Typography sx={{ fontSize: '0.65rem', color: 'white', fontWeight: 500 }}>
-                ลากเพื่อเลื่อน
+                {t.profile.dragToMove}
               </Typography>
             </Box>
           </Box>
@@ -1524,7 +1564,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
               '&:hover': { bgcolor: 'var(--glass-border)' },
             }}
           >
-            ยกเลิก
+            {t.common.cancel}
           </Button>
           <Button
             fullWidth
@@ -1540,7 +1580,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
               '&:disabled': { opacity: 0.7 },
             }}
           >
-            {uploadingImage ? 'กำลังบันทึก...' : 'ยืนยันและบันทึก'}
+            {uploadingImage ? t.profile.saving : t.profile.confirmSave}
           </Button>
         </Box>
       </Dialog>

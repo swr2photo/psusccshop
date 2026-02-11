@@ -15,11 +15,11 @@ import {
   Smartphone as PhoneIcon,
   Settings as SettingsIcon,
 } from 'lucide-react';
+import { useTranslation } from '@/hooks/useTranslation';
 
 const DISMISS_KEY = 'scc-push-prompt-dismissed';
 const DISMISS_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days
 const DENIED_DISMISS_DURATION = 3 * 24 * 60 * 60 * 1000; // 3 days for denied state (shorter to re-remind)
-const NOTIFICATION_DESC = 'รับการแจ้งเตือนเมื่อมีข้อความใหม่หรือสถานะออเดอร์อัปเดต';
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -98,6 +98,7 @@ type PromptMode = 'ask' | 'denied' | 'ios-guide' | 'unsupported';
 
 export default function NotificationPrompt() {
   const { data: session } = useSession();
+  const { t } = useTranslation();
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
@@ -327,32 +328,29 @@ export default function NotificationPrompt() {
   const getDeniedGuidance = (): string => {
     if (isIOS) {
       if (isStandalone) {
-        // In PWA/home-screen web app
-        return 'การแจ้งเตือนถูกปิดอยู่ ไปที่ ตั้งค่า > แอป SCC Shop > การแจ้งเตือน แล้วเปิดอนุญาตการแจ้งเตือน';
+        return t.notification.deniedIOSPWA;
       }
-      // In Safari on iOS 26+ (push available in browser)
-      return 'การแจ้งเตือนถูกปิดอยู่ ไปที่ ตั้งค่า > Safari > เว็บไซต์ > การแจ้งเตือน แล้วเปิดการแจ้งเตือนสำหรับเว็บนี้';
+      return t.notification.deniedIOSSafari;
     }
     if (isAndroid) {
-      return 'การแจ้งเตือนถูกปิดอยู่ กดที่ 🔒 ข้างแถบที่อยู่ > สิทธิ์ > การแจ้งเตือน แล้วเลือก "อนุญาต"';
+      return t.notification.deniedAndroid;
     }
-    return 'การแจ้งเตือนถูกปิดอยู่ กดที่ 🔒 ข้างแถบที่อยู่ แล้วเปิดการแจ้งเตือนสำหรับเว็บนี้';
+    return t.notification.deniedDesktop;
   };
 
   const getUnsupportedGuidance = (): string => {
-
     if (isAndroid) {
-      return 'เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือน ลองเปิดใน Google Chrome หรือ Samsung Internet แล้วลองใหม่';
+      return t.notification.unsupportedAndroid;
     }
-    return 'เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือน ลองเปิดใน Google Chrome หรือ Microsoft Edge แล้วลองใหม่';
+    return t.notification.unsupportedDesktop;
   };
 
   const getTitle = (): string => {
     switch (promptMode) {
-      case 'ios-guide': return isStandalone ? 'อัปเดต iOS เพื่อรับการแจ้งเตือน' : 'เพิ่มไปที่หน้าจอหลัก';
-      case 'denied': return 'เปิดการแจ้งเตือนอีกครั้ง';
-      case 'unsupported': return 'เบราว์เซอร์ไม่รองรับ';
-      default: return 'เปิดรับการแจ้งเตือน';
+      case 'ios-guide': return isStandalone ? t.notification.updateiOS : t.notification.addToHomescreen;
+      case 'denied': return t.notification.enableAgain;
+      case 'unsupported': return t.notification.notSupported;
+      default: return t.notification.enableNotification;
     }
   };
 
@@ -360,15 +358,15 @@ export default function NotificationPrompt() {
     switch (promptMode) {
       case 'ios-guide':
         if (isStandalone) {
-          return 'อุปกรณ์ของคุณอาจต้องอัพเดต iOS เป็นเวอร์ชัน 16.4 ขึ้นไปเพื่อรองรับการแจ้งเตือน (ตั้งค่า > ทั่วไป > อัพเดตซอฟต์แวร์)';
+          return t.notification.iosUpdateGuide;
         }
-        return 'กดปุ่ม แชร์ (Share) ⬆ แล้วเลือก "เพิ่มไปที่หน้าจอหลัก" จากนั้นเปิดแอปจากหน้าจอหลักเพื่อรับการแจ้งเตือน';
+        return t.notification.iosAddGuide;
       case 'denied':
         return getDeniedGuidance();
       case 'unsupported':
         return getUnsupportedGuidance();
       default:
-        return NOTIFICATION_DESC;
+        return t.notification.description;
     }
   };
 
@@ -450,7 +448,7 @@ export default function NotificationPrompt() {
                   '&:hover': { background: '#1d4ed8' },
                 }}
               >
-                {loading ? 'กำลังเปิด...' : 'เปิดการแจ้งเตือน'}
+                {loading ? t.notification.enabling : t.notification.enableNotification}
               </Button>
             )}
             {promptMode === 'denied' && (
@@ -469,7 +467,7 @@ export default function NotificationPrompt() {
                   '&:hover': { background: '#e68900' },
                 }}
               >
-                ลองอีกครั้ง
+                {t.notification.retry}
               </Button>
             )}
             <Button
@@ -484,7 +482,7 @@ export default function NotificationPrompt() {
                 color: 'var(--text-muted)',
               }}
             >
-              {promptMode === 'ios-guide' || promptMode === 'unsupported' ? 'เข้าใจแล้ว' : 'ไม่ใช่ตอนนี้'}
+              {promptMode === 'ios-guide' || promptMode === 'unsupported' ? t.notification.understood : t.notification.notNow}
             </Button>
           </Box>
         </Box>

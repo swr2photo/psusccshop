@@ -44,20 +44,19 @@ import {
   Tag,
 } from 'lucide-react';
 import { useNotification } from './NotificationContext';
+import { useTranslation } from '@/hooks/useTranslation';
 
 // ==================== CONSTANTS ====================
-const QUICK_QUESTIONS_DATA = [
-  { icon: 'cart', label: 'วิธีสั่งซื้อ' },
-  { icon: 'price', label: 'ราคาสินค้า' },
-  { icon: 'size', label: 'ไซซ์และขนาด' },
-  { icon: 'order', label: 'เช็คสถานะออเดอร์' },
-  { icon: 'shipping', label: 'การจัดส่ง' },
-  { icon: 'payment', label: 'วิธีชำระเงิน' },
-  { icon: 'promo', label: 'โค้ดส่วนลด' },
-  { icon: 'help', label: 'ติดต่อร้าน' },
+const QUICK_QUESTIONS_KEYS = [
+  { icon: 'cart', key: 'howToOrder' as const },
+  { icon: 'price', key: 'pricing' as const },
+  { icon: 'size', key: 'sizeAndFit' as const },
+  { icon: 'order', key: 'checkOrder' as const },
+  { icon: 'shipping', key: 'shipping' as const },
+  { icon: 'payment', key: 'paymentMethod' as const },
+  { icon: 'promo', key: 'promoCode' as const },
+  { icon: 'help', key: 'contactShop' as const },
 ];
-
-const QUICK_QUESTIONS = QUICK_QUESTIONS_DATA.map(q => q.label);
 
 // Session storage key for chat history
 const CHAT_STORAGE_KEY = 'scc_chat_history';
@@ -106,6 +105,9 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const { warning: toastWarning, error: toastError } = useNotification();
+  const { t } = useTranslation();
+  const QUICK_QUESTIONS_DATA = QUICK_QUESTIONS_KEYS.map(q => ({ ...q, label: t.chatbot[q.key] }));
+  const QUICK_QUESTIONS = QUICK_QUESTIONS_DATA.map(q => q.label);
   const [input, setInput] = React.useState('');
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -365,7 +367,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
         const errorMsg: ChatMessage = {
           id: generateId(),
           sender: 'bot',
-          text: isTimeout ? 'ขอโทษค่ะ ใช้เวลานานเกินไป กรุณาลองใหม่อีกครั้งนะคะ' : 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้งค่ะ',
+          text: isTimeout ? t.chatbot.timeoutError : t.chatbot.errorRetry,
           timestamp: new Date(),
           suggestions: QUICK_QUESTIONS,
         };
@@ -427,7 +429,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
       const errorMsg: ChatMessage = {
         id: generateId(),
         sender: 'bot',
-        text: isTimeout ? 'ขอโทษค่ะ ใช้เวลานานเกินไป กรุณาลองใหม่อีกครั้งนะคะ' : 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้งค่ะ',
+        text: isTimeout ? t.chatbot.timeoutError : t.chatbot.errorRetry,
         timestamp: new Date(),
         suggestions: QUICK_QUESTIONS,
       };
@@ -477,11 +479,11 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
     
     const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
-      toastWarning('รองรับเฉพาะไฟล์รูปภาพ (PNG, JPG, WEBP)');
+      toastWarning(t.chatbot.imageOnly);
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      toastWarning('ไฟล์ต้องมีขนาดไม่เกิน 5MB');
+      toastWarning(t.chatbot.maxFileSize);
       return;
     }
     
@@ -494,7 +496,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
         setIsUploading(false);
       };
       reader.onerror = () => {
-        toastError('ไม่สามารถอ่านไฟล์ได้');
+        toastError(t.chatbot.cannotReadFile);
         setIsUploading(false);
       };
       reader.readAsDataURL(file);
@@ -510,13 +512,13 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
   const handleSendWithImage = async () => {
     if (!uploadedImage && !input.trim()) return;
     
-    const msgText = input.trim() || 'ช่วยดูรูปนี้หน่อยค่ะ';
+    const msgText = input.trim() || t.chatbot.defaultImageQuery;
     const userMsg: ChatMessage = {
       id: generateId(),
       sender: 'user',
       text: uploadedImage ? `[รูปภาพ] ${msgText}` : msgText,
       timestamp: new Date(),
-      productImages: uploadedImage ? [{ name: 'รูปที่อัปโหลด', image: uploadedImage.preview }] : undefined,
+      productImages: uploadedImage ? [{ name: t.chatbot.uploadedImage, image: uploadedImage.preview }] : undefined,
       replyTo: replyToMessage || undefined,
     };
     
@@ -561,7 +563,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
       const errorMsg: ChatMessage = {
         id: generateId(),
         sender: 'bot',
-        text: 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้งค่ะ',
+        text: t.chatbot.errorRetry,
         timestamp: new Date(),
         suggestions: QUICK_QUESTIONS,
       };
@@ -885,7 +887,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 {loading ? (
                   <>
                     <Sparkles size={14} color={isDark ? '#2997ff' : '#0071e3'} style={{ animation: 'shimmer 1.5s infinite' }} />
-                    กำลังคิด...
+                    {t.chatbot.thinking}
                   </>
                 ) : (
                   <>
@@ -896,7 +898,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       bgcolor: '#30d158',
                       boxShadow: '0 0 6px #30d158',
                     }} />
-                    ออนไลน์
+                    {t.chatbot.online}
                   </>
                 )}
               </Typography>
@@ -915,7 +917,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                   transform: 'rotate(180deg)',
                 } 
               }}
-              title="ล้างแชท"
+              title={t.chatbot.clearChat}
             >
               <RotateCcw size={20} />
             </IconButton>
@@ -930,7 +932,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                   bgcolor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)',
                 } 
               }}
-              title={isFullscreen ? "ย่อหน้าต่าง" : "ขยายเต็มจอ"}
+              title={isFullscreen ? t.chatbot.minimize : t.chatbot.maximize}
             >
               {isFullscreen ? <Minimize2 size={20} /> : <Maximize2 size={20} />}
             </IconButton>
@@ -1020,7 +1022,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 justifyContent: 'center',
                 gap: 0.75,
               }}>
-                สวัสดีค่ะ! <Hand size={20} color="#ffd60a" />
+                {t.chatbot.welcome} <Hand size={20} color="#ffd60a" />
               </Typography>
               
               {aiEnabled && (
@@ -1039,12 +1041,12 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                   mb: 1.5,
                 }}>
                   <Sparkles size={12} />
-                  ขับเคลื่อนด้วย Gemini AI
+                  {t.chatbot.poweredBy}
                 </Box>
               )}
               
               <Typography sx={{ color: isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.5)', fontSize: 13, mb: 2 }}>
-                ถามเกี่ยวกับสินค้า ราคา ไซซ์ ได้เลยค่ะ
+                {t.chatbot.askAbout}
               </Typography>
 
               {/* Shop Stats */}
@@ -1069,7 +1071,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                     borderRadius: 1,
                   }}>
                     <Store size={13} />
-                    {shopInfo.totalProducts} สินค้า
+                    {shopInfo.totalProducts} {t.chatbot.products}
                   </Box>
                   {typeof shopInfo.availableProducts === 'number' && shopInfo.availableProducts > 0 && (
                     <Box sx={{
@@ -1084,7 +1086,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       py: 0.4,
                       borderRadius: 1,
                     }}>
-                      <BadgeCheck size={12} /> {shopInfo.availableProducts} พร้อมขาย
+                      <BadgeCheck size={12} /> {shopInfo.availableProducts} {t.chatbot.available}
                     </Box>
                   )}
                   {shopInfo.priceRange && shopInfo.priceRange.max > 0 && (
@@ -1110,7 +1112,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
               
               {/* Quick Questions */}
               <Typography sx={{ color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)', fontSize: 11, mb: 1.5, textAlign: 'left' }}>
-                ลองถาม:
+                {t.chatbot.trySuggestion}
               </Typography>
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, justifyContent: 'center' }}>
                 {QUICK_QUESTIONS_DATA.map((q, i) => (
@@ -1326,7 +1328,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       flex: 1,
                     }}>
                       <Box component="span" sx={{ fontWeight: 500, mr: 0.5 }}>
-                        {msg.replyTo.sender === 'user' ? 'คุณ' : 'Bot'}:
+                        {msg.replyTo.sender === 'user' ? t.chatbot.you : t.chatbot.bot}:
                       </Box>
                       {msg.replyTo.text}
                     </Box>
@@ -1376,7 +1378,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)',
                       fontStyle: 'italic',
                     }}>
-                      (แก้ไขแล้ว)
+                      {t.chatbot.edited}
                     </Box>
                   )}
                   {msg.sender === 'bot' && msg.source === 'ai' && (
@@ -1422,7 +1424,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                         color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)',
                         '&:hover': { color: '#ffd60a', bgcolor: 'transparent' },
                       }}
-                      title="แก้ไขข้อความ"
+                      title={t.chatbot.editMessage}
                     >
                       <Pencil size={12} />
                     </IconButton>
@@ -1435,7 +1437,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                       color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)',
                       '&:hover': { color: isDark ? '#2997ff' : '#0071e3', bgcolor: 'transparent' },
                     }}
-                    title="ตอบกลับ"
+                    title={t.chatbot.reply}
                   >
                     <Reply size={12} style={{ transform: 'scaleX(-1)' }} />
                   </IconButton>
@@ -1448,7 +1450,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                         color: copiedMessageId === msg.id ? '#30d158' : isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)',
                         '&:hover': { color: isDark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.6)', bgcolor: 'transparent' },
                       }}
-                      title="คัดลอก"
+                      title={t.chatbot.copy}
                     >
                       {copiedMessageId === msg.id ? (
                         <Check size={12} />
@@ -1492,7 +1494,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 {msg.sender === 'bot' && msg.relatedQuestions && msg.relatedQuestions.length > 0 && (
                   <Box sx={{ mt: 1.5 }}>
                     <Typography sx={{ fontSize: 10, color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)', mb: 0.75 }}>
-                      คำถามที่เกี่ยวข้อง:
+                      {t.chatbot.relatedQuestions}
                     </Typography>
                     {msg.relatedQuestions.map((q, i) => (
                       <Box 
@@ -1595,7 +1597,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 whiteSpace: 'nowrap',
               }}>
                 <Box component="span" sx={{ color: isDark ? '#2997ff' : '#0071e3', fontWeight: 500, mr: 0.5 }}>
-                  ตอบกลับ {replyToMessage.sender === 'user' ? 'คุณ' : 'Bot'}:
+                  {t.chatbot.replyTo} {replyToMessage.sender === 'user' ? t.chatbot.you : t.chatbot.bot}:
                 </Box>
                 {replyToMessage.text}
               </Typography>
@@ -1640,7 +1642,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 whiteSpace: 'nowrap',
               }}>
                 <Box component="span" sx={{ color: isDark ? '#ffd60a' : '#ff9f0a', fontWeight: 500, mr: 0.5 }}>
-                  แก้ไขข้อความ
+                  {t.chatbot.editMode}
                 </Box>
                 {editingMessage.text.slice(0, 50) + (editingMessage.text.length > 50 ? '...' : '')}
               </Typography>
@@ -1696,7 +1698,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                   color: isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)',
                 },
               }}
-              title="อัปโหลดรูปภาพ"
+              title={t.chatbot.uploadImage}
             >
               {isUploading ? (
                 <CircularProgress size={18} sx={{ color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.4)' }} />
@@ -1775,7 +1777,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 multiline
                 minRows={1}
                 maxRows={3}
-                placeholder={editingMessage ? "แก้ไขข้อความ..." : uploadedImage ? "พิมพ์คำถามเกี่ยวกับรูป..." : "พิมพ์คำถามของคุณ..."}
+                placeholder={editingMessage ? t.chatbot.editPlaceholder : uploadedImage ? t.chatbot.imagePlaceholder : t.chatbot.defaultPlaceholder}
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -1852,7 +1854,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
             </Box>
             <Box component="span" sx={{ mx: 0.5 }}>•</Box>
             <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
-              <Image size={10} /> รองรับรูปภาพ
+              <Image size={10} /> {t.chatbot.imageSupported}
             </Box>
           </Typography>
         </Box>

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, CSSProperties, memo, useCallback } from 'react';
 import { Box, Skeleton, CircularProgress } from '@mui/material';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface OptimizedImageProps {
   src: string;
@@ -134,6 +135,7 @@ function OptimizedImageComponent({
   keepMounted = false,
   showLoadingIndicator = false,
 }: OptimizedImageProps) {
+  const { t } = useTranslation();
   // Check if this image was already loaded before (prevents flicker on remount)
   const wasLoaded = wasImageLoaded(src);
   const [loaded, setLoaded] = useState(wasLoaded);
@@ -319,9 +321,9 @@ function OptimizedImageComponent({
           
         </Box>
         <Box sx={{ textAlign: 'center', px: 1 }}>
-          โหลดรูปไม่สำเร็จ
+          {t.misc.loadImageFailed}
           <Box component="span" sx={{ display: 'block', fontSize: '0.65rem', color: '#0071e3', mt: 0.5 }}>
-            แตะเพื่อลองใหม่
+            {t.misc.tapToRetry}
           </Box>
         </Box>
       </Box>

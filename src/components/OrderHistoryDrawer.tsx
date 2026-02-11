@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   Box,
   Button,
@@ -43,10 +43,12 @@ import {
   REFUNDABLE_STATUSES,
   type OrderHistory,
 } from '@/lib/shop-constants';
-import { ShopConfig } from '@/lib/config';
+import { ShopConfig, getProductName } from '@/lib/config';
 import { SHIPPING_PROVIDERS, getTrackingUrl, getTrack123Url, type ShippingProvider } from '@/lib/shipping';
 import TrackingTimeline from './TrackingTimeline';
 import { useNotification } from './NotificationContext';
+import { CountdownBadge, isOrderExpired } from './OrderCountdown';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface HistoryFilter {
   key: string;
@@ -104,6 +106,17 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
   } = props;
 
   const { success: toastSuccess, error: toastError } = useNotification();
+  const { t, lang } = useTranslation();
+
+  // Filter label map for translating static historyFilters
+  const filterLabelMap: Record<string, string> = {
+    ALL: t.orderHistory.filterAll,
+    WAITING_PAYMENT: t.orderHistory.filterWaiting,
+    COMPLETED: t.orderHistory.filterCompleted,
+    SHIPPED: t.orderHistory.filterShipped,
+    RECEIVED: t.orderHistory.filterReceived,
+    CANCELLED: t.orderHistory.filterCancelled,
+  };
 
   // Expanded order cards
   const [expandedOrders, setExpandedOrders] = React.useState<Set<string>>(new Set());
@@ -127,29 +140,15 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
   const [refundAccountName, setRefundAccountName] = React.useState('');
   const [refundAmount, setRefundAmount] = React.useState('');
   const [refundSubmitting, setRefundSubmitting] = React.useState(false);
-  const [refundReasons] = React.useState([
-    'สินค้ามีปัญหา/ชำรุด',
-    'สินค้าไม่ตรงตามที่สั่ง',
-    'ไม่สามารถเข้าร่วมค่าย/กิจกรรมได้',
-    'เปลี่ยนใจ',
-    'อื่นๆ',
-  ]);
-  const [refundBanks] = React.useState([
-    'ธนาคารกสิกรไทย',
-    'ธนาคารกรุงเทพ',
-    'ธนาคารกรุงไทย',
-    'ธนาคารไทยพาณิชย์',
-    'ธนาคารกรุงศรีอยุธยา',
-    'ธนาคารทหารไทยธนชาต',
-    'ธนาคารออมสิน',
-    'ธนาคารเกียรตินาคินภัทร',
-    'ธนาคารซีไอเอ็มบี ไทย',
-    'ธนาคารยูโอบี',
-    'ธนาคารแลนด์ แอนด์ เฮ้าส์',
-    'ธนาคารทิสโก้',
-    'พร้อมเพย์',
-    'อื่นๆ',
-  ]);
+  const refundReasons = React.useMemo(() => [
+    t.orderHistory.reason_damaged,
+    t.orderHistory.reason_wrong,
+    t.orderHistory.reason_cantAttend,
+    t.orderHistory.reason_changed,
+    t.orderHistory.reason_other,
+  ], [t]);
+  const refundBanks = React.useMemo(() => [...t.bankNames], [t]);
+  const promptPayLabel = t.bankNames[12];
 
   const openRefundDialog = (ref: string, total: number) => {
     setRefundOrderRef(ref);
@@ -183,12 +182,12 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
       const data = await res.json();
       if (res.ok && data.success) {
         setRefundDialogOpen(false);
-        toastSuccess('ส่งคำขอคืนเงินเรียบร้อยแล้ว');
+        toastSuccess(t.orderHistory.refundSuccess);
       } else {
-        toastError(data.error || 'เกิดข้อผิดพลาด กรุณาลองใหม่');
+        toastError(data.error || t.orderHistory.refundError);
       }
     } catch {
-      toastError('ไม่สามารถส่งคำขอได้ กรุณาลองใหม่');
+      toastError(t.orderHistory.refundRequestError);
     } finally {
       setRefundSubmitting(false);
     }
@@ -213,6 +212,36 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
     });
   }, [orderHistory, historyFilter]);
 
+  // Swipe-to-dismiss state
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const swipeStartY = useRef(0);
+
+  const handleSwipeStart = useCallback((e: React.TouchEvent) => {
+    swipeStartY.current = e.touches[0].clientY;
+    setIsDragging(true);
+  }, []);
+
+  const handleSwipeMove = useCallback((e: React.TouchEvent) => {
+    if (!isDragging) return;
+    const delta = e.touches[0].clientY - swipeStartY.current;
+    if (delta < 0) { setDragOffset(0); return; }
+    setDragOffset(delta > 80 ? 80 + (delta - 80) * 0.3 : delta);
+  }, [isDragging]);
+
+  const handleSwipeEnd = useCallback(() => {
+    if (!isDragging) return;
+    setIsDragging(false);
+    if (dragOffset >= 80) {
+      setDragOffset(window.innerHeight);
+      setTimeout(() => { onClose(); setDragOffset(0); }, 200);
+    } else {
+      setDragOffset(0);
+    }
+  }, [isDragging, dragOffset, onClose]);
+
+  React.useEffect(() => { if (!open) { setDragOffset(0); setIsDragging(false); } }, [open]);
+
   return (
     <Drawer
       anchor="bottom"
@@ -227,6 +256,8 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
           bgcolor: 'var(--background)',
           color: 'var(--foreground)',
           overflow: 'hidden',
+          transform: dragOffset > 0 ? `translateY(${dragOffset}px) !important` : undefined,
+          transition: isDragging ? 'none !important' : 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1) !important',
         },
       }}
     >
@@ -241,8 +272,15 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
         top: 0,
         zIndex: 10,
       }}>
-        {/* Drag Handle */}
-        <Box sx={{ width: 36, height: 4, bgcolor: 'var(--glass-bg)', borderRadius: 2, mx: 'auto', mb: 2 }} />
+        {/* Drag Handle - Swipe to dismiss */}
+        <Box
+          onTouchStart={handleSwipeStart}
+          onTouchMove={handleSwipeMove}
+          onTouchEnd={handleSwipeEnd}
+          sx={{ width: '100%', display: 'flex', justifyContent: 'center', py: 0.5, cursor: 'grab', touchAction: 'none' }}
+        >
+          <Box sx={{ width: isDragging ? 48 : 36, height: 4, bgcolor: isDragging ? 'var(--text-muted)' : 'var(--glass-bg)', borderRadius: 2, transition: 'all 0.2s ease' }} />
+        </Box>
         
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -258,10 +296,10 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
             </Box>
             <Box sx={{ flex: 1 }}>
               <Typography sx={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                คำสั่งซื้อของฉัน
+                {t.orderHistory.title}
               </Typography>
               <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                {orderHistory.length} รายการ
+                {orderHistory.length} {t.common.items}
               </Typography>
             </Box>
           </Box>
@@ -308,7 +346,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                   },
                 }}
               >
-                {filter.label}
+                {filterLabelMap[filter.key] || filter.label}
                 <Box sx={{
                   px: 0.8,
                   py: 0.1,
@@ -338,7 +376,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
         {loadingHistory ? (
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 8, gap: 2 }}>
             <CircularProgress size={36} sx={{ color: 'var(--primary)' }} />
-            <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>กำลังโหลดคำสั่งซื้อ...</Typography>
+            <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{t.orderHistory.loading}</Typography>
           </Box>
         ) : filteredOrders.length === 0 ? (
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 8, gap: 2 }}>
@@ -352,16 +390,16 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
             }}>
               <Package size={36} style={{ color: 'var(--text-muted)' }} />
             </Box>
-            <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>ไม่พบคำสั่งซื้อ</Typography>
+            <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>{t.orderHistory.empty}</Typography>
             <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-              {historyFilter === 'ALL' ? 'ยังไม่มีคำสั่งซื้อ' : 'ลองเปลี่ยนตัวกรองดู'}
+              {historyFilter === 'ALL' ? t.orderHistory.noOrders : t.orderHistory.tryFilter}
             </Typography>
           </Box>
         ) : (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {filteredOrders.map((order, idx) => {
               const statusKey = normalizeStatus(order.status);
-              const statusLabel = getStatusLabel(statusKey);
+              const statusLabel = getStatusLabel(statusKey, lang);
               const statusColor = getStatusColor(statusKey);
               const canCancel = CANCELABLE_STATUSES.includes(statusKey);
               const canPay = isShopOpen && PAYABLE_STATUSES.includes(statusKey);
@@ -479,9 +517,9 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                         </Box>
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                            {new Date(order.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })}
+                            {new Date(order.date).toLocaleDateString(lang === 'en' ? 'en-US' : 'th-TH', { day: 'numeric', month: 'short', year: '2-digit' })}
                             {' • '}
-                            {totalItems} ชิ้น
+                            {totalItems} {t.common.pieces}
                           </Typography>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--success)' }}>
@@ -494,9 +532,16 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                     </Box>
 
                     {/* Quick Action Buttons (always visible for important actions) */}
+                    {/* Countdown timer for WAITING_PAYMENT orders */}
+                    {canPay && order.date && !isOrderExpired(order.date) && (
+                      <Box sx={{ mt: 1, ml: '68px' }}>
+                        <CountdownBadge orderDate={order.date} compact />
+                      </Box>
+                    )}
+
                     {(canPay || (canCancel && !canPay)) && (
-                      <Box sx={{ display: 'flex', gap: 1, mt: 1.5, ml: '68px' }}>
-                        {canPay && (
+                      <Box sx={{ display: 'flex', gap: 1, mt: 1, ml: '68px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        {canPay && !isOrderExpired(order.date) && (
                           <Button
                             size="small"
                             onClick={(e) => { e.stopPropagation(); onOpenPayment(order.ref); }}
@@ -519,8 +564,11 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                             }}
                           >
                             <CreditCard size={14} />
-                            ชำระเงิน
+                            {t.orderHistory.payNow}
                           </Button>
+                        )}
+                        {canPay && isOrderExpired(order.date) && (
+                          <CountdownBadge orderDate={order.date} compact />
                         )}
                         {!isShopOpen && PAYABLE_STATUSES.includes(statusKey) && (
                           <Typography sx={{ 
@@ -535,7 +583,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                             gap: 0.5,
                           }}>
                             <Clock size={12} />
-                            หมดเขตชำระเงิน
+                            {t.orderHistory.expiredPayment}
                           </Typography>
                         )}
                       </Box>
@@ -575,11 +623,11 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                               color: order.refundStatus === 'REJECTED' ? 'var(--error)' :
                                      order.refundStatus === 'COMPLETED' ? 'var(--success)' : '#bf5af2',
                             }}>
-                              {order.refundStatus === 'REQUESTED' ? 'รอพิจารณาคืนเงิน' :
-                               order.refundStatus === 'APPROVED' ? 'อนุมัติคืนเงินแล้ว' :
-                               order.refundStatus === 'COMPLETED' ? 'คืนเงินเรียบร้อยแล้ว' :
-                               order.refundStatus === 'REJECTED' ? 'ปฏิเสธการคืนเงิน' :
-                               'คำขอคืนเงิน'}
+                              {order.refundStatus === 'REQUESTED' ? t.orderHistory.refundPending :
+                               order.refundStatus === 'APPROVED' ? t.orderHistory.refundApproved :
+                               order.refundStatus === 'COMPLETED' ? t.orderHistory.refundCompleted :
+                               order.refundStatus === 'REJECTED' ? t.orderHistory.refundRejected :
+                               t.orderHistory.refundRequest}
                             </Typography>
                             {order.refundAmount && (
                               <Typography sx={{ fontSize: '0.73rem', fontWeight: 700, color: 'var(--warning)', ml: 0.5 }}>
@@ -597,7 +645,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                               bgcolor: 'rgba(100,116,139,0.06)',
                               borderRadius: '8px',
                             }}>
-                              หมายเหตุจากแอดมิน: {order.refundAdminNote}
+                              {t.orderHistory.adminNote} {order.refundAdminNote}
                             </Typography>
                           )}
                         </Box>
@@ -609,14 +657,14 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, mb: 1.5 }}>
                             <ShoppingBag size={14} style={{ color: 'var(--text-muted)' }} />
                             <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                              สินค้า ({orderItems.length} รายการ)
+                              {t.orderHistory.orderItems} ({orderItems.length} {t.common.items})
                             </Typography>
                           </Box>
                           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                             {orderItems.map((item: any, itemIdx: number) => {
                               const productInfo = config?.products?.find((p) => p.id === item.productId);
                               const productImage = productInfo?.coverImage || productInfo?.images?.[0];
-                              const itemName = item.name || item.productName || productInfo?.name || 'ไม่ทราบชื่อสินค้า';
+                              const itemName = (productInfo ? getProductName(productInfo, lang) : null) || item.name || item.productName || productInfo?.name || t.orderHistory.unknownProduct;
                               const itemQty = item.qty || item.quantity || 1;
                               const itemIsLongSleeve = item.isLongSleeve || item.options?.isLongSleeve;
                               const itemCustomName = item.customName || item.options?.customName;
@@ -710,7 +758,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                                       </Typography>
                                       {itemIsLongSleeve && (
                                         <Box sx={{ px: 0.8, py: 0.2, borderRadius: '5px', bgcolor: 'rgba(245,158,11,0.12)', fontSize: '0.65rem', fontWeight: 600, color: 'var(--warning)' }}>
-                                          แขนยาว
+                                          {t.common.longSleeve}
                                         </Box>
                                       )}
                                       {itemCustomName && (
@@ -744,7 +792,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, mb: 1 }}>
                             <MapPin size={14} style={{ color: 'var(--text-muted)' }} />
                             <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                              รับสินค้า
+                              {t.orderHistory.pickupSection}
                             </Typography>
                           </Box>
                           <Box sx={{
@@ -764,7 +812,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                                 <Box sx={{ mb: 1.5 }}>
                                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
                                     <MapPin size={14} style={{ color: 'var(--success)' }} />
-                                    <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--success)' }}>สถานที่รับสินค้า</Typography>
+                                    <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--success)' }}>{t.orderHistory.pickupLocation}</Typography>
                                   </Box>
                                   {uniqueLocations.map((loc, locIdx) => (
                                     <Typography key={locIdx} sx={{ fontSize: '0.82rem', color: 'var(--foreground)', fontWeight: 600 }}>{loc}</Typography>
@@ -773,9 +821,9 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.8 }}>
                                       <Clock size={13} style={{ color: 'var(--text-muted)' }} />
                                       <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                                        {productsWithPickup[0].pickup.startDate && new Date(productsWithPickup[0].pickup.startDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                        {productsWithPickup[0].pickup.startDate && new Date(productsWithPickup[0].pickup.startDate).toLocaleDateString(lang === 'en' ? 'en-US' : 'th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                                         {productsWithPickup[0].pickup.startDate && productsWithPickup[0].pickup.endDate && ' - '}
-                                        {productsWithPickup[0].pickup.endDate && new Date(productsWithPickup[0].pickup.endDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                        {productsWithPickup[0].pickup.endDate && new Date(productsWithPickup[0].pickup.endDate).toLocaleDateString(lang === 'en' ? 'en-US' : 'th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                                       </Typography>
                                     </Box>
                                   )}
@@ -808,7 +856,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                               }}
                             >
                               <Package size={18} />
-                              แสดง QR รับสินค้า
+                              {t.orderHistory.showQR}
                             </Button>
                           </Box>
                         </Box>
@@ -822,7 +870,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, mb: 1 }}>
                             <Truck size={14} style={{ color: 'var(--text-muted)' }} />
                             <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                              การจัดส่ง
+                              {t.orderHistory.shippingSection}
                             </Typography>
                           </Box>
                           <Box sx={{
@@ -847,10 +895,10 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                             </Box>
                             <Box>
                               <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--secondary)' }}>
-                                เตรียมจัดส่ง
+                                {t.orderHistory.preparingShipment}
                               </Typography>
                               <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                                กำลังเตรียมจัดส่ง จะแจ้งเลขพัสดุให้เร็วๆนี้
+                                {t.orderHistory.preparingShipmentDesc}
                               </Typography>
                             </Box>
                           </Box>
@@ -863,7 +911,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, mb: 1 }}>
                             <Truck size={14} style={{ color: 'var(--text-muted)' }} />
                             <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                              ติดตามพัสดุ
+                              {t.orderHistory.trackPackage}
                             </Typography>
                           </Box>
                           <TrackingTimeline
@@ -885,7 +933,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                         justifyContent: 'space-between',
                       }}>
                         <Box>
-                          <Typography sx={{ fontSize: '0.68rem', color: 'var(--text-muted)', mb: 0.1 }}>ยอดรวมทั้งหมด</Typography>
+                          <Typography sx={{ fontSize: '0.68rem', color: 'var(--text-muted)', mb: 0.1 }}>{t.orderHistory.totalAmount}</Typography>
                           <Typography sx={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--success)' }}>
                             ฿{order.total?.toLocaleString() || '0'}
                           </Typography>
@@ -911,7 +959,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                                 '&:disabled': { color: 'var(--text-muted)', borderColor: 'rgba(100,116,139,0.2)' },
                               }}
                             >
-                              {cancellingRef === order.ref ? 'กำลังยกเลิก...' : 'ยกเลิก'}
+                              {cancellingRef === order.ref ? t.orderHistory.cancelling : t.orderHistory.cancelOrder}
                             </Button>
                           )}
                           {canRequestRefund && (
@@ -936,7 +984,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                               }}
                             >
                               <RotateCcw size={12} />
-                              ขอคืนเงิน
+                              {t.orderHistory.requestRefund}
                             </Button>
                           )}
                         </Box>
@@ -970,10 +1018,10 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                   {loadingHistoryMore ? (
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <CircularProgress size={16} sx={{ color: 'var(--secondary)' }} />
-                      กำลังโหลด...
+                      {t.orderHistory.loadingMore}
                     </Box>
                   ) : (
-                    'โหลดเพิ่มเติม'
+                    t.orderHistory.loadMore
                   )}
                 </Button>
               </Box>
@@ -1005,7 +1053,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
             '&:hover': { bgcolor: 'var(--glass-bg)' },
           }}
         >
-          ปิด
+          {t.common.close}
         </Button>
       </Box>
 
@@ -1034,7 +1082,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
           pb: 1.5,
         }}>
           <RotateCcw size={20} style={{ color: '#bf5af2' }} />
-          ขอคืนเงิน
+          {t.orderHistory.refundTitle}
           <Typography sx={{ ml: 'auto', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
             {refundOrderRef}
           </Typography>
@@ -1043,7 +1091,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
           {/* Reason */}
           <Box>
             <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, mb: 0.5, color: 'var(--foreground)' }}>
-              เหตุผลในการขอคืนเงิน *
+              {t.orderHistory.refundReason}
             </Typography>
             <Select
               value={refundReason}
@@ -1059,7 +1107,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                 '& .MuiSelect-icon': { color: 'var(--text-muted)' },
               }}
             >
-              <MenuItem value="" disabled>เลือกเหตุผล</MenuItem>
+              <MenuItem value="" disabled>{t.orderHistory.selectReason}</MenuItem>
               {refundReasons.map((r) => (
                 <MenuItem key={r} value={r}>{r}</MenuItem>
               ))}
@@ -1069,7 +1117,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
           {/* Details */}
           <Box>
             <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, mb: 0.5, color: 'var(--foreground)' }}>
-              รายละเอียดเพิ่มเติม
+              {t.orderHistory.additionalDetails}
             </Typography>
             <TextField
               value={refundDetails}
@@ -1077,7 +1125,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
               multiline
               rows={3}
               fullWidth
-              placeholder="อธิบายรายละเอียดเพิ่มเติม..."
+              placeholder={t.orderHistory.detailsPlaceholder}
               size="small"
               sx={{
                 '& .MuiOutlinedInput-root': {
@@ -1094,7 +1142,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
           {/* Refund Amount */}
           <Box>
             <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, mb: 0.5, color: 'var(--foreground)' }}>
-              จำนวนเงินที่ต้องการคืน (฿) *
+              {t.orderHistory.refundAmount}
             </Typography>
             <TextField
               value={refundAmount}
@@ -1106,8 +1154,8 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
               size="small"
               type="text"
               inputMode="decimal"
-              placeholder={`สูงสุด ฿${refundOrderTotal.toLocaleString()}`}
-              helperText={`ยอดรวมคำสั่งซื้อ: ฿${refundOrderTotal.toLocaleString()}`}
+              placeholder={`${t.orderHistory.maxAmount} ฿${refundOrderTotal.toLocaleString()}`}
+              helperText={`${t.orderHistory.orderTotal} ฿${refundOrderTotal.toLocaleString()}`}
               sx={{
                 '& .MuiOutlinedInput-root': {
                   borderRadius: '10px',
@@ -1128,12 +1176,12 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
             border: '1px solid rgba(124,58,237,0.2)',
           }}>
             <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, mb: 1.5, color: '#bf5af2' }}>
-              ข้อมูลบัญชีรับเงิน
+              {t.orderHistory.bankInfo}
             </Typography>
 
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
               <Box>
-                <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, mb: 0.3, color: 'var(--foreground)' }}>ธนาคาร *</Typography>
+                <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, mb: 0.3, color: 'var(--foreground)' }}>{t.orderHistory.bankName}</Typography>
                 <Select
                   value={refundBankName}
                   onChange={(e) => setRefundBankName(e.target.value as string)}
@@ -1148,7 +1196,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                     '& .MuiSelect-icon': { color: 'var(--text-muted)' },
                   }}
                 >
-                  <MenuItem value="" disabled>เลือกธนาคาร</MenuItem>
+                  <MenuItem value="" disabled>{t.orderHistory.selectBank}</MenuItem>
                   {refundBanks.map((b) => (
                     <MenuItem key={b} value={b}>{b}</MenuItem>
                   ))}
@@ -1157,14 +1205,14 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
 
               <Box>
                 <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, mb: 0.3, color: 'var(--foreground)' }}>
-                  {refundBankName === 'พร้อมเพย์' ? 'หมายเลขพร้อมเพย์ *' : 'เลขบัญชี *'}
+                  {refundBankName === promptPayLabel ? t.orderHistory.promptPayNumber : t.orderHistory.accountNumber}
                 </Typography>
                 <TextField
                   value={refundBankAccount}
                   onChange={(e) => setRefundBankAccount(e.target.value.replace(/[^0-9-]/g, ''))}
                   fullWidth
                   size="small"
-                  placeholder={refundBankName === 'พร้อมเพย์' ? 'เบอร์โทร / เลขบัตรประชาชน' : 'กรอกเลขบัญชี'}
+                  placeholder={refundBankName === promptPayLabel ? t.orderHistory.promptPayHint : t.orderHistory.accountHint}
                   sx={{
                     '& .MuiOutlinedInput-root': {
                       borderRadius: '10px',
@@ -1178,13 +1226,13 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
               </Box>
 
               <Box>
-                <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, mb: 0.3, color: 'var(--foreground)' }}>ชื่อเจ้าของบัญชี *</Typography>
+                <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, mb: 0.3, color: 'var(--foreground)' }}>{t.orderHistory.accountOwner}</Typography>
                 <TextField
                   value={refundAccountName}
                   onChange={(e) => setRefundAccountName(e.target.value)}
                   fullWidth
                   size="small"
-                  placeholder="ชื่อ-นามสกุล เจ้าของบัญชี"
+                  placeholder={t.orderHistory.accountOwnerHint}
                   sx={{
                     '& .MuiOutlinedInput-root': {
                       borderRadius: '10px',
@@ -1211,7 +1259,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
               fontWeight: 600,
             }}
           >
-            ยกเลิก
+            {t.common.cancel}
           </Button>
           <Button
             onClick={handleSubmitRefund}
@@ -1236,10 +1284,10 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
             {refundSubmitting ? (
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <CircularProgress size={16} sx={{ color: 'white' }} />
-                กำลังส่งคำขอ...
+                {t.orderHistory.submitting}
               </Box>
             ) : (
-              'ส่งคำขอคืนเงิน'
+              t.orderHistory.submitRefund
             )}
           </Button>
         </DialogActions>

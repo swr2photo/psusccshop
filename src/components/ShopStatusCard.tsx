@@ -12,6 +12,7 @@ import {
   Store,
   LucideIcon,
 } from 'lucide-react';
+import { useTranslation } from '@/hooks/useTranslation';
 
 // ==================== SHOP STATUS TYPES ====================
 export type ShopStatusType = 'OPEN' | 'COMING_SOON' | 'ORDER_ENDED' | 'TEMPORARILY_CLOSED' | 'WAITING_TO_OPEN';
@@ -28,40 +29,40 @@ export interface ShopStatusInfo {
 
 export const SHOP_STATUS_CONFIG: Record<ShopStatusType, Omit<ShopStatusInfo, 'type'>> = {
   OPEN: {
-    label: 'เปิดให้บริการ',
-    description: 'สั่งซื้อสินค้าได้แล้ววันนี้!',
+    label: 'Open',
+    description: 'Order now!',
     icon: CheckCircle,
     color: '#34c759',
     bgGradient: 'linear-gradient(135deg, rgba(16,185,129,0.15) 0%, rgba(16,185,129,0.05) 100%)',
     borderColor: 'rgba(16,185,129,0.4)',
   },
   COMING_SOON: {
-    label: 'เร็วๆ นี้',
-    description: 'เตรียมพบกับสินค้าใหม่เร็วๆ นี้!',
+    label: 'Coming Soon',
+    description: 'New products coming soon!',
     icon: Zap,
     color: '#ff9f0a',
     bgGradient: 'linear-gradient(135deg, rgba(245,158,11,0.15) 0%, rgba(245,158,11,0.05) 100%)',
     borderColor: 'rgba(245,158,11,0.4)',
   },
   ORDER_ENDED: {
-    label: 'หมดเขตสั่งซื้อ',
-    description: 'ระยะเวลาการสั่งซื้อสิ้นสุดแล้ว',
+    label: 'Order Period Ended',
+    description: 'The ordering period has ended',
     icon: XCircle,
     color: '#ff453a',
     bgGradient: 'linear-gradient(135deg, rgba(239,68,68,0.15) 0%, rgba(239,68,68,0.05) 100%)',
     borderColor: 'rgba(239,68,68,0.4)',
   },
   TEMPORARILY_CLOSED: {
-    label: 'ปิดชั่วคราว',
-    description: 'ร้านค้าปิดให้บริการชั่วคราว กรุณารอการแจ้งเปิดใหม่',
+    label: 'Temporarily Closed',
+    description: 'Shop is temporarily closed. Please wait for reopening.',
     icon: AlertTriangle,
     color: '#ff9f0a',
     bgGradient: 'linear-gradient(135deg, rgba(249,115,22,0.15) 0%, rgba(249,115,22,0.05) 100%)',
     borderColor: 'rgba(249,115,22,0.4)',
   },
   WAITING_TO_OPEN: {
-    label: 'รอเปิดให้บริการ',
-    description: 'กรุณารอสักครู่ ร้านค้ากำลังจะเปิด',
+    label: 'Opening Soon',
+    description: 'Please wait, the shop is about to open',
     icon: CalendarClock,
     color: '#0071e3',
     bgGradient: 'linear-gradient(135deg, rgba(0,113,227,0.15) 0%, rgba(0,113,227,0.05) 100%)',
@@ -137,23 +138,27 @@ export const getProductStatus = (product: { isActive?: boolean; startDate?: stri
 };
 
 // Format countdown time
-export const formatCountdown = (targetDate: Date): string => {
+export const formatCountdown = (targetDate: Date, t?: { common: { days: string; hours: string; minutes: string } }): string => {
   // Handle invalid date
   if (!targetDate || isNaN(targetDate.getTime())) return '';
   
   const now = new Date();
   const diff = targetDate.getTime() - now.getTime();
   
-  // ไม่แสดง "หมดเวลาแล้ว" - return empty string แทน
+  // Don't show "time expired" - return empty string instead
   if (diff <= 0) return '';
   
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
   const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
   
-  if (days > 0) return `${days} วัน ${hours} ชม.`;
-  if (hours > 0) return `${hours} ชม. ${minutes} นาที`;
-  return `${minutes} นาที`;
+  const daysLabel = t?.common.days ?? 'days';
+  const hoursLabel = t?.common.hours ?? 'hrs';
+  const minutesLabel = t?.common.minutes ?? 'min';
+  
+  if (days > 0) return `${days} ${daysLabel} ${hours} ${hoursLabel}`;
+  if (hours > 0) return `${hours} ${hoursLabel} ${minutes} ${minutesLabel}`;
+  return `${minutes} ${minutesLabel}`;
 };
 
 // ==================== SHOP STATUS CARD COMPONENT ====================
@@ -172,6 +177,7 @@ export default function ShopStatusCard({
   compact = false,
   showWhenOpen = false,
 }: ShopStatusCardProps) {
+  const { t } = useTranslation();
   const config = SHOP_STATUS_CONFIG[status];
   const [countdown, setCountdown] = useState<string>('');
   
@@ -180,13 +186,31 @@ export default function ShopStatusCard({
     const targetDate = new Date(countdownDate);
     
     const updateCountdown = () => {
-      setCountdown(formatCountdown(targetDate));
+      setCountdown(formatCountdown(targetDate, t));
     };
     
     updateCountdown();
     const interval = setInterval(updateCountdown, 60000); // Update every minute
     return () => clearInterval(interval);
-  }, [countdownDate]);
+  }, [countdownDate, t]);
+
+  // Get translated label and description based on status
+  const statusLabels: Record<ShopStatusType, string> = {
+    OPEN: t.shopStatus.open,
+    COMING_SOON: t.shopStatus.comingSoon,
+    ORDER_ENDED: t.shopStatus.closedEnded,
+    TEMPORARILY_CLOSED: t.shopStatus.closed,
+    WAITING_TO_OPEN: t.shopStatus.waitingToOpen,
+  };
+  const statusDescriptions: Record<ShopStatusType, string> = {
+    OPEN: t.shopStatus.openDesc,
+    COMING_SOON: t.shopStatus.comingSoonDesc,
+    ORDER_ENDED: t.shopStatus.closedEndedDesc,
+    TEMPORARILY_CLOSED: t.shopStatus.closedDesc,
+    WAITING_TO_OPEN: t.shopStatus.waitingToOpenDesc,
+  };
+  const label = statusLabels[status];
+  const description = statusDescriptions[status];
 
   // Don't show anything if shop is open and showWhenOpen is false
   if (status === 'OPEN' && !showWhenOpen) return null;
@@ -209,7 +233,7 @@ export default function ShopStatusCard({
           <config.icon size={16} />
         </Box>
         <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: config.color }}>
-          {config.label}
+          {label}
         </Typography>
         {countdown && (
           <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', ml: 0.5 }}>
@@ -288,7 +312,7 @@ export default function ShopStatusCard({
                 mb: 0.5,
               }}
             >
-              {config.label}
+              {label}
             </Typography>
             <Typography
               sx={{
@@ -297,7 +321,7 @@ export default function ShopStatusCard({
                 lineHeight: 1.5,
               }}
             >
-              {customMessage || config.description}
+              {customMessage || description}
             </Typography>
 
             {/* Countdown */}
@@ -317,7 +341,7 @@ export default function ShopStatusCard({
               >
                 <Clock size={16} color={config.color} />
                 <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>
-                  {(status === 'COMING_SOON' || status === 'WAITING_TO_OPEN') ? 'เปิดใน ' : ''}
+                  {(status === 'COMING_SOON' || status === 'WAITING_TO_OPEN') ? t.shopStatus.opensIn : ''}
                   <Box component="span" sx={{ color: config.color, fontWeight: 700 }}>
                     {countdown}
                   </Box>
@@ -337,8 +361,18 @@ interface ProductStatusBadgeProps {
 }
 
 export function ProductStatusBadge({ product }: ProductStatusBadgeProps) {
+  const { t, lang } = useTranslation();
   const status = getProductStatus(product);
   const config = SHOP_STATUS_CONFIG[status];
+  
+  const statusLabels: Record<ShopStatusType, string> = {
+    OPEN: t.shopStatus.open,
+    COMING_SOON: t.shopStatus.comingSoon,
+    ORDER_ENDED: t.shopStatus.closedEnded,
+    TEMPORARILY_CLOSED: t.shopStatus.closed,
+    WAITING_TO_OPEN: t.shopStatus.waitingToOpen,
+  };
+  const label = statusLabels[status];
   
   if (status === 'OPEN') return null;
   
@@ -382,11 +416,11 @@ export function ProductStatusBadge({ product }: ProductStatusBadgeProps) {
           px: 2,
         }}
       >
-        {config.label}
+        {label}
       </Typography>
       {product.startDate && status === 'COMING_SOON' && (
         <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', mt: 0.5 }}>
-          เปิด {new Date(product.startDate).toLocaleDateString('th-TH')}
+          {t.shopStatus.opensOn} {new Date(product.startDate).toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-US')}
         </Typography>
       )}
     </Box>
@@ -430,21 +464,31 @@ interface StatusChipProps {
 }
 
 export function StatusChip({ status, countdownDate }: StatusChipProps) {
+  const { t } = useTranslation();
   const config = SHOP_STATUS_CONFIG[status];
   const [countdown, setCountdown] = useState<string>('');
+  
+  const statusLabels: Record<ShopStatusType, string> = {
+    OPEN: t.shopStatus.open,
+    COMING_SOON: t.shopStatus.comingSoon,
+    ORDER_ENDED: t.shopStatus.closedEnded,
+    TEMPORARILY_CLOSED: t.shopStatus.closed,
+    WAITING_TO_OPEN: t.shopStatus.waitingToOpen,
+  };
+  const label = statusLabels[status];
   
   useEffect(() => {
     if (!countdownDate) return;
     const targetDate = new Date(countdownDate);
     
     const updateCountdown = () => {
-      setCountdown(formatCountdown(targetDate));
+      setCountdown(formatCountdown(targetDate, t));
     };
     
     updateCountdown();
     const interval = setInterval(updateCountdown, 60000);
     return () => clearInterval(interval);
-  }, [countdownDate]);
+  }, [countdownDate, t]);
 
   return (
     <Box
@@ -463,7 +507,7 @@ export function StatusChip({ status, countdownDate }: StatusChipProps) {
         <config.icon size={14} />
       </Box>
       <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: config.color }}>
-        {config.label}
+        {label}
       </Typography>
       {countdown && (
         <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>

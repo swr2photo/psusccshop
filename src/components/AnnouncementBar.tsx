@@ -28,6 +28,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import OptimizedImage from './OptimizedImage';
+import { useTranslation } from '@/hooks/useTranslation';
 
 // ==================== Types ====================
 
@@ -113,6 +114,7 @@ const PLATFORM_CONFIG: Record<string, { label: string; icon: React.ReactNode; co
 };
 
 export default function AnnouncementBar({ announcements, history, socialMediaNews, onProductClick }: AnnouncementBarProps) {
+  const { t } = useTranslation();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [dismissed, setDismissed] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -349,7 +351,7 @@ export default function AnnouncementBar({ announcements, history, socialMediaNew
                 cursor: 'pointer',
               }}
             >
-              {current.message || 'ประกาศจากทีมงาน'}
+              {current.message || t.announcement.defaultTitle}
             </Typography>
             {/* Link / Product button */}
             {current.linkedProductId && onProductClick ? (
@@ -378,7 +380,7 @@ export default function AnnouncementBar({ announcements, history, socialMediaNew
                   '&:active': { transform: 'scale(0.96)' },
                 }}
               >
-                {current.linkText || 'ดูสินค้า →'}
+                {current.linkText || t.announcement.viewProducts}
               </Box>
             ) : current.link && (
               <Typography
@@ -398,7 +400,7 @@ export default function AnnouncementBar({ announcements, history, socialMediaNew
                   '&:hover': { textDecoration: 'underline' },
                 }}
               >
-                {current.linkText || 'ดูเพิ่มเติม →'}
+                {current.linkText || t.announcement.viewMore}
               </Typography>
             )}
             {current.displayName && (
@@ -588,7 +590,7 @@ export default function AnnouncementBar({ announcements, history, socialMediaNew
           </Box>
           <Box sx={{ flex: 1 }}>
             <Typography sx={{ fontWeight: 700, fontSize: '1rem', color: 'var(--foreground)' }}>
-              ประกาศ
+              {t.announcement.sectionTitle}
             </Typography>
             {current.postedAt && (
               <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
@@ -671,7 +673,7 @@ export default function AnnouncementBar({ announcements, history, socialMediaNew
             </Box>
             <Box>
               <Typography sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '1.1rem' }}>
-                ประวัติประกาศ
+                {t.announcement.history}
               </Typography>
               <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                 {history?.length || 0} รายการ
@@ -710,7 +712,7 @@ export default function AnnouncementBar({ announcements, history, socialMediaNew
                         ? new Date(item.postedAt).toLocaleDateString('th-TH', {
                             day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
                           })
-                        : 'ไม่ระบุวันที่'}
+                        : t.announcement.noDate}
                     </Box>
 
                     {/* Image */}
@@ -739,13 +741,13 @@ export default function AnnouncementBar({ announcements, history, socialMediaNew
           ) : (
             <Box sx={{ py: 6, textAlign: 'center', color: 'var(--text-muted)' }}>
               <History size={48} style={{ opacity: 0.3, marginBottom: 16 }} />
-              <Typography>ยังไม่มีประวัติประกาศ</Typography>
+              <Typography>{t.announcement.noHistory}</Typography>
             </Box>
           )}
         </DialogContent>
         <DialogActions sx={{ borderTop: '1px solid var(--glass-border)', p: 2 }}>
           <Button onClick={() => setShowHistory(false)} sx={{ color: 'var(--text-muted)', '&:hover': { bgcolor: 'var(--glass-bg)' } }}>
-            ปิด
+            {t.common.close}
           </Button>
         </DialogActions>
       </Dialog>

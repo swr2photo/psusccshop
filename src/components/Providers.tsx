@@ -13,6 +13,8 @@ import { useScreenshotProtection } from '@/hooks';
 import { SWRProvider } from '@/hooks/useSWRConfig';
 import { TanStackQueryProvider } from '@/hooks/useTanStackQuery';
 import { useThemeStore } from '@/store/themeStore';
+import { getTranslations } from '@/lib/i18n/translations';
+import { useLanguageStore } from '@/store/languageStore';
 
 // Error Boundary for catching client-side errors (especially on older browsers)
 interface ErrorBoundaryState {
@@ -36,6 +38,8 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, ErrorBounda
 
   render() {
     if (this.state.hasError) {
+      const lang = useLanguageStore.getState().language;
+      const t = getTranslations(lang);
       const errorMessage = this.state.error?.message || 'Unknown error';
       const isDataError = errorMessage.includes('Cannot read properties of undefined') || 
                           errorMessage.includes('Cannot read properties of null') ||
@@ -76,12 +80,12 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, ErrorBounda
             </svg>
           </div>
           <h1 style={{ fontSize: 22, marginBottom: 8, fontWeight: 700, color: 'var(--foreground, #f5f5f7)' }}>
-            เกิดข้อผิดพลาด
+            {t.misc.errorOccurred}
           </h1>
           <p style={{ fontSize: 14, marginBottom: 24, maxWidth: 400, lineHeight: 1.6, color: 'var(--text-muted, #86868b)' }}>
             {isDataError
-              ? 'ข้อมูลบางส่วนอาจล้าสมัย กรุณาล้างข้อมูลเก่าแล้วลองใหม่อีกครั้ง'
-              : 'มีบางอย่างผิดพลาด กรุณารีเฟรชหน้าเว็บ หรืออัปเดต browser'}
+              ? t.misc.dataOutdated
+              : t.misc.genericErrorDesc}
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', maxWidth: 280, margin: '0 auto' }}>
             <button
@@ -103,7 +107,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, ErrorBounda
               }}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
-              รีเฟรชหน้าเว็บ
+              {t.misc.refreshPage}
             </button>
             {isDataError && (
               <button
@@ -140,7 +144,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, ErrorBounda
                 }}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-                ล้างข้อมูลเก่าแล้วรีเฟรช
+                {t.misc.clearAndRefresh}
               </button>
             )}
             <button
@@ -162,14 +166,14 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, ErrorBounda
               }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-              กลับหน้าหลัก
+              {t.misc.goHome}
             </button>
           </div>
           {this.state.error && (
             <details style={{ marginTop: 24, fontSize: 12, color: '#86868b', maxWidth: 500, width: '100%' }}>
               <summary style={{ cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>
-                รายละเอียดทางเทคนิค</summary>
+                {t.misc.technicalDetails}</summary>
               <pre style={{ 
                 textAlign: 'left', 
                 whiteSpace: 'pre-wrap', 

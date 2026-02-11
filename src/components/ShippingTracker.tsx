@@ -29,6 +29,7 @@ import {
   TRACKING_STATUS_THAI,
   ShippingProvider,
 } from '@/lib/shipping';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface ShippingTrackerProps {
   initialProvider?: ShippingProvider;
@@ -63,6 +64,7 @@ export default function ShippingTracker({
   initialTrackingNumber,
   compact = false,
 }: ShippingTrackerProps) {
+  const { t, lang } = useTranslation();
   const [provider, setProvider] = useState<ShippingProvider>(initialProvider || 'thailand_post');
   const [trackingNumber, setTrackingNumber] = useState(initialTrackingNumber || '');
   const [trackingInfo, setTrackingInfo] = useState<TrackingInfo | null>(null);
@@ -72,7 +74,7 @@ export default function ShippingTracker({
 
   const handleTrack = async () => {
     if (!trackingNumber.trim()) {
-      setError('กรุณาใส่เลขพัสดุ');
+      setError(t.shipping.enterTrackingNumber);
       return;
     }
 
@@ -94,10 +96,10 @@ export default function ShippingTracker({
       if (data.success) {
         setTrackingInfo(data.data);
       } else {
-        setError(data.error || 'ไม่สามารถดึงข้อมูลได้');
+        setError(data.error || t.shipping.cannotFetchData);
       }
     } catch (err) {
-      setError('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+      setError(t.shipping.connectionError);
     } finally {
       setLoading(false);
     }
@@ -126,7 +128,7 @@ export default function ShippingTracker({
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
           <LocalShipping size={28} color="var(--primary)" />
           <Typography variant="h6" fontWeight="bold">
-            ติดตามพัสดุ
+            {t.shipping.trackingTitle}
           </Typography>
         </Box>
 
@@ -163,7 +165,7 @@ export default function ShippingTracker({
 
           <Box sx={{ display: 'flex', gap: 2 }}>
             <TextField
-              placeholder="ใส่เลขพัสดุ"
+              placeholder={t.shipping.enterPlaceholder}
               value={trackingNumber}
               onChange={(e) => setTrackingNumber(e.target.value.toUpperCase())}
               onKeyDown={(e) => e.key === 'Enter' && handleTrack()}
@@ -180,7 +182,7 @@ export default function ShippingTracker({
               }}
               InputProps={{
                 endAdornment: trackingNumber && (
-                  <Tooltip title={copied ? 'คัดลอกแล้ว!' : 'คัดลอก'}>
+                  <Tooltip title={copied ? t.shipping.copiedTooltip : t.shipping.copyTooltip}>
                     <IconButton size="small" onClick={handleCopyTracking}>
                       <ContentCopy size={18} color={copied ? '#30d158' : 'var(--text-muted)'} />
                     </IconButton>
@@ -200,7 +202,7 @@ export default function ShippingTracker({
                 '&:hover': { bgcolor: '#bf5af2' },
               }}
             >
-              {loading ? 'กำลังค้นหา' : 'ค้นหา'}
+              {loading ? t.shipping.searching : t.shipping.search}
             </Button>
           </Box>
         </Stack>
@@ -239,12 +241,12 @@ export default function ShippingTracker({
                       </Typography>
                     </Box>
                     <Typography variant="caption" color="textSecondary">
-                      อัปเดตล่าสุด: {new Date(trackingInfo.lastUpdate).toLocaleString('th-TH')}
+                      {t.shipping.lastUpdate}: {new Date(trackingInfo.lastUpdate).toLocaleString(lang === 'th' ? 'th-TH' : 'en-US')}
                     </Typography>
                   </Box>
 
                   <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                    <Tooltip title="รีเฟรช">
+                    <Tooltip title={t.shipping.refresh}>
                       <IconButton onClick={handleTrack} disabled={loading}>
                         <Refresh size={24} color="var(--text-muted)" />
                       </IconButton>
@@ -283,7 +285,7 @@ export default function ShippingTracker({
                           },
                         }}
                       >
-                        เว็บไซต์ขนส่ง
+                        {t.shipping.carrierWebsite}
                       </Button>
                     )}
                   </Box>
@@ -295,7 +297,7 @@ export default function ShippingTracker({
             {trackingInfo.events.length > 0 ? (
               <Box>
                 <Typography variant="subtitle2" sx={{ mb: 2, color: 'var(--text-muted)' }}>
-                  ประวัติการเคลื่อนไหว
+                  {t.shipping.movementHistory}
                 </Typography>
                 <Stepper orientation="vertical" sx={{ ml: 1 }}>
                   {trackingInfo.events.map((event, index) => (
@@ -323,7 +325,7 @@ export default function ShippingTracker({
                             {event.descriptionThai || event.description}
                           </Typography>
                           <Typography variant="caption" color="textSecondary">
-                            {new Date(event.timestamp).toLocaleString('th-TH')}
+                            {new Date(event.timestamp).toLocaleString(lang === 'th' ? 'th-TH' : 'en-US')}
                             {event.location && ` • ${event.location}`}
                           </Typography>
                         </Box>
@@ -341,7 +343,7 @@ export default function ShippingTracker({
                 }}
               >
                 <Typography variant="body2">
-                  ยังไม่มีข้อมูลการเคลื่อนไหว กรุณาลองตรวจสอบที่เว็บไซต์ขนส่งโดยตรง
+                  {t.shipping.noMovementYet}
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
                   {trackingInfo.track123Url && (
@@ -350,7 +352,7 @@ export default function ShippingTracker({
                       onClick={() => window.open(trackingInfo.track123Url, '_blank')}
                       sx={{ color: 'var(--secondary)' }}
                     >
-                      ดูที่ Track123 →
+                      {t.shipping.viewAtTrack123}
                     </Button>
                   )}
                   {trackingInfo.trackingUrl && (
@@ -359,7 +361,7 @@ export default function ShippingTracker({
                       onClick={openExternalTracking}
                       sx={{ color: '#64d2ff' }}
                     >
-                      ไปที่เว็บไซต์ขนส่ง →
+                      {t.shipping.goToCarrierWebsite}
                     </Button>
                   )}
                 </Box>
@@ -376,7 +378,7 @@ export default function ShippingTracker({
             borderTop: '1px solid var(--glass-border)',
           }}>
             <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 2 }}>
-              ลิงก์ติดตามพัสดุโดยตรง:
+              {t.shipping.directTrackingLinks}
             </Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
               {Object.entries(SHIPPING_PROVIDERS)

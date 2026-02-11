@@ -28,6 +28,7 @@ import { Headphones as SupportAgentIcon, X as CloseIcon, Send as SendIcon, Clock
 import { useNotification } from './NotificationContext';
 import { usePushNotification } from '@/hooks/usePushNotification';
 import { useRealtimeChat } from '@/hooks/useRealtimeChat';
+import { useTranslation } from '@/hooks/useTranslation';
 
 // ชื่อแอดมินเริ่มต้น (ดึงจากตั้งค่าแชท)
 const DEFAULT_ADMIN_NAME = 'ทีมงาน PSU SCC';
@@ -79,6 +80,7 @@ interface ChatWithMessages extends ChatSession {
 
 export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, externalOpen, onExternalOpenHandled }: SupportChatWidgetProps) {
   const { data: session, status: authStatus } = useSession();
+  const { t, lang } = useTranslation();
   const { warning: toastWarning, error: toastError } = useNotification();
   const { permission: pushPermission, isSupported: pushSupported, isSubscribed: pushSubscribed, loading: pushLoading, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotification();
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
@@ -108,6 +110,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
   const [pushBannerDismissed, setPushBannerDismissed] = useState(false);
   const [adminDisplayName, setAdminDisplayName] = useState(DEFAULT_ADMIN_NAME);
   const [fallbackTyping, setFallbackTyping] = useState(false);
+  const displayAdminName = adminDisplayName === DEFAULT_ADMIN_NAME ? t.supportChat.adminName : adminDisplayName;
   
   // === Supabase Realtime: live messages, typing, read receipts ===
   const {
@@ -198,7 +201,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
       if (document.hidden || !open) {
         if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
           try {
-            const notif = new Notification('SCC Shop - ข้อความใหม่', {
+            const notif = new Notification(`SCC Shop - ${t.supportChat.newMessage}`, {
               body: latestMsg.message.substring(0, 100),
               icon: '/favicon.png',
               tag: `chat-${chat.id}`,
@@ -438,13 +441,13 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
 
     // Check file type
     if (!file.type.startsWith('image/')) {
-      toastWarning('กรุณาเลือกไฟล์รูปภาพเท่านั้น');
+      toastWarning(t.supportChat.imageOnly);
       return;
     }
 
     // Check file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      toastWarning('ไฟล์ต้องมีขนาดไม่เกิน 5MB');
+      toastWarning(t.supportChat.maxFileSize);
       return;
     }
 
@@ -479,13 +482,13 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
       });
 
       if (!uploadRes.ok) {
-        throw new Error(`อัปโหลดล้มเหลว (HTTP ${uploadRes.status})`);
+        throw new Error(`${t.supportChat.imageUploadFailed} (HTTP ${uploadRes.status})`);
       }
       let uploadData;
       try {
         uploadData = await uploadRes.json();
       } catch {
-        throw new Error('เซิร์ฟเวอร์ตอบกลับผิดปกติ กรุณาลองใหม่');
+        throw new Error(t.supportChat.sendFailed);
       }
       
       if (uploadData.status === 'success' && uploadData.data?.url) {
@@ -513,11 +516,11 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
         setMessage('');
         setPreviewImage(null);
       } else {
-        throw new Error(uploadData.message || 'อัปโหลดรูปภาพไม่สำเร็จ');
+        throw new Error(uploadData.message || t.supportChat.imageUploadFailed);
       }
     } catch (error: any) {
       console.error('Error uploading image:', error);
-      toastError(error?.message || 'เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ');
+      toastError(error?.message || t.supportChat.imageUploadFailed);
     } finally {
       setUploadingImage(false);
       if (fileInputRef.current) {
@@ -580,7 +583,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
 
   // Handle reply to message
   const handleReplyToMessage = (msg: ChatMessage) => {
-    const previewText = msg.message.replace(/\[รูปภาพ: [^\]]+\]/g, '[รูปภาพ]').trim() || '[รูปภาพ]';
+    const previewText = msg.message.replace(/\[รูปภาพ: [^\]]+\]/g, `[${t.supportChat.image}]`).trim() || `[${t.supportChat.image}]`;
     setReplyToMessage({
       id: msg.id,
       text: previewText,
@@ -761,10 +764,10 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
     const diffHours = Math.floor(diffMins / 60);
     const diffDays = Math.floor(diffHours / 24);
     
-    if (diffMins < 1) return 'เมื่อกี้';
-    if (diffMins < 60) return `${diffMins} นาทีที่แล้ว`;
-    if (diffHours < 24) return `${diffHours} ชั่วโมงที่แล้ว`;
-    return `${diffDays} วันที่แล้ว`;
+    if (diffMins < 1) return t.supportChat.justNow;
+    if (diffMins < 60) return `${diffMins} ${t.supportChat.minutesAgo}`;
+    if (diffHours < 24) return `${diffHours} ${t.supportChat.hoursAgo}`;
+    return `${diffDays} ${t.supportChat.daysAgo}`;
   };
 
   // Parse message to extract image URL and order ref
@@ -815,10 +818,10 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
   const handleSendOrderRef = async (order: any) => {
     if (!chat || chat.status === 'closed') return;
     
-    const orderMsg = `*ออเดอร์ #${order.ref}*
-ยอด: ฿${order.totalAmount?.toLocaleString() || order.amount?.toLocaleString() || 0}
-วันที่: ${new Date(order.date || order.createdAt).toLocaleDateString('th-TH')}
-สถานะ: ${getStatusLabel(order.status)}
+    const orderMsg = `*${t.supportChat.orderRef} #${order.ref}*
+${t.common.total}: ฿${order.totalAmount?.toLocaleString() || order.amount?.toLocaleString() || 0}
+${new Date(order.date || order.createdAt).toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-US')}
+${getStatusLabel(order.status)}
 [ORDER_REF:${order.ref}]`;
     
     setSending(true);
@@ -844,18 +847,9 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
     }
   };
 
-  // Get status label in Thai
+  // Get status label
   const getStatusLabel = (status: string) => {
-    const labels: Record<string, string> = {
-      'PENDING': 'รอดำเนินการ',
-      'PAID': 'ชำระแล้ว',
-      'PROCESSING': 'กำลังดำเนินการ',
-      'READY': 'พร้อมรับ',
-      'SHIPPED': 'จัดส่งแล้ว',
-      'COMPLETED': 'เสร็จสิ้น',
-      'CANCELLED': 'ยกเลิก',
-    };
-    return labels[status?.toUpperCase()] || status;
+    return (t.status as any)[status?.toUpperCase()] || status;
   };
 
   // Show loading spinner while checking auth
@@ -967,7 +961,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
           >
             <IconButton
               onClick={handleOpenMenu}
-              aria-label="เปิดแชท"
+              aria-label={t.supportChat.chatTitle}
               sx={{
                 position: 'relative',
                 width: '100%',
@@ -1053,8 +1047,8 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
             <ChatbotIcon size={24} color="#30d158" />
           </ListItemIcon>
           <ListItemText 
-            primary="ถามแชทบอท" 
-            secondary="ตอบคำถามอัตโนมัติ 24 ชม."
+            primary={t.help.askChatbot} 
+            secondary={t.help.chatbotDesc}
             secondaryTypographyProps={{ sx: { color: 'var(--text-muted)', fontSize: '0.75rem' } }}
           />
         </MenuItem>
@@ -1069,8 +1063,8 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
             <SupportAgentIcon size={24} color="#0071e3" />
           </ListItemIcon>
           <ListItemText 
-            primary="ติดต่อแอดมิน" 
-            secondary={isLoggedIn ? "แชทกับทีมงานโดยตรง" : "ต้องเข้าสู่ระบบก่อน"}
+            primary={t.help.contactAdmin} 
+            secondary={isLoggedIn ? t.help.contactAdminDesc : t.supportChat.loginRequired}
             secondaryTypographyProps={{ sx: { color: isLoggedIn ? 'var(--text-muted)' : 'var(--warning)', fontSize: '0.75rem' } }}
           />
         </MenuItem>
@@ -1111,7 +1105,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
             )}
           </ListItemIcon>
           <ListItemText 
-            primary={unsending ? "กำลังยกเลิก..." : "ยกเลิกข้อความ"}
+            primary={unsending ? t.common.loading : t.common.delete}
             primaryTypographyProps={{ sx: { fontWeight: 500 } }}
           />
         </MenuItem>
@@ -1132,7 +1126,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
               <ReplyIcon size={20} color="#0071e3" />
             </ListItemIcon>
             <ListItemText 
-              primary="ตอบกลับ"
+              primary={t.chatbot.reply}
               primaryTypographyProps={{ sx: { fontWeight: 500 } }}
             />
           </MenuItem>
@@ -1203,7 +1197,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
           <Box
             component="img"
             src={lightboxImage}
-            alt="รูปภาพขยาย"
+            alt={t.supportChat.image}
             onClick={(e) => e.stopPropagation()}
             sx={{
               maxWidth: '95vw',
@@ -1229,7 +1223,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
               fontSize: '0.8rem',
             }}
           >
-            คลิกที่ใดก็ได้เพื่อปิด หรือกด ESC
+            {t.common.close}
           </Typography>
         </Box>
       )}
@@ -1275,7 +1269,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
             }}>
               <ReceiptIcon size={24} color="#0071e3" />
               <Typography sx={{ fontWeight: 700, color: 'var(--foreground)', flex: 1 }}>
-                เลือกออเดอร์ที่ต้องการแนบ
+                {t.supportChat.orderRef}
               </Typography>
               <IconButton size="small" onClick={() => setShowOrderPicker(false)}>
                 <CloseIcon size={24} />
@@ -1291,7 +1285,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
               ) : orderHistory.length === 0 ? (
                 <Box sx={{ textAlign: 'center', py: 4 }}>
                   <ShoppingBagIcon size={48} color="#86868b" style={{ marginBottom: 8 }} />
-                  <Typography sx={{ color: 'var(--text-muted)' }}>ไม่พบประวัติการสั่งซื้อ</Typography>
+                  <Typography sx={{ color: 'var(--text-muted)' }}>{t.orderHistory.empty}</Typography>
                 </Box>
               ) : (
                 orderHistory.map((order) => (
@@ -1330,10 +1324,10 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                       </Box>
                       <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Typography sx={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.85rem' }}>
-                          ออเดอร์ #{order.ref}
+                          {t.supportChat.orderRef} #{order.ref}
                         </Typography>
                         <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-                          ฿{order.totalAmount?.toLocaleString() || order.amount?.toLocaleString() || 0} · {new Date(order.date || order.createdAt).toLocaleDateString('th-TH')}
+                          ฿{order.totalAmount?.toLocaleString() || order.amount?.toLocaleString() || 0} · {new Date(order.date || order.createdAt).toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-US')}
                         </Typography>
                       </Box>
                       <Chip
@@ -1406,7 +1400,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
             />
             <Box sx={{ flex: 1 }}>
               <Typography sx={{ fontWeight: 700, fontSize: '1rem' }}>
-                {showHistory ? 'ประวัติการสนทนา' : adminDisplayName}
+                {showHistory ? t.supportChat.recentChats : displayAdminName}
               </Typography>
               <Typography sx={{ fontSize: '0.75rem', opacity: 0.9, display: 'flex', alignItems: 'center', gap: 0.5 }}>
                 {/* Realtime connection indicator */}
@@ -1429,21 +1423,21 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                   />
                 )}
                 {showHistory 
-                  ? 'เลือกดูการสนทนาที่ผ่านมา'
+                  ? t.supportChat.recentChats
                   : chat?.status === 'active' 
-                  ? `กำลังสนทนากับ ${chat.admin_name || 'แอดมิน'}`
+                  ? `${t.supportChat.activeChats} - ${chat.admin_name || t.supportChat.admin}`
                   : chat?.status === 'pending'
-                  ? 'รอแอดมินรับเคส...'
+                  ? t.supportChat.connecting
                   : chat?.status === 'closed'
-                  ? 'การสนทนาจบแล้ว (ดูได้อย่างเดียว)'
-                  : 'พร้อมให้บริการ'}
+                  ? t.supportChat.chatEnded
+                  : t.supportChat.connected}
               </Typography>
             </Box>
             {!showHistory && (
               <IconButton
                 onClick={() => { fetchChatHistory(); setShowHistory(true); }}
                 sx={{ color: 'white' }}
-                title="ดูประวัติการสนทนา"
+                title={t.supportChat.recentChats}
               >
                 <HistoryIcon size={24} />
               </IconButton>
@@ -1457,13 +1451,13 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                   } else {
                     const ok = await pushSubscribe();
                     if (!ok && pushPermission === 'denied') {
-                      toastWarning('กรุณาเปิดสิทธิ์การแจ้งเตือนในตั้งค่าเบราว์เซอร์');
+                      toastWarning(t.notification.deniedDesktop);
                     }
                   }
                 }}
                 disabled={pushLoading}
                 sx={{ color: 'white', opacity: pushSubscribed ? 1 : 0.6 }}
-                title={pushSubscribed ? 'ปิดการแจ้งเตือน' : 'เปิดการแจ้งเตือน'}
+                title={pushSubscribed ? t.common.close : t.notification.enableNotification}
               >
                 {pushSubscribed ? <BellIcon size={20} /> : <BellOffIcon size={20} />}
               </IconButton>
@@ -1488,7 +1482,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                 {chatHistory.length === 0 ? (
                   <Box sx={{ textAlign: 'center', py: 4 }}>
                     <HistoryIcon size={48} color="#86868b" style={{ marginBottom: 8 }} />
-                    <Typography sx={{ color: 'var(--text-muted)' }}>ไม่มีประวัติการสนทนา</Typography>
+                    <Typography sx={{ color: 'var(--text-muted)' }}>{t.supportChat.noChats}</Typography>
                   </Box>
                 ) : (
                   chatHistory.map((historyChat) => {
@@ -1509,7 +1503,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                         }}
                       >
                         <Typography sx={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.9rem' }}>
-                          {historyChat.subject || 'สอบถามข้อมูล'}
+                          {historyChat.subject || t.supportChat.topicProduct}
                         </Typography>
                         <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.8rem', mt: 0.5 }}>
                           {historyChat.last_message_preview}
@@ -1517,7 +1511,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
                           <TimeIcon size={14} color="#86868b" />
                           <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>
-                            {new Date(historyChat.closed_at || historyChat.updated_at).toLocaleDateString('th-TH', { 
+                            {new Date(historyChat.closed_at || historyChat.updated_at).toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-US', { 
                               day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
                             })}
                           </Typography>
@@ -1579,10 +1573,10 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                 </Box>
                 
                 <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5, color: 'var(--foreground)' }}>
-                  การสนทนาสิ้นสุดแล้ว
+                  {t.supportChat.chatEnded}
                 </Typography>
                 <Typography sx={{ color: 'var(--text-muted)', mb: 3, fontSize: '0.85rem' }}>
-                  คุณพอใจกับการให้บริการมากแค่ไหน?
+                  {t.supportChat.rateDesc}
                 </Typography>
                 
                 {/* Rating Stars */}
@@ -1609,10 +1603,10 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                   />
                   {rating && (
                     <Typography sx={{ color: 'var(--warning)', fontSize: '0.8rem', mt: 1, fontWeight: 500 }}>
-                      {rating === 5 ? 'ยอดเยี่ยมมาก!' : 
-                       rating === 4 ? 'ดีมาก!' : 
-                       rating === 3 ? 'พอใช้' : 
-                       rating === 2 ? 'ควรปรับปรุง' : 'ต้องปรับปรุง'}
+                      {rating === 5 ? t.supportChat.excellent : 
+                       rating === 4 ? t.supportChat.good : 
+                       rating === 3 ? t.supportChat.average : 
+                       rating === 2 ? t.supportChat.poor : t.supportChat.terrible}
                     </Typography>
                   )}
                 </Box>
@@ -1621,7 +1615,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                   fullWidth
                   multiline
                   rows={2}
-                  placeholder="ความคิดเห็นเพิ่มเติม (ไม่บังคับ)"
+                  placeholder={`${t.supportChat.rateDesc} (${t.common.optional})`}
                   value={ratingComment}
                   onChange={(e) => setRatingComment(e.target.value)}
                   sx={{ 
@@ -1669,7 +1663,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                   }}
                 >
                   {sending ? <CircularProgress size={22} sx={{ color: 'white' }} /> : (
-                    <>ส่งคะแนน</>
+                    <>{t.supportChat.rateService}</>
                   )}
                 </Button>
               </Box>
@@ -1718,10 +1712,10 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                     <SupportAgentIcon size={32} color="white" />
                   </Box>
                   <Typography sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '1.15rem', mb: 0.5 }}>
-                    ส่งข้อความถึงเรา
+                    {t.supportChat.chatTitle}
                   </Typography>
                   <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                    ทีมงานพร้อมตอบคำถามของคุณ
+                    {t.help.contactAdminDesc}
                   </Typography>
                 </Box>
 
@@ -1729,13 +1723,18 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                 <Box sx={{ p: 2.5, flex: 1, display: 'flex', flexDirection: 'column' }}>
                   {/* Quick Topics */}
                   <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)', mb: 1, fontWeight: 600 }}>
-                    เลือกหัวข้อ
+                    {t.supportChat.selectTopic}
                   </Typography>
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
-                    {['สอบถามสินค้า', 'ปัญหาการสั่งซื้อ', 'การจัดส่ง', 'อื่นๆ'].map((topic) => (
+                    {[
+                      { value: 'สอบถามสินค้า', label: t.supportChat.topicProduct },
+                      { value: 'ปัญหาการสั่งซื้อ', label: t.supportChat.topicOrder },
+                      { value: 'การจัดส่ง', label: t.supportChat.topicShipping },
+                      { value: 'อื่นๆ', label: t.supportChat.topicOther },
+                    ].map((topic) => (
                       <Box
-                        key={topic}
-                        onClick={() => setSubject(topic)}
+                        key={topic.value}
+                        onClick={() => setSubject(topic.value)}
                         sx={{
                           px: 1.5,
                           py: 0.75,
@@ -1744,17 +1743,17 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                           fontWeight: 500,
                           cursor: 'pointer',
                           transition: 'all 0.2s ease',
-                          bgcolor: subject === topic ? 'var(--primary)' : 'var(--surface-2)',
-                          color: subject === topic ? 'white' : 'var(--text-muted)',
+                          bgcolor: subject === topic.value ? 'var(--primary)' : 'var(--surface-2)',
+                          color: subject === topic.value ? 'white' : 'var(--text-muted)',
                           border: '1px solid',
-                          borderColor: subject === topic ? 'var(--primary)' : 'var(--glass-border)',
+                          borderColor: subject === topic.value ? 'var(--primary)' : 'var(--glass-border)',
                           '&:hover': {
-                            bgcolor: subject === topic ? 'var(--primary)' : 'var(--surface-2)',
-                            borderColor: subject === topic ? 'var(--primary)' : 'var(--glass-border)',
+                            bgcolor: subject === topic.value ? 'var(--primary)' : 'var(--surface-2)',
+                            borderColor: subject === topic.value ? 'var(--primary)' : 'var(--glass-border)',
                           },
                         }}
                       >
-                        {topic}
+                        {topic.label}
                       </Box>
                     ))}
                   </Box>
@@ -1763,7 +1762,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                   <TextField
                     fullWidth
                     size="small"
-                    placeholder="หรือพิมพ์หัวข้อเอง..."
+                    placeholder={t.supportChat.customTopic}
                     value={!['สอบถามสินค้า', 'ปัญหาการสั่งซื้อ', 'การจัดส่ง', 'อื่นๆ'].includes(subject) ? subject : ''}
                     onChange={(e) => setSubject(e.target.value)}
                     sx={{ 
@@ -1786,13 +1785,13 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
 
                   {/* Message Input */}
                   <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)', mb: 1, fontWeight: 600 }}>
-                    ข้อความของคุณ
+                    {t.supportChat.typeMessage}
                   </Typography>
                   <TextField
                     fullWidth
                     multiline
                     rows={4}
-                    placeholder="เขียนข้อความของคุณที่นี่..."
+                    placeholder={t.supportChat.typeMessage}
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     sx={{ 
@@ -1845,7 +1844,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                     ) : (
                       <>
                         <SendIcon size={20} style={{ marginRight: 8 }} />
-                        เริ่มการสนทนา
+                        {t.supportChat.startChat}
                       </>
                     )}
                   </Button>
@@ -1869,7 +1868,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                       '&:hover': { color: 'var(--primary)', bgcolor: 'transparent' },
                     }}
                   >
-                    ดูประวัติการสนทนา
+                    {t.supportChat.recentChats}
                   </Button>
                 </Box>
               </Box>
@@ -1902,7 +1901,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                       },
                     }} />
                     <Typography sx={{ color: 'var(--warning)', fontSize: '0.85rem', fontWeight: 600 }}>
-                      รอแอดมินรับเคส...
+                      {t.supportChat.connecting}
                     </Typography>
                   </Box>
                 )}
@@ -1921,7 +1920,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                   }}>
                     <BellIcon size={16} color="#0071e3" />
                     <Typography sx={{ flex: 1, fontSize: '0.75rem', color: 'var(--foreground)', lineHeight: 1.3 }}>
-                      รับการแจ้งเตือนเมื่อมีข้อความใหม่หรือสถานะออเดอร์อัปเดต
+                      {t.notification.description}
                     </Typography>
                     <Button
                       size="small"
@@ -1930,7 +1929,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                       onClick={async () => {
                         const ok = await pushSubscribe();
                         if (!ok && typeof Notification !== 'undefined' && Notification.permission === 'denied') {
-                          toastWarning('คุณได้ปิดสิทธิ์การแจ้งเตือน กรุณาเปิดในตั้งค่าเบราว์เซอร์');
+                          toastWarning(t.notification.deniedDesktop);
                         }
                       }}
                       sx={{
@@ -1944,7 +1943,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                         '&:hover': { background: '#1d4ed8' },
                       }}
                     >
-                      {pushLoading ? <CircularProgress size={14} sx={{ color: 'white' }} /> : 'เปิด'}
+                      {pushLoading ? <CircularProgress size={14} sx={{ color: 'white' }} /> : t.notification.enableNotification}
                     </Button>
                     <IconButton 
                       size="small" 
@@ -2099,7 +2098,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                                           fontWeight: 600,
                                           color: msg.sender === 'customer' ? 'white' : 'var(--foreground)',
                                         }}>
-                                          ออเดอร์ #{parseMessage(msg.message).orderRef}
+                                          {t.supportChat.orderRef} #{parseMessage(msg.message).orderRef}
                                         </Typography>
                                         <Typography sx={{ 
                                           fontSize: '0.7rem',
@@ -2115,7 +2114,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                                   <Box
                                     component="img"
                                     src={imageUrl}
-                                    alt="รูปภาพ"
+                                    alt={t.supportChat.image}
                                     loading="lazy"
                                     sx={{
                                       width: '100%',
@@ -2167,7 +2166,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                                       }
                                       {msg.is_read && msg.read_at && (
                                         <Typography sx={{ fontSize: '0.6rem', color: '#30d158', ml: 0.25 }}>
-                                          อ่านแล้ว {formatTimeAgo(msg.read_at)}
+                                          {t.supportChat.readAll} {formatTimeAgo(msg.read_at)}
                                         </Typography>
                                       )}
                                     </>
@@ -2278,7 +2277,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                         />
                         <Box sx={{ flex: 1, minWidth: 0 }}>
                           <Typography sx={{ fontSize: '0.7rem', color: '#0071e3', fontWeight: 600 }}>
-                            ตอบกลับ {replyToMessage.sender === 'admin' ? 'แอดมิน' : 'ตัวเอง'}
+                            {t.chatbot.reply} {replyToMessage.sender === 'admin' ? t.supportChat.admin : t.supportChat.you}
                           </Typography>
                           <Typography 
                             sx={{ 
@@ -2345,7 +2344,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                         },
                         transition: 'all 0.2s',
                       }}
-                      title="แนบออเดอร์"
+                      title={t.supportChat.orderRef}
                     >
                       <ReceiptIcon size={24} />
                     </IconButton>
@@ -2355,7 +2354,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                       size="small"
                       multiline
                       maxRows={4}
-                      placeholder={replyToMessage ? "พิมพ์ข้อความตอบกลับ..." : (isTouchDevice ? "พิมพ์ข้อความ..." : "พิมพ์ข้อความ... (Shift+Enter = ขึ้นบรรทัด)")}
+                      placeholder={t.supportChat.typeMessage}
                       value={message}
                       onChange={(e) => {
                         setMessage(e.target.value);
@@ -2451,8 +2450,8 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                       }} />
                       <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                         {chat.rating 
-                          ? `การสนทนานี้ปิดแล้ว • คะแนน ${chat.rating}/5`
-                          : 'การสนทนานี้ปิดแล้ว'}
+                          ? `${t.supportChat.chatEnded} • ${t.supportChat.rateService} ${chat.rating}/5`
+                          : t.supportChat.chatEnded}
                       </Typography>
                     </Box>
                     
@@ -2480,7 +2479,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                           },
                         }}
                       >
-                        ให้คะแนนการบริการ
+                        {t.supportChat.rateService}
                       </Button>
                     )}
                     
@@ -2514,7 +2513,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
                         },
                       }}
                     >
-                      เริ่มการสนทนาใหม่
+                      {t.supportChat.startNew}
                     </Button>
                   </Box>
                 )}

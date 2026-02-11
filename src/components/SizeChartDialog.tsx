@@ -8,6 +8,7 @@ import {
   Typography,
 } from '@mui/material';
 import { Ruler } from 'lucide-react';
+import { useTranslation } from '@/hooks/useTranslation';
 
 const SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL', '7XL', '8XL', '9XL', '10XL'];
 
@@ -42,6 +43,7 @@ export default function SizeChartDialog(props: SizeChartDialogProps) {
   const selectedSize = props.selectedSize;
   const onSelectSize = props.onSelectSize;
   const longSleevePrice = props.longSleevePrice ?? 50;
+  const { t } = useTranslation();
 
   return (
     <Dialog
@@ -88,8 +90,8 @@ export default function SizeChartDialog(props: SizeChartDialogProps) {
             <Ruler size={20} color="white" />
           </Box>
           <Box>
-            <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--foreground)' }}>ตารางไซส์</Typography>
-            <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>สัดส่วนรอบอก/ความยาว (นิ้ว)</Typography>
+            <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--foreground)' }}>{t.product.sizeChartTitle}</Typography>
+            <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t.product.sizeChartSubtitle}</Typography>
           </Box>
         </Box>
       </Box>
@@ -111,7 +113,7 @@ export default function SizeChartDialog(props: SizeChartDialogProps) {
             alignItems: 'center',
             gap: 0.5,
           }}>
-            <Ruler size={14} /> อก / ความยาว (นิ้ว)
+            <Ruler size={14} /> {t.misc.sizeChartInch}
           </Box>
           <Box sx={{
             px: 1.2,
@@ -123,7 +125,7 @@ export default function SizeChartDialog(props: SizeChartDialogProps) {
             fontWeight: 600,
             color: '#ffd60a',
           }}>
-            แขนยาว +{longSleevePrice}฿
+            {t.misc.longSleevePrice}{longSleevePrice}฿
           </Box>
         </Box>
 
@@ -198,7 +200,7 @@ export default function SizeChartDialog(props: SizeChartDialogProps) {
             '&:hover': { bgcolor: 'rgba(100,116,139,0.25)' },
           }}
         >
-          ปิด
+          {t.common.close}
         </Button>
       </Box>
     </Dialog>
