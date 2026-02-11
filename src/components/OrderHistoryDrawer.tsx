@@ -27,6 +27,7 @@ import {
   ExternalLink,
   MapPin,
   Package,
+  FileText,
   RotateCcw,
   ShoppingBag,
   Truck,
@@ -986,6 +987,21 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                               <RotateCcw size={12} />
                               {t.orderHistory.requestRefund}
                             </Button>
+                          )}
+                          {/* Invoice Download */}
+                          {statusKey !== 'CANCELLED' && (
+                            <IconButton
+                              size="small"
+                              onClick={() => window.open(`/api/invoice?ref=${order.ref}&lang=${lang}`, '_blank')}
+                              sx={{
+                                width: 30, height: 30, bgcolor: 'rgba(0,113,227,0.08)',
+                                border: '1px solid rgba(0,113,227,0.2)', color: '#2997ff',
+                                '&:hover': { bgcolor: 'rgba(0,113,227,0.15)' },
+                              }}
+                              title={t.invoice?.download || 'Invoice'}
+                            >
+                              <FileText size={14} />
+                            </IconButton>
                           )}
                         </Box>
                       </Box>

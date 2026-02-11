@@ -2109,6 +2109,20 @@ import {
   Link2,
   Percent,
   Ticket,
+  Heart,
+  ArrowUpDown,
+  SlidersHorizontal,
+  Star,
+  ThumbsUp,
+  Filter,
+  Download,
+  FileText,
+  Users,
+  Bell,
+  BellOff,
+  Eye,
+  BarChart3,
+  TrendingUp,
 } from 'lucide-react';
 import { useNotification } from '@/components/NotificationContext';
 import PaymentFlow from '@/components/PaymentFlow';
@@ -2167,6 +2181,8 @@ import {
   submitOrder as submitOrderApi,
 } from '@/lib/api-client';
 import { useThemeStore, ThemeMode } from '@/store/themeStore';
+import { useWishlistStore } from '@/store/wishlistStore';
+import { useRecentlyViewedStore } from '@/store/recentlyViewedStore';
 import { useTranslation } from '@/hooks/useTranslation';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -2717,7 +2733,21 @@ export default function HomePage() {
   const [productSearch, setProductSearch] = useState('');
   const [showSearchBar, setShowSearchBar] = useState(false);
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 0]);
+  const [sortBy, setSortBy] = useState<'default' | 'price-low' | 'price-high' | 'newest' | 'name'>('default');
+  const [showOnlyAvailable, setShowOnlyAvailable] = useState(false);
+  const [showWishlistDrawer, setShowWishlistDrawer] = useState(false);
+  const [showRecentlyViewed, setShowRecentlyViewed] = useState(false);
+  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState('');
+  const [productReviews, setProductReviews] = useState<Record<string, Array<{ id: string; userName: string; userImage?: string; rating: number; comment: string; date: string; verified: boolean; helpful: number }>>>({});
   const [editingCartItem, setEditingCartItem] = useState<CartItem | null>(null);
+  const [bulkOrderOpen, setBulkOrderOpen] = useState(false);
+  const [bulkStep, setBulkStep] = useState(0); // 0=sizes, 1=names, 2=preview
+  const [bulkSizes, setBulkSizes] = useState<Record<string, number>>({}); // size -> qty
+  const [bulkNames, setBulkNames] = useState('');
+  const [bulkLongSleeve, setBulkLongSleeve] = useState(false);
+  const [bulkAssignments, setBulkAssignments] = useState<Array<{ name: string; size: string }>>([]); // name->size
 
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productDialogOpen, setProductDialogOpen] = useState(false);
@@ -2777,6 +2807,10 @@ export default function HomePage() {
   // Theme sync with DB
   const themeMode = useThemeStore((s) => s.mode);
   const prevThemeModeRef = useRef<ThemeMode | null>(null);
+
+  // Wishlist & Recently Viewed
+  const wishlistStore = useWishlistStore();
+  const recentlyViewedStore = useRecentlyViewedStore();
 
   const { t, lang } = useTranslation();
   const STATUS_LABELS_I18N: Record<string, string> = t.status as unknown as Record<string, string>;
@@ -3194,6 +3228,8 @@ export default function HomePage() {
     setActiveImageIndex(0);
     setProductOptions({ size: defaultSize, quantity: 1, customName: '', customNumber: '', isLongSleeve: false });
     setProductDialogOpen(true);
+    // Track recently viewed
+    recentlyViewedStore.addItem(product.id);
   }, []);
 
   //  Auto-cycle through announcements
@@ -3578,6 +3614,74 @@ export default function HomePage() {
     commitCartItem(newItem, { goCheckout: true });
   };
 
+  // ==================== BULK ORDER LOGIC ====================
+  const openBulkOrder = () => {
+    if (!selectedProduct || !isShopOpen) return;
+    setBulkStep(0);
+    setBulkSizes({});
+    setBulkNames('');
+    setBulkLongSleeve(false);
+    setBulkAssignments([]);
+    setBulkOrderOpen(true);
+  };
+
+  const bulkTotalQty = Object.values(bulkSizes).reduce((s, q) => s + q, 0);
+
+  const bulkBuildAssignments = () => {
+    const names = bulkNames.split('\n').map(n => n.trim()).filter(Boolean);
+    // Distribute sizes across names sequentially
+    const sizeList: string[] = [];
+    for (const [size, qty] of Object.entries(bulkSizes)) {
+      for (let i = 0; i < qty; i++) sizeList.push(size);
+    }
+    const assignments: Array<{ name: string; size: string }> = names.map((name, i) => ({
+      name,
+      size: sizeList[i] || sizeList[sizeList.length - 1] || Object.keys(bulkSizes)[0] || 'M',
+    }));
+    setBulkAssignments(assignments);
+    return assignments;
+  };
+
+  const bulkCommitToCart = (goCheckout = false) => {
+    if (!selectedProduct) return;
+    const assignments = bulkAssignments.length ? bulkAssignments : bulkBuildAssignments();
+    if (!assignments.length) return;
+
+    const discount = getEventDiscount(selectedProduct.id, config?.events as ShopEvent[] | undefined);
+    const longSleeveFee = selectedProduct.options?.hasLongSleeve && bulkLongSleeve
+      ? (selectedProduct.options?.longSleevePrice ?? 50) : 0;
+
+    const newItems: CartItem[] = assignments.map(a => {
+      let basePrice = selectedProduct.sizePricing?.[a.size] ?? selectedProduct.basePrice;
+      if (discount) basePrice = discount.discountedPrice(basePrice);
+      const unitPrice = basePrice + longSleeveFee;
+      return {
+        id: `${selectedProduct.id}-${a.size}-${a.name}--${bulkLongSleeve}`,
+        productId: selectedProduct.id,
+        productName: selectedProduct.name,
+        size: a.size,
+        quantity: 1,
+        unitPrice,
+        options: {
+          customName: a.name,
+          isLongSleeve: bulkLongSleeve,
+        },
+      };
+    });
+
+    const newCart = [...cart, ...newItems];
+    saveCart(newCart);
+    showToast('success', `${t.bulkOrder.addToCart} (${newItems.length} ${t.bulkOrder.pieces})`);
+    setBulkOrderOpen(false);
+    resetProductDialog();
+
+    if (goCheckout) {
+      setShowCart(false);
+      setShowOrderDialog(true);
+      setActiveTab('cart');
+    }
+  };
+
   const handleShareProduct = async (product: Product) => {
     const url = getProductLink(product);
     const shareText = `${getProductName(product, lang)} - ฿${product.basePrice.toLocaleString()}`;
@@ -3779,6 +3883,32 @@ export default function HomePage() {
             </Box>
 
             <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+              {/* Wishlist button in dialog */}
+              <IconButton 
+                onClick={() => {
+                  const wasInWishlist = wishlistStore.items.includes(selectedProduct.id);
+                  wishlistStore.toggleItem(selectedProduct.id);
+                  showToast(
+                    wasInWishlist ? 'info' : 'success',
+                    wasInWishlist ? t.wishlist.removedFromWishlist : t.wishlist.addedToWishlist
+                  );
+                }}
+                sx={{ 
+                  color: wishlistStore.isInWishlist(selectedProduct.id) ? '#ff453a' : 'var(--text-muted)', 
+                  bgcolor: wishlistStore.isInWishlist(selectedProduct.id) ? 'rgba(255,69,58,0.1)' : 'var(--glass-bg)', 
+                  border: `1px solid ${wishlistStore.isInWishlist(selectedProduct.id) ? 'rgba(255,69,58,0.3)' : 'var(--glass-border)'}`,
+                  width: 40,
+                  height: 40,
+                  '&:hover': { 
+                    bgcolor: 'rgba(255,69,58,0.15)', 
+                    borderColor: 'rgba(255,69,58,0.3)',
+                    color: '#ff453a',
+                  },
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <Heart size={18} fill={wishlistStore.isInWishlist(selectedProduct.id) ? '#ff453a' : 'none'} />
+              </IconButton>
               <IconButton 
                 onClick={() => handleShareProduct(selectedProduct)}
                 sx={{ 
@@ -4947,6 +5077,113 @@ export default function HomePage() {
             </Box>
           </Box>
 
+          {/* ===== Product Reviews Section ===== */}
+          {selectedProduct && (
+            <Box sx={{ mt: 2, mb: 0.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Star size={16} color="#ff9f0a" fill="#ff9f0a" />
+                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                    {t.reviews.title}
+                  </Typography>
+                  {(() => {
+                    const reviews = productReviews[selectedProduct.id] || [];
+                    if (reviews.length === 0) return null;
+                    const avg = reviews.reduce((s, r) => s + r.rating, 0) / reviews.length;
+                    return (
+                      <Chip 
+                        label={`${avg.toFixed(1)} (${reviews.length})`} 
+                        size="small" 
+                        sx={{ height: 20, fontSize: '0.65rem', fontWeight: 700, bgcolor: 'rgba(255,159,10,0.1)', color: '#ff9f0a' }} 
+                      />
+                    );
+                  })()}
+                </Box>
+                <Button
+                  size="small"
+                  startIcon={<Edit size={14} />}
+                  onClick={() => {
+                    if (!session) {
+                      showToast('warning', t.reviews.loginRequired);
+                      return;
+                    }
+                    setReviewRating(0);
+                    setReviewComment('');
+                    setReviewDialogOpen(true);
+                  }}
+                  sx={{ fontSize: '0.72rem', fontWeight: 600, textTransform: 'none', color: '#0071e3' }}
+                >
+                  {t.reviews.writeReview}
+                </Button>
+              </Box>
+
+              {/* Reviews list */}
+              {(() => {
+                const reviews = productReviews[selectedProduct.id] || [];
+                if (reviews.length === 0) {
+                  return (
+                    <Box sx={{ textAlign: 'center', py: 3, borderRadius: '14px', bgcolor: 'var(--surface-2)', border: '1px solid var(--glass-border)' }}>
+                      <Star size={32} strokeWidth={1} color="var(--text-muted)" />
+                      <Typography sx={{ mt: 1, fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>{t.reviews.noReviews}</Typography>
+                      <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', opacity: 0.7 }}>{t.reviews.beFirst}</Typography>
+                    </Box>
+                  );
+                }
+                return (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    {reviews.slice(0, 3).map((review) => (
+                      <Box key={review.id} sx={{ p: 1.5, borderRadius: '12px', bgcolor: 'var(--surface-2)', border: '1px solid var(--glass-border)' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                          <Avatar src={review.userImage} sx={{ width: 24, height: 24, fontSize: '0.65rem' }}>{review.userName[0]}</Avatar>
+                          <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--foreground)', flex: 1 }}>{review.userName}</Typography>
+                          {review.verified && (
+                            <Chip label={t.reviews.verified} size="small" sx={{ height: 18, fontSize: '0.55rem', bgcolor: 'rgba(52,199,89,0.1)', color: '#34c759' }} />
+                          )}
+                          <Box sx={{ display: 'flex', gap: 0.2 }}>
+                            {[1, 2, 3, 4, 5].map((s) => (
+                              <Star key={s} size={10} color="#ff9f0a" fill={s <= review.rating ? '#ff9f0a' : 'none'} />
+                            ))}
+                          </Box>
+                        </Box>
+                        {review.comment && (
+                          <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.5, ml: 4.2 }}>{review.comment}</Typography>
+                        )}
+                      </Box>
+                    ))}
+                    {reviews.length > 3 && (
+                      <Typography sx={{ fontSize: '0.7rem', color: '#0071e3', textAlign: 'center', fontWeight: 600, cursor: 'pointer' }}>
+                        + {reviews.length - 3} {t.reviews.totalReviews}
+                      </Typography>
+                    )}
+                  </Box>
+                );
+              })()}
+            </Box>
+          )}
+
+          {/* Stock / Inventory indicator */}
+          {selectedProduct?.stock != null && (
+            <Box sx={{ 
+              mt: 1, mb: 1, px: 1.5, py: 0.8, 
+              borderRadius: '12px', 
+              bgcolor: selectedProduct.stock <= 0 ? 'rgba(255,69,58,0.08)' : selectedProduct.stock <= 5 ? 'rgba(255,159,10,0.08)' : 'rgba(52,199,89,0.08)',
+              border: `1px solid ${selectedProduct.stock <= 0 ? 'rgba(255,69,58,0.2)' : selectedProduct.stock <= 5 ? 'rgba(255,159,10,0.2)' : 'rgba(52,199,89,0.2)'}`,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+            }}>
+              <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: selectedProduct.stock <= 0 ? '#ff453a' : selectedProduct.stock <= 5 ? '#ff9f0a' : '#34c759' }} />
+              <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: selectedProduct.stock <= 0 ? '#ff453a' : selectedProduct.stock <= 5 ? '#ff9f0a' : '#34c759' }}>
+                {selectedProduct.stock <= 0 
+                  ? t.inventory.outOfStock 
+                  : selectedProduct.stock <= 5 
+                    ? `${t.inventory.lowStock} — ${selectedProduct.stock} ${t.inventory.remaining}`
+                    : `${t.inventory.inStock} — ${selectedProduct.stock} ${t.inventory.remaining}`
+                }
+              </Typography>
+            </Box>
+          )}
+
           {/* Action Buttons - Enhanced */}
           <Box sx={{ display: 'flex', gap: 1.5 }}>
             <Button
@@ -5007,6 +5244,34 @@ export default function HomePage() {
               {t.product.buyNow}
             </Button>
           </Box>
+
+          {/* Bulk Order Button - only for apparel with sizes & custom names */}
+          {selectedProduct && productRequiresSize(selectedProduct) && selectedProduct.options?.hasCustomName && isShopOpen && (
+            <Button
+              onClick={openBulkOrder}
+              startIcon={<Users size={18} />}
+              fullWidth
+              sx={{
+                mt: 1,
+                py: 1.2,
+                borderRadius: '14px',
+                background: 'linear-gradient(135deg, rgba(168,85,247,0.15) 0%, rgba(139,92,246,0.1) 100%)',
+                border: '1px solid rgba(168,85,247,0.35)',
+                color: '#a855f7',
+                fontSize: '0.85rem',
+                fontWeight: 700,
+                textTransform: 'none',
+                transition: 'all 0.25s ease',
+                '&:hover': { 
+                  background: 'linear-gradient(135deg, rgba(168,85,247,0.25) 0%, rgba(139,92,246,0.2) 100%)',
+                  transform: 'translateY(-1px)',
+                  boxShadow: '0 4px 20px rgba(168,85,247,0.2)',
+                },
+              }}
+            >
+              {t.bulkOrder.buttonLabel} — {t.bulkOrder.subtitle}
+            </Button>
+          )}
         </Box>
       </Box>
     );
@@ -5502,11 +5767,34 @@ export default function HomePage() {
           const price = getBasePrice(p);
           return priceRange[0] <= price && price <= priceRange[1];
         });
-        return [key, byPrice] as const;
+        // Filter by availability
+        const byAvailability = showOnlyAvailable 
+          ? byPrice.filter((p) => getProductStatus(p) === 'OPEN')
+          : byPrice;
+        // Filter by wishlist if wishlist drawer is open
+        return [key, byAvailability] as const;
       })
       .filter(([, items]) => items.length > 0);
+    
+    // Apply sorting
+    if (sortBy !== 'default') {
+      for (const entry of entries) {
+        const items = [...entry[1]];
+        items.sort((a, b) => {
+          switch (sortBy) {
+            case 'price-low': return getBasePrice(a) - getBasePrice(b);
+            case 'price-high': return getBasePrice(b) - getBasePrice(a);
+            case 'newest': return new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime();
+            case 'name': return getProductName(a, lang).localeCompare(getProductName(b, lang), lang === 'th' ? 'th' : 'en');
+            default: return 0;
+          }
+        });
+        (entry as any)[1] = items;
+      }
+    }
+    
     return Object.fromEntries(entries);
-  }, [categoryFilter, allGroupedProducts, priceRange, productSearch]);
+  }, [categoryFilter, allGroupedProducts, priceRange, productSearch, sortBy, showOnlyAvailable]);
 
   const filteredProductCount = useMemo(
     () => Object.values(filteredGroupedProducts).reduce((acc, items) => acc + items.length, 0),
@@ -6074,6 +6362,62 @@ export default function HomePage() {
                 ))}
               </Box>
 
+              {/* Sort & Filter Controls */}
+              <Box sx={{ px: 2, pb: 1.5, display: 'flex', gap: 0.6, alignItems: 'center', overflowX: 'auto', '&::-webkit-scrollbar': { display: 'none' } }}>
+                {/* Sort dropdown chips */}
+                {([
+                  { key: 'default' as const, label: t.search.sortDefault },
+                  { key: 'price-low' as const, label: t.search.sortPriceLow },
+                  { key: 'price-high' as const, label: t.search.sortPriceHigh },
+                  { key: 'newest' as const, label: t.search.sortNewest },
+                  { key: 'name' as const, label: t.search.sortName },
+                ] as const).map((opt) => (
+                  <Chip
+                    key={opt.key}
+                    icon={<ArrowUpDown size={10} />}
+                    label={opt.label}
+                    size="small"
+                    onClick={() => setSortBy(opt.key)}
+                    sx={{
+                      bgcolor: sortBy === opt.key ? 'rgba(52,199,89,0.15)' : 'transparent',
+                      color: sortBy === opt.key ? '#34c759' : 'var(--text-muted)',
+                      border: '1px solid',
+                      borderColor: sortBy === opt.key ? 'rgba(52,199,89,0.3)' : (theme: any) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                      fontSize: '0.68rem',
+                      fontWeight: 600,
+                      height: 26,
+                      flexShrink: 0,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      '& .MuiChip-icon': { color: 'inherit', ml: 0.5 },
+                      '&:hover': { bgcolor: 'rgba(52,199,89,0.1)' },
+                    }}
+                  />
+                ))}
+                <Box sx={{ width: 1, height: 20, bgcolor: 'var(--glass-border)', flexShrink: 0, mx: 0.3 }} />
+                {/* Available only toggle */}
+                <Chip
+                  icon={<Eye size={10} />}
+                  label={t.search.filterAvailable}
+                  size="small"
+                  onClick={() => setShowOnlyAvailable(!showOnlyAvailable)}
+                  sx={{
+                    bgcolor: showOnlyAvailable ? 'rgba(0,113,227,0.15)' : 'transparent',
+                    color: showOnlyAvailable ? '#0071e3' : 'var(--text-muted)',
+                    border: '1px solid',
+                    borderColor: showOnlyAvailable ? 'rgba(0,113,227,0.3)' : (theme: any) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                    fontSize: '0.68rem',
+                    fontWeight: 600,
+                    height: 26,
+                    flexShrink: 0,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    '& .MuiChip-icon': { color: 'inherit', ml: 0.5 },
+                    '&:hover': { bgcolor: 'rgba(0,113,227,0.1)' },
+                  }}
+                />
+              </Box>
+
               {/* Instant Search Results Preview */}
               {productSearch.trim() && (() => {
                 const allResults = Object.values(filteredGroupedProducts).flat();
@@ -6358,6 +6702,52 @@ export default function HomePage() {
                 startIcon={<History size={20} />}
               >
                 {t.nav.orderHistory}
+              </Button>
+              {/* Wishlist button */}
+              <Button
+                fullWidth
+                onClick={() => { setSidebarOpen(false); setShowWishlistDrawer(true); }}
+                sx={{
+                  textAlign: 'left',
+                  mb: 1,
+                  color: 'var(--foreground)',
+                  justifyContent: 'flex-start',
+                  borderRadius: 2,
+                  px: 1.5,
+                  py: 1.1,
+                  background: 'linear-gradient(120deg, rgba(255,69,58,0.18), rgba(255,159,10,0.12))',
+                  border: '1px solid var(--glass-border)',
+                  boxShadow: (theme: any) => theme.palette.mode === 'dark' ? '0 12px 30px rgba(0,0,0,0.25)' : '0 4px 12px rgba(0,0,0,0.06)',
+                  '&:hover': { borderColor: 'rgba(255,69,58,0.5)', background: 'linear-gradient(120deg, rgba(255,69,58,0.24), rgba(255,159,10,0.18))' },
+                }}
+                startIcon={
+                  <Badge badgeContent={wishlistStore.items.length} color="error" sx={{ '& .MuiBadge-badge': { fontSize: '0.6rem', minWidth: 16, height: 16 } }}>
+                    <Heart size={20} />
+                  </Badge>
+                }
+              >
+                {t.wishlist.title}
+              </Button>
+              {/* Recently Viewed button */}
+              <Button
+                fullWidth
+                onClick={() => { setSidebarOpen(false); setShowRecentlyViewed(true); }}
+                sx={{
+                  textAlign: 'left',
+                  mb: 1,
+                  color: 'var(--foreground)',
+                  justifyContent: 'flex-start',
+                  borderRadius: 2,
+                  px: 1.5,
+                  py: 1.1,
+                  background: 'linear-gradient(120deg, rgba(100,210,255,0.18), rgba(48,209,88,0.12))',
+                  border: '1px solid var(--glass-border)',
+                  boxShadow: (theme: any) => theme.palette.mode === 'dark' ? '0 12px 30px rgba(0,0,0,0.25)' : '0 4px 12px rgba(0,0,0,0.06)',
+                  '&:hover': { borderColor: 'rgba(100,210,255,0.5)', background: 'linear-gradient(120deg, rgba(100,210,255,0.24), rgba(48,209,88,0.18))' },
+                }}
+                startIcon={<Eye size={20} />}
+              >
+                {t.recentlyViewed.title}
               </Button>
               <Button
                 fullWidth
@@ -6914,6 +7304,34 @@ export default function HomePage() {
                               }}
                             >
                               <Share2 size={14} />
+                            </IconButton>
+
+                            {/* Wishlist heart button */}
+                            <IconButton
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const wasInWishlist = wishlistStore.items.includes(product.id);
+                                wishlistStore.toggleItem(product.id);
+                                showToast(
+                                  wasInWishlist ? 'info' : 'success',
+                                  wasInWishlist ? t.wishlist.removedFromWishlist : t.wishlist.addedToWishlist
+                                );
+                              }}
+                              sx={{
+                                position: 'absolute',
+                                bottom: 8,
+                                left: 44,
+                                bgcolor: 'rgba(0,0,0,0.5)',
+                                backdropFilter: 'blur(8px)',
+                                color: wishlistStore.isInWishlist(product.id) ? '#ff453a' : 'white',
+                                width: 30,
+                                height: 30,
+                                '&:hover': { bgcolor: 'rgba(255,69,58,0.7)' },
+                                transition: 'all 0.2s ease',
+                              }}
+                            >
+                              <Heart size={14} fill={wishlistStore.isInWishlist(product.id) ? '#ff453a' : 'none'} />
                             </IconButton>
                           </Box>
 
@@ -7534,6 +7952,509 @@ export default function HomePage() {
           setLightboxImage(image);
         }}
       />
+
+      {/* ===== Wishlist Drawer ===== */}
+      <Drawer
+        anchor="right"
+        open={showWishlistDrawer}
+        onClose={() => setShowWishlistDrawer(false)}
+        PaperProps={{
+          sx: {
+            width: { xs: '100%', sm: 420 },
+            bgcolor: 'var(--background)',
+            backgroundImage: 'none',
+          },
+        }}
+      >
+        <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--glass-border)' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Heart size={20} color="#ff453a" />
+            <Typography sx={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--foreground)' }}>
+              {t.wishlist.title}
+            </Typography>
+            {wishlistStore.items.length > 0 && (
+              <Chip label={`${wishlistStore.items.length} ${t.wishlist.items}`} size="small" sx={{ fontSize: '0.7rem', height: 22, bgcolor: 'rgba(255,69,58,0.1)', color: '#ff453a' }} />
+            )}
+          </Box>
+          <Box sx={{ display: 'flex', gap: 0.5 }}>
+            {wishlistStore.items.length > 0 && (
+              <IconButton size="small" onClick={() => { wishlistStore.clearWishlist(); showToast('info', t.wishlist.clearAll); }} sx={{ color: 'var(--text-muted)' }}>
+                <X size={16} />
+              </IconButton>
+            )}
+            <IconButton size="small" onClick={() => setShowWishlistDrawer(false)} sx={{ color: 'var(--text-muted)' }}>
+              <X size={20} />
+            </IconButton>
+          </Box>
+        </Box>
+        <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
+          {wishlistStore.items.length === 0 ? (
+            <Box sx={{ textAlign: 'center', py: 8, color: 'var(--text-muted)' }}>
+              <Heart size={48} strokeWidth={1} />
+              <Typography sx={{ mt: 2, fontWeight: 600 }}>{t.wishlist.empty}</Typography>
+              <Typography sx={{ mt: 0.5, fontSize: '0.85rem', opacity: 0.7 }}>{t.wishlist.emptyDesc}</Typography>
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              {wishlistStore.items.map((productId) => {
+                const product = Object.values(allGroupedProducts).flat().find((p) => p.id === productId);
+                if (!product) return null;
+                const eventDiscount = getEventDiscount(product.id, config?.events as ShopEvent[] | undefined);
+                return (
+                  <Box
+                    key={productId}
+                    onClick={() => { setShowWishlistDrawer(false); handleSelectProduct(product); }}
+                    sx={{
+                      display: 'flex',
+                      gap: 1.5,
+                      p: 1.5,
+                      borderRadius: '16px',
+                      bgcolor: 'var(--surface)',
+                      border: '1px solid var(--glass-border)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      '&:hover': { borderColor: 'rgba(0,113,227,0.3)', transform: 'translateX(4px)' },
+                    }}
+                  >
+                    <Box sx={{ width: 72, height: 72, borderRadius: '12px', overflow: 'hidden', flexShrink: 0, bgcolor: 'var(--surface-2)' }}>
+                      {(product.coverImage || product.images?.[0]) && (
+                        <OptimizedImage src={product.coverImage ?? product.images![0]} alt={product.name} width={72} height={72} objectFit="cover" />
+                      )}
+                    </Box>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--foreground)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {getProductName(product, lang)}
+                      </Typography>
+                      <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)', mt: 0.3 }}>
+                        {getCategoryLabel(product.category || product.type, lang)}
+                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                        {eventDiscount ? (
+                          <>
+                            <Typography sx={{ fontSize: '0.75rem', color: '#86868b', textDecoration: 'line-through' }}>฿{product.basePrice.toLocaleString()}</Typography>
+                            <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#ff453a' }}>฿{eventDiscount.discountedPrice(product.basePrice).toLocaleString()}</Typography>
+                          </>
+                        ) : (
+                          <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#34c759' }}>฿{product.basePrice.toLocaleString()}</Typography>
+                        )}
+                      </Box>
+                    </Box>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => { e.stopPropagation(); wishlistStore.removeItem(productId); showToast('info', t.wishlist.removedFromWishlist); }}
+                      sx={{ color: '#ff453a', alignSelf: 'center' }}
+                    >
+                      <Heart size={18} fill="#ff453a" />
+                    </IconButton>
+                  </Box>
+                );
+              })}
+            </Box>
+          )}
+        </Box>
+      </Drawer>
+
+      {/* ===== Recently Viewed Drawer ===== */}
+      <Drawer
+        anchor="right"
+        open={showRecentlyViewed}
+        onClose={() => setShowRecentlyViewed(false)}
+        PaperProps={{
+          sx: {
+            width: { xs: '100%', sm: 420 },
+            bgcolor: 'var(--background)',
+            backgroundImage: 'none',
+          },
+        }}
+      >
+        <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--glass-border)' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Eye size={20} color="#64d2ff" />
+            <Typography sx={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--foreground)' }}>
+              {t.recentlyViewed.title}
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 0.5 }}>
+            {recentlyViewedStore.items.length > 0 && (
+              <Button size="small" onClick={() => recentlyViewedStore.clear()} sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                {t.recentlyViewed.clearAll}
+              </Button>
+            )}
+            <IconButton size="small" onClick={() => setShowRecentlyViewed(false)} sx={{ color: 'var(--text-muted)' }}>
+              <X size={20} />
+            </IconButton>
+          </Box>
+        </Box>
+        <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
+          {recentlyViewedStore.items.length === 0 ? (
+            <Box sx={{ textAlign: 'center', py: 8, color: 'var(--text-muted)' }}>
+              <Eye size={48} strokeWidth={1} />
+              <Typography sx={{ mt: 2, fontWeight: 600 }}>{t.recentlyViewed.empty}</Typography>
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              {recentlyViewedStore.items.map((productId) => {
+                const product = Object.values(allGroupedProducts).flat().find((p) => p.id === productId);
+                if (!product) return null;
+                return (
+                  <Box
+                    key={productId}
+                    onClick={() => { setShowRecentlyViewed(false); handleSelectProduct(product); }}
+                    sx={{
+                      display: 'flex',
+                      gap: 1.5,
+                      p: 1.5,
+                      borderRadius: '16px',
+                      bgcolor: 'var(--surface)',
+                      border: '1px solid var(--glass-border)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      '&:hover': { borderColor: 'rgba(0,113,227,0.3)', transform: 'translateX(4px)' },
+                    }}
+                  >
+                    <Box sx={{ width: 60, height: 60, borderRadius: '10px', overflow: 'hidden', flexShrink: 0, bgcolor: 'var(--surface-2)' }}>
+                      {(product.coverImage || product.images?.[0]) && (
+                        <OptimizedImage src={product.coverImage ?? product.images![0]} alt={product.name} width={60} height={60} objectFit="cover" />
+                      )}
+                    </Box>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {getProductName(product, lang)}
+                      </Typography>
+                      <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#34c759', mt: 0.3 }}>
+                        ฿{product.basePrice.toLocaleString()}
+                      </Typography>
+                    </Box>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const wasInWishlist = wishlistStore.items.includes(productId);
+                        wishlistStore.toggleItem(productId);
+                        showToast(
+                          wasInWishlist ? 'info' : 'success',
+                          wasInWishlist ? t.wishlist.removedFromWishlist : t.wishlist.addedToWishlist
+                        );
+                      }}
+                      sx={{ color: wishlistStore.isInWishlist(productId) ? '#ff453a' : 'var(--text-muted)', alignSelf: 'center' }}
+                    >
+                      <Heart size={16} fill={wishlistStore.isInWishlist(productId) ? '#ff453a' : 'none'} />
+                    </IconButton>
+                  </Box>
+                );
+              })}
+            </Box>
+          )}
+        </Box>
+      </Drawer>
+
+      {/* ===== Bulk Order Dialog ===== */}
+      <Dialog
+        open={bulkOrderOpen}
+        onClose={() => setBulkOrderOpen(false)}
+        fullWidth
+        maxWidth="sm"
+        PaperProps={{
+          sx: {
+            borderRadius: '24px',
+            bgcolor: 'var(--surface)',
+            backgroundImage: 'none',
+            maxHeight: '85vh',
+          },
+        }}
+      >
+        {selectedProduct && (
+          <>
+            {/* Header */}
+            <Box sx={{ p: 2.5, pb: 1.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box sx={{
+                width: 44, height: 44, borderRadius: '12px', overflow: 'hidden', flexShrink: 0,
+                bgcolor: 'rgba(168,85,247,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Users size={22} style={{ color: '#a855f7' }} />
+              </Box>
+              <Box sx={{ flex: 1 }}>
+                <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                  {t.bulkOrder.title}
+                </Typography>
+                <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  {getProductName(selectedProduct, lang)}
+                </Typography>
+              </Box>
+              <IconButton size="small" onClick={() => setBulkOrderOpen(false)} sx={{ color: 'var(--text-muted)' }}>
+                <X size={20} />
+              </IconButton>
+            </Box>
+
+            {/* Steps Indicator */}
+            <Box sx={{ px: 2.5, pb: 1.5, display: 'flex', gap: 1 }}>
+              {[t.bulkOrder.step1, t.bulkOrder.step2, t.bulkOrder.step3].map((label, i) => (
+                <Box key={i} sx={{
+                  flex: 1, textAlign: 'center', py: 0.6, borderRadius: '10px', fontSize: '0.72rem', fontWeight: 600,
+                  bgcolor: bulkStep === i ? 'rgba(168,85,247,0.15)' : 'var(--surface-2)',
+                  color: bulkStep === i ? '#a855f7' : 'var(--text-muted)',
+                  border: bulkStep === i ? '1px solid rgba(168,85,247,0.3)' : '1px solid transparent',
+                  transition: 'all 0.2s',
+                }}>
+                  {i + 1}. {label}
+                </Box>
+              ))}
+            </Box>
+
+            <Divider />
+
+            {/* Step Content */}
+            <Box sx={{ p: 2.5, overflowY: 'auto', maxHeight: '50vh' }}>
+              {/* Step 0: Select Sizes & Quantities */}
+              {bulkStep === 0 && (
+                <Box>
+                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)', mb: 1.5 }}>
+                    {t.bulkOrder.sizeQuantity}
+                  </Typography>
+                  <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 1 }}>
+                    {SIZE_ORDER.filter(s => {
+                      const sp = selectedProduct.sizePricing;
+                      return !sp || sp[s] !== undefined;
+                    }).map(size => {
+                      const qty = bulkSizes[size] || 0;
+                      const price = selectedProduct.sizePricing?.[size] ?? selectedProduct.basePrice;
+                      return (
+                        <Box key={size} sx={{
+                          p: 1.2, borderRadius: '14px', border: qty > 0 ? '2px solid #a855f7' : '1px solid var(--glass-border)',
+                          bgcolor: qty > 0 ? 'rgba(168,85,247,0.06)' : 'var(--surface-2)', transition: 'all 0.2s',
+                        }}>
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                            <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>{size}</Typography>
+                            <Typography sx={{ fontSize: '0.7rem', color: '#34c759', fontWeight: 600 }}>฿{price.toLocaleString()}</Typography>
+                          </Box>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <IconButton
+                              size="small"
+                              onClick={() => setBulkSizes(prev => {
+                                const n = { ...prev };
+                                if (n[size] && n[size] > 0) { n[size]--; if (n[size] === 0) delete n[size]; }
+                                return n;
+                              })}
+                              disabled={!qty}
+                              sx={{ width: 28, height: 28, bgcolor: 'var(--surface)', border: '1px solid var(--glass-border)' }}
+                            >
+                              <Minus size={14} />
+                            </IconButton>
+                            <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)', minWidth: 24, textAlign: 'center' }}>
+                              {qty}
+                            </Typography>
+                            <IconButton
+                              size="small"
+                              onClick={() => setBulkSizes(prev => ({ ...prev, [size]: (prev[size] || 0) + 1 }))}
+                              sx={{ width: 28, height: 28, bgcolor: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.3)', color: '#a855f7' }}
+                            >
+                              <Plus size={14} />
+                            </IconButton>
+                          </Box>
+                        </Box>
+                      );
+                    })}
+                  </Box>
+
+                  {/* Long Sleeve Option */}
+                  {selectedProduct.options?.hasLongSleeve && (
+                    <FormControlLabel
+                      control={<Switch checked={bulkLongSleeve} onChange={(e) => setBulkLongSleeve(e.target.checked)} size="small" />}
+                      label={<Typography sx={{ fontSize: '0.82rem', fontWeight: 600 }}>{t.bulkOrder.longSleeve} (+฿{selectedProduct.options?.longSleevePrice ?? 50})</Typography>}
+                      sx={{ mt: 1.5 }}
+                    />
+                  )}
+
+                  {/* Summary */}
+                  {bulkTotalQty > 0 && (
+                    <Box sx={{ mt: 2, p: 1.5, borderRadius: '12px', bgcolor: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.2)' }}>
+                      <Typography sx={{ fontSize: '0.82rem', fontWeight: 600, color: '#a855f7' }}>
+                        {t.bulkOrder.totalItems}: {bulkTotalQty} {t.bulkOrder.pieces}
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+              )}
+
+              {/* Step 1: Enter Names */}
+              {bulkStep === 1 && (
+                <Box>
+                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)', mb: 0.5 }}>
+                    {t.bulkOrder.nameList}
+                  </Typography>
+                  <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', mb: 1.5 }}>
+                    {t.bulkOrder.nameListHint} ({bulkTotalQty} {t.bulkOrder.pieces})
+                  </Typography>
+                  <TextField
+                    multiline
+                    rows={8}
+                    value={bulkNames}
+                    onChange={(e) => setBulkNames(e.target.value)}
+                    placeholder={`Name 1\nName 2\nName 3\n...`}
+                    fullWidth
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '14px',
+                        bgcolor: 'var(--surface-2)',
+                        fontSize: '0.85rem',
+                      },
+                    }}
+                  />
+                  <Box sx={{ mt: 1, display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      {t.bulkOrder.namesCount}: {bulkNames.split('\n').filter(n => n.trim()).length}
+                    </Typography>
+                    <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      {t.bulkOrder.sizesCount}: {bulkTotalQty}
+                    </Typography>
+                  </Box>
+                  {bulkNames.split('\n').filter(n => n.trim()).length !== bulkTotalQty && bulkNames.trim() && (
+                    <Box sx={{ mt: 1, p: 1, borderRadius: '10px', bgcolor: 'rgba(255,159,10,0.1)', border: '1px solid rgba(255,159,10,0.3)' }}>
+                      <Typography sx={{ fontSize: '0.72rem', color: '#ff9f0a', fontWeight: 600 }}>
+                        {t.bulkOrder.mismatchWarning}
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+              )}
+
+              {/* Step 2: Preview & Assign */}
+              {bulkStep === 2 && (
+                <Box>
+                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)', mb: 1.5 }}>
+                    {t.bulkOrder.preview}
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.8 }}>
+                    {bulkAssignments.map((a, i) => {
+                      const price = selectedProduct.sizePricing?.[a.size] ?? selectedProduct.basePrice;
+                      const longFee = selectedProduct.options?.hasLongSleeve && bulkLongSleeve ? (selectedProduct.options?.longSleevePrice ?? 50) : 0;
+                      return (
+                        <Box key={i} sx={{
+                          display: 'flex', alignItems: 'center', gap: 1, p: 1, borderRadius: '10px',
+                          bgcolor: 'var(--surface-2)', border: '1px solid var(--glass-border)',
+                        }}>
+                          <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', width: 24, textAlign: 'center' }}>
+                            {i + 1}
+                          </Typography>
+                          <Typography sx={{ flex: 1, fontSize: '0.82rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                            {a.name}
+                          </Typography>
+                          {/* Size dropdown */}
+                          <select
+                            value={a.size}
+                            onChange={(e) => {
+                              const newAssignments = [...bulkAssignments];
+                              newAssignments[i] = { ...newAssignments[i], size: e.target.value };
+                              setBulkAssignments(newAssignments);
+                            }}
+                            style={{
+                              padding: '4px 8px', borderRadius: '8px', border: '1px solid var(--glass-border)',
+                              background: 'var(--surface)', color: 'var(--foreground)', fontSize: '0.75rem', fontWeight: 700,
+                              outline: 'none',
+                            }}
+                          >
+                            {SIZE_ORDER.filter(s => !selectedProduct.sizePricing || selectedProduct.sizePricing[s] !== undefined).map(s => (
+                              <option key={s} value={s}>{s}</option>
+                            ))}
+                          </select>
+                          <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#34c759', minWidth: 55, textAlign: 'right' }}>
+                            ฿{(price + longFee).toLocaleString()}
+                          </Typography>
+                        </Box>
+                      );
+                    })}
+                  </Box>
+
+                  {/* Total */}
+                  <Box sx={{ mt: 2, p: 1.5, borderRadius: '12px', bgcolor: 'rgba(52,199,89,0.08)', border: '1px solid rgba(52,199,89,0.2)' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                        {t.bulkOrder.totalPrice}
+                      </Typography>
+                      <Typography sx={{ fontSize: '1rem', fontWeight: 800, color: '#34c759' }}>
+                        ฿{bulkAssignments.reduce((s, a) => {
+                          const price = selectedProduct.sizePricing?.[a.size] ?? selectedProduct.basePrice;
+                          const longFee = selectedProduct.options?.hasLongSleeve && bulkLongSleeve ? (selectedProduct.options?.longSleevePrice ?? 50) : 0;
+                          return s + price + longFee;
+                        }, 0).toLocaleString()}
+                      </Typography>
+                    </Box>
+                    <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', mt: 0.3 }}>
+                      {bulkAssignments.length} {t.bulkOrder.pieces}
+                    </Typography>
+                  </Box>
+                </Box>
+              )}
+            </Box>
+
+            <Divider />
+
+            {/* Footer Actions */}
+            <Box sx={{ p: 2, display: 'flex', gap: 1 }}>
+              {bulkStep > 0 && (
+                <Button
+                  onClick={() => setBulkStep(s => s - 1)}
+                  sx={{
+                    flex: 1, py: 1.2, borderRadius: '14px', border: '1px solid var(--glass-border)',
+                    color: 'var(--foreground)', fontWeight: 600, textTransform: 'none', fontSize: '0.85rem',
+                  }}
+                >
+                  {t.bulkOrder.back}
+                </Button>
+              )}
+              {bulkStep < 2 ? (
+                <Button
+                  onClick={() => {
+                    if (bulkStep === 0) {
+                      if (bulkTotalQty === 0) { showToast('warning', t.bulkOrder.noSizesSelected); return; }
+                      setBulkStep(1);
+                    } else if (bulkStep === 1) {
+                      if (!bulkNames.trim()) { showToast('warning', t.bulkOrder.noNamesEntered); return; }
+                      bulkBuildAssignments();
+                      setBulkStep(2);
+                    }
+                  }}
+                  sx={{
+                    flex: 2, py: 1.2, borderRadius: '14px',
+                    background: 'linear-gradient(135deg, #a855f7 0%, #8b5cf6 100%)',
+                    color: 'white', fontWeight: 700, textTransform: 'none', fontSize: '0.85rem',
+                    boxShadow: '0 4px 16px rgba(168,85,247,0.3)',
+                    '&:hover': { boxShadow: '0 6px 24px rgba(168,85,247,0.4)' },
+                  }}
+                >
+                  {t.bulkOrder.next}
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    onClick={() => bulkCommitToCart(false)}
+                    startIcon={<ShoppingCart size={18} />}
+                    sx={{
+                      flex: 1, py: 1.2, borderRadius: '14px',
+                      background: 'rgba(0,113,227,0.12)', border: '1px solid rgba(0,113,227,0.3)',
+                      color: '#2997ff', fontWeight: 700, textTransform: 'none', fontSize: '0.82rem',
+                    }}
+                  >
+                    {t.bulkOrder.addToCart}
+                  </Button>
+                  <Button
+                    onClick={() => bulkCommitToCart(true)}
+                    startIcon={<Zap size={18} />}
+                    sx={{
+                      flex: 1.5, py: 1.2, borderRadius: '14px',
+                      background: 'linear-gradient(135deg, #34c759 0%, #34c759 100%)',
+                      color: 'white', fontWeight: 800, textTransform: 'none', fontSize: '0.82rem',
+                      boxShadow: '0 4px 16px rgba(52,199,89,0.3)',
+                    }}
+                  >
+                    {t.bulkOrder.buyNow}
+                  </Button>
+                </>
+              )}
+            </Box>
+          </>
+        )}
+      </Dialog>
 
       <Box
         sx={{
@@ -8379,6 +9300,117 @@ export default function HomePage() {
             ))}
           </Box>
         )}
+      </Dialog>
+
+      {/* ===== Review Dialog ===== */}
+      <Dialog
+        open={reviewDialogOpen}
+        onClose={() => setReviewDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '20px',
+            bgcolor: 'var(--background)',
+            backgroundImage: 'none',
+            border: '1px solid var(--glass-border)',
+            mx: 2,
+          },
+        }}
+        sx={{ zIndex: 9000 }}
+      >
+        <Box sx={{ p: 3 }}>
+          <Typography sx={{ fontSize: '1.1rem', fontWeight: 700, mb: 2, color: 'var(--foreground)' }}>
+            {t.reviews.writeReview}
+          </Typography>
+
+          {/* Star Rating */}
+          <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', mb: 1 }}>{t.reviews.rating}</Typography>
+          <Box sx={{ display: 'flex', gap: 0.5, mb: 2 }}>
+            {[1, 2, 3, 4, 5].map((s) => (
+              <IconButton
+                key={s}
+                onClick={() => setReviewRating(s)}
+                sx={{ 
+                  p: 0.5,
+                  color: s <= reviewRating ? '#ff9f0a' : 'var(--text-muted)',
+                  transition: 'all 0.15s ease',
+                  '&:hover': { transform: 'scale(1.2)' },
+                }}
+              >
+                <Star size={28} fill={s <= reviewRating ? '#ff9f0a' : 'none'} />
+              </IconButton>
+            ))}
+          </Box>
+
+          {/* Comment */}
+          <TextField
+            multiline
+            rows={3}
+            fullWidth
+            value={reviewComment}
+            onChange={(e) => setReviewComment(e.target.value)}
+            placeholder={t.reviews.commentPlaceholder}
+            inputProps={{ maxLength: 500 }}
+            sx={{
+              mb: 2,
+              '& .MuiOutlinedInput-root': {
+                borderRadius: '14px',
+                bgcolor: 'var(--surface-2)',
+                color: 'var(--foreground)',
+                fontSize: '0.9rem',
+                '& fieldset': { borderColor: 'var(--glass-border)' },
+                '&:hover fieldset': { borderColor: 'rgba(0,113,227,0.3)' },
+                '&.Mui-focused fieldset': { borderColor: '#0071e3' },
+              },
+            }}
+          />
+
+          {/* Actions */}
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              onClick={() => setReviewDialogOpen(false)}
+              sx={{ flex: 1, borderRadius: '12px', color: 'var(--text-muted)', border: '1px solid var(--glass-border)' }}
+            >
+              {t.common.cancel}
+            </Button>
+            <Button
+              onClick={() => {
+                if (reviewRating === 0) {
+                  showToast('warning', t.reviews.rating);
+                  return;
+                }
+                const review = {
+                  id: Date.now().toString(),
+                  userName: session?.user?.name || 'Anonymous',
+                  userImage: session?.user?.image || '',
+                  rating: reviewRating,
+                  comment: reviewComment,
+                  date: new Date().toISOString(),
+                  verified: true,
+                  helpful: 0,
+                };
+                setProductReviews((prev) => ({
+                  ...prev,
+                  [selectedProduct?.id || '']: [...(prev[selectedProduct?.id || ''] || []), review],
+                }));
+                setReviewDialogOpen(false);
+                showToast('success', t.reviews.thankYou);
+              }}
+              disabled={reviewRating === 0}
+              sx={{
+                flex: 2,
+                borderRadius: '12px',
+                background: 'linear-gradient(135deg, #0071e3 0%, #2997ff 100%)',
+                color: 'white',
+                fontWeight: 700,
+                '&:disabled': { background: 'rgba(100,116,139,0.15)', color: 'var(--text-muted)' },
+              }}
+            >
+              {t.reviews.submit}
+            </Button>
+          </Box>
+        </Box>
       </Dialog>
     </Box>
   );

@@ -148,6 +148,9 @@ import {
   Radio,
   User as UserIcon,
   CalendarDays,
+  TrendingUp,
+  BarChart3,
+  Flame as Fire,
 } from 'lucide-react';
 
 import { isAdmin, isSuperAdmin, setDynamicAdminEmails, SUPER_ADMIN_EMAIL, Product, ShopConfig, SIZES, AdminPermissions, DEFAULT_ADMIN_PERMISSIONS, DEFAULT_NAME_VALIDATION, type NameValidationConfig, DEFAULT_SHIRT_NAME, type ShirtNameConfig } from '@/lib/config';
@@ -5030,6 +5033,192 @@ export default function AdminPage(): JSX.Element {
               </Typography>
             </Box>
           ))}
+        </Box>
+
+        {/* ===== Analytics Charts ===== */}
+        <Box sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', md: '2fr 1fr' },
+          gap: 2,
+        }}>
+          {/* Revenue Trend - Last 7 days */}
+          <Box sx={{ ...glassCardSx, p: 3 }}>
+            <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--foreground)', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <TrendingUp size={20} color="#34c759" />
+              Revenue Trend (7 Days)
+            </Typography>
+            {(() => {
+              // Calculate daily revenue for last 7 days
+              const days = 7;
+              const dailyData: { date: string; revenue: number; count: number }[] = [];
+              for (let i = days - 1; i >= 0; i--) {
+                const d = new Date();
+                d.setDate(d.getDate() - i);
+                const dateStr = d.toISOString().split('T')[0];
+                const dayLabel = d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+                const dayOrders = validOrders.filter(o => {
+                  const od = new Date(o.date || '');
+                  return od.toISOString().split('T')[0] === dateStr;
+                });
+                dailyData.push({
+                  date: dayLabel,
+                  revenue: dayOrders.reduce((s, o) => s + (Number(o.amount) || 0), 0),
+                  count: dayOrders.length,
+                });
+              }
+              const maxRev = Math.max(...dailyData.map(d => d.revenue), 1);
+              return (
+                <Box>
+                  {/* Bar chart using pure CSS */}
+                  <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 0.5, height: 120, mb: 1 }}>
+                    {dailyData.map((d, i) => (
+                      <Box key={i} sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+                        <Typography sx={{ fontSize: '0.55rem', color: '#34c759', fontWeight: 700, opacity: d.revenue > 0 ? 1 : 0 }}>
+                          ฿{d.revenue >= 1000 ? `${(d.revenue / 1000).toFixed(1)}k` : d.revenue.toLocaleString()}
+                        </Typography>
+                        <Box sx={{
+                          width: '100%',
+                          height: `${Math.max((d.revenue / maxRev) * 100, 3)}%`,
+                          background: d.revenue > 0 ? 'linear-gradient(180deg, #34c759, #059669)' : 'rgba(100,116,139,0.15)',
+                          borderRadius: '6px 6px 2px 2px',
+                          transition: 'height 0.5s ease',
+                          minHeight: 4,
+                        }} />
+                      </Box>
+                    ))}
+                  </Box>
+                  <Box sx={{ display: 'flex', gap: 0.5 }}>
+                    {dailyData.map((d, i) => (
+                      <Box key={i} sx={{ flex: 1, textAlign: 'center' }}>
+                        <Typography sx={{ fontSize: '0.55rem', color: 'var(--text-muted)' }}>{d.date}</Typography>
+                        <Typography sx={{ fontSize: '0.5rem', color: 'var(--text-muted)', opacity: 0.6 }}>{d.count} orders</Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
+              );
+            })()}
+          </Box>
+
+          {/* Order Status Donut Chart */}
+          <Box sx={{ ...glassCardSx, p: 3 }}>
+            <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--foreground)', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <BarChart3 size={20} color="#a5b4fc" />
+              Order Distribution
+            </Typography>
+            {(() => {
+              const total = orders.length || 1;
+              const segments = [
+                { label: 'Pending', count: pendingOrders, color: '#ff9f0a' },
+                { label: 'Paid', count: paidOrders, color: '#34c759' },
+                { label: 'Ready/Shipped', count: readyOrders, color: '#2997ff' },
+                { label: 'Completed', count: completedOrders, color: '#30d158' },
+                { label: 'Cancelled', count: cancelledOrders, color: '#ff453a' },
+              ].filter(s => s.count > 0);
+
+              // CSS conic-gradient for donut
+              let accumulated = 0;
+              const gradientParts = segments.map(s => {
+                const start = accumulated;
+                const end = accumulated + (s.count / total) * 360;
+                accumulated = end;
+                return `${s.color} ${start}deg ${end}deg`;
+              });
+
+              return (
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                  {/* Donut */}
+                  <Box sx={{
+                    width: 120, height: 120, borderRadius: '50%',
+                    background: `conic-gradient(${gradientParts.join(', ')})`,
+                    position: 'relative',
+                    '&::after': {
+                      content: '""',
+                      position: 'absolute',
+                      inset: '25%',
+                      borderRadius: '50%',
+                      bgcolor: 'var(--surface)',
+                    },
+                  }}>
+                    <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>
+                      <Typography sx={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--foreground)' }}>{total}</Typography>
+                    </Box>
+                  </Box>
+                  {/* Legend */}
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'center' }}>
+                    {segments.map((s) => (
+                      <Box key={s.label} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: s.color }} />
+                        <Typography sx={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>
+                          {s.label} ({s.count})
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
+              );
+            })()}
+          </Box>
+        </Box>
+
+        {/* ===== Best Sellers ===== */}
+        <Box sx={{ ...glassCardSx, p: 3 }}>
+          <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--foreground)', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Fire size={20} color="#ff9f0a" />
+            Best Selling Products
+          </Typography>
+          {(() => {
+            // Count product sales from order carts
+            const productSales: Record<string, { name: string; count: number; revenue: number }> = {};
+            for (const order of validOrders) {
+              const cart = typeof order.cart === 'string' ? JSON.parse(order.cart || '[]') : order.cart || [];
+              for (const item of cart) {
+                const key = item.name || item.id || 'Unknown';
+                if (!productSales[key]) productSales[key] = { name: key, count: 0, revenue: 0 };
+                productSales[key].count += item.qty || 1;
+                productSales[key].revenue += item.total || item.price || 0;
+              }
+            }
+            const sorted = Object.values(productSales).sort((a, b) => b.count - a.count).slice(0, 5);
+            if (sorted.length === 0) {
+              return <Typography sx={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>No sales data yet</Typography>;
+            }
+            const maxCount = sorted[0].count;
+            return (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {sorted.map((product, idx) => (
+                  <Box key={idx} sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, color: idx === 0 ? '#ff9f0a' : 'var(--text-muted)', width: 20 }}>
+                      #{idx + 1}
+                    </Typography>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {product.name}
+                      </Typography>
+                      <Box sx={{ 
+                        height: 4, borderRadius: 2, mt: 0.5,
+                        bgcolor: 'rgba(100,116,139,0.1)',
+                        position: 'relative',
+                        overflow: 'hidden',
+                      }}>
+                        <Box sx={{
+                          position: 'absolute', left: 0, top: 0, bottom: 0,
+                          width: `${(product.count / maxCount) * 100}%`,
+                          background: 'linear-gradient(90deg, #0071e3, #2997ff)',
+                          borderRadius: 2,
+                          transition: 'width 0.5s ease',
+                        }} />
+                      </Box>
+                    </Box>
+                    <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
+                      <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--foreground)' }}>{product.count} pcs</Typography>
+                      <Typography sx={{ fontSize: '0.6rem', color: '#34c759' }}>฿{product.revenue.toLocaleString()}</Typography>
+                    </Box>
+                  </Box>
+                ))}
+              </Box>
+            );
+          })()}
         </Box>
 
         {/* Quick Status Overview */}
