@@ -7287,52 +7287,56 @@ export default function HomePage() {
                               </Box>
                             )}
 
-                            {/* Share button */}
-                            <IconButton
-                              size="small"
-                              onClick={(e) => { e.stopPropagation(); handleShareProduct(product); }}
+                            {/* Action buttons */}
+                            <Box
                               sx={{
                                 position: 'absolute',
                                 bottom: 8,
                                 left: 8,
-                                bgcolor: 'rgba(0,0,0,0.5)',
-                                backdropFilter: 'blur(8px)',
-                                color: 'white',
-                                width: 30,
-                                height: 30,
-                                '&:hover': { bgcolor: 'rgba(0,113,227,0.7)' },
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1,
                               }}
                             >
-                              <Share2 size={14} />
-                            </IconButton>
+                              <IconButton
+                                size="small"
+                                onClick={(e) => { e.stopPropagation(); handleShareProduct(product); }}
+                                sx={{
+                                  bgcolor: 'rgba(0,0,0,0.5)',
+                                  backdropFilter: 'blur(8px)',
+                                  color: 'white',
+                                  width: 30,
+                                  height: 30,
+                                  '&:hover': { bgcolor: 'rgba(0,113,227,0.7)' },
+                                }}
+                              >
+                                <Share2 size={14} />
+                              </IconButton>
 
-                            {/* Wishlist heart button */}
-                            <IconButton
-                              size="small"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                const wasInWishlist = wishlistStore.items.includes(product.id);
-                                wishlistStore.toggleItem(product.id);
-                                showToast(
-                                  wasInWishlist ? 'info' : 'success',
-                                  wasInWishlist ? t.wishlist.removedFromWishlist : t.wishlist.addedToWishlist
-                                );
-                              }}
-                              sx={{
-                                position: 'absolute',
-                                bottom: 8,
-                                left: 44,
-                                bgcolor: 'rgba(0,0,0,0.5)',
-                                backdropFilter: 'blur(8px)',
-                                color: wishlistStore.isInWishlist(product.id) ? '#ff453a' : 'white',
-                                width: 30,
-                                height: 30,
-                                '&:hover': { bgcolor: 'rgba(255,69,58,0.7)' },
-                                transition: 'all 0.2s ease',
-                              }}
-                            >
-                              <Heart size={14} fill={wishlistStore.isInWishlist(product.id) ? '#ff453a' : 'none'} />
-                            </IconButton>
+                              <IconButton
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const wasInWishlist = wishlistStore.items.includes(product.id);
+                                  wishlistStore.toggleItem(product.id);
+                                  showToast(
+                                    wasInWishlist ? 'info' : 'success',
+                                    wasInWishlist ? t.wishlist.removedFromWishlist : t.wishlist.addedToWishlist
+                                  );
+                                }}
+                                sx={{
+                                  bgcolor: 'rgba(0,0,0,0.5)',
+                                  backdropFilter: 'blur(8px)',
+                                  color: wishlistStore.isInWishlist(product.id) ? '#ff453a' : 'white',
+                                  width: 30,
+                                  height: 30,
+                                  '&:hover': { bgcolor: 'rgba(255,69,58,0.7)' },
+                                  transition: 'all 0.2s ease',
+                                }}
+                              >
+                                <Heart size={14} fill={wishlistStore.isInWishlist(product.id) ? '#ff453a' : 'none'} />
+                              </IconButton>
+                            </Box>
                           </Box>
 
                           {/* Product Info */}
@@ -8000,10 +8004,29 @@ export default function HomePage() {
                 const product = Object.values(allGroupedProducts).flat().find((p) => p.id === productId);
                 if (!product) return null;
                 const eventDiscount = getEventDiscount(product.id, config?.events as ShopEvent[] | undefined);
+                const productStatus = getProductStatus(product);
+                const statusLabelsMap: Record<ShopStatusType, string> = {
+                  OPEN: t.shopStatus.open,
+                  COMING_SOON: t.shopStatus.comingSoon,
+                  ORDER_ENDED: t.shopStatus.closedEnded,
+                  TEMPORARILY_CLOSED: t.shopStatus.closed,
+                  WAITING_TO_OPEN: t.shopStatus.waitingToOpen,
+                };
                 return (
                   <Box
                     key={productId}
-                    onClick={() => { setShowWishlistDrawer(false); handleSelectProduct(product); }}
+                    onClick={() => {
+                      if (!isShopOpen) {
+                        showToast('warning', t.checkout.shopClosedWarning);
+                        return;
+                      }
+                      if (productStatus !== 'OPEN') {
+                        showToast('info', `${getProductName(product, lang)} - ${statusLabelsMap[productStatus]}`);
+                        return;
+                      }
+                      setShowWishlistDrawer(false);
+                      handleSelectProduct(product);
+                    }}
                     sx={{
                       display: 'flex',
                       gap: 1.5,
@@ -8096,10 +8119,29 @@ export default function HomePage() {
               {recentlyViewedStore.items.map((productId) => {
                 const product = Object.values(allGroupedProducts).flat().find((p) => p.id === productId);
                 if (!product) return null;
+                const productStatus = getProductStatus(product);
+                const statusLabelsMap: Record<ShopStatusType, string> = {
+                  OPEN: t.shopStatus.open,
+                  COMING_SOON: t.shopStatus.comingSoon,
+                  ORDER_ENDED: t.shopStatus.closedEnded,
+                  TEMPORARILY_CLOSED: t.shopStatus.closed,
+                  WAITING_TO_OPEN: t.shopStatus.waitingToOpen,
+                };
                 return (
                   <Box
                     key={productId}
-                    onClick={() => { setShowRecentlyViewed(false); handleSelectProduct(product); }}
+                    onClick={() => {
+                      if (!isShopOpen) {
+                        showToast('warning', t.checkout.shopClosedWarning);
+                        return;
+                      }
+                      if (productStatus !== 'OPEN') {
+                        showToast('info', `${getProductName(product, lang)} - ${statusLabelsMap[productStatus]}`);
+                        return;
+                      }
+                      setShowRecentlyViewed(false);
+                      handleSelectProduct(product);
+                    }}
                     sx={{
                       display: 'flex',
                       gap: 1.5,
