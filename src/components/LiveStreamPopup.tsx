@@ -243,28 +243,34 @@ function EmbedPlayer({ liveData }: { liveData: LiveData }) {
   const [embedFailed, setEmbedFailed] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const iframeLoadedRef = useRef(false);
 
   // For YouTube/Facebook — try embed first, fallback to preview card if blocked
   const isEmbeddable = liveData.streamType === 'youtube' || liveData.streamType === 'facebook' || liveData.streamType === 'custom';
   const thumbnailUrl = liveData.thumbnailUrl || (liveData.streamType === 'youtube' ? getYouTubeThumbnail(liveData.streamUrl) : null);
   const streamInfo = getStreamLabel(liveData.streamType);
 
+  // Desktop detection — desktop browsers are stricter about iframe embedding
+  const isDesktop = typeof window !== 'undefined' && !(/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent));
+
   useEffect(() => {
-    // If embed doesn't load within 3 seconds, show fallback
+    iframeLoadedRef.current = false;
+    // If embed doesn't load properly, show fallback
     if (isEmbeddable && !embedFailed) {
+      // Facebook embeds are very unreliable on desktop — skip straight to preview
+      if (liveData.streamType === 'facebook' && isDesktop) {
+        setEmbedFailed(true);
+        return;
+      }
       timerRef.current = setTimeout(() => {
-        // Check if iframe actually loaded content
-        try {
-          const iframe = iframeRef.current;
-          if (iframe) {
-            // Can't access cross-origin iframe content, but if it errors it won't render
-            // The onerror/onload approach below handles this
-          }
-        } catch { /* ignore */ }
-      }, 5000);
+        // If iframe hasn't loaded within timeout, show fallback
+        if (!iframeLoadedRef.current) {
+          setEmbedFailed(true);
+        }
+      }, 6000);
     }
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, [isEmbeddable, embedFailed]);
+  }, [isEmbeddable, embedFailed, liveData.streamType, isDesktop]);
 
   // HLS — use HLS player directly (no embed issues)
   if (liveData.streamType === 'hls') {
@@ -294,36 +300,12 @@ function EmbedPlayer({ liveData }: { liveData: LiveData }) {
         scrolling="no"
         style={{ border: 'none', overflow: 'hidden', width: '100%', height: '100%', position: 'absolute', inset: 0 }}
         onError={() => setEmbedFailed(true)}
-        onLoad={(e) => {
-          // Clear the timeout — iframe loaded something
+        onLoad={() => {
+          // Mark as loaded and clear fallback timeout
+          iframeLoadedRef.current = true;
           if (timerRef.current) clearTimeout(timerRef.current);
-          // If iframe is blank/error page, the load event still fires
-          // so we additionally show a "open directly" button overlay
         }}
       />
-      {/* Always show a floating "open directly" button on top of iframe */}
-      <a
-        href={liveData.streamUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{
-          position: 'absolute',
-          bottom: 12,
-          right: 12,
-          background: streamInfo.color,
-          color: '#fff',
-          padding: '8px 16px',
-          borderRadius: 10,
-          fontSize: '0.8rem',
-          fontWeight: 600,
-          textDecoration: 'none',
-          zIndex: 10,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Noto Sans Thai", system-ui, sans-serif',
-        }}
-      >
-        {streamInfo.icon} เปิดตรง
-      </a>
     </>
   );
 }
