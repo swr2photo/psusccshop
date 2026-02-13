@@ -215,7 +215,7 @@ function getYouTubeVideoId(url: string): string | null {
 function getEmbedUrl(url: string, type: string): string {
   if (type === 'youtube') {
     const vid = getYouTubeVideoId(url);
-    if (vid) return `https://www.youtube-nocookie.com/embed/${vid}?autoplay=1&mute=1&rel=0&modestbranding=1&playsinline=1`;
+    if (vid) return `https://www.youtube.com/embed/${vid}?autoplay=1&mute=1&rel=0&modestbranding=1&playsinline=1`;
     return url;
   }
   if (type === 'facebook') {
@@ -262,12 +262,10 @@ function EmbedPlayer({ liveData }: { liveData: LiveData }) {
         setEmbedFailed(true);
         return;
       }
+      // Always set a fallback timeout — onLoad fires even for error/refused pages
       timerRef.current = setTimeout(() => {
-        // If iframe hasn't loaded within timeout, show fallback
-        if (!iframeLoadedRef.current) {
-          setEmbedFailed(true);
-        }
-      }, 6000);
+        setEmbedFailed(true);
+      }, 5000);
     }
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [isEmbeddable, embedFailed, liveData.streamType, isDesktop]);
@@ -301,9 +299,27 @@ function EmbedPlayer({ liveData }: { liveData: LiveData }) {
         style={{ border: 'none', overflow: 'hidden', width: '100%', height: '100%', position: 'absolute', inset: 0 }}
         onError={() => setEmbedFailed(true)}
         onLoad={() => {
-          // Mark as loaded and clear fallback timeout
+          // onLoad fires even for error/refused pages, so we can't fully trust it.
+          // Instead, try to detect if the iframe actually rendered YouTube content.
+          // Keep the timeout as final fallback — it will trigger if embed is broken.
           iframeLoadedRef.current = true;
-          if (timerRef.current) clearTimeout(timerRef.current);
+          try {
+            const iframe = iframeRef.current;
+            if (iframe) {
+              // If we can access iframe.contentDocument, it's same-origin (error page)
+              // Cross-origin (actual YouTube) will throw — that means embed worked
+              const doc = iframe.contentDocument || iframe.contentWindow?.document;
+              // If we got here without throwing, it's a same-origin error page
+              if (doc) {
+                setEmbedFailed(true);
+                if (timerRef.current) clearTimeout(timerRef.current);
+                return;
+              }
+            }
+          } catch {
+            // Cross-origin error = iframe loaded actual YouTube content = success!
+            if (timerRef.current) clearTimeout(timerRef.current);
+          }
         }}
       />
     </>
