@@ -704,6 +704,7 @@ interface SettingsViewProps {
   newAdminEmail: string;
   userEmail: string | null | undefined;
   sheetSyncing: boolean;
+  isSuperAdminUser: boolean;
   onConfigChange: (newVal: ShopConfig) => void;
   onSave: () => void;
   onReset: () => void;
@@ -723,6 +724,7 @@ const SettingsView = React.memo(function SettingsView({
   newAdminEmail,
   userEmail,
   sheetSyncing,
+  isSuperAdminUser,
   onConfigChange,
   onSave,
   onReset,
@@ -730,7 +732,6 @@ const SettingsView = React.memo(function SettingsView({
   showToast,
   triggerSheetSync,
 }: SettingsViewProps) {
-  const isSuperAdminUser = isSuperAdmin(userEmail ?? null);
 
   // Get admin permissions
   const adminPerms = localConfig.adminPermissions?.[userEmail?.toLowerCase() ?? ''] ?? {
@@ -2891,7 +2892,6 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
   userEmail,
   onImageUpload,
 }: AnnouncementsViewProps) {
-  const isSuperAdminUser = isSuperAdmin(userEmail ?? null);
   const [announcements, setAnnouncements] = React.useState<Announcement[]>(config.announcements || []);
   const [history, setHistory] = React.useState(config.announcementHistory || []);
   const [editingAnn, setEditingAnn] = React.useState<Announcement | null>(null);
@@ -9350,6 +9350,7 @@ export default function AdminPage(): JSX.Element {
               newAdminEmail={newAdminEmail}
               userEmail={session?.user?.email}
               sheetSyncing={sheetSyncing}
+              isSuperAdminUser={isSuperAdminUser}
               onConfigChange={handleSettingsConfigChange}
               onSave={handleSettingsSave}
               onReset={handleSettingsReset}
