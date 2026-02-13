@@ -22,7 +22,7 @@ const KEY_LENGTH = 32; // 256 bits
 
 // Validate encryption key on startup
 if (!ENCRYPTION_KEY && typeof window === 'undefined') {
-  console.warn('[Encryption] ENCRYPTION_KEY not set, using fallback. Set ENCRYPTION_KEY in production!');
+  console.error('[Encryption] ENCRYPTION_KEY not set! Encryption operations will fail. Set ENCRYPTION_KEY in production!');
 }
 
 // ==================== TYPES ====================

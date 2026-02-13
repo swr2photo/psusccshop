@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getShopConfig, getAllOrders } from '@/lib/filebase';
 import { ShopConfig } from '@/lib/config';
-import { requireAdmin } from '@/lib/auth';
+import { requireAdmin, isSuperAdminEmail, ADMIN_EMAILS } from '@/lib/auth';
 import { sanitizeConfigForAdmin, sanitizeOrdersForAdmin } from '@/lib/sanitize';
 
 // Ensure Node runtime (uses Supabase client) and skip static caching
@@ -9,13 +9,16 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
-  // ตรวจสอบสิทธิ์ Admin
+  // ตรวจสอบสิทธิ์ Admin (server-side: reads env vars at runtime)
   const authResult = await requireAdmin();
   if (authResult instanceof NextResponse) {
     return authResult;
   }
 
   try {
+    // Determine user role (server-validated)
+    const userRole = isSuperAdminEmail(authResult.email) ? 'superadmin' : 'admin';
+
     // Get shop config using optimized Supabase query
     const cfg = (await getShopConfig()) || {
       isOpen: true,
@@ -27,6 +30,12 @@ export async function GET(req: NextRequest) {
       vendorSheetId: '',
       vendorSheetUrl: '',
     };
+    
+    // Merge env-var admin emails into config's adminEmails for the client
+    // This ensures the client knows about ALL admins (env vars + config JSON)
+    const configAdminEmails = ((cfg as any).adminEmails || []).map((e: string) => e.trim().toLowerCase());
+    const mergedAdminEmails = [...new Set([...ADMIN_EMAILS, ...configAdminEmails])].filter(Boolean);
+    (cfg as any).adminEmails = mergedAdminEmails;
     
     // Get pagination params
     const url = new URL(req.url);
@@ -50,7 +59,10 @@ export async function GET(req: NextRequest) {
           orders: sanitizedOrders, 
           total,
           hasMore: offset + orders.length < total,
-          logs: [] 
+          logs: [],
+          // Server-validated role — client MUST trust this instead of re-checking env vars
+          userRole,
+          userEmail: authResult.email,
         } 
       },
       { headers: { 'Content-Type': 'application/json; charset=utf-8' } }

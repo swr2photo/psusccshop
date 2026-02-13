@@ -462,8 +462,8 @@ const payment = {
     expiredPayment: 'หมดเวลาชำระเงิน',
     autoCancel: 'คำสั่งซื้อจะถูกยกเลิกอัตโนมัติ',
     thankYouPrefix: 'ขอบคุณ',
-    accountHolderName: 'นายวีรชาติ แก้วขำ',
-    secretaryRole: '(เลขานุการชุมนุมคอมพิวเตอร์)',
+    accountHolderName: '',
+    secretaryRole: '',
   },
   en: {
     title: 'Payment',
@@ -552,8 +552,8 @@ const payment = {
     expiredPayment: 'Payment time expired',
     autoCancel: 'Order will be auto-cancelled',
     thankYouPrefix: 'Thank you',
-    accountHolderName: 'Mr. Weerachat Kaewkham',
-    secretaryRole: '(Secretary, Computer Club)',
+    accountHolderName: '',
+    secretaryRole: '',
   },
 } as const;
 

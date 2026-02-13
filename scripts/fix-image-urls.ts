@@ -45,14 +45,14 @@ const client = new S3Client({
   },
 });
 
-// OLD WRONG SECRET used in first migration
-const OLD_WRONG_SECRET = 'psusccshop-aes256-secure-crypto-key-2026-!@#$%^&*()';
+// OLD WRONG SECRET used in first migration - read from env
+const OLD_WRONG_SECRET = process.env.IMAGE_CRYPTO_SECRET_OLD || '';
 
 // CORRECT SECRET matching image-crypto.ts
-const CORRECT_SECRET = process.env.IMAGE_CRYPTO_SECRET || 'psusccshop-image-secure-2026-!@#$%^&*()';
+const CORRECT_SECRET = process.env.IMAGE_CRYPTO_SECRET || '';
 
 // Legacy XOR secret for original URLs
-const LEGACY_SECRET = process.env.IMAGE_PROXY_SECRET || 'psusccshop-image-proxy-2026';
+const LEGACY_SECRET = process.env.IMAGE_PROXY_SECRET || '';
 
 function deriveKey(secret: string): Buffer {
   return crypto.createHash('sha256').update(secret).digest();
@@ -150,8 +150,9 @@ const streamToString = async (stream: Readable): Promise<string> => {
 async function fixConfig() {
   console.log('\n📋 Fixing shop config...');
   
+  const BUCKET = process.env.FILEBASE_BUCKET || 'psusccshop-data';
   const res = await client.send(new GetObjectCommand({ 
-    Bucket: 'psusccshop-data', 
+    Bucket: BUCKET, 
     Key: 'config/shop-settings.json' 
   }));
   
@@ -226,7 +227,7 @@ async function fixConfig() {
   
   if (changed) {
     await client.send(new PutObjectCommand({
-      Bucket: 'psusccshop-data',
+      Bucket: BUCKET,
       Key: 'config/shop-settings.json',
       Body: JSON.stringify(config, null, 2),
       ContentType: 'application/json',

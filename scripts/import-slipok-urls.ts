@@ -6,12 +6,23 @@ import { createClient } from '@supabase/supabase-js';
 
 // ข้อมูลจาก SlipOK log (copy จาก dashboard)
 // Format: id, transactionDate, slipDate, amount, receiver, receiverAccount, senderName, senderBank, senderAccount, receiverName, receiverBank, qr1, qr2, imageUrl, transRef
-const SLIPOK_DATA = `
-81645046	Sat Jan 24 2026 19:00:06 GMT+0700 (Indochina Time)	Sat Jan 24 2026 18:59:18 GMT+0700 (Indochina Time)	340	PSUSCC	PSUSCC	2153358810	วีรชาติ แก้วขำ	kbank	xxx-x-x7131-x	Mr. Justin M	xxx-x-x5881-x	MR. WERACHART K			https://slipok.s3.ap-southeast-1.amazonaws.com/transaction/84af3750-8a87-4b29-9088-490aa6df91ac.png	016024185918ATF03614
-81646153	Sat Jan 24 2026 19:08:08 GMT+0700 (Indochina Time)	Sat Jan 24 2026 19:07:52 GMT+0700 (Indochina Time)	320	PSUSCC	PSUSCC	004666018068365	วีรชาติ แก้วขำ	kbank	xxxx-xx881-3	นาย ริสกี ค	XXXXXXXXXXX8365	นาย วีรชาติ แ			https://slipok.s3.ap-southeast-1.amazonaws.com/transaction/5144f38b-cd87-4a72-a63c-5b5098ea6623.png	202601247wBwARI8zVOU1jGU6
-81647650	Sat Jan 24 2026 19:19:16 GMT+0700 (Indochina Time)	Sat Jan 24 2026 19:18:04 GMT+0700 (Indochina Time)	300	PSUSCC	PSUSCC	004666018068365	วีรชาติ แก้วขำ	kbank	0201xxxx0521	นาย ณัฐพล ย	004xxxxxxxx8365	MR. WERACHART K			https://slipok.s3.ap-southeast-1.amazonaws.com/transaction/4cb84aa9-9a4b-43ca-a5a1-6c2dff96866c.png	602419397510I000026B9790
-81649386	Sat Jan 24 2026 19:32:44 GMT+0700 (Indochina Time)	Sat Jan 24 2026 19:30:56 GMT+0700 (Indochina Time)	340	PSUSCC	PSUSCC	2153358810	วีรชาติ แก้วขำ	kbank	xxx-x-x8007-x	MS. Nareemarn C	xxx-x-x5881-x	MR. WERACHART K			https://slipok.s3.ap-southeast-1.amazonaws.com/transaction/f7dc038c-7a6a-4745-837a-d70404a4c8e2.png	016024193056BTF06658
-`.trim();
+//
+// ⚠️  PII REMOVED — paste actual SlipOK tab-separated data below before running
+// Example format (tab-separated):
+// 12345678\t<date>\t<date>\t340\tPSUSCC\tPSUSCC\t<account>\t<name>\tkbank\t<masked>\t<sender>\t<masked>\t<receiver>\t\t\t<imageUrl>\t<transRef>
+//
+const SLIPOK_DATA_FILE = process.env.SLIPOK_DATA_FILE || '';
+import { existsSync, readFileSync } from 'fs';
+
+let SLIPOK_DATA: string;
+if (SLIPOK_DATA_FILE && existsSync(SLIPOK_DATA_FILE)) {
+  SLIPOK_DATA = readFileSync(SLIPOK_DATA_FILE, 'utf-8').trim();
+  console.log(`📄 Loaded SlipOK data from file: ${SLIPOK_DATA_FILE}`);
+} else {
+  console.error('❌ Set SLIPOK_DATA_FILE env var pointing to a TSV file with SlipOK data.');
+  console.error('   Example: SLIPOK_DATA_FILE=./slipok-data.tsv npx tsx scripts/import-slipok-urls.ts');
+  process.exit(1);
+}
 
 interface ParsedSlipOKLog {
   id: string;

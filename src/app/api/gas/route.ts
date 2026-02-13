@@ -3,8 +3,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 
-const GAS_URL = process.env.GAS_SCRIPT_URL || 
-  'https://script.google.com/macros/s/AKfycbw3x3ceiC_KDlFrnP07gvlMof8uGvBsxQiHXKyxMiWCjCN_1BBeCsbuvnwv9OPi1Bmm/exec';
+const GAS_URL = process.env.GAS_SCRIPT_URL;
+if (!GAS_URL && typeof window === 'undefined') {
+  console.warn('[GAS] GAS_SCRIPT_URL is not set! GAS proxy will not work.');
+}
 
 export async function GET(request: NextRequest) {
   // ตรวจสอบว่าเข้าสู่ระบบแล้ว
@@ -28,6 +30,12 @@ export async function GET(request: NextRequest) {
     console.log(`[GAS-API] GET ${action}`, { authorization: authorization ? '***' : 'none' });
 
     // Forward to Google Apps Script
+    if (!GAS_URL) {
+      return NextResponse.json(
+        { status: 'error', message: 'GAS_SCRIPT_URL is not configured' },
+        { status: 503 }
+      );
+    }
     const gasUrl = new URL(GAS_URL);
     gasUrl.searchParams.append('action', action);
     if (authorization) {
@@ -99,6 +107,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     // Forward to Google Apps Script
+    if (!GAS_URL) {
+      return NextResponse.json(
+        { status: 'error', message: 'GAS_SCRIPT_URL is not configured' },
+        { status: 503 }
+      );
+    }
     const gasUrl = new URL(GAS_URL);
     gasUrl.searchParams.append('action', action);
 

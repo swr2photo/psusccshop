@@ -35,12 +35,14 @@ interface AdminDataRaw {
     orders?: any[];
     config?: any;
     logs?: any[];
+    userRole?: string;
+    userEmail?: string;
   };
 }
 
 interface UseAdminDataSWROptions {
   enabled: boolean;
-  onDataReceived: (data: { orders: any[]; config: any; logs: any[] }) => void;
+  onDataReceived: (data: { orders: any[]; config: any; logs: any[]; userRole?: string; userEmail?: string }) => void;
   onError?: (error: any) => void;
   onLoadingChange?: (loading: boolean) => void;
   realtimeConnected?: boolean;
@@ -123,6 +125,8 @@ export function useAdminDataSWR(options: UseAdminDataSWROptions) {
         orders: data.data.orders || [],
         config: data.data.config || {},
         logs: data.data.logs || [],
+        userRole: data.data.userRole,
+        userEmail: data.data.userEmail,
       });
       initialLoadDone.current = true;
     }

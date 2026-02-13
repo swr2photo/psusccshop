@@ -1,6 +1,6 @@
 -- Migration: Add profile_image and theme columns to profiles table
 -- Run this in the Supabase Dashboard SQL Editor:
--- https://supabase.com/dashboard/project/skfacffsynjxyvvvuycl/sql/new
+-- https://supabase.com/dashboard/project/<YOUR_PROJECT_ID>/sql/new
 --
 -- After running this migration, the profile-extras key_value_store entries
 -- are still read as a fallback, so no data is lost.

@@ -92,10 +92,19 @@ export async function POST(req: NextRequest) {
     const config = body?.config as ShopConfig | undefined;
     if (!config) return NextResponse.json({ status: 'error', message: 'missing config' }, { status: 400 });
     
+    // ⚠️ Safety: prevent saving config with empty products if DB already has products
+    // This prevents accidental data wipe from race conditions or stale client state
+    const currentConfig = await getJson<ShopConfig>(CONFIG_KEY);
+    if (currentConfig && (currentConfig.products?.length ?? 0) > 0 && (!config.products || config.products.length === 0)) {
+      console.error(`[config] BLOCKED: attempted to save 0 products when DB has ${currentConfig.products?.length}. User: ${authResult.email}`);
+      return NextResponse.json(
+        { status: 'error', message: 'ไม่สามารถบันทึกได้: กรุณาโหลดข้อมูลสินค้าก่อนบันทึก (ป้องกันข้อมูลหาย)' },
+        { status: 409 }
+      );
+    }
+    
     // Protect admin management fields - only super admin can modify these
     if (!isSuperAdminEmail(authResult.email)) {
-      // Load current config to compare admin-related fields
-      const currentConfig = await getJson<ShopConfig>(CONFIG_KEY);
       if (currentConfig) {
         // Prevent non-super-admin from modifying adminEmails or adminPermissions
         config.adminEmails = currentConfig.adminEmails;

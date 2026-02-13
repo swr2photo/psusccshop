@@ -4058,6 +4058,8 @@ export default function AdminPage(): JSX.Element {
   const [lastSavedTime, setLastSavedTime] = useState<Date | null>(null);
   const [sheetSyncing, setSheetSyncing] = useState(false);
   const [orderProcessingRef, setOrderProcessingRef] = useState<string | null>(null);
+  // Server-validated admin role (set from API response, never from client env vars)
+  const [serverUserRole, setServerUserRole] = useState<'superadmin' | 'admin' | null>(null);
   // Settings state (moved from SettingsView to prevent re-render issues)
   const [settingsLocalConfig, setSettingsLocalConfig] = useState<ShopConfig>(DEFAULT_CONFIG);
   const [settingsHasChanges, setSettingsHasChanges] = useState(false);
@@ -4100,20 +4102,25 @@ export default function AdminPage(): JSX.Element {
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
   // Check authorization including dynamic admin list from config
+  // Priority: server-validated role > dynamic admin list > static admin list
   const isAuthorized = useMemo(() => {
+    // Trust server-validated role first (avoids client env var issues)
+    if (serverUserRole) return true;
+    
     const email = session?.user?.email;
     if (!email) return false;
     const normalized = email.trim().toLowerCase();
-    // Check static admin list
+    // Check static admin list (works only if NEXT_PUBLIC_ env vars are set)
     if (isAdmin(normalized)) return true;
     // Check dynamic admin list from loaded config
     const dynamicAdmins = (config.adminEmails || []).map(e => e.trim().toLowerCase());
     return dynamicAdmins.includes(normalized);
-  }, [session?.user?.email, config.adminEmails]);
+  }, [session?.user?.email, config.adminEmails, serverUserRole]);
 
   // Calculate admin permissions
   const userEmail = session?.user?.email?.toLowerCase() ?? '';
-  const isSuperAdminUser = isSuperAdmin(session?.user?.email ?? null);
+  // Trust server-validated role OR fall back to client-side check
+  const isSuperAdminUser = serverUserRole === 'superadmin' || isSuperAdmin(session?.user?.email ?? null);
   const adminPerms = useMemo(() => {
     return config.adminPermissions?.[userEmail] 
       ? { ...DEFAULT_ADMIN_PERMISSIONS, ...config.adminPermissions[userEmail] }
@@ -4171,12 +4178,17 @@ export default function AdminPage(): JSX.Element {
   }, [session?.user?.email]);
 
   // 📥 SWR Data Handler - processes data from SWR hook
-  const handleSWRDataReceived = useCallback((data: { orders: any[]; config: any; logs: any[] }) => {
+  const handleSWRDataReceived = useCallback((data: { orders: any[]; config: any; logs: any[]; userRole?: string; userEmail?: string }) => {
     const normalizedOrders = Array.isArray(data.orders) 
       ? data.orders.map(normalizeOrder).filter((o) => o.ref) 
       : [];
     const nextConfig = data.config || DEFAULT_CONFIG;
     let nextLogs = data.logs || [];
+    
+    // Set server-validated role (if provided)
+    if (data.userRole) {
+      setServerUserRole(data.userRole as 'superadmin' | 'admin');
+    }
     
     if ((!nextLogs || nextLogs.length === 0) && normalizedOrders.length > 0) {
       nextLogs = normalizedOrders.slice(0, 50).map((o) => [
@@ -4418,6 +4430,13 @@ export default function AdminPage(): JSX.Element {
 
   // 💾 Save Config
   const saveFullConfig = useCallback(async (newConfig: ShopConfig) => {
+    // ⚠️ Safeguard: prevent saving empty config that would wipe products
+    // This can happen if save is triggered before real config loads from server
+    if ((!newConfig.products || newConfig.products.length === 0) && !serverUserRole) {
+      console.warn('[Admin] Blocked save: config has no products and server role not confirmed yet');
+      return;
+    }
+    
     setSaving(true);
     
     try {
@@ -4715,7 +4734,10 @@ export default function AdminPage(): JSX.Element {
     if (status !== 'authenticated' || !session?.user?.email) return;
     if (loading) return; // Wait for config to load
     
-    // Now check with loaded config (including dynamic admins)
+    // If server already validated our role, we're authorized
+    if (serverUserRole) return;
+    
+    // Fallback: check with loaded config (including dynamic admins)
     const email = session.user.email.trim().toLowerCase();
     const staticAdmin = isAdmin(email);
     const dynamicAdmins = (config.adminEmails || []).map(e => e.trim().toLowerCase());
@@ -4730,7 +4752,7 @@ export default function AdminPage(): JSX.Element {
         onClose: () => router.push('/'),
       });
     }
-  }, [status, session, loading, config.adminEmails, router]);
+  }, [status, session, loading, config.adminEmails, router, serverUserRole]);
 
   // 🔁 Lightweight polling for fresher data
   // ⚠️ Pause polling when order editor is open to prevent flickering

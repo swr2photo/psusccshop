@@ -216,6 +216,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
   // Payment system status
   const [paymentEnabled, setPaymentEnabled] = useState(true);
   const [paymentDisabledMessage, setPaymentDisabledMessage] = useState<string | null>(null);
+  const [accountHolderName, setAccountHolderName] = useState<string>('');
   
   // Check if already paid
   const isPaid = PAID_STATUSES.includes(orderStatus.toUpperCase());
@@ -287,6 +288,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
         // Payment system status
         setPaymentEnabled(info.paymentEnabled !== false);
         setPaymentDisabledMessage(info.paymentDisabledMessage || null);
+        setAccountHolderName(info.accountName || '');
       } else {
         addToast('error', t.common.error, data.message || t.payment.noPaymentInfo);
       }
@@ -1287,11 +1289,13 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                         {t.payment.accountName}
                       </Typography>
                       <Typography sx={{ color: '#fff', fontWeight: 600, fontSize: '0.8rem' }}>
-                        {t.payment.accountHolderName}
+                        {accountHolderName || t.payment.accountHolderName}
                       </Typography>
+                      {t.payment.secretaryRole && (
                       <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.6rem' }}>
                         {t.payment.secretaryRole}
                       </Typography>
+                      )}
                     </Box>
                     <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.65rem', mt: 1, textAlign: 'center' }}>
                       {t.payment.scanInstruction}

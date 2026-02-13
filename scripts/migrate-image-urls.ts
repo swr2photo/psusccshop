@@ -47,10 +47,10 @@ const accessKeyId = process.env.FILEBASE_ACCESS_KEY;
 const secretAccessKey = process.env.FILEBASE_SECRET_KEY;
 
 // Legacy XOR secret
-const LEGACY_SECRET = process.env.IMAGE_PROXY_SECRET || 'psusccshop-image-proxy-2026';
+const LEGACY_SECRET = process.env.IMAGE_PROXY_SECRET || '';
 
 // New AES secret - MUST match image-crypto.ts
-const AES_SECRET = process.env.IMAGE_CRYPTO_SECRET || 'psusccshop-image-secure-2026-!@#$%^&*()';
+const AES_SECRET = process.env.IMAGE_CRYPTO_SECRET || '';
 
 const s3Client = new S3Client({
   region,

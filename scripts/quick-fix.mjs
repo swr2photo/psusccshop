@@ -23,12 +23,17 @@ const client = new S3Client({
   },
 });
 
-// Secrets
-const OLD_SECRET = 'psusccshop-aes256-secure-crypto-key-2026-!@#$%^&*()';
-const CORRECT_SECRET = envVars.IMAGE_CRYPTO_SECRET || 'psusccshop-image-secure-2026-!@#$%^&*()';
+// Secrets - read from env only
+const OLD_SECRET = envVars.IMAGE_CRYPTO_SECRET_OLD || '';
+const CORRECT_SECRET = envVars.IMAGE_CRYPTO_SECRET || '';
 
-console.log('OLD:', OLD_SECRET.slice(0, 30) + '...');
-console.log('CORRECT:', CORRECT_SECRET.slice(0, 30) + '...');
+if (!CORRECT_SECRET) {
+  console.error('❌ IMAGE_CRYPTO_SECRET not set in .env.local');
+  process.exit(1);
+}
+
+console.log('OLD:', OLD_SECRET ? '***set***' : '(not set)');
+console.log('CORRECT:', CORRECT_SECRET ? '***set***' : '(not set)');
 
 function deriveKey(s) { return crypto.createHash('sha256').update(s).digest(); }
 
@@ -69,7 +74,8 @@ function fix(proxyUrl) {
 
 async function main() {
   console.log('\n📥 Fetching config...');
-  const res = await client.send(new GetObjectCommand({ Bucket: 'psusccshop-data', Key: 'config/shop-settings.json' }));
+  const BUCKET = envVars.FILEBASE_BUCKET || 'psusccshop-data';
+  const res = await client.send(new GetObjectCommand({ Bucket: BUCKET, Key: 'config/shop-settings.json' }));
   const chunks = []; for await (const c of res.Body) chunks.push(c);
   const config = JSON.parse(Buffer.concat(chunks).toString());
   
@@ -95,7 +101,7 @@ async function main() {
   
   if (changed) {
     await client.send(new PutObjectCommand({
-      Bucket: 'psusccshop-data',
+      Bucket: BUCKET,
       Key: 'config/shop-settings.json',
       Body: JSON.stringify(config, null, 2),
       ContentType: 'application/json'

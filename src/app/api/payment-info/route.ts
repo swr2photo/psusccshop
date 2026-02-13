@@ -64,8 +64,8 @@ export async function GET(req: NextRequest) {
     }
 
     const bankName = process.env.PAYMENT_BANK || 'พร้อมเพย์ (โอนได้ทุกธนาคาร)';
-    const accountName = process.env.PAYMENT_ACCOUNT_NAME || 'นายวีรชาติ แก้วขำ (เลขานุการชุมนุม)';
-    const accountNumber = process.env.PAYMENT_ACCOUNT || '000-000000-0';
+    const accountName = process.env.PAYMENT_ACCOUNT_NAME || '';
+    const accountNumber = process.env.PAYMENT_ACCOUNT || '';
 
     // ตรวจสอบสถานะระบบชำระเงิน
     const CONFIG_KEY = 'config/shop-settings.json';

@@ -20,10 +20,10 @@ const client = new S3Client({
 });
 
 const CORRECT = envVars.IMAGE_CRYPTO_SECRET;
-const OLD = 'psusccshop-aes256-secure-crypto-key-2026-!@#$%^&*()';
+const OLD = envVars.IMAGE_CRYPTO_SECRET_OLD || '';
 
-console.log('CORRECT from .env:', CORRECT);
-console.log('OLD hardcoded:', OLD);
+console.log('CORRECT from .env:', CORRECT ? '***set***' : '(not set)');
+console.log('OLD from .env:', OLD ? '***set***' : '(not set)');
 
 function deriveKey(s) { return crypto.createHash('sha256').update(s).digest(); }
 function decrypt(token, secret) {
@@ -39,7 +39,7 @@ function decrypt(token, secret) {
   } catch { return null; }
 }
 
-const res = await client.send(new GetObjectCommand({ Bucket: 'psusccshop-data', Key: 'config/shop-settings.json' }));
+const res = await client.send(new GetObjectCommand({ Bucket: envVars.FILEBASE_BUCKET || 'psusccshop-data', Key: 'config/shop-settings.json' }));
 const chunks = []; for await (const c of res.Body) chunks.push(c);
 const config = JSON.parse(Buffer.concat(chunks).toString());
 

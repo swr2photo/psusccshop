@@ -12,9 +12,9 @@ import crypto from 'crypto';
  */
 const MASTER_SECRET = process.env.IMAGE_CRYPTO_SECRET;
 if (!MASTER_SECRET && typeof window === 'undefined') {
-  console.warn('[SECURITY] IMAGE_CRYPTO_SECRET is not set! Using insecure fallback.');
+  console.error('[SECURITY] IMAGE_CRYPTO_SECRET is not set! Image encryption will fail.');
 }
-const EFFECTIVE_SECRET = MASTER_SECRET || 'psusccshop-image-secure-2026-!@#$%^&*()';
+const EFFECTIVE_SECRET = MASTER_SECRET || '';
 
 /**
  * Derive a 32-byte key from master secret
@@ -218,7 +218,7 @@ const LEGACY_SECRET = process.env.IMAGE_PROXY_SECRET;
 if (!LEGACY_SECRET && typeof window === 'undefined') {
   console.warn('[SECURITY] IMAGE_PROXY_SECRET is not set! Legacy URLs may not work.');
 }
-const EFFECTIVE_LEGACY_SECRET = LEGACY_SECRET || 'psusccshop-image-proxy-2026';
+const EFFECTIVE_LEGACY_SECRET = LEGACY_SECRET || '';
 
 export function decryptLegacyUrl(id: string): string | null {
   if (!id) return null;

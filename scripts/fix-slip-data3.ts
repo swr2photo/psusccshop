@@ -5,7 +5,15 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function fixSlipData() {
-  const transRef = '016024185918ATF03614';
+  // Pass transRef as CLI argument: npx tsx scripts/fix-slip-data3.ts <transRef> <senderName> <receiverName>
+  const transRef = process.argv[2];
+  const correctSenderName = process.argv[3];
+  const correctReceiverName = process.argv[4];
+
+  if (!transRef || !correctSenderName || !correctReceiverName) {
+    console.error('Usage: npx tsx scripts/fix-slip-data3.ts <transRef> <senderName> <receiverName>');
+    process.exit(1);
+  }
   
   // ค้นหา order โดยใช้ JSONB query
   const { data: orders, error } = await supabase
@@ -28,7 +36,7 @@ async function fixSlipData() {
     });
     
     if (found) {
-      await fixOrder(found);
+      await fixOrder(found, correctSenderName, correctReceiverName);
     } else {
       console.log('ไม่พบ order ที่มี transRef:', transRef);
     }
@@ -40,16 +48,12 @@ async function fixSlipData() {
     return;
   }
   
-  await fixOrder(orders[0]);
+  await fixOrder(orders[0], correctSenderName, correctReceiverName);
 }
 
-async function fixOrder(order: any) {
+async function fixOrder(order: any, correctSenderName: string, correctReceiverName: string) {
   console.log('พบ order:', order.id);
   console.log('ชื่อลูกค้าปัจจุบัน:', order.customer_name);
-  
-  // ข้อมูลที่ถูกต้องจากสลิป
-  const correctSenderName = 'Mr. Justin M';
-  const correctReceiverName = 'วีรชาติ แก้วขำ';
   
   // Parse slip_data
   let slipData = typeof order.slip_data === 'string' 
