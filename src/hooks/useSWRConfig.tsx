@@ -23,12 +23,13 @@ interface SWRProviderProps {
 
 /**
  * Global fetcher function with error handling
+ * Note: NO Cache-Control header — let the server control caching via response headers.
+ * SWR handles revalidation in-memory; the browser HTTP cache is our L2 cache.
  */
 export const fetcher = async (url: string) => {
   const res = await fetch(url, {
     headers: {
-      'Content-Type': 'application/json',
-      'Cache-Control': 'no-cache',
+      'Accept': 'application/json',
     },
   });
 
@@ -76,11 +77,11 @@ export function SWRProvider({ children }: SWRProviderProps) {
         revalidateOnReconnect: true,
         revalidateIfStale: true,
         
-        // Deduplication - prevent duplicate requests within 2s
-        dedupingInterval: 2000,
+        // Performance: increase dedup interval (prevent duplicate requests within 5s)
+        dedupingInterval: 5000,
         
-        // Focus throttle - minimum 5s between focus revalidations
-        focusThrottleInterval: 5000,
+        // Performance: throttle focus revalidation (min 10s between focus events)
+        focusThrottleInterval: 10000,
         
         // Error retry with exponential backoff
         errorRetryCount: 3,
@@ -89,6 +90,11 @@ export function SWRProvider({ children }: SWRProviderProps) {
           // Never retry on 404 or 403
           if ((error as any)?.status === 404) return;
           if ((error as any)?.status === 403) return;
+          if ((error as any)?.status === 429) {
+            // Rate limited — back off longer
+            setTimeout(() => revalidate({ retryCount }), 15000);
+            return;
+          }
           
           // Only retry up to 3 times
           if (retryCount >= 3) return;
@@ -101,15 +107,17 @@ export function SWRProvider({ children }: SWRProviderProps) {
         // Loading timeout
         loadingTimeout: 10000,
         
-        // Keep previous data while revalidating
+        // Performance: keep previous data visible during revalidation
         keepPreviousData: true,
         
-        // Global error handler
+        // Global error handler (minimal logging in production)
         onError: (error, key) => {
-          if ((error as any)?.status === 403) {
-            console.warn('[SWR] Access denied:', key);
-          } else if ((error as any)?.status !== 404) {
-            console.error('[SWR] Error fetching:', key, error);
+          if (process.env.NODE_ENV === 'development') {
+            if ((error as any)?.status === 403) {
+              console.warn('[SWR] Access denied:', key);
+            } else if ((error as any)?.status !== 404) {
+              console.error('[SWR] Error fetching:', key, error);
+            }
           }
         },
         

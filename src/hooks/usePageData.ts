@@ -82,7 +82,7 @@ export function usePageConfig() {
       revalidateOnFocus: true,
       revalidateOnReconnect: true,
       // Keep data fresh
-      refreshInterval: 60000, // 1 minute
+      refreshInterval: 2 * 60 * 1000, // 2 minutes (config rarely changes mid-session)
       dedupingInterval: 5000,
       // Error retry
       errorRetryCount: 3,

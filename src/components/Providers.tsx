@@ -1,14 +1,15 @@
 // src/components/Providers.tsx
 'use client';
 
-import React, { Component, ErrorInfo, useMemo, useEffect } from 'react';
+import React, { Component, ErrorInfo, useMemo, useEffect, lazy, Suspense } from 'react';
 import { SessionProvider } from "next-auth/react";
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { NotificationProvider } from './NotificationContext';
-import ToastContainer from './ToastContainer';
-import CookieConsentBanner from './CookieConsentBanner';
-import NotificationPrompt from './NotificationPrompt';
+// Performance: lazy-load non-critical UI components
+const ToastContainer = lazy(() => import('./ToastContainer'));
+const CookieConsentBanner = lazy(() => import('./CookieConsentBanner'));
+const NotificationPrompt = lazy(() => import('./NotificationPrompt'));
 import { useScreenshotProtection } from '@/hooks';
 import { SWRProvider } from '@/hooks/useSWRConfig';
 import { TanStackQueryProvider } from '@/hooks/useTanStackQuery';
@@ -439,9 +440,11 @@ export default function Providers({ children }: { children: React.ReactNode }) {
                 <ScreenshotProtectionProvider>
                   {children}
                 </ScreenshotProtectionProvider>
-                <ToastContainer />
-                <CookieConsentBanner />
-                <NotificationPrompt />
+                <Suspense fallback={null}>
+                  <ToastContainer />
+                  <CookieConsentBanner />
+                  <NotificationPrompt />
+                </Suspense>
               </NotificationProvider>
             </ThemeProvider>
           </SWRProvider>

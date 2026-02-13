@@ -14,13 +14,11 @@ import { useCallback, useEffect, useRef } from 'react';
 import useSWR from 'swr';
 import { CACHE_KEYS } from './useAdminData';
 
-// Admin-specific fetcher with cache-busting for always-fresh data
+// Admin-specific fetcher: revalidates aggressively but allows HTTP cache for fast back-forward navigation
 const adminFetcher = async (url: string) => {
   const res = await fetch(url, {
     headers: {
-      'Content-Type': 'application/json',
-      'Cache-Control': 'no-cache, no-store',
-      'Pragma': 'no-cache',
+      'Accept': 'application/json',
     },
   });
   if (!res.ok) {

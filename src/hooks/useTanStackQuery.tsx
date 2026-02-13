@@ -13,8 +13,14 @@
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, lazy, Suspense } from 'react';
+
+// Lazy-load devtools so they are never in the production bundle
+const ReactQueryDevtools = lazy(() =>
+  import('@tanstack/react-query-devtools').then((mod) => ({
+    default: mod.ReactQueryDevtools,
+  }))
+);
 
 // ============== QUERY CLIENT CONFIGURATION ==============
 
@@ -22,19 +28,21 @@ function makeQueryClient() {
   return new QueryClient({
     defaultOptions: {
       queries: {
-        // Stale time: 30 seconds
-        staleTime: 30 * 1000,
-        // Cache time: 5 minutes
-        gcTime: 5 * 60 * 1000,
-        // Retry with exponential backoff
-        retry: 3,
-        retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-        // Refetch on window focus
-        refetchOnWindowFocus: true,
+        // Stale time: 2 minutes — data is fresh for 2 min, no refetches
+        staleTime: 2 * 60 * 1000,
+        // Cache time: 10 minutes — keep in memory for 10 min after unmount
+        gcTime: 10 * 60 * 1000,
+        // Retry with exponential backoff (max 2 retries)
+        retry: 2,
+        retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 15000),
+        // Only refetch stale data on window focus (not fresh data)
+        refetchOnWindowFocus: 'always',
         // Refetch on reconnect
-        refetchOnReconnect: true,
-        // Don't refetch on mount if data is fresh
-        refetchOnMount: true,
+        refetchOnReconnect: 'always',
+        // Don't refetch on mount if data is still fresh
+        refetchOnMount: false,
+        // Structural sharing to minimize re-renders
+        structuralSharing: true,
       },
       mutations: {
         // Retry mutations once
@@ -71,7 +79,9 @@ export function TanStackQueryProvider({ children }: TanStackQueryProviderProps) 
     <QueryClientProvider client={queryClient}>
       {children}
       {process.env.NODE_ENV === 'development' && (
-        <ReactQueryDevtools initialIsOpen={false} />
+        <Suspense fallback={null}>
+          <ReactQueryDevtools initialIsOpen={false} />
+        </Suspense>
       )}
     </QueryClientProvider>
   );

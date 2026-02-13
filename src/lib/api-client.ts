@@ -384,10 +384,19 @@ type FetchOptions = Omit<RequestInit, 'body'> & { body?: any };
 async function fetchJson<T = any>(path: string, opts?: FetchOptions): Promise<APIResponse<T>> {
   try {
     const { body, headers, ...rest } = opts || {};
+    // Performance: let the server control caching via response headers.
+    // Only bust cache for mutations (POST/PUT/DELETE), not reads.
+    const method = rest.method || 'GET';
+    const isRead = method === 'GET';
     const init: RequestInit = {
-      method: rest.method || 'GET',
-      headers: { 'Content-Type': 'application/json', ...(headers || {}) },
-      cache: 'no-store', // ป้องกัน browser cache เพื่อให้ได้ข้อมูลล่าสุดเสมอ
+      method,
+      headers: { 
+        'Content-Type': 'application/json',
+        ...(isRead ? { 'Accept': 'application/json' } : {}),
+        ...(headers || {}),
+      },
+      // Only disable cache for mutations; reads use server cache headers
+      ...(isRead ? {} : { cache: 'no-store' as RequestCache }),
       ...rest,
       body: body !== undefined ? JSON.stringify(body) : undefined,
     };

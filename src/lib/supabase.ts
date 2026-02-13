@@ -21,12 +21,24 @@ if (typeof window !== 'undefined' && supabaseServiceKey) {
 
 // ==================== CLIENTS ====================
 
+// Performance: Use connection pooler URL (port 6543, Transaction mode) when available
+// This reduces connection overhead significantly on serverless/edge deployments.
+const poolerUrl = process.env.SUPABASE_POOLER_URL || supabaseUrl;
+
 // Public client (for client-side, uses anon key with RLS)
 // ใช้เฉพาะสำหรับ read public config เท่านั้น
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false,
+  },
+  // Performance: disable realtime on the public client (only admin uses it)
+  realtime: {
+    params: { eventsPerSecond: 2 },
+  },
+  // Performance: set sensible global fetch options
+  global: {
+    fetch: (url, options) => fetch(url, { ...options, keepalive: true }),
   },
 });
 
@@ -48,10 +60,18 @@ export const getSupabaseAdmin = () => {
       return null;
     }
     
-    _supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+    // Performance: use connection pooler URL for server-side admin client
+    _supabaseAdmin = createClient(poolerUrl, supabaseServiceKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
+      },
+      // Performance: enable keepalive for connection reuse
+      global: {
+        fetch: (url, options) => fetch(url, { ...options, keepalive: true }),
+      },
+      db: {
+        schema: 'public',
       },
     });
   }

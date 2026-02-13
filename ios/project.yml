@@ -2,15 +2,15 @@ name: PSUSCCShop
 options:
   bundleIdPrefix: com.psusccshop
   deploymentTarget:
-    iOS: "26.0"
-  xcodeVersion: "26.2"
+    iOS: "17.0"
+  xcodeVersion: "15.4"
   createIntermediateGroups: true
   generateEmptyDirectories: true
   groupSortPosition: top
 
 settings:
   base:
-    SWIFT_VERSION: "6.0"
+    SWIFT_VERSION: "5.9"
     TARGETED_DEVICE_FAMILY: "1,2"
     GENERATE_INFOPLIST_FILE: NO
     INFOPLIST_FILE: PSUSCCShop/Info.plist

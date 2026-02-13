@@ -34,7 +34,10 @@ export async function GET(request: NextRequest) {
       grouped[row.product_id].bySize[row.size || 'FREE'] = row.quantity;
     }
 
-    return NextResponse.json({ inventory: Object.values(grouped) });
+    return NextResponse.json(
+      { inventory: Object.values(grouped) },
+      { headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' } }
+    );
   } catch (error: any) {
     console.error('GET /api/inventory error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });

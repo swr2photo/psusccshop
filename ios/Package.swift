@@ -1,12 +1,12 @@
-// swift-tools-version: 6.1
-// Compatible with Xcode 26 and iOS 26 SDK
+// swift-tools-version: 5.9
+// Compatible with Xcode 15+ and iOS 17+ SDK
 
 import PackageDescription
 
 let package = Package(
     name: "PSUSCCShop",
     platforms: [
-        .iOS(.v26)
+        .iOS(.v17)
     ],
     products: [
         .library(

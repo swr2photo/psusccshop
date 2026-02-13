@@ -2124,14 +2124,23 @@ import {
   BarChart3,
   TrendingUp,
 } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { useNotification } from '@/components/NotificationContext';
-import PaymentFlow from '@/components/PaymentFlow';
-import ProfileModal, { type SavedAddress } from '@/components/ProfileModal';
 import AnnouncementBar from '@/components/AnnouncementBar';
 import EventBanner, { type ShopEvent } from '@/components/EventBanner';
 import Footer from '@/components/Footer';
 import TurnstileWidget from '@/components/TurnstileWidget';
 import { ShopStatusBanner, getProductStatus, getShopStatus, SHOP_STATUS_CONFIG, type ShopStatusType } from '@/components/ShopStatusCard';
+import type { SavedAddress } from '@/components/ProfileModal';
+
+// ==================== DYNAMIC IMPORTS (Code Splitting) ====================
+// Heavy components loaded on-demand to reduce initial bundle size
+const PaymentFlow = dynamic(() => import('@/components/PaymentFlow'), { ssr: false });
+const ProfileModal = dynamic(() => import('@/components/ProfileModal'), { ssr: false });
+const CartDrawer = dynamic(() => import('@/components/CartDrawer'), { ssr: false });
+const OrderHistoryDrawer = dynamic(() => import('@/components/OrderHistoryDrawer'), { ssr: false });
+const CheckoutDialog = dynamic(() => import('@/components/CheckoutDialog'), { ssr: false });
+const SupportChatWidget = dynamic(() => import('@/components/SupportChatWidget'), { ssr: false });
 
 // Common tag translations for well-known tags
 const TAG_TRANSLATIONS_TH_TO_EN: Record<string, string> = {
@@ -2147,11 +2156,7 @@ const TAG_TRANSLATIONS_TH_TO_EN: Record<string, string> = {
   'ของใหม่': 'New Arrival',
 };
 import OptimizedImage, { preloadImages, OptimizedBackground } from '@/components/OptimizedImage';
-import CartDrawer from '@/components/CartDrawer';
-import OrderHistoryDrawer from '@/components/OrderHistoryDrawer';
-import CheckoutDialog from '@/components/CheckoutDialog';
 import LoadingScreen from '@/components/LoadingScreen';
-import SupportChatWidget from '@/components/SupportChatWidget';
 import ThemeToggle from '@/components/ThemeToggle';
 import LanguageToggle from '@/components/LanguageToggle';
 import { 

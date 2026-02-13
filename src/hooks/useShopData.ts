@@ -69,8 +69,8 @@ export function useShopConfig() {
     {
       revalidateOnFocus: true,
       revalidateOnReconnect: true,
-      dedupingInterval: 10000, // 10 seconds
-      refreshInterval: 60000, // 1 minute
+      dedupingInterval: 15000, // 15 seconds
+      refreshInterval: 3 * 60 * 1000, // 3 minutes (config rarely changes)
       fallbackData: cachedConfig ? { status: 'success', data: cachedConfig } : undefined,
       onSuccess: (data) => {
         if (data?.status === 'success' && data.data) {

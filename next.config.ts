@@ -30,6 +30,13 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: '**.fbcdn.net' },
       { protocol: 'https', hostname: 'graph.microsoft.com' },
     ],
+    // Performance: aggressive image caching (31 days)
+    minimumCacheTTL: 2678400,
+    // Performance: modern image formats
+    formats: ['image/avif', 'image/webp'],
+    // Performance: limit image sizes to what we actually use
+    deviceSizes: [640, 750, 828, 1080, 1200],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256],
   },
   // Security: Hide server info
   poweredByHeader: false,
@@ -38,6 +45,22 @@ const nextConfig: NextConfig = {
   productionBrowserSourceMaps: false,
   // Security: Compress responses
   compress: true,
+  // ======================== PERFORMANCE ========================
+  // Tree-shake barrel exports for heavy packages
+  // This dramatically reduces bundle size for MUI and lucide-react
+  experimental: {
+    optimizePackageImports: [
+      '@mui/material',
+      '@mui/icons-material',
+      'lucide-react',
+      '@supabase/supabase-js',
+      'date-fns',
+      '@tanstack/react-query',
+      'swr',
+      'zustand',
+      'qrcode.react',
+    ],
+  },
   // Enable HTTPS in production (for custom server, not Vercel)
   ...(process.env.NODE_ENV === 'production' && process.env.HTTPS_KEY && process.env.HTTPS_CERT
     ? {
@@ -165,6 +188,73 @@ const nextConfig: NextConfig = {
         {
           key: 'Service-Worker-Allowed',
           value: '/',
+        },
+      ],
+    },
+    // Performance: Long cache for static assets (hashed filenames)
+    {
+      source: '/_next/static/(.*)',
+      headers: [
+        {
+          key: 'Cache-Control',
+          value: 'public, max-age=31536000, immutable',
+        },
+      ],
+    },
+    // Performance: Cache fonts aggressively
+    {
+      source: '/fonts/(.*)',
+      headers: [
+        {
+          key: 'Cache-Control',
+          value: 'public, max-age=31536000, immutable',
+        },
+      ],
+    },
+    // Performance: Cache images with revalidation
+    {
+      source: '/(.*\\.(?:png|jpg|jpeg|gif|webp|avif|svg|ico))',
+      headers: [
+        {
+          key: 'Cache-Control',
+          value: 'public, max-age=86400, stale-while-revalidate=604800',
+        },
+      ],
+    },
+    // Performance: API routes — allow stale-while-revalidate for GET requests
+    {
+      source: '/api/config',
+      headers: [
+        {
+          key: 'Cache-Control',
+          value: 'public, s-maxage=60, stale-while-revalidate=300',
+        },
+      ],
+    },
+    {
+      source: '/api/shipping/options',
+      headers: [
+        {
+          key: 'Cache-Control',
+          value: 'public, s-maxage=300, stale-while-revalidate=600',
+        },
+      ],
+    },
+    {
+      source: '/api/inventory',
+      headers: [
+        {
+          key: 'Cache-Control',
+          value: 'public, s-maxage=30, stale-while-revalidate=120',
+        },
+      ],
+    },
+    {
+      source: '/api/reviews',
+      headers: [
+        {
+          key: 'Cache-Control',
+          value: 'public, s-maxage=60, stale-while-revalidate=300',
         },
       ],
     },

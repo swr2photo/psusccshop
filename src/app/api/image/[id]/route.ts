@@ -87,6 +87,101 @@ async function saveToCache(cacheKey: string, buffer: Buffer, contentType: string
 // Re-export encodeImageUrl for backward compatibility
 export { encryptImageUrl as encodeImageUrl };
 
+// ==================== ACCESS CONTROL ====================
+
+/**
+ * Known origins that are allowed to load images.
+ * Checked against Referer header and Sec-Fetch-Site.
+ */
+const ALLOWED_ORIGINS = [
+  'psuscc',
+  'sccshop',
+  'localhost',
+  '127.0.0.1',
+  'vercel.app',
+  'railway.app',
+  'github.dev',
+  'gitpod.io',
+  'codespaces',
+];
+
+/**
+ * Validate that the request comes from within the app (not direct URL access).
+ *
+ * Uses the browser-standard Sec-Fetch-* headers:
+ *  - Sec-Fetch-Dest: "image" → loaded via <img>/<picture>/CSS  ✅
+ *  - Sec-Fetch-Dest: "document" → user pasted URL in address bar  ❌
+ *  - Sec-Fetch-Site: "same-origin" / "same-site"  ✅
+ *  - Sec-Fetch-Site: "none" → address-bar navigation  ❌
+ *
+ * Falls back to Referer check for browsers that don't send Sec-Fetch.
+ */
+function isAllowedImageRequest(req: NextRequest): boolean {
+  const secFetchDest = req.headers.get('sec-fetch-dest');
+  const secFetchSite = req.headers.get('sec-fetch-site');
+  const secFetchMode = req.headers.get('sec-fetch-mode');
+  const referer = req.headers.get('referer');
+  const host = req.headers.get('host') || '';
+
+  // 1. If we have Sec-Fetch-Dest, trust it (all modern browsers send this)
+  if (secFetchDest) {
+    // Allow normal <img> / CSS background / <picture> loads
+    if (secFetchDest === 'image') return true;
+    // Allow <video>/<audio> poster attribute
+    if (secFetchDest === 'video' || secFetchDest === 'audio') return true;
+    // Block direct navigation (user pasted URL), iframe, object, etc.
+    return false;
+  }
+
+  // 2. If we have Sec-Fetch-Site but no Dest (rare), check origin
+  if (secFetchSite) {
+    if (secFetchSite === 'same-origin' || secFetchSite === 'same-site') return true;
+    // cross-site or none without image dest → block
+    return false;
+  }
+
+  // 3. Fallback for older browsers (Safari < 16.4, etc.): check Referer
+  if (referer) {
+    try {
+      const refUrl = new URL(referer);
+      // Same host → same-origin context
+      if (refUrl.host === host) return true;
+      // Known allowed origins
+      if (ALLOWED_ORIGINS.some(o => refUrl.host.includes(o))) return true;
+    } catch {
+      // invalid referer
+    }
+    return false;
+  }
+
+  // 4. No Sec-Fetch, no Referer → likely cURL/wget/bot/direct → block
+  return false;
+}
+
+/**
+ * Return an "Access Denied" image (PNG with text) instead of the real image.
+ * This is displayed when someone directly navigates to the URL.
+ */
+function accessDeniedResponse(): NextResponse {
+  // 1×1 red pixel PNG as a simple visual indicator
+  // In production, returning 403 JSON is cleaner + cheaper
+  return NextResponse.json(
+    {
+      error: 'Access Denied',
+      message: 'ไม่สามารถเข้าถึงรูปภาพโดยตรงได้ กรุณาเข้าผ่านหน้าเว็บไซต์เท่านั้น',
+      hint: 'Images can only be viewed within the application.',
+    },
+    {
+      status: 403,
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff',
+      },
+    }
+  );
+}
+
 // ==================== ALLOWED DOMAINS ====================
 
 /**
@@ -136,6 +231,11 @@ export async function HEAD(
       return new NextResponse(null, { status: 400 });
     }
 
+    // Block direct access on HEAD too
+    if (!isAllowedImageRequest(req)) {
+      return new NextResponse(null, { status: 403 });
+    }
+
     const imageUrl = smartDecryptUrl(id);
     if (!imageUrl || !isAllowedUrl(imageUrl)) {
       return new NextResponse(null, { status: 400 });
@@ -170,32 +270,10 @@ export async function GET(
       return NextResponse.json({ error: 'Missing image ID' }, { status: 400 });
     }
 
-    //  SECURITY: Basic referer check - log suspicious requests but don't block
-    // Images need to load from any origin for proper UX
-    const referer = req.headers.get('referer');
-    if (referer) {
-      try {
-        const refererUrl = new URL(referer);
-        const host = req.headers.get('host');
-        const isKnownOrigin = 
-          refererUrl.host === host ||
-          refererUrl.host.includes('github.dev') ||
-          refererUrl.host.includes('gitpod.io') ||
-          refererUrl.host.includes('codespaces') ||
-          refererUrl.host.includes('vercel.app') ||
-          refererUrl.host.includes('railway.app') ||
-          refererUrl.host.includes('psuscc') ||
-          refererUrl.host.includes('sccshop') ||
-          refererUrl.host.includes('localhost') ||
-          refererUrl.host.includes('127.0.0.1');
-        
-        if (!isKnownOrigin) {
-          // Just log, don't block - might be legitimate browser behavior
-          console.log('[Image Proxy] Request from:', refererUrl.host);
-        }
-      } catch {
-        // Invalid referer URL, ignore
-      }
+    // ==================== ACCESS CONTROL ====================
+    // Block direct URL access — only allow <img> loads from the app
+    if (!isAllowedImageRequest(req)) {
+      return accessDeniedResponse();
     }
 
     // Decrypt the image URL using smart decryption (AES or legacy XOR)
@@ -240,7 +318,7 @@ export async function GET(
           'Vercel-CDN-Cache-Control': 'public, max-age=31536000',
           'X-Content-Type-Options': 'nosniff',
           'X-Cache': 'HIT',
-          'Vary': 'Accept',
+          'Vary': 'Accept, Sec-Fetch-Dest',
         },
       });
     }
@@ -289,7 +367,7 @@ export async function GET(
         'Vercel-CDN-Cache-Control': 'public, max-age=31536000',
         'X-Content-Type-Options': 'nosniff',
         'X-Cache': 'MISS',
-        'Vary': 'Accept',
+          'Vary': 'Accept, Sec-Fetch-Dest',
       },
     });
 

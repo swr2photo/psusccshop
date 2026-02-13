@@ -37,7 +37,10 @@ export async function GET(request: NextRequest) {
       helpful: r.helpful_count || 0,
     }));
 
-    return NextResponse.json({ reviews: reviewData });
+    return NextResponse.json(
+      { reviews: reviewData },
+      { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } }
+    );
   } catch (error: any) {
     console.error('GET /api/reviews error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });

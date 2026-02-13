@@ -55,13 +55,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: true,
         data: publicConfig
-      });
+      }, { headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' } });
     }
 
     return NextResponse.json({
       success: true,
       data: config
-    });
+    }, { headers: { 'Cache-Control': 'private, no-cache' } });
 
   } catch (error) {
     console.error('[API] Get shipping options error:', error);
