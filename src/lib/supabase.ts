@@ -647,6 +647,9 @@ function transformLegacyToDBOrder(legacyOrder: any): any {
     tracking_last_checked: legacyOrder.trackingLastChecked || null,
     shipped_at: legacyOrder.shippedAt || null,
     received_at: legacyOrder.receivedAt || null,
+    // Multi-shop support
+    ...(legacyOrder.shopId ? { shop_id: legacyOrder.shopId } : {}),
+    ...(legacyOrder.shopSlug ? { shop_slug: legacyOrder.shopSlug } : {}),
     updated_at: new Date().toISOString(),
   };
 }

@@ -164,6 +164,7 @@ import PaymentSettings from '@/components/admin/PaymentSettings';
 import TrackingManagement from '@/components/admin/TrackingManagement';
 import RefundManagement from '@/components/admin/RefundManagement';
 import LiveStreamSettings from '@/components/admin/LiveStreamSettings';
+import ShopManagement from '@/components/admin/ShopManagement';
 
 // ============== TYPES ==============
 interface AdminDataResponse {
@@ -9163,6 +9164,7 @@ export default function AdminPage(): JSX.Element {
               { icon: <AttachMoney size={20} />, label: 'ตั้งค่าชำระเงิน', idx: 11, color: '#22d3ee', show: canManagePayment },
               { icon: <Send size={20} />, label: 'ส่งอีเมล', idx: 7, color: '#10b981', show: canSendEmail },
               { icon: <Groups size={20} />, label: 'ประวัติผู้ใช้', idx: 8, color: '#f97316', show: isSuperAdminUser },
+              { icon: <Store size={20} />, label: 'ร้านค้าย่อย', idx: 17, color: '#c084fc', show: isSuperAdminUser },
               { icon: <History size={20} />, label: 'ประวัติระบบ', idx: 9, color: 'var(--text-muted)', show: isSuperAdminUser },
             ].filter(item => item.show).map((item) => {
               const isActive = activeTab === item.idx;
@@ -9376,6 +9378,7 @@ export default function AdminPage(): JSX.Element {
           {activeTab === 11 && (canManagePayment ? <PaymentSettings onSave={() => showToast('success', 'บันทึกการตั้งค่าชำระเงินแล้ว')} /> : <NoPermissionView permission="ตั้งค่าชำระเงิน" />)}
           {activeTab === 12 && (canManageTracking ? <TrackingManagement showToast={showToast} /> : <NoPermissionView permission="ติดตามพัสดุ" />)}
           {activeTab === 13 && (canManageRefunds ? <RefundManagement showToast={showToast} /> : <NoPermissionView permission="จัดการคืนเงิน" />)}
+          {activeTab === 17 && (isSuperAdminUser ? <ShopManagement showToast={showToast} isSuperAdmin={isSuperAdminUser} userEmail={session?.user?.email || ''} /> : <NoPermissionView permission="จัดการร้านค้าย่อย" />)}
         </Box>
       </Box>
 

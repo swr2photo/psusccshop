@@ -141,6 +141,9 @@ export async function POST(req: NextRequest) {
       date: now.toISOString(),
       status: 'WAITING_PAYMENT',
       ...sanitizedBody,
+      // Multi-shop support: preserve shopId/shopSlug if provided
+      ...(sanitizedBody.shopId ? { shopId: sanitizedBody.shopId } : {}),
+      ...(sanitizedBody.shopSlug ? { shopSlug: sanitizedBody.shopSlug } : {}),
     };
     
     const key = orderKey(ref, now);
