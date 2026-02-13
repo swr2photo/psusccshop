@@ -95,6 +95,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             __html: `(function(){try{var s=localStorage.getItem('psusccshop-theme');if(s){var m=JSON.parse(s).state.mode;var r=m==='system'?window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark':m;document.documentElement.setAttribute('data-theme',r);document.documentElement.style.colorScheme=r}else{var r=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark';document.documentElement.setAttribute('data-theme',r);document.documentElement.style.colorScheme=r}}catch(e){}})()`,
           }}
         />
+        {/* Force SW update + clear old caches on load */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(function(regs){regs.forEach(function(r){r.update()})});caches.keys().then(function(names){names.forEach(function(n){if(n.indexOf('scc-shop-v2.3.0')===-1){caches.delete(n)}})})}})()`,
+          }}
+        />
         {/* Preconnect to external resources for faster loading */}
         <link rel="preconnect" href="https://ipfs.filebase.io" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://s3.filebase.com" crossOrigin="anonymous" />

@@ -452,6 +452,23 @@ body.page-hidden video {
   transition: none !important;
 }
 
+/* Screen Capture Guard — Banking-grade protection */
+body.screen-capture-detected .protected-content,
+body.screen-capture-detected .protected-image,
+body.screen-capture-detected .protected-image-container,
+body.screen-capture-detected img:not(.screen-capture-shield img),
+body.screen-capture-detected canvas:not(.screen-capture-shield canvas),
+body.screen-capture-detected video:not(.screen-capture-shield video) {
+  filter: brightness(0) !important;
+  -webkit-filter: brightness(0) !important;
+  opacity: 0 !important;
+  transition: none !important;
+}
+
+body.screen-capture-detected {
+  background: #000 !important;
+}
+
 /* Alternative: blur instead of black */
 body.page-blurred .protected-content,
 body.page-blurred .protected-image,

@@ -10,7 +10,7 @@ import { NotificationProvider } from './NotificationContext';
 const ToastContainer = lazy(() => import('./ToastContainer'));
 const CookieConsentBanner = lazy(() => import('./CookieConsentBanner'));
 const NotificationPrompt = lazy(() => import('./NotificationPrompt'));
-import { useScreenshotProtection } from '@/hooks';
+import ScreenCaptureGuard, { type CaptureEvent } from './ScreenCaptureGuard';
 import { SWRProvider } from '@/hooks/useSWRConfig';
 import { TanStackQueryProvider } from '@/hooks/useTanStackQuery';
 import { useThemeStore } from '@/store/themeStore';
@@ -201,25 +201,27 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, ErrorBounda
   }
 }
 
-// Screenshot protection wrapper
+// Screen Capture Guard — banking-grade protection wrapper
 // Throttle logging to avoid console spam
-let lastScreenshotLog = 0;
-const SCREENSHOT_LOG_INTERVAL = 10000; // 10 seconds
+let lastCapturelog = 0;
+const CAPTURE_LOG_INTERVAL = 10000; // 10 seconds
 
-function ScreenshotProtectionProvider({ children }: { children: React.ReactNode }) {
-  // Enable screenshot protection across the entire app
-  useScreenshotProtection({
-    recoveryTime: 300,
-    onScreenshotDetected: () => {
-      const now = Date.now();
-      if (now - lastScreenshotLog > SCREENSHOT_LOG_INTERVAL) {
-        console.log('[Security] Screenshot protection active');
-        lastScreenshotLog = now;
-      }
-    },
-  });
-
-  return <>{children}</>;
+function ScreenCaptureGuardWrapper({ children }: { children: React.ReactNode }) {
+  return (
+    <ScreenCaptureGuard
+      enabled={true}
+      shieldDuration={2000}
+      onCaptureDetected={(event: CaptureEvent) => {
+        const now = Date.now();
+        if (now - lastCapturelog > CAPTURE_LOG_INTERVAL) {
+          console.log(`[Security] Screen capture blocked: ${event.type} on ${event.platform}`);
+          lastCapturelog = now;
+        }
+      }}
+    >
+      {children}
+    </ScreenCaptureGuard>
+  );
 }
 
 // ==================== SHARED THEME CONFIG — Apple-inspired ====================
@@ -437,9 +439,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
             <ThemeProvider theme={activeTheme}>
               <CssBaseline />
               <NotificationProvider>
-                <ScreenshotProtectionProvider>
+                <ScreenCaptureGuardWrapper>
                   {children}
-                </ScreenshotProtectionProvider>
+                </ScreenCaptureGuardWrapper>
                 <Suspense fallback={null}>
                   <ToastContainer />
                   <CookieConsentBanner />

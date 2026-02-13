@@ -3,7 +3,7 @@
 // v2.2.0 — PWA navigation + push notifications
 // Cross-platform: iOS 16.4+ / iOS 26+ / Android / Desktop
 
-const SW_VERSION = '2.2.0';
+const SW_VERSION = '2.3.0';
 const CACHE_VERSION = `scc-shop-v${SW_VERSION}`;
 
 // Minimal shell to cache for offline/instant start
@@ -56,10 +56,10 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
   if (url.origin !== self.location.origin) return;
 
-  // Skip API routes, auth, and Next.js internals — always go to network
+  // Skip API routes, auth, Next.js internals and HMR — always go to network
   if (url.pathname.startsWith('/api/') ||
       url.pathname.startsWith('/auth/') ||
-      url.pathname.startsWith('/_next/webpack') ||
+      url.pathname.startsWith('/_next/') ||
       url.pathname.includes('__nextjs')) {
     return;
   }

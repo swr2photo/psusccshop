@@ -12,6 +12,7 @@ struct PSUSCCShopApp: App {
     @StateObject private var chatManager = ChatManager()
     @StateObject private var notificationManager = NotificationManager.shared
     @StateObject private var themeManager = ThemeManager()
+    @StateObject private var screenCaptureManager = ScreenCaptureManager.shared
 
     var body: some Scene {
         WindowGroup {
@@ -21,6 +22,7 @@ struct PSUSCCShopApp: App {
                 .environmentObject(chatManager)
                 .environmentObject(notificationManager)
                 .environmentObject(themeManager)
+                .environmentObject(screenCaptureManager)
                 .preferredColorScheme(themeManager.colorScheme)
                 .onAppear {
                     notificationManager.requestPermission()

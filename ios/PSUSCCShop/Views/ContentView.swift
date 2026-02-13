@@ -22,6 +22,7 @@ struct ContentView: View {
             }
         }
         .animation(.smooth, value: authManager.isAuthenticated)
+        .screenCaptureProtected() // Banking-grade screen capture protection
     }
 
     @ViewBuilder
