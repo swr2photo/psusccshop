@@ -163,6 +163,7 @@ import { SHIPPING_PROVIDERS, type ShippingProvider } from '@/lib/shipping';
 import PaymentSettings from '@/components/admin/PaymentSettings';
 import TrackingManagement from '@/components/admin/TrackingManagement';
 import RefundManagement from '@/components/admin/RefundManagement';
+import LiveStreamSettings from '@/components/admin/LiveStreamSettings';
 
 // ============== TYPES ==============
 interface AdminDataResponse {
@@ -1596,6 +1597,7 @@ const SettingsView = React.memo(function SettingsView({
                               { key: 'canManagePromoCodes', label: 'โค้ดส่วนลด', color: '#34c759' },
                               { key: 'canManageSupport', label: 'แชทสนับสนุน', color: '#ec4899' },
                               { key: 'canSendEmail', label: 'ส่งอีเมล', color: '#10b981' },
+                              { key: 'canManageLiveStream', label: 'ไลฟ์สด', color: '#ef4444' },
                             ],
                           },
                         ].map((group) => (
@@ -4011,6 +4013,7 @@ export default function AdminPage(): JSX.Element {
     12: 'tracking',
     14: 'events',
     15: 'promo',
+    16: 'live',
   };
   const HASH_TAB_MAP: Record<string, number> = Object.fromEntries(
     Object.entries(TAB_HASH_MAP).map(([k, v]) => [v, Number(k)])
@@ -4131,6 +4134,7 @@ export default function AdminPage(): JSX.Element {
   const canManageShipping = isSuperAdminUser || adminPerms.canManageShipping;
   const canManagePayment = isSuperAdminUser || adminPerms.canManagePayment;
   const canManageSupport = isSuperAdminUser || adminPerms.canManageSupport;
+  const canManageLiveStream = isSuperAdminUser || adminPerms.canManageLiveStream;
   const canSendEmail = isSuperAdminUser || adminPerms.canSendEmail;
   
   const isSessionLoading = status === 'loading';
@@ -9122,6 +9126,7 @@ export default function AdminPage(): JSX.Element {
               { icon: <NotificationsActive size={20} />, label: 'ประกาศ', idx: 5, color: '#f472b6', show: canManageAnnouncement },
               { icon: <Sparkles size={20} />, label: 'อีเวนต์/โปรโมชั่น', idx: 14, color: '#fbbf24', show: canManageEvents },
               { icon: <Ticket size={20} />, label: 'โค้ดส่วนลด', idx: 15, color: '#34c759', show: canManagePromoCodes },
+              { icon: <Radio size={20} />, label: 'ไลฟ์สด', idx: 16, color: '#ef4444', show: true },
               { icon: <Settings size={20} />, label: 'ตั้งค่าร้าน', idx: 6, color: '#60a5fa', show: canManageShop || canManageSheet || isSuperAdminUser },
               { icon: <LocalShipping size={20} />, label: 'ตั้งค่าจัดส่ง', idx: 10, color: '#a78bfa', show: canManageShipping },
               { icon: <AttachMoney size={20} />, label: 'ตั้งค่าชำระเงิน', idx: 11, color: '#22d3ee', show: canManagePayment },
@@ -9300,6 +9305,18 @@ export default function AdminPage(): JSX.Element {
               />
             ) : (
               <NoPermissionView permission="จัดการโค้ดส่วนลด" />
+            )
+          )}
+          {activeTab === 16 && (
+            canManageLiveStream ? (
+              <LiveStreamSettings
+                config={config}
+                saveConfig={saveFullConfig}
+                showToast={showToast}
+                userEmail={session?.user?.email}
+              />
+            ) : (
+              <NoPermissionView permission="จัดการไลฟ์สด" />
             )
           )}
           {activeTab === 6 && (

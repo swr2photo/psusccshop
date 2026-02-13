@@ -218,6 +218,7 @@ const nav = {
     openInBrowserDesc: 'Google ไม่รองรับการเข้าสู่ระบบจากแอปนี้โดยตรง กรุณากดปุ่ม ⋮ หรือ ... แล้วเลือก "เปิดในเบราว์เซอร์" หรือ "Open in Browser"',
     linkCopied: 'คัดลอกลิงก์แล้ว! กรุณาวางในเบราว์เซอร์',
     copyLink: 'คัดลอกลิงก์',
+    live: 'สด',
   },
   en: {
     home: 'Home',
@@ -244,6 +245,7 @@ const nav = {
     openInBrowserDesc: 'Google does not support login from this app directly. Please tap ⋮ or ... and select "Open in Browser".',
     linkCopied: 'Link copied! Please paste in browser',
     copyLink: 'Copy Link',
+    live: 'Live',
   },
 } as const;
 

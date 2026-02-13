@@ -309,6 +309,7 @@ export interface AdminPermissions {
   canManagePromoCodes?: boolean;   // จัดการโค้ดส่วนลด
   canManageSupport?: boolean;      // แชทสนับสนุน
   canSendEmail?: boolean;          // ส่งอีเมลถึงลูกค้า
+  canManageLiveStream?: boolean;   // จัดการไลฟ์สด
 }
 
 /** Default permissions for newly added admins */
@@ -327,6 +328,7 @@ export const DEFAULT_ADMIN_PERMISSIONS: AdminPermissions = {
   canManagePromoCodes: false,
   canManageSupport: true,
   canSendEmail: false,
+  canManageLiveStream: true,
 };
 
 /** ตั้งค่าการตรวจสอบชื่อ */
@@ -568,6 +570,33 @@ export interface ShopConfig {
     createdBy?: string;
     createdAt: string;
   }>;
+  /** ไลฟ์สดขายของ (Live Stream) */
+  liveStream?: {
+    /** เปิดใช้งานไลฟ์สด */
+    enabled: boolean;
+    /** ชื่อไลฟ์ */
+    title: string;
+    /** คำอธิบาย */
+    description?: string;
+    /** URL ของ HLS stream (.m3u8) หรือ embed URL (YouTube/Facebook) */
+    streamUrl: string;
+    /** ประเภท stream */
+    streamType: 'hls' | 'youtube' | 'facebook' | 'custom';
+    /** รูปปก thumbnail */
+    thumbnailUrl?: string;
+    /** เวลาเริ่มไลฟ์ */
+    startedAt?: string;
+    /** เวลาจบไลฟ์ */
+    endedAt?: string;
+    /** แสดง popup อัตโนมัติเมื่อมีไลฟ์ */
+    autoPopup: boolean;
+    /** สินค้าที่ขายในไลฟ์ (product IDs) */
+    featuredProducts?: string[];
+    /** ตั้งค่าโดย */
+    updatedBy?: string;
+    /** อัปเดตล่าสุด */
+    updatedAt?: string;
+  };
 }
 
 export interface Order {

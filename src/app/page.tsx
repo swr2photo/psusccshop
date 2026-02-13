@@ -2123,6 +2123,7 @@ import {
   Eye,
   BarChart3,
   TrendingUp,
+  Radio,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useNotification } from '@/components/NotificationContext';
@@ -2831,6 +2832,32 @@ export default function HomePage() {
   const [inlineNotice, setInlineNotice] = useState<Toast | null>(null);
   const toastTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const ToastTransition = (props: any) => <Slide {...props} direction="down" />;
+
+  // Live stream status for navbar indicator
+  const [isLiveActive, setIsLiveActive] = useState(false);
+  const [liveTitle, setLiveTitle] = useState('');
+
+  useEffect(() => {
+    let mounted = true;
+    const checkLive = async () => {
+      try {
+        const res = await fetch('/api/live', { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (mounted) {
+          setIsLiveActive(!!data.live?.enabled);
+          setLiveTitle(data.live?.title || '');
+        }
+      } catch { /* ignore */ }
+    };
+    checkLive();
+    const iv = setInterval(checkLive, 30000);
+    return () => { mounted = false; clearInterval(iv); };
+  }, []);
+
+  const openLiveStream = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('open-live-stream'));
+  }, []);
 
   const bottomTabs = useMemo(() => {
     const leftTabs = [
@@ -6195,6 +6222,27 @@ export default function HomePage() {
           >
             <Search size={22} />
           </IconButton>
+          {isLiveActive && (
+            <IconButton
+              onClick={openLiveStream}
+              sx={{
+                mr: 0.5,
+                display: { xs: 'flex', md: 'none' },
+                color: '#fff',
+                bgcolor: '#ef4444',
+                width: 34,
+                height: 34,
+                animation: 'navLivePulse 2s ease-in-out infinite',
+                '@keyframes navLivePulse': {
+                  '0%, 100%': { boxShadow: '0 0 0 0 rgba(239,68,68,0.4)' },
+                  '50%': { boxShadow: '0 0 0 6px rgba(239,68,68,0)' },
+                },
+                '&:hover': { bgcolor: '#dc2626' },
+              }}
+            >
+              <Radio size={18} />
+            </IconButton>
+          )}
           <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 1, mr: 2 }}>
             <Button
               variant="outlined"
@@ -6272,6 +6320,48 @@ export default function HomePage() {
             >
               {t.nav.cart}
             </Button>
+            {isLiveActive && (
+              <Button
+                variant="contained"
+                startIcon={<Radio size={18} />}
+                onClick={openLiveStream}
+                sx={{
+                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                  color: '#fff',
+                  textTransform: 'none',
+                  borderRadius: 2,
+                  px: 1.5,
+                  py: 0.5,
+                  height: 40,
+                  fontWeight: 700,
+                  position: 'relative',
+                  overflow: 'visible',
+                  animation: 'navLivePulse 2s ease-in-out infinite',
+                  '@keyframes navLivePulse': {
+                    '0%, 100%': { boxShadow: '0 0 0 0 rgba(239,68,68,0.4)' },
+                    '50%': { boxShadow: '0 0 0 8px rgba(239,68,68,0)' },
+                  },
+                  '&:hover': { background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)' },
+                  '&::before': {
+                    content: '""',
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    bgcolor: '#fff',
+                    position: 'absolute',
+                    top: 6,
+                    right: 6,
+                    animation: 'navLiveDot 1.5s ease-in-out infinite',
+                  },
+                  '@keyframes navLiveDot': {
+                    '0%, 100%': { opacity: 1 },
+                    '50%': { opacity: 0.3 },
+                  },
+                }}
+              >
+                {t.nav.live}
+              </Button>
+            )}
           </Box>
           {session && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>

@@ -23,7 +23,8 @@
  * 8. CSS-level: print block, touch-callout prevention, user-select block
  */
 
-import React, { useEffect, useCallback, useRef } from 'react';
+import React, { useEffect, useCallback, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 // ==================== TYPES ====================
 
@@ -77,8 +78,8 @@ const SHIELD_CSS = `
 }
 /* When active: show shield, hide content */
 body.scg-active .scg-shield {
-  opacity: 1;
-  pointer-events: auto;
+  opacity: 1 !important;
+  pointer-events: auto !important;
 }
 body.scg-active {
   caret-color: transparent !important;
@@ -134,6 +135,12 @@ export default function ScreenCaptureGuard({
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const blurTimeRef = useRef(0);
   const lastTriggerRef = useRef(0);
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+
+  // Portal target — render shield directly to body (avoids position:fixed containment issues)
+  useEffect(() => {
+    setPortalTarget(document.body);
+  }, []);
 
   const getPlatform = useCallback(() => {
     if (typeof window === 'undefined') return 'unknown';
@@ -172,16 +179,11 @@ export default function ScreenCaptureGuard({
   }, [shieldDuration, onCaptureDetected, getPlatform]);
 
   // ==================== INJECT CSS ====================
+  // CSS is also rendered inline as <style> JSX for SSR safety.
+  // This useEffect ensures cleanup only.
 
   useEffect(() => {
     if (!enabled) return;
-    const id = 'scg-styles';
-    if (!document.getElementById(id)) {
-      const s = document.createElement('style');
-      s.id = id;
-      s.textContent = SHIELD_CSS;
-      document.head.appendChild(s);
-    }
     return () => { document.body.classList.remove('scg-active'); };
   }, [enabled]);
 
@@ -439,14 +441,33 @@ export default function ScreenCaptureGuard({
   }, []);
 
   // ==================== RENDER ====================
-  // Shield is ALWAYS in DOM — shown/hidden purely by CSS class on body
+  // Shield renders via portal to document.body — avoids position:fixed
+  // containment issues from ancestor transforms/backdrop-filters.
+  // CSS is included as inline <style> to avoid flash of unstyled content.
 
-  return (
-    <>
-      {children}
-
-      {/* Always-present shield overlay — controlled by body.scg-active CSS */}
-      <div className="scg-shield" aria-hidden="true">
+  const shieldElement = (
+    <div
+      className="scg-shield"
+      aria-hidden="true"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 2147483647,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'rgba(0,0,0,0.97)',
+        opacity: 0,
+        pointerEvents: 'none' as const,
+        touchAction: 'none',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        WebkitBackdropFilter: 'blur(40px)',
+        backdropFilter: 'blur(40px)',
+        transition: 'none',
+      }}
+    >
         {/* Icon */}
         <div style={{ animation: 'scg-pulse 2s ease-in-out infinite', marginBottom: 24, opacity: 0.9 }}>
           <svg width="56" height="56" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -518,6 +539,15 @@ export default function ScreenCaptureGuard({
           animation: 'scg-scan 3s ease-in-out infinite',
         }} />
       </div>
+  );
+
+  return (
+    <>
+      {/* Shield CSS — rendered inline for SSR safety, no flash of unstyled content */}
+      <style dangerouslySetInnerHTML={{ __html: SHIELD_CSS }} />
+      {children}
+      {/* Portal shield to document.body so position:fixed always works */}
+      {portalTarget && createPortal(shieldElement, portalTarget)}
     </>
   );
 }
