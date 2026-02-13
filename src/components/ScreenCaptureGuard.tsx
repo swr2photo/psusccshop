@@ -70,10 +70,10 @@ const SHIELD_CSS = `
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
-  /* Hidden by default */
+  /* Hidden by default — NO transition for instant Win+Shift+S response */
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.06s ease-out;
+  transition: none;
 }
 /* When active: show shield, hide content */
 body.scg-active .scg-shield {
@@ -154,11 +154,14 @@ export default function ScreenCaptureGuard({
 
   const showShield = useCallback((type: CaptureEventType, duration?: number) => {
     const now = Date.now();
-    if (now - lastTriggerRef.current < 300) return;
+    // 50ms debounce — just enough to prevent double-fire, fast enough for Win+Shift+S
+    if (now - lastTriggerRef.current < 50) return;
     lastTriggerRef.current = now;
 
     // Instant show — CSS only, no React re-render
     document.body.classList.add('scg-active');
+    // Force synchronous paint — browser must commit the style BEFORE the OS captures the screen
+    void document.body.offsetHeight;
 
     onCaptureDetected?.({ type, timestamp: now, platform: getPlatform() });
 
@@ -246,17 +249,40 @@ export default function ScreenCaptureGuard({
     };
   }, [enabled, getPlatform, showShield, shieldDuration]);
 
-  // ==================== KEYBOARD ====================
+  // ==================== KEYBOARD (Win+Shift+S ultra-fast path) ====================
+  // Windows 11: Win+Shift+S opens Snipping Tool. The OS intercepts the combo,
+  // so the browser may not get 'S'. We catch it at TWO stages:
+  //   1. keydown with metaKey+shiftKey → shield IMMEDIATELY (before S is pressed)
+  //   2. Fallback: blur event when Snipping Tool steals focus
 
   useEffect(() => {
     if (!enabled) return;
+
+    // Track modifier state for pre-activation
+    let metaDown = false;
+    let shiftDown = false;
+
     const handler = (e: KeyboardEvent) => {
+      // PrintScreen — instant
       if (e.key === 'PrintScreen' || e.code === 'PrintScreen') {
         e.preventDefault();
         showShield('keyboard');
         return;
       }
-      // macOS: Cmd+Shift+3/4/5, Windows: Win+Shift+S
+
+      // === WIN+SHIFT+S PRE-ACTIVATION (Windows 11) ===
+      // When Meta (Win key) + Shift are both held, activate shield BEFORE S is pressed.
+      // The OS often swallows the 'S' keydown, so we can't wait for it.
+      if (e.key === 'Meta' || e.key === 'OS') metaDown = true;
+      if (e.key === 'Shift') shiftDown = true;
+
+      // Meta+Shift combo detected — pre-activate on Windows
+      if (metaDown && shiftDown && getPlatform() === 'windows') {
+        showShield('keyboard');
+        return;
+      }
+
+      // macOS: Cmd+Shift+3/4/5, Windows: Ctrl+Shift+S fallback
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && ['3','4','5','s','S'].includes(e.key)) {
         e.preventDefault();
         showShield('keyboard');
@@ -271,9 +297,20 @@ export default function ScreenCaptureGuard({
         e.preventDefault();
       }
     };
+
+    const keyupHandler = (e: KeyboardEvent) => {
+      if (e.key === 'Meta' || e.key === 'OS') metaDown = false;
+      if (e.key === 'Shift') shiftDown = false;
+    };
+
+    // Capture phase (true) = we get the event BEFORE any other handler
     window.addEventListener('keydown', handler, true);
-    return () => window.removeEventListener('keydown', handler, true);
-  }, [enabled, showShield]);
+    window.addEventListener('keyup', keyupHandler, true);
+    return () => {
+      window.removeEventListener('keydown', handler, true);
+      window.removeEventListener('keyup', keyupHandler, true);
+    };
+  }, [enabled, showShield, getPlatform]);
 
   // ==================== SCREEN CAPTURE API INTERCEPTION ====================
   // Block navigator.mediaDevices.getDisplayMedia (screen sharing/recording)
