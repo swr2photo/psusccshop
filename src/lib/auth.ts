@@ -6,6 +6,7 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { NextResponse } from 'next/server';
 import { getJson } from '@/lib/filebase';
 import { getAdminPermissionsFromDB } from '@/lib/supabase';
+import { isShopAdminEmail } from '@/lib/shops';
 import type { AdminPermissions } from '@/lib/config';
 
 // Re-export authOptions for convenience
@@ -111,7 +112,17 @@ export const isAdminEmailAsync = async (email: string | null | undefined): Promi
   
   // Check dynamic list from config
   const dynamicAdmins = await getDynamicAdminEmails();
-  return dynamicAdmins.includes(normalized);
+  if (dynamicAdmins.includes(normalized)) return true;
+
+  // Check shop_admins table — shop admins can access the admin panel
+  try {
+    const shopAdmin = await isShopAdminEmail(normalized);
+    if (shopAdmin) return true;
+  } catch (err) {
+    console.error('[auth] isShopAdminEmail check failed:', err);
+  }
+
+  return false;
 };
 
 /**

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getShopConfig, getAllOrders } from '@/lib/filebase';
 import { ShopConfig } from '@/lib/config';
-import { requireAdmin, isSuperAdminEmail, ADMIN_EMAILS } from '@/lib/auth';
+import { requireAdmin, isSuperAdminEmail, ADMIN_EMAILS, isAdminEmail } from '@/lib/auth';
 import { sanitizeConfigForAdmin, sanitizeOrdersForAdmin } from '@/lib/sanitize';
+import { getShopAdminPermissions } from '@/lib/shops';
 
 // Ensure Node runtime (uses Supabase client) and skip static caching
 export const runtime = 'nodejs';
@@ -16,9 +17,6 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Determine user role (server-validated)
-    const userRole = isSuperAdminEmail(authResult.email) ? 'superadmin' : 'admin';
-
     // Get shop config using optimized Supabase query
     const cfg = (await getShopConfig()) || {
       isOpen: true,
@@ -36,6 +34,22 @@ export async function GET(req: NextRequest) {
     const configAdminEmails = ((cfg as any).adminEmails || []).map((e: string) => e.trim().toLowerCase());
     const mergedAdminEmails = [...new Set([...ADMIN_EMAILS, ...configAdminEmails])].filter(Boolean);
     (cfg as any).adminEmails = mergedAdminEmails;
+
+    // Determine user role (server-validated)
+    // superadmin > admin (env/config list) > shopAdmin (shop_admins table only)
+    const normalizedEmail = authResult.email.trim().toLowerCase();
+    let userRole: 'superadmin' | 'admin' | 'shopAdmin' = 'admin';
+    let shopAdminPerms: Record<string, boolean> | undefined;
+    if (isSuperAdminEmail(normalizedEmail)) {
+      userRole = 'superadmin';
+    } else if (isAdminEmail(normalizedEmail) || configAdminEmails.includes(normalizedEmail)) {
+      // In static env admin list OR dynamic config admin list → full admin
+      userRole = 'admin';
+    } else {
+      // Not in any admin list — must be a shop admin (since requireAdmin passed)
+      userRole = 'shopAdmin';
+      shopAdminPerms = await getShopAdminPermissions(normalizedEmail) as unknown as Record<string, boolean>;
+    }
     
     // Get pagination params
     const url = new URL(req.url);
@@ -63,6 +77,8 @@ export async function GET(req: NextRequest) {
           // Server-validated role — client MUST trust this instead of re-checking env vars
           userRole,
           userEmail: authResult.email,
+          // Shop admin permissions (merged across all shops) — only set for shopAdmin role
+          ...(shopAdminPerms ? { shopAdminPermissions: shopAdminPerms } : {}),
         } 
       },
       { headers: { 'Content-Type': 'application/json; charset=utf-8' } }

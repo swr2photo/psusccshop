@@ -4064,7 +4064,9 @@ export default function AdminPage(): JSX.Element {
   const [sheetSyncing, setSheetSyncing] = useState(false);
   const [orderProcessingRef, setOrderProcessingRef] = useState<string | null>(null);
   // Server-validated admin role (set from API response, never from client env vars)
-  const [serverUserRole, setServerUserRole] = useState<'superadmin' | 'admin' | null>(null);
+  const [serverUserRole, setServerUserRole] = useState<'superadmin' | 'admin' | 'shopAdmin' | null>(null);
+  // Shop-admin-specific permissions (from shop_admins table, merged across shops)
+  const [shopAdminPermissions, setShopAdminPermissions] = useState<Record<string, boolean> | null>(null);
   // Settings state (moved from SettingsView to prevent re-render issues)
   const [settingsLocalConfig, setSettingsLocalConfig] = useState<ShopConfig>(DEFAULT_CONFIG);
   const [settingsHasChanges, setSettingsHasChanges] = useState(false);
@@ -4143,6 +4145,26 @@ export default function AdminPage(): JSX.Element {
     if (config.adminPermissions?.[userEmail]) {
       return { ...DEFAULT_ADMIN_PERMISSIONS, ...config.adminPermissions[userEmail] };
     }
+    // Shop admin: use permissions from shop_admins table (mapped to admin permission keys)
+    if (serverUserRole === 'shopAdmin' && shopAdminPermissions) {
+      return {
+        canManageShop: false,
+        canManageSheet: false,
+        canManageAnnouncement: false,
+        canManageOrders: shopAdminPermissions.canManageOrders ?? true,
+        canManageProducts: shopAdminPermissions.canManageProducts ?? true,
+        canManagePickup: shopAdminPermissions.canManagePickup ?? false,
+        canManageEvents: shopAdminPermissions.canManageEvents ?? false,
+        canManagePromoCodes: shopAdminPermissions.canManagePromoCodes ?? false,
+        canManageRefunds: shopAdminPermissions.canManageRefunds ?? false,
+        canManageTracking: shopAdminPermissions.canManageTracking ?? false,
+        canManageShipping: shopAdminPermissions.canManageShipping ?? false,
+        canManagePayment: shopAdminPermissions.canManagePayment ?? false,
+        canManageSupport: shopAdminPermissions.canManageSupport ?? false,
+        canManageLiveStream: false,
+        canSendEmail: false,
+      } as AdminPermissions;
+    }
     // Server-validated admins (from ADMIN_EMAILS env var) get all permissions
     // by default until the super admin explicitly customizes them
     if (serverUserRole) {
@@ -4153,7 +4175,7 @@ export default function AdminPage(): JSX.Element {
       return allPerms;
     }
     return { ...DEFAULT_ADMIN_PERMISSIONS };
-  }, [config.adminPermissions, userEmail, serverUserRole]);
+  }, [config.adminPermissions, userEmail, serverUserRole, shopAdminPermissions]);
 
   // Permission flags - super admin has all permissions
   const canManageShop = isSuperAdminUser || adminPerms.canManageShop;
@@ -4206,7 +4228,7 @@ export default function AdminPage(): JSX.Element {
   }, [session?.user?.email]);
 
   // 📥 SWR Data Handler - processes data from SWR hook
-  const handleSWRDataReceived = useCallback((data: { orders: any[]; config: any; logs: any[]; userRole?: string; userEmail?: string }) => {
+  const handleSWRDataReceived = useCallback((data: { orders: any[]; config: any; logs: any[]; userRole?: string; userEmail?: string; shopAdminPermissions?: Record<string, boolean> }) => {
     const normalizedOrders = Array.isArray(data.orders) 
       ? data.orders.map(normalizeOrder).filter((o) => o.ref) 
       : [];
@@ -4215,7 +4237,11 @@ export default function AdminPage(): JSX.Element {
     
     // Set server-validated role (if provided)
     if (data.userRole) {
-      setServerUserRole(data.userRole as 'superadmin' | 'admin');
+      setServerUserRole(data.userRole as 'superadmin' | 'admin' | 'shopAdmin');
+    }
+    // Store shop admin permissions if present
+    if (data.shopAdminPermissions) {
+      setShopAdminPermissions(data.shopAdminPermissions);
     }
     
     if ((!nextLogs || nextLogs.length === 0) && normalizedOrders.length > 0) {

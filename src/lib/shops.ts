@@ -502,6 +502,48 @@ export async function getShopAdminRole(shopId: string, email: string): Promise<S
 // ==================== SHOP ORDERS ====================
 
 /** Get orders for a specific shop */
+/**
+ * Check if an email is a shop admin in any shop.
+ * Used by auth layer to grant admin-panel access to shop admins.
+ */
+export async function isShopAdminEmail(email: string): Promise<boolean> {
+  try {
+    const db = getDB();
+    const { count, error } = await db
+      .from('shop_admins')
+      .select('id', { count: 'exact', head: true })
+      .eq('email', email.toLowerCase().trim());
+    if (error) {
+      console.error('[shops] isShopAdminEmail error:', error.message);
+      return false;
+    }
+    return (count ?? 0) > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Get the merged shop admin permissions for a user across all their shops.
+ * Returns the union of all permissions (if any shop grants a permission, it's true).
+ */
+export async function getShopAdminPermissions(email: string): Promise<ShopAdminPermissions> {
+  try {
+    const shops = await getShopsForAdmin(email);
+    const merged: ShopAdminPermissions = { ...DEFAULT_SHOP_ADMIN_PERMISSIONS };
+    for (const sr of shops) {
+      for (const key of Object.keys(sr.permissions) as (keyof ShopAdminPermissions)[]) {
+        if (sr.permissions[key]) {
+          merged[key] = true;
+        }
+      }
+    }
+    return merged;
+  } catch {
+    return { ...DEFAULT_SHOP_ADMIN_PERMISSIONS };
+  }
+}
+
 export async function getShopOrders(shopId: string, options?: {
   limit?: number;
   offset?: number;
