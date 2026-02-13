@@ -227,6 +227,9 @@ interface AdminOrder {
   shippingOption?: string;
   shippingProvider?: string;
   trackingNumber?: string;
+  // Multi-shop
+  shopId?: string;
+  shopSlug?: string;
 }
 
 interface Toast {
@@ -336,6 +339,9 @@ const normalizeOrder = (order: any): AdminOrder => {
     shippingOption: shippingOpt,
     shippingProvider: order?.shippingProvider || order?.shipping_provider || '',
     trackingNumber: order?.trackingNumber || order?.tracking_number || '',
+    // Multi-shop
+    shopId: order?.shopId || order?.shop_id || undefined,
+    shopSlug: order?.shopSlug || order?.shop_slug || undefined,
   };
 };
 
@@ -4100,6 +4106,18 @@ export default function AdminPage(): JSX.Element {
   const fetchInFlightRef = useRef(false);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
+  // ========== Multi-Shop Context ==========
+  interface MyShopInfo {
+    id: string;
+    slug: string;
+    name: string;
+    role: 'owner' | 'admin';
+    permissions: Record<string, boolean>;
+  }
+  const [myShops, setMyShops] = useState<MyShopInfo[]>([]);
+  const [selectedShopId, setSelectedShopId] = useState<string | 'all' | ''>('');
+  const myShopsLoadedRef = useRef(false);
+
   // Check authorization including dynamic admin list from config
   // Priority: server-validated role > dynamic admin list > static admin list
   const isAuthorized = useMemo(() => {
@@ -4245,6 +4263,38 @@ export default function AdminPage(): JSX.Element {
     setLastSavedTime(new Date());
     saveAdminCache({ config: nextConfig, orders: normalizedOrders, logs: nextLogs });
   }, []);
+
+  // ========== Fetch My Shops (after auth) ==========
+  useEffect(() => {
+    if (status !== 'authenticated' || myShopsLoadedRef.current) return;
+    myShopsLoadedRef.current = true;
+    (async () => {
+      try {
+        const res = await fetch('/api/shops');
+        const data = await res.json();
+        if (data.status === 'success') {
+          const shops: MyShopInfo[] = (data.shops || []).map((s: any) => ({
+            id: s.id,
+            slug: s.slug,
+            name: s.name,
+            role: s.role || 'admin',
+            permissions: s.permissions || {},
+          }));
+          setMyShops(shops);
+          // SuperAdmin sees all by default, regular admin auto-selects first shop
+          if (data.role === 'superadmin') {
+            setSelectedShopId('all');
+          } else if (shops.length === 1) {
+            setSelectedShopId(shops[0].id);
+          } else if (shops.length > 1) {
+            setSelectedShopId(shops[0].id);
+          }
+        }
+      } catch {
+        console.warn('[Admin] Failed to fetch shops');
+      }
+    })();
+  }, [status]);
 
   // 📥 SWR Hook for Admin Data (replaces manual fetchData)
   const { 
@@ -4919,13 +4969,13 @@ export default function AdminPage(): JSX.Element {
 
   // ✅ View Components
   const DashboardView = (): JSX.Element => {
-    const validOrders = orders.filter(o => o.status !== 'CANCELLED');
+    const validOrders = shopOrders.filter(o => o.status !== 'CANCELLED');
     const totalSales = validOrders.reduce((sum, o) => sum + (Number(o.amount) || 0), 0);
-    const pendingOrders = orders.filter(o => ['WAITING_PAYMENT', 'PENDING'].includes(o.status)).length;
-    const paidOrders = orders.filter(o => o.status === 'PAID').length;
-    const readyOrders = orders.filter(o => ['READY', 'SHIPPED'].includes(o.status)).length;
-    const completedOrders = orders.filter(o => o.status === 'COMPLETED').length;
-    const cancelledOrders = orders.filter(o => o.status === 'CANCELLED').length;
+    const pendingOrders = shopOrders.filter(o => ['WAITING_PAYMENT', 'PENDING'].includes(o.status)).length;
+    const paidOrders = shopOrders.filter(o => o.status === 'PAID').length;
+    const readyOrders = shopOrders.filter(o => ['READY', 'SHIPPED'].includes(o.status)).length;
+    const completedOrders = shopOrders.filter(o => o.status === 'COMPLETED').length;
+    const cancelledOrders = shopOrders.filter(o => o.status === 'CANCELLED').length;
 
     const statsData = [
       { 
@@ -6907,11 +6957,17 @@ export default function AdminPage(): JSX.Element {
   // Ref to preserve search input focus
   const searchInputRef = useRef<HTMLInputElement>(null);
 
+  // Shop-scoped orders (used for dashboard stats, badge counts, etc.)
+  const shopOrders = useMemo(() => {
+    if (!selectedShopId || selectedShopId === 'all') return orders;
+    return orders.filter(o => o.shopId === selectedShopId);
+  }, [orders, selectedShopId]);
+
   // Memoize filtered orders outside the render function
   const filteredOrders = useMemo(() => {
-    let filtered = orders;
+    let filtered = shopOrders;
     if (orderFilterStatus !== 'ALL') {
-      filtered = orders.filter(o => normalizeStatusKey(o.status) === orderFilterStatus);
+      filtered = filtered.filter(o => normalizeStatusKey(o.status) === orderFilterStatus);
     }
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
@@ -6922,7 +6978,7 @@ export default function AdminPage(): JSX.Element {
       );
     }
     return filtered;
-  }, [orderFilterStatus, searchTerm, orders]);
+  }, [orderFilterStatus, searchTerm, shopOrders]);
 
   const OrdersView = () => {
 
@@ -8522,7 +8578,7 @@ export default function AdminPage(): JSX.Element {
   // isLoading / isAuthorized defined earlier
 
   // Main Render
-  const pendingCount = orders.filter((o) => ['WAITING_PAYMENT', 'PENDING'].includes(o.status)).length;
+  const pendingCount = shopOrders.filter((o) => ['WAITING_PAYMENT', 'PENDING'].includes(o.status)).length;
 
   // 🔐 Login Component - Show when not authenticated
   if (status === 'unauthenticated') {
@@ -9130,6 +9186,53 @@ export default function AdminPage(): JSX.Element {
               </Box>
             )}
             
+            {/* Shop Selector */}
+            {myShops.length > 0 && (
+              <Box sx={{ mb: 1.5, px: 0.5, flexShrink: 0 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel id="shop-selector-label" sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    ร้านค้า
+                  </InputLabel>
+                  <Select
+                    labelId="shop-selector-label"
+                    value={selectedShopId}
+                    label="ร้านค้า"
+                    onChange={(e) => setSelectedShopId(e.target.value)}
+                    sx={{
+                      fontSize: '0.85rem',
+                      borderRadius: '12px',
+                      bgcolor: 'var(--glass-bg)',
+                      color: 'var(--foreground)',
+                      '& .MuiOutlinedInput-notchedOutline': {
+                        borderColor: 'var(--glass-bg)',
+                      },
+                      '&:hover .MuiOutlinedInput-notchedOutline': {
+                        borderColor: ADMIN_THEME.primary,
+                      },
+                      '& .MuiSelect-icon': { color: 'var(--text-muted)' },
+                    }}
+                  >
+                    {isSuperAdminUser && (
+                      <MenuItem value="all">
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Store size={16} />
+                          ทุกร้านค้า
+                        </Box>
+                      </MenuItem>
+                    )}
+                    {myShops.map((shop) => (
+                      <MenuItem key={shop.id} value={shop.id}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Store size={16} />
+                          {shop.name}
+                        </Box>
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
+            )}
+
             {/* Navigation Items - Scrollable */}
             <Box sx={{
               flex: 1,
