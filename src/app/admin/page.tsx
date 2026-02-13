@@ -733,15 +733,13 @@ const SettingsView = React.memo(function SettingsView({
   triggerSheetSync,
 }: SettingsViewProps) {
 
-  // Get admin permissions
-  const adminPerms = localConfig.adminPermissions?.[userEmail?.toLowerCase() ?? ''] ?? {
-    canManageShop: false,
-    canManageSheet: false,
-    canManageAnnouncement: true, // Default: admins can manage announcements
-    canManageOrders: true,
-    canManageProducts: true,
-    canManagePickup: false,
-  };
+  // Get admin permissions — isSuperAdminUser already comes from parent (server-validated)
+  const hasCustomPerms = !!localConfig.adminPermissions?.[userEmail?.toLowerCase() ?? ''];
+  const adminPerms = hasCustomPerms
+    ? { ...DEFAULT_ADMIN_PERMISSIONS, ...localConfig.adminPermissions![userEmail?.toLowerCase() ?? ''] }
+    : isSuperAdminUser
+      ? Object.fromEntries(Object.keys(DEFAULT_ADMIN_PERMISSIONS).map(k => [k, true]))
+      : { ...DEFAULT_ADMIN_PERMISSIONS };
 
   // Super admin has all permissions
   const canManageShop = isSuperAdminUser || adminPerms.canManageShop;
@@ -4122,10 +4120,21 @@ export default function AdminPage(): JSX.Element {
   // Trust server-validated role OR fall back to client-side check
   const isSuperAdminUser = serverUserRole === 'superadmin' || isSuperAdmin(session?.user?.email ?? null);
   const adminPerms = useMemo(() => {
-    return config.adminPermissions?.[userEmail] 
-      ? { ...DEFAULT_ADMIN_PERMISSIONS, ...config.adminPermissions[userEmail] }
-      : { ...DEFAULT_ADMIN_PERMISSIONS };
-  }, [config.adminPermissions, userEmail]);
+    // If user has custom permissions in config, use those
+    if (config.adminPermissions?.[userEmail]) {
+      return { ...DEFAULT_ADMIN_PERMISSIONS, ...config.adminPermissions[userEmail] };
+    }
+    // Server-validated admins (from ADMIN_EMAILS env var) get all permissions
+    // by default until the super admin explicitly customizes them
+    if (serverUserRole) {
+      const allPerms: AdminPermissions = {};
+      for (const key of Object.keys(DEFAULT_ADMIN_PERMISSIONS) as (keyof AdminPermissions)[]) {
+        allPerms[key] = true;
+      }
+      return allPerms;
+    }
+    return { ...DEFAULT_ADMIN_PERMISSIONS };
+  }, [config.adminPermissions, userEmail, serverUserRole]);
 
   // Permission flags - super admin has all permissions
   const canManageShop = isSuperAdminUser || adminPerms.canManageShop;
