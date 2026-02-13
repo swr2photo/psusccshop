@@ -11,7 +11,7 @@ const ToastContainer = lazy(() => import('./ToastContainer'));
 const CookieConsentBanner = lazy(() => import('./CookieConsentBanner'));
 const NotificationPrompt = lazy(() => import('./NotificationPrompt'));
 const LiveStreamPopup = lazy(() => import('./LiveStreamPopup'));
-import ScreenCaptureGuard, { type CaptureEvent } from './ScreenCaptureGuard';
+// ScreenCaptureGuard removed — was interfering with live stream and user interactions
 import { SWRProvider } from '@/hooks/useSWRConfig';
 import { TanStackQueryProvider } from '@/hooks/useTanStackQuery';
 import { useThemeStore } from '@/store/themeStore';
@@ -202,28 +202,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, ErrorBounda
   }
 }
 
-// Screen Capture Guard — banking-grade protection wrapper
-// Throttle logging to avoid console spam
-let lastCapturelog = 0;
-const CAPTURE_LOG_INTERVAL = 10000; // 10 seconds
 
-function ScreenCaptureGuardWrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <ScreenCaptureGuard
-      enabled={true}
-      shieldDuration={2000}
-      onCaptureDetected={(event: CaptureEvent) => {
-        const now = Date.now();
-        if (now - lastCapturelog > CAPTURE_LOG_INTERVAL) {
-          console.log(`[Security] Screen capture blocked: ${event.type} on ${event.platform}`);
-          lastCapturelog = now;
-        }
-      }}
-    >
-      {children}
-    </ScreenCaptureGuard>
-  );
-}
 
 // ==================== SHARED THEME CONFIG — Apple-inspired ====================
 
@@ -440,9 +419,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
             <ThemeProvider theme={activeTheme}>
               <CssBaseline />
               <NotificationProvider>
-                <ScreenCaptureGuardWrapper>
                   {children}
-                </ScreenCaptureGuardWrapper>
                 <Suspense fallback={null}>
                   <ToastContainer />
                   <CookieConsentBanner />

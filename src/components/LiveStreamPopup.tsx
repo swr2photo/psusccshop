@@ -200,12 +200,28 @@ const POPUP_CSS = `
 // ==================== HELPERS ====================
 function getEmbedUrl(url: string, type: string): string {
   if (type === 'youtube') {
-    const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|live\/|embed\/))([a-zA-Z0-9_-]+)/);
-    if (match) return `https://www.youtube.com/embed/${match[1]}?autoplay=1&mute=0&rel=0`;
+    // Support: watch?v=, live/, embed/, youtu.be/, shorts/, and direct video IDs
+    const patterns = [
+      /(?:youtu\.be\/)([a-zA-Z0-9_-]{11})/,
+      /youtube\.com\/(?:watch\?.*v=|live\/|embed\/|shorts\/)([a-zA-Z0-9_-]{11})/,
+      /youtube\.com\/.*[?&]v=([a-zA-Z0-9_-]{11})/,
+    ];
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match) {
+        return `https://www.youtube.com/embed/${match[1]}?autoplay=1&mute=1&rel=0&modestbranding=1&playsinline=1`;
+      }
+    }
+    // If it looks like a bare video ID (11 chars)
+    if (/^[a-zA-Z0-9_-]{11}$/.test(url.trim())) {
+      return `https://www.youtube.com/embed/${url.trim()}?autoplay=1&mute=1&rel=0&modestbranding=1&playsinline=1`;
+    }
     return url;
   }
   if (type === 'facebook') {
-    return `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}&autoplay=true&mute=false&show_text=false`;
+    // Facebook video embed — use plugins/video.php with proper params
+    const encodedUrl = encodeURIComponent(url);
+    return `https://www.facebook.com/plugins/video.php?href=${encodedUrl}&width=720&height=405&show_text=false&autoplay=true&allowFullScreen=true&appId=`;
   }
   return url;
 }
@@ -316,6 +332,9 @@ export default function LiveStreamPopup() {
               src={getEmbedUrl(liveData.streamUrl, liveData.streamType)}
               allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
               allowFullScreen
+              referrerPolicy="no-referrer-when-downgrade"
+              scrolling="no"
+              style={{ border: 'none', overflow: 'hidden' }}
             />
           ) : liveData.streamType === 'hls' ? (
             <HLSPlayer url={liveData.streamUrl} />
