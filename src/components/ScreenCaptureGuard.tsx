@@ -1,27 +1,42 @@
 'use client';
 
 /**
- * ScreenCaptureGuard — Banking-grade screen capture protection
+ * ScreenCaptureGuard — Banking-grade screen capture protection (Web layer)
  * 
- * Mimics banking apps (SCB, KBank, Bangkok Bank) behavior:
- * - Detects screenshot attempts (blur/focus pattern, keyboard shortcuts)
- * - Detects screen recording / screen sharing
- * - Shows full-screen shield overlay with "ไม่สามารถบันทึกหน้าจอได้"
- * - Blacks out all content instantly when triggered
+ * KEY ARCHITECTURE: The shield overlay is ALWAYS in the DOM (hidden via CSS).
+ * When triggered, we only add a CSS class — no React re-render needed.
+ * This fixes iOS timing: body hides + overlay shows in the SAME paint frame.
+ * 
+ * PROTECTION TIERS (what's possible on web):
+ * - These are "frontend tricks" — they cannot 100% prevent capture
+ * - For 100% protection, use native iOS/Android apps (ScreenCaptureManager.swift)
+ * - DRM (EME+CDN) only works for <video> via Widevine/FairPlay
+ * 
+ * DETECTION METHODS:
+ * 1. Window blur/focus (Win+Shift+S, Alt+Tab, iOS app switcher)
+ * 2. Page Visibility API (iOS Control Center, Android screenshot, tab switch)
+ * 3. Keyboard shortcuts (PrintScreen, Cmd+Shift+3/4/5)
+ * 4. DevTools detection (outerWidth/innerWidth gap)
+ * 5. iOS pageshow/pagehide (better iOS lifecycle detection)
+ * 6. Screen Capture API interception (navigator.mediaDevices.getDisplayMedia)
+ * 7. Permissions API monitoring (display-capture permission)
+ * 8. CSS-level: print block, touch-callout prevention, user-select block
  */
 
-import React, { useEffect, useCallback, useRef, useState } from 'react';
+import React, { useEffect, useCallback, useRef } from 'react';
 
 // ==================== TYPES ====================
 
 type CaptureEventType =
   | 'screenshot'
   | 'screen-recording'
-  | 'screen-sharing'
   | 'visibility-hidden'
   | 'window-blur'
   | 'devtools-open'
-  | 'keyboard';
+  | 'keyboard'
+  | 'ios-pagehide'
+  | 'screen-capture-api'
+  | 'permission-change';
 
 export interface CaptureEvent {
   type: CaptureEventType;
@@ -29,29 +44,75 @@ export interface CaptureEvent {
   platform: string;
 }
 
-interface ScreenCaptureGuardProps {
+interface Props {
   children: React.ReactNode;
   enabled?: boolean;
   shieldDuration?: number;
   onCaptureDetected?: (event: CaptureEvent) => void;
-  message?: string;
-  subMessage?: string;
 }
 
 // ==================== CSS ====================
+// The overlay is always in the DOM but hidden.
+// Adding .scg-active to body shows it AND hides content in ONE paint frame.
 
 const SHIELD_CSS = `
-@keyframes scg-fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+.scg-shield {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.97);
+  -webkit-backdrop-filter: blur(40px);
+  backdrop-filter: blur(40px);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  /* Hidden by default */
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.06s ease-out;
 }
+/* When active: show shield, hide content */
+body.scg-active .scg-shield {
+  opacity: 1;
+  pointer-events: auto;
+}
+body.scg-active {
+  caret-color: transparent !important;
+}
+body.scg-active > *:not(script):not(style):not(link) {
+  visibility: hidden !important;
+}
+body.scg-active .scg-shield,
+body.scg-active .scg-shield * {
+  visibility: visible !important;
+}
+/* Print protection */
+@media print {
+  body { display: none !important; }
+}
+/* iOS-specific: prevent long-press save image, copy */
+img, canvas, video {
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  pointer-events: auto;
+}
+/* Protect images from drag-save */
+img[src] { draggable: false; }
+/* iOS selection prevention on protected content */
+.protected-content, .no-copy {
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  -webkit-touch-callout: none !important;
+}
+/* Shield animations (only when visible) */
 @keyframes scg-pulse {
   0%, 100% { transform: scale(1); opacity: 0.9; }
   50% { transform: scale(1.05); opacity: 1; }
-}
-@keyframes scg-textIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
 }
 @keyframes scg-scan {
   0% { top: 20%; opacity: 0; }
@@ -60,227 +121,236 @@ const SHIELD_CSS = `
   90% { opacity: 1; }
   100% { top: 20%; opacity: 0; }
 }
-@keyframes scg-recordDot {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
-}
-body.scg-active {
-  caret-color: transparent !important;
-}
-body.scg-active *:not(.scg-overlay):not(.scg-overlay *) {
-  filter: brightness(0) !important;
-  -webkit-filter: brightness(0) !important;
-}
-body.scg-active .scg-overlay,
-body.scg-active .scg-overlay * {
-  filter: none !important;
-  -webkit-filter: none !important;
-}
-@media print {
-  body { display: none !important; visibility: hidden !important; }
-}
-img, canvas, video {
-  -webkit-touch-callout: none !important;
-  -webkit-user-select: none !important;
-  user-select: none !important;
-}
 `;
 
-// ==================== MAIN COMPONENT ====================
+// ==================== COMPONENT ====================
 
 export default function ScreenCaptureGuard({
   children,
   enabled = true,
   shieldDuration = 2000,
   onCaptureDetected,
-  message,
-  subMessage,
-}: ScreenCaptureGuardProps) {
-  const [showShield, setShowShield] = useState(false);
-  const [captureType, setCaptureType] = useState<CaptureEventType | null>(null);
-  const [isRecording, setIsRecording] = useState(false);
-  const [ready, setReady] = useState(false);
-  const shieldTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+}: Props) {
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const blurTimeRef = useRef(0);
   const lastTriggerRef = useRef(0);
 
-  // Detect platform
   const getPlatform = useCallback(() => {
     if (typeof window === 'undefined') return 'unknown';
     const ua = navigator.userAgent;
-    if (/iPad|iPhone|iPod/.test(ua)) return 'ios';
+    if (/iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) return 'ios';
     if (/Android/i.test(ua)) return 'android';
     if (/Mac/i.test(navigator.platform || '')) return 'macos';
     if (/Win/i.test(navigator.platform || '')) return 'windows';
     return 'desktop';
   }, []);
 
-  // ==================== INJECT CSS + MOUNT ====================
+  const isMobile = useCallback(() => {
+    const p = getPlatform();
+    return p === 'ios' || p === 'android';
+  }, [getPlatform]);
 
-  useEffect(() => {
-    if (!enabled) return;
+  // ==================== SHOW / HIDE SHIELD (pure DOM, no React state) ====================
 
-    const id = 'scg-styles';
-    if (!document.getElementById(id)) {
-      const style = document.createElement('style');
-      style.id = id;
-      style.textContent = SHIELD_CSS;
-      document.head.appendChild(style);
-    }
-
-    setReady(true);
-    console.log('[SCG] ✅ ScreenCaptureGuard active — platform:', getPlatform());
-
-    return () => {
-      document.body.classList.remove('scg-active');
-    };
-  }, [enabled, getPlatform]);
-
-  // ==================== TRIGGER SHIELD ====================
-
-  const triggerShield = useCallback((type: CaptureEventType, duration?: number) => {
+  const showShield = useCallback((type: CaptureEventType, duration?: number) => {
     const now = Date.now();
     if (now - lastTriggerRef.current < 300) return;
     lastTriggerRef.current = now;
 
-    console.log(`[SCG] 🛡️ Shield triggered: ${type}`);
-
-    setCaptureType(type);
-    setShowShield(true);
+    // Instant show — CSS only, no React re-render
     document.body.classList.add('scg-active');
 
-    onCaptureDetected?.({
-      type,
-      timestamp: now,
-      platform: getPlatform(),
-    });
+    onCaptureDetected?.({ type, timestamp: now, platform: getPlatform() });
 
-    if (shieldTimeoutRef.current) clearTimeout(shieldTimeoutRef.current);
-    shieldTimeoutRef.current = setTimeout(() => {
-      setShowShield(false);
-      setCaptureType(null);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
       document.body.classList.remove('scg-active');
     }, duration ?? shieldDuration);
   }, [shieldDuration, onCaptureDetected, getPlatform]);
 
-  // ==================== WINDOW BLUR/FOCUS ====================
-  // PRIMARY detection for Win+Shift+S, Alt+PrintScreen, etc.
+  // ==================== INJECT CSS ====================
 
   useEffect(() => {
-    if (!enabled || !ready) return;
+    if (!enabled) return;
+    const id = 'scg-styles';
+    if (!document.getElementById(id)) {
+      const s = document.createElement('style');
+      s.id = id;
+      s.textContent = SHIELD_CSS;
+      document.head.appendChild(s);
+    }
+    return () => { document.body.classList.remove('scg-active'); };
+  }, [enabled]);
 
-    const handleBlur = () => {
+  // ==================== WINDOW BLUR / FOCUS ====================
+  // Primary detection for Win+Shift+S, iOS screenshot, Android screenshot
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    const onBlur = () => {
       blurTimeRef.current = Date.now();
-      triggerShield('window-blur');
+      showShield('window-blur');
     };
 
-    const handleFocus = () => {
+    const onFocus = () => {
       const gap = Date.now() - blurTimeRef.current;
+      // Quick blur→focus = screenshot tool
       if (gap > 30 && gap < 10000) {
-        triggerShield('screenshot', shieldDuration + 500);
+        showShield('screenshot', shieldDuration + 500);
       }
     };
 
-    window.addEventListener('blur', handleBlur);
-    window.addEventListener('focus', handleFocus);
-    console.log('[SCG] 👁️ Blur/focus listeners active');
-
+    window.addEventListener('blur', onBlur);
+    window.addEventListener('focus', onFocus);
     return () => {
-      window.removeEventListener('blur', handleBlur);
-      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('blur', onBlur);
+      window.removeEventListener('focus', onFocus);
     };
-  }, [enabled, ready, triggerShield, shieldDuration]);
+  }, [enabled, showShield, shieldDuration]);
 
   // ==================== VISIBILITY CHANGE ====================
+  // iOS: Control Center, app switch; Android: screenshot button
 
   useEffect(() => {
-    if (!enabled || !ready) return;
-
+    if (!enabled) return;
     const handler = () => {
-      if (document.hidden) {
-        triggerShield('visibility-hidden');
-      }
+      if (document.hidden) showShield('visibility-hidden');
     };
     document.addEventListener('visibilitychange', handler);
     return () => document.removeEventListener('visibilitychange', handler);
-  }, [enabled, ready, triggerShield]);
+  }, [enabled, showShield]);
 
-  // ==================== KEYBOARD SHORTCUTS ====================
+  // ==================== iOS PAGE LIFECYCLE ====================
+  // iOS Safari fires pagehide/pageshow during app switching and 
+  // Control Center pull-down which is when screenshots happen
 
   useEffect(() => {
-    if (!enabled || !ready) return;
+    if (!enabled) return;
+    const platform = getPlatform();
+    if (platform !== 'ios' && platform !== 'android') return;
 
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const onPageHide = () => {
+      showShield('ios-pagehide');
+    };
+    const onPageShow = (e: PageTransitionEvent) => {
+      // persisted = page restored from bfcache (back/forward)
+      if (e.persisted) showShield('ios-pagehide', shieldDuration + 1000);
+    };
+
+    window.addEventListener('pagehide', onPageHide);
+    window.addEventListener('pageshow', onPageShow);
+    return () => {
+      window.removeEventListener('pagehide', onPageHide);
+      window.removeEventListener('pageshow', onPageShow);
+    };
+  }, [enabled, getPlatform, showShield, shieldDuration]);
+
+  // ==================== KEYBOARD ====================
+
+  useEffect(() => {
+    if (!enabled) return;
+    const handler = (e: KeyboardEvent) => {
       if (e.key === 'PrintScreen' || e.code === 'PrintScreen') {
         e.preventDefault();
-        triggerShield('keyboard');
+        showShield('keyboard');
         return;
       }
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && ['3', '4', '5', 's', 'S'].includes(e.key)) {
+      // macOS: Cmd+Shift+3/4/5, Windows: Win+Shift+S
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && ['3','4','5','s','S'].includes(e.key)) {
         e.preventDefault();
-        triggerShield('keyboard');
+        showShield('keyboard');
         return;
       }
+      // Ctrl+S / Cmd+S — save page
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && !e.shiftKey) {
         e.preventDefault();
-        return;
       }
-    };
-
-    window.addEventListener('keydown', handleKeyDown, true);
-    return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [enabled, ready, triggerShield]);
-
-  // ==================== DEVTOOLS DETECTION ====================
-
-  useEffect(() => {
-    if (!enabled || !ready) return;
-
-    const check = () => {
-      const wDiff = window.outerWidth - window.innerWidth;
-      const hDiff = window.outerHeight - window.innerHeight;
-      if (wDiff > 160 || hDiff > 160) {
-        triggerShield('devtools-open', 5000);
-      }
-    };
-
-    const interval = setInterval(check, 3000);
-    return () => clearInterval(interval);
-  }, [enabled, ready, triggerShield]);
-
-  // ==================== FOCUS POLLING FALLBACK ====================
-
-  useEffect(() => {
-    if (!enabled || !ready) return;
-    let hadFocus = document.hasFocus();
-
-    const interval = setInterval(() => {
-      const hasFocus = document.hasFocus();
-      if (hadFocus && !hasFocus) {
-        triggerShield('window-blur');
-      }
-      hadFocus = hasFocus;
-    }, 300);
-
-    return () => clearInterval(interval);
-  }, [enabled, ready, triggerShield]);
-
-  // ==================== CONTEXT MENU / DRAG / CLIPBOARD ====================
-
-  useEffect(() => {
-    if (!enabled || !ready) return;
-
-    const handleContext = (e: MouseEvent) => {
-      const t = e.target as HTMLElement;
-      if (t.tagName === 'IMG' || t.tagName === 'CANVAS' || t.closest('.protected-content')) {
+      // Ctrl+P / Cmd+P — print
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
         e.preventDefault();
       }
     };
-    const handleDrag = (e: DragEvent) => {
+    window.addEventListener('keydown', handler, true);
+    return () => window.removeEventListener('keydown', handler, true);
+  }, [enabled, showShield]);
+
+  // ==================== SCREEN CAPTURE API INTERCEPTION ====================
+  // Block navigator.mediaDevices.getDisplayMedia (screen sharing/recording)
+
+  useEffect(() => {
+    if (!enabled) return;
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices) return;
+
+    const original = navigator.mediaDevices.getDisplayMedia;
+    if (original) {
+      navigator.mediaDevices.getDisplayMedia = function(...args) {
+        showShield('screen-capture-api', 5000);
+        // Still allow the call to proceed (blocking it throws errors in browsers)
+        return original.apply(this, args);
+      };
+    }
+
+    return () => {
+      if (original) {
+        navigator.mediaDevices.getDisplayMedia = original;
+      }
+    };
+  }, [enabled, showShield]);
+
+  // ==================== PERMISSIONS API — display-capture monitoring ====================
+
+  useEffect(() => {
+    if (!enabled) return;
+    if (typeof navigator === 'undefined' || !navigator.permissions) return;
+
+    let permStatus: PermissionStatus | null = null;
+
+    // Some browsers support 'display-capture' permission query
+    navigator.permissions.query({ name: 'display-capture' as PermissionName }).then(status => {
+      permStatus = status;
+      const onChange = () => {
+        if (status.state === 'granted') {
+          showShield('permission-change', 3000);
+        }
+      };
+      status.addEventListener('change', onChange);
+    }).catch(() => {
+      // Not supported — silently ignore
+    });
+
+    return () => { permStatus = null; };
+  }, [enabled, showShield]);
+
+  // ==================== DEVTOOLS ====================
+
+  useEffect(() => {
+    if (!enabled) return;
+    // Skip devtools detection on mobile — no devtools there
+    if (isMobile()) return;
+
+    const check = () => {
+      const w = window.outerWidth - window.innerWidth;
+      const h = window.outerHeight - window.innerHeight;
+      if (w > 160 || h > 160) showShield('devtools-open', 5000);
+    };
+    const id = setInterval(check, 10000);
+    return () => clearInterval(id);
+  }, [enabled, showShield, isMobile]);
+
+  // ==================== CONTEXT MENU / DRAG / COPY / IMAGE SAVE ====================
+
+  useEffect(() => {
+    if (!enabled) return;
+    const ctx = (e: MouseEvent) => {
+      const t = e.target as HTMLElement;
+      if (t.tagName === 'IMG' || t.tagName === 'CANVAS' || t.closest('.protected-content')) e.preventDefault();
+    };
+    const drag = (e: DragEvent) => {
       const t = e.target as HTMLElement;
       if (t.tagName === 'IMG' || t.tagName === 'CANVAS') e.preventDefault();
     };
-    const handleCopy = (e: ClipboardEvent) => {
+    const copy = (e: ClipboardEvent) => {
       const t = document.activeElement as HTMLElement;
       if (t?.closest?.('.protected-content') || t?.closest?.('.no-copy')) {
         e.preventDefault();
@@ -288,170 +358,129 @@ export default function ScreenCaptureGuard({
       }
     };
 
-    document.addEventListener('contextmenu', handleContext);
-    document.addEventListener('dragstart', handleDrag);
-    document.addEventListener('copy', handleCopy);
-    return () => {
-      document.removeEventListener('contextmenu', handleContext);
-      document.removeEventListener('dragstart', handleDrag);
-      document.removeEventListener('copy', handleCopy);
+    // Prevent iOS long-press "Save Image" on all images
+    const touchStart = (e: TouchEvent) => {
+      const t = e.target as HTMLElement;
+      if (t.tagName === 'IMG' || t.tagName === 'CANVAS') {
+        // Use a short timeout to distinguish tap from long-press
+        const timer = setTimeout(() => {
+          e.preventDefault();
+        }, 500);
+        const cleanup = () => {
+          clearTimeout(timer);
+          t.removeEventListener('touchend', cleanup);
+          t.removeEventListener('touchmove', cleanup);
+        };
+        t.addEventListener('touchend', cleanup, { once: true });
+        t.addEventListener('touchmove', cleanup, { once: true });
+      }
     };
-  }, [enabled, ready]);
+
+    document.addEventListener('contextmenu', ctx);
+    document.addEventListener('dragstart', drag);
+    document.addEventListener('copy', copy);
+    document.addEventListener('touchstart', touchStart, { passive: false });
+
+    // Make all images non-draggable
+    document.querySelectorAll('img').forEach(img => {
+      img.setAttribute('draggable', 'false');
+    });
+
+    return () => {
+      document.removeEventListener('contextmenu', ctx);
+      document.removeEventListener('dragstart', drag);
+      document.removeEventListener('copy', copy);
+      document.removeEventListener('touchstart', touchStart);
+    };
+  }, [enabled]);
 
   // ==================== CLEANUP ====================
 
-  useEffect(() => {
-    return () => {
-      if (shieldTimeoutRef.current) clearTimeout(shieldTimeoutRef.current);
-      document.body.classList.remove('scg-active');
-    };
+  useEffect(() => () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    document.body.classList.remove('scg-active');
   }, []);
 
-  // ==================== SHIELD MESSAGES ====================
-
-  const isVideoCapture = isRecording || captureType === 'screen-recording' || captureType === 'screen-sharing';
-
-  const shieldMessage = message || (
-    isVideoCapture
-      ? 'ไม่สามารถบันทึกวิดีโอหน้าจอได้'
-      : 'ไม่สามารถบันทึกภาพหน้าจอได้'
-  );
-
-  const shieldSubMessage = subMessage || (
-    isVideoCapture
-      ? 'Screen recording is not allowed'
-      : 'Screenshot is not allowed'
-  );
-
   // ==================== RENDER ====================
-
-  // Debug: visible indicator that component mounted (remove after confirming)
-  if (typeof window !== 'undefined' && !document.getElementById('scg-debug-flag')) {
-    const flag = document.createElement('div');
-    flag.id = 'scg-debug-flag';
-    flag.textContent = '🛡️ SCG';
-    flag.style.cssText = 'position:fixed;bottom:4px;right:4px;z-index:999999;background:#000;color:#0f0;font-size:10px;padding:2px 6px;border-radius:4px;opacity:0.7;pointer-events:none;';
-    document.body.appendChild(flag);
-  }
+  // Shield is ALWAYS in DOM — shown/hidden purely by CSS class on body
 
   return (
     <>
       {children}
 
-      {/* Shield Overlay */}
-      {showShield && (
-        <div
-          className="scg-overlay"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 2147483647,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'rgba(0, 0, 0, 0.97)',
-            backdropFilter: 'blur(40px)',
-            WebkitBackdropFilter: 'blur(40px)',
-            animation: 'scg-fadeIn 0.08s ease-out both',
-            touchAction: 'none',
-            userSelect: 'none',
-          }}
-        >
-          {/* Icon */}
-          <div style={{ animation: 'scg-pulse 2s ease-in-out infinite', marginBottom: 24, opacity: 0.9 }}>
-            {isVideoCapture ? (
-              <svg width="56" height="56" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M16.5 10L21 7V17L16.5 14" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                <rect x="2" y="6" width="14.5" height="12" rx="2" stroke="white" strokeWidth="1.5" />
-                <line x1="2" y1="2" x2="22" y2="22" stroke="#ff453a" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-            ) : (
-              <svg width="56" height="56" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 2L3 7V12C3 17.25 6.85 22.03 12 23C17.15 22.03 21 17.25 21 12V7L12 2Z" stroke="white" strokeWidth="1.5" strokeLinejoin="round" fill="rgba(255,255,255,0.08)" />
-                <rect x="9" y="10" width="6" height="5" rx="1" stroke="white" strokeWidth="1.3" />
-                <path d="M10 10V8.5C10 7.12 10.9 6 12 6C13.1 6 14 7.12 14 8.5V10" stroke="white" strokeWidth="1.3" strokeLinecap="round" />
-                <circle cx="12" cy="12.5" r="0.8" fill="white" />
-              </svg>
-            )}
-          </div>
-
-          {/* Main Thai message */}
-          <div style={{
-            color: '#f5f5f7',
-            fontSize: '1.25rem',
-            fontWeight: 600,
-            fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Noto Sans Thai", system-ui, sans-serif',
-            textAlign: 'center',
-            lineHeight: 1.5,
-            marginBottom: 8,
-            padding: '0 32px',
-            animation: 'scg-textIn 0.3s ease-out 0.1s both',
-          }}>
-            {shieldMessage}
-          </div>
-
-          {/* English sub-message */}
-          <div style={{
-            color: 'rgba(255, 255, 255, 0.45)',
-            fontSize: '0.875rem',
-            fontWeight: 400,
-            fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif',
-            textAlign: 'center',
-            marginBottom: 32,
-            padding: '0 32px',
-            animation: 'scg-textIn 0.3s ease-out 0.2s both',
-          }}>
-            {shieldSubMessage}
-          </div>
-
-          {/* Branding */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, opacity: 0.3, animation: 'scg-textIn 0.3s ease-out 0.3s both' }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2L3 7V12C3 17.25 6.85 22.03 12 23C17.15 22.03 21 17.25 21 12V7L12 2Z" fill="rgba(255,255,255,0.5)" />
-            </svg>
-            <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.75rem', fontWeight: 500, letterSpacing: '0.05em' }}>
-              SCC SHOP SECURITY
-            </span>
-          </div>
-
-          {/* Scanning line */}
-          <div style={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            height: 1,
-            background: 'linear-gradient(90deg, transparent, rgba(41, 151, 255, 0.3), transparent)',
-            animation: 'scg-scan 3s ease-in-out infinite',
-          }} />
+      {/* Always-present shield overlay — controlled by body.scg-active CSS */}
+      <div className="scg-shield" aria-hidden="true">
+        {/* Icon */}
+        <div style={{ animation: 'scg-pulse 2s ease-in-out infinite', marginBottom: 24, opacity: 0.9 }}>
+          <svg width="56" height="56" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L3 7V12C3 17.25 6.85 22.03 12 23C17.15 22.03 21 17.25 21 12V7L12 2Z" stroke="white" strokeWidth="1.5" strokeLinejoin="round" fill="rgba(255,255,255,0.08)" />
+            <rect x="9" y="10" width="6" height="5" rx="1" stroke="white" strokeWidth="1.3" />
+            <path d="M10 10V8.5C10 7.12 10.9 6 12 6C13.1 6 14 7.12 14 8.5V10" stroke="white" strokeWidth="1.3" strokeLinecap="round" />
+            <circle cx="12" cy="12.5" r="0.8" fill="white" />
+          </svg>
         </div>
-      )}
 
-      {/* Recording banner */}
-      {isRecording && !showShield && (
-        <div
-          className="scg-overlay"
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            zIndex: 2147483646,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 8,
-            padding: '10px 16px',
-            background: 'rgba(255, 69, 58, 0.95)',
-            backdropFilter: 'blur(20px)',
-          }}
-        >
-          <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#fff', animation: 'scg-recordDot 1s ease-in-out infinite' }} />
-          <span style={{ color: '#fff', fontSize: '0.8125rem', fontWeight: 600, fontFamily: '-apple-system, "Noto Sans Thai", sans-serif' }}>
-            ตรวจพบการบันทึกหน้าจอ — เนื้อหาถูกซ่อน
+        {/* Thai message — primary */}
+        <div style={{
+          color: '#f5f5f7',
+          fontSize: '1.25rem',
+          fontWeight: 600,
+          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Noto Sans Thai", system-ui, sans-serif',
+          textAlign: 'center',
+          lineHeight: 1.5,
+          marginBottom: 4,
+          padding: '0 32px',
+        }}>
+          ไม่สามารถบันทึกวิดีโอและแคปเจอร์จอได้
+        </div>
+
+        {/* Thai sub-message */}
+        <div style={{
+          color: 'rgba(255, 255, 255, 0.55)',
+          fontSize: '0.9rem',
+          fontWeight: 400,
+          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Noto Sans Thai", system-ui, sans-serif',
+          textAlign: 'center',
+          lineHeight: 1.4,
+          marginBottom: 8,
+          padding: '0 32px',
+        }}>
+          เพื่อความปลอดภัยของข้อมูลทางการเงิน
+        </div>
+
+        {/* English sub-message */}
+        <div style={{
+          color: 'rgba(255, 255, 255, 0.35)',
+          fontSize: '0.8rem',
+          fontWeight: 400,
+          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif',
+          textAlign: 'center',
+          marginBottom: 32,
+          padding: '0 32px',
+        }}>
+          Screen capture is not allowed for security reasons
+        </div>
+
+        {/* Branding */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, opacity: 0.3 }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2L3 7V12C3 17.25 6.85 22.03 12 23C17.15 22.03 21 17.25 21 12V7L12 2Z" fill="rgba(255,255,255,0.5)" />
+          </svg>
+          <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.75rem', fontWeight: 500, letterSpacing: '0.05em' }}>
+            SCC SHOP SECURITY
           </span>
         </div>
-      )}
+
+        {/* Scanning line */}
+        <div style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          height: 1,
+          background: 'linear-gradient(90deg, transparent, rgba(41, 151, 255, 0.3), transparent)',
+          animation: 'scg-scan 3s ease-in-out infinite',
+        }} />
+      </div>
     </>
   );
 }
