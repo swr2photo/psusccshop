@@ -4065,6 +4065,8 @@ export default function AdminPage(): JSX.Element {
   const [orderProcessingRef, setOrderProcessingRef] = useState<string | null>(null);
   // Server-validated admin role (set from API response, never from client env vars)
   const [serverUserRole, setServerUserRole] = useState<'superadmin' | 'admin' | 'shopAdmin' | null>(null);
+  // Whether the server has responded with the role (prevents premature access-denied for shop admins)
+  const [serverRoleChecked, setServerRoleChecked] = useState(false);
   // Shop-admin-specific permissions (from shop_admins table, merged across shops)
   const [shopAdminPermissions, setShopAdminPermissions] = useState<Record<string, boolean> | null>(null);
   // Settings state (moved from SettingsView to prevent re-render issues)
@@ -4245,6 +4247,7 @@ export default function AdminPage(): JSX.Element {
     // Set server-validated role (if provided)
     if (data.userRole) {
       setServerUserRole(data.userRole as 'superadmin' | 'admin' | 'shopAdmin');
+      setServerRoleChecked(true);
     }
     // Store shop admin permissions if present
     if (data.shopAdminPermissions) {
@@ -4409,6 +4412,8 @@ export default function AdminPage(): JSX.Element {
     enabled: status === 'authenticated',
     onDataReceived: handleSWRDataReceived,
     onError: (error) => {
+      // Mark role check complete so auth useEffect can proceed
+      setServerRoleChecked(true);
       const isNetworkError = error?.message?.includes('Failed to fetch') || 
                             error?.message?.includes('NETWORK_ERROR');
       if (isNetworkError) {
@@ -4905,10 +4910,10 @@ export default function AdminPage(): JSX.Element {
     }
   }, [status]);
 
-  // Check authorization after config loads (includes dynamic admin list)
+  // Check authorization after server role check completes
   useEffect(() => {
     if (status !== 'authenticated' || !session?.user?.email) return;
-    if (loading) return; // Wait for config to load
+    if (!serverRoleChecked) return; // Wait for server to respond (prevents premature block for shop admins)
     
     // If server already validated our role, we're authorized
     if (serverUserRole) return;
@@ -4928,7 +4933,7 @@ export default function AdminPage(): JSX.Element {
         onClose: () => router.push('/'),
       });
     }
-  }, [status, session, loading, config.adminEmails, router, serverUserRole]);
+  }, [status, session, serverRoleChecked, config.adminEmails, router, serverUserRole]);
 
   // 🔁 Lightweight polling for fresher data
   // ⚠️ Pause polling when order editor is open to prevent flickering
