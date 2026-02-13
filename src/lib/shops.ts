@@ -2,9 +2,20 @@
 // Multi-shop system: types, helpers, and Supabase operations
 
 import { getSupabaseAdmin } from './supabase';
-import { Product } from './config';
+import { Product, ShopConfig } from './config';
 
 // ==================== TYPES ====================
+
+/** Shop-level config: everything a shop can customize (subset of ShopConfig) */
+export type ShopLocalConfig = Pick<ShopConfig,
+  | 'announcements' | 'announcementHistory' | 'announcement'
+  | 'events' | 'promoCodes' | 'liveStream'
+  | 'pickup' | 'nameValidation' | 'shirtNameConfig'
+  | 'socialMediaNews'
+> & {
+  /** Shop-level shipping options (array of {id,name,price,freeAbove,...}) */
+  shippingOptions?: any[];
+};
 
 export interface ShopPaymentInfo {
   promptPayId: string;
@@ -36,6 +47,8 @@ export interface Shop {
   settings: ShopSettings;
   paymentInfo: ShopPaymentInfo;
   products: Product[];
+  /** Shop-local config (announcements, events, promoCodes, liveStream, etc.) */
+  config: ShopLocalConfig;
   contactEmail?: string;
   contactPhone?: string;
   socialLinks?: Record<string, string>;
@@ -145,6 +158,7 @@ function dbToShop(row: any): Shop {
     settings: row.settings || { isOpen: true },
     paymentInfo: row.payment_info || { promptPayId: '', bankName: '', accountName: '', accountNumber: '' },
     products: row.products || [],
+    config: row.config || {},
     contactEmail: row.contact_email || undefined,
     contactPhone: row.contact_phone || undefined,
     socialLinks: row.social_links || undefined,
@@ -276,6 +290,7 @@ export async function createShop(input: {
       payment_info: input.paymentInfo || { promptPayId: '', bankName: '', accountName: '', accountNumber: '' },
       logo_url: input.logoUrl || null,
       products: [],
+      config: {},
       settings: { isOpen: true },
     })
     .select()
@@ -305,6 +320,7 @@ export async function updateShop(id: string, updates: Partial<{
   settings: ShopSettings;
   paymentInfo: ShopPaymentInfo;
   products: Product[];
+  config: ShopLocalConfig;
   contactEmail: string;
   contactPhone: string;
   socialLinks: Record<string, string>;
@@ -325,6 +341,7 @@ export async function updateShop(id: string, updates: Partial<{
   if (updates.settings !== undefined) dbUpdates.settings = updates.settings;
   if (updates.paymentInfo !== undefined) dbUpdates.payment_info = updates.paymentInfo;
   if (updates.products !== undefined) dbUpdates.products = updates.products;
+  if (updates.config !== undefined) dbUpdates.config = updates.config;
   if (updates.contactEmail !== undefined) dbUpdates.contact_email = updates.contactEmail;
   if (updates.contactPhone !== undefined) dbUpdates.contact_phone = updates.contactPhone;
   if (updates.socialLinks !== undefined) dbUpdates.social_links = updates.socialLinks;

@@ -4119,6 +4119,13 @@ export default function AdminPage(): JSX.Element {
   const [myShops, setMyShops] = useState<MyShopInfo[]>([]);
   const [selectedShopId, setSelectedShopId] = useState<string | 'all' | ''>('');
   const myShopsLoadedRef = useRef(false);
+  // Ref to hold the global config when switching to a specific shop
+  const globalConfigRef = useRef<ShopConfig | null>(null);
+  const [shopConfigLoading, setShopConfigLoading] = useState(false);
+  // Whether we're currently viewing a specific shop's data (not 'all')
+  const isShopMode = selectedShopId !== '' && selectedShopId !== 'all';
+  const isShopModeRef = useRef(isShopMode);
+  isShopModeRef.current = isShopMode;
 
   // Check authorization including dynamic admin list from config
   // Priority: server-validated role > dynamic admin list > static admin list
@@ -4254,19 +4261,25 @@ export default function AdminPage(): JSX.Element {
     }
     
     // Efficient diffing: compare lightweight fingerprints instead of full JSON.stringify
-    setConfig(prev => {
-      // Quick check: compare key scalar fields first before falling back to JSON
-      if (prev.isOpen === nextConfig.isOpen &&
-          prev.sheetId === nextConfig.sheetId &&
-          (prev.products?.length ?? 0) === (nextConfig.products?.length ?? 0) &&
-          (prev.adminEmails?.length ?? 0) === (nextConfig.adminEmails?.length ?? 0)) {
-        // Fields match — do deeper check only if shallow looks same
-        const prevJson = JSON.stringify(prev);
-        const nextJson = JSON.stringify(nextConfig);
-        if (prevJson === nextJson) return prev;
-      }
-      return nextConfig;
-    });
+    // Skip config update when viewing a specific shop (don't overwrite shop config with global)
+    if (!isShopModeRef.current) {
+      setConfig(prev => {
+        // Quick check: compare key scalar fields first before falling back to JSON
+        if (prev.isOpen === nextConfig.isOpen &&
+            prev.sheetId === nextConfig.sheetId &&
+            (prev.products?.length ?? 0) === (nextConfig.products?.length ?? 0) &&
+            (prev.adminEmails?.length ?? 0) === (nextConfig.adminEmails?.length ?? 0)) {
+          // Fields match — do deeper check only if shallow looks same
+          const prevJson = JSON.stringify(prev);
+          const nextJson = JSON.stringify(nextConfig);
+          if (prevJson === nextJson) return prev;
+        }
+        return nextConfig;
+      });
+    } else {
+      // Still update the global config ref so switching back restores the latest
+      globalConfigRef.current = nextConfig;
+    }
     setDynamicAdminEmails(nextConfig.adminEmails || []);
     setOrders(prev => {
       // Fast path: length changed → definitely different
@@ -4321,6 +4334,69 @@ export default function AdminPage(): JSX.Element {
       }
     })();
   }, [status]);
+
+  // ========== Load Shop Config when selectedShopId changes ==========
+  useEffect(() => {
+    if (!selectedShopId) return;
+    
+    if (selectedShopId === 'all') {
+      // Switch back to global config
+      if (globalConfigRef.current) {
+        setConfig(globalConfigRef.current);
+        setSettingsLocalConfig(globalConfigRef.current);
+        globalConfigRef.current = null;
+      }
+      return;
+    }
+    
+    // Save global config before switching to shop mode
+    if (!globalConfigRef.current) {
+      globalConfigRef.current = config;
+    }
+    
+    // Fetch shop-specific config
+    let cancelled = false;
+    setShopConfigLoading(true);
+    (async () => {
+      try {
+        const res = await fetch(`/api/shops/${selectedShopId}/config`);
+        const data = await res.json();
+        if (!cancelled && data.status === 'success' && data.config) {
+          const shopConfig: ShopConfig = {
+            ...(globalConfigRef.current || config),
+            // Override with shop-specific data
+            isOpen: data.config.isOpen ?? true,
+            closeDate: data.config.closeDate || '',
+            openDate: data.config.openDate,
+            closedMessage: data.config.closedMessage,
+            paymentEnabled: data.config.paymentEnabled,
+            paymentDisabledMessage: data.config.paymentDisabledMessage,
+            products: data.config.products || [],
+            bankAccount: data.config.bankAccount,
+            announcements: data.config.announcements || [],
+            announcementHistory: data.config.announcementHistory || [],
+            announcement: data.config.announcement,
+            events: data.config.events || [],
+            promoCodes: data.config.promoCodes || [],
+            liveStream: data.config.liveStream,
+            pickup: data.config.pickup,
+            nameValidation: data.config.nameValidation,
+            shirtNameConfig: data.config.shirtNameConfig,
+            socialMediaNews: data.config.socialMediaNews || [],
+          };
+          setConfig(shopConfig);
+          setSettingsLocalConfig(shopConfig);
+        }
+      } catch (err) {
+        console.warn('[Admin] Failed to fetch shop config:', err);
+      } finally {
+        if (!cancelled) setShopConfigLoading(false);
+      }
+    })();
+    
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedShopId]);
 
   // 📥 SWR Hook for Admin Data (replaces manual fetchData)
   const { 
@@ -4571,20 +4647,34 @@ export default function AdminPage(): JSX.Element {
       setLastSavedTime(new Date());
       saveAdminCache({ config: configWithUrls, orders, logs });
 
-      // Save to server
-      const res = await saveShopConfig(configWithUrls, session?.user?.email || '');
-      if (res.status !== 'success') {
-        throw new Error((res as any).message || 'บันทึกไม่สำเร็จ');
+      // Save to server — shop-specific or global
+      if (isShopMode && selectedShopId) {
+        // Save to shop-specific config API
+        const res = await fetch(`/api/shops/${selectedShopId}/config`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(configWithUrls),
+        });
+        const data = await res.json();
+        if (data.status !== 'success') {
+          throw new Error(data.message || 'บันทึกร้านค้าย่อยไม่สำเร็จ');
+        }
+        addLog('SAVE_SHOP_CONFIG', `บันทึกการตั้งค่าร้านค้า (${myShops.find(s => s.id === selectedShopId)?.name || selectedShopId})`, { config: configWithUrls });
+      } else {
+        // Save to global config
+        const res = await saveShopConfig(configWithUrls, session?.user?.email || '');
+        if (res.status !== 'success') {
+          throw new Error((res as any).message || 'บันทึกไม่สำเร็จ');
+        }
+        addLog('SAVE_CONFIG', 'บันทึกการตั้งค่า', { config: configWithUrls });
       }
-      
-      addLog('SAVE_CONFIG', 'บันทึกการตั้งค่า', { config: configWithUrls });
     } catch (error: any) {
       console.error('❌ Save error:', error);
       showToast('error', error?.message || 'บันทึกไม่สำเร็จ');
     } finally {
       setSaving(false);
     }
-  }, [orders, logs, showToast, session?.user?.email, addLog, config?.announcement]);
+  }, [orders, logs, showToast, session?.user?.email, addLog, config?.announcement, isShopMode, selectedShopId, myShops]);
 
   // Update Order Status
   const updateOrderStatus = async (ref: string, newStatus: string) => {
@@ -5051,6 +5141,14 @@ export default function AdminPage(): JSX.Element {
             <WavingHand size={24} color="#fbbf24" />
             ยินดีต้อนรับ, {session?.user?.name?.split(' ')[0] || 'Admin'}
           </Typography>
+          {isShopMode && (
+            <Chip 
+              icon={<Store size={14} />}
+              label={`กำลังดูร้าน: ${myShops.find(s => s.id === selectedShopId)?.name || 'ร้านค้าย่อย'}`}
+              size="small"
+              sx={{ mb: 1, bgcolor: 'rgba(139,92,246,0.2)', color: '#c084fc', fontWeight: 700, borderRadius: '10px' }}
+            />
+          )}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
             <Typography sx={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
               จัดการร้านค้าและออเดอร์ของคุณได้ที่นี่ • อัพเดทล่าสุด: {lastSavedTime?.toLocaleTimeString('th-TH') || 'กำลังโหลด...'}
@@ -9412,7 +9510,14 @@ export default function AdminPage(): JSX.Element {
           gap: 3,
           minHeight: 0,
         }}>
-          {activeTab === 0 && <DashboardView />}
+          {/* Shop config loading overlay */}
+          {shopConfigLoading && (
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, p: 4, borderRadius: '16px', bgcolor: 'var(--glass-bg)', border: '1px solid var(--glass-bg)' }}>
+              <CircularProgress size={24} sx={{ color: '#c084fc' }} />
+              <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>กำลังโหลดข้อมูลร้านค้า...</Typography>
+            </Box>
+          )}
+          {!shopConfigLoading && activeTab === 0 && <DashboardView />}
           {activeTab === 1 && (
             canManageProducts ? (
               <ProductsView
