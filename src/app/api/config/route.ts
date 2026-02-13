@@ -3,6 +3,7 @@ import { getJson, putJson } from '@/lib/filebase';
 import { ShopConfig } from '@/lib/config';
 import { requireAdmin, requireAuth, isSuperAdminEmail } from '@/lib/auth';
 import { sanitizeConfigForPublic, sanitizeObjectUtf8 } from '@/lib/sanitize';
+import { saveAllAdminPermissionsToDB, getAllAdminPermissionsFromDB, deleteAdminPermissionsFromDB } from '@/lib/supabase';
 
 // Helper to save user log server-side
 const userLogKey = (id: string) => `user-logs/${id}.json`;
@@ -106,6 +107,26 @@ export async function POST(req: NextRequest) {
     const sanitizedConfig = sanitizeObjectUtf8(config);
     
     await putJson(CONFIG_KEY, sanitizedConfig);
+    
+    // Sync admin permissions to DB (if present in config)
+    if (config.adminPermissions && typeof config.adminPermissions === 'object') {
+      try {
+        // Upsert current permissions
+        await saveAllAdminPermissionsToDB(config.adminPermissions as Record<string, Record<string, boolean>>);
+        
+        // Clean up permissions for removed admins
+        const dbPerms = await getAllAdminPermissionsFromDB();
+        const configEmails = new Set(Object.keys(config.adminPermissions).map(e => e.toLowerCase()));
+        for (const dbEmail of Object.keys(dbPerms)) {
+          if (!configEmails.has(dbEmail.toLowerCase())) {
+            await deleteAdminPermissionsFromDB(dbEmail);
+          }
+        }
+      } catch (e) {
+        console.error('[config] Failed to sync admin permissions to DB:', e);
+        // Don't fail the whole save - config JSON is the primary source
+      }
+    }
     
     // Log config change
     const userAgent = req.headers.get('user-agent') || undefined;

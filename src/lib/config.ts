@@ -640,17 +640,21 @@ export interface CartItem {
 
 export const API_URL = process.env.NEXT_PUBLIC_GAS_URL || '';
 
-// Keep raw list here (case/space insensitive). If you add env support later, normalize similarly.
-const ADMIN_EMAILS_RAW = [
-  'doralaikon.th@gmail.com',
-  // Add more admin emails here
-];
+// Keep raw list here from env variable ONLY (never hardcode emails in source)
+const ADMIN_EMAILS_RAW = (
+  process.env.ADMIN_EMAILS || ''
+).split(',').map(e => e.trim()).filter(Boolean);
 
 // Super admin - can manage other admins (cannot be removed)
-export const SUPER_ADMIN_EMAIL = 'doralaikon.th@gmail.com';
+export const SUPER_ADMIN_EMAIL = (process.env.SUPER_ADMIN_EMAIL || '').trim().toLowerCase();
 
-// Normalize to lowercase and trim to avoid casing/whitespace mismatches
-export const ADMIN_EMAILS = ADMIN_EMAILS_RAW.map((e) => e.trim().toLowerCase()).filter(Boolean);
+// Normalize to lowercase and trim
+export const ADMIN_EMAILS = [
+  ...new Set([
+    ...ADMIN_EMAILS_RAW.map((e) => e.trim().toLowerCase()).filter(Boolean),
+    ...(SUPER_ADMIN_EMAIL ? [SUPER_ADMIN_EMAIL] : []),
+  ])
+];
 
 // Dynamic admin check - supports runtime admin list from config
 let dynamicAdminEmails: string[] = [];

@@ -24,6 +24,12 @@ export {
   logSecurityEvent,
   getSecurityAuditLogs,
   cleanupOldData,
+  // Admin permissions
+  getAdminPermissionsFromDB,
+  getAllAdminPermissionsFromDB,
+  saveAdminPermissionsToDB,
+  saveAllAdminPermissionsToDB,
+  deleteAdminPermissionsFromDB,
 } from './supabase';
 
 // Type exports

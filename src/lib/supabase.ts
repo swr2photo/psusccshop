@@ -1074,3 +1074,177 @@ export function isSupabaseStorageUrl(url: string): boolean {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
   return url.includes(`${supabaseUrl}/storage/`) || url.includes('supabase.co/storage/');
 }
+
+// ==================== ADMIN PERMISSIONS ====================
+
+/** DB column names → camelCase mapping */
+const DB_PERM_COLUMNS = [
+  'can_manage_shop', 'can_manage_sheet', 'can_manage_shipping', 'can_manage_payment',
+  'can_manage_products', 'can_manage_orders', 'can_manage_pickup', 'can_manage_tracking',
+  'can_manage_refunds', 'can_manage_announcement', 'can_manage_events', 'can_manage_promo_codes',
+  'can_manage_support', 'can_send_email', 'can_manage_live_stream',
+] as const;
+
+function snakeToCamel(s: string): string {
+  return s.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+}
+
+function camelToSnake(s: string): string {
+  return s.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
+}
+
+/** Convert DB row → AdminPermissions object */
+function dbRowToPerms(row: Record<string, any>): Record<string, boolean> {
+  const perms: Record<string, boolean> = {};
+  for (const col of DB_PERM_COLUMNS) {
+    perms[snakeToCamel(col)] = Boolean(row[col]);
+  }
+  return perms;
+}
+
+/** Convert AdminPermissions object → DB columns */
+function permsToDbRow(email: string, perms: Record<string, boolean>): Record<string, any> {
+  const row: Record<string, any> = { email: email.trim().toLowerCase() };
+  for (const [key, value] of Object.entries(perms)) {
+    const col = camelToSnake(key);
+    if (DB_PERM_COLUMNS.includes(col as any)) {
+      row[col] = Boolean(value);
+    }
+  }
+  return row;
+}
+
+/**
+ * Get admin permissions from DB for a specific email
+ */
+export async function getAdminPermissionsFromDB(email: string): Promise<Record<string, boolean> | null> {
+  const db = getSupabaseAdmin();
+  if (!db) return null;
+  
+  try {
+    const { data, error } = await db
+      .from('admin_permissions')
+      .select('*')
+      .eq('email', email.trim().toLowerCase())
+      .single();
+    
+    if (error && error.code !== 'PGRST116') {
+      // PGRST116 = no rows returned, which is expected for new admins
+      console.error('[supabase] getAdminPermissionsFromDB error:', error);
+      return null;
+    }
+    
+    return data ? dbRowToPerms(data) : null;
+  } catch (error) {
+    console.error('[supabase] getAdminPermissionsFromDB error:', error);
+    return null;
+  }
+}
+
+/**
+ * Get all admin permissions from DB
+ */
+export async function getAllAdminPermissionsFromDB(): Promise<Record<string, Record<string, boolean>>> {
+  const db = getSupabaseAdmin();
+  if (!db) return {};
+  
+  try {
+    const { data, error } = await db
+      .from('admin_permissions')
+      .select('*');
+    
+    if (error) {
+      console.error('[supabase] getAllAdminPermissionsFromDB error:', error);
+      return {};
+    }
+    
+    const result: Record<string, Record<string, boolean>> = {};
+    for (const row of (data || [])) {
+      result[row.email] = dbRowToPerms(row);
+    }
+    return result;
+  } catch (error) {
+    console.error('[supabase] getAllAdminPermissionsFromDB error:', error);
+    return {};
+  }
+}
+
+/**
+ * Save admin permissions to DB (upsert)
+ */
+export async function saveAdminPermissionsToDB(
+  email: string, 
+  perms: Record<string, boolean>
+): Promise<boolean> {
+  const db = getSupabaseAdmin();
+  if (!db) return false;
+  
+  try {
+    const row = permsToDbRow(email, perms);
+    const { error } = await db
+      .from('admin_permissions')
+      .upsert(row, { onConflict: 'email' });
+    
+    if (error) {
+      console.error('[supabase] saveAdminPermissionsToDB error:', error);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('[supabase] saveAdminPermissionsToDB error:', error);
+    return false;
+  }
+}
+
+/**
+ * Save all admin permissions to DB (batch upsert)
+ */
+export async function saveAllAdminPermissionsToDB(
+  allPerms: Record<string, Record<string, boolean>>
+): Promise<boolean> {
+  const db = getSupabaseAdmin();
+  if (!db) return false;
+  
+  try {
+    const rows = Object.entries(allPerms).map(([email, perms]) => permsToDbRow(email, perms));
+    
+    if (rows.length === 0) return true;
+    
+    const { error } = await db
+      .from('admin_permissions')
+      .upsert(rows, { onConflict: 'email' });
+    
+    if (error) {
+      console.error('[supabase] saveAllAdminPermissionsToDB error:', error);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('[supabase] saveAllAdminPermissionsToDB error:', error);
+    return false;
+  }
+}
+
+/**
+ * Delete admin permissions from DB
+ */
+export async function deleteAdminPermissionsFromDB(email: string): Promise<boolean> {
+  const db = getSupabaseAdmin();
+  if (!db) return false;
+  
+  try {
+    const { error } = await db
+      .from('admin_permissions')
+      .delete()
+      .eq('email', email.trim().toLowerCase());
+    
+    if (error) {
+      console.error('[supabase] deleteAdminPermissionsFromDB error:', error);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('[supabase] deleteAdminPermissionsFromDB error:', error);
+    return false;
+  }
+}

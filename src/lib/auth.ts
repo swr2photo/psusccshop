@@ -5,27 +5,26 @@ import { getServerSession, Session } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { NextResponse } from 'next/server';
 import { getJson } from '@/lib/filebase';
+import { getAdminPermissionsFromDB } from '@/lib/supabase';
 import type { AdminPermissions } from '@/lib/config';
 
 // Re-export authOptions for convenience
 export { authOptions };
 
-// Admin emails list - reads from environment variable first, then fallback to hardcoded list
-const ADMIN_EMAILS_ENV = process.env.NEXT_PUBLIC_ADMIN_EMAILS || process.env.ADMIN_EMAILS || '';
-const ADMIN_EMAILS_HARDCODED = [
-  'psuscc@psusci.club',
-  'doralaikon.th@gmail.com',
-  'tanawatnoojit@gmail.com',
-  'tanawat.n@psu.ac.th',
-];
+// Admin emails list - reads from environment variable ONLY (never hardcode in source)
+const ADMIN_EMAILS_ENV = process.env.ADMIN_EMAILS || '';
 
-// Super admin email - cannot be removed
-export const SUPER_ADMIN_EMAIL = 'doralaikon.th@gmail.com';
+// Super admin email - from env var (cannot be removed)
+export const SUPER_ADMIN_EMAIL = (process.env.SUPER_ADMIN_EMAIL || '').trim().toLowerCase();
 
-// Combine and normalize all admin emails
+if (!SUPER_ADMIN_EMAIL) {
+  console.warn('[auth] SUPER_ADMIN_EMAIL is not set in environment variables!');
+}
+
+// Normalize all admin emails from env
 const ADMIN_EMAILS_RAW = [
   ...ADMIN_EMAILS_ENV.split(',').map((e) => e.trim()).filter(Boolean),
-  ...ADMIN_EMAILS_HARDCODED,
+  ...(SUPER_ADMIN_EMAIL ? [SUPER_ADMIN_EMAIL] : []),
 ];
 
 export const ADMIN_EMAILS = [...new Set(ADMIN_EMAILS_RAW.map((e) => e.trim().toLowerCase()).filter(Boolean))];
@@ -55,7 +54,7 @@ const getDynamicAdminEmails = async (): Promise<string[]> => {
 };
 
 /**
- * Get admin permissions from config for a specific email
+ * Get admin permissions - tries DB first, falls back to config JSON
  */
 const getAdminPermissions = async (email: string): Promise<AdminPermissions> => {
   const defaultPerms: AdminPermissions = {
@@ -73,8 +72,16 @@ const getAdminPermissions = async (email: string): Promise<AdminPermissions> => 
     canManagePayment: false,
     canManageSupport: true,
     canSendEmail: false,
+    canManageLiveStream: true,
   };
   try {
+    // Try DB first (admin_permissions table)
+    const dbPerms = await getAdminPermissionsFromDB(email);
+    if (dbPerms) {
+      return { ...defaultPerms, ...dbPerms } as AdminPermissions;
+    }
+    
+    // Fallback: read from config JSON (backward compatibility)
     const config = await getJson<{ adminPermissions?: Record<string, AdminPermissions> }>(CONFIG_KEY);
     const perms = config?.adminPermissions?.[email.trim().toLowerCase()];
     return perms ? { ...defaultPerms, ...perms } : defaultPerms;
