@@ -91,7 +91,7 @@ const nextConfig: NextConfig = {
             "connect-src 'self' https://*.filebase.com https://*.filebase.io https://api.resend.com https://challenges.cloudflare.com https://*.supabase.co wss://*.supabase.co https://*.googlevideo.com https://*.youtube.com https://*.facebook.com;",
             "media-src 'self' blob: https://*.cdn.jsdelivr.net https://*.cloudflarestream.com;",
             "worker-src 'self';",
-            "frame-src https://challenges.cloudflare.com https://www.youtube.com https://www.facebook.com https://web.facebook.com https://player.vimeo.com;",
+            "frame-src https://challenges.cloudflare.com https://www.youtube.com https://www.youtube-nocookie.com https://www.facebook.com https://web.facebook.com https://player.vimeo.com;",
             "frame-ancestors 'none';",
             "object-src 'none';",
             "base-uri 'self';",

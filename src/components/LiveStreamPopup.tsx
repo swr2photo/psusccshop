@@ -198,32 +198,194 @@ const POPUP_CSS = `
 `;
 
 // ==================== HELPERS ====================
+function getYouTubeVideoId(url: string): string | null {
+  const patterns = [
+    /(?:youtu\.be\/)([a-zA-Z0-9_-]{11})/,
+    /youtube(?:-nocookie)?\.com\/(?:watch\?.*v=|live\/|embed\/|shorts\/)([a-zA-Z0-9_-]{11})/,
+    /youtube(?:-nocookie)?\.com\/.*[?&]v=([a-zA-Z0-9_-]{11})/,
+  ];
+  for (const p of patterns) {
+    const m = url.match(p);
+    if (m) return m[1];
+  }
+  if (/^[a-zA-Z0-9_-]{11}$/.test(url.trim())) return url.trim();
+  return null;
+}
+
 function getEmbedUrl(url: string, type: string): string {
   if (type === 'youtube') {
-    // Support: watch?v=, live/, embed/, youtu.be/, shorts/, and direct video IDs
-    const patterns = [
-      /(?:youtu\.be\/)([a-zA-Z0-9_-]{11})/,
-      /youtube\.com\/(?:watch\?.*v=|live\/|embed\/|shorts\/)([a-zA-Z0-9_-]{11})/,
-      /youtube\.com\/.*[?&]v=([a-zA-Z0-9_-]{11})/,
-    ];
-    for (const pattern of patterns) {
-      const match = url.match(pattern);
-      if (match) {
-        return `https://www.youtube.com/embed/${match[1]}?autoplay=1&mute=1&rel=0&modestbranding=1&playsinline=1`;
-      }
-    }
-    // If it looks like a bare video ID (11 chars)
-    if (/^[a-zA-Z0-9_-]{11}$/.test(url.trim())) {
-      return `https://www.youtube.com/embed/${url.trim()}?autoplay=1&mute=1&rel=0&modestbranding=1&playsinline=1`;
-    }
+    const vid = getYouTubeVideoId(url);
+    if (vid) return `https://www.youtube-nocookie.com/embed/${vid}?autoplay=1&mute=1&rel=0&modestbranding=1&playsinline=1`;
     return url;
   }
   if (type === 'facebook') {
-    // Facebook video embed — use plugins/video.php with proper params
     const encodedUrl = encodeURIComponent(url);
     return `https://www.facebook.com/plugins/video.php?href=${encodedUrl}&width=720&height=405&show_text=false&autoplay=true&allowFullScreen=true&appId=`;
   }
   return url;
+}
+
+function getYouTubeThumbnail(url: string): string | null {
+  const vid = getYouTubeVideoId(url);
+  return vid ? `https://img.youtube.com/vi/${vid}/maxresdefault.jpg` : null;
+}
+
+function getStreamLabel(type: string): { label: string; icon: string; color: string } {
+  switch (type) {
+    case 'youtube': return { label: 'ดูบน YouTube', icon: '▶', color: '#FF0000' };
+    case 'facebook': return { label: 'ดูบน Facebook', icon: '▶', color: '#1877F2' };
+    default: return { label: 'ดูไลฟ์สด', icon: '▶', color: '#ef4444' };
+  }
+}
+
+// ==================== EMBED PLAYER WITH FALLBACK ====================
+function EmbedPlayer({ liveData }: { liveData: LiveData }) {
+  const [embedFailed, setEmbedFailed] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // For YouTube/Facebook — try embed first, fallback to preview card if blocked
+  const isEmbeddable = liveData.streamType === 'youtube' || liveData.streamType === 'facebook' || liveData.streamType === 'custom';
+  const thumbnailUrl = liveData.thumbnailUrl || (liveData.streamType === 'youtube' ? getYouTubeThumbnail(liveData.streamUrl) : null);
+  const streamInfo = getStreamLabel(liveData.streamType);
+
+  useEffect(() => {
+    // If embed doesn't load within 3 seconds, show fallback
+    if (isEmbeddable && !embedFailed) {
+      timerRef.current = setTimeout(() => {
+        // Check if iframe actually loaded content
+        try {
+          const iframe = iframeRef.current;
+          if (iframe) {
+            // Can't access cross-origin iframe content, but if it errors it won't render
+            // The onerror/onload approach below handles this
+          }
+        } catch { /* ignore */ }
+      }, 5000);
+    }
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, [isEmbeddable, embedFailed]);
+
+  // HLS — use HLS player directly (no embed issues)
+  if (liveData.streamType === 'hls') {
+    return <HLSPlayer url={liveData.streamUrl} />;
+  }
+
+  // Show preview card (for when embed fails or for better UX)
+  if (embedFailed || !isEmbeddable) {
+    return (
+      <PreviewCard
+        thumbnailUrl={thumbnailUrl}
+        streamUrl={liveData.streamUrl}
+        streamInfo={streamInfo}
+      />
+    );
+  }
+
+  // Try iframe embed with fallback
+  return (
+    <>
+      <iframe
+        ref={iframeRef}
+        src={getEmbedUrl(liveData.streamUrl, liveData.streamType)}
+        allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+        allowFullScreen
+        referrerPolicy="no-referrer-when-downgrade"
+        scrolling="no"
+        style={{ border: 'none', overflow: 'hidden', width: '100%', height: '100%', position: 'absolute', inset: 0 }}
+        onError={() => setEmbedFailed(true)}
+        onLoad={(e) => {
+          // Clear the timeout — iframe loaded something
+          if (timerRef.current) clearTimeout(timerRef.current);
+          // If iframe is blank/error page, the load event still fires
+          // so we additionally show a "open directly" button overlay
+        }}
+      />
+      {/* Always show a floating "open directly" button on top of iframe */}
+      <a
+        href={liveData.streamUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          position: 'absolute',
+          bottom: 12,
+          right: 12,
+          background: streamInfo.color,
+          color: '#fff',
+          padding: '8px 16px',
+          borderRadius: 10,
+          fontSize: '0.8rem',
+          fontWeight: 600,
+          textDecoration: 'none',
+          zIndex: 10,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Noto Sans Thai", system-ui, sans-serif',
+        }}
+      >
+        {streamInfo.icon} เปิดตรง
+      </a>
+    </>
+  );
+}
+
+// ==================== PREVIEW CARD (when embed is blocked) ====================
+function PreviewCard({ thumbnailUrl, streamUrl, streamInfo }: {
+  thumbnailUrl: string | null;
+  streamUrl: string;
+  streamInfo: { label: string; icon: string; color: string };
+}) {
+  return (
+    <div style={{
+      width: '100%', height: '100%', position: 'absolute', inset: 0,
+      background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      gap: 16, padding: 20,
+    }}>
+      {thumbnailUrl && (
+        <img
+          src={thumbnailUrl}
+          alt="Live stream thumbnail"
+          style={{
+            position: 'absolute', inset: 0, width: '100%', height: '100%',
+            objectFit: 'cover', opacity: 0.3, filter: 'blur(2px)',
+          }}
+        />
+      )}
+      <div style={{
+        position: 'relative', zIndex: 2, textAlign: 'center',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16,
+      }}>
+        {/* Animated play icon */}
+        <div style={{
+          width: 72, height: 72, borderRadius: '50%',
+          background: `linear-gradient(135deg, ${streamInfo.color}, ${streamInfo.color}cc)`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: `0 8px 32px ${streamInfo.color}66`,
+          animation: 'live-pulse 2s ease-in-out infinite',
+        }}>
+          <span style={{ fontSize: 28, color: '#fff', marginLeft: 4 }}>▶</span>
+        </div>
+        <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', fontFamily: '-apple-system, BlinkMacSystemFont, "Noto Sans Thai", system-ui' }}>
+          กดปุ่มเพื่อดูไลฟ์สด
+        </div>
+        <a
+          href={streamUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            background: `linear-gradient(135deg, ${streamInfo.color}, ${streamInfo.color}dd)`,
+            color: '#fff', padding: '14px 32px', borderRadius: 14,
+            fontSize: '1rem', fontWeight: 700, textDecoration: 'none',
+            boxShadow: `0 8px 24px ${streamInfo.color}44`,
+            fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Noto Sans Thai", system-ui, sans-serif',
+            transition: 'all 0.2s ease',
+          }}
+        >
+          {streamInfo.label}
+        </a>
+      </div>
+    </div>
+  );
 }
 
 // ==================== COMPONENT ====================
@@ -327,21 +489,10 @@ export default function LiveStreamPopup() {
       <div className="live-popup-container" onClick={(e) => e.stopPropagation()}>
         {/* Video Player */}
         <div className="live-popup-video">
-          {(liveData.streamType === 'youtube' || liveData.streamType === 'facebook' || liveData.streamType === 'custom') ? (
-            <iframe
-              src={getEmbedUrl(liveData.streamUrl, liveData.streamType)}
-              allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-              allowFullScreen
-              referrerPolicy="no-referrer-when-downgrade"
-              scrolling="no"
-              style={{ border: 'none', overflow: 'hidden' }}
-            />
-          ) : liveData.streamType === 'hls' ? (
-            <HLSPlayer url={liveData.streamUrl} />
-          ) : null}
+          <EmbedPlayer liveData={liveData} />
 
           {/* Live badge */}
-          <div style={{ position: 'absolute', top: 12, left: 12 }}>
+          <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 10 }}>
             <span className="live-popup-badge">
               <span className="live-popup-badge-dot" />
               LIVE
@@ -371,7 +522,7 @@ export default function LiveStreamPopup() {
             <button className="live-popup-btn live-popup-btn-secondary" onClick={handleDismiss}>
               ปิด
             </button>
-            {liveData.streamType === 'youtube' && (
+            {(liveData.streamType === 'youtube' || liveData.streamType === 'facebook') && (
               <a
                 href={liveData.streamUrl}
                 target="_blank"
@@ -379,18 +530,7 @@ export default function LiveStreamPopup() {
                 className="live-popup-btn live-popup-btn-primary"
                 style={{ textDecoration: 'none', display: 'inline-block' }}
               >
-                ดูบน YouTube
-              </a>
-            )}
-            {liveData.streamType === 'facebook' && (
-              <a
-                href={liveData.streamUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="live-popup-btn live-popup-btn-primary"
-                style={{ textDecoration: 'none', display: 'inline-block' }}
-              >
-                ดูบน Facebook
+                {liveData.streamType === 'youtube' ? 'ดูบน YouTube' : 'ดูบน Facebook'}
               </a>
             )}
           </div>
