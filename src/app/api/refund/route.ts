@@ -121,6 +121,7 @@ function getRefundInfo(order: any): { refundStatus: string | null; refundData: R
  */
 export async function GET(req: NextRequest) {
   const isAdminQuery = req.nextUrl.searchParams.get('admin') === 'true';
+  const shopId = req.nextUrl.searchParams.get('shopId');
   const useColumns = await hasRefundColumns();
 
   if (isAdminQuery) {
@@ -134,20 +135,24 @@ export async function GET(req: NextRequest) {
       let data: any[];
 
       if (useColumns) {
-        const result = await supabase
+        let query = supabase
           .from('orders')
           .select('*')
           .not('refund_status', 'is', null)
           .order('refund_requested_at', { ascending: false });
+        if (shopId) query = query.eq('shop_id', shopId);
+        const result = await query;
         if (result.error) throw result.error;
         data = result.data || [];
       } else {
         // Fallback: scan notes for refund data
-        const result = await supabase
+        let query = supabase
           .from('orders')
           .select('*')
           .like('notes', '%[REFUND_DATA]%')
           .order('updated_at', { ascending: false });
+        if (shopId) query = query.eq('shop_id', shopId);
+        const result = await query;
         if (result.error) throw result.error;
         data = result.data || [];
       }

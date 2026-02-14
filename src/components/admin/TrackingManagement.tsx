@@ -72,6 +72,7 @@ import {
 
 interface TrackingManagementProps {
   showToast?: (type: 'success' | 'error' | 'warning' | 'info', message: string) => void;
+  selectedShopId?: string;
 }
 
 interface Order {
@@ -126,14 +127,14 @@ const CARRIER_LABEL_URLS: Record<string, string> = {
   flash: 'https://merchant.flashexpress.com/', // Flash Express merchant portal
 };
 
-export default function TrackingManagement({ showToast }: TrackingManagementProps) {
+export default function TrackingManagement({ showToast, selectedShopId }: TrackingManagementProps) {
   // ============== SWR HOOKS ==============
   const { 
     orders: allOrders, 
     isLoading: loadingOrders, 
     refresh: refreshOrders,
     error: ordersError 
-  } = useShippingOrders();
+  } = useShippingOrders(selectedShopId);
   
   const { 
     updateTracking, 

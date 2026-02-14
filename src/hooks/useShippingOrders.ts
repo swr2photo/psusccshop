@@ -31,11 +31,12 @@ interface Order {
   cart?: any[];
   total?: number;
   shippingOption?: string;
+  shopId?: string;
 }
 
 // ============== SHIPPING ORDERS HOOK ==============
 
-export function useShippingOrders() {
+export function useShippingOrders(selectedShopId?: string) {
   const { data, error, isLoading, mutate: revalidate } = useSWR(
     CACHE_KEYS.ADMIN_DATA,
     fetcher,
@@ -51,6 +52,9 @@ export function useShippingOrders() {
     if (!data?.data?.orders) return [];
     
     return data.data.orders.filter((o: any) => {
+      // Shop filter: skip orders not belonging to selected shop
+      if (selectedShopId && (o.shopId || o.shop_id) !== selectedShopId) return false;
+      
       // Must be in relevant status
       if (!['SHIPPED', 'READY', 'PAID'].includes(o.status)) return false;
       
@@ -109,9 +113,10 @@ export function useShippingOrders() {
         cart: o.cart,
         total: o.total || o.totalAmount || o.amount,
         shippingOption: shippingOpt,
+        shopId: o.shopId || o.shop_id,
       };
     });
-  }, [data]);
+  }, [data, selectedShopId]);
 
   return {
     orders,

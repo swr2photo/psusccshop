@@ -83,6 +83,7 @@ export async function GET(req: NextRequest) {
 
   const ref = req.nextUrl.searchParams.get('ref');
   const search = req.nextUrl.searchParams.get('search');
+  const shopId = req.nextUrl.searchParams.get('shopId');
   const isAdmin = isAdminEmail(authResult.email);
 
   try {
@@ -95,27 +96,37 @@ export async function GET(req: NextRequest) {
       // Try exact ref match first (fastest)
       const exactOrder = await getOrderByRef(searchTerm);
       if (exactOrder) {
-        results.push({
-          ref: exactOrder.ref,
-          name: exactOrder.customerName || exactOrder.name,
-          email: exactOrder.customerEmail || exactOrder.email,
-          status: exactOrder.status,
-          amount: exactOrder.totalAmount || exactOrder.amount,
-          cart: exactOrder.cart || exactOrder.items || [],
-          pickup: exactOrder.pickup,
-          date: exactOrder.date,
-        });
-        return NextResponse.json({ status: 'success', data: results });
+        // Skip if shop filter is active and order doesn't belong to this shop
+        const orderShopId = exactOrder.shopId || exactOrder.shop_id;
+        if (!shopId || orderShopId === shopId) {
+          results.push({
+            ref: exactOrder.ref,
+            name: exactOrder.customerName || exactOrder.name,
+            email: exactOrder.customerEmail || exactOrder.email,
+            status: exactOrder.status,
+            amount: exactOrder.totalAmount || exactOrder.amount,
+            cart: exactOrder.cart || exactOrder.items || [],
+            pickup: exactOrder.pickup,
+            date: exactOrder.date,
+          });
+          return NextResponse.json({ status: 'success', data: results });
+        }
       }
       
       // If not exact match, search with Supabase ilike
       const db = getSupabaseAdmin();
       if (db) {
-        const { data: orders, error } = await db
+        let query = db
           .from('orders')
           .select('*')
-          .or(`ref.ilike.%${searchTerm}%,customer_name.ilike.%${searchTerm}%,customer_email.ilike.%${searchTerm}%`)
-          .limit(50);
+          .or(`ref.ilike.%${searchTerm}%,customer_name.ilike.%${searchTerm}%,customer_email.ilike.%${searchTerm}%`);
+        
+        // Filter by shop if specified
+        if (shopId) {
+          query = query.eq('shop_id', shopId);
+        }
+        
+        const { data: orders, error } = await query.limit(50);
         
         if (!error && orders) {
           for (const order of orders) {

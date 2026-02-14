@@ -67,9 +67,10 @@ interface RefundOrder {
 
 interface Props {
   showToast: (type: 'success' | 'error' | 'warning', message: string) => void;
+  selectedShopId?: string;
 }
 
-export default function RefundManagement({ showToast }: Props) {
+export default function RefundManagement({ showToast, selectedShopId }: Props) {
   const [refundOrders, setRefundOrders] = useState<RefundOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
@@ -84,7 +85,8 @@ export default function RefundManagement({ showToast }: Props) {
   const fetchRefundOrders = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/refund?admin=true');
+      const shopParam = selectedShopId ? `&shopId=${encodeURIComponent(selectedShopId)}` : '';
+      const res = await fetch(`/api/refund?admin=true${shopParam}`);
       const data = await res.json();
       if (data.orders) {
         setRefundOrders(data.orders);
@@ -94,7 +96,7 @@ export default function RefundManagement({ showToast }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [showToast]);
+  }, [showToast, selectedShopId]);
 
   useEffect(() => {
     fetchRefundOrders();

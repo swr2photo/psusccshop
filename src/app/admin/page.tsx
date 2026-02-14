@@ -5960,7 +5960,8 @@ export default function AdminPage(): JSX.Element {
     
     setPickupSearching(true);
     try {
-      const res = await fetch(`/api/pickup?search=${encodeURIComponent(term.trim())}`);
+      const shopParam = isShopMode && selectedShopId ? `&shopId=${encodeURIComponent(selectedShopId)}` : '';
+      const res = await fetch(`/api/pickup?search=${encodeURIComponent(term.trim())}${shopParam}`);
       const data = await res.json();
       if (data.status === 'success') {
         setPickupSearchResults(data.data || []);
@@ -5972,7 +5973,7 @@ export default function AdminPage(): JSX.Element {
     } finally {
       setPickupSearching(false);
     }
-  }, [showToast]);
+  }, [showToast, isShopMode, selectedShopId]);
 
   // Handle pickup confirmation
   const handlePickupConfirm = useCallback(async () => {
@@ -6061,21 +6062,28 @@ export default function AdminPage(): JSX.Element {
     }
   }, [showToast, isProcessingScan]);
 
+  // Shop-scoped orders (used for dashboard stats, badge counts, pickup, etc.)
+  const shopOrders = useMemo(() => {
+    if (!selectedShopId || selectedShopId === 'all') return orders;
+    return orders.filter(o => o.shopId === selectedShopId);
+  }, [orders, selectedShopId]);
+
   // Memoize pickup data outside PickupView to avoid conditional hook calls
+  // Use shopOrders so pickup list is shop-scoped when a shop is selected
   const readyForPickup = useMemo(() => 
-    orders.filter(o => ['READY', 'SHIPPED', 'PAID'].includes(normalizeStatusKey(o.status))),
-    [orders]
+    shopOrders.filter(o => ['READY', 'SHIPPED', 'PAID'].includes(normalizeStatusKey(o.status))),
+    [shopOrders]
   );
   
   const completedToday = useMemo(() => {
     const today = new Date().toDateString();
-    return orders.filter(o => {
+    return shopOrders.filter(o => {
       if (normalizeStatusKey(o.status) !== 'COMPLETED') return false;
       const pickup = o.raw?.pickup;
       if (!pickup?.pickedUpAt) return false;
       return new Date(pickup.pickedUpAt).toDateString() === today;
     });
-  }, [orders]);
+  }, [shopOrders]);
 
   const PickupView = () => {
     return (
@@ -7085,12 +7093,6 @@ export default function AdminPage(): JSX.Element {
 
   // Ref to preserve search input focus
   const searchInputRef = useRef<HTMLInputElement>(null);
-
-  // Shop-scoped orders (used for dashboard stats, badge counts, etc.)
-  const shopOrders = useMemo(() => {
-    if (!selectedShopId || selectedShopId === 'all') return orders;
-    return orders.filter(o => o.shopId === selectedShopId);
-  }, [orders, selectedShopId]);
 
   // Memoize filtered orders outside the render function
   const filteredOrders = useMemo(() => {
@@ -9540,7 +9542,7 @@ export default function AdminPage(): JSX.Element {
           )}
           {activeTab === 2 && (canManageOrders ? OrdersView() : <NoPermissionView permission="จัดการออเดอร์" />)}
           {activeTab === 3 && (canManagePickup ? PickupView() : <NoPermissionView permission="จัดการรับสินค้า" />)}
-          {activeTab === 4 && (canManageSupport ? <SupportChatPanel /> : <NoPermissionView permission="แชทสนับสนุน" />)}
+          {activeTab === 4 && (canManageSupport ? <SupportChatPanel selectedShopId={isShopMode ? selectedShopId : undefined} /> : <NoPermissionView permission="แชทสนับสนุน" />)}
           {activeTab === 5 && (
             canManageAnnouncement ? (
               <AnnouncementsView
@@ -9615,8 +9617,8 @@ export default function AdminPage(): JSX.Element {
           {activeTab === 9 && (isSuperAdminUser ? <LogsView /> : <NoPermissionView permission="ดูประวัติระบบ" />)}
           {activeTab === 10 && (canManageShipping ? <ShippingSettings onSave={() => showToast('success', 'บันทึกการตั้งค่าจัดส่งแล้ว')} /> : <NoPermissionView permission="ตั้งค่าจัดส่ง" />)}
           {activeTab === 11 && (canManagePayment ? <PaymentSettings onSave={() => showToast('success', 'บันทึกการตั้งค่าชำระเงินแล้ว')} /> : <NoPermissionView permission="ตั้งค่าชำระเงิน" />)}
-          {activeTab === 12 && (canManageTracking ? <TrackingManagement showToast={showToast} /> : <NoPermissionView permission="ติดตามพัสดุ" />)}
-          {activeTab === 13 && (canManageRefunds ? <RefundManagement showToast={showToast} /> : <NoPermissionView permission="จัดการคืนเงิน" />)}
+          {activeTab === 12 && (canManageTracking ? <TrackingManagement showToast={showToast} selectedShopId={isShopMode ? selectedShopId : undefined} /> : <NoPermissionView permission="ติดตามพัสดุ" />)}
+          {activeTab === 13 && (canManageRefunds ? <RefundManagement showToast={showToast} selectedShopId={isShopMode ? selectedShopId : undefined} /> : <NoPermissionView permission="จัดการคืนเงิน" />)}
           {activeTab === 17 && (isSuperAdminUser ? <ShopManagement showToast={showToast} isSuperAdmin={isSuperAdminUser} userEmail={session?.user?.email || ''} /> : <NoPermissionView permission="จัดการร้านค้าย่อย" />)}
         </Box>
       </Box>

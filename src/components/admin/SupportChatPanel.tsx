@@ -122,7 +122,7 @@ interface ChatSettings {
   notification_sound: boolean;
 }
 
-export default function SupportChatPanel() {
+export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: string }) {
   const { data: session } = useSession();
   const { warning: toastWarning, error: toastError } = useNotification();
   const { isSupported: pushSupported, isSubscribed: pushSubscribed, subscribe: pushSubscribe } = usePushNotification();
@@ -234,14 +234,15 @@ export default function SupportChatPanel() {
   const fetchChats = useCallback(async () => {
     try {
       const filter = ['all', 'pending', 'my', 'closed'][tabValue];
-      const res = await fetch('/api/admin/support-chat?filter=' + filter);
+      const shopParam = selectedShopId ? `&shopId=${encodeURIComponent(selectedShopId)}` : '';
+      const res = await fetch('/api/admin/support-chat?filter=' + filter + shopParam);
       const data = await res.json();
       if (data.chats) setChats(data.chats);
       if (data.stats) setStats(data.stats);
     } catch (error) {
       console.error('Error fetching chats:', error);
     }
-  }, [tabValue]);
+  }, [tabValue, selectedShopId]);
 
   const fetchChatDetails = useCallback(async (chatId: string, markRead = false) => {
     try {
