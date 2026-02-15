@@ -5976,32 +5976,9 @@ export default function HomePage() {
                 {t.nav.shopTitle}
               </Typography>
 
-              <Typography sx={{ color: 'var(--foreground)', mb: 2, fontSize: '0.95rem', lineHeight: 1.8, textAlign: 'center', maxWidth: 480, mx: 'auto', fontWeight: 400 }}>
+              <Typography sx={{ color: 'var(--text-muted)', mb: 4, fontSize: '0.85rem', lineHeight: 1.7, textAlign: 'center', maxWidth: 400, mx: 'auto' }}>
                 {t.nav.appDescription}
               </Typography>
-
-              {/* Feature highlights for app purpose clarity */}
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.8, mb: 3, maxWidth: 420, mx: 'auto' }}>
-                {[
-                  lang === 'en' ? '🛍️ Browse & purchase club merchandise and souvenirs' : '🛍️ เลือกซื้อสินค้าชุมนุมและของที่ระลึก',
-                  lang === 'en' ? '💳 Secure PromptPay payment with slip verification' : '💳 ชำระเงินผ่าน PromptPay พร้อมระบบตรวจสลิป',
-                  lang === 'en' ? '📦 Real-time order tracking and history' : '📦 ติดตามคำสั่งซื้อแบบเรียลไทม์',
-                ].map((feature, i) => (
-                  <Typography key={i} sx={{ color: 'var(--text-muted)', fontSize: '0.82rem', textAlign: 'left', lineHeight: 1.5 }}>
-                    {feature}
-                  </Typography>
-                ))}
-              </Box>
-
-              {/* Prominent Privacy & Terms links */}
-              <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mb: 3 }}>
-                <Link href="/privacy" style={{ color: 'var(--primary)', fontSize: '0.88rem', fontWeight: 600, textDecoration: 'underline' }}>
-                  {lang === 'en' ? '🔒 Privacy Policy' : '🔒 นโยบายความเป็นส่วนตัว'}
-                </Link>
-                <Link href="/terms" style={{ color: 'var(--primary)', fontSize: '0.88rem', fontWeight: 600, textDecoration: 'underline' }}>
-                  {lang === 'en' ? '📄 Terms of Service' : '📄 ข้อกำหนดการใช้งาน'}
-                </Link>
-              </Box>
               
               <Divider sx={{ borderColor: 'var(--glass-border)', mb: 4 }} />
               
@@ -6217,23 +6194,15 @@ export default function HomePage() {
         </Box>
 
         {/* Footer with links — visible without login */}
-        <Box sx={{ py: 4, textAlign: 'center', borderTop: '1px solid var(--glass-border)', px: 2 }}>
-          <Typography sx={{ color: 'var(--foreground)', fontSize: '0.9rem', fontWeight: 600, mb: 1 }}>
-            SCC Shop — {lang === 'en' ? 'Official Online Store' : 'ร้านค้าออนไลน์อย่างเป็นทางการ'}
-          </Typography>
-          <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.82rem', mb: 2, maxWidth: 500, mx: 'auto', lineHeight: 1.6 }}>
-            {lang === 'en' 
-              ? 'Science Computer Club (SCC), Faculty of Science, Prince of Songkla University. Selling club shirts, faculty apparel, and souvenir merchandise.'
-              : 'ชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ มหาวิทยาลัยสงขลานครินทร์ จำหน่ายเสื้อชุมนุม เสื้อคณะ และสินค้าที่ระลึก'}
-          </Typography>
-          <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.75rem', mb: 1.5 }}>
+        <Box sx={{ py: 3, textAlign: 'center', borderTop: '1px solid var(--glass-border)' }}>
+          <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.75rem', mb: 1 }}>
             © {new Date().getFullYear()} Science Computer Club, Faculty of Science, Prince of Songkla University
           </Typography>
-          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 3 }}>
-            <Link href="/privacy" style={{ color: 'var(--primary)', fontSize: '0.85rem', fontWeight: 600, textDecoration: 'underline' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
+            <Link href="/privacy" style={{ color: 'var(--primary)', fontSize: '0.78rem', textDecoration: 'underline' }}>
               {lang === 'en' ? 'Privacy Policy' : 'นโยบายความเป็นส่วนตัว'}
             </Link>
-            <Link href="/terms" style={{ color: 'var(--primary)', fontSize: '0.85rem', fontWeight: 600, textDecoration: 'underline' }}>
+            <Link href="/terms" style={{ color: 'var(--primary)', fontSize: '0.78rem', textDecoration: 'underline' }}>
               {lang === 'en' ? 'Terms of Service' : 'ข้อกำหนดการใช้งาน'}
             </Link>
           </Box>
