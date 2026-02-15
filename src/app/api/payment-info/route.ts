@@ -92,10 +92,23 @@ export async function GET(req: NextRequest) {
     const effectivePromptPayId = shopPaymentInfo?.promptPayId || process.env.PROMPTPAY_ID || '';
 
     // ตรวจสอบสถานะระบบชำระเงิน
-    const CONFIG_KEY = 'config/shop-settings.json';
-    const shopConfig = await getJson<any>(CONFIG_KEY);
-    const paymentEnabled = shopConfig?.paymentEnabled !== false;
-    const paymentDisabledMessage = shopConfig?.paymentDisabledMessage || 'ระบบชำระเงินปิดให้บริการชั่วคราว';
+    // For shop orders, check shop-specific settings first; fallback to global
+    let paymentEnabled = true;
+    let paymentDisabledMessage = 'ระบบชำระเงินปิดให้บริการชั่วคราว';
+    if (orderShopId) {
+      // Use shop-specific payment settings if available
+      const shopData = await getShopById(orderShopId);
+      if (shopData?.settings && typeof shopData.settings.paymentEnabled === 'boolean') {
+        paymentEnabled = shopData.settings.paymentEnabled;
+        paymentDisabledMessage = shopData.settings.paymentDisabledMessage || paymentDisabledMessage;
+      }
+    } else {
+      // Global payment config for main shop
+      const CONFIG_KEY = 'config/shop-settings.json';
+      const shopConfig = await getJson<any>(CONFIG_KEY);
+      paymentEnabled = shopConfig?.paymentEnabled !== false;
+      paymentDisabledMessage = shopConfig?.paymentDisabledMessage || paymentDisabledMessage;
+    }
 
     const baseAmount = Number(order.totalAmount ?? order.amount ?? calculateOrderTotal(order.cart || [])) || 0;
     const discount = Number(order.discount ?? 0);

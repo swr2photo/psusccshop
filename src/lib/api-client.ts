@@ -464,6 +464,9 @@ export async function submitOrder(data: {
   // Promo code
   promoCode?: string;
   promoDiscount?: number;
+  // Multi-shop support
+  shopId?: string;
+  shopSlug?: string;
 }): Promise<APIResponse> {
   return fetchJson('/api/orders', { method: 'POST', body: data });
 }

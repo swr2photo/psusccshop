@@ -16,6 +16,7 @@ import {
 import { useSession, signIn } from 'next-auth/react';
 import dynamic from 'next/dynamic';
 const PasskeyLoginButton = dynamic(() => import('@/components/PasskeyLoginButton'), { ssr: false });
+const TurnstileWidget = dynamic(() => import('@/components/TurnstileWidget'), { ssr: false });
 import Link from 'next/link';
 import { useCartStore } from '@/store/cartStore';
 import { useWishlistStore } from '@/store/wishlistStore';
@@ -117,6 +118,9 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
   const addToCart = useCartStore((s) => s.addToCart);
   const wishlistStore = useWishlistStore();
 
+  // Filter cart items for this shop only
+  const shopCart = useMemo(() => cart.filter(item => item.shopSlug === shopSlug), [cart, shopSlug]);
+
   const [shop, setShop] = useState<ShopInfo>(initialShop);
   const [products, setProducts] = useState<Product[]>([]);
   const [announcements, setAnnouncements] = useState<any[]>([]);
@@ -143,6 +147,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
   const [orderName, setOrderName] = useState('');
   const [orderPhone, setOrderPhone] = useState('');
   const [paymentRef, setPaymentRef] = useState<string | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState('');
 
   // Load user profile for checkout
   useEffect(() => {
@@ -203,7 +208,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       showToast('warning', lang === 'en' ? 'Please sign in to checkout' : 'กรุณาเข้าสู่ระบบก่อนสั่งซื้อ');
       return;
     }
-    if (cart.length === 0) {
+    if (shopCart.length === 0) {
       showToast('warning', lang === 'en' ? 'Cart is empty' : 'ตะกร้าว่าง');
       return;
     }
@@ -211,17 +216,21 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       showToast('warning', lang === 'en' ? 'Please enter your name' : 'กรุณากรอกชื่อ');
       return;
     }
+    if (!turnstileToken) {
+      showToast('warning', lang === 'en' ? 'Please complete the verification' : 'กรุณายืนยันว่าคุณไม่ใช่บอท');
+      return;
+    }
 
     setCheckoutProcessing(true);
     try {
-      const totalAmount = cart.reduce((sum, item) => sum + item.total, 0);
+      const totalAmount = shopCart.reduce((sum, item) => sum + item.total, 0);
       const res = await submitOrderApi({
         customerName: orderName.trim(),
         customerEmail: session.user.email,
         customerPhone: orderPhone.trim(),
         customerAddress: '',
         customerInstagram: '',
-        cart: cart.map(item => ({
+        cart: shopCart.map(item => ({
           productId: item.id,
           productName: item.name,
           size: item.size || '-',
@@ -230,19 +239,21 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
           options: {},
         })),
         totalAmount,
+        turnstileToken,
         shippingOptionId: 'pickup',
         paymentOptionId: 'bank_transfer',
         shopId: shop.id,
         shopSlug: shop.slug,
-      } as any);
+      });
 
       if (res.status === 'success' && res.ref) {
         showToast('success', `${lang === 'en' ? 'Order placed!' : 'สั่งซื้อสำเร็จ!'} ${res.ref}`);
-        // Clear cart items belonging to this shop
-        const clearCart = useCartStore.getState().clearCart;
-        clearCart();
+        // Clear only this shop's cart items
+        const clearCartByShop = useCartStore.getState().clearCartByShop;
+        clearCartByShop(shopSlug);
         setCartOpen(false);
         setCheckoutOpen(false);
+        setTurnstileToken('');
         // Open payment
         setPaymentRef(res.ref);
       } else {
@@ -253,7 +264,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
     } finally {
       setCheckoutProcessing(false);
     }
-  }, [session, cart, orderName, orderPhone, shop.id, shop.slug, lang, showToast]);
+  }, [session, shopCart, orderName, orderPhone, shop.id, shop.slug, shopSlug, lang, showToast, turnstileToken]);
 
   // Categories from products
   const categories = useMemo(() => {
@@ -288,7 +299,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
   }, [products, selectedCategory, searchQuery]);
 
   const totalFilteredCount = Object.values(filteredGroupedProducts).reduce((sum, items) => sum + items.length, 0);
-  const cartCount = cart.length;
+  const cartCount = shopCart.length;
   const isShopOpen = shop.settings?.isOpen !== false;
 
   const handleSelectProduct = useCallback((product: Product) => {
@@ -314,6 +325,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       size: selectedSize || '-',
       total: price * quantity,
       selectedVariant: selectedVariant || undefined,
+      shopSlug,
     };
     addToCart(item);
     showToast('success', `เพิ่ม "${getProductName(selectedProduct, lang)}" ลงตะกร้าแล้ว`);
@@ -1147,14 +1159,14 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       >
         <Box sx={{ px: 3, py: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--glass-border)' }}>
           <Typography sx={{ fontWeight: 800, fontSize: '1.1rem' }}>
-            🛒 {lang === 'en' ? 'Cart' : 'ตะกร้าสินค้า'} ({cart.length})
+            🛒 {lang === 'en' ? 'Cart' : 'ตะกร้าสินค้า'} ({shopCart.length})
           </Typography>
           <IconButton onClick={() => setCartOpen(false)} sx={{ color: 'var(--text-muted)' }}>
             <X size={20} />
           </IconButton>
         </Box>
         <DialogContent sx={{ px: 3, py: 2 }}>
-          {cart.length === 0 ? (
+          {shopCart.length === 0 ? (
             <Box sx={{ py: 4, textAlign: 'center' }}>
               <ShoppingCart size={48} style={{ color: 'var(--text-muted)', marginBottom: 8 }} />
               <Typography sx={{ color: 'var(--text-muted)' }}>
@@ -1163,7 +1175,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
             </Box>
           ) : (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-              {cart.map((item, idx) => (
+              {shopCart.map((item, idx) => (
                 <Box key={idx} sx={{
                   p: 2, borderRadius: '12px',
                   bgcolor: 'var(--surface-2)',
@@ -1189,7 +1201,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                   {lang === 'en' ? 'Total' : 'รวม'}
                 </Typography>
                 <Typography sx={{ fontWeight: 800, color: '#34c759', fontSize: '1.2rem' }}>
-                  ฿{cart.reduce((sum, item) => sum + item.total, 0).toLocaleString()}
+                  ฿{shopCart.reduce((sum, item) => sum + item.total, 0).toLocaleString()}
                 </Typography>
               </Box>
               <Link href="/" style={{ textDecoration: 'none' }}>
@@ -1249,10 +1261,21 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                         size="small"
                         sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px', bgcolor: 'var(--surface-2)' }, '& .MuiInputLabel-root': { color: 'var(--text-muted)' }, '& .MuiOutlinedInput-input': { color: 'var(--foreground)' } }}
                       />
+                      {/* Turnstile CAPTCHA */}
+                      <Box sx={{ display: 'flex', justifyContent: 'center', py: 1 }}>
+                        <TurnstileWidget
+                          onSuccess={(token: string) => setTurnstileToken(token)}
+                          onExpire={() => setTurnstileToken('')}
+                          onError={() => setTurnstileToken('')}
+                          theme="dark"
+                          size="normal"
+                          action="shop-order"
+                        />
+                      </Box>
                       <Button
                         fullWidth
                         onClick={handleShopCheckout}
-                        disabled={checkoutProcessing || !orderName.trim()}
+                        disabled={checkoutProcessing || !orderName.trim() || !turnstileToken}
                         startIcon={checkoutProcessing ? <CircularProgress size={16} /> : <CreditCard size={16} />}
                         sx={{
                           background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',

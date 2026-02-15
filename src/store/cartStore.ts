@@ -32,6 +32,8 @@ export interface CartItem extends Product {
   selectedVariant?: ProductVariant;
   /** ข้อมูลเพิ่มเติมจากฟิลด์กำหนดเอง */
   customFieldValues?: Record<string, string | number>;
+  /** Sub-shop slug (undefined = main shop) */
+  shopSlug?: string;
 }
 
 interface CartState {
@@ -40,6 +42,8 @@ interface CartState {
   removeFromCart: (index: number) => void;
   updateItem: (index: number, item: CartItem) => void;
   clearCart: () => void;
+  /** Clear only items belonging to a specific shop (or main shop if shopSlug is undefined) */
+  clearCartByShop: (shopSlug?: string) => void;
   totalAmount: () => number;
   setCart: (cart: CartItem[]) => void;
 }
@@ -62,6 +66,10 @@ export const useCartStore = create<CartState>()(
       }),
 
       clearCart: () => set({ cart: [] }),
+
+      clearCartByShop: (shopSlug?: string) => set((state) => ({
+        cart: state.cart.filter(item => item.shopSlug !== shopSlug),
+      })),
 
       totalAmount: () => get().cart.reduce((sum, item) => sum + item.total, 0),
 
