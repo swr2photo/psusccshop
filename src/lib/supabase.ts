@@ -611,6 +611,8 @@ function transformDBOrderToLegacy(dbOrder: any): any {
     refundReviewedAt: dbOrder.refund_reviewed_at,
     refundReviewedBy: dbOrder.refund_reviewed_by,
     refundAdminNote: dbOrder.refund_admin_note,
+    shopId: dbOrder.shop_id || null,
+    shopSlug: dbOrder.shop_slug || null,
     createdAt: dbOrder.created_at,
     updatedAt: dbOrder.updated_at,
     _key: `orders/${new Date(dbOrder.created_at).getFullYear()}-${String(new Date(dbOrder.created_at).getMonth() + 1).padStart(2, '0')}/${dbOrder.ref}.json`,
@@ -743,11 +745,11 @@ function transformLegacyToDBUserLog(data: any): any {
  */
 export async function getOrdersByEmail(
   email: string, 
-  options: { limit?: number; offset?: number; status?: string[] } = {}
+  options: { limit?: number; offset?: number; status?: string[]; shopSlug?: string } = {}
 ): Promise<{ orders: any[]; total: number }> {
   const db = getSupabaseAdmin();
   if (!db) throw new Error('Database not available');
-  const { limit = 50, offset = 0, status } = options;
+  const { limit = 50, offset = 0, status, shopSlug } = options;
   const hash = emailHash(email);
   
   let query = db
@@ -759,6 +761,10 @@ export async function getOrdersByEmail(
   
   if (status && status.length > 0) {
     query = query.in('status', status);
+  }
+  
+  if (shopSlug) {
+    query = query.eq('shop_slug', shopSlug);
   }
   
   const { data, error, count } = await query;

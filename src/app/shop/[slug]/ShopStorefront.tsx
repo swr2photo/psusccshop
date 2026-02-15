@@ -7,16 +7,18 @@ import {
   Box, Typography, Button, Chip, Avatar, IconButton, Badge,
   Dialog, DialogContent, DialogActions, TextField,
   Snackbar, Alert, useMediaQuery, Skeleton,
-  CircularProgress,
+  CircularProgress, Tooltip,
 } from '@mui/material';
 import {
   Store, ShoppingCart, Plus, Minus, X, ArrowLeft, Search,
-  Share2, Heart, Package, Clock, Tag, CreditCard,
+  Share2, Heart, Package, Clock, Tag, CreditCard, Trash2,
+  History, MapPin, User, Phone, Instagram,
 } from 'lucide-react';
 import { useSession, signIn } from 'next-auth/react';
 import dynamic from 'next/dynamic';
 const PasskeyLoginButton = dynamic(() => import('@/components/PasskeyLoginButton'), { ssr: false });
 const TurnstileWidget = dynamic(() => import('@/components/TurnstileWidget'), { ssr: false });
+const OrderHistoryDrawer = dynamic(() => import('@/components/OrderHistoryDrawer'), { ssr: false });
 import Link from 'next/link';
 import { useCartStore } from '@/store/cartStore';
 import { useWishlistStore } from '@/store/wishlistStore';
@@ -35,7 +37,8 @@ import {
   getProductName, getProductDescription,
   getCategoryLabel, getCategoryIcon,
 } from '@/lib/config';
-import { submitOrder as submitOrderApi } from '@/lib/api-client';
+import { submitOrder as submitOrderApi, getHistory, cancelOrder as cancelOrderApi } from '@/lib/api-client';
+import type { OrderHistory } from '@/lib/shop-constants';
 
 // ==================== TYPES ====================
 interface ShopInfo {
@@ -146,8 +149,27 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
   const [checkoutProcessing, setCheckoutProcessing] = useState(false);
   const [orderName, setOrderName] = useState('');
   const [orderPhone, setOrderPhone] = useState('');
+  const [orderAddress, setOrderAddress] = useState('');
+  const [orderInstagram, setOrderInstagram] = useState('');
   const [paymentRef, setPaymentRef] = useState<string | null>(null);
   const [turnstileToken, setTurnstileToken] = useState('');
+
+  // Order History state
+  const [showOrderHistory, setShowOrderHistory] = useState(false);
+  const [orderHistory, setOrderHistory] = useState<OrderHistory[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [loadingHistoryMore, setLoadingHistoryMore] = useState(false);
+  const [historyCursor, setHistoryCursor] = useState<string | null>(null);
+  const [historyHasMore, setHistoryHasMore] = useState(false);
+  const [historyFilter, setHistoryFilter] = useState<'ALL' | 'WAITING_PAYMENT' | 'COMPLETED' | 'SHIPPED' | 'RECEIVED' | 'CANCELLED'>('ALL');
+  const [cancellingRef, setCancellingRef] = useState<string | null>(null);
+
+  // Follow shop state
+  const [isFollowing, setIsFollowing] = useState(false);
+
+  const showToast = useCallback((type: 'success' | 'error' | 'info' | 'warning', message: string) => {
+    setToast({ open: true, type, message });
+  }, []);
 
   // Load user profile for checkout
   useEffect(() => {
@@ -158,6 +180,8 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
           if (data.status === 'success' && data.data) {
             if (data.data.name && !orderName) setOrderName(data.data.name);
             if (data.data.phone && !orderPhone) setOrderPhone(data.data.phone);
+            if (data.data.address && !orderAddress) setOrderAddress(data.data.address);
+            if (data.data.instagram && !orderInstagram) setOrderInstagram(data.data.instagram);
           }
         })
         .catch(() => {});
@@ -165,9 +189,135 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user?.email]);
 
-  const showToast = useCallback((type: 'success' | 'error' | 'info' | 'warning', message: string) => {
-    setToast({ open: true, type, message });
-  }, []);
+  // Load follow state from localStorage
+  useEffect(() => {
+    try {
+      const follows = JSON.parse(localStorage.getItem('shop-follows') || '{}');
+      setIsFollowing(!!follows[shopSlug]);
+    } catch { /* ignore */ }
+  }, [shopSlug]);
+
+  const toggleFollow = useCallback(() => {
+    setIsFollowing(prev => {
+      const newVal = !prev;
+      try {
+        const follows = JSON.parse(localStorage.getItem('shop-follows') || '{}');
+        if (newVal) {
+          follows[shopSlug] = Date.now();
+        } else {
+          delete follows[shopSlug];
+        }
+        localStorage.setItem('shop-follows', JSON.stringify(follows));
+      } catch { /* ignore */ }
+      return newVal;
+    });
+  }, [shopSlug]);
+
+  // Order History - Load orders for this shop
+  const loadOrderHistory = useCallback(async (opts?: { append?: boolean }) => {
+    if (!session?.user?.email) return;
+    const append = opts?.append;
+    const pageSize = isMobile ? 20 : 50;
+    append ? setLoadingHistoryMore(true) : setLoadingHistory(true);
+    try {
+      const res = await getHistory(session.user.email, append ? historyCursor || undefined : undefined, pageSize, shopSlug);
+      if (res.status === 'success') {
+        const rawHistory = res.data?.history || (res as any)?.history || [];
+        const hasMore = Boolean(res.data?.hasMore);
+        const nextCursor = res.data?.nextCursor || null;
+        if (Array.isArray(rawHistory)) {
+          const history = rawHistory.map((order: any) => {
+            let total = order.total || order.totalAmount || order.amount || 0;
+            if (!total || total === 0) {
+              const items = order.items || order.cart || [];
+              if (Array.isArray(items) && items.length > 0) {
+                total = items.reduce((sum: number, item: any) => {
+                  const price = item.unitPrice || item.subtotal || item.price || 0;
+                  const qty = item.qty || item.quantity || 1;
+                  return sum + (item.subtotal || (price * qty));
+                }, 0);
+              }
+            }
+            return { ...order, total, items: order.items || order.cart || [] };
+          });
+          setOrderHistory(prev => {
+            if (append) {
+              const existingRefs = new Set(prev.map(o => o.ref));
+              const newOrders = history.filter((o: any) => !existingRefs.has(o.ref));
+              return [...prev, ...newOrders];
+            } else {
+              const seen = new Set<string>();
+              return history.filter((o: any) => {
+                if (seen.has(o.ref)) return false;
+                seen.add(o.ref);
+                return true;
+              });
+            }
+          });
+          setHistoryHasMore(hasMore);
+          setHistoryCursor(nextCursor);
+        } else {
+          if (!append) setOrderHistory([]);
+          setHistoryHasMore(false);
+          setHistoryCursor(null);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load history:', error);
+      showToast('error', lang === 'en' ? 'Cannot load order history' : 'ไม่สามารถโหลดประวัติคำสั่งซื้อได้');
+    } finally {
+      append ? setLoadingHistoryMore(false) : setLoadingHistory(false);
+    }
+  }, [session?.user?.email, isMobile, historyCursor, shopSlug, showToast, lang]);
+
+  // Load order history when drawer opens
+  useEffect(() => {
+    if (showOrderHistory && session?.user?.email) {
+      loadOrderHistory();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showOrderHistory, session?.user?.email, historyFilter]);
+
+  // Cancel order handler
+  const handleCancelOrder = useCallback(async (ref: string) => {
+    if (!confirm(lang === 'en' ? `Cancel order ${ref}?` : `ยกเลิกคำสั่งซื้อ ${ref}?`)) return;
+    try {
+      setCancellingRef(ref);
+      const res = await cancelOrderApi(ref);
+      if (res.status === 'success') {
+        showToast('success', lang === 'en' ? 'Order cancelled' : 'ยกเลิกคำสั่งซื้อแล้ว');
+        setOrderHistory(prev => prev.map(order => order.ref === ref ? { ...order, status: 'CANCELLED' } : order));
+        setTimeout(() => loadOrderHistory(), 500);
+      } else {
+        showToast('error', res.message || (lang === 'en' ? 'Cancel failed' : 'ยกเลิกไม่สำเร็จ'));
+      }
+    } catch (error: any) {
+      showToast('error', error.message || (lang === 'en' ? 'Cancel failed' : 'ยกเลิกไม่สำเร็จ'));
+    } finally {
+      setCancellingRef(null);
+    }
+  }, [lang, showToast, loadOrderHistory]);
+
+  // Cart operations
+  const removeFromCart = useCartStore((s) => s.removeFromCart);
+  const updateItem = useCartStore((s) => s.updateItem);
+
+  const handleRemoveCartItem = useCallback((idx: number) => {
+    removeFromCart(idx);
+    showToast('success', lang === 'en' ? 'Removed from cart' : 'ลบสินค้าออกจากตะกร้าแล้ว');
+  }, [removeFromCart, showToast, lang]);
+
+  const handleUpdateCartQty = useCallback((globalIdx: number, newQty: number) => {
+    if (newQty <= 0) {
+      removeFromCart(globalIdx);
+      showToast('success', lang === 'en' ? 'Removed from cart' : 'ลบสินค้าออกจากตะกร้าแล้ว');
+      return;
+    }
+    const item = cart[globalIdx];
+    if (item) {
+      updateItem(globalIdx, { ...item, qty: newQty, total: item.price * newQty });
+    }
+  }, [cart, removeFromCart, updateItem, showToast, lang]);
 
   // Fetch shop data (products + config) from public API
   useEffect(() => {
@@ -228,8 +378,8 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
         customerName: orderName.trim(),
         customerEmail: session.user.email,
         customerPhone: orderPhone.trim(),
-        customerAddress: '',
-        customerInstagram: '',
+        customerAddress: orderAddress.trim(),
+        customerInstagram: orderInstagram.trim(),
         cart: shopCart.map(item => ({
           productId: item.id,
           productName: item.name,
@@ -378,10 +528,34 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
             </Typography>
             {!isShopOpen && (
               <Typography sx={{ fontSize: '0.7rem', color: 'var(--error)' }}>
-                ปิดรับออเดอร์
+                {shop.settings?.closedMessage || (lang === 'en' ? 'Orders closed' : 'ปิดรับออเดอร์')}
               </Typography>
             )}
           </Box>
+          {/* Follow button */}
+          <Tooltip title={isFollowing ? (lang === 'en' ? 'Unfollow' : 'เลิกติดตาม') : (lang === 'en' ? 'Follow' : 'ติดตาม')}>
+            <IconButton
+              onClick={toggleFollow}
+              sx={{
+                color: isFollowing ? '#ff453a' : 'var(--text-muted)',
+                transition: 'all 0.2s ease',
+                '&:hover': { color: '#ff453a' },
+              }}
+            >
+              <Heart size={20} fill={isFollowing ? '#ff453a' : 'none'} />
+            </IconButton>
+          </Tooltip>
+          {/* Order History button */}
+          {session?.user?.email && (
+            <Tooltip title={lang === 'en' ? 'Order History' : 'ประวัติคำสั่งซื้อ'}>
+              <IconButton
+                onClick={() => setShowOrderHistory(true)}
+                sx={{ color: 'var(--foreground)' }}
+              >
+                <History size={20} />
+              </IconButton>
+            </Tooltip>
+          )}
           <IconButton onClick={() => setCartOpen(true)} sx={{ color: 'var(--foreground)' }}>
             <Badge badgeContent={cartCount} color="error">
               <ShoppingCart size={22} />
@@ -436,6 +610,21 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                 backdropFilter: 'blur(8px)',
               }}
             />
+            <Chip
+              icon={<Heart size={12} fill={isFollowing ? '#ff453a' : 'none'} color={isFollowing ? '#ff453a' : '#fff'} />}
+              label={isFollowing ? (lang === 'en' ? 'Following' : 'กำลังติดตาม') : (lang === 'en' ? 'Follow' : 'ติดตาม')}
+              size="small"
+              onClick={toggleFollow}
+              sx={{
+                bgcolor: isFollowing ? 'rgba(255,69,58,0.2)' : 'rgba(255,255,255,0.15)',
+                color: isFollowing ? '#ff453a' : 'white',
+                fontWeight: 700, fontSize: '0.75rem',
+                backdropFilter: 'blur(8px)',
+                cursor: 'pointer',
+                '&:hover': { opacity: 0.8 },
+                transition: 'all 0.2s ease',
+              }}
+            />
           </Box>
         </Box>
       </Box>
@@ -455,6 +644,47 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       {events.filter(e => e.enabled).length > 0 && (
         <Box sx={{ maxWidth: '1200px', mx: 'auto', px: { xs: 0, sm: 2 }, pt: 2 }}>
           <EventBanner events={events.filter(e => e.enabled)} compact />
+        </Box>
+      )}
+
+      {/* ==================== SHOP CLOSED BANNER ==================== */}
+      {!isShopOpen && (
+        <Box sx={{
+          maxWidth: '1200px', mx: 'auto', px: 2, pt: 2,
+        }}>
+          <Box sx={{
+            p: 2.5, borderRadius: '16px',
+            background: 'linear-gradient(135deg, rgba(239,68,68,0.15) 0%, rgba(239,68,68,0.05) 100%)',
+            border: '1px solid rgba(239,68,68,0.3)',
+            display: 'flex', alignItems: 'center', gap: 2,
+          }}>
+            <Box sx={{
+              width: 44, height: 44, borderRadius: '12px',
+              bgcolor: 'rgba(239,68,68,0.15)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0,
+            }}>
+              <Clock size={22} color="#ef4444" />
+            </Box>
+            <Box>
+              <Typography sx={{ fontWeight: 700, fontSize: '0.9rem', color: '#ef4444' }}>
+                {lang === 'en' ? 'Orders are currently closed' : 'ปิดรับออเดอร์ชั่วคราว'}
+              </Typography>
+              <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)', mt: 0.3 }}>
+                {shop.settings?.closedMessage || (lang === 'en'
+                  ? 'This shop is temporarily not accepting orders. Please check back later.'
+                  : 'ร้านค้านี้ปิดรับคำสั่งซื้อชั่วคราว กรุณากลับมาใหม่ภายหลัง')}
+              </Typography>
+              {shop.settings?.openDate && (
+                <Typography sx={{ fontSize: '0.75rem', color: '#f59e0b', mt: 0.5, fontWeight: 600 }}>
+                  {lang === 'en' ? 'Opens: ' : 'เปิด: '}
+                  {new Date(shop.settings.openDate).toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-US', {
+                    year: 'numeric', month: 'long', day: 'numeric'
+                  })}
+                </Typography>
+              )}
+            </Box>
+          </Box>
         </Box>
       )}
 
@@ -1153,7 +1383,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
             color: 'var(--foreground)',
             borderRadius: '20px',
             border: '1px solid var(--glass-border)',
-            maxHeight: '80vh',
+            maxHeight: '85vh',
           },
         }}
       >
@@ -1161,9 +1391,26 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
           <Typography sx={{ fontWeight: 800, fontSize: '1.1rem' }}>
             🛒 {lang === 'en' ? 'Cart' : 'ตะกร้าสินค้า'} ({shopCart.length})
           </Typography>
-          <IconButton onClick={() => setCartOpen(false)} sx={{ color: 'var(--text-muted)' }}>
-            <X size={20} />
-          </IconButton>
+          <Box sx={{ display: 'flex', gap: 0.5 }}>
+            {shopCart.length > 0 && (
+              <IconButton
+                onClick={() => {
+                  if (confirm(lang === 'en' ? 'Clear all items?' : 'ล้างตะกร้าทั้งหมด?')) {
+                    const clearCartByShop = useCartStore.getState().clearCartByShop;
+                    clearCartByShop(shopSlug);
+                    showToast('success', lang === 'en' ? 'Cart cleared' : 'ล้างตะกร้าแล้ว');
+                  }
+                }}
+                size="small"
+                sx={{ color: 'var(--error)' }}
+              >
+                <Trash2 size={18} />
+              </IconButton>
+            )}
+            <IconButton onClick={() => setCartOpen(false)} sx={{ color: 'var(--text-muted)' }}>
+              <X size={20} />
+            </IconButton>
+          </Box>
         </Box>
         <DialogContent sx={{ px: 3, py: 2 }}>
           {shopCart.length === 0 ? (
@@ -1175,32 +1422,87 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
             </Box>
           ) : (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-              {shopCart.map((item, idx) => (
-                <Box key={idx} sx={{
-                  p: 2, borderRadius: '12px',
-                  bgcolor: 'var(--surface-2)',
-                  border: '1px solid var(--glass-border)',
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                }}>
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography sx={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--foreground)' }} noWrap>
-                      {item.name}
-                    </Typography>
-                    <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                      {item.size !== '-' ? `${lang === 'en' ? 'Size' : 'ขนาด'}: ${item.size} · ` : ''}
-                      {lang === 'en' ? 'Qty' : 'จำนวน'}: {item.qty}
-                    </Typography>
+              {shopCart.map((item, idx) => {
+                // Find global index in full cart for operations
+                const globalIdx = cart.findIndex((c, i) => {
+                  const shopItems = cart.filter(ci => ci.shopSlug === shopSlug);
+                  const localIdx = shopItems.indexOf(c);
+                  return c.shopSlug === shopSlug && localIdx === idx;
+                });
+                const actualGlobalIdx = cart.indexOf(item);
+                
+                return (
+                  <Box key={idx} sx={{
+                    p: 2, borderRadius: '14px',
+                    bgcolor: 'var(--surface-2)',
+                    border: '1px solid var(--glass-border)',
+                  }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography sx={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--foreground)' }} noWrap>
+                          {item.name}
+                        </Typography>
+                        <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          {item.size !== '-' ? `${lang === 'en' ? 'Size' : 'ขนาด'}: ${item.size}` : ''}
+                          {item.selectedVariant ? ` · ${item.selectedVariant.name}` : ''}
+                        </Typography>
+                      </Box>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleRemoveCartItem(actualGlobalIdx)}
+                        sx={{ color: 'var(--error)', ml: 1 }}
+                      >
+                        <X size={16} />
+                      </IconButton>
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      {/* Quantity controls */}
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleUpdateCartQty(actualGlobalIdx, item.qty - 1)}
+                          sx={{
+                            width: 28, height: 28,
+                            bgcolor: 'var(--surface)',
+                            border: '1px solid var(--glass-border)',
+                            color: 'var(--foreground)',
+                          }}
+                        >
+                          <Minus size={14} />
+                        </IconButton>
+                        <Typography sx={{ fontWeight: 700, minWidth: 28, textAlign: 'center', fontSize: '0.9rem', color: 'var(--foreground)' }}>
+                          {item.qty}
+                        </Typography>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleUpdateCartQty(actualGlobalIdx, item.qty + 1)}
+                          sx={{
+                            width: 28, height: 28,
+                            bgcolor: 'var(--surface)',
+                            border: '1px solid var(--glass-border)',
+                            color: 'var(--foreground)',
+                          }}
+                        >
+                          <Plus size={14} />
+                        </IconButton>
+                      </Box>
+                      <Box sx={{ textAlign: 'right' }}>
+                        <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                          ฿{item.price.toLocaleString()} × {item.qty}
+                        </Typography>
+                        <Typography sx={{ fontWeight: 800, color: '#34c759', fontSize: '0.95rem' }}>
+                          ฿{item.total.toLocaleString()}
+                        </Typography>
+                      </Box>
+                    </Box>
                   </Box>
-                  <Typography sx={{ fontWeight: 800, color: '#34c759', fontSize: '0.95rem', ml: 2 }}>
-                    ฿{item.total.toLocaleString()}
-                  </Typography>
-                </Box>
-              ))}
-              <Box sx={{ pt: 2, borderTop: '1px solid var(--glass-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                );
+              })}
+              <Box sx={{ pt: 2, borderTop: '2px solid var(--glass-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Typography sx={{ fontWeight: 700, fontSize: '1rem' }}>
-                  {lang === 'en' ? 'Total' : 'รวม'}
+                  {lang === 'en' ? 'Total' : 'รวมทั้งหมด'}
                 </Typography>
-                <Typography sx={{ fontWeight: 800, color: '#34c759', fontSize: '1.2rem' }}>
+                <Typography sx={{ fontWeight: 800, color: '#34c759', fontSize: '1.3rem' }}>
                   ฿{shopCart.reduce((sum, item) => sum + item.total, 0).toLocaleString()}
                 </Typography>
               </Box>
@@ -1227,40 +1529,92 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                   {!checkoutOpen ? (
                     <Button
                       fullWidth
-                      onClick={() => setCheckoutOpen(true)}
+                      onClick={() => {
+                        if (!isShopOpen) {
+                          showToast('warning', lang === 'en' ? 'Shop is currently closed' : 'ร้านค้าปิดรับออเดอร์อยู่');
+                          return;
+                        }
+                        setCheckoutOpen(true);
+                      }}
+                      disabled={!isShopOpen}
                       sx={{
                         mt: 1,
-                        background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
+                        background: isShopOpen
+                          ? 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)'
+                          : 'rgba(100,116,139,0.3)',
                         borderRadius: '12px',
                         textTransform: 'none',
                         fontWeight: 700,
                         py: 1.2,
                         color: 'white',
+                        '&.Mui-disabled': { color: 'rgba(255,255,255,0.5)' },
                       }}
                     >
-                      {lang === 'en' ? 'Checkout' : 'สั่งซื้อสินค้า'}
+                      {isShopOpen
+                        ? (lang === 'en' ? 'Checkout' : 'สั่งซื้อสินค้า')
+                        : (lang === 'en' ? 'Shop Closed' : 'ร้านค้าปิดรับออเดอร์')}
                     </Button>
                   ) : (
-                    <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1.5, pt: 1, borderTop: '1px solid var(--glass-border)' }}>
-                      <Typography sx={{ fontWeight: 700, fontSize: '0.9rem' }}>
-                        {lang === 'en' ? 'Order Details' : 'ข้อมูลการสั่งซื้อ'}
+                    <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1.5, pt: 2, borderTop: '1px solid var(--glass-border)' }}>
+                      <Typography sx={{ fontWeight: 800, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <CreditCard size={18} />
+                        {lang === 'en' ? 'Checkout Information' : 'ข้อมูลการสั่งซื้อ'}
                       </Typography>
+
+                      {/* Name */}
                       <TextField
-                        label={lang === 'en' ? 'Name *' : 'ชื่อ-นามสกุล *'}
+                        label={lang === 'en' ? 'Full Name *' : 'ชื่อ-นามสกุล *'}
                         value={orderName}
                         onChange={(e) => setOrderName(e.target.value)}
                         fullWidth
                         size="small"
+                        InputProps={{
+                          startAdornment: <User size={16} style={{ marginRight: 8, color: 'var(--text-muted)' }} />,
+                        }}
                         sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px', bgcolor: 'var(--surface-2)' }, '& .MuiInputLabel-root': { color: 'var(--text-muted)' }, '& .MuiOutlinedInput-input': { color: 'var(--foreground)' } }}
                       />
+
+                      {/* Phone */}
                       <TextField
                         label={lang === 'en' ? 'Phone' : 'เบอร์โทร'}
                         value={orderPhone}
                         onChange={(e) => setOrderPhone(e.target.value)}
                         fullWidth
                         size="small"
+                        InputProps={{
+                          startAdornment: <Phone size={16} style={{ marginRight: 8, color: 'var(--text-muted)' }} />,
+                        }}
                         sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px', bgcolor: 'var(--surface-2)' }, '& .MuiInputLabel-root': { color: 'var(--text-muted)' }, '& .MuiOutlinedInput-input': { color: 'var(--foreground)' } }}
                       />
+
+                      {/* Address */}
+                      <TextField
+                        label={lang === 'en' ? 'Address (for delivery)' : 'ที่อยู่ (กรณีจัดส่ง)'}
+                        value={orderAddress}
+                        onChange={(e) => setOrderAddress(e.target.value)}
+                        fullWidth
+                        size="small"
+                        multiline
+                        rows={2}
+                        InputProps={{
+                          startAdornment: <MapPin size={16} style={{ marginRight: 8, color: 'var(--text-muted)', alignSelf: 'flex-start', marginTop: 8 }} />,
+                        }}
+                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px', bgcolor: 'var(--surface-2)' }, '& .MuiInputLabel-root': { color: 'var(--text-muted)' }, '& .MuiOutlinedInput-input': { color: 'var(--foreground)' } }}
+                      />
+
+                      {/* Instagram */}
+                      <TextField
+                        label={lang === 'en' ? 'Instagram (for contact)' : 'Instagram (สำหรับติดต่อ)'}
+                        value={orderInstagram}
+                        onChange={(e) => setOrderInstagram(e.target.value)}
+                        fullWidth
+                        size="small"
+                        InputProps={{
+                          startAdornment: <Instagram size={16} style={{ marginRight: 8, color: 'var(--text-muted)' }} />,
+                        }}
+                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px', bgcolor: 'var(--surface-2)' }, '& .MuiInputLabel-root': { color: 'var(--text-muted)' }, '& .MuiOutlinedInput-input': { color: 'var(--foreground)' } }}
+                      />
+
                       {/* Turnstile CAPTCHA */}
                       <Box sx={{ display: 'flex', justifyContent: 'center', py: 1 }}>
                         <TurnstileWidget
@@ -1272,25 +1626,72 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                           action="shop-order"
                         />
                       </Box>
-                      <Button
-                        fullWidth
-                        onClick={handleShopCheckout}
-                        disabled={checkoutProcessing || !orderName.trim() || !turnstileToken}
-                        startIcon={checkoutProcessing ? <CircularProgress size={16} /> : <CreditCard size={16} />}
-                        sx={{
-                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                          borderRadius: '12px',
-                          textTransform: 'none',
-                          fontWeight: 700,
-                          py: 1.2,
-                          color: 'white',
-                          '&.Mui-disabled': { opacity: 0.6, color: 'white' },
-                        }}
-                      >
-                        {checkoutProcessing
-                          ? (lang === 'en' ? 'Processing...' : 'กำลังดำเนินการ...')
-                          : (lang === 'en' ? 'Place Order & Pay' : 'ยืนยันสั่งซื้อ & ชำระเงิน')}
-                      </Button>
+
+                      {/* Order Summary */}
+                      <Box sx={{
+                        p: 2, borderRadius: '12px',
+                        bgcolor: 'rgba(0,113,227,0.08)',
+                        border: '1px solid rgba(0,113,227,0.2)',
+                      }}>
+                        <Typography sx={{ fontWeight: 700, fontSize: '0.85rem', mb: 1, color: 'var(--foreground)' }}>
+                          {lang === 'en' ? 'Order Summary' : 'สรุปคำสั่งซื้อ'}
+                        </Typography>
+                        {shopCart.map((item, i) => (
+                          <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                            <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                              {item.name} {item.size !== '-' ? `(${item.size})` : ''} ×{item.qty}
+                            </Typography>
+                            <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                              ฿{item.total.toLocaleString()}
+                            </Typography>
+                          </Box>
+                        ))}
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1, pt: 1, borderTop: '1px solid var(--glass-border)' }}>
+                          <Typography sx={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--foreground)' }}>
+                            {lang === 'en' ? 'Total' : 'รวม'}
+                          </Typography>
+                          <Typography sx={{ fontWeight: 800, fontSize: '1rem', color: '#34c759' }}>
+                            ฿{shopCart.reduce((sum, item) => sum + item.total, 0).toLocaleString()}
+                          </Typography>
+                        </Box>
+                      </Box>
+
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Button
+                          variant="outlined"
+                          onClick={() => setCheckoutOpen(false)}
+                          sx={{
+                            flex: 1,
+                            borderColor: 'var(--glass-border)',
+                            borderRadius: '12px',
+                            textTransform: 'none',
+                            fontWeight: 600,
+                            py: 1.2,
+                            color: 'var(--text-muted)',
+                          }}
+                        >
+                          {lang === 'en' ? 'Back' : 'กลับ'}
+                        </Button>
+                        <Button
+                          onClick={handleShopCheckout}
+                          disabled={checkoutProcessing || !orderName.trim() || !turnstileToken}
+                          startIcon={checkoutProcessing ? <CircularProgress size={16} /> : <CreditCard size={16} />}
+                          sx={{
+                            flex: 2,
+                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                            borderRadius: '12px',
+                            textTransform: 'none',
+                            fontWeight: 700,
+                            py: 1.2,
+                            color: 'white',
+                            '&.Mui-disabled': { opacity: 0.6, color: 'white' },
+                          }}
+                        >
+                          {checkoutProcessing
+                            ? (lang === 'en' ? 'Processing...' : 'กำลังดำเนินการ...')
+                            : (lang === 'en' ? 'Place Order & Pay' : 'ยืนยันสั่งซื้อ')}
+                        </Button>
+                      </Box>
                     </Box>
                   )}
                 </>
@@ -1329,6 +1730,33 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
           }}
         />
       )}
+
+      {/* ==================== ORDER HISTORY DRAWER ==================== */}
+      <OrderHistoryDrawer
+        open={showOrderHistory}
+        onClose={() => setShowOrderHistory(false)}
+        orderHistory={orderHistory}
+        loadingHistory={loadingHistory}
+        loadingHistoryMore={loadingHistoryMore}
+        historyHasMore={historyHasMore}
+        historyFilter={historyFilter}
+        onFilterChange={(filter) => setHistoryFilter(filter)}
+        onLoadMore={() => loadOrderHistory({ append: true })}
+        onOpenPayment={(ref) => {
+          setShowOrderHistory(false);
+          setPaymentRef(ref);
+        }}
+        onCancelOrder={(ref) => handleCancelOrder(ref)}
+        onShowQR={(ref) => {
+          // Show payment modal for this order
+          setShowOrderHistory(false);
+          setPaymentRef(ref);
+        }}
+        cancellingRef={cancellingRef}
+        isShopOpen={isShopOpen}
+        realtimeConnected={false}
+        config={null}
+      />
 
       {/* ==================== SUPPORT CHAT ==================== */}
       <SupportChatWidget shopId={shop.id} shopName={shop.name} />

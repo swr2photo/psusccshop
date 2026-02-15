@@ -72,6 +72,7 @@ export async function GET(req: NextRequest) {
   const offset = Number.isFinite(offsetParam) ? Math.max(0, offsetParam) : 0;
   const limitParam = Number(req.nextUrl.searchParams.get('limit'));
   const limit = Number.isFinite(limitParam) ? Math.min(100, Math.max(10, limitParam)) : 50;
+  const shopSlug = req.nextUrl.searchParams.get('shopSlug') || undefined;
 
   // ถ้าไม่ใช่ admin ต้องดู orders ของตัวเองเท่านั้น
   const queryEmail = isAdmin && email ? email : currentUserEmail;
@@ -79,8 +80,8 @@ export async function GET(req: NextRequest) {
   try {
     const normalizedEmail = normalizeEmail(queryEmail);
     
-    // Use optimized Supabase query
-    const { orders, total } = await getOrdersByEmail(normalizedEmail, { limit, offset });
+    // Use optimized Supabase query (with optional shopSlug filter)
+    const { orders, total } = await getOrdersByEmail(normalizedEmail, { limit, offset, shopSlug });
     
     const hasMore = offset + orders.length < total;
     

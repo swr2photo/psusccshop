@@ -522,9 +522,10 @@ export async function saveProfile(
 /**
  * Get order history for user (supports pagination via cursor/limit)
  */
-export async function getHistory(email: string, cursor?: string, limit = 50): Promise<APIResponse> {
+export async function getHistory(email: string, cursor?: string, limit = 50, shopSlug?: string): Promise<APIResponse> {
   const params = new URLSearchParams({ email, limit: String(limit) });
   if (cursor) params.append('cursor', cursor);
+  if (shopSlug) params.append('shopSlug', shopSlug);
   return fetchJson(`/api/orders?${params.toString()}`);
 }
 
