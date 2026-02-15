@@ -2142,6 +2142,7 @@ const CartDrawer = dynamic(() => import('@/components/CartDrawer'), { ssr: false
 const OrderHistoryDrawer = dynamic(() => import('@/components/OrderHistoryDrawer'), { ssr: false });
 const CheckoutDialog = dynamic(() => import('@/components/CheckoutDialog'), { ssr: false });
 const SupportChatWidget = dynamic(() => import('@/components/SupportChatWidget'), { ssr: false });
+const PasskeyLoginButton = dynamic(() => import('@/components/PasskeyLoginButton'), { ssr: false });
 
 // Common tag translations for well-known tags
 const TAG_TRANSLATIONS_TH_TO_EN: Record<string, string> = {
@@ -6164,6 +6165,16 @@ export default function HomePage() {
                 {`${t.nav.loginWith} LINE`}
               </Button>}
               
+              {/* Passkey Sign In */}
+              <Box sx={{ mt: 2 }}>
+                <Divider sx={{ borderColor: 'var(--glass-border)', mb: 2, '&::before, &::after': { borderColor: 'var(--glass-border)' } }}>
+                  <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.75rem', px: 1 }}>
+                    {lang === 'en' ? 'or' : 'หรือ'}
+                  </Typography>
+                </Divider>
+                <PasskeyLoginButton />
+              </Box>
+
               <Typography sx={{ color: 'var(--text-muted)', mt: 4, fontSize: '0.75rem' }}>
                 {t.nav.termsAgreement}
               </Typography>
@@ -9224,6 +9235,11 @@ export default function HomePage() {
               LINE
             </Button>
           )}
+
+          {/* Passkey Sign In */}
+          <Box sx={{ mt: 1 }}>
+            <PasskeyLoginButton variant="outlined" />
+          </Box>
         </DialogContent>
       </Dialog>
 

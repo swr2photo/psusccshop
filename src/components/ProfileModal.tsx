@@ -6,6 +6,7 @@ import {
   Drawer, Box, Typography, Button, IconButton, TextField, InputAdornment,
   Slide, Avatar, Autocomplete, CircularProgress, Paper, Dialog, Slider, Chip,
 } from '@mui/material';
+import PasskeyManager from '@/components/PasskeyManager';
 import { useThaiAddress, type AddressSelection } from '@/hooks/useThaiAddress';
 import { type NameValidationConfig, DEFAULT_NAME_VALIDATION } from '@/lib/config';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -1302,6 +1303,18 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
               </Box>
             )}
           </Box>
+
+          {/* ====== Passkey Card ====== */}
+          {userEmail && (
+            <Box sx={{
+              p: 2,
+              borderRadius: '16px',
+              bgcolor: 'var(--surface-2)',
+              border: '1px solid var(--glass-border)',
+            }}>
+              <PasskeyManager userEmail={userEmail} />
+            </Box>
+          )}
 
           {/* ====== PDPA Card ====== */}
           <Box sx={{

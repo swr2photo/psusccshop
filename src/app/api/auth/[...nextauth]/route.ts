@@ -5,8 +5,11 @@ import AzureADProvider from "next-auth/providers/azure-ad";
 import FacebookProvider from "next-auth/providers/facebook";
 import AppleProvider from "next-auth/providers/apple";
 import LineProvider from "next-auth/providers/line";
+import CredentialsProvider from "next-auth/providers/credentials";
 import { JWT } from "next-auth/jwt";
-import { putJson } from "@/lib/filebase";
+import { putJson, getJson } from "@/lib/filebase";
+import { verifyPasskeyLoginToken } from "@/lib/passkey";
+import { createHash } from 'crypto';
 
 // Helper to save user log server-side
 async function saveUserLogServer(log: {
@@ -102,6 +105,7 @@ const providerNameMap: Record<string, string> = {
   facebook: 'Facebook',
   apple: 'Apple',
   line: 'LINE',
+  passkey: 'Passkey',
 };
 
 export const authOptions: NextAuthOptions = {
@@ -154,6 +158,39 @@ export const authOptions: NextAuthOptions = {
           }),
         ]
       : []),
+    // Passkey (WebAuthn) — passwordless sign-in via fingerprint/face/screen lock
+    CredentialsProvider({
+      id: 'passkey',
+      name: 'Passkey',
+      credentials: {
+        token: { label: 'Passkey Token', type: 'text' },
+      },
+      async authorize(credentials) {
+        if (!credentials?.token) return null;
+        try {
+          const email = await verifyPasskeyLoginToken(credentials.token);
+          if (!email) return null;
+          // Try to load existing profile for name/image
+          let name = email.split('@')[0];
+          let image: string | undefined;
+          try {
+            const hash = createHash('sha256').update(email.toLowerCase()).digest('hex');
+            const profile = await getJson(`users/${hash}.json`) as any;
+            if (profile?.name) name = profile.name;
+            if (profile?.profileImage) image = profile.profileImage;
+          } catch { /* no profile yet */ }
+          return {
+            id: email,
+            email,
+            name,
+            image: image || undefined,
+          };
+        } catch (err) {
+          console.error('[NextAuth] Passkey authorize error:', err);
+          return null;
+        }
+      },
+    }),
   ],
   
   // Custom pages
@@ -219,8 +256,8 @@ export const authOptions: NextAuthOptions = {
         timestamp: new Date().toISOString(),
       });
       
-      // Allow all OAuth sign-ins
-      const allowedProviders = ['google', 'azure-ad', 'facebook', 'apple', 'line'];
+      // Allow all sign-ins (OAuth + passkey)
+      const allowedProviders = ['google', 'azure-ad', 'facebook', 'apple', 'line', 'passkey'];
       if (account?.provider && allowedProviders.includes(account.provider)) {
         return true;
       }
