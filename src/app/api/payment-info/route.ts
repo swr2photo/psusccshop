@@ -136,6 +136,7 @@ export async function GET(req: NextRequest) {
         accountName: effectiveAccountName,
         // SECURITY: Mask account number - แสดงแค่ 4 ตัวท้าย
         accountNumber: maskAccountNumber(effectiveAccountNumber),
+        promptPayId: effectivePromptPayId,
         baseAmount,
         discount,
         finalAmount,

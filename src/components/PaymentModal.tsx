@@ -217,6 +217,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
   const [paymentEnabled, setPaymentEnabled] = useState(true);
   const [paymentDisabledMessage, setPaymentDisabledMessage] = useState<string | null>(null);
   const [accountHolderName, setAccountHolderName] = useState<string>('');
+  const [promptPayId, setPromptPayId] = useState<string>('');
   
   // Check if already paid
   const isPaid = PAID_STATUSES.includes(orderStatus.toUpperCase());
@@ -289,6 +290,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
         setPaymentEnabled(info.paymentEnabled !== false);
         setPaymentDisabledMessage(info.paymentDisabledMessage || null);
         setAccountHolderName(info.accountName || '');
+        setPromptPayId(info.promptPayId || '');
       } else {
         addToast('error', t.common.error, data.message || t.payment.noPaymentInfo);
       }
@@ -1283,7 +1285,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                         ฿{amount.toLocaleString(lang === 'th' ? 'th-TH' : 'en-US', { minimumFractionDigits: 2 })}
                       </Typography>
                     </Box>
-                    {/* Account Name */}
+                    {/* PromptPay ID + Account Name */}
                     <Box sx={{ mt: 1, textAlign: 'center', bgcolor: 'var(--glass-bg)', borderRadius: 1.5, px: 2, py: 0.75 }}>
                       <Typography sx={{ color: 'var(--foreground)', fontSize: '0.65rem' }}>
                         {t.payment.accountName}
@@ -1291,10 +1293,15 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                       <Typography sx={{ color: '#fff', fontWeight: 600, fontSize: '0.8rem' }}>
                         {accountHolderName || t.payment.accountHolderName}
                       </Typography>
+                      {promptPayId && (
+                        <Typography sx={{ color: '#fff', fontWeight: 700, fontSize: '1.1rem', letterSpacing: 1, mt: 0.5 }}>
+                          {promptPayId}
+                        </Typography>
+                      )}
                       {t.payment.secretaryRole && (
-                      <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.6rem' }}>
-                        {t.payment.secretaryRole}
-                      </Typography>
+                        <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.6rem' }}>
+                          {t.payment.secretaryRole}
+                        </Typography>
                       )}
                     </Box>
                     <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.65rem', mt: 1, textAlign: 'center' }}>
