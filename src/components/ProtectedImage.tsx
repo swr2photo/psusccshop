@@ -403,11 +403,8 @@ export default function ProtectedImage({
     drawImage(img, ctx, canvas, effectiveProtection);
   }, [effectiveProtection, drawImage]);
 
-  // ==================== PROTECTION HOOKS ====================
-  // NOTE: Visibility, blur/focus, keyboard shortcuts, and iOS gesture protection
-  // are handled globally by useScreenshotProtection in Providers.tsx.
-  // The global hook applies body.page-hidden class which CSS uses to black out all images.
-  // Per-instance hooks are not needed and would be N×duplicated for N images on screen.
+  // ==================== PROTECTION ====================
+  // Per-image protection via canvas rendering and interaction prevention.
 
   // Prevent interactions
   const preventInteraction = useCallback((e: React.SyntheticEvent) => {

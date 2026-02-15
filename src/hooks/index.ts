@@ -4,13 +4,6 @@ export type { ToastType, ToastMessage, ToastOptions } from './useToast';
 export { usePushNotification } from './usePushNotification';
 export type { PushPermissionState } from './usePushNotification';
 
-// Screenshot protection hooks
-export { 
-  default as useScreenshotProtection,
-  useDisableRightClick,
-  useDisableDrag,
-} from './useScreenshotProtection';
-
 // Realtime hooks
 export { 
   useRealtimeOrders,

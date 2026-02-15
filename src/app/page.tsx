@@ -6179,11 +6179,33 @@ export default function HomePage() {
                 <PasskeyLoginButton />
               </Box>
 
-              <Typography sx={{ color: 'var(--text-muted)', mt: 4, fontSize: '0.75rem' }}>
-                {t.nav.termsAgreement}
+              <Typography sx={{ color: 'var(--text-muted)', mt: 4, fontSize: '0.75rem', lineHeight: 1.8 }}>
+                {t.nav.termsAgreement}{' '}
+                <Link href="/terms" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>
+                  {lang === 'en' ? 'Terms of Service' : 'ข้อกำหนดการใช้งาน'}
+                </Link>
+                {' & '}
+                <Link href="/privacy" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>
+                  {lang === 'en' ? 'Privacy Policy' : 'นโยบายความเป็นส่วนตัว'}
+                </Link>
               </Typography>
             </Card>
           </Container>
+        </Box>
+
+        {/* Footer with links — visible without login */}
+        <Box sx={{ py: 3, textAlign: 'center', borderTop: '1px solid var(--glass-border)' }}>
+          <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.75rem', mb: 1 }}>
+            © {new Date().getFullYear()} Science Computer Club, Faculty of Science, Prince of Songkla University
+          </Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
+            <Link href="/privacy" style={{ color: 'var(--text-muted)', fontSize: '0.75rem', textDecoration: 'underline' }}>
+              {lang === 'en' ? 'Privacy Policy' : 'นโยบายความเป็นส่วนตัว'}
+            </Link>
+            <Link href="/terms" style={{ color: 'var(--text-muted)', fontSize: '0.75rem', textDecoration: 'underline' }}>
+              {lang === 'en' ? 'Terms of Service' : 'ข้อกำหนดการใช้งาน'}
+            </Link>
+          </Box>
         </Box>
       </Box>
     );
