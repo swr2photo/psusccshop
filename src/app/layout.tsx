@@ -9,13 +9,13 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 
 // SEO & Open Graph Metadata
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'https://psusccshop.vercel.app'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'https://sccshop.psusci.club'),
   title: {
-    default: "SCC Shop - ร้านค้าชุมนุมคอมพิวเตอร์ ม.อ.",
+    default: "SCC Shop - ร้านค้าออนไลน์ชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ มหาวิทยาลัยสงขลานครินทร์",
     template: "%s | SCC Shop",
   },
-  description: "ร้านค้าในชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ มหาวิทยาลัยสงขลานครินทร์ จำหน่ายเสื้อและสินค้าที่ระลึก",
-  keywords: ["SCC Shop", "ชุมนุมคอมพิวเตอร์", "PSU", "มหาวิทยาลัยสงขลานครินทร์", "เสื้อชุมนุม", "คณะวิทยาศาสตร์"],
+  description: "SCC Shop คือร้านค้าออนไลน์ของชุมนุมคอมพิวเตอร์ (Science Computer Club) คณะวิทยาศาสตร์ มหาวิทยาลัยสงขลานครินทร์ จำหน่ายเสื้อชุมนุม เสื้อคณะ และสินค้าที่ระลึก สั่งซื้อง่าย ชำระเงินผ่าน PromptPay พร้อมระบบติดตามคำสั่งซื้อแบบเรียลไทม์ | The official online store of the PSU Science Computer Club for club shirts, faculty apparel, and souvenir merchandise.",
+  keywords: ["SCC Shop", "ชุมนุมคอมพิวเตอร์", "PSU", "มหาวิทยาลัยสงขลานครินทร์", "เสื้อชุมนุม", "คณะวิทยาศาสตร์", "Prince of Songkla University", "online store", "ร้านค้าออนไลน์"],
   authors: [{ name: "PSU Science Computer Club" }],
   creator: "PSU Science Computer Club",
   publisher: "PSU Science Computer Club",
@@ -35,8 +35,8 @@ export const metadata: Metadata = {
     locale: "th_TH",
     url: "/",
     siteName: "SCC Shop",
-    title: "SCC Shop - ร้านค้าชุมนุมคอมพิวเตอร์ ม.อ.",
-    description: "ร้านค้าในชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ มหาวิทยาลัยสงขลานครินทร์",
+    title: "SCC Shop - ร้านค้าออนไลน์ชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ มหาวิทยาลัยสงขลานครินทร์",
+    description: "SCC Shop คือร้านค้าออนไลน์ของชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ มหาวิทยาลัยสงขลานครินทร์ จำหน่ายเสื้อชุมนุม เสื้อคณะ และสินค้าที่ระลึก",
     images: [
       {
         url: "/logo.png",
@@ -48,8 +48,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "SCC Shop - ร้านค้าชุมนุมคอมพิวเตอร์ ม.อ.",
-    description: "ร้านค้าในชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ มหาวิทยาลัยสงขลานครินทร์",
+    title: "SCC Shop - ร้านค้าออนไลน์ชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ มหาวิทยาลัยสงขลานครินทร์",
+    description: "SCC Shop คือร้านค้าออนไลน์ของชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ มหาวิทยาลัยสงขลานครินทร์ จำหน่ายเสื้อชุมนุม เสื้อคณะ และสินค้าที่ระลึก",
     images: ["/logo.png"],
   },
   manifest: "/manifest.json",
@@ -128,6 +128,39 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           ข้ามไปยังเนื้อหาหลัก
         </a>
+        {/* Static fallback content for search engines and crawlers that don't execute JavaScript */}
+        <noscript>
+          <div style={{ maxWidth: '800px', margin: '40px auto', padding: '24px', fontFamily: 'system-ui, sans-serif', lineHeight: 1.8 }}>
+            <h1 style={{ fontSize: '28px', fontWeight: 800, marginBottom: '16px' }}>SCC Shop — ร้านค้าออนไลน์ชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ มหาวิทยาลัยสงขลานครินทร์</h1>
+            <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '12px' }}>About This Application</h2>
+            <p style={{ fontSize: '16px', marginBottom: '16px' }}>
+              SCC Shop คือร้านค้าออนไลน์ของชุมนุมคอมพิวเตอร์ (Science Computer Club หรือ SCC) คณะวิทยาศาสตร์ มหาวิทยาลัยสงขลานครินทร์
+              จำหน่ายเสื้อชุมนุม เสื้อคณะ และสินค้าที่ระลึก สั่งซื้อง่าย ชำระเงินผ่าน PromptPay พร้อมระบบติดตามคำสั่งซื้อแบบเรียลไทม์
+            </p>
+            <p style={{ fontSize: '16px', marginBottom: '16px' }}>
+              SCC Shop is the official online store of the Science Computer Club (SCC), Faculty of Science, Prince of Songkla University.
+              We sell club shirts, faculty apparel, and souvenir merchandise. Order easily with PromptPay payment and real-time order tracking.
+            </p>
+            <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '12px' }}>Features</h2>
+            <ul style={{ fontSize: '16px', marginBottom: '16px', paddingLeft: '24px' }}>
+              <li>Browse and purchase club merchandise, faculty shirts, and souvenirs.</li>
+              <li>Secure authentication via Google, Microsoft, Facebook, Apple, LINE, or Passkey.</li>
+              <li>Pay easily via PromptPay QR code with automatic slip verification.</li>
+              <li>Real-time order tracking and order history.</li>
+              <li>The app uses your Google account name and email for login and order identification only.</li>
+            </ul>
+            <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '12px' }}>Legal &amp; Privacy</h2>
+            <p style={{ fontSize: '16px', marginBottom: '8px' }}>
+              <a href="/privacy" style={{ color: '#0071e3', textDecoration: 'underline', fontWeight: 600 }}>Privacy Policy (นโยบายความเป็นส่วนตัว)</a>
+            </p>
+            <p style={{ fontSize: '16px', marginBottom: '16px' }}>
+              <a href="/terms" style={{ color: '#0071e3', textDecoration: 'underline', fontWeight: 600 }}>Terms of Service (ข้อกำหนดการใช้งาน)</a>
+            </p>
+            <p style={{ fontSize: '14px', color: '#666' }}>
+              © {new Date().getFullYear()} Science Computer Club, Faculty of Science, Prince of Songkla University. All rights reserved.
+            </p>
+          </div>
+        </noscript>
         {/* Decorative gradient orbs - theme-aware via CSS vars */}
         <div className="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
           <div className="absolute -left-10 -top-24 h-80 w-80 rounded-full blur-3xl" style={{ background: 'radial-gradient(circle at 30% 30%, var(--glow-1), transparent 65%)' }} />
