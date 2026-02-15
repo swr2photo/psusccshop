@@ -6,7 +6,7 @@ Disallow: /api/
 Disallow: /auth/
 
 # Sitemap
-Sitemap: https://psusccshop.vercel.app/sitemap.xml
+Sitemap: https://sccshop.psusci.club/sitemap.xml
 
 # Block common crawlers from sensitive areas
 User-agent: GPTBot
