@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { JSX } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
+import dynamic from 'next/dynamic';
+const PasskeyLoginButton = dynamic(() => import('@/components/PasskeyLoginButton'), { ssr: false });
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useConfirmDialog, useAlertDialog } from '@/hooks/useConfirmDialog';
 import { useRealtimeAdminOrders } from '@/hooks/useRealtimeOrders';
@@ -8921,6 +8923,11 @@ export default function AdminPage(): JSX.Element {
                 </Box>
                 เข้าสู่ระบบด้วย Microsoft
               </Button>}
+
+              {/* Passkey Sign In */}
+              <Box sx={{ mt: 1.5 }}>
+                <PasskeyLoginButton fullWidth variant="outlined" />
+              </Box>
 
               {/* Divider */}
               <Box sx={{ display: 'flex', alignItems: 'center', my: 3 }}>

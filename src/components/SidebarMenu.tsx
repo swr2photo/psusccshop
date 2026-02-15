@@ -28,6 +28,8 @@ import {
   ArrowLeftRight,
 } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
+import dynamic from 'next/dynamic';
+const PasskeyLoginButton = dynamic(() => import('@/components/PasskeyLoginButton'), { ssr: false });
 import LanguageToggle from './LanguageToggle';
 import { useTranslation } from '@/hooks/useTranslation';
 
@@ -393,6 +395,11 @@ export default function SidebarMenu(props: SidebarMenuProps) {
             LINE
           </Button>
         )}
+
+        {/* Passkey Sign In */}
+        <Box sx={{ mt: 1 }}>
+          <PasskeyLoginButton fullWidth variant="outlined" />
+        </Box>
       </DialogContent>
     </Dialog>
     </>

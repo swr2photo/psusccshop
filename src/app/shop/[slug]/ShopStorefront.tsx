@@ -13,7 +13,9 @@ import {
   Store, ShoppingCart, Plus, Minus, X, ArrowLeft, Search,
   Share2, Heart, Package, Clock, Tag, CreditCard,
 } from 'lucide-react';
-import { useSession } from 'next-auth/react';
+import { useSession, signIn } from 'next-auth/react';
+import dynamic from 'next/dynamic';
+const PasskeyLoginButton = dynamic(() => import('@/components/PasskeyLoginButton'), { ssr: false });
 import Link from 'next/link';
 import { useCartStore } from '@/store/cartStore';
 import { useWishlistStore } from '@/store/wishlistStore';
@@ -1270,11 +1272,11 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                   )}
                 </>
               ) : (
-                <Link href="/auth/signin" style={{ textDecoration: 'none' }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
                   <Button
                     fullWidth
+                    onClick={() => signIn('google', { redirect: true, callbackUrl: window.location.href, prompt: 'select_account' })}
                     sx={{
-                      mt: 1,
                       background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
                       borderRadius: '12px',
                       textTransform: 'none',
@@ -1285,7 +1287,8 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                   >
                     {lang === 'en' ? 'Sign in to Checkout' : 'เข้าสู่ระบบเพื่อสั่งซื้อ'}
                   </Button>
-                </Link>
+                  <PasskeyLoginButton fullWidth variant="outlined" />
+                </Box>
               )}
             </Box>
           )}
