@@ -5972,8 +5972,12 @@ export default function HomePage() {
               >
                 SCC Shop
               </Typography>
-              <Typography sx={{ color: 'var(--text-muted)', mb: 4, fontSize: '1rem' }}>
+              <Typography sx={{ color: 'var(--text-muted)', mb: 1, fontSize: '1rem' }}>
                 {t.nav.shopTitle}
+              </Typography>
+
+              <Typography sx={{ color: 'var(--text-muted)', mb: 4, fontSize: '0.82rem', lineHeight: 1.7, textAlign: 'center', maxWidth: 360, mx: 'auto' }}>
+                {t.nav.appDescription}
               </Typography>
               
               <Divider sx={{ borderColor: 'var(--glass-border)', mb: 4 }} />
