@@ -38,6 +38,8 @@ interface SupportChatWidgetProps {
   hideMobileFab?: boolean;
   externalOpen?: boolean;
   onExternalOpenHandled?: () => void;
+  shopId?: string;
+  shopName?: string;
 }
 
 interface ChatSession {
@@ -78,7 +80,7 @@ interface ChatWithMessages extends ChatSession {
   messages: ChatMessage[];
 }
 
-export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, externalOpen, onExternalOpenHandled }: SupportChatWidgetProps) {
+export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, externalOpen, onExternalOpenHandled, shopId, shopName }: SupportChatWidgetProps) {
   const { data: session, status: authStatus } = useSession();
   const { t, lang } = useTranslation();
   const { warning: toastWarning, error: toastError } = useNotification();
@@ -406,6 +408,8 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
         body: JSON.stringify({
           subject: subject.trim() || 'สอบถามข้อมูล',
           message: message.trim(),
+          shopId: shopId || undefined,
+          shopName: shopName || undefined,
         }),
       });
       

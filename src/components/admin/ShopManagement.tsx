@@ -10,6 +10,7 @@ import {
 import {
   Store, Plus, Trash2, Edit, Save, X, Users, ShieldCheck, Eye, EyeOff, Copy,
   ExternalLink, Settings, DollarSign, ChevronDown, ChevronUp, UserPlus, Check,
+  Image, Upload,
 } from 'lucide-react';
 
 // ==================== TYPES ====================
@@ -105,6 +106,7 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
   const [shopAdmins, setShopAdmins] = useState<ShopAdmin[]>([]);
   const [expandedShopId, setExpandedShopId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState<'logo' | 'banner' | null>(null);
 
   // Create form state
   const [newShop, setNewShop] = useState({
@@ -151,6 +153,49 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
       }
     } catch {
       showToast('error', 'โหลดรายชื่อแอดมินไม่สำเร็จ');
+    }
+  };
+
+  // ==================== IMAGE UPLOAD ====================
+  const handleImageUpload = async (file: File, type: 'logo' | 'banner') => {
+    if (!file || !editingShop) return;
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('error', 'ไฟล์ต้องมีขนาดไม่เกิน 5MB');
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      showToast('error', 'กรุณาเลือกไฟล์รูปภาพ');
+      return;
+    }
+    setUploadingImage(type);
+    try {
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const base64Data = base64.split(',')[1];
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          base64: base64Data,
+          filename: `shop-${type}-${editingShop.id}-${Date.now()}.${file.name.split('.').pop()}`,
+          mime: file.type,
+        }),
+      });
+      const data = await res.json();
+      if (data.status === 'success' && data.url) {
+        setEditingShop(prev => prev ? { ...prev, [type === 'logo' ? 'logoUrl' : 'bannerUrl']: data.url } : null);
+        showToast('success', `อัปโหลด${type === 'logo' ? 'โลโก้' : 'แบนเนอร์'}สำเร็จ`);
+      } else {
+        showToast('error', data.message || 'อัปโหลดไม่สำเร็จ');
+      }
+    } catch {
+      showToast('error', 'เกิดข้อผิดพลาดในการอัปโหลด');
+    } finally {
+      setUploadingImage(null);
     }
   };
 
@@ -214,6 +259,8 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
           contactEmail: editingShop.contactEmail,
           contactPhone: editingShop.contactPhone,
           sortOrder: editingShop.sortOrder,
+          logoUrl: editingShop.logoUrl,
+          bannerUrl: editingShop.bannerUrl,
         }),
       });
       const data = await res.json();
@@ -700,6 +747,54 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
               <Edit size={20} /> แก้ไขร้าน: {editingShop.name}
             </DialogTitle>
             <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '12px !important' }}>
+              {/* Banner & Logo Upload */}
+              <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#a78bfa', display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Image size={16} /> รูปภาพร้านค้า
+              </Typography>
+              {/* Banner Preview & Upload */}
+              <Box sx={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', border: `1px solid ${ADMIN_THEME.border}` }}>
+                <Box sx={{
+                  height: 120,
+                  background: editingShop.bannerUrl
+                    ? `url(${editingShop.bannerUrl}) center/cover`
+                    : 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Button
+                    component="label"
+                    variant="contained"
+                    size="small"
+                    disabled={uploadingImage === 'banner'}
+                    startIcon={uploadingImage === 'banner' ? <CircularProgress size={14} /> : <Upload size={14} />}
+                    sx={{ bgcolor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', textTransform: 'none', borderRadius: '8px', fontSize: '0.75rem' }}
+                  >
+                    {editingShop.bannerUrl ? 'เปลี่ยนแบนเนอร์' : 'อัปโหลดแบนเนอร์'}
+                    <input type="file" hidden accept="image/*" onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0], 'banner')} />
+                  </Button>
+                </Box>
+                {/* Logo overlay */}
+                <Box sx={{ position: 'absolute', bottom: -20, left: 16 }}>
+                  <Box sx={{ position: 'relative', display: 'inline-block' }}>
+                    <Avatar
+                      src={editingShop.logoUrl}
+                      sx={{ width: 56, height: 56, border: '3px solid #1a1a2e', bgcolor: '#2a2a3e', fontSize: '1.2rem', fontWeight: 700 }}
+                    >
+                      {editingShop.name[0]}
+                    </Avatar>
+                    <IconButton
+                      component="label"
+                      size="small"
+                      disabled={uploadingImage === 'logo'}
+                      sx={{ position: 'absolute', bottom: -4, right: -4, bgcolor: '#8b5cf6', color: 'white', width: 22, height: 22, '&:hover': { bgcolor: '#7c3aed' } }}
+                    >
+                      {uploadingImage === 'logo' ? <CircularProgress size={10} sx={{ color: 'white' }} /> : <Upload size={10} />}
+                      <input type="file" hidden accept="image/*" onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0], 'logo')} />
+                    </IconButton>
+                  </Box>
+                </Box>
+              </Box>
+              <Box sx={{ height: 16 }} />
+
               <TextField
                 label="ชื่อร้านค้า"
                 value={editingShop.name}

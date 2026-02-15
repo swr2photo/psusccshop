@@ -2,15 +2,16 @@
 // Client-side storefront for individual shops — matches main store design
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Box, Typography, Button, Chip, Avatar, IconButton, Badge,
   Dialog, DialogContent, DialogActions, TextField,
   Snackbar, Alert, useMediaQuery, Skeleton,
+  CircularProgress,
 } from '@mui/material';
 import {
   Store, ShoppingCart, Plus, Minus, X, ArrowLeft, Search,
-  Share2, Heart, Package, Clock, Tag,
+  Share2, Heart, Package, Clock, Tag, CreditCard,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
@@ -21,6 +22,8 @@ import OptimizedImage from '@/components/OptimizedImage';
 import AnnouncementBar from '@/components/AnnouncementBar';
 import EventBanner, { type ShopEvent } from '@/components/EventBanner';
 import Footer from '@/components/Footer';
+import SupportChatWidget from '@/components/SupportChatWidget';
+import PaymentModal from '@/components/PaymentModal';
 import {
   getProductStatus, SHOP_STATUS_CONFIG, type ShopStatusType,
 } from '@/components/ShopStatusCard';
@@ -29,6 +32,7 @@ import {
   getProductName, getProductDescription,
   getCategoryLabel, getCategoryIcon,
 } from '@/lib/config';
+import { submitOrder as submitOrderApi } from '@/lib/api-client';
 
 // ==================== TYPES ====================
 interface ShopInfo {
@@ -131,6 +135,29 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
   const [quantity, setQuantity] = useState(1);
 
+  // Checkout state
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [checkoutProcessing, setCheckoutProcessing] = useState(false);
+  const [orderName, setOrderName] = useState('');
+  const [orderPhone, setOrderPhone] = useState('');
+  const [paymentRef, setPaymentRef] = useState<string | null>(null);
+
+  // Load user profile for checkout
+  useEffect(() => {
+    if (session?.user?.email) {
+      fetch(`/api/profile?email=${encodeURIComponent(session.user.email)}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.status === 'success' && data.data) {
+            if (data.data.name && !orderName) setOrderName(data.data.name);
+            if (data.data.phone && !orderPhone) setOrderPhone(data.data.phone);
+          }
+        })
+        .catch(() => {});
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user?.email]);
+
   const showToast = useCallback((type: 'success' | 'error' | 'info' | 'warning', message: string) => {
     setToast({ open: true, type, message });
   }, []);
@@ -167,6 +194,64 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       }
     })();
   }, [shopSlug, initialShop.id]);
+
+  // Checkout handler
+  const handleShopCheckout = useCallback(async () => {
+    if (!session?.user?.email) {
+      showToast('warning', lang === 'en' ? 'Please sign in to checkout' : 'กรุณาเข้าสู่ระบบก่อนสั่งซื้อ');
+      return;
+    }
+    if (cart.length === 0) {
+      showToast('warning', lang === 'en' ? 'Cart is empty' : 'ตะกร้าว่าง');
+      return;
+    }
+    if (!orderName.trim()) {
+      showToast('warning', lang === 'en' ? 'Please enter your name' : 'กรุณากรอกชื่อ');
+      return;
+    }
+
+    setCheckoutProcessing(true);
+    try {
+      const totalAmount = cart.reduce((sum, item) => sum + item.total, 0);
+      const res = await submitOrderApi({
+        customerName: orderName.trim(),
+        customerEmail: session.user.email,
+        customerPhone: orderPhone.trim(),
+        customerAddress: '',
+        customerInstagram: '',
+        cart: cart.map(item => ({
+          productId: item.id,
+          productName: item.name,
+          size: item.size || '-',
+          quantity: item.qty,
+          unitPrice: item.price,
+          options: {},
+        })),
+        totalAmount,
+        shippingOptionId: 'pickup',
+        paymentOptionId: 'bank_transfer',
+        shopId: shop.id,
+        shopSlug: shop.slug,
+      } as any);
+
+      if (res.status === 'success' && res.ref) {
+        showToast('success', `${lang === 'en' ? 'Order placed!' : 'สั่งซื้อสำเร็จ!'} ${res.ref}`);
+        // Clear cart items belonging to this shop
+        const clearCart = useCartStore.getState().clearCart;
+        clearCart();
+        setCartOpen(false);
+        setCheckoutOpen(false);
+        // Open payment
+        setPaymentRef(res.ref);
+      } else {
+        showToast('error', (res as any).message || (lang === 'en' ? 'Order failed' : 'สั่งซื้อไม่สำเร็จ'));
+      }
+    } catch (err: any) {
+      showToast('error', err.message || (lang === 'en' ? 'Error' : 'เกิดข้อผิดพลาด'));
+    } finally {
+      setCheckoutProcessing(false);
+    }
+  }, [session, cart, orderName, orderPhone, shop.id, shop.slug, lang, showToast]);
 
   // Categories from products
   const categories = useMemo(() => {
@@ -1108,23 +1193,119 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
               <Link href="/" style={{ textDecoration: 'none' }}>
                 <Button
                   fullWidth
+                  variant="outlined"
                   sx={{
                     mt: 1,
-                    background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
+                    borderColor: 'var(--glass-border)',
                     borderRadius: '12px',
                     textTransform: 'none',
-                    fontWeight: 700,
-                    py: 1.2,
-                    color: 'white',
+                    fontWeight: 600,
+                    py: 1,
+                    color: 'var(--text-muted)',
+                    fontSize: '0.85rem',
                   }}
                 >
-                  {lang === 'en' ? 'Go to Main Store to Checkout' : 'ไปชำระเงินที่หน้าหลัก'}
+                  {lang === 'en' ? 'Continue Shopping at Main Store' : 'ช้อปต่อที่ร้านหลัก'}
                 </Button>
               </Link>
+              {session?.user?.email ? (
+                <>
+                  {!checkoutOpen ? (
+                    <Button
+                      fullWidth
+                      onClick={() => setCheckoutOpen(true)}
+                      sx={{
+                        mt: 1,
+                        background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
+                        borderRadius: '12px',
+                        textTransform: 'none',
+                        fontWeight: 700,
+                        py: 1.2,
+                        color: 'white',
+                      }}
+                    >
+                      {lang === 'en' ? 'Checkout' : 'สั่งซื้อสินค้า'}
+                    </Button>
+                  ) : (
+                    <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1.5, pt: 1, borderTop: '1px solid var(--glass-border)' }}>
+                      <Typography sx={{ fontWeight: 700, fontSize: '0.9rem' }}>
+                        {lang === 'en' ? 'Order Details' : 'ข้อมูลการสั่งซื้อ'}
+                      </Typography>
+                      <TextField
+                        label={lang === 'en' ? 'Name *' : 'ชื่อ-นามสกุล *'}
+                        value={orderName}
+                        onChange={(e) => setOrderName(e.target.value)}
+                        fullWidth
+                        size="small"
+                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px', bgcolor: 'var(--surface-2)' }, '& .MuiInputLabel-root': { color: 'var(--text-muted)' }, '& .MuiOutlinedInput-input': { color: 'var(--foreground)' } }}
+                      />
+                      <TextField
+                        label={lang === 'en' ? 'Phone' : 'เบอร์โทร'}
+                        value={orderPhone}
+                        onChange={(e) => setOrderPhone(e.target.value)}
+                        fullWidth
+                        size="small"
+                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px', bgcolor: 'var(--surface-2)' }, '& .MuiInputLabel-root': { color: 'var(--text-muted)' }, '& .MuiOutlinedInput-input': { color: 'var(--foreground)' } }}
+                      />
+                      <Button
+                        fullWidth
+                        onClick={handleShopCheckout}
+                        disabled={checkoutProcessing || !orderName.trim()}
+                        startIcon={checkoutProcessing ? <CircularProgress size={16} /> : <CreditCard size={16} />}
+                        sx={{
+                          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                          borderRadius: '12px',
+                          textTransform: 'none',
+                          fontWeight: 700,
+                          py: 1.2,
+                          color: 'white',
+                          '&.Mui-disabled': { opacity: 0.6, color: 'white' },
+                        }}
+                      >
+                        {checkoutProcessing
+                          ? (lang === 'en' ? 'Processing...' : 'กำลังดำเนินการ...')
+                          : (lang === 'en' ? 'Place Order & Pay' : 'ยืนยันสั่งซื้อ & ชำระเงิน')}
+                      </Button>
+                    </Box>
+                  )}
+                </>
+              ) : (
+                <Link href="/auth/signin" style={{ textDecoration: 'none' }}>
+                  <Button
+                    fullWidth
+                    sx={{
+                      mt: 1,
+                      background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
+                      borderRadius: '12px',
+                      textTransform: 'none',
+                      fontWeight: 700,
+                      py: 1.2,
+                      color: 'white',
+                    }}
+                  >
+                    {lang === 'en' ? 'Sign in to Checkout' : 'เข้าสู่ระบบเพื่อสั่งซื้อ'}
+                  </Button>
+                </Link>
+              )}
             </Box>
           )}
         </DialogContent>
       </Dialog>
+
+      {/* ==================== PAYMENT MODAL ==================== */}
+      {paymentRef && (
+        <PaymentModal
+          orderRef={paymentRef}
+          onClose={() => setPaymentRef(null)}
+          onSuccess={() => {
+            setPaymentRef(null);
+            showToast('success', lang === 'en' ? 'Payment submitted!' : 'ส่งหลักฐานการชำระเงินแล้ว!');
+          }}
+        />
+      )}
+
+      {/* ==================== SUPPORT CHAT ==================== */}
+      <SupportChatWidget shopId={shop.id} shopName={shop.name} />
 
       {/* ==================== FOOTER ==================== */}
       <Footer />

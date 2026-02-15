@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { listKeys, getJson } from '@/lib/filebase';
-import { generatePromptPayPayload, generatePromptPayQR, calculateOrderTotal } from '@/lib/payment-utils';
+import { generatePromptPayPayload, generatePromptPayPayloadForId, generatePromptPayQR, calculateOrderTotal } from '@/lib/payment-utils';
 import { requireAuth, isResourceOwner, isAdminEmail } from '@/lib/auth';
 import { maskPhone } from '@/lib/sanitize';
+import { getShopById } from '@/lib/shops';
 
 // Mask account number - แสดงแค่ 4 ตัวท้าย
 const maskAccountNumber = (accountNumber: string): string => {
@@ -67,6 +68,29 @@ export async function GET(req: NextRequest) {
     const accountName = process.env.PAYMENT_ACCOUNT_NAME || '';
     const accountNumber = process.env.PAYMENT_ACCOUNT || '';
 
+    // Check if order belongs to a shop — use shop-specific payment info
+    const orderShopId = order.shopId || order.shop_id;
+    let shopPaymentInfo: { bankName: string; accountName: string; accountNumber: string; promptPayId: string } | null = null;
+    if (orderShopId) {
+      const shop = await getShopById(orderShopId);
+      if (shop?.paymentInfo) {
+        const pi = shop.paymentInfo;
+        if (pi.promptPayId || pi.bankName) {
+          shopPaymentInfo = {
+            bankName: pi.bankName || bankName,
+            accountName: pi.accountName || accountName,
+            accountNumber: pi.accountNumber || accountNumber,
+            promptPayId: pi.promptPayId || process.env.PROMPTPAY_ID || '',
+          };
+        }
+      }
+    }
+
+    const effectiveBankName = shopPaymentInfo?.bankName || bankName;
+    const effectiveAccountName = shopPaymentInfo?.accountName || accountName;
+    const effectiveAccountNumber = shopPaymentInfo?.accountNumber || accountNumber;
+    const effectivePromptPayId = shopPaymentInfo?.promptPayId || process.env.PROMPTPAY_ID || '';
+
     // ตรวจสอบสถานะระบบชำระเงิน
     const CONFIG_KEY = 'config/shop-settings.json';
     const shopConfig = await getJson<any>(CONFIG_KEY);
@@ -76,9 +100,9 @@ export async function GET(req: NextRequest) {
     const baseAmount = Number(order.totalAmount ?? order.amount ?? calculateOrderTotal(order.cart || [])) || 0;
     const discount = Number(order.discount ?? 0);
     const finalAmount = Math.max(0, baseAmount - discount);
-    // Generate both QR payload (for client-side rendering) and legacy URL
-    const qrPayload = finalAmount > 0 ? generatePromptPayPayload(finalAmount) : null;
-    const qrUrl = finalAmount > 0 ? generatePromptPayQR(finalAmount) : null;
+    // Generate QR payload — use shop-specific PromptPay ID if available
+    const qrPayload = finalAmount > 0 ? generatePromptPayPayloadForId(effectivePromptPayId, finalAmount) : null;
+    const qrUrl = finalAmount > 0 && qrPayload ? `https://quickchart.io/qr?size=300&text=${encodeURIComponent(qrPayload)}` : null;
 
     // ดึงข้อมูลสินค้าจาก order และ sanitize
     const cartItems = (order.cart || order.items || []).map((item: any) => ({
@@ -95,10 +119,10 @@ export async function GET(req: NextRequest) {
       status: 'success',
       data: {
         ref: sanitizedRef,
-        bankName,
-        accountName,
+        bankName: effectiveBankName,
+        accountName: effectiveAccountName,
         // SECURITY: Mask account number - แสดงแค่ 4 ตัวท้าย
-        accountNumber: maskAccountNumber(accountNumber),
+        accountNumber: maskAccountNumber(effectiveAccountNumber),
         baseAmount,
         discount,
         finalAmount,

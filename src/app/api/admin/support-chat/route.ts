@@ -47,11 +47,17 @@ export async function GET(request: NextRequest) {
     const filter = searchParams.get('filter') as ChatStatus | 'all' | 'my' | null;
     const shopId = searchParams.get('shopId');
     
-    // If filtering by shop, get customer emails belonging to this shop
+    // If filtering by shop, filter by shop_id column first, then fallback to order emails
     const shopEmails = shopId ? await getShopCustomerEmails(shopId) : null;
     const filterByShop = (list: ChatSession[]) => {
-      if (!shopEmails) return list;
-      return list.filter(c => shopEmails.has((c.customer_email || '').toLowerCase()));
+      if (!shopId) return list;
+      return list.filter(c => {
+        // Direct match on shop_id column
+        if ((c as any).shop_id === shopId) return true;
+        // Fallback: match by customer email from shop orders
+        if (shopEmails && shopEmails.has((c.customer_email || '').toLowerCase())) return true;
+        return false;
+      });
     };
     
     let chats;

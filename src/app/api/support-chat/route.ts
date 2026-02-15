@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
     }
     
     const body = await request.json();
-    const { subject, message } = body;
+    const { subject, message, shopId, shopName } = body;
     
     if (!message?.trim()) {
       return NextResponse.json(
@@ -82,7 +82,9 @@ export async function POST(request: NextRequest) {
       customerName,
       subject?.trim() || 'สอบถามข้อมูล',
       message.trim(),
-      session.user.image || undefined  // Pass customer avatar
+      session.user.image || undefined,  // Pass customer avatar
+      shopId || undefined,
+      shopName || undefined
     );
     
     return NextResponse.json({ 

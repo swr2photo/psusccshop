@@ -19,6 +19,13 @@ function tlv(id: string, val: string) {
  */
 export function generatePromptPayPayload(amount: number): string {
   const ppID = process.env.PROMPTPAY_ID || '';
+  return generatePromptPayPayloadForId(ppID, amount);
+}
+
+/**
+ * Generate PromptPay payload for a specific PromptPay ID
+ */
+export function generatePromptPayPayloadForId(ppID: string, amount: number): string {
   if (!ppID) return '';
   
   const amountStr = amount.toFixed(2);

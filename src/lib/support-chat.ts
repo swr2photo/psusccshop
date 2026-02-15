@@ -26,6 +26,8 @@ export interface ChatSession {
   admin_email?: string;
   admin_name?: string;
   subject?: string;
+  shop_id?: string;      // Links chat to specific shop (null = main store)
+  shop_name?: string;    // Shop name for display
   rating?: number;  // 1-5 stars
   rating_comment?: string;
   created_at: string;
@@ -65,7 +67,9 @@ export async function createChatSession(
   customerName: string,
   subject?: string,
   initialMessage?: string,
-  customerAvatar?: string
+  customerAvatar?: string,
+  shopId?: string,
+  shopName?: string
 ): Promise<ChatSession> {
   const db = getDb();
   
@@ -79,6 +83,8 @@ export async function createChatSession(
     customer_avatar: customerAvatar,
     status: 'pending',
     subject: subject || 'สอบถามข้อมูล',
+    shop_id: shopId || undefined,
+    shop_name: shopName || undefined,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     unread_count: initialMessage ? 1 : 0,
