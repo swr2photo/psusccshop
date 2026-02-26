@@ -1,29 +1,15 @@
 // src/lib/supabase.ts
-// Supabase client configuration and helper functions
+// Database operations using Prisma ORM + Supabase Storage
+// Migrated from Supabase client to Prisma for all database queries
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { prisma } from './prisma';
 
 // ==================== CONFIGURATION ====================
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-
-if (!supabaseUrl) {
-  console.warn('[supabase] NEXT_PUBLIC_SUPABASE_URL is not set');
-}
-
-// ==================== SECURITY CHECK ====================
-// ตรวจสอบว่า service key ไม่ถูก expose ใน client-side
-if (typeof window !== 'undefined' && supabaseServiceKey) {
-  console.error('[SECURITY] SUPABASE_SERVICE_ROLE_KEY should NEVER be exposed to client-side!');
-}
-
-// ==================== CLIENTS ====================
-
-// Performance: Use connection pooler URL (port 6543, Transaction mode) when available
-// This reduces connection overhead significantly on serverless/edge deployments.
-const poolerUrl = process.env.SUPABASE_POOLER_URL || supabaseUrl;
 
 // Public client (for client-side, uses anon key with RLS)
 // ใช้เฉพาะสำหรับ read public config เท่านั้น
@@ -32,56 +18,42 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: false,
     persistSession: false,
   },
-  // Performance: disable realtime on the public client (only admin uses it)
   realtime: {
     params: { eventsPerSecond: 2 },
   },
-  // Performance: set sensible global fetch options
   global: {
-    fetch: (url, options) => fetch(url, { ...options, keepalive: true }),
+    fetch(url, options = {}) {
+      return fetch(url, { ...options, cache: 'no-store' as any });
+    },
   },
 });
 
 // Admin client (for server-side ONLY, bypasses RLS)
-// ห้ามใช้ใน client components!
+// ยังคงใช้สำหรับ Storage เท่านั้น
 let _supabaseAdmin: SupabaseClient | null = null;
-export const getSupabaseAdmin = () => {
-  // ป้องกันการเรียกใช้จาก client-side
-  if (typeof window !== 'undefined') {
-    console.error('[SECURITY] getSupabaseAdmin() should NEVER be called from client-side!');
-    throw new Error('Server-only function called from client');
+
+export function getSupabaseAdmin(): SupabaseClient | null {
+  if (_supabaseAdmin) return _supabaseAdmin;
+  if (!supabaseUrl || !supabaseServiceKey) {
+    console.warn('[supabase] Missing SUPABASE_URL or SERVICE_ROLE_KEY');
+    return null;
   }
-  
-  if (!_supabaseAdmin && supabaseServiceKey) {
-    // Validate service key format (should be JWT)
-    if (!supabaseServiceKey.startsWith('eyJ')) {
-      console.error('[supabase] Invalid SUPABASE_SERVICE_ROLE_KEY format. Should be a JWT token starting with "eyJ"');
-      console.error('[supabase] Get the correct key from: https://supabase.com/dashboard/project/YOUR_PROJECT/settings/api');
-      return null;
-    }
-    
-    // Performance: use connection pooler URL for server-side admin client
-    _supabaseAdmin = createClient(poolerUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
+  _supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+    db: {
+      schema: 'public',
+    },
+    global: {
+      fetch(url, options = {}) {
+        return fetch(url, { ...options, cache: 'no-store' as any });
       },
-      // Performance: enable keepalive for connection reuse
-      global: {
-        fetch: (url, options) => fetch(url, { ...options, keepalive: true }),
-      },
-      db: {
-        schema: 'public',
-      },
-    });
-  }
-  
-  if (!_supabaseAdmin) {
-    console.warn('[supabase] Admin client not available. SUPABASE_SERVICE_ROLE_KEY may not be set.');
-  }
-  
+    },
+  });
   return _supabaseAdmin;
-};
+}
 
 // ==================== DATABASE TYPES ====================
 
@@ -175,130 +147,67 @@ export interface DBDataRequest {
  * Maps key patterns to appropriate tables
  */
 export async function getJson<T = any>(key: string): Promise<T | null> {
-  const db = getSupabaseAdmin();
-  if (!db) throw new Error('Database not available');
-  
   try {
     // Route based on key pattern
     if (key.startsWith('orders/index/')) {
-      // Order index by email hash
       const emailHash = key.replace('orders/index/', '').replace('.json', '');
-      const { data, error } = await db
-        .from('orders')
-        .select('*')
-        .eq('email_hash', emailHash)
-        .order('created_at', { ascending: false })
-        .limit(500);
-      
-      if (error) throw error;
+      const data = await prisma.order.findMany({
+        where: { email_hash: emailHash },
+        orderBy: { created_at: 'desc' },
+        take: 500,
+      });
       return (data?.map(transformDBOrderToLegacy) || []) as T;
     }
     
     if (key.startsWith('orders/')) {
-      // Single order by key (orders/YYYY-MM/REF.json)
       const ref = key.split('/').pop()?.replace('.json', '');
       if (!ref) return null;
-      
-      const { data, error } = await db
-        .from('orders')
-        .select('*')
-        .eq('ref', ref)
-        .single();
-      
-      if (error && error.code !== 'PGRST116') throw error;
+      const data = await prisma.order.findUnique({ where: { ref } });
       return data ? (transformDBOrderToLegacy(data) as T) : null;
     }
     
     if (key.startsWith('config/')) {
-      // Config storage
       const configKey = key.replace('config/', '').replace('.json', '');
-      const { data, error } = await db
-        .from('config')
-        .select('value')
-        .eq('key', configKey)
-        .single();
-      
-      if (error && error.code !== 'PGRST116') throw error;
-      return data?.value as T || null;
+      const data = await prisma.config.findUnique({ where: { key: configKey } });
+      return (data?.value as T) || null;
     }
     
     if (key.startsWith('carts/')) {
-      // Cart by email hash
       const emailHash = key.replace('carts/', '').replace('.json', '');
-      const { data, error } = await db
-        .from('carts')
-        .select('cart_data')
-        .eq('email_hash', emailHash)
-        .single();
-      
-      if (error && error.code !== 'PGRST116') throw error;
-      return data?.cart_data as T || null;
+      const data = await prisma.cart.findUnique({ where: { email_hash: emailHash } });
+      return (data?.cart_data as T) || null;
     }
     
     if (key.startsWith('users/')) {
-      // Profile by email hash
       const emailHash = key.replace('users/', '').replace('.json', '');
-      const { data, error } = await db
-        .from('profiles')
-        .select('*')
-        .eq('email_hash', emailHash)
-        .single();
-      
-      if (error && error.code !== 'PGRST116') throw error;
+      const data = await prisma.profile.findUnique({ where: { email_hash: emailHash } });
       return data ? (transformDBProfileToLegacy(data) as T) : null;
     }
     
     if (key.startsWith('email-logs/')) {
-      // Email log by ID
       const logId = key.replace('email-logs/', '').replace('.json', '');
-      const { data, error } = await db
-        .from('email_logs')
-        .select('*')
-        .eq('id', logId)
-        .single();
-      
-      if (error && error.code !== 'PGRST116') throw error;
+      const data = await prisma.emailLog.findUnique({ where: { id: logId } });
       return data ? (transformDBEmailLogToLegacy(data) as T) : null;
     }
     
     if (key.startsWith('user-logs/')) {
-      // User log by ID
       const logId = key.replace('user-logs/', '').replace('.json', '');
-      const { data, error } = await db
-        .from('user_logs')
-        .select('*')
-        .eq('id', logId)
-        .single();
-      
-      if (error && error.code !== 'PGRST116') throw error;
+      const data = await prisma.userLog.findUnique({ where: { id: logId } });
       return data ? (transformDBUserLogToLegacy(data) as T) : null;
     }
     
     if (key.startsWith('data-requests/')) {
-      // Data request by ID
       const requestId = key.replace('data-requests/', '').replace('.json', '');
-      const { data, error } = await db
-        .from('data_requests')
-        .select('*')
-        .eq('id', requestId)
-        .single();
-      
-      if (error && error.code !== 'PGRST116') throw error;
-      return data as T || null;
+      const data = await prisma.dataRequest.findUnique({ where: { id: requestId } });
+      return (data as T) || null;
     }
     
     // Generic key-value fallback
-    const { data, error } = await db
-      .from('key_value_store')
-      .select('value')
-      .eq('key', key)
-      .single();
-    
-    if (error && error.code !== 'PGRST116') throw error;
-    return data?.value as T || null;
+    const data = await prisma.keyValueStore.findUnique({ where: { key } });
+    return (data?.value as T) || null;
     
   } catch (error: any) {
-    console.error('[supabase] getJson error', key, error);
+    console.error('[prisma] getJson error', key, error);
     throw error;
   }
 }
@@ -307,131 +216,89 @@ export async function getJson<T = any>(key: string): Promise<T | null> {
  * Store JSON data
  */
 export async function putJson(key: string, data: any): Promise<void> {
-  const db = getSupabaseAdmin();
-  if (!db) throw new Error('Database not available');
-  
   try {
-    // Route based on key pattern
     if (key.startsWith('orders/index/')) {
-      // Order indexes are maintained automatically via triggers
-      // No need to update manually
+      // Order indexes are maintained automatically
       return;
     }
     
     if (key.startsWith('orders/')) {
-      // Single order
       const ref = key.split('/').pop()?.replace('.json', '');
       if (!ref) throw new Error('Invalid order key');
-      
       const dbOrder = transformLegacyToDBOrder(data);
-      
-      // Check if order already exists
-      const { data: existing } = await db
-        .from('orders')
-        .select('ref')
-        .eq('ref', ref)
-        .single();
-      
-      if (existing) {
-        // Update existing order - only update provided fields
-        const { error } = await db
-          .from('orders')
-          .update(dbOrder)
-          .eq('ref', ref);
-        
-        if (error) throw error;
-      } else {
-        // Insert new order
-        const { error } = await db
-          .from('orders')
-          .insert(dbOrder);
-        
-        if (error) throw error;
-      }
+      await prisma.order.upsert({
+        where: { ref },
+        update: dbOrder,
+        create: { ...dbOrder, ref },
+      });
       return;
     }
     
     if (key.startsWith('config/')) {
       const configKey = key.replace('config/', '').replace('.json', '');
-      const { error } = await db
-        .from('config')
-        .upsert({ 
-          key: configKey, 
-          value: data,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'key' });
-      
-      if (error) throw error;
+      await prisma.config.upsert({
+        where: { key: configKey },
+        update: { value: data },
+        create: { key: configKey, value: data },
+      });
       return;
     }
     
     if (key.startsWith('carts/')) {
       const emailHash = key.replace('carts/', '').replace('.json', '');
-      const { error } = await db
-        .from('carts')
-        .upsert({ 
-          email_hash: emailHash, 
-          cart_data: data,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'email_hash' });
-      
-      if (error) throw error;
+      await prisma.cart.upsert({
+        where: { email_hash: emailHash },
+        update: { cart_data: data },
+        create: { email_hash: emailHash, cart_data: data },
+      });
       return;
     }
     
     if (key.startsWith('users/')) {
       const emailHash = key.replace('users/', '').replace('.json', '');
       const dbProfile = transformLegacyToDBProfile(emailHash, data);
-      const { error } = await db
-        .from('profiles')
-        .upsert(dbProfile, { onConflict: 'email_hash' });
-      
-      if (error) throw error;
+      await prisma.profile.upsert({
+        where: { email_hash: emailHash },
+        update: dbProfile,
+        create: dbProfile,
+      });
       return;
     }
     
     if (key.startsWith('email-logs/')) {
       const dbLog = transformLegacyToDBEmailLog(data);
-      const { error } = await db
-        .from('email_logs')
-        .upsert(dbLog, { onConflict: 'id' });
-      
-      if (error) throw error;
+      await prisma.emailLog.upsert({
+        where: { id: dbLog.id },
+        update: dbLog,
+        create: dbLog,
+      });
       return;
     }
     
     if (key.startsWith('user-logs/')) {
       const dbLog = transformLegacyToDBUserLog(data);
-      const { error } = await db
-        .from('user_logs')
-        .insert(dbLog);
-      
-      if (error) throw error;
+      await prisma.userLog.create({ data: dbLog });
       return;
     }
     
     if (key.startsWith('data-requests/')) {
-      const { error } = await db
-        .from('data_requests')
-        .upsert(data, { onConflict: 'id' });
-      
-      if (error) throw error;
+      await prisma.dataRequest.upsert({
+        where: { id: data.id },
+        update: data,
+        create: data,
+      });
       return;
     }
     
     // Generic key-value fallback
-    const { error } = await db
-      .from('key_value_store')
-      .upsert({ 
-        key, 
-        value: data,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'key' });
-    
-    if (error) throw error;
+    await prisma.keyValueStore.upsert({
+      where: { key },
+      update: { value: data },
+      create: { key, value: data },
+    });
     
   } catch (error: any) {
-    console.error('[supabase] putJson error', key, error);
+    console.error('[prisma] putJson error', key, error);
     throw error;
   }
 }
@@ -440,20 +307,12 @@ export async function putJson(key: string, data: any): Promise<void> {
  * List keys with prefix (simulates S3 listKeys)
  */
 export async function listKeys(prefix: string): Promise<string[]> {
-  const db = getSupabaseAdmin();
-  if (!db) throw new Error('Database not available');
-  
   try {
     if (prefix.startsWith('orders/') && !prefix.includes('index')) {
-      // List all order keys
-      const { data, error } = await db
-        .from('orders')
-        .select('ref, created_at')
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      
-      // Convert to file-like keys
+      const data = await prisma.order.findMany({
+        select: { ref: true, created_at: true },
+        orderBy: { created_at: 'desc' },
+      });
       return (data || []).map(order => {
         const date = new Date(order.created_at);
         const yyyy = date.getFullYear();
@@ -463,46 +322,38 @@ export async function listKeys(prefix: string): Promise<string[]> {
     }
     
     if (prefix.startsWith('email-logs/')) {
-      const { data, error } = await db
-        .from('email_logs')
-        .select('id')
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
+      const data = await prisma.emailLog.findMany({
+        select: { id: true },
+        orderBy: { created_at: 'desc' },
+      });
       return (data || []).map(log => `email-logs/${log.id}.json`);
     }
     
     if (prefix.startsWith('user-logs/')) {
-      const { data, error } = await db
-        .from('user_logs')
-        .select('id')
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
+      const data = await prisma.userLog.findMany({
+        select: { id: true },
+        orderBy: { created_at: 'desc' },
+      });
       return (data || []).map(log => `user-logs/${log.id}.json`);
     }
     
     if (prefix.startsWith('data-requests/')) {
-      const { data, error } = await db
-        .from('data_requests')
-        .select('id')
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
+      const data = await prisma.dataRequest.findMany({
+        select: { id: true },
+        orderBy: { created_at: 'desc' },
+      });
       return (data || []).map(req => `data-requests/${req.id}.json`);
     }
     
     // Generic key-value store fallback
-    const { data, error } = await db
-      .from('key_value_store')
-      .select('key')
-      .like('key', `${prefix}%`);
-    
-    if (error) throw error;
+    const data = await prisma.keyValueStore.findMany({
+      where: { key: { startsWith: prefix } },
+      select: { key: true },
+    });
     return (data || []).map(item => item.key);
     
   } catch (error: any) {
-    console.error('[supabase] listKeys error', prefix, error);
+    console.error('[prisma] listKeys error', prefix, error);
     throw error;
   }
 }
@@ -511,55 +362,31 @@ export async function listKeys(prefix: string): Promise<string[]> {
  * Delete an object
  */
 export async function deleteObject(key: string): Promise<void> {
-  const db = getSupabaseAdmin();
-  if (!db) throw new Error('Database not available');
-  
   try {
     if (key.startsWith('orders/')) {
       const ref = key.split('/').pop()?.replace('.json', '');
       if (!ref) return;
-      
-      const { error } = await db
-        .from('orders')
-        .delete()
-        .eq('ref', ref);
-      
-      if (error) throw error;
+      await prisma.order.delete({ where: { ref } }).catch(() => {});
       return;
     }
     
     if (key.startsWith('carts/')) {
       const emailHash = key.replace('carts/', '').replace('.json', '');
-      const { error } = await db
-        .from('carts')
-        .delete()
-        .eq('email_hash', emailHash);
-      
-      if (error) throw error;
+      await prisma.cart.delete({ where: { email_hash: emailHash } }).catch(() => {});
       return;
     }
     
     if (key.startsWith('users/')) {
       const emailHash = key.replace('users/', '').replace('.json', '');
-      const { error } = await db
-        .from('profiles')
-        .delete()
-        .eq('email_hash', emailHash);
-      
-      if (error) throw error;
+      await prisma.profile.delete({ where: { email_hash: emailHash } }).catch(() => {});
       return;
     }
     
     // Generic key-value store fallback
-    const { error } = await db
-      .from('key_value_store')
-      .delete()
-      .eq('key', key);
-    
-    if (error) throw error;
+    await prisma.keyValueStore.delete({ where: { key } }).catch(() => {});
     
   } catch (error: any) {
-    console.error('[supabase] deleteObject error', key, error);
+    console.error('[prisma] deleteObject error', key, error);
     throw error;
   }
 }
@@ -585,21 +412,17 @@ function transformDBOrderToLegacy(dbOrder: any): any {
     totalAmount: dbOrder.total_amount,
     amount: dbOrder.total_amount,
     notes: dbOrder.notes,
-    // Map slip_data to both 'slip' and 'slipData' for backward compatibility
     slip: dbOrder.slip_data,
     slipData: dbOrder.slip_data,
     paymentVerifiedAt: dbOrder.payment_verified_at,
     paymentMethod: dbOrder.payment_method,
-    // Shipping option (pickup, delivery, etc.)
     shippingOption: dbOrder.shipping_option,
-    // Tracking fields
     trackingNumber: dbOrder.tracking_number,
     shippingProvider: dbOrder.shipping_provider,
     trackingStatus: dbOrder.tracking_status,
     trackingLastChecked: dbOrder.tracking_last_checked,
     shippedAt: dbOrder.shipped_at,
     receivedAt: dbOrder.received_at,
-    // Refund fields
     refundStatus: dbOrder.refund_status,
     refundReason: dbOrder.refund_reason,
     refundDetails: dbOrder.refund_details,
@@ -636,23 +459,19 @@ function transformLegacyToDBOrder(legacyOrder: any): any {
     cart: legacyOrder.cart || [],
     total_amount: legacyOrder.totalAmount || legacyOrder.amount || 0,
     notes: legacyOrder.notes || null,
-    // Support both 'slip' (from payment verify) and 'slipData' fields
     slip_data: legacyOrder.slip || legacyOrder.slipData || null,
     payment_verified_at: legacyOrder.paymentVerifiedAt || legacyOrder.verifiedAt || null,
     payment_method: legacyOrder.paymentMethod || null,
-    // Shipping option (support both shippingOption and shippingOptionId from frontend)
     shipping_option: shippingOpt,
-    // Tracking fields
     tracking_number: legacyOrder.trackingNumber || null,
     shipping_provider: legacyOrder.shippingProvider || null,
     tracking_status: legacyOrder.trackingStatus || null,
     tracking_last_checked: legacyOrder.trackingLastChecked || null,
     shipped_at: legacyOrder.shippedAt || null,
     received_at: legacyOrder.receivedAt || null,
-    // Multi-shop support
     ...(legacyOrder.shopId ? { shop_id: legacyOrder.shopId } : {}),
     ...(legacyOrder.shopSlug ? { shop_slug: legacyOrder.shopSlug } : {}),
-    updated_at: new Date().toISOString(),
+    updated_at: new Date(),
   };
 }
 
@@ -672,7 +491,6 @@ function transformLegacyToDBProfile(hash: string, data: any): any {
     phone: data.phone || '',
     address: data.address || '',
     instagram: data.instagram || null,
-    updated_at: new Date().toISOString(),
   };
 }
 
@@ -693,7 +511,6 @@ function transformDBEmailLogToLegacy(dbLog: any): any {
 }
 
 function transformLegacyToDBEmailLog(data: any): any {
-  // Ensure id is always present - generate one if missing
   const id = data.id || `email-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   return {
     id,
@@ -706,7 +523,7 @@ function transformLegacyToDBEmailLog(data: any): any {
     status: data.status || 'pending',
     sent_at: data.sentAt || null,
     error: data.error || null,
-    created_at: data.timestamp || new Date().toISOString(),
+    created_at: data.timestamp ? new Date(data.timestamp) : new Date(),
   };
 }
 
@@ -734,46 +551,39 @@ function transformLegacyToDBUserLog(data: any): any {
     metadata: data.metadata || null,
     ip: data.ip || null,
     user_agent: data.userAgent || null,
-    created_at: data.timestamp || new Date().toISOString(),
+    created_at: data.timestamp ? new Date(data.timestamp) : new Date(),
   };
 }
 
 // ==================== DIRECT DATABASE QUERIES ====================
 
 /**
- * Get orders by email with pagination (optimized for Supabase)
+ * Get orders by email with pagination (optimized for Prisma)
  */
 export async function getOrdersByEmail(
   email: string, 
   options: { limit?: number; offset?: number; status?: string[]; shopSlug?: string } = {}
 ): Promise<{ orders: any[]; total: number }> {
-  const db = getSupabaseAdmin();
-  if (!db) throw new Error('Database not available');
   const { limit = 50, offset = 0, status, shopSlug } = options;
   const hash = emailHash(email);
   
-  let query = db
-    .from('orders')
-    .select('*', { count: 'exact' })
-    .eq('email_hash', hash)
-    .order('created_at', { ascending: false })
-    .range(offset, offset + limit - 1);
+  const where: any = { email_hash: hash };
+  if (status && status.length > 0) where.status = { in: status };
+  if (shopSlug) where.shop_slug = shopSlug;
   
-  if (status && status.length > 0) {
-    query = query.in('status', status);
-  }
-  
-  if (shopSlug) {
-    query = query.eq('shop_slug', shopSlug);
-  }
-  
-  const { data, error, count } = await query;
-  
-  if (error) throw error;
+  const [data, total] = await Promise.all([
+    prisma.order.findMany({
+      where,
+      orderBy: { created_at: 'desc' },
+      skip: offset,
+      take: limit,
+    }),
+    prisma.order.count({ where }),
+  ]);
   
   return {
     orders: (data || []).map(transformDBOrderToLegacy),
-    total: count || 0,
+    total,
   };
 }
 
@@ -783,31 +593,31 @@ export async function getOrdersByEmail(
 export async function getAllOrders(
   options: { limit?: number; offset?: number; status?: string[]; search?: string } = {}
 ): Promise<{ orders: any[]; total: number }> {
-  const db = getSupabaseAdmin();
-  if (!db) throw new Error('Database not available');
   const { limit = 100, offset = 0, status, search } = options;
   
-  let query = db
-    .from('orders')
-    .select('*', { count: 'exact' })
-    .order('created_at', { ascending: false })
-    .range(offset, offset + limit - 1);
-  
-  if (status && status.length > 0) {
-    query = query.in('status', status);
-  }
-  
+  const where: any = {};
+  if (status && status.length > 0) where.status = { in: status };
   if (search) {
-    query = query.or(`ref.ilike.%${search}%,customer_name.ilike.%${search}%,customer_email.ilike.%${search}%`);
+    where.OR = [
+      { ref: { contains: search, mode: 'insensitive' } },
+      { customer_name: { contains: search, mode: 'insensitive' } },
+      { customer_email: { contains: search, mode: 'insensitive' } },
+    ];
   }
   
-  const { data, error, count } = await query;
-  
-  if (error) throw error;
+  const [data, total] = await Promise.all([
+    prisma.order.findMany({
+      where,
+      orderBy: { created_at: 'desc' },
+      skip: offset,
+      take: limit,
+    }),
+    prisma.order.count({ where }),
+  ]);
   
   return {
     orders: (data || []).map(transformDBOrderToLegacy),
-    total: count || 0,
+    total,
   };
 }
 
@@ -815,16 +625,7 @@ export async function getAllOrders(
  * Get order by ref
  */
 export async function getOrderByRef(ref: string): Promise<any | null> {
-  const db = getSupabaseAdmin();
-  if (!db) throw new Error('Database not available');
-  
-  const { data, error } = await db
-    .from('orders')
-    .select('*')
-    .eq('ref', ref)
-    .single();
-  
-  if (error && error.code !== 'PGRST116') throw error;
+  const data = await prisma.order.findUnique({ where: { ref } });
   return data ? transformDBOrderToLegacy(data) : null;
 }
 
@@ -832,10 +633,7 @@ export async function getOrderByRef(ref: string): Promise<any | null> {
  * Update order by ref
  */
 export async function updateOrderByRef(ref: string, updates: Partial<any>): Promise<any> {
-  const db = getSupabaseAdmin();
-  if (!db) throw new Error('Database not available');
-  
-  const dbUpdates: any = { updated_at: new Date().toISOString() };
+  const dbUpdates: any = { updated_at: new Date() };
   
   if (updates.status !== undefined) dbUpdates.status = updates.status;
   if (updates.customerName !== undefined) dbUpdates.customer_name = updates.customerName;
@@ -848,17 +646,14 @@ export async function updateOrderByRef(ref: string, updates: Partial<any>): Prom
   if (updates.slipData !== undefined) dbUpdates.slip_data = updates.slipData;
   if (updates.paymentVerifiedAt !== undefined) dbUpdates.payment_verified_at = updates.paymentVerifiedAt;
   if (updates.paymentMethod !== undefined) dbUpdates.payment_method = updates.paymentMethod;
-  // Shipping option
   if (updates.shippingOption !== undefined) dbUpdates.shipping_option = updates.shippingOption;
   if (updates.shippingOptionId !== undefined) dbUpdates.shipping_option = updates.shippingOptionId;
-  // Tracking fields
   if (updates.trackingNumber !== undefined) dbUpdates.tracking_number = updates.trackingNumber;
   if (updates.shippingProvider !== undefined) dbUpdates.shipping_provider = updates.shippingProvider;
   if (updates.trackingStatus !== undefined) dbUpdates.tracking_status = updates.trackingStatus;
   if (updates.trackingLastChecked !== undefined) dbUpdates.tracking_last_checked = updates.trackingLastChecked;
   if (updates.shippedAt !== undefined) dbUpdates.shipped_at = updates.shippedAt;
   if (updates.receivedAt !== undefined) dbUpdates.received_at = updates.receivedAt;
-  // Refund fields
   if (updates.refundStatus !== undefined) dbUpdates.refund_status = updates.refundStatus;
   if (updates.refundReason !== undefined) dbUpdates.refund_reason = updates.refundReason;
   if (updates.refundDetails !== undefined) dbUpdates.refund_details = updates.refundDetails;
@@ -871,14 +666,11 @@ export async function updateOrderByRef(ref: string, updates: Partial<any>): Prom
   if (updates.refundReviewedBy !== undefined) dbUpdates.refund_reviewed_by = updates.refundReviewedBy;
   if (updates.refundAdminNote !== undefined) dbUpdates.refund_admin_note = updates.refundAdminNote;
   
-  const { data, error } = await db
-    .from('orders')
-    .update(dbUpdates)
-    .eq('ref', ref)
-    .select()
-    .single();
+  const data = await prisma.order.update({
+    where: { ref },
+    data: dbUpdates,
+  });
   
-  if (error) throw error;
   return transformDBOrderToLegacy(data);
 }
 
@@ -886,17 +678,15 @@ export async function updateOrderByRef(ref: string, updates: Partial<any>): Prom
  * Get expired unpaid orders (for cron job)
  */
 export async function getExpiredUnpaidOrders(expiryHours: number = 24): Promise<any[]> {
-  const db = getSupabaseAdmin();
-  if (!db) throw new Error('Database not available');
-  const expiryDate = new Date(Date.now() - expiryHours * 60 * 60 * 1000).toISOString();
+  const expiryDate = new Date(Date.now() - expiryHours * 60 * 60 * 1000);
   
-  const { data, error } = await db
-    .from('orders')
-    .select('*')
-    .in('status', ['PENDING', 'WAITING_PAYMENT', 'AWAITING_PAYMENT', 'UNPAID', 'DRAFT'])
-    .lt('created_at', expiryDate);
+  const data = await prisma.order.findMany({
+    where: {
+      status: { in: ['PENDING', 'WAITING_PAYMENT', 'AWAITING_PAYMENT', 'UNPAID', 'DRAFT'] },
+      created_at: { lt: expiryDate },
+    },
+  });
   
-  if (error) throw error;
   return (data || []).map(transformDBOrderToLegacy);
 }
 
@@ -927,17 +717,16 @@ export async function logSecurityEvent(event: {
   details?: Record<string, any>;
 }): Promise<void> {
   try {
-    const db = getSupabaseAdmin();
-    if (!db) return; // Don't throw for audit logging
-    await db.from('security_audit_log').insert({
-      event_type: event.eventType,
-      user_email: event.userEmail,
-      ip_address: event.ipAddress,
-      user_agent: event.userAgent,
-      details: event.details,
+    await prisma.securityAuditLog.create({
+      data: {
+        event_type: event.eventType,
+        user_email: event.userEmail,
+        ip_address: event.ipAddress,
+        user_agent: event.userAgent,
+        details: event.details,
+      },
     });
   } catch (error) {
-    // Don't throw - audit logging should not break the app
     console.error('[Security Audit] Failed to log event:', error);
   }
 }
@@ -951,32 +740,23 @@ export async function getSecurityAuditLogs(options: {
   eventType?: string;
   userEmail?: string;
 } = {}): Promise<{ logs: any[]; total: number }> {
-  const db = getSupabaseAdmin();
-  if (!db) throw new Error('Database not available');
   const { limit = 100, offset = 0, eventType, userEmail } = options;
   
-  let query = db
-    .from('security_audit_log')
-    .select('*', { count: 'exact' })
-    .order('created_at', { ascending: false })
-    .range(offset, offset + limit - 1);
+  const where: any = {};
+  if (eventType) where.event_type = eventType;
+  if (userEmail) where.user_email = userEmail;
   
-  if (eventType) {
-    query = query.eq('event_type', eventType);
-  }
+  const [data, total] = await Promise.all([
+    prisma.securityAuditLog.findMany({
+      where,
+      orderBy: { created_at: 'desc' },
+      skip: offset,
+      take: limit,
+    }),
+    prisma.securityAuditLog.count({ where }),
+  ]);
   
-  if (userEmail) {
-    query = query.eq('user_email', userEmail);
-  }
-  
-  const { data, error, count } = await query;
-  
-  if (error) throw error;
-  
-  return {
-    logs: data || [],
-    total: count || 0,
-  };
+  return { logs: data || [], total };
 }
 
 /**
@@ -987,17 +767,18 @@ export async function cleanupOldData(retentionDays: number = 365): Promise<{
   deletedLogs: number;
   deletedAudit: number;
 }> {
-  const db = getSupabaseAdmin();
-  if (!db) throw new Error('Database not available');
+  const cutoffDate = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
   
-  const { data, error } = await db.rpc('cleanup_old_data', { retention_days: retentionDays });
-  
-  if (error) throw error;
+  const [deletedOrders, deletedLogs, deletedAudit] = await Promise.all([
+    prisma.order.deleteMany({ where: { created_at: { lt: cutoffDate } } }),
+    prisma.userLog.deleteMany({ where: { created_at: { lt: cutoffDate } } }),
+    prisma.securityAuditLog.deleteMany({ where: { created_at: { lt: cutoffDate } } }),
+  ]);
   
   return {
-    deletedOrders: data?.[0]?.deleted_orders || 0,
-    deletedLogs: data?.[0]?.deleted_logs || 0,
-    deletedAudit: data?.[0]?.deleted_audit || 0,
+    deletedOrders: deletedOrders.count,
+    deletedLogs: deletedLogs.count,
+    deletedAudit: deletedAudit.count,
   };
 }
 
@@ -1017,19 +798,17 @@ export async function uploadImageToStorage(
   const db = getSupabaseAdmin();
   if (!db) throw new Error('Database not available');
   
-  // Generate unique path: images/YYYY-MM/timestamp_random.ext
   const now = new Date();
   const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const ext = filename.split('.').pop()?.toLowerCase() || 'png';
   const uniqueName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
   const path = `${yearMonth}/${uniqueName}`;
   
-  // Upload to Supabase Storage
   const { data, error } = await db.storage
     .from(STORAGE_BUCKET)
     .upload(path, buffer, {
       contentType,
-      cacheControl: '31536000', // 1 year cache
+      cacheControl: '31536000',
       upsert: false,
     });
   
@@ -1038,7 +817,6 @@ export async function uploadImageToStorage(
     throw new Error(`Failed to upload image: ${error.message}`);
   }
   
-  // Get public URL (permanent, no expiration)
   const { data: urlData } = db.storage
     .from(STORAGE_BUCKET)
     .getPublicUrl(path);
@@ -1127,25 +905,13 @@ function permsToDbRow(email: string, perms: Record<string, boolean>): Record<str
  * Get admin permissions from DB for a specific email
  */
 export async function getAdminPermissionsFromDB(email: string): Promise<Record<string, boolean> | null> {
-  const db = getSupabaseAdmin();
-  if (!db) return null;
-  
   try {
-    const { data, error } = await db
-      .from('admin_permissions')
-      .select('*')
-      .eq('email', email.trim().toLowerCase())
-      .single();
-    
-    if (error && error.code !== 'PGRST116') {
-      // PGRST116 = no rows returned, which is expected for new admins
-      console.error('[supabase] getAdminPermissionsFromDB error:', error);
-      return null;
-    }
-    
-    return data ? dbRowToPerms(data) : null;
+    const data = await prisma.adminPermission.findUnique({
+      where: { email: email.trim().toLowerCase() },
+    });
+    return data ? dbRowToPerms(data as any) : null;
   } catch (error) {
-    console.error('[supabase] getAdminPermissionsFromDB error:', error);
+    console.error('[prisma] getAdminPermissionsFromDB error:', error);
     return null;
   }
 }
@@ -1154,26 +920,15 @@ export async function getAdminPermissionsFromDB(email: string): Promise<Record<s
  * Get all admin permissions from DB
  */
 export async function getAllAdminPermissionsFromDB(): Promise<Record<string, Record<string, boolean>>> {
-  const db = getSupabaseAdmin();
-  if (!db) return {};
-  
   try {
-    const { data, error } = await db
-      .from('admin_permissions')
-      .select('*');
-    
-    if (error) {
-      console.error('[supabase] getAllAdminPermissionsFromDB error:', error);
-      return {};
-    }
-    
+    const data = await prisma.adminPermission.findMany();
     const result: Record<string, Record<string, boolean>> = {};
     for (const row of (data || [])) {
-      result[row.email] = dbRowToPerms(row);
+      result[row.email] = dbRowToPerms(row as any);
     }
     return result;
   } catch (error) {
-    console.error('[supabase] getAllAdminPermissionsFromDB error:', error);
+    console.error('[prisma] getAllAdminPermissionsFromDB error:', error);
     return {};
   }
 }
@@ -1185,22 +940,17 @@ export async function saveAdminPermissionsToDB(
   email: string, 
   perms: Record<string, boolean>
 ): Promise<boolean> {
-  const db = getSupabaseAdmin();
-  if (!db) return false;
-  
   try {
     const row = permsToDbRow(email, perms);
-    const { error } = await db
-      .from('admin_permissions')
-      .upsert(row, { onConflict: 'email' });
-    
-    if (error) {
-      console.error('[supabase] saveAdminPermissionsToDB error:', error);
-      return false;
-    }
+    const normalizedEmail = email.trim().toLowerCase();
+    await prisma.adminPermission.upsert({
+      where: { email: normalizedEmail },
+      update: row,
+      create: row as any,
+    });
     return true;
   } catch (error) {
-    console.error('[supabase] saveAdminPermissionsToDB error:', error);
+    console.error('[prisma] saveAdminPermissionsToDB error:', error);
     return false;
   }
 }
@@ -1211,25 +961,25 @@ export async function saveAdminPermissionsToDB(
 export async function saveAllAdminPermissionsToDB(
   allPerms: Record<string, Record<string, boolean>>
 ): Promise<boolean> {
-  const db = getSupabaseAdmin();
-  if (!db) return false;
-  
   try {
-    const rows = Object.entries(allPerms).map(([email, perms]) => permsToDbRow(email, perms));
+    const entries = Object.entries(allPerms);
+    if (entries.length === 0) return true;
     
-    if (rows.length === 0) return true;
-    
-    const { error } = await db
-      .from('admin_permissions')
-      .upsert(rows, { onConflict: 'email' });
-    
-    if (error) {
-      console.error('[supabase] saveAllAdminPermissionsToDB error:', error);
-      return false;
-    }
+    // Use transaction for batch operations
+    await prisma.$transaction(
+      entries.map(([email, perms]) => {
+        const row = permsToDbRow(email, perms);
+        const normalizedEmail = email.trim().toLowerCase();
+        return prisma.adminPermission.upsert({
+          where: { email: normalizedEmail },
+          update: row,
+          create: row as any,
+        });
+      })
+    );
     return true;
   } catch (error) {
-    console.error('[supabase] saveAllAdminPermissionsToDB error:', error);
+    console.error('[prisma] saveAllAdminPermissionsToDB error:', error);
     return false;
   }
 }
@@ -1238,22 +988,13 @@ export async function saveAllAdminPermissionsToDB(
  * Delete admin permissions from DB
  */
 export async function deleteAdminPermissionsFromDB(email: string): Promise<boolean> {
-  const db = getSupabaseAdmin();
-  if (!db) return false;
-  
   try {
-    const { error } = await db
-      .from('admin_permissions')
-      .delete()
-      .eq('email', email.trim().toLowerCase());
-    
-    if (error) {
-      console.error('[supabase] deleteAdminPermissionsFromDB error:', error);
-      return false;
-    }
+    await prisma.adminPermission.delete({
+      where: { email: email.trim().toLowerCase() },
+    }).catch(() => {});
     return true;
   } catch (error) {
-    console.error('[supabase] deleteAdminPermissionsFromDB error:', error);
+    console.error('[prisma] deleteAdminPermissionsFromDB error:', error);
     return false;
   }
 }

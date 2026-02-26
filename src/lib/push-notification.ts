@@ -1,15 +1,12 @@
 // src/lib/push-notification.ts
-// Web Push notification sender (server-side)
+// Web Push notification sender (server-side) — using Prisma
 
-import { getSupabaseAdmin } from './supabase';
+import { prisma } from './prisma';
 
-// VAPID keys for web push
-// Generate with: npx web-push generate-vapid-keys
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '';
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || '';
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:psuscc@psusci.club';
 
-// Cache webpush module to avoid re-importing and re-setting VAPID on every call
 let _webpush: any = null;
 async function getWebPush() {
   if (_webpush) return _webpush;
@@ -33,9 +30,6 @@ interface PushPayload {
   chatId?: string;
 }
 
-/**
- * Send push notification to all devices of a user
- */
 export async function sendPushNotification(
   email: string,
   payload: PushPayload
@@ -45,17 +39,12 @@ export async function sendPushNotification(
     return { sent: 0, failed: 0 };
   }
 
-  const db = getSupabaseAdmin();
-  if (!db) return { sent: 0, failed: 0 };
+  const subscriptions = await prisma.pushSubscription.findMany({
+    where: { email },
+  });
 
-  // Get all subscriptions for this user
-  const { data: subscriptions, error } = await db
-    .from('push_subscriptions')
-    .select('*')
-    .eq('email', email);
-
-  if (error || !subscriptions?.length) {
-    console.log(`[Push] No subscriptions found for ${email}`, error?.message || '');
+  if (!subscriptions.length) {
+    console.log(`[Push] No subscriptions found for ${email}`);
     return { sent: 0, failed: 0 };
   }
 
@@ -79,12 +68,11 @@ export async function sendPushNotification(
       await webpush.sendNotification(
         pushSubscription,
         JSON.stringify(payload),
-        { TTL: 3600 } // 1 hour expiry
+        { TTL: 3600 }
       );
       sent++;
     } catch (err: any) {
       failed++;
-      // If subscription expired or invalid, mark for deletion
       if (err?.statusCode === 404 || err?.statusCode === 410) {
         expiredEndpoints.push(sub.endpoint);
       }
@@ -92,12 +80,10 @@ export async function sendPushNotification(
     }
   }
 
-  // Clean up expired subscriptions
   if (expiredEndpoints.length > 0) {
-    await db
-      .from('push_subscriptions')
-      .delete()
-      .in('endpoint', expiredEndpoints);
+    await prisma.pushSubscription.deleteMany({
+      where: { endpoint: { in: expiredEndpoints } },
+    });
     console.log(`[Push] Cleaned up ${expiredEndpoints.length} expired subscriptions`);
   }
 

@@ -1,0 +1,376 @@
+// prisma/schema.prisma
+// Prisma Schema สำหรับ psusccshop — ครอบคลุมทุก table ที่ใช้ใน Supabase
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==================== ORDERS ====================
+
+model Order {
+  id                   String   @id @default(uuid())
+  ref                  String   @unique
+  date                 String?
+  status               String   @default("WAITING_PAYMENT")
+  customer_name        String
+  customer_email       String
+  email_hash           String
+  customer_phone       String
+  customer_address     String
+  customer_instagram   String?
+  cart                 Json     @default("[]")
+  total_amount         Float    @default(0)
+  notes                String?
+  slip_data            Json?
+  payment_verified_at  String?
+  payment_method       String?
+  shipping_option      String?
+  tracking_number      String?
+  shipping_provider    String?
+  tracking_status      String?
+  tracking_last_checked String?
+  shipped_at           String?
+  received_at          String?
+  refund_status        String?
+  refund_reason        String?
+  refund_details       String?
+  refund_bank_name     String?
+  refund_bank_account  String?
+  refund_account_name  String?
+  refund_amount        Float?
+  refund_requested_at  String?
+  refund_reviewed_at   String?
+  refund_reviewed_by   String?
+  refund_admin_note    String?
+  shop_id              String?
+  shop_slug            String?
+  created_at           DateTime @default(now())
+  updated_at           DateTime @default(now()) @updatedAt
+
+  @@index([email_hash])
+  @@index([status])
+  @@index([shop_slug])
+  @@index([created_at])
+  @@map("orders")
+}
+
+// ==================== CONFIG ====================
+
+model Config {
+  id         String   @id @default(uuid())
+  key        String   @unique
+  value      Json
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now()) @updatedAt
+
+  @@map("config")
+}
+
+// ==================== CARTS ====================
+
+model Cart {
+  id         String   @id @default(uuid())
+  email_hash String   @unique
+  cart_data  Json     @default("[]")
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now()) @updatedAt
+
+  @@map("carts")
+}
+
+// ==================== PROFILES ====================
+
+model Profile {
+  id         String   @id @default(uuid())
+  email_hash String   @unique
+  name       String   @default("")
+  phone      String   @default("")
+  address    String   @default("")
+  instagram  String?
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now()) @updatedAt
+
+  @@map("profiles")
+}
+
+// ==================== EMAIL LOGS ====================
+
+model EmailLog {
+  id         String   @id @default(uuid())
+  order_ref  String?
+  to_email   String
+  from_email String
+  subject    String
+  body       String
+  email_type String   @default("custom")
+  status     String   @default("pending")
+  sent_at    String?
+  error      String?
+  created_at DateTime @default(now())
+
+  @@index([order_ref])
+  @@index([created_at])
+  @@map("email_logs")
+}
+
+// ==================== USER LOGS ====================
+
+model UserLog {
+  id         String   @id @default(uuid())
+  email      String
+  name       String?
+  action     String
+  details    String?
+  metadata   Json?
+  ip         String?
+  user_agent String?
+  created_at DateTime @default(now())
+
+  @@index([email])
+  @@index([created_at])
+  @@map("user_logs")
+}
+
+// ==================== DATA REQUESTS (PDPA) ====================
+
+model DataRequest {
+  id           String   @id @default(uuid())
+  email        String
+  request_type String
+  status       String   @default("pending")
+  details      Json?
+  processed_at String?
+  created_at   DateTime @default(now())
+
+  @@index([email])
+  @@map("data_requests")
+}
+
+// ==================== KEY-VALUE STORE ====================
+
+model KeyValueStore {
+  id         String   @id @default(uuid())
+  key        String   @unique
+  value      Json
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now()) @updatedAt
+
+  @@map("key_value_store")
+}
+
+// ==================== SECURITY AUDIT LOG ====================
+
+model SecurityAuditLog {
+  id         String   @id @default(uuid())
+  event_type String
+  user_email String?
+  ip_address String?
+  user_agent String?
+  details    Json?
+  created_at DateTime @default(now())
+
+  @@index([event_type])
+  @@index([user_email])
+  @@index([created_at])
+  @@map("security_audit_log")
+}
+
+// ==================== ADMIN PERMISSIONS ====================
+
+model AdminPermission {
+  id                      String  @id @default(uuid())
+  email                   String  @unique
+  can_manage_shop         Boolean @default(false)
+  can_manage_sheet        Boolean @default(false)
+  can_manage_shipping     Boolean @default(false)
+  can_manage_payment      Boolean @default(false)
+  can_manage_products     Boolean @default(false)
+  can_manage_orders       Boolean @default(false)
+  can_manage_pickup       Boolean @default(false)
+  can_manage_tracking     Boolean @default(false)
+  can_manage_refunds      Boolean @default(false)
+  can_manage_announcement Boolean @default(false)
+  can_manage_events       Boolean @default(false)
+  can_manage_promo_codes  Boolean @default(false)
+  can_manage_support      Boolean @default(false)
+  can_send_email          Boolean @default(false)
+  can_manage_live_stream  Boolean @default(false)
+  created_at              DateTime @default(now())
+  updated_at              DateTime @default(now()) @updatedAt
+
+  @@map("admin_permissions")
+}
+
+// ==================== SUPPORT CHATS ====================
+
+model SupportChat {
+  id                    String   @id @default(uuid())
+  customer_email        String
+  customer_name         String
+  customer_avatar       String?
+  status                String   @default("pending")
+  admin_email           String?
+  admin_name            String?
+  subject               String?
+  shop_id               String?
+  shop_name             String?
+  rating                Int?
+  rating_comment        String?
+  last_message_at       DateTime?
+  last_message_preview  String?
+  unread_count          Int      @default(0)
+  customer_unread_count Int      @default(0)
+  closed_at             DateTime?
+  created_at            DateTime @default(now())
+  updated_at            DateTime @default(now()) @updatedAt
+
+  messages SupportMessage[]
+
+  @@index([customer_email])
+  @@index([status])
+  @@index([created_at])
+  @@map("support_chats")
+}
+
+model SupportMessage {
+  id            String   @id @default(uuid())
+  session_id    String
+  sender        String
+  sender_email  String?
+  sender_name   String?
+  sender_avatar String?
+  message       String
+  is_read       Boolean  @default(false)
+  read_at       DateTime?
+  is_unsent     Boolean  @default(false)
+  created_at    DateTime @default(now())
+
+  chat SupportChat @relation(fields: [session_id], references: [id], onDelete: Cascade)
+
+  @@index([session_id])
+  @@index([created_at])
+  @@map("support_messages")
+}
+
+// ==================== SHOPS (MULTI-SHOP) ====================
+
+model Shop {
+  id              String   @id @default(uuid())
+  slug            String   @unique
+  name            String
+  name_en         String?
+  description     String?
+  description_en  String?
+  logo_url        String?
+  banner_url      String?
+  owner_email     String
+  is_active       Boolean  @default(true)
+  settings        Json     @default("{}")
+  payment_info    Json     @default("{}")
+  products        Json     @default("[]")
+  config          Json     @default("{}")
+  contact_email   String?
+  contact_phone   String?
+  social_links    Json?
+  sort_order      Int      @default(0)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @default(now()) @updatedAt
+
+  admins ShopAdmin[]
+
+  @@index([owner_email])
+  @@index([is_active])
+  @@map("shops")
+}
+
+model ShopAdmin {
+  id          String   @id @default(uuid())
+  shop_id     String
+  email       String
+  role        String   @default("admin")
+  permissions Json     @default("{}")
+  added_by    String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now()) @updatedAt
+
+  shop Shop @relation(fields: [shop_id], references: [id], onDelete: Cascade)
+
+  @@unique([shop_id, email])
+  @@index([email])
+  @@map("shop_admins")
+}
+
+// ==================== PASSKEYS (WebAuthn) ====================
+
+model PasskeyCredential {
+  credential_id String   @id
+  user_email    String
+  public_key    String
+  counter       Int      @default(0)
+  device_type   String
+  backed_up     Boolean  @default(false)
+  transports    Json     @default("[]")
+  friendly_name String   @default("My Passkey")
+  created_at    DateTime @default(now())
+  last_used_at  DateTime?
+
+  @@index([user_email])
+  @@map("passkey_credentials")
+}
+
+model PasskeyChallenge {
+  id         String   @id @default(uuid())
+  challenge  String
+  type       String
+  user_email String?
+  expires_at DateTime
+  created_at DateTime @default(now())
+
+  @@index([expires_at])
+  @@map("passkey_challenges")
+}
+
+// ==================== PUSH NOTIFICATIONS ====================
+
+model PushSubscription {
+  id          String   @id @default(uuid())
+  email       String
+  endpoint    String   @unique
+  keys_p256dh String
+  keys_auth   String
+  created_at  DateTime @default(now())
+
+  @@index([email])
+  @@map("push_subscriptions")
+}
+
+// ==================== RATE LIMITING ====================
+
+model RateLimit {
+  id         String   @id @default(uuid())
+  identifier String   @unique
+  count      Int      @default(0)
+  reset_at   DateTime
+  created_at DateTime @default(now())
+
+  @@index([reset_at])
+  @@map("rate_limits")
+}
+
+// ==================== BLOCKED IPs ====================
+
+model BlockedIp {
+  id         String   @id @default(uuid())
+  ip_address String   @unique
+  reason     String
+  blocked_at DateTime @default(now())
+  expires_at DateTime
+
+  @@index([expires_at])
+  @@map("blocked_ips")
+}

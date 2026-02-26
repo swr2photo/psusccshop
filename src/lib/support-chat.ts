@@ -1,16 +1,7 @@
 // src/lib/support-chat.ts
-// Support Chat System - Types and Supabase helpers
+// Support Chat System - Types and Prisma helpers
 
-import { getSupabaseAdmin } from './supabase';
-
-// Helper function to get admin client with null check
-function getDb() {
-  const db = getSupabaseAdmin();
-  if (!db) {
-    throw new Error('Supabase admin client not available. Check SUPABASE_SERVICE_ROLE_KEY configuration.');
-  }
-  return db;
-}
+import { prisma } from './prisma';
 
 // ==================== TYPES ====================
 
@@ -21,22 +12,22 @@ export interface ChatSession {
   id: string;
   customer_email: string;
   customer_name: string;
-  customer_avatar?: string;  // Customer profile picture
+  customer_avatar?: string;
   status: ChatStatus;
   admin_email?: string;
   admin_name?: string;
   subject?: string;
-  shop_id?: string;      // Links chat to specific shop (null = main store)
-  shop_name?: string;    // Shop name for display
-  rating?: number;  // 1-5 stars
+  shop_id?: string;
+  shop_name?: string;
+  rating?: number;
   rating_comment?: string;
   created_at: string;
   updated_at: string;
   closed_at?: string;
   last_message_at?: string;
   last_message_preview?: string;
-  unread_count: number;  // Unread by admin
-  customer_unread_count: number;  // Unread by customer
+  unread_count: number;
+  customer_unread_count: number;
 }
 
 export interface ChatMessage {
@@ -49,15 +40,37 @@ export interface ChatMessage {
   message: string;
   created_at: string;
   is_read: boolean;
-  read_at?: string;  // Timestamp when message was read
-  is_unsent?: boolean;  // IG-style unsent message
+  read_at?: string;
+  is_unsent?: boolean;
 }
 
 export interface ChatSessionWithMessages extends ChatSession {
   messages: ChatMessage[];
 }
 
-// ==================== SUPABASE HELPERS ====================
+// ==================== HELPERS ====================
+
+function toChat(row: any): ChatSession {
+  return {
+    ...row,
+    created_at: row.created_at?.toISOString?.() || row.created_at,
+    updated_at: row.updated_at?.toISOString?.() || row.updated_at,
+    closed_at: row.closed_at?.toISOString?.() || row.closed_at,
+    last_message_at: row.last_message_at?.toISOString?.() || row.last_message_at,
+    status: row.status as ChatStatus,
+  };
+}
+
+function toMsg(row: any): ChatMessage {
+  return {
+    ...row,
+    created_at: row.created_at?.toISOString?.() || row.created_at,
+    read_at: row.read_at?.toISOString?.() || row.read_at,
+    sender: row.sender as MessageSender,
+  };
+}
+
+// ==================== PRISMA HELPERS ====================
 
 /**
  * Create a new chat session
@@ -71,185 +84,122 @@ export async function createChatSession(
   shopId?: string,
   shopName?: string
 ): Promise<ChatSession> {
-  const db = getDb();
-  
-  // Generate a unique session ID
   const sessionId = `chat_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  const now = new Date();
   
-  const newSession: Partial<ChatSession> = {
-    id: sessionId,
-    customer_email: customerEmail,
-    customer_name: customerName,
-    customer_avatar: customerAvatar,
-    status: 'pending',
-    subject: subject || 'สอบถามข้อมูล',
-    shop_id: shopId || undefined,
-    shop_name: shopName || undefined,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    unread_count: initialMessage ? 1 : 0,
-    customer_unread_count: 0,
-    last_message_preview: initialMessage?.substring(0, 100),
-    last_message_at: initialMessage ? new Date().toISOString() : undefined,
-  };
+  const data = await prisma.supportChat.create({
+    data: {
+      id: sessionId,
+      customer_email: customerEmail,
+      customer_name: customerName,
+      customer_avatar: customerAvatar,
+      status: 'pending',
+      subject: subject || 'สอบถามข้อมูล',
+      shop_id: shopId,
+      shop_name: shopName,
+      unread_count: initialMessage ? 1 : 0,
+      customer_unread_count: 0,
+      last_message_preview: initialMessage?.substring(0, 100),
+      last_message_at: initialMessage ? now : undefined,
+    },
+  });
   
-  const { data, error } = await db
-    .from('support_chats')
-    .insert(newSession)
-    .select()
-    .single();
-  
-  if (error) throw error;
-  
-  // Add initial message if provided
   if (initialMessage) {
     await addChatMessage(sessionId, 'customer', customerEmail, customerName, initialMessage, customerAvatar);
   }
   
-  return data as ChatSession;
+  return toChat(data);
 }
 
 /**
  * Get a chat session by ID
  */
 export async function getChatSession(sessionId: string): Promise<ChatSession | null> {
-  const db = getDb();
-  
-  const { data, error } = await db
-    .from('support_chats')
-    .select('*')
-    .eq('id', sessionId)
-    .single();
-  
-  if (error && error.code !== 'PGRST116') throw error;
-  return data as ChatSession | null;
+  const data = await prisma.supportChat.findUnique({ where: { id: sessionId } });
+  return data ? toChat(data) : null;
 }
 
 /**
  * Get chat session with messages
  */
 export async function getChatSessionWithMessages(sessionId: string): Promise<ChatSessionWithMessages | null> {
-  const db = getDb();
+  const data = await prisma.supportChat.findUnique({
+    where: { id: sessionId },
+    include: { messages: { orderBy: { created_at: 'asc' } } },
+  });
   
-  // Get session
-  const { data: session, error: sessionError } = await db
-    .from('support_chats')
-    .select('*')
-    .eq('id', sessionId)
-    .single();
-  
-  if (sessionError && sessionError.code !== 'PGRST116') throw sessionError;
-  if (!session) return null;
-  
-  // Get messages
-  const { data: messages, error: msgError } = await db
-    .from('support_messages')
-    .select('*')
-    .eq('session_id', sessionId)
-    .order('created_at', { ascending: true });
-  
-  if (msgError) throw msgError;
+  if (!data) return null;
   
   return {
-    ...session,
-    messages: messages || [],
-  } as ChatSessionWithMessages;
+    ...toChat(data),
+    messages: (data.messages || []).map(toMsg),
+  };
 }
 
 /**
  * Get all pending chat sessions (for admin)
  */
 export async function getPendingChats(): Promise<ChatSession[]> {
-  const db = getDb();
-  
-  const { data, error } = await db
-    .from('support_chats')
-    .select('*')
-    .eq('status', 'pending')
-    .order('created_at', { ascending: true });
-  
-  if (error) throw error;
-  return data as ChatSession[];
+  const data = await prisma.supportChat.findMany({
+    where: { status: 'pending' },
+    orderBy: { created_at: 'asc' },
+  });
+  return data.map(toChat);
 }
 
 /**
  * Get all active chat sessions (for admin)
  */
 export async function getActiveChats(adminEmail?: string): Promise<ChatSession[]> {
-  const db = getDb();
+  const where: any = { status: 'active' };
+  if (adminEmail) where.admin_email = adminEmail;
   
-  let query = db
-    .from('support_chats')
-    .select('*')
-    .eq('status', 'active')
-    .order('last_message_at', { ascending: false });
-  
-  if (adminEmail) {
-    query = query.eq('admin_email', adminEmail);
-  }
-  
-  const { data, error } = await query;
-  
-  if (error) throw error;
-  return data as ChatSession[];
+  const data = await prisma.supportChat.findMany({
+    where,
+    orderBy: { last_message_at: 'desc' },
+  });
+  return data.map(toChat);
 }
 
 /**
  * Get all chats (for admin panel)
  */
 export async function getAllChats(status?: ChatStatus, limit = 50): Promise<ChatSession[]> {
-  const db = getDb();
+  const where: any = {};
+  if (status) where.status = status;
   
-  let query = db
-    .from('support_chats')
-    .select('*')
-    .order('updated_at', { ascending: false })
-    .limit(limit);
-  
-  if (status) {
-    query = query.eq('status', status);
-  }
-  
-  const { data, error } = await query;
-  
-  if (error) throw error;
-  return data as ChatSession[];
+  const data = await prisma.supportChat.findMany({
+    where,
+    orderBy: { updated_at: 'desc' },
+    take: limit,
+  });
+  return data.map(toChat);
 }
 
 /**
  * Get customer's chat sessions
  */
 export async function getCustomerChats(customerEmail: string): Promise<ChatSession[]> {
-  const db = getDb();
-  
-  const { data, error } = await db
-    .from('support_chats')
-    .select('*')
-    .eq('customer_email', customerEmail)
-    .order('created_at', { ascending: false })
-    .limit(10);
-  
-  if (error) throw error;
-  return data as ChatSession[];
+  const data = await prisma.supportChat.findMany({
+    where: { customer_email: customerEmail },
+    orderBy: { created_at: 'desc' },
+    take: 10,
+  });
+  return data.map(toChat);
 }
 
 /**
  * Get customer's active chat session (if any)
  */
 export async function getCustomerActiveChat(customerEmail: string): Promise<ChatSession | null> {
-  const db = getDb();
-  
-  const { data, error } = await db
-    .from('support_chats')
-    .select('*')
-    .eq('customer_email', customerEmail)
-    .in('status', ['pending', 'active'])
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  
-  if (error) throw error;
-  return data as ChatSession | null;
+  const data = await prisma.supportChat.findFirst({
+    where: {
+      customer_email: customerEmail,
+      status: { in: ['pending', 'active'] },
+    },
+    orderBy: { created_at: 'desc' },
+  });
+  return data ? toChat(data) : null;
 }
 
 /**
@@ -260,67 +210,37 @@ export async function acceptChatSession(
   adminEmail: string, 
   adminName: string
 ): Promise<ChatSession> {
-  const db = getDb();
-  
-  const { data, error } = await db
-    .from('support_chats')
-    .update({
+  const data = await prisma.supportChat.update({
+    where: { id: sessionId },
+    data: {
       status: 'active',
       admin_email: adminEmail,
       admin_name: adminName,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', sessionId)
-    .eq('status', 'pending')  // Only accept pending chats
-    .select()
-    .single();
+    },
+  });
   
-  if (error) throw error;
+  await addChatMessage(sessionId, 'system', undefined, undefined, `${adminName} เข้ารับการสนทนา`);
   
-  // Add system message
-  await addChatMessage(
-    sessionId, 
-    'system', 
-    undefined, 
-    undefined, 
-    `${adminName} เข้ารับการสนทนา`
-  );
-  
-  return data as ChatSession;
+  return toChat(data);
 }
 
 /**
  * Close a chat session
  */
 export async function closeChatSession(sessionId: string): Promise<ChatSession> {
-  const db = getDb();
-  
-  const { data, error } = await db
-    .from('support_chats')
-    .update({
+  const data = await prisma.supportChat.update({
+    where: { id: sessionId },
+    data: {
       status: 'closed',
-      closed_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      // Reset unread counts when closing chat
+      closed_at: new Date(),
       unread_count: 0,
       customer_unread_count: 0,
-    })
-    .eq('id', sessionId)
-    .select()
-    .single();
+    },
+  });
   
-  if (error) throw error;
+  await addChatMessage(sessionId, 'system', undefined, undefined, 'การสนทนาสิ้นสุดลง');
   
-  // Add system message
-  await addChatMessage(
-    sessionId, 
-    'system', 
-    undefined, 
-    undefined, 
-    'การสนทนาสิ้นสุดลง'
-  );
-  
-  return data as ChatSession;
+  return toChat(data);
 }
 
 /**
@@ -331,21 +251,14 @@ export async function rateChatSession(
   rating: number, 
   comment?: string
 ): Promise<ChatSession> {
-  const db = getDb();
-  
-  const { data, error } = await db
-    .from('support_chats')
-    .update({
-      rating: Math.min(5, Math.max(1, rating)),  // Clamp 1-5
+  const data = await prisma.supportChat.update({
+    where: { id: sessionId },
+    data: {
+      rating: Math.min(5, Math.max(1, rating)),
       rating_comment: comment?.substring(0, 500),
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', sessionId)
-    .select()
-    .single();
-  
-  if (error) throw error;
-  return data as ChatSession;
+    },
+  });
+  return toChat(data);
 }
 
 /**
@@ -359,65 +272,40 @@ export async function addChatMessage(
   message?: string,
   senderAvatar?: string
 ): Promise<ChatMessage> {
-  const db = getDb();
-  
   const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-  const now = new Date().toISOString();
+  const now = new Date();
   
-  const newMessage: Partial<ChatMessage> = {
-    id: msgId,
-    session_id: sessionId,
-    sender,
-    sender_email: senderEmail,
-    sender_name: senderName,
-    sender_avatar: senderAvatar,
-    message: message || '',
-    created_at: now,
-    is_read: sender === 'system',  // System messages are always "read"
-  };
-  
-  const { data, error } = await db
-    .from('support_messages')
-    .insert(newMessage)
-    .select()
-    .single();
-  
-  if (error) throw error;
+  const data = await prisma.supportMessage.create({
+    data: {
+      id: msgId,
+      session_id: sessionId,
+      sender,
+      sender_email: senderEmail,
+      sender_name: senderName,
+      sender_avatar: senderAvatar,
+      message: message || '',
+      is_read: sender === 'system',
+    },
+  });
   
   // Update session's last message and unread count
-  const updateData: Record<string, unknown> = {
+  const updateData: any = {
     last_message_at: now,
     last_message_preview: (message || '').substring(0, 100),
-    updated_at: now,
   };
   
-  // Atomically increment unread count for the other party using RPC or raw update
   if (sender === 'customer') {
-    // Customer sent message, atomically increment admin unread
-    try {
-      await db.rpc('increment_unread', { chat_id: sessionId, field_name: 'unread_count' });
-    } catch {
-      // Fallback: non-atomic increment if RPC doesn't exist
-      const { data: s } = await db.from('support_chats').select('unread_count').eq('id', sessionId).single();
-      updateData.unread_count = (s?.unread_count || 0) + 1;
-    }
+    updateData.unread_count = { increment: 1 };
   } else if (sender === 'admin') {
-    // Admin sent message, atomically increment customer unread
-    try {
-      await db.rpc('increment_unread', { chat_id: sessionId, field_name: 'customer_unread_count' });
-    } catch {
-      // Fallback: non-atomic increment if RPC doesn't exist
-      const { data: s } = await db.from('support_chats').select('customer_unread_count').eq('id', sessionId).single();
-      updateData.customer_unread_count = (s?.customer_unread_count || 0) + 1;
-    }
+    updateData.customer_unread_count = { increment: 1 };
   }
   
-  await db
-    .from('support_chats')
-    .update(updateData)
-    .eq('id', sessionId);
+  await prisma.supportChat.update({
+    where: { id: sessionId },
+    data: updateData,
+  });
   
-  return data as ChatMessage;
+  return toMsg(data);
 }
 
 /**
@@ -428,23 +316,17 @@ export async function getChatMessages(
   limit = 100,
   afterTimestamp?: string
 ): Promise<ChatMessage[]> {
-  const db = getDb();
-  
-  let query = db
-    .from('support_messages')
-    .select('*')
-    .eq('session_id', sessionId)
-    .order('created_at', { ascending: true })
-    .limit(limit);
-  
+  const where: any = { session_id: sessionId };
   if (afterTimestamp) {
-    query = query.gt('created_at', afterTimestamp);
+    where.created_at = { gt: new Date(afterTimestamp) };
   }
   
-  const { data, error } = await query;
-  
-  if (error) throw error;
-  return data as ChatMessage[];
+  const data = await prisma.supportMessage.findMany({
+    where,
+    orderBy: { created_at: 'asc' },
+    take: limit,
+  });
+  return data.map(toMsg);
 }
 
 /**
@@ -454,33 +336,29 @@ export async function markMessagesAsRead(
   sessionId: string, 
   reader: 'customer' | 'admin'
 ): Promise<void> {
-  const db = getDb();
-  
-  // Mark messages as read with timestamp
   const senderToMark = reader === 'customer' ? 'admin' : 'customer';
   
-  await db
-    .from('support_messages')
-    .update({ 
+  await prisma.supportMessage.updateMany({
+    where: {
+      session_id: sessionId,
+      sender: senderToMark,
+      is_read: false,
+    },
+    data: {
       is_read: true,
-      read_at: new Date().toISOString()
-    })
-    .eq('session_id', sessionId)
-    .eq('sender', senderToMark)
-    .eq('is_read', false);
+      read_at: new Date(),
+    },
+  });
   
-  // Reset unread count
   const updateField = reader === 'customer' ? 'customer_unread_count' : 'unread_count';
-  
-  await db
-    .from('support_chats')
-    .update({ [updateField]: 0 })
-    .eq('id', sessionId);
+  await prisma.supportChat.update({
+    where: { id: sessionId },
+    data: { [updateField]: 0 },
+  });
 }
 
 /**
  * Get chat statistics for admin dashboard
- * Optimized: uses fewer queries with conditional counts
  */
 export async function getChatStatistics(): Promise<{
   pendingCount: number;
@@ -488,88 +366,63 @@ export async function getChatStatistics(): Promise<{
   todayCount: number;
   avgRating: number;
 }> {
-  const db = getDb();
-  
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   
-  // Parallel queries for better performance
-  const [pendingRes, activeRes, todayRes, ratingRes] = await Promise.all([
-    db.from('support_chats').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-    db.from('support_chats').select('*', { count: 'exact', head: true }).eq('status', 'active'),
-    db.from('support_chats').select('*', { count: 'exact', head: true }).gte('created_at', today.toISOString()),
-    db.from('support_chats').select('rating').not('rating', 'is', null),
+  const [pendingCount, activeCount, todayCount, ratingData] = await Promise.all([
+    prisma.supportChat.count({ where: { status: 'pending' } }),
+    prisma.supportChat.count({ where: { status: 'active' } }),
+    prisma.supportChat.count({ where: { created_at: { gte: today } } }),
+    prisma.supportChat.aggregate({
+      _avg: { rating: true },
+      where: { rating: { not: null } },
+    }),
   ]);
   
-  const ratings = (ratingRes.data || []).map(r => r.rating).filter(r => r != null);
-  const avgRating = ratings.length > 0 
-    ? ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length 
-    : 0;
-  
   return {
-    pendingCount: pendingRes.count || 0,
-    activeCount: activeRes.count || 0,
-    todayCount: todayRes.count || 0,
-    avgRating: Math.round(avgRating * 10) / 10,
+    pendingCount,
+    activeCount,
+    todayCount,
+    avgRating: Math.round((ratingData._avg.rating || 0) * 10) / 10,
   };
 }
 
 /**
  * Unsend/Delete a message (IG-style)
- * Only the message owner can unsend their own messages
  */
 export async function unsendChatMessage(
   sessionId: string,
   messageId: string,
   userEmail: string
 ): Promise<{ success: boolean; error?: string }> {
-  const db = getDb();
+  const message = await prisma.supportMessage.findFirst({
+    where: { id: messageId, session_id: sessionId },
+  });
   
-  // Get the message to verify ownership
-  const { data: message, error: msgError } = await db
-    .from('support_messages')
-    .select('*')
-    .eq('id', messageId)
-    .eq('session_id', sessionId)
-    .single();
-  
-  if (msgError || !message) {
+  if (!message) {
     return { success: false, error: 'ไม่พบข้อความที่ต้องการยกเลิก' };
   }
   
-  // Only allow customer to unsend their own messages
   if (message.sender !== 'customer' || message.sender_email !== userEmail) {
     return { success: false, error: 'คุณสามารถยกเลิกได้เฉพาะข้อความของตัวเองเท่านั้น' };
   }
   
-  // Completely delete the message (hard delete)
-  const { error: deleteError } = await db
-    .from('support_messages')
-    .delete()
-    .eq('id', messageId);
+  await prisma.supportMessage.delete({ where: { id: messageId } });
   
-  if (deleteError) {
-    console.error('[unsendChatMessage] Error:', deleteError);
-    return { success: false, error: 'ไม่สามารถยกเลิกข้อความได้' };
-  }
+  // Update last message preview
+  const lastMessage = await prisma.supportMessage.findFirst({
+    where: { session_id: sessionId },
+    orderBy: { created_at: 'desc' },
+    select: { message: true, created_at: true },
+  });
   
-  // Get the last remaining message to update preview
-  const { data: lastMessage } = await db
-    .from('support_messages')
-    .select('message, created_at')
-    .eq('session_id', sessionId)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
-  
-  // Update session with new last message preview
-  await db
-    .from('support_chats')
-    .update({ 
+  await prisma.supportChat.update({
+    where: { id: sessionId },
+    data: {
       last_message_preview: lastMessage?.message?.substring(0, 100) || null,
-      last_message_at: lastMessage?.created_at || null
-    })
-    .eq('id', sessionId);
+      last_message_at: lastMessage?.created_at || null,
+    },
+  });
   
   return { success: true };
 }
@@ -578,50 +431,45 @@ export async function unsendChatMessage(
  * Cleanup old chat images (delete images from closed chats older than 7 days)
  */
 export async function cleanupOldChatImages(daysOld = 7): Promise<{ deletedImages: number; cleanedChats: number }> {
-  const db = getDb();
-  
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - daysOld);
   
-  // Find closed chats older than cutoff date
-  const { data: oldChats, error } = await db
-    .from('support_chats')
-    .select('id')
-    .eq('status', 'closed')
-    .lt('closed_at', cutoffDate.toISOString());
+  const oldChats = await prisma.supportChat.findMany({
+    where: {
+      status: 'closed',
+      closed_at: { lt: cutoffDate },
+    },
+    select: { id: true },
+  });
   
-  if (error) throw error;
-  if (!oldChats || oldChats.length === 0) {
+  if (oldChats.length === 0) {
     return { deletedImages: 0, cleanedChats: 0 };
   }
   
   const chatIds = oldChats.map(c => c.id);
   
-  // Find messages with images in these chats
-  const { data: messagesWithImages, error: msgError } = await db
-    .from('support_messages')
-    .select('id, message')
-    .in('session_id', chatIds)
-    .like('message', '%[รูปภาพ:%');
-  
-  if (msgError) throw msgError;
+  const messagesWithImages = await prisma.supportMessage.findMany({
+    where: {
+      session_id: { in: chatIds },
+      message: { contains: '[รูปภาพ:' },
+    },
+    select: { id: true, message: true },
+  });
   
   let deletedImages = 0;
   
-  // Extract image URLs and update messages
-  for (const msg of (messagesWithImages || [])) {
+  for (const msg of messagesWithImages) {
     const imageMatch = msg.message.match(/\[รูปภาพ: ([^\]]+)\]/);
     if (imageMatch) {
-      // Replace image URL with placeholder text
       const newMessage = msg.message.replace(
         /\[รูปภาพ: [^\]]+\]/g, 
         '[รูปภาพถูกลบเนื่องจากผ่านไป 7 วัน]'
       );
       
-      await db
-        .from('support_messages')
-        .update({ message: newMessage })
-        .eq('id', msg.id);
+      await prisma.supportMessage.update({
+        where: { id: msg.id },
+        data: { message: newMessage },
+      });
       
       deletedImages++;
     }

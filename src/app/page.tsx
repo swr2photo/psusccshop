@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { MessageCircle as ChatIcon, Send as SendIcon, X as CloseIcon, Bot as SmartToyIcon, RotateCcw as RefreshIcon, Sparkles as AutoAwesomeIcon, Store as StorefrontIcon, Copy as ContentCopyIcon, Check as CheckIcon, Maximize2 as FullscreenIcon, Minimize2 as FullscreenExitIcon, ImagePlus as AddPhotoAlternateIcon, ShoppingCart as ShoppingCartOutlinedIcon, Coins as PaidOutlinedIcon, Ruler as StraightenOutlinedIcon, Truck as LocalShippingOutlinedIcon, Wallet as AccountBalanceWalletOutlinedIcon, HelpCircle as HelpOutlineOutlinedIcon, Image as ImageOutlinedIcon, User as PersonOutlineIcon, BadgeCheck as VerifiedIcon, BookOpen as MenuBookOutlinedIcon, Hand as WavingHandIcon, Reply as ReplyIcon, Pencil as EditIcon, ClipboardList as ClipboardListIcon, Tag as TagIcon } from 'lucide-react';
+import { MessageCircle as ChatIcon, Send as SendIcon, X as CloseIcon, Bot as SmartToyIcon, RotateCcw as RefreshIcon, Sparkles as AutoAwesomeIcon, Store as StorefrontIcon, Copy as ContentCopyIcon, Check as CheckIcon, Maximize2 as FullscreenIcon, Minimize2 as FullscreenExitIcon, ImagePlus as AddPhotoAlternateIcon, ShoppingCart as ShoppingCartOutlinedIcon, Coins as PaidOutlinedIcon, Ruler as StraightenOutlinedIcon, Truck as LocalShippingOutlinedIcon, Wallet as AccountBalanceWalletOutlinedIcon, HelpCircle as HelpOutlineOutlinedIcon, Image as ImageOutlinedIcon, User as PersonOutlineIcon, BadgeCheck as VerifiedIcon, BookOpen as MenuBookOutlinedIcon, Hand as WavingHandIcon, Reply as ReplyIcon, Pencil as EditIcon, ClipboardList as ClipboardListIcon, Tag as TagIcon, ChevronUp, ChevronDown } from 'lucide-react';
 
 // ==================== CHATBOT COMPONENT (Enhanced with Logo & AI) ====================
 const QUICK_QUESTIONS_KEYS = [
@@ -2758,6 +2758,7 @@ export default function HomePage() {
 
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [productDialogOpen, setProductDialogOpen] = useState(false);
+  const [bottomPanelCollapsed, setBottomPanelCollapsed] = useState(true);
   const [productOptions, setProductOptions] = useState<ProductOptions>({
     size: '',
     quantity: 1,
@@ -3864,9 +3865,10 @@ export default function HomePage() {
           zIndex: 10,
           borderBottom: '1px solid var(--glass-border)',
           background: (theme: any) => theme.palette.mode === 'dark' 
-            ? 'linear-gradient(180deg, rgba(0,0,0,0.98) 0%, rgba(0,0,0,0.95) 100%)' 
-            : 'linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.95) 100%)',
-          backdropFilter: 'blur(24px)',
+            ? 'rgba(0,0,0,0.85)' 
+            : 'rgba(242,242,247,0.85)',
+          backdropFilter: 'blur(30px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(30px) saturate(180%)',
         }}>
           {isMobile && (
             <Box sx={{ 
@@ -3928,13 +3930,12 @@ export default function HomePage() {
                 }}
                 sx={{ 
                   color: wishlistStore.isInWishlist(selectedProduct.id) ? '#ff453a' : 'var(--text-muted)', 
-                  bgcolor: wishlistStore.isInWishlist(selectedProduct.id) ? 'rgba(255,69,58,0.1)' : 'var(--glass-bg)', 
-                  border: `1px solid ${wishlistStore.isInWishlist(selectedProduct.id) ? 'rgba(255,69,58,0.3)' : 'var(--glass-border)'}`,
-                  width: 40,
-                  height: 40,
+                  bgcolor: wishlistStore.isInWishlist(selectedProduct.id) ? 'rgba(255,69,58,0.1)' : 'var(--surface-2)', 
+                  border: 'none',
+                  width: 36,
+                  height: 36,
                   '&:hover': { 
                     bgcolor: 'rgba(255,69,58,0.15)', 
-                    borderColor: 'rgba(255,69,58,0.3)',
                     color: '#ff453a',
                   },
                   transition: 'all 0.2s ease',
@@ -3946,14 +3947,13 @@ export default function HomePage() {
                 onClick={() => handleShareProduct(selectedProduct)}
                 sx={{ 
                   color: 'var(--text-muted)', 
-                  bgcolor: 'var(--glass-bg)', 
-                  border: '1px solid var(--glass-border)',
-                  width: 40,
-                  height: 40,
+                  bgcolor: 'var(--surface-2)', 
+                  border: 'none',
+                  width: 36,
+                  height: 36,
                   '&:hover': { 
-                    bgcolor: 'rgba(0,113,227,0.15)', 
-                    borderColor: 'rgba(0,113,227,0.3)',
-                    color: '#2997ff',
+                    bgcolor: 'rgba(0,122,255,0.12)', 
+                    color: 'var(--primary)',
                   },
                   transition: 'all 0.2s ease',
                 }}
@@ -3964,14 +3964,13 @@ export default function HomePage() {
                 onClick={() => setProductDialogOpen(false)} 
                 sx={{ 
                   color: 'var(--text-muted)', 
-                  bgcolor: 'var(--glass-bg)', 
-                  border: '1px solid var(--glass-border)',
-                  width: 40,
-                  height: 40,
+                  bgcolor: 'var(--surface-2)', 
+                  border: 'none',
+                  width: 36,
+                  height: 36,
                   '&:hover': { 
-                    bgcolor: 'rgba(239,68,68,0.15)', 
-                    borderColor: 'rgba(239,68,68,0.3)',
-                    color: '#f87171',
+                    bgcolor: 'rgba(239,68,68,0.12)', 
+                    color: '#ff453a',
                   },
                   transition: 'all 0.2s ease',
                 }}
@@ -5038,17 +5037,82 @@ export default function HomePage() {
           </Box>
         </Box>
 
-        {/* Bottom Actions - Enhanced */}
+        {/* Bottom Actions - Collapsible */}
         <Box sx={{
           px: { xs: 2.5, sm: 3 },
-          py: 2.5,
+          py: bottomPanelCollapsed ? 1.5 : 2.5,
           borderTop: '1px solid var(--glass-border)',
           background: (theme: any) => theme.palette.mode === 'dark' 
             ? 'linear-gradient(180deg, rgba(0,0,0,0.98) 0%, rgba(0,0,0,0.99) 100%)' 
             : 'linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.99) 100%)',
           backdropFilter: 'blur(24px)',
           paddingBottom: 'max(20px, env(safe-area-inset-bottom))',
+          transition: 'padding 0.3s ease',
         }}>
+          {/* Collapse Toggle Handle */}
+          <Box 
+            onClick={() => setBottomPanelCollapsed(!bottomPanelCollapsed)}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              mb: bottomPanelCollapsed ? 1 : 1.5,
+              py: 0.3,
+              mx: 'auto',
+              userSelect: 'none',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <Box sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.5,
+              px: 2,
+              py: 0.3,
+              borderRadius: '12px',
+              bgcolor: 'rgba(0,113,227,0.08)',
+              border: '1px solid rgba(0,113,227,0.15)',
+              transition: 'all 0.2s ease',
+              '&:hover': { bgcolor: 'rgba(0,113,227,0.15)' },
+            }}>
+              {bottomPanelCollapsed ? <ChevronUp size={14} color="#2997ff" /> : <ChevronDown size={14} color="#2997ff" />}
+              <Typography sx={{ fontSize: '0.65rem', color: '#2997ff', fontWeight: 600 }}>
+                {bottomPanelCollapsed ? 'แสดงรายละเอียด' : 'ย่อลง'}
+              </Typography>
+            </Box>
+          </Box>
+
+          {/* Collapsed: Compact price row */}
+          {bottomPanelCollapsed && (
+            <Box sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              mb: 1.5,
+              px: 1,
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+                <Typography sx={{ fontSize: '1.3rem', fontWeight: 900, color: 'var(--success)', lineHeight: 1 }}>
+                  ฿{getCurrentPrice().toLocaleString()}
+                </Typography>
+                <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                  {productOptions.size} × {productOptions.quantity}
+                </Typography>
+              </Box>
+              {productOptions.isLongSleeve && selectedProduct && (
+                <Typography sx={{ fontSize: '0.68rem', color: 'var(--warning)', fontWeight: 600 }}>+ {t.common.longSleeve}</Typography>
+              )}
+            </Box>
+          )}
+
+          {/* Expandable Section: Price Summary + Reviews + Stock */}
+          <Box sx={{
+            maxHeight: bottomPanelCollapsed ? 0 : 600,
+            overflow: 'hidden',
+            transition: 'max-height 0.35s ease, opacity 0.25s ease',
+            opacity: bottomPanelCollapsed ? 0 : 1,
+          }}>
           {/* Price Summary - Enhanced */}
           <Box sx={{
             p: 2.5,
@@ -5216,6 +5280,7 @@ export default function HomePage() {
               </Typography>
             </Box>
           )}
+          </Box>{/* End Expandable Section */}
 
           {/* Action Buttons - Enhanced */}
           <Box sx={{ display: 'flex', gap: 1.5 }}>
@@ -7116,22 +7181,12 @@ export default function HomePage() {
             {config?.products && Object.keys(filteredGroupedProducts).length > 0 ? (
               Object.entries(filteredGroupedProducts).map(([category, items]) => (
                 <Box key={category} sx={{ mb: 4 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
-                    <Box sx={{
-                      px: 1.5,
-                      py: 0.6,
-                      borderRadius: '10px',
-                      background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 0.75,
-                    }}>
-                      <span style={{ fontSize: '0.9rem' }}>{getCategoryIcon(category)}</span>
-                      <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: 'white' }}>
-                        {(t.category as Record<string, string>)[category] || getCategoryLabel(category, lang) || TYPE_LABELS_I18N[category] || category || t.type.OTHER}
-                      </Typography>
-                    </Box>
-                    <Typography sx={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 2 }}>
+                    <span style={{ fontSize: '1.1rem' }}>{getCategoryIcon(category)}</span>
+                    <Typography sx={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--foreground)', letterSpacing: '-0.02em' }}>
+                      {(t.category as Record<string, string>)[category] || getCategoryLabel(category, lang) || TYPE_LABELS_I18N[category] || category || t.type.OTHER}
+                    </Typography>
+                    <Typography sx={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: 500 }}>
                       {items.length} {t.common.items}
                     </Typography>
                     {items.length > 1 && (
@@ -7208,19 +7263,21 @@ export default function HomePage() {
                           sx={{
                             height: '100%',
                             display: 'flex',
-                            flexDirection: 'column', // Always vertical
+                            flexDirection: 'column',
                             cursor: isProductAvailable ? 'pointer' : 'default',
-                            borderRadius: '20px',
+                            borderRadius: 'var(--card-radius)',
                             overflow: 'hidden',
                             bgcolor: 'var(--surface)',
-                            border: `1px solid ${isProductClosed ? SHOP_STATUS_CONFIG[productStatus].borderColor : 'var(--glass-bg)'}`,
-                            transition: 'all 0.25s ease',
+                            boxShadow: 'var(--card-shadow)',
+                            border: isProductClosed ? `1px solid ${SHOP_STATUS_CONFIG[productStatus].borderColor}` : 'none',
+                            transition: 'all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
                             position: 'relative',
                             opacity: isProductClosed ? 0.85 : 1,
                             '&:hover': isProductAvailable ? {
-                              transform: 'translateY(-4px)',
-                              boxShadow: '0 20px 40px rgba(0,113,227,0.2)',
-                              borderColor: 'rgba(0,113,227,0.4)',
+                              transform: 'translateY(-3px)',
+                              boxShadow: (theme: any) => theme.palette.mode === 'dark'
+                                ? '0 8px 30px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06)'
+                                : '0 4px 20px rgba(0,0,0,0.08), 0 8px 30px rgba(0,0,0,0.05)',
                             } : {},
                           }}
                         >
@@ -7365,31 +7422,32 @@ export default function HomePage() {
                             {/* Price badge */}
                             <Box sx={{
                               position: 'absolute',
-                              bottom: 8,
-                              right: 8,
+                              bottom: 10,
+                              right: 10,
                               px: 1.2,
-                              py: 0.5,
+                              py: 0.4,
                               borderRadius: '10px',
-                              bgcolor: isProductClosed ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.7)',
-                              backdropFilter: 'blur(8px)',
+                              bgcolor: (theme: any) => theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.75)' : 'rgba(255,255,255,0.9)',
+                              backdropFilter: 'blur(12px)',
                               display: 'flex',
                               alignItems: 'center',
                               gap: 0.5,
+                              boxShadow: (theme: any) => theme.palette.mode === 'dark' ? 'none' : '0 1px 4px rgba(0,0,0,0.1)',
                             }}>
                               {eventDiscount && !isProductClosed ? (
                                 <>
-                                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#86868b', textDecoration: 'line-through' }}>
+                                  <Typography sx={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)', textDecoration: 'line-through' }}>
                                     ฿{product.basePrice.toLocaleString()}
                                   </Typography>
-                                  <Typography sx={{ fontSize: '0.9rem', fontWeight: 800, color: '#ff453a' }}>
+                                  <Typography sx={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--error)' }}>
                                     ฿{eventDiscount.discountedPrice(product.basePrice).toLocaleString()}
                                   </Typography>
                                 </>
                               ) : (
                                 <Typography sx={{ 
-                                  fontSize: '0.9rem', 
+                                  fontSize: '0.88rem', 
                                   fontWeight: 800, 
-                                  color: isProductClosed ? 'var(--text-muted)' : '#34c759',
+                                  color: isProductClosed ? 'var(--text-muted)' : 'var(--foreground)',
                                 }}>
                                   ฿{product.basePrice.toLocaleString()}
                                 </Typography>
@@ -7578,18 +7636,16 @@ export default function HomePage() {
                                   disabled={!isProductAvailable}
                                   sx={{
                                     py: 0.8,
-                                    borderRadius: '10px',
-                                    background: isProductAvailable 
-                                      ? 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)' 
-                                      : 'rgba(100,116,139,0.2)',
-                                    color: isProductAvailable ? 'white' : '#86868b',
-                                    fontSize: '0.75rem',
-                                    fontWeight: 700,
+                                    borderRadius: 'var(--btn-radius)',
+                                    bgcolor: isProductAvailable ? 'var(--primary)' : 'var(--surface-3)',
+                                    color: isProductAvailable ? 'white' : 'var(--text-muted)',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 600,
                                     textTransform: 'none',
+                                    boxShadow: 'none',
                                     '&:hover': {
-                                      background: isProductAvailable 
-                                        ? 'linear-gradient(135deg, #0071e3 0%, #0071e3 100%)' 
-                                        : 'rgba(100,116,139,0.2)',
+                                      bgcolor: isProductAvailable ? 'var(--primary)' : 'var(--surface-3)',
+                                      filter: isProductAvailable ? 'brightness(1.1)' : 'none',
                                     },
                                   }}
                                 >
@@ -8328,6 +8384,8 @@ export default function HomePage() {
         onClose={() => setBulkOrderOpen(false)}
         fullWidth
         maxWidth="sm"
+        sx={{ zIndex: 9000 }}
+        slotProps={{ backdrop: { sx: { backdropFilter: 'blur(8px)', backgroundColor: 'rgba(0,0,0,0.5)' } } }}
         PaperProps={{
           sx: {
             borderRadius: '24px',

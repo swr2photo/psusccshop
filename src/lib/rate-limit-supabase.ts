@@ -1,7 +1,7 @@
 // src/lib/rate-limit-supabase.ts
-// Rate limiting with Supabase persistence for production use
+// Rate limiting with Prisma persistence for production use
 
-import { getSupabaseAdmin } from './supabase';
+import { prisma } from './prisma';
 
 // ==================== TYPES ====================
 
@@ -28,33 +28,17 @@ export interface RateLimitResult {
 // ==================== DEFAULT CONFIGS ====================
 
 export const RATE_LIMITS = {
-  // General API - 100 requests per minute
   api: { maxRequests: 100, windowSeconds: 60, prefix: 'api' },
-  
-  // Authentication - 10 requests per minute
   auth: { maxRequests: 10, windowSeconds: 60, prefix: 'auth' },
-  
-  // Order submission - 5 per minute
   order: { maxRequests: 5, windowSeconds: 60, prefix: 'order' },
-  
-  // Payment verification - 10 per minute
   payment: { maxRequests: 10, windowSeconds: 60, prefix: 'payment' },
-  
-  // File upload - 10 per minute
   upload: { maxRequests: 10, windowSeconds: 60, prefix: 'upload' },
-  
-  // Admin operations - 30 per minute
   admin: { maxRequests: 30, windowSeconds: 60, prefix: 'admin' },
-  
-  // Strict - 3 per minute (for sensitive operations)
   strict: { maxRequests: 3, windowSeconds: 60, prefix: 'strict' },
-  
-  // Very strict - 1 per minute (for key rotation, etc.)
   critical: { maxRequests: 1, windowSeconds: 60, prefix: 'critical' },
 } as const;
 
 // ==================== IN-MEMORY CACHE ====================
-// Use local cache first, sync to Supabase for distributed rate limiting
 
 interface CachedEntry {
   count: number;
@@ -64,11 +48,8 @@ interface CachedEntry {
 
 const localCache = new Map<string, CachedEntry>();
 
-// ==================== SUPABASE FUNCTIONS ====================
+// ==================== PRISMA FUNCTIONS ====================
 
-/**
- * Check rate limit using Supabase (distributed)
- */
 export async function checkRateLimitSupabase(
   identifier: string,
   config: RateLimitConfig
@@ -79,27 +60,17 @@ export async function checkRateLimitSupabase(
   const resetTime = now + windowMs;
   
   try {
-    const db = getSupabaseAdmin();
-    if (!db) {
-      // Fallback to in-memory if DB not available
-      return checkRateLimitLocal(identifier, config);
-    }
-    
-    // Get or create rate limit entry
-    const { data: existing } = await db
-      .from('rate_limits')
-      .select('*')
-      .eq('identifier', key)
-      .single();
+    const existing = await prisma.rateLimit.findUnique({
+      where: { identifier: key },
+    });
     
     if (existing && new Date(existing.reset_at).getTime() > now) {
-      // Entry exists and not expired
       const newCount = existing.count + 1;
       
-      await db
-        .from('rate_limits')
-        .update({ count: newCount })
-        .eq('identifier', key);
+      await prisma.rateLimit.update({
+        where: { identifier: key },
+        data: { count: newCount },
+      });
       
       const remaining = Math.max(0, config.maxRequests - newCount);
       const allowed = newCount <= config.maxRequests;
@@ -111,16 +82,11 @@ export async function checkRateLimitSupabase(
         retryAfter: allowed ? undefined : Math.ceil((new Date(existing.reset_at).getTime() - now) / 1000),
       };
     } else {
-      // Create new entry or reset expired one
-      await db
-        .from('rate_limits')
-        .upsert({
-          identifier: key,
-          count: 1,
-          reset_at: new Date(resetTime).toISOString(),
-        }, {
-          onConflict: 'identifier',
-        });
+      await prisma.rateLimit.upsert({
+        where: { identifier: key },
+        update: { count: 1, reset_at: new Date(resetTime) },
+        create: { identifier: key, count: 1, reset_at: new Date(resetTime) },
+      });
       
       return {
         allowed: true,
@@ -129,15 +95,11 @@ export async function checkRateLimitSupabase(
       };
     }
   } catch (error) {
-    console.error('[RateLimit] Supabase error, using fallback:', error);
-    // Fallback to in-memory if DB fails
+    console.error('[RateLimit] Prisma error, using fallback:', error);
     return checkRateLimitLocal(identifier, config);
   }
 }
 
-/**
- * In-memory rate limit (fallback)
- */
 export function checkRateLimitLocal(
   identifier: string,
   config: RateLimitConfig
@@ -149,11 +111,7 @@ export function checkRateLimitLocal(
   let entry = localCache.get(key);
   
   if (!entry || now > entry.resetTime) {
-    entry = {
-      count: 0,
-      resetTime: now + windowMs,
-      syncedToDb: false,
-    };
+    entry = { count: 0, resetTime: now + windowMs, syncedToDb: false };
   }
   
   entry.count += 1;
@@ -170,130 +128,78 @@ export function checkRateLimitLocal(
   };
 }
 
-/**
- * Get client IP from request
- */
 export function getClientIP(request: Request): string {
-  // Cloudflare
   const cfIP = request.headers.get('cf-connecting-ip');
   if (cfIP) return cfIP;
-  
-  // X-Forwarded-For
   const xff = request.headers.get('x-forwarded-for');
   if (xff) return xff.split(',')[0].trim();
-  
-  // X-Real-IP
   const realIP = request.headers.get('x-real-ip');
   if (realIP) return realIP;
-  
   return 'unknown';
 }
 
-/**
- * Create rate limit headers
- */
 export function getRateLimitHeaders(result: RateLimitResult): Record<string, string> {
   const headers: Record<string, string> = {
     'X-RateLimit-Remaining': String(result.remaining),
     'X-RateLimit-Reset': String(Math.floor(result.resetTime / 1000)),
   };
-  
   if (result.retryAfter !== undefined) {
     headers['Retry-After'] = String(result.retryAfter);
   }
-  
   return headers;
 }
 
-/**
- * Clean up expired rate limit entries
- */
 export async function cleanupExpiredRateLimits(): Promise<number> {
   try {
-    const db = getSupabaseAdmin();
-    if (!db) return 0;
-    const { data, error } = await db
-      .from('rate_limits')
-      .delete()
-      .lt('reset_at', new Date().toISOString())
-      .select('identifier');
-    
-    if (error) throw error;
-    return data?.length || 0;
+    const result = await prisma.rateLimit.deleteMany({
+      where: { reset_at: { lt: new Date() } },
+    });
+    return result.count;
   } catch (error) {
     console.error('[RateLimit] Cleanup error:', error);
     return 0;
   }
 }
 
-/**
- * Block an IP address
- */
 export async function blockIP(ip: string, reason: string, durationHours: number = 24): Promise<void> {
-  const db = getSupabaseAdmin();
-  if (!db) throw new Error('Database not available');
   const expiresAt = new Date(Date.now() + durationHours * 60 * 60 * 1000);
-  
-  await db.from('blocked_ips').upsert({
-    ip_address: ip,
-    reason,
-    expires_at: expiresAt.toISOString(),
-    blocked_at: new Date().toISOString(),
-  }, {
-    onConflict: 'ip_address',
+  await prisma.blockedIp.upsert({
+    where: { ip_address: ip },
+    update: { reason, expires_at: expiresAt, blocked_at: new Date() },
+    create: { ip_address: ip, reason, expires_at: expiresAt },
   });
 }
 
-/**
- * Check if IP is blocked
- */
 export async function isIPBlocked(ip: string): Promise<boolean> {
   try {
-    const db = getSupabaseAdmin();
-    if (!db) return false;
-    const { data } = await db
-      .from('blocked_ips')
-      .select('*')
-      .eq('ip_address', ip)
-      .gt('expires_at', new Date().toISOString())
-      .single();
-    
+    const data = await prisma.blockedIp.findFirst({
+      where: { ip_address: ip, expires_at: { gt: new Date() } },
+    });
     return !!data;
   } catch {
     return false;
   }
 }
 
-/**
- * Unblock an IP address
- */
 export async function unblockIP(ip: string): Promise<void> {
-  const db = getSupabaseAdmin();
-  if (!db) throw new Error('Database not available');
-  await db.from('blocked_ips').delete().eq('ip_address', ip);
+  await prisma.blockedIp.delete({ where: { ip_address: ip } }).catch(() => {});
 }
 
-/**
- * Get blocked IPs list
- */
 export async function getBlockedIPs(): Promise<Array<{
   ip: string;
   reason: string;
   blockedAt: string;
   expiresAt: string;
 }>> {
-  const db = getSupabaseAdmin();
-  if (!db) return [];
-  const { data } = await db
-    .from('blocked_ips')
-    .select('*')
-    .gt('expires_at', new Date().toISOString())
-    .order('blocked_at', { ascending: false });
+  const data = await prisma.blockedIp.findMany({
+    where: { expires_at: { gt: new Date() } },
+    orderBy: { blocked_at: 'desc' },
+  });
   
-  return (data || []).map(row => ({
+  return data.map(row => ({
     ip: row.ip_address,
     reason: row.reason,
-    blockedAt: row.blocked_at,
-    expiresAt: row.expires_at,
+    blockedAt: row.blocked_at.toISOString(),
+    expiresAt: row.expires_at.toISOString(),
   }));
 }

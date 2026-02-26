@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getJson, putJson, listKeys, getOrderByRef, getAllOrders, getSupabaseAdmin } from '@/lib/filebase';
+import { getJson, putJson, listKeys, getOrderByRef, getAllOrders } from '@/lib/filebase';
+import { prisma } from '@/lib/prisma';
 import { requireAuth, requireAdmin, requireAdminWithPermission, isAdminEmail } from '@/lib/auth';
 import { sanitizeUtf8Input } from '@/lib/sanitize';
 import crypto from 'crypto';
@@ -114,34 +115,32 @@ export async function GET(req: NextRequest) {
       }
       
       // If not exact match, search with Supabase ilike
-      const db = getSupabaseAdmin();
-      if (db) {
-        let query = db
-          .from('orders')
-          .select('*')
-          .or(`ref.ilike.%${searchTerm}%,customer_name.ilike.%${searchTerm}%,customer_email.ilike.%${searchTerm}%`);
-        
-        // Filter by shop if specified
-        if (shopId) {
-          query = query.eq('shop_id', shopId);
-        }
-        
-        const { data: orders, error } = await query.limit(50);
-        
-        if (!error && orders) {
-          for (const order of orders) {
-            results.push({
-              ref: order.ref,
-              name: order.customer_name,
-              email: order.customer_email,
-              status: order.status,
-              amount: order.total_amount,
-              cart: order.cart || [],
-              pickup: order.pickup,
-              date: order.created_at,
-            });
-          }
-        }
+      // If not exact match, search with Prisma
+      const where: any = {
+        OR: [
+          { ref: { contains: searchTerm, mode: 'insensitive' } },
+          { customer_name: { contains: searchTerm, mode: 'insensitive' } },
+          { customer_email: { contains: searchTerm, mode: 'insensitive' } },
+        ],
+      };
+      if (shopId) where.shop_id = shopId;
+
+      const dbOrders = await prisma.order.findMany({
+        where,
+        take: 50,
+      });
+
+      for (const order of dbOrders) {
+        results.push({
+          ref: order.ref,
+          name: order.customer_name,
+          email: order.customer_email,
+          status: order.status,
+          amount: order.total_amount,
+          cart: order.cart || [],
+          pickup: (order as any).pickup,
+          date: order.created_at,
+        });
       }
       
       // Fallback to old method if no results

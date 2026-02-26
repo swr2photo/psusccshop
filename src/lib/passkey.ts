@@ -18,7 +18,7 @@ import type {
   RegistrationResponseJSON,
   AuthenticationResponseJSON,
 } from '@simplewebauthn/types';
-import { getSupabaseAdmin } from '@/lib/supabase';
+import { prisma } from '@/lib/prisma';
 import { SignJWT, jwtVerify } from 'jose';
 
 // ==================== RP CONFIG ====================
@@ -38,7 +38,7 @@ function getRpConfig() {
 export interface StoredCredential {
   credential_id: string;
   user_email: string;
-  public_key: string; // base64url
+  public_key: string;
   counter: number;
   device_type: CredentialDeviceType;
   backed_up: boolean;
@@ -55,21 +55,14 @@ async function storeChallenge(
   type: 'registration' | 'authentication',
   userEmail?: string,
 ): Promise<string> {
-  const db = getSupabaseAdmin();
-  if (!db) throw new Error('Database not available');
-
-  const { data, error } = await db
-    .from('passkey_challenges')
-    .insert({
+  const data = await prisma.passkeyChallenge.create({
+    data: {
       challenge,
       type,
       user_email: userEmail || null,
-      expires_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-    })
-    .select('id')
-    .single();
-
-  if (error) throw new Error(`Failed to store challenge: ${error.message}`);
+      expires_at: new Date(Date.now() + 5 * 60 * 1000),
+    },
+  });
   return data.id;
 }
 
@@ -77,122 +70,88 @@ async function getAndDeleteChallenge(
   challengeId: string,
   type: 'registration' | 'authentication',
 ): Promise<string> {
-  const db = getSupabaseAdmin();
-  if (!db) throw new Error('Database not available');
-
-  const { data, error } = await db
-    .from('passkey_challenges')
-    .delete()
-    .eq('id', challengeId)
-    .eq('type', type)
-    .gt('expires_at', new Date().toISOString())
-    .select('challenge')
-    .single();
-
-  if (error || !data) throw new Error('Challenge expired or not found');
+  const data = await prisma.passkeyChallenge.findFirst({
+    where: {
+      id: challengeId,
+      type,
+      expires_at: { gt: new Date() },
+    },
+  });
+  
+  if (!data) throw new Error('Challenge expired or not found');
+  
+  await prisma.passkeyChallenge.delete({ where: { id: challengeId } }).catch(() => {});
   return data.challenge;
 }
 
-// Clean up expired challenges
 async function cleanExpiredChallenges(): Promise<void> {
-  const db = getSupabaseAdmin();
-  if (!db) return;
-  await db
-    .from('passkey_challenges')
-    .delete()
-    .lt('expires_at', new Date().toISOString());
+  await prisma.passkeyChallenge.deleteMany({
+    where: { expires_at: { lt: new Date() } },
+  }).catch(() => {});
 }
 
 // ==================== CREDENTIAL STORE ====================
 
+function toStoredCred(row: any): StoredCredential {
+  return {
+    ...row,
+    transports: (row.transports as any) || [],
+    created_at: row.created_at?.toISOString?.() || row.created_at,
+    last_used_at: row.last_used_at?.toISOString?.() || row.last_used_at,
+  };
+}
+
 export async function getCredentialsByEmail(email: string): Promise<StoredCredential[]> {
-  const db = getSupabaseAdmin();
-  if (!db) return [];
-
-  const { data, error } = await db
-    .from('passkey_credentials')
-    .select('*')
-    .eq('user_email', email)
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.error('[Passkey] Failed to get credentials:', error);
-    return [];
-  }
-  return (data || []) as StoredCredential[];
+  const data = await prisma.passkeyCredential.findMany({
+    where: { user_email: email },
+    orderBy: { created_at: 'desc' },
+  });
+  return data.map(toStoredCred);
 }
 
 export async function getCredentialById(credentialId: string): Promise<StoredCredential | null> {
-  const db = getSupabaseAdmin();
-  if (!db) return null;
-
-  const { data, error } = await db
-    .from('passkey_credentials')
-    .select('*')
-    .eq('credential_id', credentialId)
-    .single();
-
-  if (error) return null;
-  return data as StoredCredential;
+  const data = await prisma.passkeyCredential.findUnique({
+    where: { credential_id: credentialId },
+  });
+  return data ? toStoredCred(data) : null;
 }
 
 async function getAllCredentials(): Promise<StoredCredential[]> {
-  // For discoverable credentials login — get all to match
-  // In production, the authenticator sends credentialId so we look up directly
-  const db = getSupabaseAdmin();
-  if (!db) return [];
-
-  const { data } = await db
-    .from('passkey_credentials')
-    .select('*');
-
-  return (data || []) as StoredCredential[];
+  const data = await prisma.passkeyCredential.findMany();
+  return data.map(toStoredCred);
 }
 
 async function saveCredential(cred: Omit<StoredCredential, 'created_at' | 'last_used_at'>): Promise<void> {
-  const db = getSupabaseAdmin();
-  if (!db) throw new Error('Database not available');
-
-  const { error } = await db
-    .from('passkey_credentials')
-    .insert({
+  await prisma.passkeyCredential.create({
+    data: {
       credential_id: cred.credential_id,
       user_email: cred.user_email,
       public_key: cred.public_key,
       counter: cred.counter,
       device_type: cred.device_type,
       backed_up: cred.backed_up,
-      transports: cred.transports || [],
+      transports: (cred.transports || []) as any,
       friendly_name: cred.friendly_name,
-    });
-
-  if (error) throw new Error(`Failed to save credential: ${error.message}`);
+    },
+  });
 }
 
 async function updateCredentialCounter(credentialId: string, newCounter: number): Promise<void> {
-  const db = getSupabaseAdmin();
-  if (!db) return;
-
-  await db
-    .from('passkey_credentials')
-    .update({
-      counter: newCounter,
-      last_used_at: new Date().toISOString(),
-    })
-    .eq('credential_id', credentialId);
+  await prisma.passkeyCredential.update({
+    where: { credential_id: credentialId },
+    data: { counter: newCounter, last_used_at: new Date() },
+  });
 }
 
 export async function deleteCredential(credentialId: string, userEmail: string): Promise<boolean> {
-  const db = getSupabaseAdmin();
-  if (!db) return false;
-
-  const { error } = await db
-    .from('passkey_credentials')
-    .delete()
-    .eq('credential_id', credentialId)
-    .eq('user_email', userEmail);
-
-  return !error;
+  try {
+    await prisma.passkeyCredential.deleteMany({
+      where: { credential_id: credentialId, user_email: userEmail },
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function renameCredential(
@@ -200,16 +159,20 @@ export async function renameCredential(
   userEmail: string,
   name: string,
 ): Promise<boolean> {
-  const db = getSupabaseAdmin();
-  if (!db) return false;
-
-  const { error } = await db
-    .from('passkey_credentials')
-    .update({ friendly_name: name })
-    .eq('credential_id', credentialId)
-    .eq('user_email', userEmail);
-
-  return !error;
+  try {
+    const existing = await prisma.passkeyCredential.findFirst({
+      where: { credential_id: credentialId, user_email: userEmail },
+    });
+    if (!existing) return false;
+    
+    await prisma.passkeyCredential.update({
+      where: { credential_id: credentialId },
+      data: { friendly_name: name },
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // ==================== REGISTRATION ====================
@@ -219,8 +182,6 @@ export async function generatePasskeyRegistrationOptions(
   userName: string,
 ): Promise<{ options: PublicKeyCredentialCreationOptionsJSON; challengeId: string }> {
   const { rpName, rpID } = getRpConfig();
-
-  // Get existing credentials to exclude
   const existingCreds = await getCredentialsByEmail(userEmail);
 
   const options = await generateRegistrationOptions({
@@ -228,15 +189,12 @@ export async function generatePasskeyRegistrationOptions(
     rpID,
     userName: userEmail,
     userDisplayName: userName || userEmail,
-    // Don't re-register existing authenticators
     excludeCredentials: existingCreds.map((c) => ({
       id: c.credential_id,
       transports: c.transports,
     })),
     authenticatorSelection: {
-      // Prefer platform authenticators (fingerprint, face, etc.)
       authenticatorAttachment: 'platform',
-      // Require resident key for discoverable credentials
       residentKey: 'preferred',
       userVerification: 'required',
     },
@@ -244,8 +202,6 @@ export async function generatePasskeyRegistrationOptions(
   });
 
   const challengeId = await storeChallenge(options.challenge, 'registration', userEmail);
-
-  // Opportunistically clean expired challenges
   cleanExpiredChallenges().catch(() => {});
 
   return { options, challengeId };
@@ -258,7 +214,6 @@ export async function verifyPasskeyRegistration(
   friendlyName?: string,
 ): Promise<VerifiedRegistrationResponse> {
   const { rpID, origin } = getRpConfig();
-
   const expectedChallenge = await getAndDeleteChallenge(challengeId, 'registration');
 
   const verification = await verifyRegistrationResponse({
@@ -298,12 +253,10 @@ export async function generatePasskeyAuthenticationOptions(): Promise<{
   const options = await generateAuthenticationOptions({
     rpID,
     userVerification: 'required',
-    // Empty allowCredentials = discoverable credential (resident key) flow
     allowCredentials: [],
   });
 
   const challengeId = await storeChallenge(options.challenge, 'authentication');
-
   return { options, challengeId };
 }
 
@@ -312,10 +265,8 @@ export async function verifyPasskeyAuthentication(
   response: AuthenticationResponseJSON,
 ): Promise<{ verified: boolean; userEmail: string | null }> {
   const { rpID, origin } = getRpConfig();
-
   const expectedChallenge = await getAndDeleteChallenge(challengeId, 'authentication');
 
-  // Find the credential by ID
   const credentialId = response.id;
   const storedCred = await getCredentialById(credentialId);
 
@@ -338,7 +289,6 @@ export async function verifyPasskeyAuthentication(
   });
 
   if (verification.verified) {
-    // Update counter for clone detection
     await updateCredentialCounter(
       storedCred.credential_id,
       verification.authenticationInfo.newCounter,
@@ -352,8 +302,6 @@ export async function verifyPasskeyAuthentication(
 }
 
 // ==================== PASSKEY LOGIN TOKEN ====================
-// Short-lived JWT to prove passkey auth succeeded
-// Used by NextAuth CredentialsProvider
 
 const SECRET_KEY = new TextEncoder().encode(process.env.NEXTAUTH_SECRET || 'fallback-secret');
 
@@ -361,7 +309,7 @@ export async function createPasskeyLoginToken(email: string): Promise<string> {
   return new SignJWT({ email, purpose: 'passkey-login' })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime('2m') // Very short-lived
+    .setExpirationTime('2m')
     .sign(SECRET_KEY);
 }
 
@@ -378,7 +326,6 @@ export async function verifyPasskeyLoginToken(token: string): Promise<string | n
 // ==================== HELPERS ====================
 
 function detectDeviceName(): string {
-  // Server-side, we can't detect device — use generic name
   const names = ['Passkey', 'พาสคีย์'];
   return names[0];
 }

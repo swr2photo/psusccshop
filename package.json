@@ -12,7 +12,8 @@
     "lint": "eslint",
     "migrate:images": "npx tsx scripts/migrate-image-urls.ts",
     "cron": "tsx scripts/cron-worker.ts",
-    "cron:dev": "tsx watch scripts/cron-worker.ts"
+    "cron:dev": "tsx watch scripts/cron-worker.ts",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.985.0",
@@ -20,6 +21,8 @@
     "@emotion/styled": "^11.14.1",
     "@mui/icons-material": "^7.3.7",
     "@mui/material": "^7.3.7",
+    "@prisma/adapter-pg": "^7.4.1",
+    "@prisma/client": "^7.4.1",
     "@simplewebauthn/browser": "^11.0.0",
     "@simplewebauthn/server": "^11.0.0",
     "@supabase/supabase-js": "^2.95.3",
@@ -35,6 +38,8 @@
     "next": "16.1.6",
     "next-auth": "^4.24.13",
     "node-cron": "^4.2.1",
+    "pg": "^8.19.0",
+    "prisma": "^7.4.1",
     "qrcode.react": "^4.2.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",

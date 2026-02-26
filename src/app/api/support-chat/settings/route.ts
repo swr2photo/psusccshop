@@ -1,10 +1,10 @@
 // src/app/api/support-chat/settings/route.ts
-// Chat settings API (Admin only)
+// Chat settings API (Admin only) — Prisma
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions, isAdminEmail } from '@/lib/auth';
-import { getSupabaseAdmin } from '@/lib/supabase';
+import { prisma } from '@/lib/prisma';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -32,31 +32,16 @@ const DEFAULT_SETTINGS = {
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
-    
     if (!session?.user?.email || !isAdminEmail(session.user.email)) {
       return NextResponse.json('Unauthorized', { status: 401 });
     }
     
-    const db = getSupabaseAdmin();
-    if (!db) {
-      return NextResponse.json(
-        { error: 'Database not configured' },
-        { status: 500 }
-      );
-    }
-    
-    // Use 'config' table instead of 'app_settings' (matches existing schema)
-    const { data, error } = await db
-      .from('config')
-      .select('value')
-      .eq('key', 'support_chat_settings')
-      .single();
-    
-    // PGRST116 = row not found, which is OK (use defaults)
-    if (error && error.code !== 'PGRST116') throw error;
+    const data = await prisma.config.findUnique({
+      where: { key: 'support_chat_settings' },
+    });
     
     return NextResponse.json({ 
-      settings: data?.value || DEFAULT_SETTINGS 
+      settings: (data?.value as any) || DEFAULT_SETTINGS 
     });
     
   } catch (error: any) {
@@ -72,38 +57,20 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
     if (!session?.user?.email || !isAdminEmail(session.user.email)) {
       return NextResponse.json('Unauthorized', { status: 401 });
     }
     
     const settings = await request.json();
+    const merged = { ...DEFAULT_SETTINGS, ...settings };
     
-    const db = getSupabaseAdmin();
-    if (!db) {
-      return NextResponse.json(
-        { error: 'Database not configured' },
-        { status: 500 }
-      );
-    }
-    
-    // Upsert settings using 'config' table (matches existing schema)
-    const { error } = await db
-      .from('config')
-      .upsert({
-        key: 'support_chat_settings',
-        value: { ...DEFAULT_SETTINGS, ...settings },
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'key'
-      });
-    
-    if (error) throw error;
-    
-    return NextResponse.json({ 
-      success: true,
-      settings: { ...DEFAULT_SETTINGS, ...settings }
+    await prisma.config.upsert({
+      where: { key: 'support_chat_settings' },
+      update: { value: merged as any },
+      create: { key: 'support_chat_settings', value: merged as any },
     });
+    
+    return NextResponse.json({ success: true, settings: merged });
     
   } catch (error: any) {
     console.error('[support-chat/settings] POST error:', error);

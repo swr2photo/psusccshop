@@ -1,10 +1,10 @@
 // src/app/api/support-chat/[sessionId]/typing/route.ts
-// Typing indicator API
+// Typing indicator API — Prisma
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions, isAdminEmail } from '@/lib/auth';
-import { getSupabaseAdmin } from '@/lib/supabase';
+import { prisma } from '@/lib/prisma';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -26,25 +26,16 @@ export async function POST(request: NextRequest, { params }: Params) {
     const { isTyping } = await request.json();
     const isAdmin = isAdminEmail(session.user.email);
     
-    const db = getSupabaseAdmin();
-    if (!db) {
-      return NextResponse.json(
-        { error: 'Database not configured' },
-        { status: 500 }
-      );
-    }
-    
-    // Update typing status in database
     const field = isAdmin ? 'admin_typing' : 'customer_typing';
-    const { error } = await db
-      .from('support_chats')
-      .update({
-        [field]: isTyping,
-        [`${field}_at`]: isTyping ? new Date().toISOString() : null,
-      })
-      .eq('id', sessionId);
+    const fieldAt = isAdmin ? 'admin_typing_at' : 'customer_typing_at';
     
-    if (error) throw error;
+    await prisma.supportChat.update({
+      where: { id: sessionId },
+      data: {
+        [field]: isTyping,
+        [fieldAt]: isTyping ? new Date() : null,
+      },
+    });
     
     return NextResponse.json({ success: true });
     
@@ -67,44 +58,31 @@ export async function GET(request: NextRequest, { params }: Params) {
       return NextResponse.json('Unauthorized', { status: 401 });
     }
     
-    const db = getSupabaseAdmin();
-    if (!db) {
-      return NextResponse.json(
-        { error: 'Database not configured' },
-        { status: 500 }
-      );
+    const data = await prisma.supportChat.findUnique({
+      where: { id: sessionId },
+    }) as any;
+    
+    if (!data) {
+      return NextResponse.json({ isTyping: false });
     }
     
-    const { data, error } = await db
-      .from('support_chats')
-      .select('admin_typing, admin_typing_at, customer_typing, customer_typing_at')
-      .eq('id', sessionId)
-      .single();
-    
-    if (error) throw error;
-    
-    // Check if typing status is still valid (within 5 seconds)
     const now = new Date().getTime();
     const isAdmin = isAdminEmail(session.user.email);
     
     let otherTyping = false;
     if (isAdmin) {
-      // Admin sees customer typing
       if (data.customer_typing && data.customer_typing_at) {
         const typingTime = new Date(data.customer_typing_at).getTime();
         otherTyping = (now - typingTime) < 5000;
       }
     } else {
-      // Customer sees admin typing
       if (data.admin_typing && data.admin_typing_at) {
         const typingTime = new Date(data.admin_typing_at).getTime();
         otherTyping = (now - typingTime) < 5000;
       }
     }
     
-    return NextResponse.json({ 
-      isTyping: otherTyping,
-    });
+    return NextResponse.json({ isTyping: otherTyping });
     
   } catch (error: any) {
     console.error('[support-chat/typing] GET error:', error);

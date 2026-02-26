@@ -1,16 +1,16 @@
 // src/lib/api-key-rotation.ts
-// API Key management and rotation system
+// API Key management and rotation system — Prisma
 
-import { getSupabaseAdmin } from './supabase';
+import { prisma } from './prisma';
 import crypto from 'crypto';
 
 // ==================== TYPES ====================
 
-export interface APIKey {
+interface APIKey {
   id: string;
   name: string;
-  keyHash: string; // Store only hash, not the actual key
-  keyPrefix: string; // First 8 chars for identification
+  keyHash: string;
+  keyPrefix: string;
   permissions: string[];
   createdAt: string;
   expiresAt: string | null;
@@ -34,34 +34,34 @@ export interface APIKeyValidation {
 
 // ==================== KEY GENERATION ====================
 
-/**
- * Generate a secure API key
- * Format: psu_[type]_[random 32 chars]
- */
+// Generate a secure API key
+// Format: psu_[type]_[random 32 chars]
 export function generateAPIKey(type: 'admin' | 'user' | 'cron' | 'webhook' = 'user'): string {
-  const randomPart = crypto.randomBytes(24).toString('base64url');
-  return `psu_${type}_${randomPart}`;
+  const random = crypto.randomBytes(24).toString('base64url');
+  return `psu_${type}_${random}`;
 }
 
-/**
- * Hash an API key for storage
- */
+// Hash an API key for storage
 export function hashAPIKey(key: string): string {
   return crypto.createHash('sha256').update(key).digest('hex');
 }
 
-/**
- * Get key prefix for identification
- */
+// Get key prefix for identification
 export function getKeyPrefix(key: string): string {
-  return key.substring(0, 12);
+  const parts = key.split('_');
+  return parts.length >= 3 ? `${parts[0]}_${parts[1]}_${parts[2].substring(0, 4)}` : key.substring(0, 12);
 }
 
 // ==================== KEY MANAGEMENT ====================
 
-/**
- * Create a new API key
- */
+// Store keys in key_value_store with prefix "api-key:"
+const KEY_PREFIX = 'api-key:';
+
+function keyStoreKey(id: string): string {
+  return `${KEY_PREFIX}${id}`;
+}
+
+// Create a new API key
 export async function createAPIKey(options: {
   name: string;
   permissions: string[];
@@ -70,302 +70,173 @@ export async function createAPIKey(options: {
   rateLimit?: { maxRequests: number; windowSeconds: number };
   type?: 'admin' | 'user' | 'cron' | 'webhook';
 }): Promise<{ key: string; keyId: string }> {
-  const db = getSupabaseAdmin();
-  if (!db) {
-    throw new Error('Database not available');
-  }
+  const key = generateAPIKey(options.type);
+  const keyId = crypto.randomUUID();
   
-  const key = generateAPIKey(options.type || 'user');
-  const keyHash = hashAPIKey(key);
-  const keyPrefix = getKeyPrefix(key);
-  
-  const expiresAt = options.expiresInDays
-    ? new Date(Date.now() + options.expiresInDays * 24 * 60 * 60 * 1000).toISOString()
-    : null;
-  
-  const { data, error } = await db
-    .from('api_keys')
-    .insert({
-      name: options.name,
-      key_hash: keyHash,
-      key_prefix: keyPrefix,
-      permissions: options.permissions,
-      expires_at: expiresAt,
-      created_by: options.createdBy,
-      rate_limit: options.rateLimit || null,
-      is_active: true,
-      usage_count: 0,
-    })
-    .select('id')
-    .single();
-  
-  if (error) throw error;
-  
-  return {
-    key,
-    keyId: data.id,
+  const apiKey: APIKey = {
+    id: keyId,
+    name: options.name,
+    keyHash: hashAPIKey(key),
+    keyPrefix: getKeyPrefix(key),
+    permissions: options.permissions,
+    createdAt: new Date().toISOString(),
+    expiresAt: options.expiresInDays
+      ? new Date(Date.now() + options.expiresInDays * 24 * 60 * 60 * 1000).toISOString()
+      : null,
+    lastUsedAt: null,
+    usageCount: 0,
+    isActive: true,
+    createdBy: options.createdBy,
+    rateLimit: options.rateLimit,
   };
+  
+  await prisma.keyValueStore.create({
+    data: { key: keyStoreKey(keyId), value: apiKey as any },
+  });
+  
+  return { key, keyId };
 }
 
-/**
- * Validate an API key
- */
+// Validate an API key
 export async function validateAPIKey(key: string): Promise<APIKeyValidation> {
-  if (!key || !key.startsWith('psu_')) {
-    return { valid: false, error: 'Invalid key format' };
+  try {
+    const keyHash = hashAPIKey(key);
+    
+    // Get all API keys
+    const allKeys = await prisma.keyValueStore.findMany({
+      where: { key: { startsWith: KEY_PREFIX } },
+    });
+    
+    for (const entry of allKeys) {
+      const apiKey = entry.value as any as APIKey;
+      if (apiKey.keyHash !== keyHash) continue;
+      if (!apiKey.isActive) return { valid: false, error: 'API key is revoked' };
+      if (apiKey.expiresAt && new Date(apiKey.expiresAt) < new Date()) {
+        return { valid: false, error: 'API key has expired' };
+      }
+      
+      // Update usage
+      apiKey.lastUsedAt = new Date().toISOString();
+      apiKey.usageCount++;
+      await prisma.keyValueStore.update({
+        where: { key: entry.key },
+        data: { value: apiKey as any },
+      });
+      
+      return {
+        valid: true,
+        keyId: apiKey.id,
+        name: apiKey.name,
+        permissions: apiKey.permissions,
+      };
+    }
+    
+    return { valid: false, error: 'Invalid API key' };
+  } catch (error) {
+    console.error('[API Key] Validation error:', error);
+    return { valid: false, error: 'Validation failed' };
   }
-  
-  const db = getSupabaseAdmin();
-  if (!db) {
-    return { valid: false, error: 'Database not available' };
-  }
-  const keyHash = hashAPIKey(key);
-  
-  const { data, error } = await db
-    .from('api_keys')
-    .select('*')
-    .eq('key_hash', keyHash)
-    .eq('is_active', true)
-    .single();
-  
-  if (error || !data) {
-    return { valid: false, error: 'Key not found or inactive' };
-  }
-  
-  // Check expiration
-  if (data.expires_at && new Date(data.expires_at) < new Date()) {
-    return { valid: false, error: 'Key has expired' };
-  }
-  
-  // Update last used
-  await db
-    .from('api_keys')
-    .update({
-      last_used_at: new Date().toISOString(),
-      usage_count: data.usage_count + 1,
-    })
-    .eq('id', data.id);
-  
-  return {
-    valid: true,
-    keyId: data.id,
-    name: data.name,
-    permissions: data.permissions,
-  };
 }
 
-/**
- * Rotate an API key (create new, invalidate old)
- */
+// Rotate an API key (create new, invalidate old)
 export async function rotateAPIKey(keyId: string, rotatedBy: string): Promise<{ newKey: string; newKeyId: string }> {
-  const db = getSupabaseAdmin();
-  if (!db) {
-    throw new Error('Database not available');
-  }
+  const entry = await prisma.keyValueStore.findUnique({
+    where: { key: keyStoreKey(keyId) },
+  });
+  if (!entry) throw new Error('API key not found');
   
-  // Get existing key info
-  const { data: existingKey, error: fetchError } = await db
-    .from('api_keys')
-    .select('*')
-    .eq('id', keyId)
-    .single();
+  const oldKey = entry.value as any as APIKey;
+  oldKey.isActive = false;
+  await prisma.keyValueStore.update({
+    where: { key: keyStoreKey(keyId) },
+    data: { value: oldKey as any },
+  });
   
-  if (fetchError || !existingKey) {
-    throw new Error('Key not found');
-  }
-  
-  // Determine key type from prefix
-  let keyType: 'admin' | 'user' | 'cron' | 'webhook' = 'user';
-  if (existingKey.key_prefix.includes('admin')) keyType = 'admin';
-  else if (existingKey.key_prefix.includes('cron')) keyType = 'cron';
-  else if (existingKey.key_prefix.includes('webhook')) keyType = 'webhook';
-  
-  // Create new key with same permissions
   const result = await createAPIKey({
-    name: existingKey.name,
-    permissions: existingKey.permissions,
-    expiresInDays: existingKey.expires_at 
-      ? Math.ceil((new Date(existingKey.expires_at).getTime() - Date.now()) / (24 * 60 * 60 * 1000))
-      : undefined,
+    name: oldKey.name,
+    permissions: oldKey.permissions,
     createdBy: rotatedBy,
-    rateLimit: existingKey.rate_limit,
-    type: keyType,
+    rateLimit: oldKey.rateLimit,
   });
-  
-  // Deactivate old key
-  await db
-    .from('api_keys')
-    .update({
-      is_active: false,
-      rotated_at: new Date().toISOString(),
-      rotated_to: result.keyId,
-    })
-    .eq('id', keyId);
-  
-  // Log rotation event
-  await db.from('security_audit_log').insert({
-    event_type: 'api_key_rotation',
-    user_email: rotatedBy,
-    details: {
-      oldKeyId: keyId,
-      newKeyId: result.keyId,
-      keyName: existingKey.name,
-    },
-  });
-  
-  return {
-    newKey: result.key,
-    newKeyId: result.keyId,
-  };
+  return { newKey: result.key, newKeyId: result.keyId };
 }
 
-/**
- * Revoke an API key
- */
+// Revoke an API key
 export async function revokeAPIKey(keyId: string, revokedBy: string, reason?: string): Promise<void> {
-  const db = getSupabaseAdmin();
-  if (!db) {
-    throw new Error('Database not available');
-  }
+  const entry = await prisma.keyValueStore.findUnique({
+    where: { key: keyStoreKey(keyId) },
+  });
+  if (!entry) throw new Error('API key not found');
   
-  await db
-    .from('api_keys')
-    .update({
-      is_active: false,
-      revoked_at: new Date().toISOString(),
-      revoked_by: revokedBy,
-      revoke_reason: reason,
-    })
-    .eq('id', keyId);
+  const apiKey = entry.value as any as APIKey;
+  apiKey.isActive = false;
+  (apiKey as any).revokedBy = revokedBy;
+  (apiKey as any).revokedAt = new Date().toISOString();
+  (apiKey as any).revokeReason = reason;
   
-  // Log revocation
-  await db.from('security_audit_log').insert({
-    event_type: 'api_key_revoked',
-    user_email: revokedBy,
-    details: { keyId, reason },
+  await prisma.keyValueStore.update({
+    where: { key: keyStoreKey(keyId) },
+    data: { value: apiKey as any },
   });
 }
 
-/**
- * List all API keys (without showing actual keys)
- */
+// List all API keys (without showing actual keys)
 export async function listAPIKeys(options: {
   includeInactive?: boolean;
   createdBy?: string;
 } = {}): Promise<Omit<APIKey, 'keyHash'>[]> {
-  const db = getSupabaseAdmin();
-  if (!db) {
-    throw new Error('Database not available');
-  }
+  const allKeys = await prisma.keyValueStore.findMany({
+    where: { key: { startsWith: KEY_PREFIX } },
+  });
   
-  let query = db
-    .from('api_keys')
-    .select('*')
-    .order('created_at', { ascending: false });
+  let keys = allKeys.map(entry => {
+    const k = entry.value as any as APIKey;
+    const { keyHash: _, ...rest } = k;
+    return rest;
+  });
   
-  if (!options.includeInactive) {
-    query = query.eq('is_active', true);
-  }
+  if (!options.includeInactive) keys = keys.filter(k => k.isActive);
+  if (options.createdBy) keys = keys.filter(k => k.createdBy === options.createdBy);
   
-  if (options.createdBy) {
-    query = query.eq('created_by', options.createdBy);
-  }
-  
-  const { data, error } = await query;
-  
-  if (error) throw error;
-  
-  return (data || []).map(row => ({
-    id: row.id,
-    name: row.name,
-    keyHash: '[HIDDEN]',
-    keyPrefix: row.key_prefix,
-    permissions: row.permissions,
-    createdAt: row.created_at,
-    expiresAt: row.expires_at,
-    lastUsedAt: row.last_used_at,
-    usageCount: row.usage_count,
-    isActive: row.is_active,
-    createdBy: row.created_by,
-    rateLimit: row.rate_limit,
-  }));
+  return keys;
 }
 
-/**
- * Get keys that are expiring soon
- */
+// Get keys that are expiring soon
 export async function getExpiringKeys(withinDays: number = 7): Promise<Omit<APIKey, 'keyHash'>[]> {
-  const db = getSupabaseAdmin();
-  if (!db) {
-    throw new Error('Database not available');
-  }
-  const futureDate = new Date(Date.now() + withinDays * 24 * 60 * 60 * 1000);
-  
-  const { data, error } = await db
-    .from('api_keys')
-    .select('*')
-    .eq('is_active', true)
-    .not('expires_at', 'is', null)
-    .lt('expires_at', futureDate.toISOString())
-    .gt('expires_at', new Date().toISOString())
-    .order('expires_at', { ascending: true });
-  
-  if (error) throw error;
-  
-  return (data || []).map(row => ({
-    id: row.id,
-    name: row.name,
-    keyHash: '[HIDDEN]',
-    keyPrefix: row.key_prefix,
-    permissions: row.permissions,
-    createdAt: row.created_at,
-    expiresAt: row.expires_at,
-    lastUsedAt: row.last_used_at,
-    usageCount: row.usage_count,
-    isActive: row.is_active,
-    createdBy: row.created_by,
-    rateLimit: row.rate_limit,
-  }));
+  const cutoff = new Date(Date.now() + withinDays * 24 * 60 * 60 * 1000);
+  const keys = await listAPIKeys();
+  return keys.filter(k => k.expiresAt && new Date(k.expiresAt) <= cutoff);
 }
 
-/**
- * Auto-rotate keys that are expiring soon
- */
+// Auto-rotate keys that are expiring soon
 export async function autoRotateExpiringKeys(withinDays: number = 3): Promise<number> {
-  const expiringKeys = await getExpiringKeys(withinDays);
-  let rotatedCount = 0;
-  
-  for (const key of expiringKeys) {
+  const expiring = await getExpiringKeys(withinDays);
+  let rotated = 0;
+  for (const key of expiring) {
     try {
-      await rotateAPIKey(key.id, 'SYSTEM_AUTO_ROTATE');
-      rotatedCount++;
-      console.log(`[APIKey] Auto-rotated key: ${key.name} (${key.keyPrefix}...)`);
+      await rotateAPIKey(key.id, 'system-auto-rotate');
+      rotated++;
     } catch (error) {
-      console.error(`[APIKey] Failed to auto-rotate ${key.name}:`, error);
+      console.error(`[API Key] Auto-rotate failed for ${key.id}:`, error);
     }
   }
-  
-  return rotatedCount;
+  return rotated;
 }
 
-/**
- * Cleanup expired and revoked keys older than retention period
- */
+// Cleanup expired and revoked keys older than retention period
 export async function cleanupOldKeys(retentionDays: number = 90): Promise<number> {
-  const db = getSupabaseAdmin();
-  if (!db) {
-    throw new Error('Database not available');
+  const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
+  const allKeys = await prisma.keyValueStore.findMany({
+    where: { key: { startsWith: KEY_PREFIX } },
+  });
+  
+  let deleted = 0;
+  for (const entry of allKeys) {
+    const k = entry.value as any as APIKey;
+    if (!k.isActive && new Date(k.createdAt) < cutoff) {
+      await prisma.keyValueStore.delete({ where: { key: entry.key } });
+      deleted++;
+    }
   }
-  const cutoffDate = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
-  
-  const { data, error } = await db
-    .from('api_keys')
-    .delete()
-    .eq('is_active', false)
-    .lt('updated_at', cutoffDate.toISOString())
-    .select('id');
-  
-  if (error) throw error;
-  
-  return data?.length || 0;
+  return deleted;
 }

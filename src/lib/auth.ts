@@ -2,7 +2,7 @@
 // Centralized authentication utilities for server-side use
 
 import { getServerSession, Session } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth-options';
 import { NextResponse } from 'next/server';
 import { getJson } from '@/lib/filebase';
 import { getAdminPermissionsFromDB } from '@/lib/supabase';

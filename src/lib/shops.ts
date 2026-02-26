@@ -1,19 +1,18 @@
 // src/lib/shops.ts
-// Multi-shop system: types, helpers, and Supabase operations
+// Multi-shop system: types, helpers, and Prisma operations
 
-import { getSupabaseAdmin } from './supabase';
+import { prisma } from './prisma';
 import { Product, ShopConfig } from './config';
 
 // ==================== TYPES ====================
 
-/** Shop-level config: everything a shop can customize (subset of ShopConfig) */
+/** Shop-level config */
 export type ShopLocalConfig = Pick<ShopConfig,
   | 'announcements' | 'announcementHistory' | 'announcement'
   | 'events' | 'promoCodes' | 'liveStream'
   | 'pickup' | 'nameValidation' | 'shirtNameConfig'
   | 'socialMediaNews'
 > & {
-  /** Shop-level shipping options (array of {id,name,price,freeAbove,...}) */
   shippingOptions?: any[];
 };
 
@@ -47,7 +46,6 @@ export interface Shop {
   settings: ShopSettings;
   paymentInfo: ShopPaymentInfo;
   products: Product[];
-  /** Shop-local config (announcements, events, promoCodes, liveStream, etc.) */
   config: ShopLocalConfig;
   contactEmail?: string;
   contactPhone?: string;
@@ -113,7 +111,6 @@ export const ALL_SHOP_ADMIN_PERMISSIONS: ShopAdminPermissions = {
   canAddAdmins: true,
 };
 
-/** Summary for listing shops */
 export interface ShopSummary {
   id: string;
   slug: string;
@@ -127,7 +124,6 @@ export interface ShopSummary {
   ownerEmail: string;
 }
 
-/** Shop + user's role in it */
 export interface ShopWithRole {
   shop: ShopSummary;
   role: 'owner' | 'admin';
@@ -135,13 +131,6 @@ export interface ShopWithRole {
 }
 
 // ==================== DB ↔ APP MAPPING ====================
-
-/** Get DB client with null check */
-function getDB() {
-  const db = getSupabaseAdmin();
-  if (!db) throw new Error('Database not available');
-  return db;
-}
 
 function dbToShop(row: any): Shop {
   return {
@@ -155,16 +144,16 @@ function dbToShop(row: any): Shop {
     bannerUrl: row.banner_url || undefined,
     ownerEmail: row.owner_email,
     isActive: row.is_active,
-    settings: row.settings || { isOpen: true },
-    paymentInfo: row.payment_info || { promptPayId: '', bankName: '', accountName: '', accountNumber: '' },
-    products: row.products || [],
-    config: row.config || {},
+    settings: (row.settings as any) || { isOpen: true },
+    paymentInfo: (row.payment_info as any) || { promptPayId: '', bankName: '', accountName: '', accountNumber: '' },
+    products: (row.products as any) || [],
+    config: (row.config as any) || {},
     contactEmail: row.contact_email || undefined,
     contactPhone: row.contact_phone || undefined,
-    socialLinks: row.social_links || undefined,
+    socialLinks: (row.social_links as any) || undefined,
     sortOrder: row.sort_order || 0,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    createdAt: row.created_at?.toISOString?.() || row.created_at,
+    updatedAt: row.updated_at?.toISOString?.() || row.updated_at,
   };
 }
 
@@ -174,99 +163,65 @@ function dbToShopAdmin(row: any): ShopAdmin {
     shopId: row.shop_id,
     email: row.email,
     role: row.role,
-    permissions: { ...DEFAULT_SHOP_ADMIN_PERMISSIONS, ...(row.permissions || {}) },
+    permissions: { ...DEFAULT_SHOP_ADMIN_PERMISSIONS, ...((row.permissions as any) || {}) },
     addedBy: row.added_by || undefined,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    createdAt: row.created_at?.toISOString?.() || row.created_at,
+    updatedAt: row.updated_at?.toISOString?.() || row.updated_at,
+  };
+}
+
+function dbToShopSummary(row: any): ShopSummary {
+  return {
+    id: row.id,
+    slug: row.slug,
+    name: row.name,
+    nameEn: row.name_en || undefined,
+    description: row.description || undefined,
+    logoUrl: row.logo_url || undefined,
+    isActive: row.is_active,
+    productCount: Array.isArray(row.products) ? (row.products as any[]).length : 0,
+    adminCount: 0,
+    ownerEmail: row.owner_email,
   };
 }
 
 // ==================== SHOP CRUD ====================
 
-/** List all shops (for SuperAdmin) */
 export async function listAllShops(): Promise<ShopSummary[]> {
-  const db = getDB();
-  const { data, error } = await db
-    .from('shops')
-    .select('id, slug, name, name_en, description, logo_url, is_active, owner_email, products, sort_order')
-    .order('sort_order', { ascending: true })
-    .order('name', { ascending: true });
-
-  if (error) {
+  try {
+    const data = await prisma.shop.findMany({
+      orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
+    });
+    return data.map(dbToShopSummary);
+  } catch (error: any) {
     console.error('[shops] listAllShops error:', error.message);
     return [];
   }
-
-  return (data || []).map(row => ({
-    id: row.id,
-    slug: row.slug,
-    name: row.name,
-    nameEn: row.name_en || undefined,
-    description: row.description || undefined,
-    logoUrl: row.logo_url || undefined,
-    isActive: row.is_active,
-    productCount: Array.isArray(row.products) ? row.products.length : 0,
-    adminCount: 0, // filled separately if needed
-    ownerEmail: row.owner_email,
-  }));
 }
 
-/** List active shops (for storefront) */
 export async function listActiveShops(): Promise<ShopSummary[]> {
-  const db = getDB();
-  const { data, error } = await db
-    .from('shops')
-    .select('id, slug, name, name_en, description, logo_url, is_active, owner_email, products, sort_order')
-    .eq('is_active', true)
-    .order('sort_order', { ascending: true })
-    .order('name', { ascending: true });
-
-  if (error) {
+  try {
+    const data = await prisma.shop.findMany({
+      where: { is_active: true },
+      orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
+    });
+    return data.map(dbToShopSummary);
+  } catch (error: any) {
     console.error('[shops] listActiveShops error:', error.message);
     return [];
   }
-
-  return (data || []).map(row => ({
-    id: row.id,
-    slug: row.slug,
-    name: row.name,
-    nameEn: row.name_en || undefined,
-    description: row.description || undefined,
-    logoUrl: row.logo_url || undefined,
-    isActive: row.is_active,
-    productCount: Array.isArray(row.products) ? row.products.length : 0,
-    adminCount: 0,
-    ownerEmail: row.owner_email,
-  }));
 }
 
-/** Get shop by slug */
 export async function getShopBySlug(slug: string): Promise<Shop | null> {
-  const db = getDB();
-  const { data, error } = await db
-    .from('shops')
-    .select('*')
-    .eq('slug', slug)
-    .single();
-
-  if (error || !data) return null;
-  return dbToShop(data);
+  const data = await prisma.shop.findUnique({ where: { slug } });
+  return data ? dbToShop(data) : null;
 }
 
-/** Get shop by ID */
 export async function getShopById(id: string): Promise<Shop | null> {
-  const db = getDB();
-  const { data, error } = await db
-    .from('shops')
-    .select('*')
-    .eq('id', id)
-    .single();
-
-  if (error || !data) return null;
-  return dbToShop(data);
+  const data = await prisma.shop.findUnique({ where: { id } });
+  return data ? dbToShop(data) : null;
 }
 
-/** Create a new shop */
 export async function createShop(input: {
   slug: string;
   name: string;
@@ -277,37 +232,31 @@ export async function createShop(input: {
   paymentInfo?: ShopPaymentInfo;
   logoUrl?: string;
 }): Promise<Shop | null> {
-  const db = getDB();
-  const { data, error } = await db
-    .from('shops')
-    .insert({
-      slug: input.slug.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
-      name: input.name,
-      name_en: input.nameEn || null,
-      description: input.description || null,
-      description_en: input.descriptionEn || null,
-      owner_email: input.ownerEmail.toLowerCase(),
-      payment_info: input.paymentInfo || { promptPayId: '', bankName: '', accountName: '', accountNumber: '' },
-      logo_url: input.logoUrl || null,
-      products: [],
-      config: {},
-      settings: { isOpen: true },
-    })
-    .select()
-    .single();
-
-  if (error) {
+  try {
+    const data = await prisma.shop.create({
+      data: {
+        slug: input.slug.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
+        name: input.name,
+        name_en: input.nameEn || null,
+        description: input.description || null,
+        description_en: input.descriptionEn || null,
+        owner_email: input.ownerEmail.toLowerCase(),
+        payment_info: (input.paymentInfo || { promptPayId: '', bankName: '', accountName: '', accountNumber: '' }) as any,
+        logo_url: input.logoUrl || null,
+        products: [] as any,
+        config: {} as any,
+        settings: { isOpen: true } as any,
+      },
+    });
+    
+    await addShopAdmin(data.id, input.ownerEmail, 'owner', ALL_SHOP_ADMIN_PERMISSIONS, input.ownerEmail);
+    return dbToShop(data);
+  } catch (error: any) {
     console.error('[shops] createShop error:', error.message);
     return null;
   }
-
-  // Add owner as shop admin with all permissions
-  await addShopAdmin(data.id, input.ownerEmail, 'owner', ALL_SHOP_ADMIN_PERMISSIONS, input.ownerEmail);
-
-  return dbToShop(data);
 }
 
-/** Update shop details */
 export async function updateShop(id: string, updates: Partial<{
   name: string;
   nameEn: string;
@@ -326,72 +275,58 @@ export async function updateShop(id: string, updates: Partial<{
   socialLinks: Record<string, string>;
   sortOrder: number;
 }>): Promise<Shop | null> {
-  const db = getDB();
-  
-  // Map camelCase to snake_case
-  const dbUpdates: any = {};
-  if (updates.name !== undefined) dbUpdates.name = updates.name;
-  if (updates.nameEn !== undefined) dbUpdates.name_en = updates.nameEn;
-  if (updates.slug !== undefined) dbUpdates.slug = updates.slug.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-  if (updates.description !== undefined) dbUpdates.description = updates.description;
-  if (updates.descriptionEn !== undefined) dbUpdates.description_en = updates.descriptionEn;
-  if (updates.logoUrl !== undefined) dbUpdates.logo_url = updates.logoUrl;
-  if (updates.bannerUrl !== undefined) dbUpdates.banner_url = updates.bannerUrl;
-  if (updates.isActive !== undefined) dbUpdates.is_active = updates.isActive;
-  if (updates.settings !== undefined) dbUpdates.settings = updates.settings;
-  if (updates.paymentInfo !== undefined) dbUpdates.payment_info = updates.paymentInfo;
-  if (updates.products !== undefined) dbUpdates.products = updates.products;
-  if (updates.config !== undefined) dbUpdates.config = updates.config;
-  if (updates.contactEmail !== undefined) dbUpdates.contact_email = updates.contactEmail;
-  if (updates.contactPhone !== undefined) dbUpdates.contact_phone = updates.contactPhone;
-  if (updates.socialLinks !== undefined) dbUpdates.social_links = updates.socialLinks;
-  if (updates.sortOrder !== undefined) dbUpdates.sort_order = updates.sortOrder;
-
-  const { data, error } = await db
-    .from('shops')
-    .update(dbUpdates)
-    .eq('id', id)
-    .select()
-    .single();
-
-  if (error) {
+  try {
+    const dbUpdates: any = {};
+    if (updates.name !== undefined) dbUpdates.name = updates.name;
+    if (updates.nameEn !== undefined) dbUpdates.name_en = updates.nameEn;
+    if (updates.slug !== undefined) dbUpdates.slug = updates.slug.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    if (updates.description !== undefined) dbUpdates.description = updates.description;
+    if (updates.descriptionEn !== undefined) dbUpdates.description_en = updates.descriptionEn;
+    if (updates.logoUrl !== undefined) dbUpdates.logo_url = updates.logoUrl;
+    if (updates.bannerUrl !== undefined) dbUpdates.banner_url = updates.bannerUrl;
+    if (updates.isActive !== undefined) dbUpdates.is_active = updates.isActive;
+    if (updates.settings !== undefined) dbUpdates.settings = updates.settings;
+    if (updates.paymentInfo !== undefined) dbUpdates.payment_info = updates.paymentInfo;
+    if (updates.products !== undefined) dbUpdates.products = updates.products;
+    if (updates.config !== undefined) dbUpdates.config = updates.config;
+    if (updates.contactEmail !== undefined) dbUpdates.contact_email = updates.contactEmail;
+    if (updates.contactPhone !== undefined) dbUpdates.contact_phone = updates.contactPhone;
+    if (updates.socialLinks !== undefined) dbUpdates.social_links = updates.socialLinks;
+    if (updates.sortOrder !== undefined) dbUpdates.sort_order = updates.sortOrder;
+    
+    const data = await prisma.shop.update({ where: { id }, data: dbUpdates });
+    return dbToShop(data);
+  } catch (error: any) {
     console.error('[shops] updateShop error:', error.message);
     return null;
   }
-  return dbToShop(data);
 }
 
-/** Delete a shop */
 export async function deleteShop(id: string): Promise<boolean> {
-  const db = getDB();
-  const { error } = await db.from('shops').delete().eq('id', id);
-  if (error) {
+  try {
+    await prisma.shop.delete({ where: { id } });
+    return true;
+  } catch (error: any) {
     console.error('[shops] deleteShop error:', error.message);
     return false;
   }
-  return true;
 }
 
 // ==================== SHOP ADMIN CRUD ====================
 
-/** List admins of a shop */
 export async function listShopAdmins(shopId: string): Promise<ShopAdmin[]> {
-  const db = getDB();
-  const { data, error } = await db
-    .from('shop_admins')
-    .select('*')
-    .eq('shop_id', shopId)
-    .order('role', { ascending: true })
-    .order('email', { ascending: true });
-
-  if (error) {
+  try {
+    const data = await prisma.shopAdmin.findMany({
+      where: { shop_id: shopId },
+      orderBy: [{ role: 'asc' }, { email: 'asc' }],
+    });
+    return data.map(dbToShopAdmin);
+  } catch (error: any) {
     console.error('[shops] listShopAdmins error:', error.message);
     return [];
   }
-  return (data || []).map(dbToShopAdmin);
 }
 
-/** Add admin to a shop */
 export async function addShopAdmin(
   shopId: string,
   email: string,
@@ -399,160 +334,111 @@ export async function addShopAdmin(
   permissions?: ShopAdminPermissions,
   addedBy?: string,
 ): Promise<ShopAdmin | null> {
-  const db = getDB();
-  const { data, error } = await db
-    .from('shop_admins')
-    .upsert({
-      shop_id: shopId,
-      email: email.toLowerCase().trim(),
-      role,
-      permissions: permissions || DEFAULT_SHOP_ADMIN_PERMISSIONS,
-      added_by: addedBy || null,
-    }, { onConflict: 'shop_id,email' })
-    .select()
-    .single();
-
-  if (error) {
+  try {
+    const normalizedEmail = email.toLowerCase().trim();
+    const data = await prisma.shopAdmin.upsert({
+      where: { shop_id_email: { shop_id: shopId, email: normalizedEmail } },
+      update: {
+        role,
+        permissions: (permissions || DEFAULT_SHOP_ADMIN_PERMISSIONS) as any,
+        added_by: addedBy || null,
+      },
+      create: {
+        shop_id: shopId,
+        email: normalizedEmail,
+        role,
+        permissions: (permissions || DEFAULT_SHOP_ADMIN_PERMISSIONS) as any,
+        added_by: addedBy || null,
+      },
+    });
+    return dbToShopAdmin(data);
+  } catch (error: any) {
     console.error('[shops] addShopAdmin error:', error.message);
     return null;
   }
-  return dbToShopAdmin(data);
 }
 
-/** Update shop admin permissions */
 export async function updateShopAdmin(
   shopId: string,
   email: string,
   updates: { role?: 'owner' | 'admin'; permissions?: ShopAdminPermissions },
 ): Promise<ShopAdmin | null> {
-  const db = getDB();
-  const dbUpdates: any = {};
-  if (updates.role) dbUpdates.role = updates.role;
-  if (updates.permissions) dbUpdates.permissions = updates.permissions;
-
-  const { data, error } = await db
-    .from('shop_admins')
-    .update(dbUpdates)
-    .eq('shop_id', shopId)
-    .eq('email', email.toLowerCase().trim())
-    .select()
-    .single();
-
-  if (error) {
+  try {
+    const normalizedEmail = email.toLowerCase().trim();
+    const dbUpdates: any = {};
+    if (updates.role) dbUpdates.role = updates.role;
+    if (updates.permissions) dbUpdates.permissions = updates.permissions;
+    
+    const data = await prisma.shopAdmin.update({
+      where: { shop_id_email: { shop_id: shopId, email: normalizedEmail } },
+      data: dbUpdates,
+    });
+    return dbToShopAdmin(data);
+  } catch (error: any) {
     console.error('[shops] updateShopAdmin error:', error.message);
     return null;
   }
-  return dbToShopAdmin(data);
 }
 
-/** Remove admin from shop */
 export async function removeShopAdmin(shopId: string, email: string): Promise<boolean> {
-  const db = getDB();
-  const { error } = await db
-    .from('shop_admins')
-    .delete()
-    .eq('shop_id', shopId)
-    .eq('email', email.toLowerCase().trim());
-
-  if (error) {
+  try {
+    await prisma.shopAdmin.delete({
+      where: { shop_id_email: { shop_id: shopId, email: email.toLowerCase().trim() } },
+    });
+    return true;
+  } catch (error: any) {
     console.error('[shops] removeShopAdmin error:', error.message);
     return false;
   }
-  return true;
 }
 
 // ==================== SHOP ACCESS CONTROL ====================
 
-/** Get all shops a user has admin access to */
 export async function getShopsForAdmin(email: string): Promise<ShopWithRole[]> {
-  const db = getDB();
-  const { data, error } = await db
-    .from('shop_admins')
-    .select(`
-      role, permissions,
-      shops:shop_id (id, slug, name, name_en, description, logo_url, is_active, owner_email, products, sort_order)
-    `)
-    .eq('email', email.toLowerCase().trim());
-
-  if (error) {
+  try {
+    const data = await prisma.shopAdmin.findMany({
+      where: { email: email.toLowerCase().trim() },
+      include: { shop: true },
+    });
+    
+    return data
+      .filter(row => row.shop)
+      .map(row => ({
+        shop: dbToShopSummary(row.shop),
+        role: row.role as 'owner' | 'admin',
+        permissions: { ...DEFAULT_SHOP_ADMIN_PERMISSIONS, ...((row.permissions as any) || {}) },
+      }));
+  } catch (error: any) {
     console.error('[shops] getShopsForAdmin error:', error.message);
     return [];
   }
-
-  return (data || [])
-    .filter((row: any) => row.shops) // filter out rows where shop was deleted
-    .map((row: any) => {
-      const s = row.shops;
-      return {
-        shop: {
-          id: s.id,
-          slug: s.slug,
-          name: s.name,
-          nameEn: s.name_en || undefined,
-          description: s.description || undefined,
-          logoUrl: s.logo_url || undefined,
-          isActive: s.is_active,
-          productCount: Array.isArray(s.products) ? s.products.length : 0,
-          adminCount: 0,
-          ownerEmail: s.owner_email,
-        },
-        role: row.role as 'owner' | 'admin',
-        permissions: { ...DEFAULT_SHOP_ADMIN_PERMISSIONS, ...(row.permissions || {}) },
-      };
-    });
 }
 
-/** Check if user has access to a specific shop */
 export async function getShopAdminRole(shopId: string, email: string): Promise<ShopAdmin | null> {
-  const db = getDB();
-  const { data, error } = await db
-    .from('shop_admins')
-    .select('*')
-    .eq('shop_id', shopId)
-    .eq('email', email.toLowerCase().trim())
-    .single();
-
-  if (error || !data) return null;
-  return dbToShopAdmin(data);
+  const data = await prisma.shopAdmin.findFirst({
+    where: { shop_id: shopId, email: email.toLowerCase().trim() },
+  });
+  return data ? dbToShopAdmin(data) : null;
 }
 
-// ==================== SHOP ORDERS ====================
-
-/** Get orders for a specific shop */
-/**
- * Check if an email is a shop admin in any shop.
- * Used by auth layer to grant admin-panel access to shop admins.
- */
 export async function isShopAdminEmail(email: string): Promise<boolean> {
   try {
-    const db = getDB();
-    const { count, error } = await db
-      .from('shop_admins')
-      .select('id', { count: 'exact', head: true })
-      .eq('email', email.toLowerCase().trim());
-    if (error) {
-      console.error('[shops] isShopAdminEmail error:', error.message);
-      return false;
-    }
-    return (count ?? 0) > 0;
+    const count = await prisma.shopAdmin.count({
+      where: { email: email.toLowerCase().trim() },
+    });
+    return count > 0;
   } catch {
     return false;
   }
 }
 
-/**
- * Get the merged shop admin permissions for a user across all their shops.
- * Returns the union of all permissions (if any shop grants a permission, it's true).
- */
 export async function getShopAdminPermissions(email: string): Promise<ShopAdminPermissions> {
   try {
     const shops = await getShopsForAdmin(email);
     const merged: ShopAdminPermissions = { ...DEFAULT_SHOP_ADMIN_PERMISSIONS };
     for (const sr of shops) {
       for (const key of Object.keys(sr.permissions) as (keyof ShopAdminPermissions)[]) {
-        if (sr.permissions[key]) {
-          merged[key] = true;
-        }
+        if (sr.permissions[key]) merged[key] = true;
       }
     }
     return merged;
@@ -567,31 +453,33 @@ export async function getShopOrders(shopId: string, options?: {
   status?: string[];
   search?: string;
 }): Promise<{ orders: any[]; total: number }> {
-  const db = getDB();
-  const limit = options?.limit ?? 100;
-  const offset = options?.offset ?? 0;
-
-  let query = db
-    .from('orders')
-    .select('*', { count: 'exact' })
-    .eq('shop_id', shopId)
-    .order('created_at', { ascending: false })
-    .range(offset, offset + limit - 1);
-
-  if (options?.status?.length) {
-    query = query.in('status', options.status);
-  }
-
-  if (options?.search) {
-    query = query.or(`ref.ilike.%${options.search}%,customer_name.ilike.%${options.search}%,customer_email.ilike.%${options.search}%`);
-  }
-
-  const { data, error, count } = await query;
-
-  if (error) {
+  try {
+    const limit = options?.limit ?? 100;
+    const offset = options?.offset ?? 0;
+    
+    const where: any = { shop_id: shopId };
+    if (options?.status?.length) where.status = { in: options.status };
+    if (options?.search) {
+      where.OR = [
+        { ref: { contains: options.search, mode: 'insensitive' } },
+        { customer_name: { contains: options.search, mode: 'insensitive' } },
+        { customer_email: { contains: options.search, mode: 'insensitive' } },
+      ];
+    }
+    
+    const [data, total] = await Promise.all([
+      prisma.order.findMany({
+        where,
+        orderBy: { created_at: 'desc' },
+        skip: offset,
+        take: limit,
+      }),
+      prisma.order.count({ where }),
+    ]);
+    
+    return { orders: data || [], total };
+  } catch (error: any) {
     console.error('[shops] getShopOrders error:', error.message);
     return { orders: [], total: 0 };
   }
-
-  return { orders: data || [], total: count || 0 };
 }
