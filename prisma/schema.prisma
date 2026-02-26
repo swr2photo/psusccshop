@@ -314,7 +314,7 @@ model PasskeyCredential {
   counter       Int      @default(0)
   device_type   String
   backed_up     Boolean  @default(false)
-  transports    Json     @default("[]")
+  transports    String[] @default([])
   friendly_name String   @default("My Passkey")
   created_at    DateTime @default(now())
   last_used_at  DateTime?
