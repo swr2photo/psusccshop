@@ -17,9 +17,8 @@ FROM base AS builder
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
-# Copy the generated Prisma client to the custom location we use
-COPY --from=deps /app/src/generated/prisma ./src/generated/prisma
 COPY . .
+RUN npx prisma generate
 
 # Build-time environment variables (Railway injects these)
 ARG NEXT_PUBLIC_GAS_URL
