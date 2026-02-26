@@ -4721,8 +4721,8 @@ export default function HomePage() {
                       px: 2,
                       py: 1.2,
                       borderRadius: '12px',
-                      border: active ? '2px solid #0071e3' : '1px solid var(--glass-border)',
-                      bgcolor: active ? 'rgba(0,113,227,0.15)' : 'var(--glass-bg)',
+                      border: active ? '2px solid var(--primary)' : '1px solid var(--glass-border)',
+                      bgcolor: active ? 'rgba(0,122,255,0.08)' : 'var(--surface-2)',
                       cursor: 'pointer',
                       transition: 'all 0.2s ease',
                       display: 'flex',
@@ -4796,8 +4796,8 @@ export default function HomePage() {
                           px: 2,
                           py: 1.5,
                           borderRadius: '12px',
-                          border: active ? '2px solid #0077ED' : '1px solid var(--glass-border)',
-                          bgcolor: active ? 'rgba(0,113,227,0.15)' : isOutOfStock ? 'var(--glass-bg)' : 'var(--glass-bg)',
+                          border: active ? '2px solid var(--primary)' : '1px solid var(--glass-border)',
+                          bgcolor: active ? 'rgba(0,122,255,0.08)' : isOutOfStock ? 'var(--surface)' : 'var(--surface-2)',
                           cursor: isOutOfStock ? 'not-allowed' : 'pointer',
                           opacity: isOutOfStock ? 0.5 : 1,
                           transition: 'all 0.2s ease',
@@ -4967,10 +4967,8 @@ export default function HomePage() {
             p: { xs: 2.5, sm: 3 },
             mb: 2.5,
             borderRadius: '20px',
-            background: (theme: any) => theme.palette.mode === 'dark' 
-              ? 'linear-gradient(135deg, rgba(29,29,31,0.6) 0%, rgba(29,29,31,0.3) 100%)' 
-              : 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(245,245,247,0.6) 100%)',
-            border: '1px solid var(--glass-border)',
+            background: 'var(--surface-2)',
+            border: 'none',
           }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -5118,25 +5116,14 @@ export default function HomePage() {
             p: 2.5,
             mb: 2.5,
             borderRadius: '18px',
-            background: 'linear-gradient(135deg, rgba(16,185,129,0.12) 0%, rgba(16,185,129,0.05) 100%)',
-            border: '1px solid rgba(16,185,129,0.25)',
+            background: 'var(--surface-2)',
+            border: 'none',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             position: 'relative',
             overflow: 'hidden',
           }}>
-            {/* Background glow */}
-            <Box sx={{
-              position: 'absolute',
-              top: -20,
-              right: -20,
-              width: 100,
-              height: 100,
-              borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(16,185,129,0.2) 0%, transparent 70%)',
-              pointerEvents: 'none',
-            }} />
             <Box sx={{ position: 'relative', zIndex: 1 }}>
               <Typography sx={{ fontSize: '0.78rem', color: 'var(--success)', fontWeight: 600, mb: 0.3 }}>
                 {t.product.totalPrice}
@@ -5293,21 +5280,20 @@ export default function HomePage() {
                 py: 1.6,
                 borderRadius: '16px',
                 background: isShopOpen 
-                  ? 'linear-gradient(135deg, rgba(0,113,227,0.2) 0%, rgba(0,113,227,0.15) 100%)'
-                  : 'rgba(100,116,139,0.1)',
-                border: isShopOpen ? '1px solid rgba(0,113,227,0.4)' : '1px solid rgba(100,116,139,0.2)',
-                color: isShopOpen ? '#2997ff' : '#86868b',
+                  ? 'rgba(0,122,255,0.08)'
+                  : 'var(--surface-2)',
+                border: 'none',
+                color: isShopOpen ? 'var(--primary)' : '#86868b',
                 fontSize: '0.95rem',
                 fontWeight: 700,
                 textTransform: 'none',
-                boxShadow: isShopOpen ? '0 4px 20px rgba(0,113,227,0.2)' : 'none',
+                boxShadow: 'none',
                 transition: 'all 0.25s ease',
                 '&:hover': { 
-                  background: isShopOpen ? 'linear-gradient(135deg, rgba(0,113,227,0.3) 0%, rgba(0,113,227,0.25) 100%)' : 'rgba(100,116,139,0.1)',
-                  transform: isShopOpen ? 'translateY(-2px)' : 'none',
-                  boxShadow: isShopOpen ? '0 8px 30px rgba(0,113,227,0.3)' : 'none',
+                  background: isShopOpen ? 'rgba(0,122,255,0.12)' : 'var(--surface-2)',
+                  transform: isShopOpen ? 'scale(0.98)' : 'none',
                 },
-                '&:disabled': { color: 'var(--text-muted)', borderColor: 'rgba(100,116,139,0.2)' },
+                '&:disabled': { color: 'var(--text-muted)' },
               }}
             >
               {t.product.addToCart}
@@ -5321,22 +5307,21 @@ export default function HomePage() {
                 py: 1.6,
                 borderRadius: '16px',
                 background: isShopOpen 
-                  ? 'linear-gradient(135deg, #34c759 0%, #34c759 100%)'
-                  : 'rgba(100,116,139,0.15)',
+                  ? 'var(--primary)'
+                  : 'var(--surface-2)',
                 color: isShopOpen ? 'white' : '#86868b',
                 fontSize: '0.95rem',
                 fontWeight: 800,
                 textTransform: 'none',
-                boxShadow: isShopOpen ? '0 4px 20px rgba(16,185,129,0.35)' : 'none',
+                boxShadow: 'none',
                 transition: 'all 0.25s ease',
                 '&:hover': {
                   background: isShopOpen 
-                    ? 'linear-gradient(135deg, #34c759 0%, #047857 100%)' 
-                    : 'rgba(100,116,139,0.15)',
-                  transform: isShopOpen ? 'translateY(-2px)' : 'none',
-                  boxShadow: isShopOpen ? '0 8px 30px rgba(16,185,129,0.45)' : 'none',
+                    ? '#0062cc' 
+                    : 'var(--surface-2)',
+                  transform: isShopOpen ? 'scale(0.98)' : 'none',
                 },
-                '&:disabled': { background: 'rgba(100,116,139,0.15)', color: 'var(--text-muted)' },
+                '&:disabled': { background: 'var(--surface-2)', color: 'var(--text-muted)' },
               }}
             >
               {t.product.buyNow}
