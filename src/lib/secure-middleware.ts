@@ -425,8 +425,9 @@ export function withSecureMiddleware(
       }
       
       // ==================== 11. Audit Logging ====================
+      // Fire-and-forget: success audit logs don't need to block the response
       if (!skipAudit && auditEventType) {
-        await logSecurityEvent(auditEventType, {
+        logSecurityEvent(auditEventType, {
           severity: 'low',
           ip: clientIP,
           userEmail: ctx.userEmail || undefined,
@@ -438,7 +439,7 @@ export function withSecureMiddleware(
             status: response.status, 
             duration: Date.now() - startTime,
           },
-        });
+        }).catch(e => console.warn('[SecureMiddleware] audit log failed:', e));
       }
       
       // ==================== 12. Add Security Headers ====================

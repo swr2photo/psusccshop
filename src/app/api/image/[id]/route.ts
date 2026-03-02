@@ -84,9 +84,6 @@ async function saveToCache(cacheKey: string, buffer: Buffer, contentType: string
   }
 }
 
-// Re-export encodeImageUrl for backward compatibility
-export { encryptImageUrl as encodeImageUrl };
-
 // ==================== ACCESS CONTROL ====================
 
 /**

@@ -598,7 +598,289 @@ textarea:focus-visible,
   border-radius: 4px;
 }
 
-/* Ensure touch targets are at least 44x44px (WCAG 2.5.5) */
+/* ==================== TYPOGRAPHY UTILITIES ==================== */
+
+.text-gradient {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-gradient-accent {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ==================== BASE FORM ELEMENTS ==================== */
+/* Consistent input/button styles using CSS variables */
+
+input,
+textarea,
+select {
+  font-family: inherit;
+  color: var(--foreground);
+  background: var(--surface-2);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.2);
+}
+
+[data-theme="light"] input:focus,
+[data-theme="light"] textarea:focus,
+[data-theme="light"] select:focus {
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+/* ==================== BUTTON BASE ==================== */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: inherit;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  border-radius: var(--btn-radius);
+  transition:
+    transform 0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+    box-shadow 0.18s ease,
+    opacity 0.18s ease,
+    background 0.18s ease;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* Primary button */
+.btn-primary {
+  background: var(--primary);
+  color: #ffffff;
+  box-shadow: 0 2px 12px rgba(10, 132, 255, 0.35);
+}
+
+.btn-primary:hover:not(:disabled) {
+  box-shadow: 0 4px 20px rgba(10, 132, 255, 0.45);
+  filter: brightness(1.08);
+}
+
+[data-theme="light"] .btn-primary {
+  box-shadow: 0 2px 12px rgba(0, 122, 255, 0.3);
+}
+
+/* Ghost button */
+.btn-ghost {
+  background: var(--glass-bg);
+  color: var(--foreground);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--surface-2);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+[data-theme="light"] .btn-ghost:hover:not(:disabled) {
+  background: var(--surface-3);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Danger button */
+.btn-danger {
+  background: var(--error);
+  color: #ffffff;
+  box-shadow: 0 2px 12px rgba(255, 69, 58, 0.3);
+}
+
+.btn-danger:hover:not(:disabled) {
+  filter: brightness(1.08);
+  box-shadow: 0 4px 16px rgba(255, 69, 58, 0.4);
+}
+
+/* ==================== BADGE / CHIP ==================== */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 0.73rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.badge-blue {
+  background: rgba(10, 132, 255, 0.15);
+  color: var(--primary);
+  border: 1px solid rgba(10, 132, 255, 0.25);
+}
+
+.badge-green {
+  background: rgba(48, 209, 88, 0.12);
+  color: var(--success);
+  border: 1px solid rgba(48, 209, 88, 0.2);
+}
+
+.badge-red {
+  background: rgba(255, 69, 58, 0.12);
+  color: var(--error);
+  border: 1px solid rgba(255, 69, 58, 0.2);
+}
+
+.badge-yellow {
+  background: rgba(255, 214, 10, 0.12);
+  color: var(--warning);
+  border: 1px solid rgba(255, 214, 10, 0.2);
+}
+
+.badge-purple {
+  background: rgba(191, 90, 242, 0.12);
+  color: var(--accent);
+  border: 1px solid rgba(191, 90, 242, 0.2);
+}
+
+[data-theme="light"] .badge-blue   { background: rgba(0, 122, 255, 0.08); }
+[data-theme="light"] .badge-green  { background: rgba(52, 199, 89, 0.08); }
+[data-theme="light"] .badge-red    { background: rgba(255, 59, 48, 0.08); }
+[data-theme="light"] .badge-yellow { background: rgba(255, 159, 10, 0.08); }
+[data-theme="light"] .badge-purple { background: rgba(175, 82, 222, 0.08); }
+
+/* ==================== DIVIDER ==================== */
+
+.divider {
+  height: 1px;
+  background: var(--glass-border);
+  border: none;
+  margin: 0;
+}
+
+.divider-vertical {
+  width: 1px;
+  background: var(--glass-border);
+  align-self: stretch;
+}
+
+/* ==================== SURFACE VARIANTS ==================== */
+
+.surface {
+  background: var(--surface);
+  border-radius: var(--card-radius);
+  border: 1px solid var(--glass-border);
+}
+
+.surface-2 {
+  background: var(--surface-2);
+  border-radius: var(--card-radius);
+  border: 1px solid var(--glass-border);
+}
+
+/* ==================== ADDITIONAL ANIMATIONS ==================== */
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-6px); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(10, 132, 255, 0.3); }
+  50%       { box-shadow: 0 0 24px rgba(10, 132, 255, 0.6); }
+}
+
+@keyframes bounce-soft {
+  0%, 100% { transform: translateY(0); animation-timing-function: cubic-bezier(0.8, 0, 1, 1); }
+  50%       { transform: translateY(-6px); animation-timing-function: cubic-bezier(0, 0, 0.2, 1); }
+}
+
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.animate-float       { animation: float 3s ease-in-out infinite; }
+.animate-glow-pulse  { animation: glow-pulse 2s ease-in-out infinite; }
+.animate-bounce-soft { animation: bounce-soft 1.2s ease-in-out infinite; }
+.animate-fade-in-scale { animation: fadeInScale 0.3s cubic-bezier(0.2, 0.6, 0.35, 1) both; }
+
+/* ==================== INTERACTIVE FEEDBACK ==================== */
+
+/* Tap/press effect for mobile */
+.press-effect {
+  transition: transform 0.15s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.press-effect:active {
+  transform: scale(0.96);
+}
+
+/* Ripple-like hover highlight */
+.hover-highlight {
+  position: relative;
+  overflow: hidden;
+}
+
+.hover-highlight::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0);
+  transition: background 0.2s ease;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.hover-highlight:hover::after {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+[data-theme="light"] .hover-highlight:hover::after {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+/* ==================== SCROLLBAR (improved light mode) ==================== */
+
+/* Already defined globally above — add Safari/iOS rubber band fix */
+@supports (-webkit-overflow-scrolling: touch) {
+  .scroll-smooth-ios {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+}
+
+/* ==================== WCAG TOUCH TARGETS ==================== */
 @media (pointer: coarse) {
   button,
   a,
@@ -609,3 +891,4 @@ textarea:focus-visible,
     min-width: 44px;
   }
 }
+

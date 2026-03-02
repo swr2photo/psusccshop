@@ -203,28 +203,34 @@ export const authOptions: NextAuthOptions = {
   events: {
     async signIn({ user, account }) {
       if (user.email) {
-        await saveUserLogServer({
+        // Fire-and-forget: don't block login waiting for S3 write
+        saveUserLogServer({
           email: user.email,
           name: user.name || undefined,
           action: 'login',
           details: `เข้าสู่ระบบด้วย ${providerNameMap[account?.provider || ''] || account?.provider || 'Unknown'}`,
           metadata: { provider: account?.provider },
-        });
+        }).catch(e => console.warn('[NextAuth] signIn log failed:', e));
       }
     },
     async signOut({ token }) {
       const email = (token as any)?.email;
-      if (email) await saveUserLogServer({ email, action: 'logout', details: 'ออกจากระบบ' });
+      if (email) {
+        // Fire-and-forget: don't block logout waiting for S3 write
+        saveUserLogServer({ email, action: 'logout', details: 'ออกจากระบบ' })
+          .catch(e => console.warn('[NextAuth] signOut log failed:', e));
+      }
     },
     async createUser({ user }) {
       if (user.email) {
-        await saveUserLogServer({
+        // Fire-and-forget: don't block user creation waiting for S3 write
+        saveUserLogServer({
           email: user.email,
           name: user.name || undefined,
           action: 'login',
           details: 'สมัครสมาชิกใหม่',
           metadata: { isNewUser: true },
-        });
+        }).catch(e => console.warn('[NextAuth] createUser log failed:', e));
       }
     },
     async session({ session }) {

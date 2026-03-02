@@ -41,16 +41,35 @@ export const isSuperAdminEmail = (email: string | null | undefined): boolean => 
   return email.trim().toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
 };
 
+// ==================== PERFORMANCE CACHE ====================
+// Cache dynamic admin emails from Filebase (expensive S3 call) — TTL 5 minutes
+let _dynamicAdminEmailsCache: string[] | null = null;
+let _dynamicAdminEmailsCacheExpiry = 0;
+const DYNAMIC_ADMIN_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Cache per-email admin check results — TTL 30 seconds
+const _adminCheckCache = new Map<string, { result: boolean; expires: number }>();
+const ADMIN_CHECK_CACHE_TTL = 30 * 1000; // 30 seconds
+
 /**
  * Get dynamic admin emails from config stored in Filebase
+ * Results are cached for 5 minutes to avoid expensive S3 calls on every request
  */
 const getDynamicAdminEmails = async (): Promise<string[]> => {
+  const now = Date.now();
+  if (_dynamicAdminEmailsCache !== null && now < _dynamicAdminEmailsCacheExpiry) {
+    return _dynamicAdminEmailsCache;
+  }
   try {
     const config = await getJson<{ adminEmails?: string[] }>(CONFIG_KEY);
-    return (config?.adminEmails || []).map(e => e.trim().toLowerCase()).filter(Boolean);
+    const emails = (config?.adminEmails || []).map(e => e.trim().toLowerCase()).filter(Boolean);
+    _dynamicAdminEmailsCache = emails;
+    _dynamicAdminEmailsCacheExpiry = now + DYNAMIC_ADMIN_CACHE_TTL;
+    return emails;
   } catch (error) {
     console.error('Failed to load dynamic admin emails:', error);
-    return [];
+    // Return stale cache if available rather than empty on error
+    return _dynamicAdminEmailsCache || [];
   }
 };
 
@@ -102,27 +121,34 @@ export const isAdminEmail = (email: string | null | undefined): boolean => {
 
 /**
  * Check if an email belongs to an admin (includes dynamic list from config)
+ * Results are cached for 30 seconds to avoid repeated expensive lookups per request
  */
 export const isAdminEmailAsync = async (email: string | null | undefined): Promise<boolean> => {
   if (!email) return false;
   const normalized = email.trim().toLowerCase();
-  
-  // Check static list first
+
+  // Fast path: check static env list (no async needed)
   if (ADMIN_EMAILS.includes(normalized)) return true;
-  
-  // Check dynamic list from config
-  const dynamicAdmins = await getDynamicAdminEmails();
-  if (dynamicAdmins.includes(normalized)) return true;
 
-  // Check shop_admins table — shop admins can access the admin panel
-  try {
-    const shopAdmin = await isShopAdminEmail(normalized);
-    if (shopAdmin) return true;
-  } catch (err) {
-    console.error('[auth] isShopAdminEmail check failed:', err);
-  }
+  // Check per-email cache
+  const cached = _adminCheckCache.get(normalized);
+  if (cached && Date.now() < cached.expires) return cached.result;
 
-  return false;
+  // Run both async checks in parallel (instead of sequential) for speed
+  const [dynamicAdmins, shopAdmin] = await Promise.all([
+    getDynamicAdminEmails(),
+    isShopAdminEmail(normalized).catch((err) => {
+      console.error('[auth] isShopAdminEmail check failed:', err);
+      return false;
+    }),
+  ]);
+
+  const result = dynamicAdmins.includes(normalized) || shopAdmin;
+
+  // Cache result to avoid re-checking on the next request
+  _adminCheckCache.set(normalized, { result, expires: Date.now() + ADMIN_CHECK_CACHE_TTL });
+
+  return result;
 };
 
 /**

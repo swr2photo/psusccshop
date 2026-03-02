@@ -11,6 +11,15 @@ import { Pool } from 'pg';
 function createPrismaClient() {
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL!,
+    // Limit connections to avoid exhausting DB on Railway/serverless
+    max: parseInt(process.env.DB_POOL_MAX || '5'),
+    min: 1,
+    // Release idle connections faster in serverless environments
+    idleTimeoutMillis: 30_000,
+    // Fail fast if DB is unreachable (don't queue indefinitely)
+    connectionTimeoutMillis: 5_000,
+    // Keep connections alive to avoid reconnect overhead
+    keepAlive: true,
   });
   const adapter = new PrismaPg(pool);
   return new PrismaClient({ adapter });
