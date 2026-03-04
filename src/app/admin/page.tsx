@@ -5137,15 +5137,16 @@ export default function AdminPage(): JSX.Element {
 
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-        {/* Welcome Header */}
-        <Box sx={{ 
+        {/* Welcome Header — Aurora + Grid Pattern */}
+        <Box className="aurora-bg grid-pattern noise-overlay" sx={{ 
           p: 3, 
           borderRadius: '20px', 
-          background: 'linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(139,92,246,0.1) 100%)',
-          border: '1px solid rgba(99,102,241,0.2)',
+          border: '1px solid rgba(99,102,241,0.15)',
+          position: 'relative',
+          overflow: 'hidden',
         }}>
-          <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--foreground)', mb: 0.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <WavingHand size={24} color="#fbbf24" />
+          <Typography sx={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--foreground)', mb: 0.5, display: 'flex', alignItems: 'center', gap: 1, position: 'relative', zIndex: 2 }}>
+            <WavingHand size={22} color="#fbbf24" />
             ยินดีต้อนรับ, {session?.user?.name?.split(' ')[0] || 'Admin'}
           </Typography>
           {isShopMode && (
@@ -9371,103 +9372,161 @@ export default function AdminPage(): JSX.Element {
               </Box>
             )}
 
-            {/* Navigation Items - Scrollable */}
+            {/* Navigation Items - Categorized & Scrollable */}
             <Box sx={{
               flex: 1,
               overflow: 'auto',
               display: 'flex',
               flexDirection: 'column',
-              gap: 1,
+              gap: 0.5,
               pb: 2,
               // Custom scrollbar
-              '&::-webkit-scrollbar': { width: 6 },
+              '&::-webkit-scrollbar': { width: 4 },
               '&::-webkit-scrollbar-track': { bgcolor: 'transparent' },
               '&::-webkit-scrollbar-thumb': { 
-                bgcolor: 'var(--glass-bg)', 
-                borderRadius: 3,
-                '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' },
+                bgcolor: 'rgba(255,255,255,0.08)', 
+                borderRadius: 2,
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.15)' },
               },
             }}>
-            {[
-              { icon: <Dashboard size={20} />, label: 'แดชบอร์ด', idx: 0, color: '#a5b4fc', show: true },
-              { icon: <ShoppingCart size={20} />, label: 'จัดการสินค้า', idx: 1, color: '#fbbf24', show: canManageProducts },
-              { icon: <Receipt size={20} />, label: 'ออเดอร์', idx: 2, color: '#34d399', badge: pendingCount, show: canManageOrders },
-              { icon: <QrCodeScanner size={20} />, label: 'รับสินค้า', idx: 3, color: '#06b6d4', show: canManagePickup },
-              { icon: <LocalShipping size={20} />, label: 'ติดตามพัสดุ', idx: 12, color: '#fb923c', show: canManageTracking },
-              { icon: <Refresh size={20} />, label: 'คืนเงิน', idx: 13, color: '#c084fc', show: canManageRefunds },
-              { icon: <SupportAgent size={20} />, label: 'แชทสนับสนุน', idx: 4, color: '#ec4899', show: canManageSupport },
-              { icon: <NotificationsActive size={20} />, label: 'ประกาศ', idx: 5, color: '#f472b6', show: canManageAnnouncement },
-              { icon: <Sparkles size={20} />, label: 'อีเวนต์/โปรโมชั่น', idx: 14, color: '#fbbf24', show: canManageEvents },
-              { icon: <Ticket size={20} />, label: 'โค้ดส่วนลด', idx: 15, color: '#34c759', show: canManagePromoCodes },
-              { icon: <Radio size={20} />, label: 'ไลฟ์สด', idx: 16, color: '#ef4444', show: true },
-              { icon: <Settings size={20} />, label: 'ตั้งค่าร้าน', idx: 6, color: '#60a5fa', show: canManageShop || canManageSheet || isSuperAdminUser },
-              { icon: <LocalShipping size={20} />, label: 'ตั้งค่าจัดส่ง', idx: 10, color: '#a78bfa', show: canManageShipping },
-              { icon: <AttachMoney size={20} />, label: 'ตั้งค่าชำระเงิน', idx: 11, color: '#22d3ee', show: canManagePayment },
-              { icon: <Send size={20} />, label: 'ส่งอีเมล', idx: 7, color: '#10b981', show: canSendEmail },
-              { icon: <Groups size={20} />, label: 'ประวัติผู้ใช้', idx: 8, color: '#f97316', show: isSuperAdminUser },
-              { icon: <Store size={20} />, label: 'ร้านค้าย่อย', idx: 17, color: '#c084fc', show: isSuperAdminUser },
-              { icon: <History size={20} />, label: 'ประวัติระบบ', idx: 9, color: 'var(--text-muted)', show: isSuperAdminUser },
-            ].filter(item => item.show).map((item) => {
-              const isActive = activeTab === item.idx;
-              return (
-                <Box
-                  key={item.idx}
-                  onClick={() => {
-                    setActiveTab(item.idx);
-                    setSidebarOpen(false);
-                  }}
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 1.5,
-                    px: 2,
-                    py: 1.5,
-                    borderRadius: '14px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    bgcolor: isActive ? 'rgba(99,102,241,0.15)' : 'transparent',
-                    border: isActive ? '1px solid rgba(99,102,241,0.3)' : '1px solid transparent',
-                    '&:hover': { 
-                      bgcolor: isActive ? 'rgba(99,102,241,0.2)' : 'rgba(255,255,255,0.05)',
-                    },
-                  }}
-                >
-                  <Box sx={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: '10px',
-                    bgcolor: isActive ? `${item.color}20` : 'rgba(255,255,255,0.05)',
-                    display: 'grid',
-                    placeItems: 'center',
-                    color: isActive ? item.color : '#64748b',
-                    transition: 'all 0.2s ease',
-                  }}>
-                    {item.icon}
-                  </Box>
-                  <Typography sx={{ 
-                    flex: 1,
-                    fontSize: '0.9rem', 
-                    fontWeight: isActive ? 700 : 500, 
-                    color: isActive ? 'var(--foreground)' : 'var(--text-muted)',
-                  }}>
-                    {item.label}
-                  </Typography>
-                  {item.badge && item.badge > 0 && (
-                    <Box sx={{
-                      px: 1,
-                      py: 0.3,
-                      borderRadius: '8px',
-                      bgcolor: 'rgba(239,68,68,0.2)',
-                      border: '1px solid rgba(239,68,68,0.4)',
+            {/* Categorized Navigation */}
+            {([
+              {
+                category: 'หลัก',
+                items: [
+                  { icon: <Dashboard size={18} />, label: 'แดชบอร์ด', idx: 0, color: '#a5b4fc', show: true },
+                  { icon: <ShoppingCart size={18} />, label: 'จัดการสินค้า', idx: 1, color: '#fbbf24', show: canManageProducts },
+                  { icon: <Receipt size={18} />, label: 'ออเดอร์', idx: 2, color: '#34d399', badge: pendingCount, show: canManageOrders },
+                ],
+              },
+              {
+                category: 'จัดการ',
+                items: [
+                  { icon: <QrCodeScanner size={18} />, label: 'รับสินค้า', idx: 3, color: '#06b6d4', show: canManagePickup },
+                  { icon: <LocalShipping size={18} />, label: 'ติดตามพัสดุ', idx: 12, color: '#fb923c', show: canManageTracking },
+                  { icon: <Refresh size={18} />, label: 'คืนเงิน', idx: 13, color: '#c084fc', show: canManageRefunds },
+                ],
+              },
+              {
+                category: 'สื่อสาร',
+                items: [
+                  { icon: <SupportAgent size={18} />, label: 'แชทสนับสนุน', idx: 4, color: '#ec4899', show: canManageSupport },
+                  { icon: <NotificationsActive size={18} />, label: 'ประกาศ', idx: 5, color: '#f472b6', show: canManageAnnouncement },
+                  { icon: <Send size={18} />, label: 'ส่งอีเมล', idx: 7, color: '#10b981', show: canSendEmail },
+                  { icon: <Sparkles size={18} />, label: 'อีเวนต์', idx: 14, color: '#fbbf24', show: canManageEvents },
+                  { icon: <Ticket size={18} />, label: 'โค้ดส่วนลด', idx: 15, color: '#34c759', show: canManagePromoCodes },
+                  { icon: <Radio size={18} />, label: 'ไลฟ์สด', idx: 16, color: '#ef4444', show: true },
+                ],
+              },
+              {
+                category: 'ตั้งค่า',
+                items: [
+                  { icon: <Settings size={18} />, label: 'ตั้งค่าร้าน', idx: 6, color: '#60a5fa', show: canManageShop || canManageSheet || isSuperAdminUser },
+                  { icon: <LocalShipping size={18} />, label: 'ตั้งค่าจัดส่ง', idx: 10, color: '#a78bfa', show: canManageShipping },
+                  { icon: <AttachMoney size={18} />, label: 'ชำระเงิน', idx: 11, color: '#22d3ee', show: canManagePayment },
+                ],
+              },
+              {
+                category: 'ตรวจสอบ',
+                items: [
+                  { icon: <Groups size={18} />, label: 'ประวัติผู้ใช้', idx: 8, color: '#f97316', show: isSuperAdminUser },
+                  { icon: <Store size={18} />, label: 'ร้านค้าย่อย', idx: 17, color: '#c084fc', show: isSuperAdminUser },
+                  { icon: <History size={18} />, label: 'ประวัติระบบ', idx: 9, color: '#64748b', show: isSuperAdminUser },
+                ],
+              },
+            ] as { category: string; items: { icon: React.ReactNode; label: string; idx: number; color: string; badge?: number; show: boolean }[] }[])
+              .map((group) => {
+                const visibleItems = group.items.filter(item => item.show);
+                if (visibleItems.length === 0) return null;
+                return (
+                  <Box key={group.category} sx={{ mb: 0.5 }}>
+                    {/* Category Header */}
+                    <Typography sx={{
+                      fontSize: '0.65rem',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.08em',
+                      color: 'var(--text-muted)',
+                      px: 1.5,
+                      py: 0.8,
+                      opacity: 0.7,
                     }}>
-                      <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: '#f87171' }}>
-                        {item.badge}
-                      </Typography>
-                    </Box>
-                  )}
-                </Box>
-              );
-            })}
+                      {group.category}
+                    </Typography>
+                    {/* Items */}
+                    {visibleItems.map((item) => {
+                      const isActive = activeTab === item.idx;
+                      return (
+                        <Box
+                          key={item.idx}
+                          className={isActive ? 'nav-pill-active' : ''}
+                          onClick={() => {
+                            setActiveTab(item.idx);
+                            setSidebarOpen(false);
+                          }}
+                          sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1.5,
+                            px: 1.5,
+                            py: 1,
+                            borderRadius: '12px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+                            position: 'relative',
+                            '&:hover': { 
+                              bgcolor: isActive ? undefined : 'rgba(255,255,255,0.04)',
+                            },
+                            '[data-theme="light"] &:hover': {
+                              bgcolor: isActive ? undefined : 'rgba(0,0,0,0.03)',
+                            },
+                          }}
+                        >
+                          <Box sx={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: '8px',
+                            bgcolor: isActive ? `${item.color}22` : 'transparent',
+                            display: 'grid',
+                            placeItems: 'center',
+                            color: isActive ? item.color : '#64748b',
+                            transition: 'all 0.2s ease',
+                            flexShrink: 0,
+                          }}>
+                            {item.icon}
+                          </Box>
+                          <Typography sx={{ 
+                            flex: 1,
+                            fontSize: '0.85rem', 
+                            fontWeight: isActive ? 600 : 450, 
+                            color: isActive ? 'var(--foreground)' : 'var(--text-muted)',
+                            transition: 'color 0.2s ease',
+                          }}>
+                            {item.label}
+                          </Typography>
+                          {item.badge && item.badge > 0 && (
+                            <Box sx={{
+                              minWidth: 20,
+                              height: 20,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              px: 0.5,
+                              borderRadius: '6px',
+                              bgcolor: 'rgba(239,68,68,0.15)',
+                              border: '1px solid rgba(239,68,68,0.3)',
+                            }}>
+                              <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, color: '#f87171', lineHeight: 1 }}>
+                                {item.badge}
+                              </Typography>
+                            </Box>
+                          )}
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                );
+              })}
             </Box>
           </Box>
 
@@ -9524,6 +9583,24 @@ export default function AdminPage(): JSX.Element {
           gap: 3,
           minHeight: 0,
         }}>
+          {/* Breadcrumb - Nielsen H1: Visibility of System Status */}
+          <Box className="breadcrumb" sx={{ mb: 1, px: 0.5 }}>
+            <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Dashboard size={12} />
+              Admin
+            </Typography>
+            <Typography className="breadcrumb-separator" sx={{ fontSize: '0.65rem' }}>›</Typography>
+            <Typography className="breadcrumb-current" sx={{ fontSize: '0.75rem' }}>
+              {({
+                0: 'แดชบอร์ด', 1: 'จัดการสินค้า', 2: 'ออเดอร์', 3: 'รับสินค้า',
+                4: 'แชทสนับสนุน', 5: 'ประกาศ', 6: 'ตั้งค่าร้าน', 7: 'ส่งอีเมล',
+                8: 'ประวัติผู้ใช้', 9: 'ประวัติระบบ', 10: 'ตั้งค่าจัดส่ง', 11: 'ชำระเงิน',
+                12: 'ติดตามพัสดุ', 13: 'คืนเงิน', 14: 'อีเวนต์', 15: 'โค้ดส่วนลด',
+                16: 'ไลฟ์สด', 17: 'ร้านค้าย่อย',
+              } as Record<number, string>)[activeTab] || 'แดชบอร์ด'}
+            </Typography>
+          </Box>
+
           {/* Shop config loading overlay */}
           {shopConfigLoading && (
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, p: 4, borderRadius: '16px', bgcolor: 'var(--glass-bg)', border: '1px solid var(--glass-bg)' }}>
@@ -10001,24 +10078,77 @@ export default function AdminPage(): JSX.Element {
 
 // ============== SUB-COMPONENTS ==============
 
-const StatCard = ({ label, value, trend, icon }: any): JSX.Element => {
+const StatCard = ({ label, value, trend, icon, gradient }: any): JSX.Element => {
+  const bg = gradient || 'linear-gradient(135deg, rgba(99,102,241,0.12) 0%, rgba(139,92,246,0.08) 100%)';
   return (
-    <Card sx={{ ...glassCardSx, position: 'relative', overflow: 'hidden', height: '100%' }}>
-      <CardContent>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+    <Card className="spotlight-card" sx={{
+      ...glassCardSx,
+      position: 'relative',
+      overflow: 'hidden',
+      height: '100%',
+      transition: 'all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+      '&:hover': {
+        transform: 'translateY(-2px)',
+        boxShadow: '0 12px 40px rgba(0,0,0,0.2)',
+      },
+    }}>
+      {/* Gradient accent line */}
+      <Box sx={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 3,
+        background: bg,
+        borderRadius: '20px 20px 0 0',
+      }} />
+      <CardContent sx={{ position: 'relative', zIndex: 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
           <Box>
-            <Typography gutterBottom sx={{ fontSize: 12, fontWeight: 'bold', color: ADMIN_THEME.muted }}>
+            <Typography sx={{
+              fontSize: '0.7rem',
+              fontWeight: 600,
+              color: ADMIN_THEME.muted,
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              mb: 0.5,
+            }}>
               {label}
             </Typography>
-            <Typography variant="h5" sx={{ fontWeight: 'bold', color: ADMIN_THEME.text }}>
+            <Typography className="count-up" sx={{
+              fontSize: '1.8rem',
+              fontWeight: 800,
+              color: ADMIN_THEME.text,
+              lineHeight: 1.1,
+              letterSpacing: '-0.02em',
+            }}>
               {value}
             </Typography>
           </Box>
-          <Box sx={{ fontSize: 32, opacity: 0.85, color: '#a5b4fc' }}>{icon}</Box>
+          <Box sx={{
+            width: 44,
+            height: 44,
+            borderRadius: '12px',
+            background: bg,
+            display: 'grid',
+            placeItems: 'center',
+            color: '#fff',
+            flexShrink: 0,
+          }}>
+            {icon}
+          </Box>
         </Box>
-        <Typography variant="caption" sx={{ color: ADMIN_THEME.muted }}>
-          {trend}
-        </Typography>
+        {trend && (
+          <Typography sx={{
+            fontSize: '0.72rem',
+            color: ADMIN_THEME.muted,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 0.5,
+          }}>
+            {trend}
+          </Typography>
+        )}
       </CardContent>
     </Card>
   );
@@ -10026,19 +10156,36 @@ const StatCard = ({ label, value, trend, icon }: any): JSX.Element => {
 
 const StatusChip = ({ status }: { status: string }): JSX.Element => {
   const normalized = normalizeStatusKey(status);
-  const colors: Record<string, 'warning' | 'info' | 'success' | 'error'> = {
-    WAITING_PAYMENT: 'warning',
-    PENDING: 'warning',
-    PAID: 'info',
-    READY: 'success',
-    SHIPPED: 'info',
-    COMPLETED: 'success',
-    CANCELLED: 'error'
+  const theme = STATUS_THEME[normalized] || { bg: 'rgba(100,116,139,0.15)', text: '#94a3b8', border: 'rgba(100,116,139,0.3)' };
+  const statusLabels: Record<string, string> = {
+    WAITING_PAYMENT: 'รอชำระ',
+    PENDING: 'รอดำเนินการ',
+    PAID: 'ชำระแล้ว',
+    READY: 'พร้อมส่ง',
+    SHIPPED: 'จัดส่งแล้ว',
+    COMPLETED: 'เสร็จสิ้น',
+    CANCELLED: 'ยกเลิก',
+    REFUND_REQUESTED: 'ขอคืนเงิน',
+    REFUNDED: 'คืนเงินแล้ว',
   };
 
-  const label = normalized.replace('_', ' ');
-
-  return <Chip label={label} size="small" color={colors[normalized] || 'default'} variant="outlined" />;
+  return (
+    <Box sx={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 0.6,
+      px: 1.2,
+      py: 0.3,
+      borderRadius: '8px',
+      bgcolor: theme.bg,
+      border: `1px solid ${theme.border}`,
+    }}>
+      <Box className="status-dot" sx={{ bgcolor: theme.text, width: 6, height: 6 }} />
+      <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: theme.text, lineHeight: 1 }}>
+        {statusLabels[normalized] || normalized}
+      </Typography>
+    </Box>
+  );
 };
 
 // Check if product is currently open based on startDate/endDate

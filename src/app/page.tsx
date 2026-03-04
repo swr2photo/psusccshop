@@ -5970,16 +5970,11 @@ export default function HomePage() {
             )}
             
             <Card 
+              className="glass-card-premium aurora-bg"
               sx={{ 
                 bgcolor: 'var(--surface)', 
-                backdropFilter: 'blur(20px)',
-                border: '1px solid rgba(0,113,227, 0.2)', 
-                borderRadius: '24px',
                 p: { xs: 3, sm: 5 }, 
                 textAlign: 'center',
-                boxShadow: (theme: any) => theme.palette.mode === 'dark' 
-                  ? '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 40px rgba(0,113,227, 0.1)'
-                  : '0 25px 50px -12px rgba(0, 0, 0, 0.1), 0 0 40px rgba(0,113,227, 0.06)',
               }}
             >
               {/* Web Logo */}
@@ -7029,11 +7024,17 @@ export default function HomePage() {
                 {/* Modern Filter Bar */}
                 <Box sx={{
                   p: 2,
-                  mb: 2,
-                  borderRadius: '18px',
+                  mb: 3,
+                  borderRadius: '20px',
                   bgcolor: 'var(--surface)',
                   border: '1px solid var(--glass-border)',
-                  backdropFilter: 'blur(10px)',
+                  backdropFilter: 'blur(16px)',
+                  backgroundImage: (theme: any) => theme.palette.mode === 'dark'
+                    ? 'radial-gradient(ellipse at 30% 0%, rgba(0,113,227,0.08) 0%, transparent 60%)'
+                    : 'radial-gradient(ellipse at 30% 0%, rgba(0,113,227,0.04) 0%, transparent 60%)',
+                  boxShadow: (theme: any) => theme.palette.mode === 'dark'
+                    ? '0 8px 32px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.04)'
+                    : '0 4px 16px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.8)',
                 }}>
                   {/* Search and Stats Row */}
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
@@ -7086,6 +7087,7 @@ export default function HomePage() {
                       return (
                         <Box
                           key={cat.key}
+                          className={active ? 'category-chip-active' : ''}
                           onClick={() => setCategoryFilter(cat.key)}
                           sx={{
                             px: 1.8,
@@ -7103,8 +7105,9 @@ export default function HomePage() {
                             alignItems: 'center',
                             gap: 0.8,
                             '&:hover': {
-                              bgcolor: active ? 'rgba(0,113,227,0.25)' : 'var(--glass-bg)',
-                              borderColor: active ? 'rgba(0,113,227,0.6)' : 'var(--glass-border)',
+                              bgcolor: active ? 'rgba(0,113,227,0.25)' : 'rgba(0,113,227,0.08)',
+                              borderColor: active ? 'rgba(0,113,227,0.6)' : 'rgba(0,113,227,0.2)',
+                              color: 'var(--primary)',
                             },
                           }}
                         >
@@ -7165,28 +7168,53 @@ export default function HomePage() {
 
             {config?.products && Object.keys(filteredGroupedProducts).length > 0 ? (
               Object.entries(filteredGroupedProducts).map(([category, items]) => (
-                <Box key={category} sx={{ mb: 4 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 2 }}>
-                    <span style={{ fontSize: '1.1rem' }}>{getCategoryIcon(category)}</span>
-                    <Typography sx={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--foreground)', letterSpacing: '-0.02em' }}>
-                      {(t.category as Record<string, string>)[category] || getCategoryLabel(category, lang) || TYPE_LABELS_I18N[category] || category || t.type.OTHER}
-                    </Typography>
-                    <Typography sx={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-                      {items.length} {t.common.items}
-                    </Typography>
-                    {items.length > 1 && (
+                <Box key={category} sx={{ mb: 5 }}>
+                  {/* Category Header — Redesigned */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
+                    <Box sx={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: '12px',
+                      background: 'linear-gradient(135deg, rgba(0,113,227,0.15) 0%, rgba(100,210,255,0.1) 100%)',
+                      border: '1px solid rgba(0,113,227,0.15)',
+                      display: 'grid',
+                      placeItems: 'center',
+                      fontSize: '1.15rem',
+                      flexShrink: 0,
+                    }}>
+                      {getCategoryIcon(category)}
+                    </Box>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Typography sx={{ 
-                        display: { xs: 'flex', sm: 'none' }, 
-                        alignItems: 'center',
-                        gap: 0.5,
-                        fontSize: '0.7rem', 
-                        color: 'var(--text-muted)',
-                        ml: 'auto',
+                        fontSize: '1.15rem', 
+                        fontWeight: 800, 
+                        color: 'var(--foreground)', 
+                        letterSpacing: '-0.02em',
+                        lineHeight: 1.2,
                       }}>
-                        {t.product.scrollMore}
+                        {(t.category as Record<string, string>)[category] || getCategoryLabel(category, lang) || TYPE_LABELS_I18N[category] || category || t.type.OTHER}
                       </Typography>
-                    )}
+                      <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+                        {items.length} {t.common.items}
+                        {items.length > 1 && <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' }, ml: 0.5 }}>• {t.product.scrollMore}</Box>}
+                      </Typography>
+                    </Box>
+                    <Box sx={{
+                      px: 1.5,
+                      py: 0.5,
+                      borderRadius: '10px',
+                      bgcolor: 'rgba(0,113,227,0.1)',
+                      border: '1px solid rgba(0,113,227,0.15)',
+                      fontSize: '0.7rem',
+                      fontWeight: 700,
+                      color: 'var(--primary)',
+                      flexShrink: 0,
+                    }}>
+                      {items.filter(p => getProductStatus(p) === 'OPEN').length}/{items.length}
+                    </Box>
                   </Box>
+                  {/* Gradient Divider */}
+                  <Box className="gradient-divider" sx={{ mb: 2.5 }} />
                   <Box sx={{ position: 'relative', overflow: 'hidden', mx: { xs: -2, sm: 0 } }}>
                     {/* Right fade hint on mobile */}
                     <Box sx={{
@@ -7226,6 +7254,7 @@ export default function HomePage() {
                         scrollSnapAlign: { xs: 'start', sm: 'unset' },
                       }}>
                         <Box
+                          className={isProductAvailable ? 'product-card-hover' : ''}
                           onClick={() => {
                             if (!isShopOpen) {
                               showToast('warning', t.checkout.shopClosedWarning);
@@ -7254,15 +7283,13 @@ export default function HomePage() {
                             overflow: 'hidden',
                             bgcolor: 'var(--surface)',
                             boxShadow: 'var(--card-shadow)',
-                            border: isProductClosed ? `1px solid ${SHOP_STATUS_CONFIG[productStatus].borderColor}` : 'none',
-                            transition: 'all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+                            border: isProductClosed ? `1px solid ${SHOP_STATUS_CONFIG[productStatus].borderColor}` : '1px solid transparent',
                             position: 'relative',
                             opacity: isProductClosed ? 0.85 : 1,
                             '&:hover': isProductAvailable ? {
-                              transform: 'translateY(-3px)',
                               boxShadow: (theme: any) => theme.palette.mode === 'dark'
-                                ? '0 8px 30px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06)'
-                                : '0 4px 20px rgba(0,0,0,0.08), 0 8px 30px rgba(0,0,0,0.05)',
+                                ? '0 12px 40px rgba(0,0,0,0.45), 0 0 0 1px rgba(0,113,227,0.15)'
+                                : '0 8px 30px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,113,227,0.08)',
                             } : {},
                           }}
                         >
@@ -7289,8 +7316,9 @@ export default function HomePage() {
                                   position: 'absolute',
                                   inset: 0,
                                   filter: isProductClosed ? 'grayscale(40%) brightness(0.7)' : 'none',
-                                  transition: 'filter 0.3s ease',
+                                  transition: 'filter 0.3s ease, transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
                                 }}
+                                className={!isProductClosed ? 'product-image-zoom' : ''}
                               />
                             ) : (
                               <Box sx={{ 
@@ -7366,13 +7394,14 @@ export default function HomePage() {
                             
                             {/* Feature badges */}
                             {!isProductClosed && (
-                              <Box sx={{ 
+                              <Box className="floating-badge" sx={{ 
                                 position: 'absolute', 
                                 top: 8, 
                                 left: 8, 
                                 display: 'flex', 
                                 flexDirection: 'column', 
-                                gap: 0.5 
+                                gap: 0.5,
+                                zIndex: 2,
                               }}>
                                 {/* Countdown timer if has endDate */}
                                 {product.endDate && new Date(product.endDate) > new Date() && (
@@ -7514,15 +7543,30 @@ export default function HomePage() {
                             </Box>
                           </Box>
 
-                          {/* Product Info */}
+                          {/* Product Info — Redesigned */}
                           <Box sx={{ 
                             p: 2, 
+                            pt: 1.5,
                             flex: 1, 
                             display: 'flex', 
                             flexDirection: 'column',
                           }}>
+                            {/* Type Label */}
+                            <Typography sx={{
+                              fontSize: '0.62rem',
+                              fontWeight: 700,
+                              color: 'var(--primary)',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.06em',
+                              mb: 0.3,
+                              opacity: isProductClosed ? 0.5 : 0.8,
+                            }}>
+                              {(t.category as Record<string, string>)[((product as any).category || getCategoryFromType(product.type))] || TYPE_LABELS_I18N[product.type] || product.type}
+                            </Typography>
+
+                            {/* Product Name */}
                             <Typography sx={{ 
-                              fontSize: '0.95rem', 
+                              fontSize: '0.9rem', 
                               fontWeight: 700, 
                               color: isProductClosed ? 'var(--text-muted)' : 'var(--foreground)',
                               mb: 0.5,
@@ -7532,51 +7576,42 @@ export default function HomePage() {
                               WebkitLineClamp: 2,
                               WebkitBoxOrient: 'vertical',
                               lineHeight: 1.3,
+                              letterSpacing: '-0.01em',
                             }}>
                               {getProductName(product, lang)}
                             </Typography>
                             
-                            {/* Description - Show more lines */}
-                            <Typography sx={{ 
-                              fontSize: '0.75rem', 
-                              color: 'var(--text-muted)',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              display: '-webkit-box',
-                              WebkitLineClamp: 2,
-                              WebkitBoxOrient: 'vertical',
-                              lineHeight: 1.4,
-                              mb: 1,
-                            }}>
-                              {getProductDescription(product, lang) || TYPE_LABELS_I18N[product.type] || product.type}
-                            </Typography>
+                            {/* Description — 1 line */}
+                            {getProductDescription(product, lang) && (
+                              <Typography sx={{ 
+                                fontSize: '0.72rem', 
+                                color: 'var(--text-muted)',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                lineHeight: 1.4,
+                                mb: 0.8,
+                              }}>
+                                {getProductDescription(product, lang)}
+                              </Typography>
+                            )}
 
-                            {/* Product Tags - from customTags or auto-generated */}
+                            {/* Tags — inline compact */}
                             {(() => {
-                              // Use customTags if defined, otherwise auto-generate from options
                               const tags = product.customTags && product.customTags.length > 0 
                                 ? product.customTags 
                                 : [
-                                    // Auto-generate from endDate
-                                    ...(product.endDate && new Date(product.endDate) > new Date() ? [{
-                                      text: `${t.product.until} ${new Date(product.endDate).toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-US', { day: 'numeric', month: 'short' })}`,
-                                      color: 'var(--error)',
-                                      bgColor: 'rgba(239,68,68,0.15)',
-                                      borderColor: 'rgba(239,68,68,0.3)',
-                                      icon: 'clock'
-                                    }] : []),
-                                    // Auto-generate from options
                                     ...(product.options?.hasCustomName ? [{
                                       text: t.product.customNameAvailable,
                                       color: 'var(--success)',
-                                      bgColor: 'rgba(16,185,129,0.15)',
-                                      borderColor: 'rgba(16,185,129,0.3)'
+                                      bgColor: 'rgba(16,185,129,0.1)',
+                                      borderColor: 'rgba(16,185,129,0.2)'
                                     }] : []),
                                     ...(product.options?.hasCustomNumber ? [{
                                       text: t.product.customNumberAvailable,
                                       color: 'var(--secondary)',
-                                      bgColor: 'rgba(0,113,227,0.15)',
-                                      borderColor: 'rgba(0,113,227,0.3)'
+                                      bgColor: 'rgba(0,113,227,0.1)',
+                                      borderColor: 'rgba(0,113,227,0.2)'
                                     }] : []),
                                   ];
                               
@@ -7586,24 +7621,22 @@ export default function HomePage() {
                                 <Box sx={{ 
                                   display: 'flex', 
                                   flexWrap: 'wrap', 
-                                  gap: 0.5, 
-                                  mb: 1,
+                                  gap: 0.4, 
+                                  mb: 0.8,
                                 }}>
-                                  {tags.map((tag, idx) => (
+                                  {tags.slice(0, 3).map((tag, idx) => (
                                     <Box key={idx} sx={{
-                                      px: 0.8,
-                                      py: 0.2,
-                                      borderRadius: '6px',
-                                      bgcolor: (tag as any).bgColor || `${tag.color}20`,
-                                      border: `1px solid ${(tag as any).borderColor || `${tag.color}40`}`,
-                                      fontSize: '0.6rem',
+                                      px: 0.7,
+                                      py: 0.15,
+                                      borderRadius: '5px',
+                                      bgcolor: (tag as any).bgColor || `${tag.color}15`,
+                                      fontSize: '0.55rem',
                                       fontWeight: 600,
                                       color: tag.color,
                                       display: 'flex',
                                       alignItems: 'center',
-                                      gap: 0.3,
+                                      gap: 0.2,
                                     }}>
-                                      {(tag as any).icon === 'clock' && <Clock size={10} />}
                                       {lang === 'en' 
                                         ? ((tag as any).textEn || TAG_TRANSLATIONS_TH_TO_EN[tag.text] || tag.text)
                                         : tag.text}
@@ -7612,26 +7645,80 @@ export default function HomePage() {
                                 </Box>
                               );
                             })()}
-                            
-                            {/* Status/Action Button */}
-                            <Box sx={{ mt: 'auto' }}>
+
+                            {/* ---- Price + Action Row ---- */}
+                            <Box sx={{ mt: 'auto', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 1 }}>
+                              {/* Price Display */}
+                              <Box>
+                                {!isProductClosed && (
+                                  <>
+                                    {eventDiscount ? (
+                                      <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.5 }}>
+                                        <Typography className="price-glow" sx={{
+                                          fontSize: '1.1rem',
+                                          fontWeight: 800,
+                                          color: '#ff453a',
+                                          lineHeight: 1,
+                                          letterSpacing: '-0.02em',
+                                        }}>
+                                          ฿{eventDiscount.discountedPrice(getBasePrice(product)).toLocaleString()}
+                                        </Typography>
+                                        <Typography sx={{
+                                          fontSize: '0.68rem',
+                                          color: 'var(--text-muted)',
+                                          textDecoration: 'line-through',
+                                          lineHeight: 1,
+                                        }}>
+                                          ฿{getBasePrice(product).toLocaleString()}
+                                        </Typography>
+                                      </Box>
+                                    ) : (
+                                      <Typography className="price-glow" sx={{
+                                        fontSize: '1.1rem',
+                                        fontWeight: 800,
+                                        color: 'var(--foreground)',
+                                        lineHeight: 1,
+                                        letterSpacing: '-0.02em',
+                                      }}>
+                                        ฿{getBasePrice(product).toLocaleString()}
+                                      </Typography>
+                                    )}
+                                    {Object.keys(product.sizePricing || {}).length > 1 && (
+                                      <Typography sx={{
+                                        fontSize: '0.58rem',
+                                        color: 'var(--text-muted)',
+                                        mt: 0.2,
+                                      }}>
+                                        {lang === 'en' ? 'Starting from' : 'เริ่มต้น'}
+                                      </Typography>
+                                    )}
+                                  </>
+                                )}
+                              </Box>
+                              
+                              {/* Action Button — Compact */}
                               {!isProductClosed ? (
                                 <Button
-                                  fullWidth
+                                  className={isProductAvailable ? 'shimmer-btn' : ''}
                                   disabled={!isProductAvailable}
+                                  size="small"
                                   sx={{
-                                    py: 0.8,
-                                    borderRadius: 'var(--btn-radius)',
+                                    minWidth: 0,
+                                    px: 2,
+                                    py: 0.7,
+                                    borderRadius: '10px',
                                     bgcolor: isProductAvailable ? 'var(--primary)' : 'var(--surface-3)',
                                     color: isProductAvailable ? 'white' : 'var(--text-muted)',
-                                    fontSize: '0.78rem',
-                                    fontWeight: 600,
+                                    fontSize: '0.7rem',
+                                    fontWeight: 700,
                                     textTransform: 'none',
-                                    boxShadow: 'none',
+                                    boxShadow: isProductAvailable ? '0 3px 10px rgba(0,113,227,0.25)' : 'none',
                                     '&:hover': {
                                       bgcolor: isProductAvailable ? 'var(--primary)' : 'var(--surface-3)',
                                       filter: isProductAvailable ? 'brightness(1.1)' : 'none',
+                                      boxShadow: isProductAvailable ? '0 5px 16px rgba(0,113,227,0.35)' : 'none',
                                     },
+                                    whiteSpace: 'nowrap',
                                   }}
                                 >
                                   {isShopOpen ? t.product.viewDetail : t.product.shopClosedTemp}
@@ -7639,26 +7726,27 @@ export default function HomePage() {
                               ) : (
                                 <Box
                                   sx={{
-                                    py: 0.8,
-                                    px: 1.5,
-                                    borderRadius: '10px',
+                                    px: 1.2,
+                                    py: 0.5,
+                                    borderRadius: '8px',
                                     background: SHOP_STATUS_CONFIG[productStatus].bgGradient,
                                     border: `1px solid ${SHOP_STATUS_CONFIG[productStatus].borderColor}`,
                                     display: 'flex',
                                     alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: 0.75,
+                                    gap: 0.5,
+                                    flexShrink: 0,
                                   }}
                                 >
                                   {(() => {
                                     const IconComponent = SHOP_STATUS_CONFIG[productStatus].icon;
-                                    return <IconComponent size={14} color={SHOP_STATUS_CONFIG[productStatus].color} />;
+                                    return <IconComponent size={12} color={SHOP_STATUS_CONFIG[productStatus].color} />;
                                   })()}
                                   <Typography 
                                     sx={{ 
-                                      fontSize: '0.75rem', 
+                                      fontSize: '0.65rem', 
                                       fontWeight: 700, 
                                       color: SHOP_STATUS_CONFIG[productStatus].color,
+                                      whiteSpace: 'nowrap',
                                     }}
                                   >
                                     {({
