@@ -53,21 +53,13 @@ export async function GET(req: NextRequest) {
     results.updateTracking = { status: 'error', error: message };
   }
 
-  // 3. Run Cleanup (Once a day - UTC 00:00)
-  const hour = new Date().getUTCHours();
-  if (hour === 0) {
-    try {
-      const res = await cleanup(req);
-      results.cleanup = await res.json().catch(() => ({ status: 'unknown_response' }));
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      results.cleanup = { status: 'error', error: message };
-    }
-  } else {
-    results.cleanup = {
-      status: 'skipped',
-      reason: `Runs only at UTC 00:00 (Current UTC: ${hour}:00)`,
-    };
+  // 3. Run Cleanup
+  try {
+    const res = await cleanup(req);
+    results.cleanup = await res.json().catch(() => ({ status: 'unknown_response' }));
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    results.cleanup = { status: 'error', error: message };
   }
 
   return NextResponse.json({
