@@ -1,15 +1,7 @@
 {
   "crons": [
     {
-      "path": "/api/cron/cancel-expired",
-      "schedule": "0 */6 * * *"
-    },
-    {
-      "path": "/api/cron/cleanup",
-      "schedule": "0 0 * * *"
-    },
-    {
-      "path": "/api/cron/update-tracking",
+      "path": "/api/cron",
       "schedule": "0 */3 * * *"
     }
   ],
