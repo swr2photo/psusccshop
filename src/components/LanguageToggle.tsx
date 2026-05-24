@@ -2,121 +2,83 @@
 
 import React from 'react';
 import { useLanguageStore } from '@/store/languageStore';
+import { useThemeStore } from '@/store/themeStore';
 
 interface LanguageToggleProps {
   size?: 'small' | 'medium';
 }
 
 /**
- * Language selector — Apple-style pill segmented control.
- * Uses CSS variables from the global theme system.
+ * Language selector — Apple-style circular button toggle.
+ * Matches the styling and animations of the ThemeToggle component.
  */
 export default function LanguageToggle({ size = 'medium' }: LanguageToggleProps) {
   const language = useLanguageStore((s) => s.language);
   const setLanguage = useLanguageStore((s) => s.setLanguage);
+  const resolvedMode = useThemeStore((s) => s.resolvedMode);
 
-  const isSmall = size === 'small';
-  const height = isSmall ? 30 : 34;
-  const segW   = isSmall ? 34 : 40;
-  const fontSize = isSmall ? '0.68rem' : '0.73rem';
-  const pad = 3;
+  const btnSize = size === 'small' ? 34 : 40;
+  const isDark = resolvedMode === 'dark';
 
-  const handleSelect = (lang: 'th' | 'en') => (e: React.MouseEvent) => {
+  const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (language !== lang) setLanguage(lang);
+    setLanguage(language === 'th' ? 'en' : 'th');
   };
 
   return (
-    <div
-      role="radiogroup"
-      aria-label="เลือกภาษา / Select language"
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        height,
-        borderRadius: height / 2,
-        padding: pad,
-        background: 'var(--glass-bg)',
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
-        border: '1px solid var(--glass-border)',
-        gap: 2,
-        boxSizing: 'border-box',
-        flexShrink: 0,
-        userSelect: 'none',
-        WebkitTapHighlightColor: 'transparent' as any,
-        boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
-      }}
-    >
-      {(['th', 'en'] as const).map((lang) => {
-        const active = language === lang;
+    <div style={{ display: 'inline-block' }}>
+      <button
+        onClick={handleToggle}
+        title={language === 'th' ? 'Switch to English' : 'เปลี่ยนเป็นภาษาไทย'}
+        className="magic-lang-toggle"
+        style={{
+          width: btnSize,
+          height: btnSize,
+          borderRadius: '50%',
+          border: '1px solid var(--glass-border)',
+          background: 'var(--glass-bg)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          color: 'var(--foreground)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          overflow: 'hidden',
+          position: 'relative',
+          padding: 0,
+          flexShrink: 0,
+          userSelect: 'none',
+          transition: 'background 0.3s ease, border-color 0.3s ease, transform 0.2s ease, box-shadow 0.3s ease',
+          boxShadow: isDark
+            ? '0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)'
+            : '0 1px 5px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.5)',
+        }}
+      >
+        <span
+          style={{
+            fontSize: size === 'small' ? '0.72rem' : '0.8rem',
+            fontWeight: 800,
+            letterSpacing: '0.04em',
+            lineHeight: 1,
+            fontFamily: 'inherit',
+          }}
+        >
+          {language.toUpperCase()}
+        </span>
+      </button>
 
-        return (
-          <div
-            key={lang}
-            role="radio"
-            aria-checked={active}
-            aria-label={lang === 'th' ? 'ภาษาไทย' : 'English'}
-            tabIndex={active ? 0 : -1}
-            onClick={handleSelect(lang)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                if (!active) setLanguage(lang);
-              }
-            }}
-            style={{
-              width: segW,
-              height: height - pad * 2,
-              borderRadius: (height - pad * 2) / 2,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: active ? 'default' : 'pointer',
-              transition: 'all 0.22s cubic-bezier(0.32, 0.72, 0, 1)',
-              background: active
-                ? 'var(--primary)'
-                : 'transparent',
-              boxShadow: active
-                ? '0 2px 8px rgba(10,132,255,0.35), inset 0 1px 0 rgba(255,255,255,0.15)'
-                : 'none',
-              transform: active ? 'scale(1)' : 'scale(0.95)',
-            }}
-            onMouseEnter={e => {
-              if (!active) {
-                (e.currentTarget as HTMLDivElement).style.background = 'var(--surface-2)';
-                (e.currentTarget as HTMLDivElement).style.transform = 'scale(1)';
-              }
-            }}
-            onMouseLeave={e => {
-              if (!active) {
-                (e.currentTarget as HTMLDivElement).style.background = 'transparent';
-                (e.currentTarget as HTMLDivElement).style.transform = 'scale(0.95)';
-              }
-            }}
-            onMouseDown={e => {
-              (e.currentTarget as HTMLDivElement).style.transform = 'scale(0.92)';
-            }}
-            onMouseUp={e => {
-              (e.currentTarget as HTMLDivElement).style.transform = active ? 'scale(1)' : 'scale(1)';
-            }}
-          >
-            <span
-              style={{
-                fontSize,
-                fontWeight: active ? 700 : 600,
-                color: active ? '#ffffff' : 'var(--text-muted)',
-                transition: 'color 0.2s ease, font-weight 0.15s ease',
-                lineHeight: 1,
-                letterSpacing: '0.03em',
-                pointerEvents: 'none',
-              }}
-            >
-              {lang.toUpperCase()}
-            </span>
-          </div>
-        );
-      })}
+      {/* Inline styles for hover/active states */}
+      <style jsx>{`
+        .magic-lang-toggle:hover {
+          border-color: rgba(0,113,227,0.3) !important;
+          background: var(--surface-2) !important;
+          transform: scale(1.05);
+        }
+        .magic-lang-toggle:active {
+          transform: scale(0.92) !important;
+        }
+      `}</style>
     </div>
   );
 }
