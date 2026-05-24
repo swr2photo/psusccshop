@@ -280,6 +280,14 @@ export type OrderHistory = {
   refundAmount?: number;
   refundRequestedAt?: string;
   refundAdminNote?: string;
+  // Pickup confirmation info
+  pickup?: {
+    pickedUp?: boolean;
+    pickedUpAt?: string;
+    pickedUpBy?: string;
+    condition?: string;
+    notes?: string;
+  };
 };
 
 export type LeanProduct = {

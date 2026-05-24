@@ -434,6 +434,7 @@ function transformDBOrderToLegacy(dbOrder: any): any {
     refundReviewedAt: dbOrder.refund_reviewed_at,
     refundReviewedBy: dbOrder.refund_reviewed_by,
     refundAdminNote: dbOrder.refund_admin_note,
+    pickup: dbOrder.pickup_data || undefined,
     shopId: dbOrder.shop_id || null,
     shopSlug: dbOrder.shop_slug || null,
     createdAt: dbOrder.created_at,
@@ -469,6 +470,7 @@ function transformLegacyToDBOrder(legacyOrder: any): any {
     tracking_last_checked: legacyOrder.trackingLastChecked || null,
     shipped_at: legacyOrder.shippedAt || null,
     received_at: legacyOrder.receivedAt || null,
+    ...(legacyOrder.pickup ? { pickup_data: legacyOrder.pickup } : {}),
     ...(legacyOrder.shopId ? { shop_id: legacyOrder.shopId } : {}),
     ...(legacyOrder.shopSlug ? { shop_slug: legacyOrder.shopSlug } : {}),
     updated_at: new Date(),
@@ -665,6 +667,7 @@ export async function updateOrderByRef(ref: string, updates: Partial<any>): Prom
   if (updates.refundReviewedAt !== undefined) dbUpdates.refund_reviewed_at = updates.refundReviewedAt;
   if (updates.refundReviewedBy !== undefined) dbUpdates.refund_reviewed_by = updates.refundReviewedBy;
   if (updates.refundAdminNote !== undefined) dbUpdates.refund_admin_note = updates.refundAdminNote;
+  if (updates.pickup !== undefined) dbUpdates.pickup_data = updates.pickup;
   
   const data = await prisma.order.update({
     where: { ref },

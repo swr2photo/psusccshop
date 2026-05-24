@@ -57,9 +57,10 @@ export async function POST(req: NextRequest) {
         session.user.name || session.user.email,
       );
       return NextResponse.json({ options, challengeId });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[Passkey] Registration options error:', err);
-      return NextResponse.json({ error: err.message }, { status: 500 });
+      const message = err instanceof Error ? err.message : String(err);
+      return NextResponse.json({ error: message }, { status: 500 });
     }
   }
 
@@ -83,9 +84,10 @@ export async function POST(req: NextRequest) {
       } else {
         return NextResponse.json({ verified: false, error: 'Verification failed' }, { status: 400 });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[Passkey] Registration verify error:', err);
-      return NextResponse.json({ error: err.message }, { status: 400 });
+      const message = err instanceof Error ? err.message : String(err);
+      return NextResponse.json({ error: message }, { status: 400 });
     }
   }
 

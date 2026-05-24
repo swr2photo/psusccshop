@@ -229,6 +229,14 @@ interface AdminOrder {
   shippingOption?: string;
   shippingProvider?: string;
   trackingNumber?: string;
+  // Pickup confirmation
+  pickup?: {
+    pickedUp?: boolean;
+    pickedUpAt?: string;
+    pickedUpBy?: string;
+    condition?: string;
+    notes?: string;
+  };
   // Multi-shop
   shopId?: string;
   shopSlug?: string;
@@ -341,6 +349,8 @@ const normalizeOrder = (order: any): AdminOrder => {
     shippingOption: shippingOpt,
     shippingProvider: order?.shippingProvider || order?.shipping_provider || '',
     trackingNumber: order?.trackingNumber || order?.tracking_number || '',
+    // Pickup confirmation
+    pickup: order?.pickup || undefined,
     // Multi-shop
     shopId: order?.shopId || order?.shop_id || undefined,
     shopSlug: order?.shopSlug || order?.shop_slug || undefined,
@@ -5769,6 +5779,7 @@ export default function AdminPage(): JSX.Element {
   const [pickupProcessing, setPickupProcessing] = useState(false);
   const [pickupCondition, setPickupCondition] = useState<'complete' | 'partial' | 'damaged'>('complete');
   const [pickupNotes, setPickupNotes] = useState('');
+  const [pickupFilter, setPickupFilter] = useState<'ready' | 'today' | 'all_completed'>('ready');
   const [pickupScanMode, setPickupScanMode] = useState(false);
   const [scannerError, setScannerError] = useState<string | null>(null);
   const [scannerReady, setScannerReady] = useState(false);
@@ -5998,6 +6009,17 @@ export default function AdminPage(): JSX.Element {
       const data = await res.json();
       if (data.status === 'success') {
         showToast('success', `ยืนยันรับสินค้าสำเร็จ: ${pickupSelectedOrder.ref}`);
+        // Update local order state immediately so pickup data shows
+        const pickupData = {
+          pickedUp: true,
+          pickedUpAt: new Date().toISOString(),
+          condition: pickupCondition,
+          notes: pickupNotes,
+        };
+        setOrders(prev => prev.map(o => o.ref === pickupSelectedOrder.ref
+          ? { ...o, status: 'COMPLETED', pickup: pickupData, raw: { ...o.raw, pickup: pickupData, status: 'COMPLETED' } }
+          : o
+        ));
         setPickupSelectedOrder(null);
         setPickupCondition('complete');
         setPickupNotes('');
@@ -6005,8 +6027,6 @@ export default function AdminPage(): JSX.Element {
         if (pickupSearch) {
           searchPickupOrders(pickupSearch);
         }
-        // Refresh orders list
-        fetchData();
       } else {
         showToast('error', data.message || 'ไม่สามารถยืนยันการรับสินค้า');
       }
@@ -6078,15 +6098,23 @@ export default function AdminPage(): JSX.Element {
     [shopOrders]
   );
   
+  const completedPickups = useMemo(() => 
+    shopOrders.filter(o => {
+      if (normalizeStatusKey(o.status) !== 'COMPLETED') return false;
+      const pickup = o.pickup || o.raw?.pickup;
+      return !!pickup?.pickedUp;
+    }),
+    [shopOrders]
+  );
+
   const completedToday = useMemo(() => {
     const today = new Date().toDateString();
-    return shopOrders.filter(o => {
-      if (normalizeStatusKey(o.status) !== 'COMPLETED') return false;
-      const pickup = o.raw?.pickup;
+    return completedPickups.filter(o => {
+      const pickup = o.pickup || o.raw?.pickup;
       if (!pickup?.pickedUpAt) return false;
       return new Date(pickup.pickedUpAt).toDateString() === today;
     });
-  }, [shopOrders]);
+  }, [completedPickups]);
 
   const PickupView = () => {
     return (
@@ -6121,36 +6149,69 @@ export default function AdminPage(): JSX.Element {
               </Box>
             </Box>
             
-            {/* Stats */}
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Box sx={{
-                px: 1.5,
-                py: 0.8,
-                borderRadius: '12px',
-                bgcolor: 'rgba(16, 185, 129, 0.15)',
-                border: '1px solid rgba(16, 185, 129, 0.3)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 0.8,
-              }}>
-                <LocalMall size={18} color="#10b981" />
-                <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#10b981' }}>
-                  รอรับ: {readyForPickup.length}
+            {/* Filter Tabs */}
+            <Box sx={{ display: 'flex', gap: 0.8, flexWrap: 'wrap' }}>
+              <Box
+                onClick={() => setPickupFilter('ready')}
+                sx={{
+                  px: 1.5,
+                  py: 0.8,
+                  borderRadius: '12px',
+                  bgcolor: pickupFilter === 'ready' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(16, 185, 129, 0.08)',
+                  border: `1px solid ${pickupFilter === 'ready' ? 'rgba(16, 185, 129, 0.5)' : 'rgba(16, 185, 129, 0.2)'}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.8,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  '&:hover': { bgcolor: 'rgba(16, 185, 129, 0.2)' },
+                }}
+              >
+                <LocalMall size={16} color="#10b981" />
+                <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#10b981' }}>
+                  รอรับ {readyForPickup.length}
                 </Typography>
               </Box>
-              <Box sx={{
-                px: 1.5,
-                py: 0.8,
-                borderRadius: '12px',
-                bgcolor: 'rgba(99, 102, 241, 0.15)',
-                border: '1px solid rgba(99, 102, 241, 0.3)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 0.8,
-              }}>
-                <CheckCircleOutline size={18} color="#818cf8" />
-                <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#818cf8' }}>
-                  วันนี้: {completedToday.length}
+              <Box
+                onClick={() => setPickupFilter('today')}
+                sx={{
+                  px: 1.5,
+                  py: 0.8,
+                  borderRadius: '12px',
+                  bgcolor: pickupFilter === 'today' ? 'rgba(99, 102, 241, 0.25)' : 'rgba(99, 102, 241, 0.08)',
+                  border: `1px solid ${pickupFilter === 'today' ? 'rgba(99, 102, 241, 0.5)' : 'rgba(99, 102, 241, 0.2)'}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.8,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  '&:hover': { bgcolor: 'rgba(99, 102, 241, 0.2)' },
+                }}
+              >
+                <CheckCircleOutline size={16} color="#818cf8" />
+                <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#818cf8' }}>
+                  วันนี้ {completedToday.length}
+                </Typography>
+              </Box>
+              <Box
+                onClick={() => setPickupFilter('all_completed')}
+                sx={{
+                  px: 1.5,
+                  py: 0.8,
+                  borderRadius: '12px',
+                  bgcolor: pickupFilter === 'all_completed' ? 'rgba(251, 191, 36, 0.25)' : 'rgba(251, 191, 36, 0.08)',
+                  border: `1px solid ${pickupFilter === 'all_completed' ? 'rgba(251, 191, 36, 0.5)' : 'rgba(251, 191, 36, 0.2)'}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.8,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  '&:hover': { bgcolor: 'rgba(251, 191, 36, 0.2)' },
+                }}
+              >
+                <Inventory size={16} color="#fbbf24" />
+                <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#fbbf24' }}>
+                  รับแล้ว {completedPickups.length}
                 </Typography>
               </Box>
             </Box>
@@ -6379,93 +6440,160 @@ export default function AdminPage(): JSX.Element {
           </Box>
         )}
 
-        {/* Recent Ready Orders */}
+        {/* Filtered Order List */}
         {!pickupSearch && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
             <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--foreground)', display: 'flex', alignItems: 'center', gap: 1 }}>
-              <LocalMall size={20} color="#10b981" />
-              ออเดอร์พร้อมรับ ({readyForPickup.length})
+              {pickupFilter === 'ready' && <><LocalMall size={20} color="#10b981" /> ออเดอร์พร้อมรับ ({readyForPickup.length})</>}
+              {pickupFilter === 'today' && <><CheckCircleOutline size={20} color="#818cf8" /> รับแล้ววันนี้ ({completedToday.length})</>}
+              {pickupFilter === 'all_completed' && <><Inventory size={20} color="#fbbf24" /> รับแล้วทั้งหมด ({completedPickups.length})</>}
             </Typography>
             
-            {readyForPickup.slice(0, 20).map((order) => {
-              const statusTheme = STATUS_THEME[normalizeStatusKey(order.status)] || STATUS_THEME.READY;
-              
-              return (
-                <Box
-                  key={order.ref}
-                  onClick={() => setPickupSelectedOrder({
-                    ref: order.ref,
-                    name: order.name,
-                    email: order.email,
-                    status: order.status,
-                    amount: order.amount,
-                    cart: order.cart || order.items || [],
-                    pickup: order.raw?.pickup,
-                    date: order.date,
-                  })}
-                  sx={{
-                    ...glassCardSx,
-                    p: 1.5,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    '&:hover': {
-                      transform: 'translateY(-2px)',
-                      borderColor: 'rgba(6, 182, 212, 0.5)',
-                    },
-                  }}
-                >
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                      <Box sx={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: '10px',
-                        bgcolor: statusTheme.bg,
-                        border: `1px solid ${statusTheme.border}`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}>
-                        <LocalMall size={20} color={statusTheme.text} />
-                      </Box>
-                      <Box>
-                        <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                          {order.ref}
-                        </Typography>
-                        <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                          {order.name}
-                        </Typography>
+            {/* Ready for pickup list */}
+            {pickupFilter === 'ready' && (
+              <>
+                {readyForPickup.slice(0, 20).map((order) => {
+                  const statusTheme = STATUS_THEME[normalizeStatusKey(order.status)] || STATUS_THEME.READY;
+                  return (
+                    <Box
+                      key={order.ref}
+                      onClick={() => setPickupSelectedOrder({
+                        ref: order.ref,
+                        name: order.name,
+                        email: order.email,
+                        status: order.status,
+                        amount: order.amount,
+                        cart: order.cart || order.items || [],
+                        pickup: order.pickup || order.raw?.pickup,
+                        date: order.date,
+                      })}
+                      sx={{
+                        ...glassCardSx,
+                        p: 1.5,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        '&:hover': {
+                          transform: 'translateY(-2px)',
+                          borderColor: 'rgba(6, 182, 212, 0.5)',
+                        },
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                          <Box sx={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: '10px',
+                            bgcolor: statusTheme.bg,
+                            border: `1px solid ${statusTheme.border}`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}>
+                            <LocalMall size={20} color={statusTheme.text} />
+                          </Box>
+                          <Box>
+                            <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                              {order.ref}
+                            </Typography>
+                            <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                              {order.name}
+                            </Typography>
+                          </Box>
+                        </Box>
+                        <Box sx={{ textAlign: 'right' }}>
+                          <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#10b981' }}>
+                            ฿{Number(order.amount).toLocaleString()}
+                          </Typography>
+                          <Chip
+                            size="small"
+                            label={order.status}
+                            sx={{
+                              height: 18,
+                              fontSize: '0.65rem',
+                              bgcolor: statusTheme.bg,
+                              color: statusTheme.text,
+                              border: `1px solid ${statusTheme.border}`,
+                            }}
+                          />
+                        </Box>
                       </Box>
                     </Box>
-                    <Box sx={{ textAlign: 'right' }}>
-                      <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#10b981' }}>
-                        ฿{Number(order.amount).toLocaleString()}
-                      </Typography>
-                      <Chip
-                        size="small"
-                        label={order.status}
-                        sx={{
-                          height: 18,
-                          fontSize: '0.65rem',
-                          bgcolor: statusTheme.bg,
-                          color: statusTheme.text,
-                          border: `1px solid ${statusTheme.border}`,
-                        }}
-                      />
-                    </Box>
+                  );
+                })}
+                {readyForPickup.length === 0 && (
+                  <Box sx={{ ...glassCardSx, textAlign: 'center', py: 4 }}>
+                    <CheckCircleOutline size={48} color="#10b981" style={{ marginBottom: 8 }} />
+                    <Typography sx={{ fontSize: '0.95rem', color: 'var(--text-muted)' }}>
+                      ไม่มีออเดอร์รอรับ
+                    </Typography>
                   </Box>
+                )}
+              </>
+            )}
+
+            {/* Completed pickups list (today or all) */}
+            {(pickupFilter === 'today' || pickupFilter === 'all_completed') && (() => {
+              const displayList = pickupFilter === 'today' ? completedToday : completedPickups;
+              return displayList.length > 0 ? (
+                <>
+                  {displayList.slice(0, 50).map((order) => {
+                    const pickup = order.pickup || order.raw?.pickup;
+                    return (
+                      <Box
+                        key={order.ref}
+                        sx={{
+                          ...glassCardSx,
+                          p: 1.5,
+                          opacity: 0.85,
+                        }}
+                      >
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                            <Box sx={{
+                              width: 40,
+                              height: 40,
+                              borderRadius: '10px',
+                              bgcolor: 'rgba(16, 185, 129, 0.15)',
+                              border: '1px solid rgba(16, 185, 129, 0.3)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}>
+                              <CheckCircle size={20} color="#10b981" />
+                            </Box>
+                            <Box>
+                              <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                                {order.ref}
+                              </Typography>
+                              <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                {order.name}
+                              </Typography>
+                              {pickup?.pickedUpAt && (
+                                <Typography sx={{ fontSize: '0.7rem', color: '#10b981' }}>
+                                  ✓ {new Date(pickup.pickedUpAt).toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                  {pickup.notes ? ` · ${pickup.notes}` : ''}
+                                </Typography>
+                              )}
+                            </Box>
+                          </Box>
+                          <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#10b981' }}>
+                            ฿{Number(order.amount).toLocaleString()}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    );
+                  })}
+                </>
+              ) : (
+                <Box sx={{ ...glassCardSx, textAlign: 'center', py: 4 }}>
+                  <Inventory size={48} color="#64748b" style={{ marginBottom: 8 }} />
+                  <Typography sx={{ fontSize: '0.95rem', color: 'var(--text-muted)' }}>
+                    {pickupFilter === 'today' ? 'ยังไม่มีคนรับวันนี้' : 'ยังไม่มีออเดอร์ที่รับแล้ว'}
+                  </Typography>
                 </Box>
               );
-            })}
-            
-            {readyForPickup.length === 0 && (
-              <Box sx={{ ...glassCardSx, textAlign: 'center', py: 4 }}>
-                <CheckCircleOutline size={48} color="#10b981" style={{ marginBottom: 8 }} />
-                <Typography sx={{ fontSize: '0.95rem', color: 'var(--text-muted)' }}>
-                  ไม่มีออเดอร์รอรับ
-                </Typography>
-              </Box>
-            )}
+            })()}
           </Box>
         )}
 
@@ -7540,6 +7668,23 @@ export default function AdminPage(): JSX.Element {
                           color: '#22d3ee',
                           border: '1px solid rgba(34, 211, 238, 0.3)',
                           fontFamily: 'monospace',
+                        }}
+                      />
+                    )}
+                    {/* Pickup Confirmation Badge */}
+                    {order.pickup?.pickedUp && (
+                      <Chip
+                        size="small"
+                        icon={<CheckCircle size={14} />}
+                        label={`รับแล้ว${order.pickup.pickedUpAt ? ` ${new Date(order.pickup.pickedUpAt).toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` : ''}`}
+                        sx={{
+                          height: 24,
+                          fontSize: '0.72rem',
+                          fontWeight: 600,
+                          bgcolor: 'rgba(16, 185, 129, 0.15)',
+                          color: '#10b981',
+                          border: '1px solid rgba(16, 185, 129, 0.3)',
+                          '& .MuiChip-icon': { color: '#10b981' },
                         }}
                       />
                     )}

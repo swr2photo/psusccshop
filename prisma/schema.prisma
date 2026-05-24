@@ -47,6 +47,7 @@ model Order {
   refund_reviewed_at   String?
   refund_reviewed_by   String?
   refund_admin_note    String?
+  pickup_data          Json?
   shop_id              String?
   shop_slug            String?
   created_at           DateTime @default(now())

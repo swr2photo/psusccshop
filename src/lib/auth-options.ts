@@ -44,7 +44,7 @@ async function saveUserLogServer(log: {
   name?: string;
   action: string;
   details?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   ip?: string;
   userAgent?: string;
 }) {
@@ -146,7 +146,7 @@ export const authOptions: NextAuthOptions = {
           let image: string | undefined;
           try {
             const hash = createHash('sha256').update(email.toLowerCase()).digest('hex');
-            const profile = await getJson(`users/${hash}.json`) as any;
+            const profile = await getJson(`users/${hash}.json`) as { name?: string; profileImage?: string } | null;
             if (profile?.name) name = profile.name;
             if (profile?.profileImage) image = profile.profileImage;
           } catch { /* no profile yet */ }
@@ -214,7 +214,7 @@ export const authOptions: NextAuthOptions = {
       }
     },
     async signOut({ token }) {
-      const email = (token as any)?.email;
+      const email = token?.email;
       if (email) {
         // Fire-and-forget: don't block logout waiting for S3 write
         saveUserLogServer({ email, action: 'logout', details: 'ออกจากระบบ' })

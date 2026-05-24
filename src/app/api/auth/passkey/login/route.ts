@@ -22,9 +22,10 @@ export async function POST(req: NextRequest) {
     try {
       const { options, challengeId } = await generatePasskeyAuthenticationOptions();
       return NextResponse.json({ options, challengeId });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[Passkey] Login options error:', err);
-      return NextResponse.json({ error: err.message }, { status: 500 });
+      const message = err instanceof Error ? err.message : String(err);
+      return NextResponse.json({ error: message }, { status: 500 });
     }
   }
 
@@ -53,9 +54,10 @@ export async function POST(req: NextRequest) {
         verified: false,
         error: 'Authentication failed',
       }, { status: 401 });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[Passkey] Login verify error:', err);
-      return NextResponse.json({ error: err.message }, { status: 400 });
+      const message = err instanceof Error ? err.message : String(err);
+      return NextResponse.json({ error: message }, { status: 400 });
     }
   }
 

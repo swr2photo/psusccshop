@@ -863,6 +863,44 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                         </Box>
                       )}
 
+                      {/* Pickup Confirmation - When order has been picked up */}
+                      {order.pickup?.pickedUp && (
+                        <Box sx={{ px: { xs: 1.5, sm: 2 }, pt: 1.5 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, mb: 1 }}>
+                            <CheckCircle size={14} style={{ color: 'var(--success)' }} />
+                            <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                              {t.orderHistory.pickupSection}
+                            </Typography>
+                          </Box>
+                          <Box sx={{
+                            p: 1.5,
+                            borderRadius: '12px',
+                            background: 'linear-gradient(135deg, rgba(16,185,129,0.08) 0%, rgba(52,199,89,0.08) 100%)',
+                            border: '1px solid rgba(16,185,129,0.25)',
+                          }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, mb: 0.5 }}>
+                              <CheckCircle size={16} style={{ color: '#10b981' }} />
+                              <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, color: '#10b981' }}>
+                                {t.orderHistory.pickupConfirmed}
+                              </Typography>
+                            </Box>
+                            {order.pickup.pickedUpAt && (
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
+                                <Clock size={13} style={{ color: 'var(--text-muted)' }} />
+                                <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                  {new Date(order.pickup.pickedUpAt).toLocaleDateString(lang === 'en' ? 'en-US' : 'th-TH', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                </Typography>
+                              </Box>
+                            )}
+                            {order.pickup.notes && (
+                              <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', mt: 0.5 }}>
+                                {t.orderHistory.pickupNotes}: {order.pickup.notes}
+                              </Typography>
+                            )}
+                          </Box>
+                        </Box>
+                      )}
+
                       {/* Delivery Status - Preparing to ship */}
                       {['READY', 'PAID'].includes(statusKey) && !order.trackingNumber && 
                        ((order.shippingOption && order.shippingOption !== 'pickup' && !order.shippingOption.toLowerCase().includes('รับ')) || 

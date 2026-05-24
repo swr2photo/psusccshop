@@ -44,3 +44,8 @@ next-env.d.ts
 prisma/*.db
 prisma/dev.db
 src/generated/
+
+# cache and temp
+/npm-cache/
+/supabase/
+
