@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { ProductCategory, ProductSubType, ProductVariant, ProductCustomField } from '@/lib/config';
+import type { ProductCategory, ProductSubType, ProductVariant, ProductCustomField, ProductPattern } from '@/lib/config';
 
 // รองรับหลายหมวดหมู่สินค้า
 export interface Product {
@@ -30,10 +30,14 @@ export interface CartItem extends Product {
   total: number;             // ราคารวม
   /** ตัวเลือกสินค้าที่เลือก (สำหรับของที่ระลึก) */
   selectedVariant?: ProductVariant;
+  /** ลายสินค้าที่เลือก */
+  selectedPattern?: ProductPattern;
   /** ข้อมูลเพิ่มเติมจากฟิลด์กำหนดเอง */
   customFieldValues?: Record<string, string | number>;
   /** Sub-shop slug (undefined = main shop) */
   shopSlug?: string;
+  /** Original product ID */
+  productId?: string;
 }
 
 interface CartState {

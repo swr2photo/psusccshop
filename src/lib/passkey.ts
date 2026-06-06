@@ -1,5 +1,5 @@
 // src/lib/passkey.ts
-// WebAuthn/Passkey server-side utilities
+// WebAuthn/Passkey server-side utilities — using Drizzle ORM
 // Uses @simplewebauthn/server v11 for registration & authentication
 
 import {
@@ -18,7 +18,9 @@ import type {
   RegistrationResponseJSON,
   AuthenticationResponseJSON,
 } from '@simplewebauthn/types';
-import { prisma } from '@/lib/prisma';
+import { db } from './db';
+import { passkeyChallenges, passkeyCredentials } from '../db/schema';
+import { eq, lt, gt, and, desc } from 'drizzle-orm';
 import { SignJWT, jwtVerify } from 'jose';
 
 // ==================== RP CONFIG ====================
@@ -55,99 +57,108 @@ async function storeChallenge(
   type: 'registration' | 'authentication',
   userEmail?: string,
 ): Promise<string> {
-  const data = await prisma.passkeyChallenge.create({
-    data: {
+  const data = await db.insert(passkeyChallenges)
+    .values({
       challenge,
       type,
-      user_email: userEmail || null,
-      expires_at: new Date(Date.now() + 5 * 60 * 1000),
-    },
-  });
-  return data.id;
+      userEmail: userEmail || null,
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+    })
+    .returning();
+  return data[0].id;
 }
 
 async function getAndDeleteChallenge(
   challengeId: string,
   type: 'registration' | 'authentication',
 ): Promise<string> {
-  const data = await prisma.passkeyChallenge.findFirst({
-    where: {
-      id: challengeId,
-      type,
-      expires_at: { gt: new Date() },
-    },
-  });
+  const rows = await db.select()
+    .from(passkeyChallenges)
+    .where(and(
+      eq(passkeyChallenges.id, challengeId),
+      eq(passkeyChallenges.type, type),
+      gt(passkeyChallenges.expiresAt, new Date())
+    ))
+    .limit(1);
+  const data = rows[0];
   
   if (!data) throw new Error('Challenge expired or not found');
   
-  await prisma.passkeyChallenge.delete({ where: { id: challengeId } }).catch(() => {});
+  await db.delete(passkeyChallenges).where(eq(passkeyChallenges.id, challengeId)).catch(() => {});
   return data.challenge;
 }
 
 async function cleanExpiredChallenges(): Promise<void> {
-  await prisma.passkeyChallenge.deleteMany({
-    where: { expires_at: { lt: new Date() } },
-  }).catch(() => {});
+  await db.delete(passkeyChallenges)
+    .where(lt(passkeyChallenges.expiresAt, new Date()))
+    .catch(() => {});
 }
 
 // ==================== CREDENTIAL STORE ====================
 
 function toStoredCred(row: any): StoredCredential {
   return {
-    ...row,
+    credential_id: row.credentialId,
+    user_email: row.userEmail,
+    public_key: row.publicKey,
+    counter: row.counter,
+    device_type: row.deviceType,
+    backed_up: row.backedUp,
     transports: (row.transports as any) || [],
-    created_at: row.created_at?.toISOString?.() || row.created_at,
-    last_used_at: row.last_used_at?.toISOString?.() || row.last_used_at,
+    friendly_name: row.friendlyName,
+    created_at: row.createdAt?.toISOString?.() || row.createdAt,
+    last_used_at: row.lastUsedAt?.toISOString?.() || row.lastUsedAt || null,
   };
 }
 
 export async function getCredentialsByEmail(email: string): Promise<StoredCredential[]> {
-  const data = await prisma.passkeyCredential.findMany({
-    where: { user_email: email },
-    orderBy: { created_at: 'desc' },
-  });
+  const data = await db.select()
+    .from(passkeyCredentials)
+    .where(eq(passkeyCredentials.userEmail, email))
+    .orderBy(desc(passkeyCredentials.createdAt));
   return data.map(toStoredCred);
 }
 
 export async function getCredentialById(credentialId: string): Promise<StoredCredential | null> {
-  const data = await prisma.passkeyCredential.findUnique({
-    where: { credential_id: credentialId },
-  });
-  return data ? toStoredCred(data) : null;
+  const data = await db.select()
+    .from(passkeyCredentials)
+    .where(eq(passkeyCredentials.credentialId, credentialId))
+    .limit(1);
+  return data[0] ? toStoredCred(data[0]) : null;
 }
 
 async function getAllCredentials(): Promise<StoredCredential[]> {
-  const data = await prisma.passkeyCredential.findMany();
+  const data = await db.select().from(passkeyCredentials);
   return data.map(toStoredCred);
 }
 
 async function saveCredential(cred: Omit<StoredCredential, 'created_at' | 'last_used_at'>): Promise<void> {
-  await prisma.passkeyCredential.create({
-    data: {
-      credential_id: cred.credential_id,
-      user_email: cred.user_email,
-      public_key: cred.public_key,
+  await db.insert(passkeyCredentials)
+    .values({
+      credentialId: cred.credential_id,
+      userEmail: cred.user_email,
+      publicKey: cred.public_key,
       counter: cred.counter,
-      device_type: cred.device_type,
-      backed_up: cred.backed_up,
+      deviceType: cred.device_type,
+      backedUp: cred.backed_up,
       transports: (cred.transports || []) as any,
-      friendly_name: cred.friendly_name,
-    },
-  });
+      friendlyName: cred.friendly_name,
+    });
 }
 
 async function updateCredentialCounter(credentialId: string, newCounter: number): Promise<void> {
-  await prisma.passkeyCredential.update({
-    where: { credential_id: credentialId },
-    data: { counter: newCounter, last_used_at: new Date() },
-  });
+  await db.update(passkeyCredentials)
+    .set({ counter: newCounter, lastUsedAt: new Date() })
+    .where(eq(passkeyCredentials.credentialId, credentialId));
 }
 
 export async function deleteCredential(credentialId: string, userEmail: string): Promise<boolean> {
   try {
-    await prisma.passkeyCredential.deleteMany({
-      where: { credential_id: credentialId, user_email: userEmail },
-    });
+    await db.delete(passkeyCredentials)
+      .where(and(
+        eq(passkeyCredentials.credentialId, credentialId),
+        eq(passkeyCredentials.userEmail, userEmail)
+      ));
     return true;
   } catch {
     return false;
@@ -160,15 +171,19 @@ export async function renameCredential(
   name: string,
 ): Promise<boolean> {
   try {
-    const existing = await prisma.passkeyCredential.findFirst({
-      where: { credential_id: credentialId, user_email: userEmail },
-    });
+    const rows = await db.select()
+      .from(passkeyCredentials)
+      .where(and(
+        eq(passkeyCredentials.credentialId, credentialId),
+        eq(passkeyCredentials.userEmail, userEmail)
+      ))
+      .limit(1);
+    const existing = rows[0];
     if (!existing) return false;
     
-    await prisma.passkeyCredential.update({
-      where: { credential_id: credentialId },
-      data: { friendly_name: name },
-    });
+    await db.update(passkeyCredentials)
+      .set({ friendlyName: name })
+      .where(eq(passkeyCredentials.credentialId, credentialId));
     return true;
   } catch {
     return false;

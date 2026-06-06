@@ -66,7 +66,15 @@ const DEFAULT_CONFIG: ShopConfig = {
 };
 
 export async function GET() {
-  const cfg = (await getJson<ShopConfig>(CONFIG_KEY)) || DEFAULT_CONFIG;
+  let cfg = DEFAULT_CONFIG;
+  try {
+    const dbConfig = await getJson<ShopConfig>(CONFIG_KEY);
+    if (dbConfig) {
+      cfg = dbConfig;
+    }
+  } catch (error) {
+    console.error('[Config API] Failed to load config from database, falling back to default:', error);
+  }
   
   // Sanitize: ลบ adminEmails, adminPermissions, sheetId ก่อนส่งให้ frontend
   const sanitizedConfig = sanitizeConfigForPublic(cfg);

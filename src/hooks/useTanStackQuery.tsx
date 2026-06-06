@@ -13,14 +13,8 @@
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ReactNode, useState, lazy, Suspense } from 'react';
-
-// Lazy-load devtools so they are never in the production bundle
-const ReactQueryDevtools = lazy(() =>
-  import('@tanstack/react-query-devtools').then((mod) => ({
-    default: mod.ReactQueryDevtools,
-  }))
-);
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { ReactNode, useState } from 'react';
 
 // ============== QUERY CLIENT CONFIGURATION ==============
 
@@ -79,9 +73,7 @@ export function TanStackQueryProvider({ children }: TanStackQueryProviderProps) 
     <QueryClientProvider client={queryClient}>
       {children}
       {process.env.NODE_ENV === 'development' && (
-        <Suspense fallback={null}>
-          <ReactQueryDevtools initialIsOpen={false} />
-        </Suspense>
+        <ReactQueryDevtools initialIsOpen={false} />
       )}
     </QueryClientProvider>
   );

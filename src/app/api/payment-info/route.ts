@@ -126,6 +126,7 @@ export async function GET(req: NextRequest) {
       customName: sanitizeUtf8Input(item.options?.customName || item.customName || ''),
       customNumber: sanitizeUtf8Input(item.options?.customNumber || item.customNumber || ''),
       isLongSleeve: item.options?.isLongSleeve || item.isLongSleeve || false,
+      pattern: sanitizeUtf8Input(item.options?.pattern || item.pattern || ''),
     }));
 
     const responseData = {

@@ -2,7 +2,9 @@
 // Stripe webhook handler
 
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db';
+import { orders, paymentTransactions } from '@/db/schema';
+import { eq, and } from 'drizzle-orm';
 import { verifyStripeWebhook } from '@/lib/payment';
 
 export const runtime = 'nodejs';
@@ -80,30 +82,30 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
   }
 
   // Update transaction
-  await supabase
-    .from('payment_transactions')
-    .update({
+  await db
+    .update(paymentTransactions)
+    .set({
       status: 'paid',
-      gateway_transaction_id: paymentIntent.latest_charge,
-      card_last4: cardLast4,
-      card_brand: cardBrand,
-      updated_at: new Date().toISOString(),
-      raw_response: paymentIntent,
+      gatewayTransactionId: paymentIntent.latest_charge,
+      cardLast4: cardLast4,
+      cardBrand: cardBrand,
+      updatedAt: new Date(),
+      rawResponse: paymentIntent,
     })
-    .eq('gateway_charge_id', intentId);
+    .where(eq(paymentTransactions.gatewayChargeId, intentId));
 
   // Update order status
-  await supabase
-    .from('orders')
-    .update({
-      status: 'paid',
-      payment_status: 'paid',
-      payment_method: 'credit_card',
-      payment_verified: true,
-      payment_verified_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+  await db
+    .update(orders)
+    .set({
+      status: 'PAID',
+      paymentStatus: 'paid',
+      paymentMethod: 'credit_card',
+      paymentVerified: true,
+      paymentVerifiedAt: new Date().toISOString(),
+      updatedAt: new Date(),
     })
-    .eq('ref', orderId);
+    .where(eq(orders.ref, orderId));
 
   console.log('[Webhook] PaymentIntent succeeded for order:', orderId);
 }
@@ -117,24 +119,24 @@ async function handlePaymentIntentFailed(paymentIntent: any) {
   const errorMessage = paymentIntent.last_payment_error?.message || 'Payment failed';
 
   // Update transaction
-  await supabase
-    .from('payment_transactions')
-    .update({
+  await db
+    .update(paymentTransactions)
+    .set({
       status: 'failed',
-      error_message: errorMessage,
-      updated_at: new Date().toISOString(),
-      raw_response: paymentIntent,
+      errorMessage: errorMessage,
+      updatedAt: new Date(),
+      rawResponse: paymentIntent,
     })
-    .eq('gateway_charge_id', intentId);
+    .where(eq(paymentTransactions.gatewayChargeId, intentId));
 
   // Update order
-  await supabase
-    .from('orders')
-    .update({
-      payment_status: 'failed',
-      updated_at: new Date().toISOString(),
+  await db
+    .update(orders)
+    .set({
+      paymentStatus: 'failed',
+      updatedAt: new Date(),
     })
-    .eq('ref', orderId);
+    .where(eq(orders.ref, orderId));
 
   console.log('[Webhook] PaymentIntent failed for order:', orderId, errorMessage);
 }
@@ -146,23 +148,27 @@ async function handlePaymentIntentCanceled(paymentIntent: any) {
   if (!orderId) return;
 
   // Update transaction
-  await supabase
-    .from('payment_transactions')
-    .update({
+  await db
+    .update(paymentTransactions)
+    .set({
       status: 'cancelled',
-      updated_at: new Date().toISOString(),
+      updatedAt: new Date(),
     })
-    .eq('gateway_charge_id', intentId);
+    .where(eq(paymentTransactions.gatewayChargeId, intentId));
 
   // Update order if still pending
-  await supabase
-    .from('orders')
-    .update({
-      payment_status: 'cancelled',
-      updated_at: new Date().toISOString(),
+  await db
+    .update(orders)
+    .set({
+      paymentStatus: 'cancelled',
+      updatedAt: new Date(),
     })
-    .eq('ref', orderId)
-    .eq('payment_status', 'pending');
+    .where(
+      and(
+        eq(orders.ref, orderId),
+        eq(orders.paymentStatus, 'pending')
+      )
+    );
 
   console.log('[Webhook] PaymentIntent canceled for order:', orderId);
 }
@@ -173,34 +179,35 @@ async function handleChargeRefunded(charge: any) {
   if (!paymentIntentId) return;
 
   // Get transaction by payment intent ID
-  const { data: transaction } = await supabase
-    .from('payment_transactions')
-    .select('order_id, amount')
-    .eq('gateway_charge_id', paymentIntentId)
-    .single();
+  const transactionData = await db
+    .select({ orderId: paymentTransactions.orderId, amount: paymentTransactions.amount })
+    .from(paymentTransactions)
+    .where(eq(paymentTransactions.gatewayChargeId, paymentIntentId))
+    .limit(1);
+  const transaction = transactionData[0];
 
   if (!transaction) return;
 
   const isFullRefund = charge.amount_refunded >= charge.amount;
 
   // Update transaction
-  await supabase
-    .from('payment_transactions')
-    .update({
+  await db
+    .update(paymentTransactions)
+    .set({
       status: isFullRefund ? 'refunded' : 'partially_refunded',
-      updated_at: new Date().toISOString(),
+      updatedAt: new Date(),
     })
-    .eq('gateway_charge_id', paymentIntentId);
+    .where(eq(paymentTransactions.gatewayChargeId, paymentIntentId));
 
   // Update order
-  await supabase
-    .from('orders')
-    .update({
-      status: isFullRefund ? 'refunded' : 'partially_refunded',
-      payment_status: isFullRefund ? 'refunded' : 'partially_refunded',
-      updated_at: new Date().toISOString(),
+  await db
+    .update(orders)
+    .set({
+      status: isFullRefund ? 'REFUNDED' : 'PARTIALLY_REFUNDED',
+      paymentStatus: isFullRefund ? 'refunded' : 'partially_refunded',
+      updatedAt: new Date(),
     })
-    .eq('ref', transaction.order_id);
+    .where(eq(orders.id, transaction.orderId));
 
   console.log('[Webhook] Charge refunded for PaymentIntent:', paymentIntentId);
 }

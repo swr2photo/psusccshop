@@ -189,6 +189,8 @@ export interface Product {
   sizePricing?: { [key: string]: number };
   /** ตัวเลือกสินค้าแบบกำหนดเอง (สำหรับของที่ระลึก/ค่ายฯ) */
   variants?: ProductVariant[];
+  /** ลายสินค้า (เช่น ลายเสื้อ) */
+  patterns?: ProductPattern[];
   /** จำนวนสินค้าในสต็อค (null = ไม่จำกัด) */
   stock?: number | null;
   /** จำนวนสูงสุดต่อออเดอร์ */
@@ -271,6 +273,16 @@ export interface ProductVariant {
   image?: string;
   /** จำนวนในสต็อค */
   stock?: number | null;
+  /** เปิดใช้งาน */
+  isActive?: boolean;
+}
+
+/** ลายสินค้า (สำหรับเสื้อ/สินค้าแบบมีลายให้เลือก) */
+export interface ProductPattern {
+  id: string;
+  name: string;
+  /** รูปภาพลาย */
+  image?: string;
   /** เปิดใช้งาน */
   isActive?: boolean;
 }
@@ -622,6 +634,7 @@ export interface OrderItem {
   customName?: string;
   customNumber?: string;
   customSleeve?: 'SHORT' | 'LONG';
+  pattern?: string;
   price: number;
 }
 
@@ -633,6 +646,8 @@ export interface CartItem {
   customName?: string;
   customNumber?: string;
   customSleeve?: 'SHORT' | 'LONG';
+  pattern?: string;
+  selectedPattern?: ProductPattern;
   price: number;
 }
 

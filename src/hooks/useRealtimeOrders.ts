@@ -36,8 +36,8 @@ const CONFIG = {
 // ============== SINGLETON SUPABASE CLIENT ==============
 
 let supabase: SupabaseClient | null = null;
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL2 || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY2 || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY2 || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
 function getSupabaseClient(): SupabaseClient | null {
   if (supabase) return supabase;

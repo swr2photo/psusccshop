@@ -1,10 +1,12 @@
 // src/app/api/push-subscription/route.ts
-// Manage push notification subscriptions — Prisma
+// Manage push notification subscriptions — Drizzle ORM
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { db } from '@/lib/db';
+import { pushSubscriptions } from '@/db/schema';
+import { and, eq } from 'drizzle-orm';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -21,12 +23,13 @@ export async function POST(request: NextRequest) {
     const { subscription, action } = body;
 
     if (action === 'unsubscribe') {
-      await prisma.pushSubscription.deleteMany({
-        where: {
-          email: session.user.email,
-          endpoint: subscription?.endpoint || '',
-        },
-      });
+      await db.delete(pushSubscriptions)
+        .where(
+          and(
+            eq(pushSubscriptions.email, session.user.email),
+            eq(pushSubscriptions.endpoint, subscription?.endpoint || '')
+          )
+        );
       return NextResponse.json({ success: true, action: 'unsubscribed' });
     }
 
@@ -34,20 +37,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid subscription data' }, { status: 400 });
     }
 
-    await prisma.pushSubscription.upsert({
-      where: { endpoint: subscription.endpoint },
-      update: {
-        email: session.user.email,
-        keys_p256dh: subscription.keys.p256dh,
-        keys_auth: subscription.keys.auth,
-      },
-      create: {
+    await db.insert(pushSubscriptions)
+      .values({
         email: session.user.email,
         endpoint: subscription.endpoint,
-        keys_p256dh: subscription.keys.p256dh,
-        keys_auth: subscription.keys.auth,
-      },
-    });
+        keysP256dh: subscription.keys.p256dh,
+        keysAuth: subscription.keys.auth,
+      })
+      .onConflictDoUpdate({
+        target: pushSubscriptions.endpoint,
+        set: {
+          email: session.user.email,
+          keysP256dh: subscription.keys.p256dh,
+          keysAuth: subscription.keys.auth,
+        },
+      });
 
     return NextResponse.json({ success: true, action: 'subscribed' });
   } catch (error: any) {

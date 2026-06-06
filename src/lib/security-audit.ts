@@ -1,9 +1,11 @@
 // src/lib/security-audit.ts
-// Security Audit Logging System — Prisma
+// Security Audit Logging System — Drizzle ORM
 // บันทึกกิจกรรมที่เกี่ยวข้องกับความปลอดภัยทั้งหมด
 
 import crypto from 'crypto';
-import { prisma } from './prisma';
+import { db } from './db';
+import { securityAuditLog } from '../db/schema';
+import { eq, lt, gt, and, desc, inArray, like, count } from 'drizzle-orm';
 
 // ==================== TYPES ====================
 
@@ -75,10 +77,10 @@ let flushTimeout: NodeJS.Timeout | null = null;
 
 function logToDbRow(log: SecurityAuditLog): any {
   return {
-    event_type: log.eventType,
-    user_email: log.userEmail,
-    ip_address: log.ipAddress,
-    user_agent: log.userAgent,
+    eventType: log.eventType,
+    userEmail: log.userEmail || null,
+    ipAddress: log.ipAddress,
+    userAgent: log.userAgent,
     details: {
       id: log.id,
       timestamp: log.timestamp,
@@ -101,14 +103,14 @@ function dbRowToLog(row: any): SecurityAuditLog {
   const d = (row.details as any) || {};
   return {
     id: d.id || row.id,
-    timestamp: d.timestamp || row.created_at?.toISOString?.() || row.created_at,
-    eventType: row.event_type as SecurityEventType,
+    timestamp: d.timestamp || row.createdAt?.toISOString?.() || row.createdAt,
+    eventType: row.eventType as SecurityEventType,
     severity: (d.severity || 'low') as SecuritySeverity,
-    ipAddress: row.ip_address || d.ipAddress || '',
+    ipAddress: row.ipAddress || d.ipAddress || '',
     ipHash: d.ipHash || '',
-    userAgent: row.user_agent || '',
+    userAgent: row.userAgent || '',
     userId: d.userId,
-    userEmail: row.user_email,
+    userEmail: row.userEmail,
     emailHash: d.emailHash,
     requestPath: d.requestPath || '/',
     requestMethod: d.requestMethod || 'GET',
@@ -127,9 +129,8 @@ async function flushLogBuffer(): Promise<void> {
   logBuffer.length = 0;
   
   try {
-    await prisma.securityAuditLog.createMany({
-      data: logsToWrite.map(logToDbRow),
-    });
+    await db.insert(securityAuditLog)
+      .values(logsToWrite.map(logToDbRow));
   } catch (error) {
     console.error('[Security Audit] Failed to write logs:', error);
     logBuffer.push(...logsToWrite);
@@ -203,7 +204,7 @@ export async function logSecurityEvent(
   
   if (immediate || severity === 'critical' || severity === 'high') {
     try {
-      await prisma.securityAuditLog.create({ data: logToDbRow(log) });
+      await db.insert(securityAuditLog).values(logToDbRow(log));
     } catch (error) {
       console.error('[Security Audit] Immediate write failed:', error);
     }
@@ -273,24 +274,27 @@ export async function getSecurityLogs(options: {
   offset?: number;
 }): Promise<SecurityAuditLog[]> {
   try {
-    const where: any = {};
-    if (options.eventType) where.event_type = options.eventType;
-    if (options.startDate) where.created_at = { ...(where.created_at || {}), gte: options.startDate };
-    if (options.endDate) where.created_at = { ...(where.created_at || {}), lte: options.endDate };
+    const conditions = [];
+    if (options.eventType) conditions.push(eq(securityAuditLog.eventType, options.eventType));
+    if (options.startDate) conditions.push(gt(securityAuditLog.createdAt, options.startDate));
+    if (options.endDate) conditions.push(lt(securityAuditLog.createdAt, options.endDate));
     
-    const data = await prisma.securityAuditLog.findMany({
-      where,
-      orderBy: { created_at: 'desc' },
-      skip: options.offset || 0,
-      take: options.limit || 100,
-    });
+    let selectQuery = db.select().from(securityAuditLog);
+    if (conditions.length > 0) {
+      selectQuery = selectQuery.where(and(...conditions)) as any;
+    }
+    
+    const data = await selectQuery
+      .orderBy(desc(securityAuditLog.createdAt))
+      .offset(options.offset || 0)
+      .limit(options.limit || 100);
     
     let logs = data.map(dbRowToLog);
     
     // Filter by severity/ipHash/emailHash in memory (stored in details JSON)
-    if (options.severity) logs = logs.filter(l => l.severity === options.severity);
-    if (options.ipHash) logs = logs.filter(l => l.ipHash === options.ipHash);
-    if (options.emailHash) logs = logs.filter(l => l.emailHash === options.emailHash);
+    if (options.severity) logs = logs.filter((l: any) => l.severity === options.severity);
+    if (options.ipHash) logs = logs.filter((l: any) => l.ipHash === options.ipHash);
+    if (options.emailHash) logs = logs.filter((l: any) => l.emailHash === options.emailHash);
     
     return logs;
   } catch (error) {
@@ -348,31 +352,40 @@ export async function getSecurityAuditLogs(query: AuditLogQuery): Promise<{
   total: number;
 }> {
   try {
-    const where: any = {};
-    if (query.eventTypes?.length) where.event_type = { in: query.eventTypes };
-    if (query.startDate) where.created_at = { ...(where.created_at || {}), gte: new Date(query.startDate) };
-    if (query.endDate) where.created_at = { ...(where.created_at || {}), lte: new Date(query.endDate) };
-    if (query.userEmail) where.user_email = { contains: query.userEmail };
+    const conditions = [];
+    if (query.eventTypes?.length) conditions.push(inArray(securityAuditLog.eventType, query.eventTypes));
+    if (query.startDate) conditions.push(gt(securityAuditLog.createdAt, new Date(query.startDate)));
+    if (query.endDate) conditions.push(lt(securityAuditLog.createdAt, new Date(query.endDate)));
+    if (query.userEmail) conditions.push(like(securityAuditLog.userEmail, `%${query.userEmail}%`));
     
-    const [data, total] = await Promise.all([
-      prisma.securityAuditLog.findMany({
-        where,
-        orderBy: { created_at: 'desc' },
-        skip: query.offset || 0,
-        take: query.limit || 100,
-      }),
-      prisma.securityAuditLog.count({ where }),
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    
+    let selectQuery = db.select().from(securityAuditLog);
+    let countQuery = db.select({ value: count() }).from(securityAuditLog);
+    
+    if (whereClause) {
+      selectQuery = selectQuery.where(whereClause) as any;
+      countQuery = countQuery.where(whereClause) as any;
+    }
+    
+    const [data, countResult] = await Promise.all([
+      selectQuery
+        .orderBy(desc(securityAuditLog.createdAt))
+        .offset(query.offset || 0)
+        .limit(query.limit || 100),
+      countQuery,
     ]);
     
+    const total = countResult[0]?.value || 0;
     let logs = data.map(dbRowToLog);
     
     // Filter by severity in memory (stored in details JSON)
     if (query.severity?.length) {
-      logs = logs.filter(l => query.severity!.includes(l.severity));
+      logs = logs.filter((l: any) => query.severity!.includes(l.severity));
     }
     if (query.ip) {
       const ipHash = hashSensitiveData(query.ip);
-      logs = logs.filter(l => l.ipHash === ipHash);
+      logs = logs.filter((l: any) => l.ipHash === ipHash);
     }
     
     return { logs, total };
@@ -491,10 +504,10 @@ export async function checkActiveThreats(): Promise<{
 export async function cleanupOldLogs(daysToKeep: number = 90): Promise<number> {
   try {
     const cutoffDate = new Date(Date.now() - daysToKeep * 24 * 60 * 60 * 1000);
-    const result = await prisma.securityAuditLog.deleteMany({
-      where: { created_at: { lt: cutoffDate } },
-    });
-    return result.count;
+    const result = await db.delete(securityAuditLog)
+      .where(lt(securityAuditLog.createdAt, cutoffDate))
+      .returning();
+    return result.length;
   } catch (error) {
     console.error('[Security Audit] Cleanup failed:', error);
     return 0;

@@ -1,7 +1,9 @@
 // src/lib/shops.ts
-// Multi-shop system: types, helpers, and Prisma operations
+// Multi-shop system: types, helpers, and Drizzle ORM operations
 
-import { prisma } from './prisma';
+import { db } from './db';
+import { shops, shopAdmins, orders } from '../db/schema';
+import { eq, and, desc, inArray, count, or, like } from 'drizzle-orm';
 import { Product, ShopConfig } from './config';
 
 // ==================== TYPES ====================
@@ -137,36 +139,36 @@ function dbToShop(row: any): Shop {
     id: row.id,
     slug: row.slug,
     name: row.name,
-    nameEn: row.name_en || undefined,
+    nameEn: row.nameEn || undefined,
     description: row.description || undefined,
-    descriptionEn: row.description_en || undefined,
-    logoUrl: row.logo_url || undefined,
-    bannerUrl: row.banner_url || undefined,
-    ownerEmail: row.owner_email,
-    isActive: row.is_active,
+    descriptionEn: row.descriptionEn || undefined,
+    logoUrl: row.logoUrl || undefined,
+    bannerUrl: row.bannerUrl || undefined,
+    ownerEmail: row.ownerEmail,
+    isActive: row.isActive,
     settings: (row.settings as any) || { isOpen: true },
-    paymentInfo: (row.payment_info as any) || { promptPayId: '', bankName: '', accountName: '', accountNumber: '' },
+    paymentInfo: (row.paymentInfo as any) || { promptPayId: '', bankName: '', accountName: '', accountNumber: '' },
     products: (row.products as any) || [],
     config: (row.config as any) || {},
-    contactEmail: row.contact_email || undefined,
-    contactPhone: row.contact_phone || undefined,
-    socialLinks: (row.social_links as any) || undefined,
-    sortOrder: row.sort_order || 0,
-    createdAt: row.created_at?.toISOString?.() || row.created_at,
-    updatedAt: row.updated_at?.toISOString?.() || row.updated_at,
+    contactEmail: row.contactEmail || undefined,
+    contactPhone: row.contactPhone || undefined,
+    socialLinks: (row.socialLinks as any) || undefined,
+    sortOrder: row.sortOrder || 0,
+    createdAt: row.createdAt?.toISOString?.() || row.createdAt,
+    updatedAt: row.updatedAt?.toISOString?.() || row.updatedAt,
   };
 }
 
 function dbToShopAdmin(row: any): ShopAdmin {
   return {
     id: row.id,
-    shopId: row.shop_id,
+    shopId: row.shopId,
     email: row.email,
     role: row.role,
     permissions: { ...DEFAULT_SHOP_ADMIN_PERMISSIONS, ...((row.permissions as any) || {}) },
-    addedBy: row.added_by || undefined,
-    createdAt: row.created_at?.toISOString?.() || row.created_at,
-    updatedAt: row.updated_at?.toISOString?.() || row.updated_at,
+    addedBy: row.addedBy || undefined,
+    createdAt: row.createdAt?.toISOString?.() || row.createdAt,
+    updatedAt: row.updatedAt?.toISOString?.() || row.updatedAt,
   };
 }
 
@@ -175,13 +177,57 @@ function dbToShopSummary(row: any): ShopSummary {
     id: row.id,
     slug: row.slug,
     name: row.name,
-    nameEn: row.name_en || undefined,
+    nameEn: row.nameEn || undefined,
     description: row.description || undefined,
-    logoUrl: row.logo_url || undefined,
-    isActive: row.is_active,
+    logoUrl: row.logoUrl || undefined,
+    isActive: row.isActive,
     productCount: Array.isArray(row.products) ? (row.products as any[]).length : 0,
     adminCount: 0,
-    ownerEmail: row.owner_email,
+    ownerEmail: row.ownerEmail,
+  };
+}
+
+function toLegacyOrder(row: any) {
+  return {
+    id: row.id,
+    ref: row.ref,
+    date: row.date,
+    status: row.status,
+    customer_name: row.customerName,
+    customer_email: row.customerEmail,
+    email_hash: row.emailHash,
+    customer_phone: row.customerPhone,
+    customer_address: row.customerAddress,
+    customer_instagram: row.customerInstagram,
+    cart: row.cart,
+    total_amount: row.totalAmount,
+    notes: row.notes,
+    slip_data: row.slipData,
+    payment_verified_at: row.paymentVerifiedAt,
+    payment_method: row.paymentMethod,
+    shipping_option: row.shippingOption,
+    tracking_number: row.trackingNumber,
+    shipping_provider: row.shippingProvider,
+    tracking_status: row.trackingStatus,
+    tracking_last_checked: row.trackingLastChecked,
+    shipped_at: row.shippedAt,
+    received_at: row.receivedAt,
+    refund_status: row.refundStatus,
+    refund_reason: row.refundReason,
+    refund_details: row.refundDetails,
+    refund_bank_name: row.refundBankName,
+    refund_bank_account: row.refundBankAccount,
+    refund_account_name: row.refundAccountName,
+    refund_amount: row.refundAmount,
+    refund_requested_at: row.refundRequestedAt,
+    refund_reviewed_at: row.refundReviewedAt,
+    refund_reviewed_by: row.refundReviewedBy,
+    refund_admin_note: row.refundAdminNote,
+    pickup_data: row.pickupData,
+    shop_id: row.shopId,
+    shop_slug: row.shopSlug,
+    created_at: row.createdAt,
+    updated_at: row.updatedAt,
   };
 }
 
@@ -189,9 +235,9 @@ function dbToShopSummary(row: any): ShopSummary {
 
 export async function listAllShops(): Promise<ShopSummary[]> {
   try {
-    const data = await prisma.shop.findMany({
-      orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
-    });
+    const data = await db.select()
+      .from(shops)
+      .orderBy(shops.sortOrder, shops.name);
     return data.map(dbToShopSummary);
   } catch (error: any) {
     console.error('[shops] listAllShops error:', error.message);
@@ -201,10 +247,10 @@ export async function listAllShops(): Promise<ShopSummary[]> {
 
 export async function listActiveShops(): Promise<ShopSummary[]> {
   try {
-    const data = await prisma.shop.findMany({
-      where: { is_active: true },
-      orderBy: [{ sort_order: 'asc' }, { name: 'asc' }],
-    });
+    const data = await db.select()
+      .from(shops)
+      .where(eq(shops.isActive, true))
+      .orderBy(shops.sortOrder, shops.name);
     return data.map(dbToShopSummary);
   } catch (error: any) {
     console.error('[shops] listActiveShops error:', error.message);
@@ -213,13 +259,13 @@ export async function listActiveShops(): Promise<ShopSummary[]> {
 }
 
 export async function getShopBySlug(slug: string): Promise<Shop | null> {
-  const data = await prisma.shop.findUnique({ where: { slug } });
-  return data ? dbToShop(data) : null;
+  const data = await db.select().from(shops).where(eq(shops.slug, slug)).limit(1);
+  return data[0] ? dbToShop(data[0]) : null;
 }
 
 export async function getShopById(id: string): Promise<Shop | null> {
-  const data = await prisma.shop.findUnique({ where: { id } });
-  return data ? dbToShop(data) : null;
+  const data = await db.select().from(shops).where(eq(shops.id, id)).limit(1);
+  return data[0] ? dbToShop(data[0]) : null;
 }
 
 export async function createShop(input: {
@@ -233,24 +279,24 @@ export async function createShop(input: {
   logoUrl?: string;
 }): Promise<Shop | null> {
   try {
-    const data = await prisma.shop.create({
-      data: {
+    const data = await db.insert(shops)
+      .values({
         slug: input.slug.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
         name: input.name,
-        name_en: input.nameEn || null,
+        nameEn: input.nameEn || null,
         description: input.description || null,
-        description_en: input.descriptionEn || null,
-        owner_email: input.ownerEmail.toLowerCase(),
-        payment_info: (input.paymentInfo || { promptPayId: '', bankName: '', accountName: '', accountNumber: '' }) as any,
-        logo_url: input.logoUrl || null,
+        descriptionEn: input.descriptionEn || null,
+        ownerEmail: input.ownerEmail.toLowerCase(),
+        paymentInfo: (input.paymentInfo || { promptPayId: '', bankName: '', accountName: '', accountNumber: '' }) as any,
+        logoUrl: input.logoUrl || null,
         products: [] as any,
         config: {} as any,
         settings: { isOpen: true } as any,
-      },
-    });
+      })
+      .returning();
     
-    await addShopAdmin(data.id, input.ownerEmail, 'owner', ALL_SHOP_ADMIN_PERMISSIONS, input.ownerEmail);
-    return dbToShop(data);
+    await addShopAdmin(data[0].id, input.ownerEmail, 'owner', ALL_SHOP_ADMIN_PERMISSIONS, input.ownerEmail);
+    return dbToShop(data[0]);
   } catch (error: any) {
     console.error('[shops] createShop error:', error.message);
     return null;
@@ -278,24 +324,28 @@ export async function updateShop(id: string, updates: Partial<{
   try {
     const dbUpdates: any = {};
     if (updates.name !== undefined) dbUpdates.name = updates.name;
-    if (updates.nameEn !== undefined) dbUpdates.name_en = updates.nameEn;
+    if (updates.nameEn !== undefined) dbUpdates.nameEn = updates.nameEn;
     if (updates.slug !== undefined) dbUpdates.slug = updates.slug.toLowerCase().replace(/[^a-z0-9-]/g, '-');
     if (updates.description !== undefined) dbUpdates.description = updates.description;
-    if (updates.descriptionEn !== undefined) dbUpdates.description_en = updates.descriptionEn;
-    if (updates.logoUrl !== undefined) dbUpdates.logo_url = updates.logoUrl;
-    if (updates.bannerUrl !== undefined) dbUpdates.banner_url = updates.bannerUrl;
-    if (updates.isActive !== undefined) dbUpdates.is_active = updates.isActive;
+    if (updates.descriptionEn !== undefined) dbUpdates.descriptionEn = updates.descriptionEn;
+    if (updates.logoUrl !== undefined) dbUpdates.logoUrl = updates.logoUrl;
+    if (updates.bannerUrl !== undefined) dbUpdates.bannerUrl = updates.bannerUrl;
+    if (updates.isActive !== undefined) dbUpdates.isActive = updates.isActive;
     if (updates.settings !== undefined) dbUpdates.settings = updates.settings;
-    if (updates.paymentInfo !== undefined) dbUpdates.payment_info = updates.paymentInfo;
+    if (updates.paymentInfo !== undefined) dbUpdates.paymentInfo = updates.paymentInfo;
     if (updates.products !== undefined) dbUpdates.products = updates.products;
     if (updates.config !== undefined) dbUpdates.config = updates.config;
-    if (updates.contactEmail !== undefined) dbUpdates.contact_email = updates.contactEmail;
-    if (updates.contactPhone !== undefined) dbUpdates.contact_phone = updates.contactPhone;
-    if (updates.socialLinks !== undefined) dbUpdates.social_links = updates.socialLinks;
-    if (updates.sortOrder !== undefined) dbUpdates.sort_order = updates.sortOrder;
+    if (updates.contactEmail !== undefined) dbUpdates.contactEmail = updates.contactEmail;
+    if (updates.contactPhone !== undefined) dbUpdates.contactPhone = updates.contactPhone;
+    if (updates.socialLinks !== undefined) dbUpdates.socialLinks = updates.socialLinks;
+    if (updates.sortOrder !== undefined) dbUpdates.sortOrder = updates.sortOrder;
+    dbUpdates.updatedAt = new Date();
     
-    const data = await prisma.shop.update({ where: { id }, data: dbUpdates });
-    return dbToShop(data);
+    const data = await db.update(shops)
+      .set(dbUpdates)
+      .where(eq(shops.id, id))
+      .returning();
+    return dbToShop(data[0]);
   } catch (error: any) {
     console.error('[shops] updateShop error:', error.message);
     return null;
@@ -304,7 +354,7 @@ export async function updateShop(id: string, updates: Partial<{
 
 export async function deleteShop(id: string): Promise<boolean> {
   try {
-    await prisma.shop.delete({ where: { id } });
+    await db.delete(shops).where(eq(shops.id, id));
     return true;
   } catch (error: any) {
     console.error('[shops] deleteShop error:', error.message);
@@ -316,10 +366,10 @@ export async function deleteShop(id: string): Promise<boolean> {
 
 export async function listShopAdmins(shopId: string): Promise<ShopAdmin[]> {
   try {
-    const data = await prisma.shopAdmin.findMany({
-      where: { shop_id: shopId },
-      orderBy: [{ role: 'asc' }, { email: 'asc' }],
-    });
+    const data = await db.select()
+      .from(shopAdmins)
+      .where(eq(shopAdmins.shopId, shopId))
+      .orderBy(shopAdmins.role, shopAdmins.email);
     return data.map(dbToShopAdmin);
   } catch (error: any) {
     console.error('[shops] listShopAdmins error:', error.message);
@@ -336,22 +386,27 @@ export async function addShopAdmin(
 ): Promise<ShopAdmin | null> {
   try {
     const normalizedEmail = email.toLowerCase().trim();
-    const data = await prisma.shopAdmin.upsert({
-      where: { shop_id_email: { shop_id: shopId, email: normalizedEmail } },
-      update: {
-        role,
-        permissions: (permissions || DEFAULT_SHOP_ADMIN_PERMISSIONS) as any,
-        added_by: addedBy || null,
-      },
-      create: {
-        shop_id: shopId,
+    
+    const data = await db.insert(shopAdmins)
+      .values({
+        shopId,
         email: normalizedEmail,
         role,
         permissions: (permissions || DEFAULT_SHOP_ADMIN_PERMISSIONS) as any,
-        added_by: addedBy || null,
-      },
-    });
-    return dbToShopAdmin(data);
+        addedBy: addedBy || null,
+      })
+      .onConflictDoUpdate({
+        target: [shopAdmins.shopId, shopAdmins.email],
+        set: {
+          role,
+          permissions: (permissions || DEFAULT_SHOP_ADMIN_PERMISSIONS) as any,
+          addedBy: addedBy || null,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+      
+    return dbToShopAdmin(data[0]);
   } catch (error: any) {
     console.error('[shops] addShopAdmin error:', error.message);
     return null;
@@ -365,15 +420,15 @@ export async function updateShopAdmin(
 ): Promise<ShopAdmin | null> {
   try {
     const normalizedEmail = email.toLowerCase().trim();
-    const dbUpdates: any = {};
+    const dbUpdates: any = { updatedAt: new Date() };
     if (updates.role) dbUpdates.role = updates.role;
     if (updates.permissions) dbUpdates.permissions = updates.permissions;
     
-    const data = await prisma.shopAdmin.update({
-      where: { shop_id_email: { shop_id: shopId, email: normalizedEmail } },
-      data: dbUpdates,
-    });
-    return dbToShopAdmin(data);
+    const data = await db.update(shopAdmins)
+      .set(dbUpdates)
+      .where(and(eq(shopAdmins.shopId, shopId), eq(shopAdmins.email, normalizedEmail)))
+      .returning();
+    return dbToShopAdmin(data[0]);
   } catch (error: any) {
     console.error('[shops] updateShopAdmin error:', error.message);
     return null;
@@ -382,9 +437,8 @@ export async function updateShopAdmin(
 
 export async function removeShopAdmin(shopId: string, email: string): Promise<boolean> {
   try {
-    await prisma.shopAdmin.delete({
-      where: { shop_id_email: { shop_id: shopId, email: email.toLowerCase().trim() } },
-    });
+    await db.delete(shopAdmins)
+      .where(and(eq(shopAdmins.shopId, shopId), eq(shopAdmins.email, email.toLowerCase().trim())));
     return true;
   } catch (error: any) {
     console.error('[shops] removeShopAdmin error:', error.message);
@@ -396,17 +450,20 @@ export async function removeShopAdmin(shopId: string, email: string): Promise<bo
 
 export async function getShopsForAdmin(email: string): Promise<ShopWithRole[]> {
   try {
-    const data = await prisma.shopAdmin.findMany({
-      where: { email: email.toLowerCase().trim() },
-      include: { shop: true },
-    });
+    const rows = await db.select({
+        shopAdmin: shopAdmins,
+        shop: shops,
+      })
+      .from(shopAdmins)
+      .innerJoin(shops, eq(shopAdmins.shopId, shops.id))
+      .where(eq(shopAdmins.email, email.toLowerCase().trim()));
     
-    return data
-      .filter(row => row.shop)
-      .map(row => ({
+    return rows
+      .filter((row: any) => row.shop)
+      .map((row: any) => ({
         shop: dbToShopSummary(row.shop),
-        role: row.role as 'owner' | 'admin',
-        permissions: { ...DEFAULT_SHOP_ADMIN_PERMISSIONS, ...((row.permissions as any) || {}) },
+        role: row.shopAdmin.role as 'owner' | 'admin',
+        permissions: { ...DEFAULT_SHOP_ADMIN_PERMISSIONS, ...((row.shopAdmin.permissions as any) || {}) },
       }));
   } catch (error: any) {
     console.error('[shops] getShopsForAdmin error:', error.message);
@@ -415,18 +472,19 @@ export async function getShopsForAdmin(email: string): Promise<ShopWithRole[]> {
 }
 
 export async function getShopAdminRole(shopId: string, email: string): Promise<ShopAdmin | null> {
-  const data = await prisma.shopAdmin.findFirst({
-    where: { shop_id: shopId, email: email.toLowerCase().trim() },
-  });
-  return data ? dbToShopAdmin(data) : null;
+  const data = await db.select()
+    .from(shopAdmins)
+    .where(and(eq(shopAdmins.shopId, shopId), eq(shopAdmins.email, email.toLowerCase().trim())))
+    .limit(1);
+  return data[0] ? dbToShopAdmin(data[0]) : null;
 }
 
 export async function isShopAdminEmail(email: string): Promise<boolean> {
   try {
-    const count = await prisma.shopAdmin.count({
-      where: { email: email.toLowerCase().trim() },
-    });
-    return count > 0;
+    const result = await db.select({ value: count() })
+      .from(shopAdmins)
+      .where(eq(shopAdmins.email, email.toLowerCase().trim()));
+    return (result[0]?.value || 0) > 0;
   } catch {
     return false;
   }
@@ -457,27 +515,32 @@ export async function getShopOrders(shopId: string, options?: {
     const limit = options?.limit ?? 100;
     const offset = options?.offset ?? 0;
     
-    const where: any = { shop_id: shopId };
-    if (options?.status?.length) where.status = { in: options.status };
+    const conditions = [eq(orders.shopId, shopId)];
+    if (options?.status?.length) conditions.push(inArray(orders.status, options.status));
     if (options?.search) {
-      where.OR = [
-        { ref: { contains: options.search, mode: 'insensitive' } },
-        { customer_name: { contains: options.search, mode: 'insensitive' } },
-        { customer_email: { contains: options.search, mode: 'insensitive' } },
-      ];
+      conditions.push(or(
+        like(orders.ref, `%${options.search}%`),
+        like(orders.customerName, `%${options.search}%`),
+        like(orders.customerEmail, `%${options.search}%`)
+      )!);
     }
     
-    const [data, total] = await Promise.all([
-      prisma.order.findMany({
-        where,
-        orderBy: { created_at: 'desc' },
-        skip: offset,
-        take: limit,
-      }),
-      prisma.order.count({ where }),
+    const whereClause = and(...conditions);
+    
+    const [data, totalResult] = await Promise.all([
+      db.select()
+        .from(orders)
+        .where(whereClause!)
+        .orderBy(desc(orders.createdAt))
+        .offset(offset)
+        .limit(limit),
+      db.select({ value: count() })
+        .from(orders)
+        .where(whereClause!),
     ]);
     
-    return { orders: data || [], total };
+    const total = totalResult[0]?.value || 0;
+    return { orders: (data || []).map(toLegacyOrder), total };
   } catch (error: any) {
     console.error('[shops] getShopOrders error:', error.message);
     return { orders: [], total: 0 };

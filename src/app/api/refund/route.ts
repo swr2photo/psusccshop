@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, requireAdmin, requireAdminWithPermission, isResourceOwner } from '@/lib/auth';
 import { getOrderByRef } from '@/lib/supabase';
-import { prisma } from '@/lib/prisma';
+import { db } from '@/lib/db';
+import { orders as ordersSchema } from '@/db/schema';
+import { and, eq, desc, isNotNull } from 'drizzle-orm';
 import { triggerSheetSync } from '@/lib/sheet-sync';
 import { sendPushNotification } from '@/lib/push-notification';
 
@@ -93,17 +95,35 @@ export async function GET(req: NextRequest) {
     if (adminAuth instanceof NextResponse) return adminAuth;
 
     try {
-      const where: any = {
-        refund_status: { not: null },
-      };
-      if (shopId) where.shop_id = shopId;
+      let conditions = isNotNull(ordersSchema.refundStatus);
+      if (shopId) conditions = and(conditions, eq(ordersSchema.shopId, shopId)) as any;
 
-      const data = await prisma.order.findMany({
-        where,
-        orderBy: { refund_requested_at: 'desc' },
-      });
+      const data = await db.select({
+        ref: ordersSchema.ref,
+        status: ordersSchema.status,
+        total_amount: ordersSchema.totalAmount,
+        created_at: ordersSchema.createdAt,
+        customer_name: ordersSchema.customerName,
+        customer_email: ordersSchema.customerEmail,
+        cart: ordersSchema.cart,
+        notes: ordersSchema.notes,
+        refund_status: ordersSchema.refundStatus,
+        refund_reason: ordersSchema.refundReason,
+        refund_details: ordersSchema.refundDetails,
+        refund_bank_name: ordersSchema.refundBankName,
+        refund_bank_account: ordersSchema.refundBankAccount,
+        refund_account_name: ordersSchema.refundAccountName,
+        refund_amount: ordersSchema.refundAmount,
+        refund_requested_at: ordersSchema.refundRequestedAt,
+        refund_reviewed_at: ordersSchema.refundReviewedAt,
+        refund_reviewed_by: ordersSchema.refundReviewedBy,
+        refund_admin_note: ordersSchema.refundAdminNote,
+      })
+      .from(ordersSchema)
+      .where(conditions)
+      .orderBy(desc(ordersSchema.refundRequestedAt));
 
-      const orders = (data || []).map((o: any) => {
+      const ordersList = (data || []).map((o: any) => {
         const refundFromNotes = extractRefundFromNotes(o.notes as string);
         const refund = o.refund_status
           ? {
@@ -143,7 +163,7 @@ export async function GET(req: NextRequest) {
         };
       });
 
-      return NextResponse.json({ orders });
+      return NextResponse.json({ orders: ordersList });
     } catch (error: any) {
       console.error('[Refund API] Admin list error:', error);
       return NextResponse.json({ error: error?.message || 'Internal server error' }, { status: 500 });
@@ -220,19 +240,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'จำนวนเงินไม่ถูกต้อง' }, { status: 400 });
     }
 
-    await prisma.order.update({
-      where: { ref },
-      data: {
-        refund_status: 'REQUESTED',
-        refund_reason: reason,
-        refund_details: details || null,
-        refund_bank_name: bankName,
-        refund_bank_account: bankAccount,
-        refund_account_name: accountName,
-        refund_amount: refundAmount,
-        refund_requested_at: new Date().toISOString(),
-      },
-    });
+    await db.update(ordersSchema)
+      .set({
+        refundStatus: 'REQUESTED',
+        refundReason: reason,
+        refundDetails: details || null,
+        refundBankName: bankName,
+        refundBankAccount: bankAccount,
+        refundAccountName: accountName,
+        refundAmount: refundAmount,
+        refundRequestedAt: new Date().toISOString(),
+        updatedAt: new Date(),
+      })
+      .where(eq(ordersSchema.ref, ref));
 
     return NextResponse.json({
       success: true,
@@ -284,14 +304,17 @@ export async function PUT(req: NextRequest) {
     }
 
     const updateData: any = {
-      refund_status: newRefundStatus,
-      refund_reviewed_at: new Date(),
-      refund_reviewed_by: authResult.email,
-      refund_admin_note: adminNote || null,
+      refundStatus: newRefundStatus,
+      refundReviewedAt: new Date().toISOString(),
+      refundReviewedBy: authResult.email,
+      refundAdminNote: adminNote || null,
+      updatedAt: new Date(),
     };
     if (newOrderStatus) updateData.status = newOrderStatus;
 
-    await prisma.order.update({ where: { ref }, data: updateData });
+    await db.update(ordersSchema)
+      .set(updateData)
+      .where(eq(ordersSchema.ref, ref));
 
     if (action === 'complete') triggerSheetSync().catch(() => {});
 

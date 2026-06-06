@@ -76,7 +76,7 @@ export default function CartDrawer(props: CartDrawerProps) {
     onUpdateCartItem,
   } = props;
 
-  const { t } = useTranslation();
+  const { t, lang } = useTranslation();
 
   // Swipe-to-dismiss state
   const [dragOffset, setDragOffset] = useState(0);
@@ -298,6 +298,11 @@ export default function CartDrawer(props: CartDrawerProps) {
                           {item.options?.customNumber && (
                             <Box sx={{ px: 1, py: 0.2, borderRadius: '6px', bgcolor: 'rgba(6,182,212,0.15)', border: '1px solid rgba(6,182,212,0.3)' }}>
                               <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--secondary)' }}>#{item.options.customNumber}</Typography>
+                            </Box>
+                          )}
+                          {item.options?.pattern && (
+                            <Box sx={{ px: 1, py: 0.2, borderRadius: '6px', bgcolor: 'rgba(56,189,248,0.15)', border: '1px solid rgba(56,189,248,0.3)' }}>
+                              <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: '#38bdf8' }}>{item.options.pattern}</Typography>
                             </Box>
                           )}
                         </Box>
@@ -681,6 +686,33 @@ export default function CartDrawer(props: CartDrawerProps) {
                   >
                     <Typography sx={{ color: 'var(--foreground)', fontWeight: 600 }}>{t.common.longSleeve} (+฿{product?.options?.longSleevePrice ?? 50})</Typography>
                     <Switch checked={editingCartItem.options?.isLongSleeve || false} color="warning" sx={{ pointerEvents: 'none' }} />
+                  </Box>
+                )}
+
+                {product?.patterns && product.patterns.filter(p => p.isActive !== false).length > 0 && (
+                  <Box sx={{ mb: 2 }}>
+                    <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', mb: 1 }}>
+                      {lang === 'en' ? 'Pattern/Design' : 'ลายสินค้า'}
+                    </Typography>
+                    <TextField
+                      select
+                      fullWidth
+                      value={editingCartItem.options?.pattern || ''}
+                      onChange={(e) => onSetEditingCartItem({
+                        ...editingCartItem,
+                        options: { ...editingCartItem.options, pattern: e.target.value }
+                      })}
+                      SelectProps={{ native: true }}
+                      sx={{
+                        '& .MuiOutlinedInput-root': { color: 'var(--foreground)', borderRadius: '12px' },
+                        '& fieldset': { borderColor: 'var(--glass-border)' },
+                      }}
+                    >
+                      <option value="">-- เลือกลายสินค้า --</option>
+                      {product.patterns.filter(p => p.isActive !== false).map(p => (
+                        <option key={p.id} value={p.name}>{p.name}</option>
+                      ))}
+                    </TextField>
                   </Box>
                 )}
 

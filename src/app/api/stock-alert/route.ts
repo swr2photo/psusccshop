@@ -1,6 +1,8 @@
 // API route for back-in-stock alerts
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db';
+import { stockAlerts } from '@/db/schema';
+import { eq, and, isNull } from 'drizzle-orm';
 import { createHash } from 'crypto';
 
 export const runtime = 'nodejs';
@@ -21,24 +23,46 @@ export async function POST(request: NextRequest) {
     }
 
     const emailHash = hashEmail(email);
+    const sizeVal = size || null;
 
-    const { data, error } = await supabase
-      .from('stock_alerts')
-      .upsert({
-        product_id: productId,
-        email_hash: emailHash,
-        size: size || null,
-        notified: false,
-        created_at: new Date().toISOString(),
-      }, {
-        onConflict: 'product_id,email_hash,size',
-      })
+    // Upsert stock alert
+    const existing = await db
       .select()
-      .single();
+      .from(stockAlerts)
+      .where(
+        and(
+          eq(stockAlerts.productId, productId),
+          eq(stockAlerts.emailHash, emailHash),
+          sizeVal ? eq(stockAlerts.size, sizeVal) : isNull(stockAlerts.size)
+        )
+      )
+      .limit(1);
 
-    if (error) throw error;
+    let resultData;
+    if (existing.length > 0) {
+      const updated = await db
+        .update(stockAlerts)
+        .set({
+          notified: false,
+        })
+        .where(eq(stockAlerts.id, existing[0].id))
+        .returning();
+      resultData = updated[0];
+    } else {
+      const inserted = await db
+        .insert(stockAlerts)
+        .values({
+          productId,
+          emailHash,
+          size: sizeVal,
+          notified: false,
+          createdAt: new Date(),
+        })
+        .returning();
+      resultData = inserted[0];
+    }
 
-    return NextResponse.json({ success: true, alert: data });
+    return NextResponse.json({ success: true, alert: resultData });
   } catch (error: any) {
     console.error('POST /api/stock-alert error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -57,13 +81,14 @@ export async function DELETE(request: NextRequest) {
 
     const emailHash = hashEmail(email);
 
-    const { error } = await supabase
-      .from('stock_alerts')
-      .delete()
-      .eq('product_id', productId)
-      .eq('email_hash', emailHash);
-
-    if (error) throw error;
+    await db
+      .delete(stockAlerts)
+      .where(
+        and(
+          eq(stockAlerts.productId, productId),
+          eq(stockAlerts.emailHash, emailHash)
+        )
+      );
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
@@ -82,19 +107,21 @@ export async function GET(request: NextRequest) {
 
     const emailHash = hashEmail(email);
 
-    const { data, error } = await supabase
-      .from('stock_alerts')
-      .select('*')
-      .eq('email_hash', emailHash)
-      .eq('notified', false);
-
-    if (error) throw error;
+    const data = await db
+      .select()
+      .from(stockAlerts)
+      .where(
+        and(
+          eq(stockAlerts.emailHash, emailHash),
+          eq(stockAlerts.notified, false)
+        )
+      );
 
     return NextResponse.json({
       alerts: (data || []).map((a: any) => ({
-        productId: a.product_id,
+        productId: a.productId,
         size: a.size,
-        createdAt: a.created_at,
+        createdAt: a.createdAt?.toISOString(),
       })),
     });
   } catch (error: any) {

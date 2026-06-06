@@ -1,10 +1,12 @@
 // src/app/api/support-chat/settings/route.ts
-// Chat settings API (Admin only) — Prisma
+// Chat settings API (Admin only) — Drizzle ORM
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions, isAdminEmail } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { db } from '@/lib/db';
+import { config } from '@/db/schema';
+import { eq } from 'drizzle-orm';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -36,9 +38,12 @@ export async function GET() {
       return NextResponse.json('Unauthorized', { status: 401 });
     }
     
-    const data = await prisma.config.findUnique({
-      where: { key: 'support_chat_settings' },
-    });
+    const dataResults = await db.select()
+      .from(config)
+      .where(eq(config.key, 'support_chat_settings'))
+      .limit(1);
+      
+    const data = dataResults[0];
     
     return NextResponse.json({ 
       settings: (data?.value as any) || DEFAULT_SETTINGS 
@@ -64,11 +69,12 @@ export async function POST(request: NextRequest) {
     const settings = await request.json();
     const merged = { ...DEFAULT_SETTINGS, ...settings };
     
-    await prisma.config.upsert({
-      where: { key: 'support_chat_settings' },
-      update: { value: merged as any },
-      create: { key: 'support_chat_settings', value: merged as any },
-    });
+    await db.insert(config)
+      .values({ key: 'support_chat_settings', value: merged })
+      .onConflictDoUpdate({
+        target: config.key,
+        set: { value: merged, updatedAt: new Date() },
+      });
     
     return NextResponse.json({ success: true, settings: merged });
     

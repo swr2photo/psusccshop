@@ -218,6 +218,19 @@ export function useTrackShipmentQuery(trackingNumber: string | undefined, enable
   });
 }
 
+// ============== PUBLIC SHOP DETAILS ==============
+
+export function usePublicShopQuery(shopId: string | undefined, initialShopData?: any) {
+  return useQuery({
+    queryKey: [...queryKeys.shop.all, 'public', shopId || ''],
+    queryFn: () => fetchJSON<{ status: string; shop?: any }>(`/api/shops/${shopId}/public`),
+    enabled: !!shopId,
+    staleTime: 20 * 1000, // 20 seconds
+    refetchOnWindowFocus: 'always',
+    initialData: initialShopData ? { status: 'success', shop: initialShopData } : undefined,
+  });
+}
+
 export default {
   useShopConfigQuery,
   useUserProfileQuery,
@@ -229,4 +242,5 @@ export default {
   usePaymentInfoQuery,
   useSubmitOrderMutation,
   useTrackShipmentQuery,
+  usePublicShopQuery,
 };

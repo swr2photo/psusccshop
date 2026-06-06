@@ -184,16 +184,20 @@ export async function POST(request: NextRequest) {
 
     // Log the email
     try {
-      const { supabase } = await import('@/lib/supabase');
-      await supabase.from('email_logs').insert({
-        order_ref: order.ref,
-        to_email: email,
-        email_type: type,
+      const { db } = await import('@/lib/db');
+      const { emailLogs } = await import('@/db/schema');
+      await db.insert(emailLogs).values({
+        orderRef: order.ref,
+        toEmail: email,
+        fromEmail: fromEmail,
+        subject: template.subject,
+        body: template.body,
+        emailType: type,
         status: 'sent',
-        metadata: { resendId: result.id, subject: template.subject },
+        sentAt: new Date().toISOString(),
       });
-    } catch {
-      // Log failure is non-critical
+    } catch (err) {
+      console.error('Failed to log email to DB:', err);
     }
 
     return NextResponse.json({ success: true, emailId: result.id });

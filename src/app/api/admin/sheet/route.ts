@@ -31,7 +31,8 @@ const summarizeItems = (items: any[]): string => {
     const customName = item.options?.customName ? ` | Name:${item.options.customName}` : '';
     const customNumber = item.options?.customNumber ? ` | No:${item.options.customNumber}` : '';
     const longSleeve = item.options?.isLongSleeve ? ' | LongSleeve' : '';
-    return `${name}${size} x${qty}${price}${total}${customName}${customNumber}${longSleeve}`.trim();
+    const pattern = item.options?.pattern || item.pattern ? ` | Pattern:${item.options?.pattern || item.pattern}` : '';
+    return `${name}${size} x${qty}${price}${total}${customName}${customNumber}${longSleeve}${pattern}`.trim();
   }).join('; ');
 };
 
@@ -109,6 +110,7 @@ const buildFactoryExport = (orders: any[]) => {
           originalQty: qty,
           itemIndex: qty > 1 ? `(${i + 1}/${qty})` : '',
           isLongSleeve,
+          pattern: item.options?.pattern || item.pattern || '',
           customName: item.options?.customName || item.customName || '',
           customNumber: item.options?.customNumber || item.customNumber || '',
           unitPrice: item.unitPrice || 0,
@@ -130,6 +132,7 @@ const buildFactoryExport = (orders: any[]) => {
     'ลำดับ',
     'ไซซ์',
     'แขน',
+    'ลาย',
     'ชื่อสกรีน',
     'เบอร์สกรีน',
     'ชื่อลูกค้า',
@@ -146,6 +149,7 @@ const buildFactoryExport = (orders: any[]) => {
     index + 1,
     item.size,
     item.isLongSleeve ? 'แขนยาว' : 'แขนสั้น',
+    item.pattern || '-',
     item.customName || '-',
     item.customNumber || '-',
     item.customerName,
@@ -334,7 +338,7 @@ export async function POST(req: NextRequest) {
     
     await sheets.spreadsheets.values.update({
       spreadsheetId: sheetId,
-      range: `${FACTORY_EXPORT_TITLE}!A1:L${factoryValues.length}`,
+      range: `${FACTORY_EXPORT_TITLE}!A1:M${factoryValues.length}`,
       valueInputOption: 'RAW',
       requestBody: { values: factoryValues },
     });

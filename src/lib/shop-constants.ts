@@ -237,6 +237,7 @@ export type CartItem = {
     customName?: string;
     customNumber?: string;
     isLongSleeve?: boolean;
+    pattern?: string;
   };
 };
 

@@ -4,7 +4,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db';
+import { orders, paymentTransactions } from '@/db/schema';
+import { eq } from 'drizzle-orm';
+import crypto from 'crypto';
 import { 
   PaymentMethod, 
   PaymentGateway,
@@ -54,13 +57,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify order exists and belongs to user
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .select('*')
-      .eq('ref', orderId)
-      .single();
-
-    if (orderError || !order) {
+    const orderData = await db
+      .select()
+      .from(orders)
+      .where(eq(orders.ref, orderId))
+      .limit(1);
+    const order = orderData[0];
+ 
+    if (!order) {
       return NextResponse.json(
         { success: false, error: 'ไม่พบรายการสั่งซื้อ' },
         { status: 404 }
@@ -106,22 +110,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Save transaction record
-    const transactionId = `txn_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    const transactionId = crypto.randomUUID();
     
-    await supabase
-      .from('payment_transactions')
-      .insert({
-        id: transactionId,
-        order_id: orderId,
-        method,
-        gateway,
-        amount,
-        currency: 'THB',
-        status: 'pending',
-        gateway_charge_id: chargeResult.chargeId,
-        created_at: new Date().toISOString(),
-        raw_response: chargeResult.rawResponse,
-      });
+    await db.insert(paymentTransactions).values({
+      id: transactionId,
+      orderId: order.id,
+      method,
+      gateway,
+      amount,
+      currency: 'THB',
+      status: 'pending',
+      gatewayChargeId: chargeResult.chargeId,
+      createdAt: new Date(),
+      rawResponse: chargeResult.rawResponse,
+    });
 
     return NextResponse.json({
       success: true,

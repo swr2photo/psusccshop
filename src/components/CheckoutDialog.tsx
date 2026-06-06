@@ -58,6 +58,7 @@ interface CartItem {
     customName?: string;
     customNumber?: string;
     isLongSleeve?: boolean;
+    pattern?: string;
   };
 }
 
@@ -536,6 +537,11 @@ export default function CheckoutDialog({
                         {item.options?.isLongSleeve && (
                           <Box sx={{ px: 0.6, py: 0.1, borderRadius: '4px', bgcolor: 'rgba(99,102,241,0.15)', fontSize: '0.65rem', color: '#818cf8' }}>
                             {t.common.longSleeve}
+                          </Box>
+                        )}
+                        {item.options?.pattern && (
+                          <Box sx={{ px: 0.6, py: 0.1, borderRadius: '4px', bgcolor: 'rgba(56,189,248,0.15)', fontSize: '0.65rem', color: '#38bdf8' }}>
+                            {item.options.pattern}
                           </Box>
                         )}
                       </Box>

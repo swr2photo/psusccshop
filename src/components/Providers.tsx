@@ -1,6 +1,17 @@
 // src/components/Providers.tsx
 'use client';
 
+// Workaround for the "Encountered a script tag" warning in React 19
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  const orig = console.error;
+  console.error = (...args: unknown[]) => {
+    if (typeof args[0] === 'string' && args[0].includes('Encountered a script tag')) {
+      return;
+    }
+    orig.apply(console, args);
+  };
+}
+
 import React, { Component, ErrorInfo, useMemo, useEffect, lazy, Suspense } from 'react';
 import { SessionProvider } from "next-auth/react";
 import { ThemeProvider, createTheme } from '@mui/material/styles';
@@ -91,7 +102,19 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, ErrorBounda
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', maxWidth: 280, margin: '0 auto' }}>
             <button
               className="err-btn"
-              onClick={function() { window.location.reload(); }}
+              onClick={function() {
+                if ('serviceWorker' in navigator) {
+                  navigator.serviceWorker.getRegistrations().then(function(regs) {
+                    regs.forEach(function(r) { r.unregister(); });
+                  });
+                }
+                if ('caches' in window) {
+                  caches.keys().then(function(names) {
+                    names.forEach(function(n) { caches.delete(n); });
+                  });
+                }
+                setTimeout(function() { window.location.reload(); }, 150);
+              }}
               style={{
                 padding: '12px 32px',
                 fontSize: 15,

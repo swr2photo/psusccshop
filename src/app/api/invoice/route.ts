@@ -18,15 +18,17 @@ export async function GET(request: NextRequest) {
     let order: any = null;
 
     try {
-      const { supabase } = await import('@/lib/supabase');
-      const { data } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('ref', ref)
-        .single();
-      if (data) order = data;
-    } catch {
-      // Supabase not available, try filebase
+      const { db } = await import('@/lib/db');
+      const { orders } = await import('@/db/schema');
+      const { eq } = await import('drizzle-orm');
+      const data = await db
+        .select()
+        .from(orders)
+        .where(eq(orders.ref, ref))
+        .limit(1);
+      if (data && data[0]) order = data[0];
+    } catch (err) {
+      console.error('Invoice DB fetch error:', err);
     }
 
     if (!order) {
@@ -86,10 +88,13 @@ export async function GET(request: NextRequest) {
     const discount = order.discount || 0;
     const grandTotal = order.total_amount || order.totalAmount || subtotal + shippingFee - discount;
 
-    const cartRows = cart.map((item: any) => `
+    const cartRows = cart.map((item: any) => {
+      const pattern = item.pattern || item.options?.pattern;
+      return `
       <tr>
         <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;font-size:13px;">
           ${item.name || 'Item'}
+          ${pattern ? `<br><small style="color:#0071e3;font-weight:600;">Pattern: ${pattern}</small>` : ''}
           ${item.customName ? `<br><small style="color:#666;">Name: ${item.customName}</small>` : ''}
           ${item.customNumber ? `<small style="color:#666;"> #${item.customNumber}</small>` : ''}
         </td>
@@ -98,7 +103,8 @@ export async function GET(request: NextRequest) {
         <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;font-size:13px;text-align:right;">฿${((item.total || item.price || 0) / (item.qty || 1)).toLocaleString()}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;font-size:13px;text-align:right;font-weight:600;">฿${(item.total || item.price || 0).toLocaleString()}</td>
       </tr>
-    `).join('');
+      `;
+    }).join('');
 
     const html = `<!DOCTYPE html>
 <html lang="${lang}">

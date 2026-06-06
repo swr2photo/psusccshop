@@ -1,8 +1,10 @@
 // src/app/api/cron/update-tracking/route.ts
-// Cron job to auto-update order status based on tracking information — Prisma
+// Cron job to auto-update order status based on tracking information — Drizzle ORM
 
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { db } from '@/lib/db';
+import { orders } from '@/db/schema';
+import { eq, and, desc, isNotNull } from 'drizzle-orm';
 import { trackShipment, TrackingStatus, ShippingProvider } from '@/lib/shipping';
 
 export const runtime = 'nodejs';
@@ -33,29 +35,30 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const orders = await prisma.order.findMany({
-      where: {
-        status: 'SHIPPED',
-        tracking_number: { not: null },
-      },
-      select: {
-        ref: true,
-        status: true,
-        tracking_number: true,
-        shipping_provider: true,
-        tracking_last_checked: true,
-      },
-      orderBy: { created_at: 'desc' },
-      take: 50,
-    });
+    const fetchedOrders = await db.select({
+      ref: orders.ref,
+      status: orders.status,
+      tracking_number: orders.trackingNumber,
+      shipping_provider: orders.shippingProvider,
+      tracking_last_checked: orders.trackingLastChecked,
+    })
+    .from(orders)
+    .where(
+      and(
+        eq(orders.status, 'SHIPPED'),
+        isNotNull(orders.trackingNumber)
+      )
+    )
+    .orderBy(desc(orders.createdAt))
+    .limit(50);
 
-    if (!orders.length) {
+    if (!fetchedOrders.length) {
       return NextResponse.json({ success: true, message: 'No orders to check', processed: 0, updated: 0 });
     }
 
     const results = { processed: 0, updated: 0, delivered: 0, errors: [] as string[] };
 
-    for (const order of orders) {
+    for (const order of fetchedOrders) {
       results.processed++;
       try {
         if (order.tracking_last_checked) {
@@ -68,22 +71,24 @@ export async function GET(request: NextRequest) {
         const trackingInfo = await trackShipment(provider, order.tracking_number!);
 
         const updateData: any = {
-          tracking_last_checked: new Date(),
-          tracking_status: trackingInfo?.status || 'unknown',
+          trackingLastChecked: new Date().toISOString(),
+          trackingStatus: trackingInfo?.status || 'unknown',
         };
 
         if (trackingInfo?.status) {
           const newOrderStatus = TRACKING_TO_ORDER_STATUS[trackingInfo.status];
           if (newOrderStatus && newOrderStatus !== order.status && newOrderStatus === 'RECEIVED') {
             updateData.status = 'RECEIVED';
-            updateData.received_at = new Date();
+            updateData.receivedAt = new Date().toISOString();
             results.delivered++;
             results.updated++;
             console.log(`[Tracking] Order ${order.ref} auto-updated to RECEIVED`);
           }
         }
 
-        await prisma.order.update({ where: { ref: order.ref }, data: updateData });
+        await db.update(orders)
+          .set(updateData)
+          .where(eq(orders.ref, order.ref));
         await new Promise(resolve => setTimeout(resolve, 500));
       } catch (orderError: any) {
         results.errors.push(`${order.ref}: ${orderError.message}`);

@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Providers from "@/components/Providers";
 import ThemeRegistry from "../components/ThemeRegistry";
+import Script from "next/script";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -89,28 +90,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="th" dir="ltr" suppressHydrationWarning>
       <head>
-        {/* Inline theme script — runs before React hydration to prevent FOUC */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){try{var s=localStorage.getItem('psusccshop-theme');if(s){var m=JSON.parse(s).state.mode;var r=m==='system'?window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark':m;document.documentElement.setAttribute('data-theme',r);document.documentElement.style.colorScheme=r}else{var r=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark';document.documentElement.setAttribute('data-theme',r);document.documentElement.style.colorScheme=r}}catch(e){}})()`,
-          }}
-        />
-        {/* Force SW update + clear old caches on load */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(function(regs){regs.forEach(function(r){r.update()})});caches.keys().then(function(names){names.forEach(function(n){if(n.indexOf('scc-shop-v2.3.0')===-1){caches.delete(n)}})})}})()`,
-          }}
-        />
         {/* Preconnect to external resources for faster loading */}
         <link rel="preconnect" href="https://ipfs.filebase.io" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://s3.filebase.com" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://ipfs.filebase.io" />
         <link rel="dns-prefetch" href="https://s3.filebase.com" />
         {/* Preconnect to Supabase for faster API/realtime */}
-        {process.env.NEXT_PUBLIC_SUPABASE_URL && (
+        {(process.env.NEXT_PUBLIC_SUPABASE_URL2 || process.env.NEXT_PUBLIC_SUPABASE_URL) && (
           <>
-            <link rel="preconnect" href={process.env.NEXT_PUBLIC_SUPABASE_URL} crossOrigin="anonymous" />
-            <link rel="dns-prefetch" href={process.env.NEXT_PUBLIC_SUPABASE_URL} />
+            <link rel="preconnect" href={process.env.NEXT_PUBLIC_SUPABASE_URL2 || process.env.NEXT_PUBLIC_SUPABASE_URL} crossOrigin="anonymous" />
+            <link rel="dns-prefetch" href={process.env.NEXT_PUBLIC_SUPABASE_URL2 || process.env.NEXT_PUBLIC_SUPABASE_URL} />
           </>
         )}
         {/* Apple Touch Icons */}
@@ -119,8 +108,59 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="SCC Shop" />
+        {/* Workaround for React 19 script warnings */}
+        <Script
+          id="console-filter"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `(function(){
+              if (window.console && window.console.error) {
+                var orig = window.console.error;
+                window.console.error = function() {
+                  if (arguments[0] && typeof arguments[0] === 'string' && arguments[0].indexOf('Encountered a script tag') !== -1) {
+                    return;
+                  }
+                  orig.apply(window.console, arguments);
+                };
+              }
+            })()`,
+          }}
+        />
+        {/* Inline theme script — runs before React hydration to prevent FOUC */}
+        <Script
+          id="theme-initializer"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var s=localStorage.getItem('psusccshop-theme');if(s){var m=JSON.parse(s).state.mode;var r=m==='system'?window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark':m;document.documentElement.setAttribute('data-theme',r);document.documentElement.style.colorScheme=r}else{var r=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark';document.documentElement.setAttribute('data-theme',r);document.documentElement.style.colorScheme=r}}catch(e){}})()`,
+          }}
+        />
+        {/* Force SW update + clear old caches on load */}
+        <Script
+          id="sw-updater"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `(function(){
+              if('serviceWorker' in navigator){
+                navigator.serviceWorker.getRegistrations().then(function(regs){
+                  regs.forEach(function(r){
+                    ${process.env.NODE_ENV === 'development' ? 'r.unregister();' : 'r.update();'}
+                  })
+                });
+                if (${process.env.NODE_ENV === 'development'}) {
+                  caches.keys().then(function(names){
+                    names.forEach(function(n){ caches.delete(n); })
+                  });
+                } else {
+                  caches.keys().then(function(names){
+                    names.forEach(function(n){if(n.indexOf('scc-shop-v2.3.0')===-1){caches.delete(n)}})
+                  });
+                }
+              }
+            })()`,
+          }}
+        />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased relative min-h-screen overflow-x-hidden`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased relative min-h-screen overflow-x-hidden`} suppressHydrationWarning={true}>
         {/* Skip to main content link for accessibility */}
         <a 
           href="#main-content" 

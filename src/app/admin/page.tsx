@@ -186,6 +186,7 @@ interface CartItemAdmin {
     customName?: string;
     customNumber?: string;
     isLongSleeve?: boolean;
+    pattern?: string;
   };
 }
 
@@ -4524,7 +4525,7 @@ export default function AdminPage(): JSX.Element {
     const isBase64 = (str: string) => str && str.startsWith('data:image');
     
     // Collect all base64 images
-    const imagesToUpload: { productIndex: number; field: 'coverImage' | 'images'; imageIndex?: number; base64: string }[] = [];
+    const imagesToUpload: { productIndex: number; field: 'coverImage' | 'images' | 'patternImage'; imageIndex?: number; patternIndex?: number; base64: string }[] = [];
     
     products.forEach((product, productIndex) => {
       if (product.coverImage && isBase64(product.coverImage)) {
@@ -4534,6 +4535,13 @@ export default function AdminPage(): JSX.Element {
         product.images.forEach((img: string, imageIndex: number) => {
           if (isBase64(img)) {
             imagesToUpload.push({ productIndex, field: 'images', imageIndex, base64: img });
+          }
+        });
+      }
+      if (Array.isArray(product.patterns)) {
+        product.patterns.forEach((pattern: any, patternIndex: number) => {
+          if (pattern?.image && isBase64(pattern.image)) {
+            imagesToUpload.push({ productIndex, field: 'patternImage', patternIndex, base64: pattern.image });
           }
         });
       }
@@ -4597,6 +4605,14 @@ export default function AdminPage(): JSX.Element {
             updatedProducts[result.productIndex] = {
               ...updatedProducts[result.productIndex],
               images,
+            };
+          } else if (result.field === 'patternImage' && typeof result.patternIndex === 'number') {
+            const patterns = [...(updatedProducts[result.productIndex].patterns || [])];
+            const target = patterns[result.patternIndex] || {};
+            patterns[result.patternIndex] = { ...target, image: result.url };
+            updatedProducts[result.productIndex] = {
+              ...updatedProducts[result.productIndex],
+              patterns,
             };
           }
         }
@@ -7033,6 +7049,20 @@ export default function AdminPage(): JSX.Element {
                                 }} 
                               />
                             )}
+                            {item.options?.pattern && (
+                              <Chip 
+                                size="small" 
+                                label={`ลาย: ${item.options.pattern}`} 
+                                sx={{ 
+                                  height: 22, 
+                                  fontSize: '0.7rem', 
+                                  fontWeight: 600,
+                                  bgcolor: 'rgba(56, 189, 248, 0.2)', 
+                                  color: '#38bdf8',
+                                  border: '1px solid rgba(56, 189, 248, 0.3)',
+                                }} 
+                              />
+                            )}
                           </Box>
 
                           {/* Custom Name & Number - More prominent */}
@@ -7857,6 +7887,19 @@ export default function AdminPage(): JSX.Element {
                                         }}
                                       />
                                     )}
+                                    {item.options?.pattern && (
+                                      <Chip
+                                        size="small"
+                                        label={`ลาย: ${item.options.pattern}`}
+                                        sx={{
+                                          height: 20,
+                                          fontSize: '0.7rem',
+                                          bgcolor: 'rgba(56, 189, 248, 0.15)',
+                                          color: '#38bdf8',
+                                          border: '1px solid rgba(56, 189, 248, 0.3)',
+                                        }}
+                                      />
+                                    )}
                                   </Box>
                                   <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                                     จำนวน: {item.quantity} ชิ้น × ฿{Number(item.unitPrice).toLocaleString()}
@@ -8381,6 +8424,39 @@ export default function AdminPage(): JSX.Element {
                           },
                         }}
                       />
+                      
+                      {/* Pattern Selection */}
+                      {(() => {
+                        const product = config?.products?.find(p => p.id === item.productId);
+                        const patterns = product?.patterns?.filter(p => p.isActive !== false) || [];
+                        if (patterns.length === 0) return null;
+                        return (
+                          <TextField
+                            select
+                            fullWidth
+                            label="ลายเสื้อ"
+                            value={item.options?.pattern || ''}
+                            onChange={(e) => {
+                              const newOptions = { ...item.options, pattern: e.target.value };
+                              updateCartItem(idx, { options: newOptions });
+                            }}
+                            SelectProps={{ native: true }}
+                            size="small"
+                            sx={{
+                              ...inputSx,
+                              '& .MuiOutlinedInput-root': {
+                                ...inputSx['& .MuiOutlinedInput-root'],
+                                borderRadius: '10px',
+                              },
+                            }}
+                          >
+                            <option value="">-- เลือกลายสินค้า --</option>
+                            {patterns.map(p => (
+                              <option key={p.id} value={p.name}>{p.name}</option>
+                            ))}
+                          </TextField>
+                        );
+                      })()}
                       
                       {/* Long Sleeve Toggle */}
                       <Box 
@@ -10561,6 +10637,7 @@ function ProductsView({ config, searchTerm, setSearchTerm, saveFullConfig, showT
       coverImage: '',
       basePrice: 0,
       sizePricing: {},
+      patterns: [],
       startDate: '',
       endDate: '',
       isActive: true,
@@ -10729,6 +10806,7 @@ function ProductsView({ config, searchTerm, setSearchTerm, saveFullConfig, showT
           onChange={setEditingProduct}
           onSave={handleSaveEdit}
           isSaving={saving}
+          showToast={showToast}
         />
       )}
 
@@ -10992,7 +11070,7 @@ const ProductPickupDialog = ({
   );
 };
 
-const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any): JSX.Element => {
+const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving, showToast }: any): JSX.Element => {
   const [newSizeKey, setNewSizeKey] = useState('');
   const [newSizePrice, setNewSizePrice] = useState<number | ''>('');
   const [coverUploadLoading, setCoverUploadLoading] = useState(false);
@@ -11000,6 +11078,8 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any
   const [newVariantName, setNewVariantName] = useState('');
   const [newVariantPrice, setNewVariantPrice] = useState<number | ''>('');
   const [newVariantStock, setNewVariantStock] = useState<number | ''>('');
+  const [newPatternName, setNewPatternName] = useState('');
+  const [newPatternImage, setNewPatternImage] = useState('');
   const MAX_IMAGE_SIZE = 3 * 1024 * 1024; // ~3MB
   
   // Helper: Check if product needs variants instead of sizes
@@ -11051,6 +11131,82 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any
   const filterValidFiles = (files: FileList | null) => {
     if (!files) return [];
     return Array.from(files).filter((file) => file.type.startsWith('image/') && file.size <= MAX_IMAGE_SIZE);
+  };
+
+  const readFileAsDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  const handleAddPattern = () => {
+    if (!newPatternName.trim()) return;
+    const names = newPatternName
+      .split(/[\n,;]+/)
+      .map((name) => name.trim())
+      .filter((name) => name.length > 0);
+    if (names.length === 0) return;
+
+    const newPatterns = names.map((name, index) => ({
+      id: `pat_${Date.now()}_${index}_${Math.random().toString(36).slice(2, 6)}`,
+      name,
+      image: index === 0 && newPatternImage ? newPatternImage : undefined,
+      isActive: true,
+    }));
+
+    const patterns = [...((product as any).patterns || []), ...newPatterns];
+    onChange({ ...product, patterns } as any);
+    setNewPatternName('');
+    setNewPatternImage('');
+    if (names.length > 1) {
+      showToast?.('success', `เพิ่มสำเร็จ ${names.length} ลาย`);
+    }
+  };
+
+  const handleUpdatePattern = (patternId: string, field: string, value: any) => {
+    const patterns = ((product as any).patterns || []).map((p: any) =>
+      p.id === patternId ? { ...p, [field]: value } : p
+    );
+    onChange({ ...product, patterns } as any);
+  };
+
+  const handleRemovePattern = (patternId: string) => {
+    const patterns = ((product as any).patterns || []).filter((p: any) => p.id !== patternId);
+    onChange({ ...product, patterns } as any);
+  };
+
+  const handlePatternImageUpload = async (patternId: string, files: FileList | null) => {
+    const validFiles = filterValidFiles(files);
+    if (validFiles.length === 0) return;
+    const dataUrl = await readFileAsDataUrl(validFiles[0]);
+    handleUpdatePattern(patternId, 'image', dataUrl);
+  };
+
+  const handleNewPatternImageUpload = async (files: FileList | null) => {
+    const validFiles = filterValidFiles(files);
+    if (validFiles.length === 0) return;
+
+    if (validFiles.length === 1) {
+      const dataUrl = await readFileAsDataUrl(validFiles[0]);
+      setNewPatternImage(dataUrl);
+    } else {
+      const newPatterns = await Promise.all(
+        validFiles.map(async (file, index) => {
+          const dataUrl = await readFileAsDataUrl(file);
+          const name = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+          return {
+            id: `pat_${Date.now()}_${index}_${Math.random().toString(36).slice(2, 6)}`,
+            name: name.trim(),
+            image: dataUrl,
+            isActive: true,
+          };
+        })
+      );
+      const patterns = [...((product as any).patterns || []), ...newPatterns];
+      onChange({ ...product, patterns } as any);
+      showToast?.('success', `เพิ่มสำเร็จ ${newPatterns.length} ลายจากไฟล์ภาพ`);
+    }
   };
 
   const handleSizePriceChange = (size: string, price: number) => {
@@ -11822,6 +11978,137 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving }: any
             })}
           </Box>
         </Box>
+
+        {(((product as any).category || (product.type === 'OTHER' ? 'OTHER' : 'APPAREL')) === 'APPAREL') && (
+          <Box sx={{ bgcolor: 'rgba(14,165,233,0.08)', p: 2, borderRadius: 1, border: '1px solid rgba(14,165,233,0.3)', display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Palette size={16} /> ลายเสื้อ (Patterns)
+              </Typography>
+              <Typography variant="caption" sx={{ color: ADMIN_THEME.muted }}>
+                เลือกลายและแนบรูปลายเสื้อได้
+              </Typography>
+            </Box>
+
+            {(((product as any).patterns || []) as any[]).length === 0 ? (
+              <Typography variant="caption" sx={{ color: ADMIN_THEME.muted, fontStyle: 'italic' }}>
+                ยังไม่มีลายสินค้า
+              </Typography>
+            ) : (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {(((product as any).patterns || []) as any[]).map((pattern: any) => {
+                  const isActive = pattern.isActive !== false;
+                  return (
+                    <Box
+                      key={pattern.id}
+                      sx={{
+                        display: 'grid',
+                        gridTemplateColumns: { xs: '1fr', sm: '140px 1fr auto' },
+                        gap: 1,
+                        alignItems: 'center',
+                        p: 1.2,
+                        bgcolor: 'var(--glass-bg)',
+                        borderRadius: 1,
+                        border: `1px solid ${ADMIN_THEME.border}`,
+                      }}
+                    >
+                      <Box sx={{
+                        width: '100%',
+                        height: 90,
+                        borderRadius: 1,
+                        overflow: 'hidden',
+                        border: `1px solid ${ADMIN_THEME.border}`,
+                        bgcolor: 'rgba(15,23,42,0.4)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}>
+                        {pattern.image ? (
+                          <Box component="img" src={pattern.image} alt={pattern.name} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <ImageIcon size={20} color={ADMIN_THEME.muted} />
+                        )}
+                      </Box>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        <TextField
+                          label="ชื่อลาย"
+                          size="small"
+                          value={pattern.name}
+                          onChange={(e) => handleUpdatePattern(pattern.id, 'name', e.target.value)}
+                          sx={inputSx}
+                        />
+                        <Button variant="outlined" component="label" size="small" sx={{ borderColor: ADMIN_THEME.border, color: ADMIN_THEME.text, textTransform: 'none', width: 'fit-content' }}>
+                          แนบ/เปลี่ยนรูปลาย
+                          <input hidden accept="image/*" type="file" onChange={(e) => handlePatternImageUpload(pattern.id, e.target.files)} />
+                        </Button>
+                      </Box>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleUpdatePattern(pattern.id, 'isActive', !isActive)}
+                          sx={{ color: isActive ? '#22c55e' : '#64748b' }}
+                        >
+                          {isActive ? <Visibility size={20} /> : <VisibilityOff size={20} />}
+                        </IconButton>
+                        <IconButton size="small" onClick={() => handleRemovePattern(pattern.id)} sx={{ color: '#f87171' }}>
+                          <Delete size={20} />
+                        </IconButton>
+                      </Box>
+                    </Box>
+                  );
+                })}
+              </Box>
+            )}
+
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '2fr 1fr auto' }, gap: 1, alignItems: 'center', mt: 0.5 }}>
+              <TextField
+                label="ชื่อลายใหม่ (คั่นด้วยเครื่องหมายจุลภาค , เพื่อเพิ่มหลายลาย)"
+                value={newPatternName}
+                onChange={(e) => setNewPatternName(e.target.value)}
+                size="small"
+                placeholder="เช่น ลาย A, ลาย B, ลาย C"
+                sx={inputSx}
+              />
+              <Button
+                variant="outlined"
+                component="label"
+                size="small"
+                sx={{ borderColor: ADMIN_THEME.border, color: ADMIN_THEME.text, textTransform: 'none' }}
+              >
+                แนบรูปลาย (เลือกหลายไฟล์ได้)
+                <input hidden accept="image/*" type="file" multiple onChange={(e) => handleNewPatternImageUpload(e.target.files)} />
+              </Button>
+              <Button
+                onClick={handleAddPattern}
+                variant="contained"
+                size="small"
+                startIcon={<Add size={18} />}
+                sx={{ background: 'linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%)' }}
+              >
+                เพิ่มลาย
+              </Button>
+            </Box>
+
+            {newPatternImage && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box
+                  component="img"
+                  src={newPatternImage}
+                  alt="new-pattern"
+                  sx={{ width: 90, height: 60, objectFit: 'cover', borderRadius: 1, border: `1px solid ${ADMIN_THEME.border}` }}
+                />
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => setNewPatternImage('')}
+                  sx={{ borderColor: ADMIN_THEME.border, color: ADMIN_THEME.text, textTransform: 'none' }}
+                >
+                  ลบรูปลาย
+                </Button>
+              </Box>
+            )}
+          </Box>
+        )}
 
         <Box sx={{ bgcolor: ADMIN_THEME.glassSoft, p: 2, borderRadius: 1, border: `1px solid ${ADMIN_THEME.border}` }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 2, color: ADMIN_THEME.text }}>Product Options</Typography>

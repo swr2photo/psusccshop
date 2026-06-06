@@ -1,7 +1,9 @@
 // src/lib/api-key-rotation.ts
-// API Key management and rotation system — Prisma
+// API Key management and rotation system — Drizzle ORM
 
-import { prisma } from './prisma';
+import { db } from './db';
+import { keyValueStore } from '../db/schema';
+import { eq, like } from 'drizzle-orm';
 import crypto from 'crypto';
 
 // ==================== TYPES ====================
@@ -90,9 +92,8 @@ export async function createAPIKey(options: {
     rateLimit: options.rateLimit,
   };
   
-  await prisma.keyValueStore.create({
-    data: { key: keyStoreKey(keyId), value: apiKey as any },
-  });
+  await db.insert(keyValueStore)
+    .values({ key: keyStoreKey(keyId), value: apiKey as any });
   
   return { key, keyId };
 }
@@ -103,9 +104,9 @@ export async function validateAPIKey(key: string): Promise<APIKeyValidation> {
     const keyHash = hashAPIKey(key);
     
     // Get all API keys
-    const allKeys = await prisma.keyValueStore.findMany({
-      where: { key: { startsWith: KEY_PREFIX } },
-    });
+    const allKeys = await db.select()
+      .from(keyValueStore)
+      .where(like(keyValueStore.key, `${KEY_PREFIX}%`));
     
     for (const entry of allKeys) {
       const apiKey = entry.value as any as APIKey;
@@ -118,10 +119,9 @@ export async function validateAPIKey(key: string): Promise<APIKeyValidation> {
       // Update usage
       apiKey.lastUsedAt = new Date().toISOString();
       apiKey.usageCount++;
-      await prisma.keyValueStore.update({
-        where: { key: entry.key },
-        data: { value: apiKey as any },
-      });
+      await db.update(keyValueStore)
+        .set({ value: apiKey as any })
+        .where(eq(keyValueStore.key, entry.key));
       
       return {
         valid: true,
@@ -140,17 +140,18 @@ export async function validateAPIKey(key: string): Promise<APIKeyValidation> {
 
 // Rotate an API key (create new, invalidate old)
 export async function rotateAPIKey(keyId: string, rotatedBy: string): Promise<{ newKey: string; newKeyId: string }> {
-  const entry = await prisma.keyValueStore.findUnique({
-    where: { key: keyStoreKey(keyId) },
-  });
+  const rows = await db.select()
+    .from(keyValueStore)
+    .where(eq(keyValueStore.key, keyStoreKey(keyId)))
+    .limit(1);
+  const entry = rows[0];
   if (!entry) throw new Error('API key not found');
   
   const oldKey = entry.value as any as APIKey;
   oldKey.isActive = false;
-  await prisma.keyValueStore.update({
-    where: { key: keyStoreKey(keyId) },
-    data: { value: oldKey as any },
-  });
+  await db.update(keyValueStore)
+    .set({ value: oldKey as any })
+    .where(eq(keyValueStore.key, keyStoreKey(keyId)));
   
   const result = await createAPIKey({
     name: oldKey.name,
@@ -163,9 +164,11 @@ export async function rotateAPIKey(keyId: string, rotatedBy: string): Promise<{ 
 
 // Revoke an API key
 export async function revokeAPIKey(keyId: string, revokedBy: string, reason?: string): Promise<void> {
-  const entry = await prisma.keyValueStore.findUnique({
-    where: { key: keyStoreKey(keyId) },
-  });
+  const rows = await db.select()
+    .from(keyValueStore)
+    .where(eq(keyValueStore.key, keyStoreKey(keyId)))
+    .limit(1);
+  const entry = rows[0];
   if (!entry) throw new Error('API key not found');
   
   const apiKey = entry.value as any as APIKey;
@@ -174,10 +177,9 @@ export async function revokeAPIKey(keyId: string, revokedBy: string, reason?: st
   (apiKey as any).revokedAt = new Date().toISOString();
   (apiKey as any).revokeReason = reason;
   
-  await prisma.keyValueStore.update({
-    where: { key: keyStoreKey(keyId) },
-    data: { value: apiKey as any },
-  });
+  await db.update(keyValueStore)
+    .set({ value: apiKey as any })
+    .where(eq(keyValueStore.key, keyStoreKey(keyId)));
 }
 
 // List all API keys (without showing actual keys)
@@ -185,18 +187,18 @@ export async function listAPIKeys(options: {
   includeInactive?: boolean;
   createdBy?: string;
 } = {}): Promise<Omit<APIKey, 'keyHash'>[]> {
-  const allKeys = await prisma.keyValueStore.findMany({
-    where: { key: { startsWith: KEY_PREFIX } },
-  });
+  const allKeys = await db.select()
+    .from(keyValueStore)
+    .where(like(keyValueStore.key, `${KEY_PREFIX}%`));
   
-  let keys = allKeys.map(entry => {
+  let keys = allKeys.map((entry: any) => {
     const k = entry.value as any as APIKey;
     const { keyHash: _, ...rest } = k;
     return rest;
   });
   
-  if (!options.includeInactive) keys = keys.filter(k => k.isActive);
-  if (options.createdBy) keys = keys.filter(k => k.createdBy === options.createdBy);
+  if (!options.includeInactive) keys = keys.filter((k: any) => k.isActive);
+  if (options.createdBy) keys = keys.filter((k: any) => k.createdBy === options.createdBy);
   
   return keys;
 }
@@ -226,15 +228,16 @@ export async function autoRotateExpiringKeys(withinDays: number = 3): Promise<nu
 // Cleanup expired and revoked keys older than retention period
 export async function cleanupOldKeys(retentionDays: number = 90): Promise<number> {
   const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
-  const allKeys = await prisma.keyValueStore.findMany({
-    where: { key: { startsWith: KEY_PREFIX } },
-  });
+  const allKeys = await db.select()
+    .from(keyValueStore)
+    .where(like(keyValueStore.key, `${KEY_PREFIX}%`));
   
   let deleted = 0;
   for (const entry of allKeys) {
     const k = entry.value as any as APIKey;
     if (!k.isActive && new Date(k.createdAt) < cutoff) {
-      await prisma.keyValueStore.delete({ where: { key: entry.key } });
+      await db.delete(keyValueStore)
+        .where(eq(keyValueStore.key, entry.key));
       deleted++;
     }
   }

@@ -670,6 +670,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                               const itemIsLongSleeve = item.isLongSleeve || item.options?.isLongSleeve;
                               const itemCustomName = item.customName || item.options?.customName;
                               const itemCustomNumber = item.customNumber || item.options?.customNumber;
+                              const itemPattern = item.pattern || item.options?.pattern;
                               const itemSubtotal = item.subtotal || (item.unitPrice ? item.unitPrice * itemQty : 0);
                               
                               return (
@@ -760,6 +761,11 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                                       {itemIsLongSleeve && (
                                         <Box sx={{ px: 0.8, py: 0.2, borderRadius: '5px', bgcolor: 'rgba(245,158,11,0.12)', fontSize: '0.65rem', fontWeight: 600, color: 'var(--warning)' }}>
                                           {t.common.longSleeve}
+                                        </Box>
+                                      )}
+                                      {itemPattern && (
+                                        <Box sx={{ px: 0.8, py: 0.2, borderRadius: '5px', bgcolor: 'rgba(56,189,248,0.12)', fontSize: '0.65rem', fontWeight: 600, color: '#38bdf8' }}>
+                                          {itemPattern}
                                         </Box>
                                       )}
                                       {itemCustomName && (

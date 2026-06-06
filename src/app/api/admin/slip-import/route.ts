@@ -1,12 +1,14 @@
 // src/app/api/admin/slip-import/route.ts
-// API สำหรับ import slip URL จาก SlipOK log — Prisma
+// API สำหรับ import slip URL จาก SlipOK log — Drizzle ORM
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireSuperAdmin } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { db } from '@/lib/db';
+import { orders } from '@/db/schema';
+import { eq, desc } from 'drizzle-orm';
 
 interface SlipOKLogEntry {
   id?: string;
@@ -30,32 +32,31 @@ export async function GET(request: NextRequest) {
     const admin = await requireSuperAdmin();
     if (!admin) return NextResponse.json('Unauthorized', { status: 401 });
 
-    const orders = await prisma.order.findMany({
-      where: { status: 'PAID' },
-      select: {
-        ref: true,
-        status: true,
-        total_amount: true,
-        slip_data: true,
-        created_at: true,
-        customer_name: true,
-      },
-      orderBy: { created_at: 'desc' },
-      take: 100,
-    });
+    const fetchedOrders = await db.select({
+      ref: orders.ref,
+      status: orders.status,
+      total_amount: orders.totalAmount,
+      slip_data: orders.slipData,
+      created_at: orders.createdAt,
+      customer_name: orders.customerName,
+    })
+    .from(orders)
+    .where(eq(orders.status, 'PAID'))
+    .orderBy(desc(orders.createdAt))
+    .limit(100);
 
-    const ordersWithoutSlip = (orders || []).filter(o => {
+    const ordersWithoutSlip = (fetchedOrders || []).filter((o: any) => {
       const slip = o.slip_data as any;
       return !slip || (!slip.imageUrl && !slip.base64);
     });
 
-    const ordersWithSlip = (orders || []).filter(o => {
+    const ordersWithSlip = (fetchedOrders || []).filter((o: any) => {
       const slip = o.slip_data as any;
       return slip && (slip.imageUrl || slip.base64);
     });
 
     return NextResponse.json({
-      ordersWithoutSlip: ordersWithoutSlip.map(o => ({
+      ordersWithoutSlip: ordersWithoutSlip.map((o: any) => ({
         ref: o.ref,
         amount: o.total_amount,
         date: o.created_at,
@@ -63,7 +64,7 @@ export async function GET(request: NextRequest) {
         hasSlipData: !!o.slip_data,
         slipTransRef: (o.slip_data as any)?.slipData?.transRef || null,
       })),
-      ordersWithSlip: ordersWithSlip.map(o => ({
+      ordersWithSlip: ordersWithSlip.map((o: any) => ({
         ref: o.ref,
         amount: o.total_amount,
         date: o.created_at,
@@ -72,7 +73,7 @@ export async function GET(request: NextRequest) {
         transRef: (o.slip_data as any)?.slipData?.transRef || null,
       })),
       summary: {
-        totalPaid: orders?.length || 0,
+        totalPaid: fetchedOrders?.length || 0,
         withoutSlip: ordersWithoutSlip.length,
         withSlip: ordersWithSlip.length,
       },
@@ -99,10 +100,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'slipokLogs array is required' }, { status: 400 });
     }
 
-    const orders = await prisma.order.findMany({
-      where: { status: 'PAID' },
-      select: { ref: true, status: true, total_amount: true, slip_data: true, created_at: true },
-    });
+    const fetchedOrders = await db.select({
+      ref: orders.ref,
+      status: orders.status,
+      total_amount: orders.totalAmount,
+      slip_data: orders.slipData,
+      created_at: orders.createdAt,
+    })
+    .from(orders)
+    .where(eq(orders.status, 'PAID'));
 
     const results: {
       matched: { orderRef: string; imageUrl: string; matchedBy: string }[];
@@ -114,14 +120,14 @@ export async function POST(request: NextRequest) {
     for (const log of slipokLogs) {
       if (!log.imageUrl) { results.unmatched.push(log); continue; }
 
-      let matchedOrder: typeof orders[0] | undefined;
+      let matchedOrder: typeof fetchedOrders[0] | undefined;
       let matchedBy = '';
 
       if (matchBy === 'transRef' && log.transRef) {
-        matchedOrder = orders?.find(o => (o.slip_data as any)?.slipData?.transRef === log.transRef);
+        matchedOrder = fetchedOrders?.find((o: any) => (o.slip_data as any)?.slipData?.transRef === log.transRef);
         matchedBy = `transRef: ${log.transRef}`;
       } else if (matchBy === 'amount' && log.amount) {
-        matchedOrder = orders?.find(o =>
+        matchedOrder = fetchedOrders?.find((o: any) =>
           Math.abs((o.total_amount || 0) - log.amount!) < 1 && !(o.slip_data as any)?.imageUrl
         );
         matchedBy = `amount: ${log.amount}`;
@@ -149,10 +155,9 @@ export async function POST(request: NextRequest) {
         };
         if (updatedSlipData.base64 && log.imageUrl) delete updatedSlipData.base64;
 
-        await prisma.order.update({
-          where: { ref: matchedOrder.ref },
-          data: { slip_data: updatedSlipData },
-        });
+        await db.update(orders)
+          .set({ slipData: updatedSlipData, updatedAt: new Date() })
+          .where(eq(orders.ref, matchedOrder.ref));
 
         results.matched.push({ orderRef: matchedOrder.ref, imageUrl: log.imageUrl, matchedBy });
       } catch (err: any) {
@@ -201,10 +206,15 @@ export async function PUT(request: NextRequest) {
       }
 
       try {
-        const order = await prisma.order.findUnique({
-          where: { ref: update.orderRef },
-          select: { ref: true, slip_data: true },
-        });
+        const orderResults = await db.select({
+          ref: orders.ref,
+          slip_data: orders.slipData,
+        })
+        .from(orders)
+        .where(eq(orders.ref, update.orderRef))
+        .limit(1);
+
+        const order = orderResults[0];
 
         if (!order) { results.errors.push({ orderRef: update.orderRef, error: 'Order not found' }); continue; }
 
@@ -218,10 +228,9 @@ export async function PUT(request: NextRequest) {
         };
         if (updatedSlipData.base64) delete updatedSlipData.base64;
 
-        await prisma.order.update({
-          where: { ref: update.orderRef },
-          data: { slip_data: updatedSlipData },
-        });
+        await db.update(orders)
+          .set({ slipData: updatedSlipData, updatedAt: new Date() })
+          .where(eq(orders.ref, update.orderRef));
 
         results.success.push(update.orderRef);
       } catch (err: any) {
@@ -239,3 +248,4 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+

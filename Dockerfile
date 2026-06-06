@@ -7,7 +7,6 @@ WORKDIR /app
 
 # Copy package files
 COPY package.json package-lock.json* ./
-COPY prisma ./prisma
 
 # Install dependencies
 RUN npm ci
@@ -18,7 +17,6 @@ WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npx prisma generate
 
 # Build-time environment variables (Railway injects these)
 ARG NEXT_PUBLIC_GAS_URL

@@ -34,8 +34,10 @@ export async function GET() {
       headers: { 'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=30' },
     });
   } catch (error) {
-    console.error('[API/live] GET error:', error);
-    return NextResponse.json({ live: null }, { status: 500 });
+    console.error('[API/live] GET error, falling back to no-live state:', error);
+    return NextResponse.json({ live: null }, {
+      headers: { 'Cache-Control': 'no-store' },
+    });
   }
 }
 

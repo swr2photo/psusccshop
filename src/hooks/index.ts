@@ -83,6 +83,7 @@ export {
   usePaymentInfoQuery,
   useSubmitOrderMutation,
   useTrackShipmentQuery,
+  usePublicShopQuery,
 } from './useQueryShopData';
 
 // TanStack Query - Admin hooks

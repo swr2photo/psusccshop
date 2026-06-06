@@ -1,10 +1,12 @@
 // src/app/api/support-chat/[sessionId]/typing/route.ts
-// Typing indicator API — Prisma
+// Typing indicator API — Drizzle ORM
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions, isAdminEmail } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { db } from '@/lib/db';
+import { supportChats } from '@/db/schema';
+import { eq } from 'drizzle-orm';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -26,16 +28,20 @@ export async function POST(request: NextRequest, { params }: Params) {
     const { isTyping } = await request.json();
     const isAdmin = isAdminEmail(session.user.email);
     
-    const field = isAdmin ? 'admin_typing' : 'customer_typing';
-    const fieldAt = isAdmin ? 'admin_typing_at' : 'customer_typing_at';
+    const updateData: any = {
+      updatedAt: new Date(),
+    };
+    if (isAdmin) {
+      updateData.adminTyping = isTyping;
+      updateData.adminTypingAt = isTyping ? new Date() : null;
+    } else {
+      updateData.customerTyping = isTyping;
+      updateData.customerTypingAt = isTyping ? new Date() : null;
+    }
     
-    await prisma.supportChat.update({
-      where: { id: sessionId },
-      data: {
-        [field]: isTyping,
-        [fieldAt]: isTyping ? new Date() : null,
-      },
-    });
+    await db.update(supportChats)
+      .set(updateData)
+      .where(eq(supportChats.id, sessionId));
     
     return NextResponse.json({ success: true });
     
@@ -58,9 +64,17 @@ export async function GET(request: NextRequest, { params }: Params) {
       return NextResponse.json('Unauthorized', { status: 401 });
     }
     
-    const data = await prisma.supportChat.findUnique({
-      where: { id: sessionId },
-    }) as any;
+    const dataResults = await db.select({
+      adminTyping: supportChats.adminTyping,
+      adminTypingAt: supportChats.adminTypingAt,
+      customerTyping: supportChats.customerTyping,
+      customerTypingAt: supportChats.customerTypingAt,
+    })
+    .from(supportChats)
+    .where(eq(supportChats.id, sessionId))
+    .limit(1);
+    
+    const data = dataResults[0];
     
     if (!data) {
       return NextResponse.json({ isTyping: false });
@@ -71,13 +85,13 @@ export async function GET(request: NextRequest, { params }: Params) {
     
     let otherTyping = false;
     if (isAdmin) {
-      if (data.customer_typing && data.customer_typing_at) {
-        const typingTime = new Date(data.customer_typing_at).getTime();
+      if (data.customerTyping && data.customerTypingAt) {
+        const typingTime = new Date(data.customerTypingAt).getTime();
         otherTyping = (now - typingTime) < 5000;
       }
     } else {
-      if (data.admin_typing && data.admin_typing_at) {
-        const typingTime = new Date(data.admin_typing_at).getTime();
+      if (data.adminTyping && data.adminTypingAt) {
+        const typingTime = new Date(data.adminTypingAt).getTime();
         otherTyping = (now - typingTime) < 5000;
       }
     }

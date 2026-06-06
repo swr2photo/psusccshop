@@ -1,6 +1,8 @@
 // API route for inventory/stock management
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db';
+import { inventory } from '@/db/schema';
+import { eq, and } from 'drizzle-orm';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -10,28 +12,33 @@ export async function GET(request: NextRequest) {
   try {
     const productId = request.nextUrl.searchParams.get('productId');
 
-    let query = supabase.from('inventory').select('*');
-
+    let data;
     if (productId) {
-      query = query.eq('product_id', productId);
+      data = await db
+        .select()
+        .from(inventory)
+        .where(eq(inventory.productId, productId))
+        .orderBy(inventory.productId);
+    } else {
+      data = await db
+        .select()
+        .from(inventory)
+        .orderBy(inventory.productId);
     }
-
-    const { data, error } = await query.order('product_id');
-    if (error) throw error;
 
     // Group by product_id
     const grouped: Record<string, any> = {};
     for (const row of data || []) {
-      if (!grouped[row.product_id]) {
-        grouped[row.product_id] = {
-          productId: row.product_id,
+      if (!grouped[row.productId]) {
+        grouped[row.productId] = {
+          productId: row.productId,
           totalStock: 0,
           bySize: {} as Record<string, number>,
-          lowStockThreshold: row.low_stock_threshold || 5,
+          lowStockThreshold: row.lowStockThreshold || 5,
         };
       }
-      grouped[row.product_id].totalStock += row.quantity;
-      grouped[row.product_id].bySize[row.size || 'FREE'] = row.quantity;
+      grouped[row.productId].totalStock += row.quantity;
+      grouped[row.productId].bySize[row.size || 'FREE'] = row.quantity;
     }
 
     return NextResponse.json(
@@ -54,24 +61,55 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing productId' }, { status: 400 });
     }
 
-    const { data, error } = await supabase
-      .from('inventory')
-      .upsert({
-        product_id: productId,
-        size: size || 'FREE',
-        variant_id: null,
-        quantity: quantity ?? 0,
-        low_stock_threshold: lowStockThreshold ?? 5,
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'product_id,size,variant_id',
-      })
+    const existing = await db
       .select()
-      .single();
+      .from(inventory)
+      .where(
+        and(
+          eq(inventory.productId, productId),
+          eq(inventory.size, size || 'FREE')
+        )
+      )
+      .limit(1);
 
-    if (error) throw error;
+    let resultData;
+    if (existing.length > 0) {
+      const updated = await db
+        .update(inventory)
+        .set({
+          quantity: quantity ?? 0,
+          lowStockThreshold: lowStockThreshold ?? 5,
+          updatedAt: new Date(),
+        })
+        .where(eq(inventory.id, existing[0].id))
+        .returning();
+      resultData = updated[0];
+    } else {
+      const inserted = await db
+        .insert(inventory)
+        .values({
+          productId,
+          size: size || 'FREE',
+          variantId: null,
+          quantity: quantity ?? 0,
+          lowStockThreshold: lowStockThreshold ?? 5,
+          updatedAt: new Date(),
+        })
+        .returning();
+      resultData = inserted[0];
+    }
 
-    return NextResponse.json({ success: true, inventory: data });
+    return NextResponse.json({
+      success: true,
+      inventory: {
+        product_id: resultData.productId,
+        size: resultData.size,
+        variant_id: resultData.variantId,
+        quantity: resultData.quantity,
+        low_stock_threshold: resultData.lowStockThreshold,
+        updated_at: resultData.updatedAt?.toISOString(),
+      }
+    });
   } catch (error: any) {
     console.error('POST /api/inventory error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });

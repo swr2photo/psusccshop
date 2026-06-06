@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { MessageCircle as ChatIcon, Send as SendIcon, X as CloseIcon, Bot as SmartToyIcon, RotateCcw as RefreshIcon, Sparkles as AutoAwesomeIcon, Store as StorefrontIcon, Copy as ContentCopyIcon, Check as CheckIcon, Maximize2 as FullscreenIcon, Minimize2 as FullscreenExitIcon, ImagePlus as AddPhotoAlternateIcon, ShoppingCart as ShoppingCartOutlinedIcon, Coins as PaidOutlinedIcon, Ruler as StraightenOutlinedIcon, Truck as LocalShippingOutlinedIcon, Wallet as AccountBalanceWalletOutlinedIcon, HelpCircle as HelpOutlineOutlinedIcon, Image as ImageOutlinedIcon, User as PersonOutlineIcon, BadgeCheck as VerifiedIcon, BookOpen as MenuBookOutlinedIcon, Hand as WavingHandIcon, Reply as ReplyIcon, Pencil as EditIcon, ClipboardList as ClipboardListIcon, Tag as TagIcon, ChevronUp, ChevronDown } from 'lucide-react';
+import { Palette, MessageCircle as ChatIcon, Send as SendIcon, X as CloseIcon, Bot as SmartToyIcon, RotateCcw as RefreshIcon, Sparkles as AutoAwesomeIcon, Store as StorefrontIcon, Copy as ContentCopyIcon, Check as CheckIcon, Maximize2 as FullscreenIcon, Minimize2 as FullscreenExitIcon, ImagePlus as AddPhotoAlternateIcon, ShoppingCart as ShoppingCartOutlinedIcon, Coins as PaidOutlinedIcon, Ruler as StraightenOutlinedIcon, Truck as LocalShippingOutlinedIcon, Wallet as AccountBalanceWalletOutlinedIcon, HelpCircle as HelpOutlineOutlinedIcon, Image as ImageOutlinedIcon, User as PersonOutlineIcon, BadgeCheck as VerifiedIcon, BookOpen as MenuBookOutlinedIcon, Hand as WavingHandIcon, Reply as ReplyIcon, Pencil as EditIcon, ClipboardList as ClipboardListIcon, Tag as TagIcon, ChevronUp, ChevronDown } from 'lucide-react';
 
 // ==================== CHATBOT COMPONENT (Enhanced with Logo & AI) ====================
 const QUICK_QUESTIONS_KEYS = [
@@ -2362,6 +2362,7 @@ type ProductOptions = {
   customName: string;
   customNumber: string;
   isLongSleeve: boolean;
+  pattern?: string;
 };
 
 type CartItem = {
@@ -2377,6 +2378,7 @@ type CartItem = {
     isLongSleeve?: boolean;
     variantId?: string;
     variantName?: string;
+    pattern?: string;
   };
 };
 
@@ -2765,6 +2767,7 @@ export default function HomePage() {
     customName: '',
     customNumber: '',
     isLongSleeve: false,
+    pattern: '',
   });
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
@@ -2773,6 +2776,7 @@ export default function HomePage() {
   const sizeSelectorRef = useRef<HTMLDivElement>(null);
   const customNameInputRef = useRef<HTMLInputElement>(null);
   const customNumberInputRef = useRef<HTMLInputElement>(null);
+  const patternSelectorRef = useRef<HTMLDivElement>(null);
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const cartRef = useRef<CartItem[]>([]);
@@ -3260,7 +3264,7 @@ export default function HomePage() {
     const defaultSize = sizeKeys.length > 0 ? sizeKeys[0] : t.common.freeSize;
     setSelectedProduct(product);
     setActiveImageIndex(0);
-    setProductOptions({ size: defaultSize, quantity: 1, customName: '', customNumber: '', isLongSleeve: false });
+    setProductOptions({ size: defaultSize, quantity: 1, customName: '', customNumber: '', isLongSleeve: false, pattern: '' });
     setProductDialogOpen(true);
     // Track recently viewed
     recentlyViewedStore.addItem(product.id);
@@ -3292,7 +3296,7 @@ export default function HomePage() {
     if (!isShopOpen && productDialogOpen) {
       setProductDialogOpen(false);
       setSelectedProduct(null);
-      setProductOptions({ size: '', quantity: 1, customName: '', customNumber: '', isLongSleeve: false });
+      setProductOptions({ size: '', quantity: 1, customName: '', customNumber: '', isLongSleeve: false, pattern: '' });
       showToast('warning', t.checkout.shopClosedWarning);
     }
     // Also close order dialog if shop is closed
@@ -3512,7 +3516,7 @@ export default function HomePage() {
   const resetProductDialog = () => {
     setProductDialogOpen(false);
     setSelectedProduct(null);
-    setProductOptions({ size: '', quantity: 1, customName: '', customNumber: '', isLongSleeve: false });
+    setProductOptions({ size: '', quantity: 1, customName: '', customNumber: '', isLongSleeve: false, pattern: '' });
   };
 
   const buildCartItem = (): CartItem | null => {
@@ -3592,6 +3596,18 @@ export default function HomePage() {
       }
     }
     
+    // Check if product has patterns
+    const hasPatterns = selectedProduct.patterns && selectedProduct.patterns.filter((p: any) => p.isActive !== false).length > 0;
+    if (hasPatterns && !productOptions.pattern) {
+      patternSelectorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => {
+        patternSelectorRef.current?.classList.add('shake-highlight');
+        setTimeout(() => patternSelectorRef.current?.classList.remove('shake-highlight'), 600);
+      }, 300);
+      showToast('warning', lang === 'en' ? 'Please select a design/pattern' : 'กรุณาเลือกลายสินค้า');
+      return null;
+    }
+    
     const longSleeveFee = selectedProduct.options?.hasLongSleeve && productOptions.isLongSleeve 
       ? (selectedProduct.options?.longSleevePrice ?? 50) 
       : 0;
@@ -3604,9 +3620,10 @@ export default function HomePage() {
 
     const unitPrice = basePrice + longSleeveFee;
     const quantity = clampQty(productOptions.quantity);
+    const patternToUse = productOptions.pattern || '';
 
     return {
-      id: `${selectedProduct.id}-${productOptions.size}-${normalizedCustomName}-${productOptions.customNumber}-${productOptions.isLongSleeve}`,
+      id: `${selectedProduct.id}-${productOptions.size}-${normalizedCustomName}-${productOptions.customNumber}-${productOptions.isLongSleeve}-${patternToUse}`,
       productId: selectedProduct.id,
       productName: selectedProduct.name,
       size: sizeToUse,
@@ -3618,6 +3635,7 @@ export default function HomePage() {
         isLongSleeve: productOptions.isLongSleeve,
         variantId: hasVariants ? productOptions.size : undefined,
         variantName: variantName || undefined,
+        pattern: patternToUse || undefined,
       },
     };
   };
@@ -4839,6 +4857,85 @@ export default function HomePage() {
                             {t.common.remaining} {variant.stock}
                           </Typography>
                         )}
+                      </Box>
+                    );
+                  })}
+              </Box>
+            </Box>
+          )}
+
+          {/* Pattern Selection */}
+          {selectedProduct.patterns && selectedProduct.patterns.filter((p: any) => p.isActive !== false).length > 0 && (
+            <Box
+              ref={patternSelectorRef}
+              sx={{
+                p: { xs: 2.5, sm: 3 },
+                mb: 2.5,
+                borderRadius: '20px',
+                background: 'linear-gradient(135deg, rgba(56,189,248,0.15) 0%, rgba(56,189,248,0.05) 100%)',
+                border: '1px solid rgba(56,189,248,0.3)',
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                <Box sx={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: '10px',
+                  bgcolor: 'rgba(56,189,248,0.2)',
+                  display: 'grid',
+                  placeItems: 'center',
+                }}>
+                  <Palette size={18} color="#38bdf8" />
+                </Box>
+                <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                  {lang === 'en' ? 'Select Design/Pattern' : 'เลือกลายสินค้า'}
+                </Typography>
+              </Box>
+
+              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: 1.5 }}>
+                {selectedProduct.patterns
+                  .filter((p: any) => p.isActive !== false)
+                  .map((pattern: any) => {
+                    const active = productOptions.pattern === pattern.name;
+                    return (
+                      <Box
+                        key={pattern.id}
+                        onClick={() => setProductOptions({ ...productOptions, pattern: pattern.name })}
+                        sx={{
+                          p: 1,
+                          borderRadius: '12px',
+                          border: active ? '2px solid #38bdf8' : '1px solid var(--glass-border)',
+                          bgcolor: active ? 'rgba(56,189,248,0.08)' : 'var(--surface-2)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: 0.5,
+                          '&:hover': { opacity: 0.9, borderColor: '#38bdf8' },
+                          transition: 'all 0.2s ease',
+                          position: 'relative',
+                        }}
+                      >
+                        <Box sx={{
+                          width: '100%',
+                          height: 64,
+                          borderRadius: '8px',
+                          overflow: 'hidden',
+                          bgcolor: 'var(--glass-bg)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          border: '1px solid var(--glass-border)',
+                        }}>
+                          {pattern.image ? (
+                            <img src={pattern.image} alt={pattern.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ) : (
+                            <ImageOutlinedIcon size={20} style={{ color: 'var(--text-muted)' }} />
+                          )}
+                        </Box>
+                        <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: active ? 'var(--secondary)' : 'var(--foreground)', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
+                          {pattern.name}
+                        </Typography>
                       </Box>
                     );
                   })}
@@ -7248,7 +7345,7 @@ export default function HomePage() {
                       
                       return (
                       <Box key={product.id} sx={{
-                        minWidth: { xs: '68vw', sm: 'auto' },
+                        minWidth: { xs: '68vw', sm: 0 },
                         maxWidth: { xs: '68vw', sm: 'none' },
                         flex: { xs: '0 0 auto', sm: '1 1 auto' },
                         scrollSnapAlign: { xs: 'start', sm: 'unset' },

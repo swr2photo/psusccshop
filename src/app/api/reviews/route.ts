@@ -1,6 +1,8 @@
 // API route for product reviews
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db';
+import { reviews } from '@/db/schema';
+import { eq, and, desc } from 'drizzle-orm';
 import { createHash } from 'crypto';
 
 function hashEmail(email: string): string {
@@ -12,29 +14,33 @@ export async function GET(request: NextRequest) {
   try {
     const productId = request.nextUrl.searchParams.get('productId');
     
-    let query = supabase
-      .from('reviews')
-      .select('*')
-      .order('created_at', { ascending: false });
-
+    let data;
     if (productId) {
-      query = query.eq('product_id', productId);
+      data = await db
+        .select()
+        .from(reviews)
+        .where(eq(reviews.productId, productId))
+        .orderBy(desc(reviews.createdAt))
+        .limit(100);
+    } else {
+      data = await db
+        .select()
+        .from(reviews)
+        .orderBy(desc(reviews.createdAt))
+        .limit(100);
     }
-
-    const { data, error } = await query.limit(100);
-    if (error) throw error;
 
     // Calculate average rating per product
     const reviewData = (data || []).map((r: any) => ({
       id: r.id,
-      productId: r.product_id,
-      userName: r.user_name || 'Anonymous',
-      userImage: r.user_image,
+      productId: r.productId,
+      userName: r.userName || 'Anonymous',
+      userImage: r.userImage,
       rating: r.rating,
       comment: r.comment || '',
-      date: r.created_at,
+      date: r.createdAt?.toISOString() || new Date().toISOString(),
       verified: r.verified,
-      helpful: r.helpful_count || 0,
+      helpful: r.helpfulCount || 0,
     }));
 
     return NextResponse.json(
@@ -64,26 +70,51 @@ export async function POST(request: NextRequest) {
     const emailHash = hashEmail(email);
 
     // Upsert review (one per user per product)
-    const { data, error } = await supabase
-      .from('reviews')
-      .upsert({
-        product_id: productId,
-        email_hash: emailHash,
-        user_name: userName || 'Anonymous',
-        user_image: userImage || null,
-        rating,
-        comment: (comment || '').slice(0, 500),
-        verified: true,
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'product_id,email_hash',
-      })
+    const existing = await db
       .select()
-      .single();
+      .from(reviews)
+      .where(
+        and(
+          eq(reviews.productId, productId),
+          eq(reviews.emailHash, emailHash)
+        )
+      )
+      .limit(1);
 
-    if (error) throw error;
+    let resultData;
+    if (existing.length > 0) {
+      const updated = await db
+        .update(reviews)
+        .set({
+          userName: userName || 'Anonymous',
+          userImage: userImage || null,
+          rating,
+          comment: (comment || '').slice(0, 500),
+          verified: true,
+          updatedAt: new Date(),
+        })
+        .where(eq(reviews.id, existing[0].id))
+        .returning();
+      resultData = updated[0];
+    } else {
+      const inserted = await db
+        .insert(reviews)
+        .values({
+          productId,
+          emailHash,
+          userName: userName || 'Anonymous',
+          userImage: userImage || null,
+          rating,
+          comment: (comment || '').slice(0, 500),
+          verified: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .returning();
+      resultData = inserted[0];
+    }
 
-    return NextResponse.json({ success: true, review: data });
+    return NextResponse.json({ success: true, review: resultData });
   } catch (error: any) {
     console.error('POST /api/reviews error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -102,13 +133,14 @@ export async function DELETE(request: NextRequest) {
 
     const emailHash = hashEmail(email);
 
-    const { error } = await supabase
-      .from('reviews')
-      .delete()
-      .eq('id', reviewId)
-      .eq('email_hash', emailHash);
-
-    if (error) throw error;
+    await db
+      .delete(reviews)
+      .where(
+        and(
+          eq(reviews.id, reviewId),
+          eq(reviews.emailHash, emailHash)
+        )
+      );
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

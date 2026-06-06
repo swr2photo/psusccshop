@@ -2,7 +2,9 @@
 // Omise webhook handler
 
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { db } from '@/lib/db';
+import { orders, paymentTransactions } from '@/db/schema';
+import { eq, and } from 'drizzle-orm';
 import { verifyOmiseWebhook } from '@/lib/payment';
 
 export const runtime = 'nodejs';
@@ -73,30 +75,30 @@ async function handleChargeComplete(charge: any) {
   }
 
   // Update transaction
-  await supabase
-    .from('payment_transactions')
-    .update({
+  await db
+    .update(paymentTransactions)
+    .set({
       status: 'paid',
-      gateway_transaction_id: charge.transaction,
-      card_last4: charge.card?.last_digits,
-      card_brand: charge.card?.brand,
-      updated_at: new Date().toISOString(),
-      raw_response: charge,
+      gatewayTransactionId: charge.transaction,
+      cardLast4: charge.card?.last_digits,
+      cardBrand: charge.card?.brand,
+      updatedAt: new Date(),
+      rawResponse: charge,
     })
-    .eq('gateway_charge_id', chargeId);
+    .where(eq(paymentTransactions.gatewayChargeId, chargeId));
 
   // Update order status
-  await supabase
-    .from('orders')
-    .update({
-      status: 'paid',
-      payment_status: 'paid',
-      payment_method: 'credit_card',
-      payment_verified: true,
-      payment_verified_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+  await db
+    .update(orders)
+    .set({
+      status: 'PAID',
+      paymentStatus: 'paid',
+      paymentMethod: 'credit_card',
+      paymentVerified: true,
+      paymentVerifiedAt: new Date().toISOString(),
+      updatedAt: new Date(),
     })
-    .eq('ref', orderId);
+    .where(eq(orders.ref, orderId));
 
   console.log('[Webhook] Charge complete for order:', orderId);
 }
@@ -108,13 +110,13 @@ async function handleChargeCreate(charge: any) {
   if (!orderId) return;
 
   // Update transaction status
-  await supabase
-    .from('payment_transactions')
-    .update({
+  await db
+    .update(paymentTransactions)
+    .set({
       status: 'processing',
-      updated_at: new Date().toISOString(),
+      updatedAt: new Date(),
     })
-    .eq('gateway_charge_id', chargeId);
+    .where(eq(paymentTransactions.gatewayChargeId, chargeId));
 
   console.log('[Webhook] Charge created for order:', orderId);
 }
@@ -126,24 +128,24 @@ async function handleChargeFail(charge: any) {
   if (!orderId) return;
 
   // Update transaction
-  await supabase
-    .from('payment_transactions')
-    .update({
+  await db
+    .update(paymentTransactions)
+    .set({
       status: 'failed',
-      error_message: charge.failure_message || charge.failure_code,
-      updated_at: new Date().toISOString(),
-      raw_response: charge,
+      errorMessage: charge.failure_message || charge.failure_code,
+      updatedAt: new Date(),
+      rawResponse: charge,
     })
-    .eq('gateway_charge_id', chargeId);
+    .where(eq(paymentTransactions.gatewayChargeId, chargeId));
 
   // Update order
-  await supabase
-    .from('orders')
-    .update({
-      payment_status: 'failed',
-      updated_at: new Date().toISOString(),
+  await db
+    .update(orders)
+    .set({
+      paymentStatus: 'failed',
+      updatedAt: new Date(),
     })
-    .eq('ref', orderId);
+    .where(eq(orders.ref, orderId));
 
   console.log('[Webhook] Charge failed for order:', orderId, charge.failure_message);
 }
@@ -155,23 +157,27 @@ async function handleChargeExpire(charge: any) {
   if (!orderId) return;
 
   // Update transaction
-  await supabase
-    .from('payment_transactions')
-    .update({
+  await db
+    .update(paymentTransactions)
+    .set({
       status: 'expired',
-      updated_at: new Date().toISOString(),
+      updatedAt: new Date(),
     })
-    .eq('gateway_charge_id', chargeId);
+    .where(eq(paymentTransactions.gatewayChargeId, chargeId));
 
   // Update order if still pending
-  await supabase
-    .from('orders')
-    .update({
-      payment_status: 'expired',
-      updated_at: new Date().toISOString(),
+  await db
+    .update(orders)
+    .set({
+      paymentStatus: 'expired',
+      updatedAt: new Date(),
     })
-    .eq('ref', orderId)
-    .eq('payment_status', 'pending');
+    .where(
+      and(
+        eq(orders.ref, orderId),
+        eq(orders.paymentStatus, 'pending')
+      )
+    );
 
   console.log('[Webhook] Charge expired for order:', orderId);
 }
@@ -180,34 +186,35 @@ async function handleRefundCreate(refund: any) {
   const chargeId = refund.charge;
   
   // Get transaction by charge ID
-  const { data: transaction } = await supabase
-    .from('payment_transactions')
-    .select('order_id, amount')
-    .eq('gateway_charge_id', chargeId)
-    .single();
+  const transactionData = await db
+    .select({ orderId: paymentTransactions.orderId, amount: paymentTransactions.amount })
+    .from(paymentTransactions)
+    .where(eq(paymentTransactions.gatewayChargeId, chargeId))
+    .limit(1);
+  const transaction = transactionData[0];
 
   if (!transaction) return;
 
   const isFullRefund = refund.amount >= transaction.amount * 100;
 
   // Update transaction
-  await supabase
-    .from('payment_transactions')
-    .update({
+  await db
+    .update(paymentTransactions)
+    .set({
       status: isFullRefund ? 'refunded' : 'partially_refunded',
-      updated_at: new Date().toISOString(),
+      updatedAt: new Date(),
     })
-    .eq('gateway_charge_id', chargeId);
+    .where(eq(paymentTransactions.gatewayChargeId, chargeId));
 
   // Update order
-  await supabase
-    .from('orders')
-    .update({
-      status: isFullRefund ? 'refunded' : 'partially_refunded',
-      payment_status: isFullRefund ? 'refunded' : 'partially_refunded',
-      updated_at: new Date().toISOString(),
+  await db
+    .update(orders)
+    .set({
+      status: isFullRefund ? 'REFUNDED' : 'PARTIALLY_REFUNDED',
+      paymentStatus: isFullRefund ? 'refunded' : 'partially_refunded',
+      updatedAt: new Date(),
     })
-    .eq('ref', transaction.order_id);
+    .where(eq(orders.id, transaction.orderId));
 
   console.log('[Webhook] Refund created for charge:', chargeId);
 }

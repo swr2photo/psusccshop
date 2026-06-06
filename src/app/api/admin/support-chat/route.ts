@@ -1,10 +1,12 @@
 // src/app/api/admin/support-chat/route.ts
-// Admin: Get all chat sessions — Prisma
+// Admin: Get all chat sessions — Drizzle ORM
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions, isAdminEmail } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { db } from '@/lib/db';
+import { orders } from '@/db/schema';
+import { and, eq, ne } from 'drizzle-orm';
 import { 
   getAllChats,
   getPendingChats,
@@ -19,11 +21,16 @@ export const dynamic = 'force-dynamic';
 
 /** Get customer emails that have orders in a specific shop */
 async function getShopCustomerEmails(shopId: string): Promise<Set<string>> {
-  const data = await prisma.order.findMany({
-    where: { shop_id: shopId, customer_email: { not: '' } },
-    select: { customer_email: true },
-    distinct: ['customer_email'],
-  });
+  const data = await db.selectDistinct({
+    customer_email: orders.customerEmail,
+  })
+  .from(orders)
+  .where(
+    and(
+      eq(orders.shopId, shopId),
+      ne(orders.customerEmail, '')
+    )
+  );
   return new Set(data.map((o: any) => (o.customer_email || '').toLowerCase()));
 }
 

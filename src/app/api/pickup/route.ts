@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getJson, putJson, listKeys, getOrderByRef, getAllOrders } from '@/lib/filebase';
-import { prisma } from '@/lib/prisma';
+import { db } from '@/lib/db';
+import { orders } from '@/db/schema';
+import { and, or, eq, ilike } from 'drizzle-orm';
 import { requireAuth, requireAdmin, requireAdminWithPermission, isAdminEmail } from '@/lib/auth';
 import { sanitizeUtf8Input } from '@/lib/sanitize';
 import crypto from 'crypto';
@@ -114,21 +116,30 @@ export async function GET(req: NextRequest) {
         }
       }
       
-      // If not exact match, search with Supabase ilike
-      // If not exact match, search with Prisma
-      const where: any = {
-        OR: [
-          { ref: { contains: searchTerm, mode: 'insensitive' } },
-          { customer_name: { contains: searchTerm, mode: 'insensitive' } },
-          { customer_email: { contains: searchTerm, mode: 'insensitive' } },
-        ],
-      };
-      if (shopId) where.shop_id = shopId;
+      // If not exact match, search with Drizzle ORM
+      let conditions = or(
+        ilike(orders.ref, `%${searchTerm}%`),
+        ilike(orders.customerName, `%${searchTerm}%`),
+        ilike(orders.customerEmail, `%${searchTerm}%`)
+      );
 
-      const dbOrders = await prisma.order.findMany({
-        where,
-        take: 50,
-      });
+      if (shopId) {
+        conditions = and(conditions, eq(orders.shopId, shopId));
+      }
+
+      const dbOrders = await db.select({
+        ref: orders.ref,
+        customer_name: orders.customerName,
+        customer_email: orders.customerEmail,
+        status: orders.status,
+        total_amount: orders.totalAmount,
+        cart: orders.cart,
+        pickup: orders.pickupData,
+        created_at: orders.createdAt,
+      })
+      .from(orders)
+      .where(conditions)
+      .limit(50);
 
       for (const order of dbOrders) {
         results.push({

@@ -1,7 +1,9 @@
 // src/lib/push-notification.ts
-// Web Push notification sender (server-side) — using Prisma
+// Web Push notification sender (server-side) — using Drizzle ORM
 
-import { prisma } from './prisma';
+import { db } from './db';
+import { pushSubscriptions } from '../db/schema';
+import { eq, inArray } from 'drizzle-orm';
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '';
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || '';
@@ -39,9 +41,9 @@ export async function sendPushNotification(
     return { sent: 0, failed: 0 };
   }
 
-  const subscriptions = await prisma.pushSubscription.findMany({
-    where: { email },
-  });
+  const subscriptions = await db.select()
+    .from(pushSubscriptions)
+    .where(eq(pushSubscriptions.email, email));
 
   if (!subscriptions.length) {
     console.log(`[Push] No subscriptions found for ${email}`);
@@ -60,8 +62,8 @@ export async function sendPushNotification(
       const pushSubscription = {
         endpoint: sub.endpoint,
         keys: {
-          p256dh: sub.keys_p256dh,
-          auth: sub.keys_auth,
+          p256dh: sub.keysP256dh,
+          auth: sub.keysAuth,
         },
       };
 
@@ -81,9 +83,8 @@ export async function sendPushNotification(
   }
 
   if (expiredEndpoints.length > 0) {
-    await prisma.pushSubscription.deleteMany({
-      where: { endpoint: { in: expiredEndpoints } },
-    });
+    await db.delete(pushSubscriptions)
+      .where(inArray(pushSubscriptions.endpoint, expiredEndpoints));
     console.log(`[Push] Cleaned up ${expiredEndpoints.length} expired subscriptions`);
   }
 

@@ -12,7 +12,7 @@ import {
 import {
   Store, ShoppingCart, Plus, Minus, X, ArrowLeft, Search,
   Share2, Heart, Package, Clock, Tag, CreditCard, Trash2,
-  History, MapPin, User, Phone, Instagram,
+  History, MapPin, User, Phone, Instagram, Palette, Image as ImageOutlinedIcon,
 } from 'lucide-react';
 import { useSession, signIn } from 'next-auth/react';
 import dynamic from 'next/dynamic';
@@ -23,6 +23,8 @@ import Link from 'next/link';
 import { useCartStore } from '@/store/cartStore';
 import { useWishlistStore } from '@/store/wishlistStore';
 import { useTranslation } from '@/hooks/useTranslation';
+import { usePublicShopQuery } from '@/hooks';
+import { useQueryClient } from '@tanstack/react-query';
 import OptimizedImage from '@/components/OptimizedImage';
 import AnnouncementBar from '@/components/AnnouncementBar';
 import EventBanner, { type ShopEvent } from '@/components/EventBanner';
@@ -124,13 +126,16 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
   // Filter cart items for this shop only
   const shopCart = useMemo(() => cart.filter(item => item.shopSlug === shopSlug), [cart, shopSlug]);
 
-  const [shop, setShop] = useState<ShopInfo>(initialShop);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [announcements, setAnnouncements] = useState<any[]>([]);
-  const [announcementHistory, setAnnouncementHistory] = useState<any[]>([]);
-  const [events, setEvents] = useState<ShopEvent[]>([]);
-  const [socialMediaNews, setSocialMediaNews] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: shopQueryResult, isLoading: isQueryLoading } = usePublicShopQuery(initialShop.id, initialShop);
+
+  const shop = shopQueryResult?.shop || initialShop;
+  const products: Product[] = (shop as any)?.products || [];
+  const announcements: any[] = (shop as any)?.announcements || [];
+  const announcementHistory: any[] = (shop as any)?.announcementHistory || [];
+  const events: ShopEvent[] = (shop as any)?.events || [];
+  const socialMediaNews: any[] = (shop as any)?.socialMediaNews || [];
+  const loading = isQueryLoading && !shopQueryResult;
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -142,7 +147,9 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
   // Product dialog state
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedVariant, setSelectedVariant] = useState<any>(null);
+  const [selectedPattern, setSelectedPattern] = useState<any>(null);
   const [quantity, setQuantity] = useState(1);
+  const patternSelectorRef = useRef<HTMLDivElement>(null);
 
   // Checkout state
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -319,38 +326,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
     }
   }, [cart, removeFromCart, updateItem, showToast, lang]);
 
-  // Fetch shop data (products + config) from public API
-  useEffect(() => {
-    (async () => {
-      try {
-        setLoading(true);
-        let shopId = initialShop.id;
-        if (!shopId) {
-          const shopRes = await fetch('/api/shops?public=1');
-          const shopData = await shopRes.json();
-          const found = (shopData.shops || []).find((s: any) => s.slug === shopSlug);
-          if (found) shopId = found.id;
-        }
-        if (!shopId) return;
 
-        const res = await fetch(`/api/shops/${shopId}/public`);
-        const data = await res.json();
-        if (data.status === 'success' && data.shop) {
-          const s = data.shop;
-          setShop(s);
-          setProducts(s.products || []);
-          setAnnouncements(s.announcements || []);
-          setAnnouncementHistory(s.announcementHistory || []);
-          setEvents(s.events || []);
-          setSocialMediaNews(s.socialMediaNews || []);
-        }
-      } catch {
-        console.error('Failed to load shop data');
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [shopSlug, initialShop.id]);
 
   // Checkout handler
   const handleShopCheckout = useCallback(async () => {
@@ -381,12 +357,14 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
         customerAddress: orderAddress.trim(),
         customerInstagram: orderInstagram.trim(),
         cart: shopCart.map(item => ({
-          productId: item.id,
+          productId: item.productId || item.id.split('-')[0],
           productName: item.name,
           size: item.size || '-',
           quantity: item.qty,
           unitPrice: item.price,
-          options: {},
+          options: {
+            pattern: item.selectedPattern?.name || undefined,
+          },
         })),
         totalAmount,
         turnstileToken,
@@ -406,6 +384,11 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
         setTurnstileToken('');
         // Open payment
         setPaymentRef(res.ref);
+        
+        // Invalidate shop public query to refresh inventory/stock
+        queryClient.invalidateQueries({
+          queryKey: ['shop', 'public', shop.id],
+        });
       } else {
         showToast('error', (res as any).message || (lang === 'en' ? 'Order failed' : 'สั่งซื้อไม่สำเร็จ'));
       }
@@ -414,7 +397,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
     } finally {
       setCheckoutProcessing(false);
     }
-  }, [session, shopCart, orderName, orderPhone, shop.id, shop.slug, shopSlug, lang, showToast, turnstileToken]);
+  }, [session, shopCart, orderName, orderPhone, shop.id, shop.slug, shopSlug, lang, showToast, turnstileToken, queryClient]);
 
   // Categories from products
   const categories = useMemo(() => {
@@ -456,16 +439,33 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
     setSelectedProduct(product);
     setSelectedSize('');
     setSelectedVariant(null);
+    setSelectedPattern(null);
     setQuantity(1);
   }, []);
 
   const handleAddToCart = useCallback(() => {
     if (!selectedProduct) return;
+
+    // Check if product has patterns
+    const hasPatterns = selectedProduct.patterns && selectedProduct.patterns.filter((p: any) => p.isActive !== false).length > 0;
+    if (hasPatterns && !selectedPattern) {
+      patternSelectorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => {
+        patternSelectorRef.current?.classList.add('shake-highlight');
+        setTimeout(() => patternSelectorRef.current?.classList.remove('shake-highlight'), 600);
+      }, 300);
+      showToast('warning', lang === 'en' ? 'Please select a design/pattern' : 'กรุณาเลือกลายสินค้า');
+      return;
+    }
+
     const price = selectedVariant
       ? selectedVariant.price
       : selectedProduct.sizePricing?.[selectedSize] || selectedProduct.basePrice;
+    
+    const patternName = selectedPattern?.name || '';
     const item = {
-      id: selectedProduct.id,
+      id: `${selectedProduct.id}-${selectedSize || '-'}-${selectedVariant?.id || '-'}-${patternName || '-'}`,
+      productId: selectedProduct.id,
       name: selectedProduct.name,
       type: selectedProduct.type || 'OTHER' as const,
       category: selectedProduct.category,
@@ -475,6 +475,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       size: selectedSize || '-',
       total: price * quantity,
       selectedVariant: selectedVariant || undefined,
+      selectedPattern: selectedPattern || undefined,
       shopSlug,
     };
     addToCart(item);
@@ -482,8 +483,9 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
     setSelectedProduct(null);
     setSelectedSize('');
     setSelectedVariant(null);
+    setSelectedPattern(null);
     setQuantity(1);
-  }, [selectedProduct, selectedVariant, selectedSize, quantity, addToCart, showToast, lang]);
+  }, [selectedProduct, selectedVariant, selectedSize, selectedPattern, quantity, addToCart, showToast, lang, shopSlug]);
 
   const handleShareProduct = useCallback(async (product: Product) => {
     const url = `${window.location.origin}/shop/${shopSlug}`;
@@ -835,7 +837,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
 
                     return (
                       <Box key={product.id} sx={{
-                        minWidth: { xs: '68vw', sm: 'auto' },
+                        minWidth: { xs: '68vw', sm: 0 },
                         maxWidth: { xs: '68vw', sm: 'none' },
                         flex: { xs: '0 0 auto', sm: '1 1 auto' },
                         scrollSnapAlign: { xs: 'start', sm: 'unset' },
@@ -1208,7 +1210,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       {/* ==================== PRODUCT DETAIL DIALOG ==================== */}
       <Dialog
         open={!!selectedProduct}
-        onClose={() => { setSelectedProduct(null); setSelectedSize(''); setSelectedVariant(null); setQuantity(1); }}
+        onClose={() => { setSelectedProduct(null); setSelectedSize(''); setSelectedVariant(null); setSelectedPattern(null); setQuantity(1); }}
         maxWidth="sm"
         fullWidth
         PaperProps={{
@@ -1234,7 +1236,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                   priority
                 />
                 <IconButton
-                  onClick={() => { setSelectedProduct(null); setSelectedSize(''); setSelectedVariant(null); setQuantity(1); }}
+                  onClick={() => { setSelectedProduct(null); setSelectedSize(''); setSelectedVariant(null); setSelectedPattern(null); setQuantity(1); }}
                   sx={{
                     position: 'absolute', top: 12, right: 12,
                     bgcolor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)',
@@ -1311,6 +1313,85 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                         }}
                       />
                     ))}
+                  </Box>
+                </Box>
+              )}
+
+              {/* Pattern Selection */}
+              {selectedProduct.patterns && selectedProduct.patterns.filter((p: any) => p.isActive !== false).length > 0 && (
+                <Box
+                  ref={patternSelectorRef}
+                  sx={{
+                    p: 2,
+                    mt: 2.5,
+                    borderRadius: '16px',
+                    background: 'linear-gradient(135deg, rgba(56,189,248,0.15) 0%, rgba(56,189,248,0.05) 100%)',
+                    border: '1px solid rgba(56,189,248,0.3)',
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                    <Box sx={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: '8px',
+                      bgcolor: 'rgba(56,189,248,0.2)',
+                      display: 'grid',
+                      placeItems: 'center',
+                    }}>
+                      <Palette size={16} color="#38bdf8" />
+                    </Box>
+                    <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                      {lang === 'en' ? 'Select Design/Pattern' : 'เลือกลายสินค้า'}
+                    </Typography>
+                  </Box>
+
+                  <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 1.2 }}>
+                    {selectedProduct.patterns
+                      .filter((p: any) => p.isActive !== false)
+                      .map((pattern: any) => {
+                        const active = selectedPattern?.id === pattern.id;
+                        return (
+                          <Box
+                            key={pattern.id}
+                            onClick={() => setSelectedPattern(pattern)}
+                            sx={{
+                              p: 0.8,
+                              borderRadius: '10px',
+                              border: active ? '2px solid #38bdf8' : '1px solid var(--glass-border)',
+                              bgcolor: active ? 'rgba(56,189,248,0.08)' : 'var(--surface-2)',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              gap: 0.5,
+                              '&:hover': { opacity: 0.9, borderColor: '#38bdf8' },
+                              transition: 'all 0.2s ease',
+                              position: 'relative',
+                            }}
+                          >
+                            <Box sx={{
+                              width: '100%',
+                              height: 56,
+                              borderRadius: '6px',
+                              overflow: 'hidden',
+                              bgcolor: 'var(--glass-bg)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              border: '1px solid var(--glass-border)',
+                            }}>
+                              {pattern.image ? (
+                                <img src={pattern.image} alt={pattern.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              ) : (
+                                <ImageOutlinedIcon size={18} style={{ color: 'var(--text-muted)' }} />
+                              )}
+                            </Box>
+                            <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: active ? 'var(--secondary)' : 'var(--foreground)', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
+                              {pattern.name}
+                            </Typography>
+                          </Box>
+                        );
+                      })}
                   </Box>
                 </Box>
               )}
@@ -1445,6 +1526,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                         <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                           {item.size !== '-' ? `${lang === 'en' ? 'Size' : 'ขนาด'}: ${item.size}` : ''}
                           {item.selectedVariant ? ` · ${item.selectedVariant.name}` : ''}
+                          {item.selectedPattern ? ` · ${item.selectedPattern.name}` : ''}
                         </Typography>
                       </Box>
                       <IconButton
@@ -1639,7 +1721,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                         {shopCart.map((item, i) => (
                           <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
                             <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                              {item.name} {item.size !== '-' ? `(${item.size})` : ''} ×{item.qty}
+                              {item.name} {item.size !== '-' ? `(${item.size})` : ''} {item.selectedPattern ? `[${item.selectedPattern.name}]` : ''} ×{item.qty}
                             </Typography>
                             <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)' }}>
                               ฿{item.total.toLocaleString()}
