@@ -902,6 +902,9 @@ const product = {
     noProductsYet: 'ยังไม่มีสินค้า',
     comingSoon: 'รอติดตามสินค้าใหม่เร็วๆ นี้',
     inchUnit: 'นิ้ว',
+    pricePerPiece: 'ราคาต่อชิ้น',
+    piece: 'ชิ้น',
+    excludeShipping: 'ยังไม่รวมค่าจัดส่ง',
   },
   en: {
     noImages: 'No product images',
@@ -959,6 +962,9 @@ const product = {
     noProductsYet: 'No products yet',
     comingSoon: 'Stay tuned for new products',
     inchUnit: 'inches',
+    pricePerPiece: 'Price per piece',
+    piece: 'piece',
+    excludeShipping: 'Excluding shipping fee',
   },
 } as const;
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { JSX } from 'react';
-import { X, Upload, Check, Loader2, AlertCircle, CheckCircle2, Image, Clock3, Download, CreditCard, QrCode, Copy, Smartphone, ArrowRight, Sparkles, AlertTriangle, Info, ShoppingBag, Tag, Hash, Shirt, Clock } from 'lucide-react';
+import { X, Upload, Check, Loader2, AlertCircle, CheckCircle2, Image, Clock3, Download, CreditCard, QrCode, Copy, Smartphone, ArrowRight, Sparkles, AlertTriangle, Info, ShoppingBag, Tag, Hash, Shirt, Clock, Palette } from 'lucide-react';
 import { Drawer, Box, Typography, Button, IconButton, Skeleton, useMediaQuery, LinearProgress, Slide, Collapse } from '@mui/material';
 import { QRCodeSVG } from 'qrcode.react';
 import { PaymentCountdown } from './OrderCountdown';
@@ -22,6 +22,8 @@ interface CartItem {
   customName?: string;
   customNumber?: string;
   isLongSleeve?: boolean;
+  pattern?: string;
+  coverImage?: string;
 }
 
 interface Toast {
@@ -1080,89 +1082,142 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                       <Box 
                         key={index}
                         sx={{
-                          p: 2,
+                          p: 1.5,
                           borderRadius: '16px',
                           bgcolor: 'var(--surface)',
                           border: '1px solid var(--glass-border)',
+                          display: 'flex',
+                          gap: 1.5,
                         }}
                       >
-                        {/* Product Name & Quantity */}
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-                          <Box sx={{ flex: 1 }}>
-                            <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                        {/* Product Image */}
+                        <Box sx={{
+                          width: 56,
+                          height: 56,
+                          borderRadius: '10px',
+                          bgcolor: 'var(--surface-2)',
+                          flexShrink: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          border: '1px solid var(--glass-border)',
+                          overflow: 'hidden',
+                          position: 'relative',
+                        }}>
+                          {item.coverImage ? (
+                            <img
+                              src={item.coverImage}
+                              alt={item.productName}
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                                display: 'block',
+                              }}
+                              loading="lazy"
+                            />
+                          ) : (
+                            <ShoppingBag size={20} style={{ color: 'var(--text-muted)' }} />
+                          )}
+                        </Box>
+
+                        {/* Product Details */}
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          {/* Product Name & Price Row */}
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.5 }}>
+                            <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--foreground)', pr: 1 }} noWrap>
                               {item.productName}
                             </Typography>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-                              <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                {t.payment.sizeLabel} {item.size}
-                              </Typography>
-                              <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>•</Typography>
-                              <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                x{item.quantity}
-                              </Typography>
+                            <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--success)', flexShrink: 0 }}>
+                              ฿{(item.unitPrice * item.quantity).toLocaleString()}
+                            </Typography>
+                          </Box>
+                          
+                          {/* Size & Qty */}
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                              {t.payment.sizeLabel} {item.size}
+                            </Typography>
+                            <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>•</Typography>
+                            <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                              x{item.quantity}
+                            </Typography>
+                          </Box>
+                          
+                          {/* Custom Options Badges */}
+                          {(item.customName || item.customNumber || item.isLongSleeve || item.pattern) && (
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.8, mt: 1 }}>
+                              {item.customName && (
+                                <Box sx={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 0.5,
+                                  px: 1.2,
+                                  py: 0.4,
+                                  borderRadius: '8px',
+                                  bgcolor: 'rgba(236,72,153,0.15)',
+                                  border: '1px solid rgba(236,72,153,0.3)',
+                                }}>
+                                  <Tag size={12} style={{ color: '#f472b6' }} />
+                                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#f472b6' }}>
+                                    {item.customName}
+                                  </Typography>
+                                </Box>
+                              )}
+                              {item.customNumber && (
+                                <Box sx={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 0.5,
+                                  px: 1.2,
+                                  py: 0.4,
+                                  borderRadius: '8px',
+                                  bgcolor: 'rgba(251,191,36,0.15)',
+                                  border: '1px solid rgba(251,191,36,0.3)',
+                                }}>
+                                  <Hash size={12} style={{ color: '#ffd60a' }} />
+                                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#ffd60a' }}>
+                                    {t.payment.numberLabel} {item.customNumber}
+                                  </Typography>
+                                </Box>
+                              )}
+                              {item.isLongSleeve && (
+                                <Box sx={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 0.5,
+                                  px: 1.2,
+                                  py: 0.4,
+                                  borderRadius: '8px',
+                                  bgcolor: 'rgba(34,211,238,0.15)',
+                                  border: '1px solid rgba(34,211,238,0.3)',
+                                }}>
+                                  <Shirt size={12} style={{ color: '#64d2ff' }} />
+                                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#64d2ff' }}>
+                                    {t.common.longSleeve}
+                                  </Typography>
+                                </Box>
+                              )}
+                              {item.pattern && (
+                                <Box sx={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 0.5,
+                                  px: 1.2,
+                                  py: 0.4,
+                                  borderRadius: '8px',
+                                  bgcolor: 'rgba(167,139,250,0.15)',
+                                  border: '1px solid rgba(167,139,250,0.3)',
+                                }}>
+                                  <Palette size={12} style={{ color: '#a78bfa' }} />
+                                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#a78bfa' }}>
+                                    {item.pattern}
+                                  </Typography>
+                                </Box>
+                              )}
                             </Box>
-                          </Box>
-                          <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--success)' }}>
-                            ฿{(item.unitPrice * item.quantity).toLocaleString()}
-                          </Typography>
+                          )}
                         </Box>
-                        
-                        {/* Custom Options Badges */}
-                        {(item.customName || item.customNumber || item.isLongSleeve) && (
-                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.8, mt: 1.5 }}>
-                            {item.customName && (
-                              <Box sx={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 0.5,
-                                px: 1.2,
-                                py: 0.4,
-                                borderRadius: '8px',
-                                bgcolor: 'rgba(236,72,153,0.15)',
-                                border: '1px solid rgba(236,72,153,0.3)',
-                              }}>
-                                <Tag size={12} style={{ color: '#f472b6' }} />
-                                <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#f472b6' }}>
-                                  {item.customName}
-                                </Typography>
-                              </Box>
-                            )}
-                            {item.customNumber && (
-                              <Box sx={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 0.5,
-                                px: 1.2,
-                                py: 0.4,
-                                borderRadius: '8px',
-                                bgcolor: 'rgba(251,191,36,0.15)',
-                                border: '1px solid rgba(251,191,36,0.3)',
-                              }}>
-                                <Hash size={12} style={{ color: '#ffd60a' }} />
-                                <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#ffd60a' }}>
-                                  {t.payment.numberLabel} {item.customNumber}
-                                </Typography>
-                              </Box>
-                            )}
-                            {item.isLongSleeve && (
-                              <Box sx={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: 0.5,
-                                px: 1.2,
-                                py: 0.4,
-                                borderRadius: '8px',
-                                bgcolor: 'rgba(34,211,238,0.15)',
-                                border: '1px solid rgba(34,211,238,0.3)',
-                              }}>
-                                <Shirt size={12} style={{ color: '#64d2ff' }} />
-                                <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#64d2ff' }}>
-                                  {t.common.longSleeve}
-                                </Typography>
-                              </Box>
-                            )}
-                          </Box>
-                        )}
                       </Box>
                     ))}
                   </Box>

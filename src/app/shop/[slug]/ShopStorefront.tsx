@@ -7,7 +7,7 @@ import {
   Box, Typography, Button, Chip, Avatar, IconButton, Badge,
   Dialog, DialogContent, DialogActions, TextField,
   Snackbar, Alert, useMediaQuery, Skeleton,
-  CircularProgress, Tooltip,
+  CircularProgress, Tooltip, Drawer,
 } from '@mui/material';
 import {
   Store, ShoppingCart, Plus, Minus, X, ArrowLeft, Search,
@@ -19,6 +19,9 @@ import dynamic from 'next/dynamic';
 const PasskeyLoginButton = dynamic(() => import('@/components/PasskeyLoginButton'), { ssr: false });
 const TurnstileWidget = dynamic(() => import('@/components/TurnstileWidget'), { ssr: false });
 const OrderHistoryDrawer = dynamic(() => import('@/components/OrderHistoryDrawer'), { ssr: false });
+const CheckoutDialog = dynamic(() => import('@/components/CheckoutDialog'), { ssr: false });
+const ProfileModal = dynamic(() => import('@/components/ProfileModal'), { ssr: false });
+import { type SavedAddress } from '@/components/ProfileModal';
 import Link from 'next/link';
 import { useCartStore } from '@/store/cartStore';
 import { useWishlistStore } from '@/store/wishlistStore';
@@ -39,8 +42,9 @@ import {
   getProductName, getProductDescription,
   getCategoryLabel, getCategoryIcon,
 } from '@/lib/config';
-import { submitOrder as submitOrderApi, getHistory, cancelOrder as cancelOrderApi } from '@/lib/api-client';
+import { submitOrder as submitOrderApi, getHistory, cancelOrder as cancelOrderApi, saveProfile as saveProfileApi } from '@/lib/api-client';
 import type { OrderHistory } from '@/lib/shop-constants';
+import { isThaiText, getStatusCategory, normalizeStatus } from '@/lib/shop-constants';
 
 // ==================== TYPES ====================
 interface ShopInfo {
@@ -161,6 +165,42 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
   const [paymentRef, setPaymentRef] = useState<string | null>(null);
   const [turnstileToken, setTurnstileToken] = useState('');
 
+  // Profile modal state
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [pendingCheckout, setPendingCheckout] = useState(false);
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+
+  const orderData = useMemo(() => ({
+    name: orderName,
+    phone: orderPhone,
+    address: orderAddress,
+    instagram: orderInstagram,
+    profileImage: '',
+    email: session?.user?.email || '',
+  }), [orderName, orderPhone, orderAddress, orderInstagram, session?.user?.email]);
+
+  const profileComplete = useMemo(() => {
+    return isThaiText(orderName) && !!orderPhone && !!orderInstagram;
+  }, [orderName, orderPhone, orderInstagram]);
+
+  const mappedShopCart = useMemo(() => {
+    return shopCart.map((item) => ({
+      id: item.id,
+      productId: item.productId || item.id.split('-')[0],
+      productName: item.name,
+      size: item.size || '-',
+      quantity: item.qty,
+      unitPrice: item.price,
+      options: {
+        customName: item.customName,
+        customNumber: item.customNumber,
+        isLongSleeve: item.sleeve === 'LONG',
+        pattern: item.selectedPattern?.name || undefined,
+      },
+    }));
+  }, [shopCart]);
+
   // Order History state
   const [showOrderHistory, setShowOrderHistory] = useState(false);
   const [orderHistory, setOrderHistory] = useState<OrderHistory[]>([]);
@@ -170,6 +210,18 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
   const [historyHasMore, setHistoryHasMore] = useState(false);
   const [historyFilter, setHistoryFilter] = useState<'ALL' | 'WAITING_PAYMENT' | 'COMPLETED' | 'SHIPPED' | 'RECEIVED' | 'CANCELLED'>('ALL');
   const [cancellingRef, setCancellingRef] = useState<string | null>(null);
+
+  const pendingPaymentCount = useMemo(() => {
+    return orderHistory.filter((order) => {
+      const category = getStatusCategory(normalizeStatus(order.status));
+      return category === 'WAITING_PAYMENT';
+    }).length;
+  }, [orderHistory]);
+
+  const needsPatternFirst = useMemo(() => {
+    if (!selectedProduct) return false;
+    return Boolean(selectedProduct.patterns && selectedProduct.patterns.filter((p: any) => p.isActive !== false).length > 0 && !selectedPattern);
+  }, [selectedProduct, selectedPattern]);
 
   // Follow shop state
   const [isFollowing, setIsFollowing] = useState(false);
@@ -189,9 +241,18 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
             if (data.data.phone && !orderPhone) setOrderPhone(data.data.phone);
             if (data.data.address && !orderAddress) setOrderAddress(data.data.address);
             if (data.data.instagram && !orderInstagram) setOrderInstagram(data.data.instagram);
+            if (data.data.savedAddresses) setSavedAddresses(data.data.savedAddresses);
           }
         })
         .catch(() => {});
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user?.email]);
+
+  // Load order history on mount for badge count
+  useEffect(() => {
+    if (session?.user?.email) {
+      loadOrderHistory();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user?.email]);
@@ -328,8 +389,60 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
 
 
 
+  // Profile save handler
+  const handleSaveProfile = async (data: Partial<typeof orderData> & { savedAddresses?: SavedAddress[] }) => {
+    if (!session?.user?.email) {
+      showToast('error', lang === 'en' ? 'Please log in' : 'กรุณาเข้าสู่ระบบ');
+      return;
+    }
+
+    setSavingProfile(true);
+    const sanitized = {
+      name: data.name ? data.name.replace(/[^\u0E00-\u0E7F\s]/g, '').trim() : orderName,
+      phone: data.phone ? data.phone.replace(/\D/g, '').slice(0, 12) : orderPhone,
+      address: data.address ? data.address.trim() : orderAddress,
+      instagram: data.instagram ? data.instagram.trim() : orderInstagram,
+    };
+
+    if (sanitized.name) setOrderName(sanitized.name);
+    if (sanitized.phone) setOrderPhone(sanitized.phone);
+    if (sanitized.address) setOrderAddress(sanitized.address);
+    if (sanitized.instagram) setOrderInstagram(sanitized.instagram);
+
+    if (data.savedAddresses) {
+      setSavedAddresses(data.savedAddresses);
+    }
+
+    try {
+      await saveProfileApi(session.user.email, {
+        name: sanitized.name,
+        phone: sanitized.phone,
+        address: sanitized.address,
+        instagram: sanitized.instagram,
+        ...(data.savedAddresses && { savedAddresses: data.savedAddresses }),
+      });
+
+      showToast('success', lang === 'en' ? 'Profile saved' : 'บันทึกข้อมูลจัดส่งแล้ว');
+      setShowProfileModal(false);
+      if (pendingCheckout && isThaiText(sanitized.name) && sanitized.phone && sanitized.instagram) {
+        setCheckoutOpen(true);
+        setPendingCheckout(false);
+      }
+    } catch (error: any) {
+      showToast('error', error.message || (lang === 'en' ? 'Save failed' : 'บันทึกข้อมูลไม่สำเร็จ'));
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
   // Checkout handler
-  const handleShopCheckout = useCallback(async () => {
+  const handleShopCheckout = useCallback(async (options?: {
+    shippingOptionId?: string;
+    paymentOptionId?: string;
+    shippingFee?: number;
+    promoCode?: string;
+    promoDiscount?: number;
+  }) => {
     if (!session?.user?.email) {
       showToast('warning', lang === 'en' ? 'Please sign in to checkout' : 'กรุณาเข้าสู่ระบบก่อนสั่งซื้อ');
       return;
@@ -349,7 +462,11 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
 
     setCheckoutProcessing(true);
     try {
-      const totalAmount = shopCart.reduce((sum, item) => sum + item.total, 0);
+      const subtotal = shopCart.reduce((sum, item) => sum + item.total, 0);
+      const shippingFee = options?.shippingFee || 0;
+      const promoDiscount = options?.promoDiscount || 0;
+      const totalAmount = Math.max(0, subtotal + shippingFee - promoDiscount);
+
       const res = await submitOrderApi({
         customerName: orderName.trim(),
         customerEmail: session.user.email,
@@ -363,13 +480,19 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
           quantity: item.qty,
           unitPrice: item.price,
           options: {
+            customName: item.customName,
+            customNumber: item.customNumber,
+            isLongSleeve: item.sleeve === 'LONG',
             pattern: item.selectedPattern?.name || undefined,
           },
         })),
         totalAmount,
         turnstileToken,
-        shippingOptionId: 'pickup',
-        paymentOptionId: 'bank_transfer',
+        shippingOptionId: options?.shippingOptionId || 'pickup',
+        paymentOptionId: options?.paymentOptionId || 'bank_transfer',
+        shippingFee: options?.shippingFee,
+        promoCode: options?.promoCode,
+        promoDiscount: options?.promoDiscount,
         shopId: shop.id,
         shopSlug: shop.slug,
       });
@@ -397,7 +520,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
     } finally {
       setCheckoutProcessing(false);
     }
-  }, [session, shopCart, orderName, orderPhone, shop.id, shop.slug, shopSlug, lang, showToast, turnstileToken, queryClient]);
+  }, [session, shopCart, orderName, orderPhone, orderAddress, orderInstagram, shop.id, shop.slug, shopSlug, lang, showToast, turnstileToken, queryClient]);
 
   // Categories from products
   const categories = useMemo(() => {
@@ -554,7 +677,9 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                 onClick={() => setShowOrderHistory(true)}
                 sx={{ color: 'var(--foreground)' }}
               >
-                <History size={20} />
+                <Badge badgeContent={pendingPaymentCount} color="warning">
+                  <History size={20} />
+                </Badge>
               </IconButton>
             </Tooltip>
           )}
@@ -1207,223 +1332,42 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
         <Box sx={{ pb: 4 }} />
       </Box>
 
-      {/* ==================== PRODUCT DETAIL DIALOG ==================== */}
-      <Dialog
+      {/* ==================== PRODUCT DETAIL DRAWER ==================== */}
+      <Drawer
+        anchor={isMobile ? "bottom" : "right"}
         open={!!selectedProduct}
         onClose={() => { setSelectedProduct(null); setSelectedSize(''); setSelectedVariant(null); setSelectedPattern(null); setQuantity(1); }}
-        maxWidth="sm"
-        fullWidth
         PaperProps={{
           sx: {
-            bgcolor: 'var(--surface)',
+            width: '100%',
+            maxWidth: isMobile ? 'none' : 960,
+            height: isMobile ? '95vh' : '100%',
+            maxHeight: isMobile ? '95vh' : '100%',
+            borderTopLeftRadius: isMobile ? 28 : 0,
+            borderTopRightRadius: isMobile ? 28 : 0,
+            bgcolor: 'var(--background)',
             color: 'var(--foreground)',
-            borderRadius: '20px',
-            border: '1px solid var(--glass-border)',
-            maxHeight: '90vh',
+            overflow: 'hidden',
+            boxShadow: (theme: any) => theme.palette.mode === 'dark' 
+              ? (isMobile ? '0 -10px 60px rgba(0,0,0,0.5), 0 -4px 20px rgba(0,113,227,0.15)' : '-10px 0 60px rgba(0,0,0,0.5), -4px 0 20px rgba(0,113,227,0.15)') 
+              : (isMobile ? '0 -10px 60px rgba(0,0,0,0.1), 0 -4px 20px rgba(0,113,227,0.08)' : '-10px 0 60px rgba(0,0,0,0.1), -4px 0 20px rgba(0,113,227,0.08)'),
           },
         }}
+        transitionDuration={{ enter: isMobile ? 350 : 300, exit: isMobile ? 250 : 200 }}
+        sx={{ zIndex: 8000 }}
       >
-        {selectedProduct && (
-          <>
-            {(selectedProduct.coverImage || selectedProduct.images?.[0]) && (
-              <Box sx={{ position: 'relative', width: '100%', aspectRatio: '4/3', overflow: 'hidden' }}>
-                <OptimizedImage
-                  src={selectedProduct.coverImage || selectedProduct.images?.[0] || ''}
-                  alt={getProductName(selectedProduct, lang)}
-                  width="100%"
-                  height="100%"
-                  objectFit="cover"
-                  priority
-                />
-                <IconButton
-                  onClick={() => { setSelectedProduct(null); setSelectedSize(''); setSelectedVariant(null); setSelectedPattern(null); setQuantity(1); }}
-                  sx={{
-                    position: 'absolute', top: 12, right: 12,
-                    bgcolor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)',
-                    color: 'white', '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' },
-                  }}
-                >
-                  <X size={18} />
-                </IconButton>
-                <Box sx={{
-                  position: 'absolute', bottom: 12, right: 12,
-                  px: 1.5, py: 0.6, borderRadius: '12px',
-                  bgcolor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
-                }}>
-                  <Typography sx={{ fontSize: '1.2rem', fontWeight: 800, color: '#34c759' }}>
-                    ฿{(selectedVariant?.price || selectedProduct.sizePricing?.[selectedSize] || selectedProduct.basePrice).toLocaleString()}
-                  </Typography>
-                </Box>
-              </Box>
-            )}
-
-            <DialogContent sx={{ px: 3, py: 2.5 }}>
-              <Typography sx={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--foreground)' }}>
-                {getProductName(selectedProduct, lang)}
-              </Typography>
-              {getProductDescription(selectedProduct, lang) && (
-                <Typography sx={{ fontSize: '0.85rem', color: 'var(--text-muted)', mt: 1, whiteSpace: 'pre-line' }}>
-                  {getProductDescription(selectedProduct, lang)}
-                </Typography>
-              )}
-
-              {/* Size Selection */}
-              {selectedProduct.sizePricing && Object.keys(selectedProduct.sizePricing).length > 0 && (
-                <Box sx={{ mt: 2.5 }}>
-                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, mb: 1, color: 'var(--foreground)' }}>
-                    {lang === 'en' ? 'Size' : 'ขนาด'}
-                  </Typography>
-                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                    {Object.entries(selectedProduct.sizePricing).map(([size, price]) => (
-                      <Chip
-                        key={size}
-                        label={`${size} (฿${price})`}
-                        onClick={() => setSelectedSize(size)}
-                        sx={{
-                          bgcolor: selectedSize === size ? '#0071e3' : 'var(--surface-2)',
-                          color: selectedSize === size ? 'white' : 'var(--foreground)',
-                          fontWeight: 600, cursor: 'pointer',
-                          border: `1px solid ${selectedSize === size ? '#0071e3' : 'var(--glass-border)'}`,
-                          '&:hover': { opacity: 0.8 },
-                        }}
-                      />
-                    ))}
-                  </Box>
-                </Box>
-              )}
-
-              {/* Variant Selection */}
-              {selectedProduct.variants && selectedProduct.variants.length > 0 && (
-                <Box sx={{ mt: 2.5 }}>
-                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, mb: 1, color: 'var(--foreground)' }}>
-                    {lang === 'en' ? 'Options' : 'ตัวเลือก'}
-                  </Typography>
-                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                    {selectedProduct.variants.filter(v => v.isActive).map((variant) => (
-                      <Chip
-                        key={variant.id}
-                        label={`${variant.name} (฿${variant.price})`}
-                        onClick={() => setSelectedVariant(variant)}
-                        sx={{
-                          bgcolor: selectedVariant?.id === variant.id ? '#0071e3' : 'var(--surface-2)',
-                          color: selectedVariant?.id === variant.id ? 'white' : 'var(--foreground)',
-                          fontWeight: 600, cursor: 'pointer',
-                          border: `1px solid ${selectedVariant?.id === variant.id ? '#0071e3' : 'var(--glass-border)'}`,
-                          '&:hover': { opacity: 0.8 },
-                        }}
-                      />
-                    ))}
-                  </Box>
-                </Box>
-              )}
-
-              {/* Pattern Selection */}
-              {selectedProduct.patterns && selectedProduct.patterns.filter((p: any) => p.isActive !== false).length > 0 && (
-                <Box
-                  ref={patternSelectorRef}
-                  sx={{
-                    p: 2,
-                    mt: 2.5,
-                    borderRadius: '16px',
-                    background: 'linear-gradient(135deg, rgba(56,189,248,0.15) 0%, rgba(56,189,248,0.05) 100%)',
-                    border: '1px solid rgba(56,189,248,0.3)',
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-                    <Box sx={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: '8px',
-                      bgcolor: 'rgba(56,189,248,0.2)',
-                      display: 'grid',
-                      placeItems: 'center',
-                    }}>
-                      <Palette size={16} color="#38bdf8" />
-                    </Box>
-                    <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                      {lang === 'en' ? 'Select Design/Pattern' : 'เลือกลายสินค้า'}
-                    </Typography>
-                  </Box>
-
-                  <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 1.2 }}>
-                    {selectedProduct.patterns
-                      .filter((p: any) => p.isActive !== false)
-                      .map((pattern: any) => {
-                        const active = selectedPattern?.id === pattern.id;
-                        return (
-                          <Box
-                            key={pattern.id}
-                            onClick={() => setSelectedPattern(pattern)}
-                            sx={{
-                              p: 0.8,
-                              borderRadius: '10px',
-                              border: active ? '2px solid #38bdf8' : '1px solid var(--glass-border)',
-                              bgcolor: active ? 'rgba(56,189,248,0.08)' : 'var(--surface-2)',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              gap: 0.5,
-                              '&:hover': { opacity: 0.9, borderColor: '#38bdf8' },
-                              transition: 'all 0.2s ease',
-                              position: 'relative',
-                            }}
-                          >
-                            <Box sx={{
-                              width: '100%',
-                              height: 56,
-                              borderRadius: '6px',
-                              overflow: 'hidden',
-                              bgcolor: 'var(--glass-bg)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              border: '1px solid var(--glass-border)',
-                            }}>
-                              {pattern.image ? (
-                                <img src={pattern.image} alt={pattern.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                              ) : (
-                                <ImageOutlinedIcon size={18} style={{ color: 'var(--text-muted)' }} />
-                              )}
-                            </Box>
-                            <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: active ? 'var(--secondary)' : 'var(--foreground)', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
-                              {pattern.name}
-                            </Typography>
-                          </Box>
-                        );
-                      })}
-                  </Box>
-                </Box>
-              )}
-
-              {/* Quantity */}
-              <Box sx={{ mt: 2.5, display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                  {lang === 'en' ? 'Quantity' : 'จำนวน'}
-                </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <IconButton
-                    size="small"
-                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    sx={{ bgcolor: 'var(--surface-2)', color: 'var(--foreground)', border: '1px solid var(--glass-border)' }}
-                  >
-                    <Minus size={16} />
-                  </IconButton>
-                  <Typography sx={{ fontWeight: 700, minWidth: 30, textAlign: 'center', color: 'var(--foreground)' }}>
-                    {quantity}
-                  </Typography>
-                  <IconButton
-                    size="small"
-                    onClick={() => setQuantity(quantity + 1)}
-                    sx={{ bgcolor: 'var(--surface-2)', color: 'var(--foreground)', border: '1px solid var(--glass-border)' }}
-                  >
-                    <Plus size={16} />
-                  </IconButton>
-                </Box>
-              </Box>
-            </DialogContent>
-
-            <DialogActions sx={{ px: 3, pb: 2.5 }}>
+        {selectedProduct && (() => {
+          const bottomActionsNode = (
+            <Box sx={{
+              px: { xs: 3, md: 0 },
+              pb: { xs: 2.5, md: 0 },
+              pt: { xs: 2, md: 0 },
+              borderTop: { xs: '1px solid var(--glass-border)', md: 'none' },
+              bgcolor: { xs: 'var(--background)', md: 'transparent' },
+              opacity: needsPatternFirst ? 0.5 : 1,
+              pointerEvents: needsPatternFirst ? 'none' : 'auto',
+              transition: 'all 0.3s ease',
+            }}>
               <Button
                 fullWidth
                 variant="contained"
@@ -1447,10 +1391,274 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
               >
                 {lang === 'en' ? 'Add to Cart' : 'เพิ่มลงตะกร้า'} — ฿{((selectedVariant?.price || selectedProduct.sizePricing?.[selectedSize] || selectedProduct.basePrice) * quantity).toLocaleString()}
               </Button>
-            </DialogActions>
-          </>
-        )}
-      </Dialog>
+            </Box>
+          );
+
+          return (
+            <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: 'var(--background)', color: 'var(--foreground)' }}>
+              {/* Sticky Header */}
+              <Box sx={{
+                position: 'sticky',
+                top: 0,
+                zIndex: 10,
+                borderBottom: '1px solid var(--glass-border)',
+                bgcolor: 'var(--background)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                px: 3,
+                py: 2,
+              }}>
+                <Typography sx={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--foreground)' }}>
+                  {lang === 'en' ? 'Product Details' : 'รายละเอียดสินค้า'}
+                </Typography>
+                <IconButton
+                  onClick={() => { setSelectedProduct(null); setSelectedSize(''); setSelectedVariant(null); setSelectedPattern(null); setQuantity(1); }}
+                  sx={{
+                    bgcolor: 'var(--surface-2)',
+                    color: 'var(--foreground)',
+                    '&:hover': { bgcolor: 'var(--surface-3)' },
+                  }}
+                >
+                  <X size={18} />
+                </IconButton>
+              </Box>
+
+              {/* Content body split layout */}
+              <Box sx={{
+                flex: 1,
+                overflow: 'auto',
+                WebkitOverflowScrolling: 'touch',
+                px: 3,
+                py: 2.5,
+                display: 'flex',
+                flexDirection: { xs: 'column', md: 'row' },
+                gap: { xs: 3, md: 4 },
+              }}>
+                {/* Left Column */}
+                <Box sx={{ flex: 1.2, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+                  {(selectedProduct.coverImage || selectedProduct.images?.[0]) && (
+                    <Box sx={{ 
+                      position: 'relative', 
+                      width: '100%', 
+                      aspectRatio: '4/3', 
+                      overflow: 'hidden',
+                      borderRadius: '16px',
+                      border: '1px solid var(--glass-border)',
+                    }}>
+                      <OptimizedImage
+                        src={selectedProduct.coverImage || selectedProduct.images?.[0] || ''}
+                        alt={getProductName(selectedProduct, lang)}
+                        width="100%"
+                        height="100%"
+                        objectFit="cover"
+                        priority
+                      />
+                      <Box sx={{
+                        position: 'absolute', bottom: 12, right: 12,
+                        px: 1.5, py: 0.6, borderRadius: '12px',
+                        bgcolor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
+                      }}>
+                        <Typography sx={{ fontSize: '1.2rem', fontWeight: 800, color: '#34c759' }}>
+                          ฿{(selectedVariant?.price || selectedProduct.sizePricing?.[selectedSize] || selectedProduct.basePrice).toLocaleString()}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  )}
+
+                  <Box>
+                    <Typography sx={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--foreground)' }}>
+                      {getProductName(selectedProduct, lang)}
+                    </Typography>
+                    {getProductDescription(selectedProduct, lang) && (
+                      <Typography sx={{ fontSize: '0.85rem', color: 'var(--text-muted)', mt: 1.5, whiteSpace: 'pre-line', lineHeight: 1.6 }}>
+                        {getProductDescription(selectedProduct, lang)}
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
+
+                {/* Right Column */}
+                <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+                  {/* Pattern Selection */}
+                  {selectedProduct.patterns && selectedProduct.patterns.filter((p: any) => p.isActive !== false).length > 0 && (
+                    <Box
+                      ref={patternSelectorRef}
+                      sx={{
+                        p: 2,
+                        borderRadius: '16px',
+                        background: 'linear-gradient(135deg, rgba(56,189,248,0.15) 0%, rgba(56,189,248,0.05) 100%)',
+                        border: '1px solid rgba(56,189,248,0.3)',
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                        <Box sx={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: '8px',
+                          bgcolor: 'rgba(56,189,248,0.2)',
+                          display: 'grid',
+                          placeItems: 'center',
+                        }}>
+                          <Palette size={16} color="#38bdf8" />
+                        </Box>
+                        <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+                          <span>{lang === 'en' ? 'Select Design/Pattern' : 'เลือกลายสินค้า'}</span>
+                          {needsPatternFirst && (
+                            <span style={{ fontSize: '0.72rem', color: '#ff453a', fontWeight: 600, animation: 'pulse 1.5s infinite' }}>
+                              ({lang === 'en' ? 'Please select a design first' : 'กรุณาเลือกลายสินค้าก่อน'})
+                            </span>
+                          )}
+                        </Typography>
+                      </Box>
+
+                      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 1.2 }}>
+                        {selectedProduct.patterns
+                          .filter((p: any) => p.isActive !== false)
+                          .map((pattern: any) => {
+                            const active = selectedPattern?.id === pattern.id;
+                            return (
+                              <Box
+                                key={pattern.id}
+                                onClick={() => setSelectedPattern(pattern)}
+                                sx={{
+                                  p: 0.8,
+                                  borderRadius: '10px',
+                                  border: active ? '2px solid #38bdf8' : '1px solid var(--glass-border)',
+                                  bgcolor: active ? 'rgba(56,189,248,0.08)' : 'var(--surface-2)',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  gap: 0.5,
+                                  '&:hover': { opacity: 0.9, borderColor: '#38bdf8' },
+                                  transition: 'all 0.2s ease',
+                                  position: 'relative',
+                                }}
+                              >
+                                <Box sx={{
+                                  width: '100%',
+                                  height: 56,
+                                  borderRadius: '6px',
+                                  overflow: 'hidden',
+                                  bgcolor: 'var(--glass-bg)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  border: '1px solid var(--glass-border)',
+                                }}>
+                                  {pattern.image ? (
+                                    <img src={pattern.image} alt={pattern.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                  ) : (
+                                    <ImageOutlinedIcon size={18} style={{ color: 'var(--text-muted)' }} />
+                                  )}
+                                </Box>
+                                <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: active ? 'var(--secondary)' : 'var(--foreground)', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
+                                  {pattern.name}
+                                </Typography>
+                              </Box>
+                            );
+                          })}
+                      </Box>
+                    </Box>
+                  )}
+
+                  <Box sx={{
+                    opacity: needsPatternFirst ? 0.45 : 1,
+                    pointerEvents: needsPatternFirst ? 'none' : 'auto',
+                    transition: 'all 0.3s ease',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 2.5,
+                  }}>
+                    {/* Size Selection */}
+                    {selectedProduct.sizePricing && Object.keys(selectedProduct.sizePricing).length > 0 && (
+                      <Box>
+                        <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, mb: 1, color: 'var(--foreground)' }}>
+                          {lang === 'en' ? 'Size' : 'ขนาด'}
+                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                          {Object.entries(selectedProduct.sizePricing).map(([size, price]) => (
+                            <Chip
+                              key={size}
+                              label={`${size} (฿${price})`}
+                              onClick={() => setSelectedSize(size)}
+                              sx={{
+                                bgcolor: selectedSize === size ? '#0071e3' : 'var(--surface-2)',
+                                color: selectedSize === size ? 'white' : 'var(--foreground)',
+                                fontWeight: 600, cursor: 'pointer',
+                                border: `1px solid ${selectedSize === size ? '#0071e3' : 'var(--glass-border)'}`,
+                                '&:hover': { opacity: 0.8 },
+                              }}
+                            />
+                          ))}
+                        </Box>
+                      </Box>
+                    )}
+
+                    {/* Variant Selection */}
+                    {selectedProduct.variants && selectedProduct.variants.length > 0 && (
+                      <Box>
+                        <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, mb: 1, color: 'var(--foreground)' }}>
+                          {lang === 'en' ? 'Options' : 'ตัวเลือก'}
+                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                          {selectedProduct.variants.filter(v => v.isActive).map((variant) => (
+                            <Chip
+                              key={variant.id}
+                              label={`${variant.name} (฿${variant.price})`}
+                              onClick={() => setSelectedVariant(variant)}
+                              sx={{
+                                bgcolor: selectedVariant?.id === variant.id ? '#0071e3' : 'var(--surface-2)',
+                                color: selectedVariant?.id === variant.id ? 'white' : 'var(--foreground)',
+                                fontWeight: 600, cursor: 'pointer',
+                                border: `1px solid ${selectedVariant?.id === variant.id ? '#0071e3' : 'var(--glass-border)'}`,
+                                '&:hover': { opacity: 0.8 },
+                              }}
+                            />
+                          ))}
+                        </Box>
+                      </Box>
+                    )}
+
+                    {/* Quantity */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                        {lang === 'en' ? 'Quantity' : 'จำนวน'}
+                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <IconButton
+                          size="small"
+                          onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                          sx={{ bgcolor: 'var(--surface-2)', color: 'var(--foreground)', border: '1px solid var(--glass-border)' }}
+                        >
+                          <Minus size={16} />
+                        </IconButton>
+                        <Typography sx={{ fontWeight: 700, minWidth: 30, textAlign: 'center', color: 'var(--foreground)' }}>
+                          {quantity}
+                        </Typography>
+                        <IconButton
+                          size="small"
+                          onClick={() => setQuantity(quantity + 1)}
+                          sx={{ bgcolor: 'var(--surface-2)', color: 'var(--foreground)', border: '1px solid var(--glass-border)' }}
+                        >
+                          <Plus size={16} />
+                        </IconButton>
+                      </Box>
+                    </Box>
+                  </Box>
+
+                  {/* Desktop Actions */}
+                  {!isMobile && bottomActionsNode}
+                </Box>
+              </Box>
+
+              {/* Mobile Bottom Actions */}
+              {isMobile && bottomActionsNode}
+            </Box>
+          );
+        })()}
+      </Drawer>
 
       {/* ==================== CART DIALOG ==================== */}
       <Dialog
@@ -1588,6 +1796,47 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                   ฿{shopCart.reduce((sum, item) => sum + item.total, 0).toLocaleString()}
                 </Typography>
               </Box>
+
+              <Button
+                fullWidth
+                variant="contained"
+                onClick={() => {
+                  if (!isShopOpen) {
+                    showToast('warning', lang === 'en' ? 'Shop is closed' : 'ร้านค้าปิดรับออเดอร์แล้ว');
+                    return;
+                  }
+                  if (!session?.user?.email) {
+                    showToast('warning', lang === 'en' ? 'Please sign in to checkout' : 'กรุณาเข้าสู่ระบบก่อนสั่งซื้อ');
+                    signIn();
+                    return;
+                  }
+                  setCartOpen(false);
+                  if (!profileComplete) {
+                    showToast('warning', lang === 'en' ? 'Please complete your profile details' : 'กรุณากรอกข้อมูลส่วนตัว/ที่อยู่ก่อนทำการสั่งซื้อ');
+                    setShowProfileModal(true);
+                    setPendingCheckout(true);
+                  } else {
+                    setCheckoutOpen(true);
+                  }
+                }}
+                disabled={!isShopOpen}
+                startIcon={<ShoppingCart size={18} />}
+                sx={{
+                  mt: 2,
+                  background: 'linear-gradient(135deg, #0071e3 0%, #0071e3 100%)',
+                  borderRadius: '12px',
+                  textTransform: 'none',
+                  fontWeight: 700,
+                  py: 1.2,
+                  fontSize: '1rem',
+                  color: 'white',
+                  '&:hover': { background: 'linear-gradient(135deg, #0077ed 0%, #0077ed 100%)' },
+                  '&.Mui-disabled': { bgcolor: 'var(--surface-2)', color: 'var(--text-muted)' },
+                }}
+              >
+                {lang === 'en' ? 'Checkout' : 'สั่งซื้อสินค้า'}
+              </Button>
+
               <Link href="/" style={{ textDecoration: 'none' }}>
                 <Button
                   fullWidth
@@ -1606,196 +1855,6 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                   {lang === 'en' ? 'Continue Shopping at Main Store' : 'ช้อปต่อที่ร้านหลัก'}
                 </Button>
               </Link>
-              {session?.user?.email ? (
-                <>
-                  {!checkoutOpen ? (
-                    <Button
-                      fullWidth
-                      onClick={() => {
-                        if (!isShopOpen) {
-                          showToast('warning', lang === 'en' ? 'Shop is currently closed' : 'ร้านค้าปิดรับออเดอร์อยู่');
-                          return;
-                        }
-                        setCheckoutOpen(true);
-                      }}
-                      disabled={!isShopOpen}
-                      sx={{
-                        mt: 1,
-                        background: isShopOpen
-                          ? 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)'
-                          : 'rgba(100,116,139,0.3)',
-                        borderRadius: '12px',
-                        textTransform: 'none',
-                        fontWeight: 700,
-                        py: 1.2,
-                        color: 'white',
-                        '&.Mui-disabled': { color: 'rgba(255,255,255,0.5)' },
-                      }}
-                    >
-                      {isShopOpen
-                        ? (lang === 'en' ? 'Checkout' : 'สั่งซื้อสินค้า')
-                        : (lang === 'en' ? 'Shop Closed' : 'ร้านค้าปิดรับออเดอร์')}
-                    </Button>
-                  ) : (
-                    <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 1.5, pt: 2, borderTop: '1px solid var(--glass-border)' }}>
-                      <Typography sx={{ fontWeight: 800, fontSize: '1rem', display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <CreditCard size={18} />
-                        {lang === 'en' ? 'Checkout Information' : 'ข้อมูลการสั่งซื้อ'}
-                      </Typography>
-
-                      {/* Name */}
-                      <TextField
-                        label={lang === 'en' ? 'Full Name *' : 'ชื่อ-นามสกุล *'}
-                        value={orderName}
-                        onChange={(e) => setOrderName(e.target.value)}
-                        fullWidth
-                        size="small"
-                        InputProps={{
-                          startAdornment: <User size={16} style={{ marginRight: 8, color: 'var(--text-muted)' }} />,
-                        }}
-                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px', bgcolor: 'var(--surface-2)' }, '& .MuiInputLabel-root': { color: 'var(--text-muted)' }, '& .MuiOutlinedInput-input': { color: 'var(--foreground)' } }}
-                      />
-
-                      {/* Phone */}
-                      <TextField
-                        label={lang === 'en' ? 'Phone' : 'เบอร์โทร'}
-                        value={orderPhone}
-                        onChange={(e) => setOrderPhone(e.target.value)}
-                        fullWidth
-                        size="small"
-                        InputProps={{
-                          startAdornment: <Phone size={16} style={{ marginRight: 8, color: 'var(--text-muted)' }} />,
-                        }}
-                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px', bgcolor: 'var(--surface-2)' }, '& .MuiInputLabel-root': { color: 'var(--text-muted)' }, '& .MuiOutlinedInput-input': { color: 'var(--foreground)' } }}
-                      />
-
-                      {/* Address */}
-                      <TextField
-                        label={lang === 'en' ? 'Address (for delivery)' : 'ที่อยู่ (กรณีจัดส่ง)'}
-                        value={orderAddress}
-                        onChange={(e) => setOrderAddress(e.target.value)}
-                        fullWidth
-                        size="small"
-                        multiline
-                        rows={2}
-                        InputProps={{
-                          startAdornment: <MapPin size={16} style={{ marginRight: 8, color: 'var(--text-muted)', alignSelf: 'flex-start', marginTop: 8 }} />,
-                        }}
-                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px', bgcolor: 'var(--surface-2)' }, '& .MuiInputLabel-root': { color: 'var(--text-muted)' }, '& .MuiOutlinedInput-input': { color: 'var(--foreground)' } }}
-                      />
-
-                      {/* Instagram */}
-                      <TextField
-                        label={lang === 'en' ? 'Instagram (for contact)' : 'Instagram (สำหรับติดต่อ)'}
-                        value={orderInstagram}
-                        onChange={(e) => setOrderInstagram(e.target.value)}
-                        fullWidth
-                        size="small"
-                        InputProps={{
-                          startAdornment: <Instagram size={16} style={{ marginRight: 8, color: 'var(--text-muted)' }} />,
-                        }}
-                        sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px', bgcolor: 'var(--surface-2)' }, '& .MuiInputLabel-root': { color: 'var(--text-muted)' }, '& .MuiOutlinedInput-input': { color: 'var(--foreground)' } }}
-                      />
-
-                      {/* Turnstile CAPTCHA */}
-                      <Box sx={{ display: 'flex', justifyContent: 'center', py: 1 }}>
-                        <TurnstileWidget
-                          onSuccess={(token: string) => setTurnstileToken(token)}
-                          onExpire={() => setTurnstileToken('')}
-                          onError={() => setTurnstileToken('')}
-                          theme="dark"
-                          size="normal"
-                          action="shop-order"
-                        />
-                      </Box>
-
-                      {/* Order Summary */}
-                      <Box sx={{
-                        p: 2, borderRadius: '12px',
-                        bgcolor: 'rgba(0,113,227,0.08)',
-                        border: '1px solid rgba(0,113,227,0.2)',
-                      }}>
-                        <Typography sx={{ fontWeight: 700, fontSize: '0.85rem', mb: 1, color: 'var(--foreground)' }}>
-                          {lang === 'en' ? 'Order Summary' : 'สรุปคำสั่งซื้อ'}
-                        </Typography>
-                        {shopCart.map((item, i) => (
-                          <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                            <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                              {item.name} {item.size !== '-' ? `(${item.size})` : ''} {item.selectedPattern ? `[${item.selectedPattern.name}]` : ''} ×{item.qty}
-                            </Typography>
-                            <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)' }}>
-                              ฿{item.total.toLocaleString()}
-                            </Typography>
-                          </Box>
-                        ))}
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1, pt: 1, borderTop: '1px solid var(--glass-border)' }}>
-                          <Typography sx={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--foreground)' }}>
-                            {lang === 'en' ? 'Total' : 'รวม'}
-                          </Typography>
-                          <Typography sx={{ fontWeight: 800, fontSize: '1rem', color: '#34c759' }}>
-                            ฿{shopCart.reduce((sum, item) => sum + item.total, 0).toLocaleString()}
-                          </Typography>
-                        </Box>
-                      </Box>
-
-                      <Box sx={{ display: 'flex', gap: 1 }}>
-                        <Button
-                          variant="outlined"
-                          onClick={() => setCheckoutOpen(false)}
-                          sx={{
-                            flex: 1,
-                            borderColor: 'var(--glass-border)',
-                            borderRadius: '12px',
-                            textTransform: 'none',
-                            fontWeight: 600,
-                            py: 1.2,
-                            color: 'var(--text-muted)',
-                          }}
-                        >
-                          {lang === 'en' ? 'Back' : 'กลับ'}
-                        </Button>
-                        <Button
-                          onClick={handleShopCheckout}
-                          disabled={checkoutProcessing || !orderName.trim() || !turnstileToken}
-                          startIcon={checkoutProcessing ? <CircularProgress size={16} /> : <CreditCard size={16} />}
-                          sx={{
-                            flex: 2,
-                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                            borderRadius: '12px',
-                            textTransform: 'none',
-                            fontWeight: 700,
-                            py: 1.2,
-                            color: 'white',
-                            '&.Mui-disabled': { opacity: 0.6, color: 'white' },
-                          }}
-                        >
-                          {checkoutProcessing
-                            ? (lang === 'en' ? 'Processing...' : 'กำลังดำเนินการ...')
-                            : (lang === 'en' ? 'Place Order & Pay' : 'ยืนยันสั่งซื้อ')}
-                        </Button>
-                      </Box>
-                    </Box>
-                  )}
-                </>
-              ) : (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
-                  <Button
-                    fullWidth
-                    onClick={() => signIn('google', { redirect: true, callbackUrl: window.location.href, prompt: 'select_account' })}
-                    sx={{
-                      background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
-                      borderRadius: '12px',
-                      textTransform: 'none',
-                      fontWeight: 700,
-                      py: 1.2,
-                      color: 'white',
-                    }}
-                  >
-                    {lang === 'en' ? 'Sign in to Checkout' : 'เข้าสู่ระบบเพื่อสั่งซื้อ'}
-                  </Button>
-                  <PasskeyLoginButton fullWidth variant="outlined" />
-                </Box>
-              )}
             </Box>
           )}
         </DialogContent>
@@ -1845,6 +1904,42 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
 
       {/* ==================== FOOTER ==================== */}
       <Footer />
+
+      {/* ==================== CHECKOUT DIALOG ==================== */}
+      <CheckoutDialog
+        open={checkoutOpen}
+        onClose={() => setCheckoutOpen(false)}
+        cart={mappedShopCart}
+        orderData={orderData}
+        profileComplete={profileComplete}
+        processing={checkoutProcessing}
+        turnstileToken={turnstileToken}
+        setTurnstileToken={setTurnstileToken}
+        onSubmitOrder={handleShopCheckout}
+        onEditProfile={() => { setShowProfileModal(true); setPendingCheckout(true); }}
+        products={products}
+        isMobile={isMobile}
+        savedAddresses={savedAddresses}
+        onAddressChange={(address) => setOrderAddress(address)}
+      />
+
+      {/* ==================== PROFILE MODAL ==================== */}
+      {showProfileModal && (
+        <ProfileModal
+          initialData={{
+            name: orderData.name,
+            phone: orderData.phone,
+            address: orderData.address,
+            instagram: orderData.instagram,
+            profileImage: orderData.profileImage,
+            savedAddresses,
+          }}
+          onClose={() => setShowProfileModal(false)}
+          onSave={handleSaveProfile}
+          userImage={session?.user?.image || ''}
+          userEmail={session?.user?.email || ''}
+        />
+      )}
 
       {/* ==================== TOAST ==================== */}
       <Snackbar

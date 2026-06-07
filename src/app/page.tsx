@@ -2051,6 +2051,7 @@ import {
   DialogTitle,
   Divider,
   Drawer,
+  Collapse,
   IconButton,
   InputAdornment,
   LinearProgress,

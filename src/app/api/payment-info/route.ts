@@ -117,17 +117,39 @@ export async function GET(req: NextRequest) {
     const qrPayload = finalAmount > 0 ? generatePromptPayPayloadForId(effectivePromptPayId, finalAmount) : null;
     const qrUrl = finalAmount > 0 && qrPayload ? `https://quickchart.io/qr?size=300&text=${encodeURIComponent(qrPayload)}` : null;
 
+    // Fetch products list to get coverImage/imageUrl
+    let productsList: any[] = [];
+    if (orderShopId) {
+      const shop = await getShopById(orderShopId);
+      if (shop?.products) {
+        productsList = shop.products;
+      }
+    } else {
+      const CONFIG_KEY = 'config/shop-settings.json';
+      const shopConfig = await getJson<any>(CONFIG_KEY);
+      if (shopConfig?.products) {
+        productsList = shopConfig.products;
+      }
+    }
+
     // ดึงข้อมูลสินค้าจาก order และ sanitize
-    const cartItems = (order.cart || order.items || []).map((item: any) => ({
-      productName: sanitizeUtf8Input(item.productName || item.name || 'สินค้า'),
-      size: sanitizeUtf8Input(item.size || '-'),
-      quantity: item.quantity || item.qty || 1,
-      unitPrice: item.unitPrice || item.price || 0,
-      customName: sanitizeUtf8Input(item.options?.customName || item.customName || ''),
-      customNumber: sanitizeUtf8Input(item.options?.customNumber || item.customNumber || ''),
-      isLongSleeve: item.options?.isLongSleeve || item.isLongSleeve || false,
-      pattern: sanitizeUtf8Input(item.options?.pattern || item.pattern || ''),
-    }));
+    const cartItems = (order.cart || order.items || []).map((item: any) => {
+      const productId = item.productId || item.id?.split('-')?.[0];
+      const matchedProduct = productsList.find((p: any) => p.id === productId);
+      const coverImage = matchedProduct?.coverImage || matchedProduct?.images?.[0] || '';
+
+      return {
+        productName: sanitizeUtf8Input(item.productName || item.name || 'สินค้า'),
+        size: sanitizeUtf8Input(item.size || '-'),
+        quantity: item.quantity || item.qty || 1,
+        unitPrice: item.unitPrice || item.price || 0,
+        customName: sanitizeUtf8Input(item.options?.customName || item.customName || ''),
+        customNumber: sanitizeUtf8Input(item.options?.customNumber || item.customNumber || ''),
+        isLongSleeve: item.options?.isLongSleeve || item.isLongSleeve || false,
+        pattern: sanitizeUtf8Input(item.options?.pattern || item.pattern || ''),
+        coverImage,
+      };
+    });
 
     const responseData = {
       status: 'success',

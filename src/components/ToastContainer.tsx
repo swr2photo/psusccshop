@@ -40,7 +40,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
   const style = TOAST_STYLES[toast.type];
 
   return (
-    <Slide direction="down" in={true} mountOnEnter unmountOnExit>
+    <Slide direction="left" in={true} mountOnEnter unmountOnExit>
       <Box
         sx={{
           background: style.bg,
@@ -61,11 +61,11 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
           '@keyframes toastSlideIn': {
             '0%': {
               opacity: 0,
-              transform: 'translateY(-16px) scale(0.95)',
+              transform: 'translateX(24px) scale(0.95)',
             },
             '100%': {
               opacity: 1,
-              transform: 'translateY(0) scale(1)',
+              transform: 'translateX(0) scale(1)',
             },
           },
           '&:hover': {
@@ -178,16 +178,15 @@ export default function ToastContainer() {
       sx={{
         position: 'fixed',
         top: { xs: 16, sm: 24 },
-        left: '50%',
-        transform: 'translateX(-50%)',
+        right: { xs: 16, sm: 24 },
         zIndex: 99999,
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'center',
+        alignItems: 'flex-end',
         gap: 1.5,
         pointerEvents: 'none',
-        width: '100%',
-        px: 2,
+        width: { xs: 'calc(100% - 32px)', sm: 'auto' },
+        maxWidth: 420,
       }}
     >
       {toasts.map((toast) => (

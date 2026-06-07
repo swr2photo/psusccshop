@@ -397,7 +397,14 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
             </Typography>
           </Box>
         ) : (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Box sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2,
+            maxWidth: 800,
+            mx: 'auto',
+            width: '100%',
+          }}>
             {filteredOrders.map((order, idx) => {
               const statusKey = normalizeStatus(order.status);
               const statusLabel = getStatusLabel(statusKey, lang);
@@ -566,6 +573,30 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                           >
                             <CreditCard size={14} />
                             {t.orderHistory.payNow}
+                          </Button>
+                        )}
+                        {canCancel && (
+                          <Button
+                            size="small"
+                            onClick={(e) => { e.stopPropagation(); onCancelOrder(order.ref); }}
+                            disabled={cancellingRef === order.ref}
+                            sx={{
+                              px: 2,
+                              py: 0.7,
+                              borderRadius: '10px',
+                              bgcolor: 'rgba(239,68,68,0.08)',
+                              border: '1px solid rgba(239,68,68,0.2)',
+                              color: 'var(--error)',
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              textTransform: 'none',
+                              display: 'flex',
+                              alignItems: 'center',
+                              '&:hover': { bgcolor: 'rgba(239,68,68,0.15)' },
+                              '&:disabled': { color: 'var(--text-muted)', borderColor: 'rgba(100,116,139,0.2)' },
+                            }}
+                          >
+                            {cancellingRef === order.ref ? t.orderHistory.cancelling : t.orderHistory.cancelOrder}
                           </Button>
                         )}
                         {canPay && isOrderExpired(order.date) && (
