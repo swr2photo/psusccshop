@@ -7,10 +7,10 @@ import { withReplicas } from 'drizzle-orm/pg-core';
 import { Pool } from 'pg';
 import * as schema from '../db/schema';
 
-const primaryConnectionString = process.env.DATABASE_URL!;
-const replicaConnectionString = process.env.DATABASE_READ_URL;
-
 function createDrizzleInstance() {
+  const primaryConnectionString = process.env.DATABASE_URL;
+  const replicaConnectionString = process.env.DATABASE_READ_URL;
+
   if (!primaryConnectionString) {
     throw new Error('DATABASE_URL is not set in environment variables');
   }
@@ -49,11 +49,43 @@ function createDrizzleInstance() {
 }
 
 const globalForDb = globalThis as unknown as {
-  db: ReturnType<typeof createDrizzleInstance> | undefined;
+  dbInstance: ReturnType<typeof createDrizzleInstance> | undefined;
 };
 
-export const db = globalForDb.db ?? createDrizzleInstance();
-
-if (process.env.NODE_ENV !== 'production') {
-  globalForDb.db = db;
-}
+// Lazy initialization wrapper using a Proxy to avoid connections/crashes at build time
+export const db = new Proxy({} as any, {
+  get(target, prop, receiver) {
+    if (!globalForDb.dbInstance) {
+      globalForDb.dbInstance = createDrizzleInstance();
+    }
+    const value = Reflect.get(globalForDb.dbInstance, prop);
+    if (typeof value === 'function') {
+      return value.bind(globalForDb.dbInstance);
+    }
+    return value;
+  },
+  set(target, prop, value, receiver) {
+    if (!globalForDb.dbInstance) {
+      globalForDb.dbInstance = createDrizzleInstance();
+    }
+    return Reflect.set(globalForDb.dbInstance, prop, value);
+  },
+  has(target, prop) {
+    if (!globalForDb.dbInstance) {
+      globalForDb.dbInstance = createDrizzleInstance();
+    }
+    return Reflect.has(globalForDb.dbInstance, prop);
+  },
+  ownKeys(target) {
+    if (!globalForDb.dbInstance) {
+      globalForDb.dbInstance = createDrizzleInstance();
+    }
+    return Reflect.ownKeys(globalForDb.dbInstance);
+  },
+  getOwnPropertyDescriptor(target, prop) {
+    if (!globalForDb.dbInstance) {
+      globalForDb.dbInstance = createDrizzleInstance();
+    }
+    return Reflect.getOwnPropertyDescriptor(globalForDb.dbInstance, prop);
+  }
+});
