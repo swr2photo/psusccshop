@@ -191,16 +191,6 @@ const nextConfig: NextConfig = {
         },
       ],
     },
-    // Performance: Long cache for static assets (hashed filenames)
-    {
-      source: '/_next/static/(.*)',
-      headers: [
-        {
-          key: 'Cache-Control',
-          value: 'public, max-age=31536000, immutable',
-        },
-      ],
-    },
     // Performance: Cache fonts aggressively
     {
       source: '/fonts/(.*)',
