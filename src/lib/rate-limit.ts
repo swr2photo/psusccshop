@@ -66,8 +66,8 @@ export const RATE_LIMITS = {
   // Payment verification - 10 per minute
   payment: { maxRequests: 10, windowSeconds: 60, prefix: 'payment' },
   
-  // File upload - 10 per minute
-  upload: { maxRequests: 10, windowSeconds: 60, prefix: 'upload' },
+  // File upload - 100 per minute
+  upload: { maxRequests: 100, windowSeconds: 60, prefix: 'upload' },
   
   // Admin operations - 30 per minute
   admin: { maxRequests: 30, windowSeconds: 60, prefix: 'admin' },

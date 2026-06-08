@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   // Step 1: Generate authentication options
   if (action === 'login-options') {
     try {
-      const { options, challengeId } = await generatePasskeyAuthenticationOptions();
+      const { options, challengeId } = await generatePasskeyAuthenticationOptions(req.url);
       return NextResponse.json({ options, challengeId });
     } catch (err: unknown) {
       console.error('[Passkey] Login options error:', err);
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      const result = await verifyPasskeyAuthentication(challengeId, assertion);
+      const result = await verifyPasskeyAuthentication(challengeId, assertion, req.url);
 
       if (result.verified && result.userEmail) {
         // Create a short-lived token for NextAuth CredentialsProvider
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         verified: false,
-        error: 'Authentication failed',
+        error: result.error || 'Authentication failed',
       }, { status: 401 });
     } catch (err: unknown) {
       console.error('[Passkey] Login verify error:', err);

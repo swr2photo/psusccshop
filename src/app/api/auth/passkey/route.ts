@@ -55,6 +55,7 @@ export async function POST(req: NextRequest) {
       const { options, challengeId } = await generatePasskeyRegistrationOptions(
         session.user.email,
         session.user.name || session.user.email,
+        req.url,
       );
       return NextResponse.json({ options, challengeId });
     } catch (err: unknown) {
@@ -77,6 +78,7 @@ export async function POST(req: NextRequest) {
         attestation,
         session.user.email,
         friendlyName,
+        req.url,
       );
 
       if (verification.verified) {

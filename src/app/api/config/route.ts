@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getJson, putJson } from '@/lib/filebase';
+import { getJson, putJson, syncShopOpenStatusToRedis } from '@/lib/filebase';
 import { ShopConfig } from '@/lib/config';
 import { requireAdmin, requireAuth, isSuperAdminEmail } from '@/lib/auth';
 import { sanitizeConfigForPublic, sanitizeObjectUtf8 } from '@/lib/sanitize';
@@ -124,6 +124,15 @@ export async function POST(req: NextRequest) {
     const sanitizedConfig = sanitizeObjectUtf8(config);
     
     await putJson(CONFIG_KEY, sanitizedConfig);
+    
+    // Sync the updated isOpen status to Redis cache
+    if (sanitizedConfig.isOpen !== undefined) {
+      try {
+        await syncShopOpenStatusToRedis(sanitizedConfig.isOpen);
+      } catch (e) {
+        console.error('[config] Failed to sync shop status to Redis cache:', e);
+      }
+    }
     
     // Sync admin permissions to DB (if present in config)
     if (config.adminPermissions && typeof config.adminPermissions === 'object') {

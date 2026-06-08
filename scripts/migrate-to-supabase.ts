@@ -21,7 +21,7 @@ const s3AccessKey = process.env.FILEBASE_ACCESS_KEY || '';
 const s3SecretKey = process.env.FILEBASE_SECRET_KEY || '';
 
 // Supabase (target)
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL2 || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 // ==================== CLIENTS ====================

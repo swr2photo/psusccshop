@@ -161,6 +161,11 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
 
   const shop = shopQueryResult?.shop || initialShop;
   const products: Product[] = (shop as any)?.products || [];
+  const isShopOpen = getShopStatus(
+    (shop as any).isOpen ?? shop.settings?.isOpen ?? true,
+    (shop as any).closeDate ?? shop.settings?.closeDate,
+    (shop as any).openDate ?? shop.settings?.openDate,
+  ) === 'OPEN';
   const announcements: any[] = (shop as any)?.announcements || [];
   const announcementHistory: any[] = (shop as any)?.announcementHistory || [];
   const events: ShopEvent[] = (shop as any)?.events || [];
@@ -182,7 +187,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
   const patternSelectorRef = useRef<HTMLDivElement>(null);
   const [customName, setCustomName] = useState('');
   const [customNumber, setCustomNumber] = useState('');
-  const [isLongSleeve, setIsLongSleeve] = useState(false);
+  const [isLongSleeve, setIsLongSleeve] = useState<boolean | null>(null);
   const customNameInputRef = useRef<HTMLInputElement>(null);
   const customNumberInputRef = useRef<HTMLInputElement>(null);
 
@@ -405,15 +410,41 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
         },
         (payload) => {
           console.log('[Realtime] Shop updated:', payload);
-          const updatedShop = payload.new;
-          if (updatedShop) {
+          const updatedRow = payload.new;
+          if (updatedRow) {
             queryClient.setQueryData([...queryKeys.shop.all, 'public', initialShop.id], (prev: any) => {
               if (!prev) return prev;
+              // Map DB row columns → API-formatted fields
+              // The DB row has nested `settings` JSONB, but prev.shop is flattened
+              const settings = updatedRow.settings || {};
+              const mappedFields: Record<string, any> = {
+                // Map DB columns that have direct equivalents
+                name: updatedRow.name,
+                nameEn: updatedRow.name_en,
+                description: updatedRow.description,
+                descriptionEn: updatedRow.description_en,
+                logoUrl: updatedRow.logo_url,
+                bannerUrl: updatedRow.banner_url,
+                isActive: updatedRow.is_active,
+                // Flatten the `settings` JSONB to top-level fields
+                isOpen: settings.isOpen ?? prev.shop.isOpen,
+                closeDate: settings.closeDate ?? prev.shop.closeDate,
+                openDate: settings.openDate ?? prev.shop.openDate,
+                closedMessage: settings.closedMessage ?? prev.shop.closedMessage,
+                paymentEnabled: settings.paymentEnabled ?? prev.shop.paymentEnabled,
+                paymentDisabledMessage: settings.paymentDisabledMessage ?? prev.shop.paymentDisabledMessage,
+                // Products are stored directly in the JSONB `products` column
+                products: updatedRow.products ?? prev.shop.products,
+              };
+              // Remove undefined fields to avoid overwriting valid prev values
+              const cleanMapped = Object.fromEntries(
+                Object.entries(mappedFields).filter(([, v]) => v !== undefined)
+              );
               return {
                 ...prev,
                 shop: {
                   ...prev.shop,
-                  ...updatedShop,
+                  ...cleanMapped,
                 }
               };
             });
@@ -442,6 +473,27 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       setSelectedProduct(updatedProduct);
     }
   }, [products, selectedProduct, lang, showToast]);
+
+  // Auto-close product dialog/cart when shop becomes closed
+  useEffect(() => {
+    if (!isShopOpen) {
+      if (selectedProduct) {
+        setSelectedProduct(null);
+        setSelectedSize('');
+        setSelectedVariant(null);
+        setSelectedPattern(null);
+        setQuantity(1);
+        setCustomName('');
+        setCustomNumber('');
+        setIsLongSleeve(null);
+        showToast('warning', lang === 'en' ? 'Shop is closed temporarily' : 'ร้านค้าปิดให้บริการชั่วคราว');
+      }
+      if (cartOpen) {
+        setCartOpen(false);
+        showToast('warning', lang === 'en' ? 'Shop is closed temporarily' : 'ร้านค้าปิดให้บริการชั่วคราว');
+      }
+    }
+  }, [isShopOpen, selectedProduct, cartOpen, lang, showToast]);
 
   const toggleFollow = useCallback(() => {
     setIsFollowing(prev => {
@@ -629,6 +681,28 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       showToast('warning', lang === 'en' ? 'Cart is empty' : 'ตะกร้าว่าง');
       return;
     }
+    if (!isShopOpen) {
+      showToast('warning', lang === 'en' ? 'Shop is closed temporarily' : 'ร้านค้าปิดให้บริการชั่วคราว');
+      setCheckoutOpen(false);
+      return;
+    }
+
+    // Block submission if any product in cart is disabled or out of stock
+    const unavailableItem = shopCart.find(item => {
+      const p = products.find(prod => prod.id === item.productId || prod.id === item.id.split('-')[0]);
+      if (!p) return true; // Product deleted
+      const isOutOfStock = (
+        (p.stock !== null && p.stock !== undefined && p.stock <= 0) ||
+        (p.variants && p.variants.length > 0 && p.variants.every(v => v.stock !== null && v.stock !== undefined && v.stock <= 0))
+      );
+      return getProductStatus(p) !== 'OPEN' || isOutOfStock;
+    });
+
+    if (unavailableItem) {
+      showToast('error', lang === 'en' ? `Product "${unavailableItem.name}" is no longer available.` : `สินค้า "${unavailableItem.name}" ไม่พร้อมจำหน่ายแล้ว`);
+      setCheckoutOpen(false);
+      return;
+    }
     if (!orderName.trim()) {
       showToast('warning', lang === 'en' ? 'Please enter your name' : 'กรุณากรอกชื่อ');
       return;
@@ -734,7 +808,6 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
 
   const totalFilteredCount = Object.values(filteredGroupedProducts).reduce((sum, items) => sum + items.length, 0);
   const cartCount = shopCart.length;
-  const isShopOpen = shop.settings?.isOpen !== false;
 
   const handleSelectProduct = useCallback((product: Product) => {
     setSelectedProduct(product);
@@ -744,12 +817,29 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
     setQuantity(1);
     setCustomName('');
     setCustomNumber('');
-    setIsLongSleeve(false);
+    setIsLongSleeve(null);
     setActiveImageIndex(0);
   }, []);
 
   const handleAddToCart = useCallback(() => {
     if (!selectedProduct) return;
+
+    if (!isShopOpen) {
+      showToast('warning', lang === 'en' ? 'Shop is closed' : 'ร้านค้าปิดให้บริการอยู่');
+      return;
+    }
+
+    // Validate size selection
+    if (selectedProduct.sizePricing && Object.keys(selectedProduct.sizePricing).length > 0 && !selectedSize) {
+      showToast('warning', lang === 'en' ? 'Please select a size' : 'กรุณาเลือกขนาดไซส์');
+      return;
+    }
+
+    // Validate variant selection
+    if (selectedProduct.variants && selectedProduct.variants.length > 0 && !selectedVariant) {
+      showToast('warning', lang === 'en' ? 'Please select an option' : 'กรุณาเลือกตัวเลือกสินค้า');
+      return;
+    }
 
     // Check if product has patterns
     const hasPatterns = selectedProduct.patterns && selectedProduct.patterns.filter((p: any) => p.isActive !== false).length > 0;
@@ -793,11 +883,16 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       return;
     }
 
+    if (selectedProduct.options?.hasLongSleeve && isLongSleeve === null) {
+      showToast('warning', lang === 'en' ? 'Please select a sleeve type' : 'กรุณาเลือกประเภทแขนเสื้อ');
+      return;
+    }
+
     const basePrice = selectedVariant
       ? selectedVariant.price
       : selectedProduct.sizePricing?.[selectedSize] || selectedProduct.basePrice;
     
-    const sleeveFee = (selectedProduct.options?.hasLongSleeve && isLongSleeve)
+    const sleeveFee = (selectedProduct.options?.hasLongSleeve && isLongSleeve === true)
       ? (selectedProduct.options?.longSleevePrice ?? 50)
       : 0;
 
@@ -805,7 +900,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
     
     const patternName = selectedPattern?.name || '';
     const item = {
-      id: `${selectedProduct.id}-${selectedSize || '-'}-${selectedVariant?.id || '-'}-${patternName || '-'}-${isLongSleeve ? 'LONG' : 'SHORT'}-${normalizedCustomName || '-'}-${customNumber || '-'}`,
+      id: `${selectedProduct.id}-${selectedSize || '-'}-${selectedVariant?.id || '-'}-${patternName || '-'}-${isLongSleeve === true ? 'LONG' : 'SHORT'}-${normalizedCustomName || '-'}-${customNumber || '-'}`,
       productId: selectedProduct.id,
       name: selectedProduct.name,
       type: selectedProduct.type || 'OTHER' as const,
@@ -817,7 +912,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       total: price * quantity,
       selectedVariant: selectedVariant || undefined,
       selectedPattern: selectedPattern || undefined,
-      sleeve: (selectedProduct.options?.hasLongSleeve ? (isLongSleeve ? 'LONG' : 'SHORT') : undefined) as 'LONG' | 'SHORT' | undefined,
+      sleeve: (selectedProduct.options?.hasLongSleeve ? (isLongSleeve === true ? 'LONG' : 'SHORT') : undefined) as 'LONG' | 'SHORT' | undefined,
       customName: selectedProduct.options?.hasCustomName ? normalizedCustomName : undefined,
       customNumber: selectedProduct.options?.hasCustomNumber ? customNumber : undefined,
       shopSlug,
@@ -831,8 +926,8 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
     setQuantity(1);
     setCustomName('');
     setCustomNumber('');
-    setIsLongSleeve(false);
-  }, [selectedProduct, selectedVariant, selectedSize, selectedPattern, quantity, customName, customNumber, isLongSleeve, addToCart, showToast, lang, shopSlug]);
+    setIsLongSleeve(null);
+  }, [selectedProduct, selectedVariant, selectedSize, selectedPattern, quantity, customName, customNumber, isLongSleeve, addToCart, showToast, lang, shopSlug, isShopOpen]);
 
   const handleShareProduct = useCallback(async (product: Product) => {
     const url = `${window.location.origin}/shop/${shopSlug}`;
@@ -1560,7 +1655,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       <Drawer
         anchor={isMobile ? "bottom" : "right"}
         open={!!selectedProduct}
-        onClose={() => { setSelectedProduct(null); setSelectedSize(''); setSelectedVariant(null); setSelectedPattern(null); setQuantity(1); setActiveImageIndex(0); }}
+        onClose={() => { setSelectedProduct(null); setSelectedSize(''); setSelectedVariant(null); setSelectedPattern(null); setQuantity(1); setActiveImageIndex(0); setIsLongSleeve(null); setCustomName(''); setCustomNumber(''); }}
         PaperProps={{
           sx: {
             width: '100%',
@@ -1584,7 +1679,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
           const basePrice = selectedVariant
             ? selectedVariant.price
             : selectedProduct.sizePricing?.[selectedSize] || selectedProduct.basePrice;
-          const sleeveFee = (selectedProduct.options?.hasLongSleeve && isLongSleeve)
+          const sleeveFee = (selectedProduct.options?.hasLongSleeve && isLongSleeve === true)
             ? (selectedProduct.options?.longSleevePrice ?? 50)
             : 0;
           const currentUnitPrice = basePrice + sleeveFee;
@@ -1604,10 +1699,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                 fullWidth
                 variant="contained"
                 onClick={handleAddToCart}
-                disabled={
-                  (selectedProduct.sizePricing && Object.keys(selectedProduct.sizePricing).length > 0 && !selectedSize) ||
-                  (selectedProduct.variants && selectedProduct.variants.length > 0 && !selectedVariant)
-                }
+                disabled={!isShopOpen}
                 startIcon={<ShoppingCart size={18} />}
                 sx={{
                   background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
@@ -2105,8 +2197,8 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                                       sx={{
                                         p: 2.2,
                                         borderRadius: '16px',
-                                        border: !isLongSleeve ? '2px solid #ff9f0a' : '1px solid var(--glass-border)',
-                                        bgcolor: !isLongSleeve ? 'rgba(255,159,10,0.08)' : 'var(--glass-bg)',
+                                        border: isLongSleeve === false ? '2px solid #ff9f0a' : '1px solid var(--glass-border)',
+                                        bgcolor: isLongSleeve === false ? 'rgba(255,159,10,0.08)' : 'var(--glass-bg)',
                                         cursor: 'pointer',
                                         display: 'flex',
                                         flexDirection: 'column',
@@ -2114,7 +2206,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                                         justifyContent: 'center',
                                         position: 'relative',
                                         transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                                        boxShadow: !isLongSleeve ? '0 8px 20px rgba(255,159,10,0.15)' : 'none',
+                                        boxShadow: isLongSleeve === false ? '0 8px 20px rgba(255,159,10,0.15)' : 'none',
                                         '&:hover': {
                                           borderColor: '#ff9f0a',
                                           bgcolor: 'rgba(255,159,10,0.04)',
@@ -2122,7 +2214,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                                         },
                                       }}
                                     >
-                                      {!isLongSleeve && (
+                                      {isLongSleeve === false && (
                                         <Box sx={{
                                           position: 'absolute',
                                           top: 8,
@@ -2135,7 +2227,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                                           <CheckCircle2 size={16} fill="rgba(255,159,10,0.2)" />
                                         </Box>
                                       )}
-                                      <Typography sx={{ fontSize: '0.92rem', fontWeight: 800, color: !isLongSleeve ? '#ff9f0a' : 'var(--foreground)' }}>
+                                      <Typography sx={{ fontSize: '0.92rem', fontWeight: 800, color: isLongSleeve === false ? '#ff9f0a' : 'var(--foreground)' }}>
                                         {lang === 'en' ? 'Short Sleeve (แขนสั้น)' : 'แขนสั้น (Short Sleeve)'}
                                       </Typography>
                                       <Typography sx={{ fontSize: '0.78rem', color: 'var(--text-muted)', mt: 0.5, fontWeight: 600 }}>
@@ -2149,8 +2241,8 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                                       sx={{
                                         p: 2.2,
                                         borderRadius: '16px',
-                                        border: isLongSleeve ? '2px solid #ff9f0a' : '1px solid var(--glass-border)',
-                                        bgcolor: isLongSleeve ? 'rgba(255,159,10,0.08)' : 'var(--glass-bg)',
+                                        border: isLongSleeve === true ? '2px solid #ff9f0a' : '1px solid var(--glass-border)',
+                                        bgcolor: isLongSleeve === true ? 'rgba(255,159,10,0.08)' : 'var(--glass-bg)',
                                         cursor: 'pointer',
                                         display: 'flex',
                                         flexDirection: 'column',
@@ -2158,7 +2250,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                                         justifyContent: 'center',
                                         position: 'relative',
                                         transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                                        boxShadow: isLongSleeve ? '0 8px 20px rgba(255,159,10,0.15)' : 'none',
+                                        boxShadow: isLongSleeve === true ? '0 8px 20px rgba(255,159,10,0.15)' : 'none',
                                         '&:hover': {
                                           borderColor: '#ff9f0a',
                                           bgcolor: 'rgba(255,159,10,0.04)',
@@ -2166,7 +2258,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                                         },
                                       }}
                                     >
-                                      {isLongSleeve && (
+                                      {isLongSleeve === true && (
                                         <Box sx={{
                                           position: 'absolute',
                                           top: 8,
@@ -2179,10 +2271,10 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                                           <CheckCircle2 size={16} fill="rgba(255,159,10,0.2)" />
                                         </Box>
                                       )}
-                                      <Typography sx={{ fontSize: '0.92rem', fontWeight: 800, color: isLongSleeve ? '#ff9f0a' : 'var(--foreground)' }}>
+                                      <Typography sx={{ fontSize: '0.92rem', fontWeight: 800, color: isLongSleeve === true ? '#ff9f0a' : 'var(--foreground)' }}>
                                         {lang === 'en' ? 'Long Sleeve (แขนยาว)' : 'แขนยาว (Long Sleeve)'}
                                       </Typography>
-                                      <Typography sx={{ fontSize: '0.78rem', color: isLongSleeve ? '#ff9f0a' : 'var(--text-muted)', mt: 0.5, fontWeight: 700 }}>
+                                      <Typography sx={{ fontSize: '0.78rem', color: isLongSleeve === true ? '#ff9f0a' : 'var(--text-muted)', mt: 0.5, fontWeight: 700 }}>
                                         +฿{sleevePrice}
                                       </Typography>
                                     </Box>

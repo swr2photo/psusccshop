@@ -25,13 +25,60 @@ import { SignJWT, jwtVerify } from 'jose';
 
 // ==================== RP CONFIG ====================
 
-function getRpConfig() {
-  const url = process.env.NEXTAUTH_URL || 'http://localhost:3000';
-  const parsed = new URL(url);
+function getRpConfig(requestUrl?: string) {
+  let hostname = 'localhost';
+  let origin = 'http://localhost:3000';
+
+  if (requestUrl) {
+    try {
+      const u = new URL(requestUrl);
+      hostname = u.hostname;
+      origin = u.origin;
+    } catch {}
+  } else {
+    const url = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+    try {
+      const u = new URL(url);
+      hostname = u.hostname;
+      origin = u.origin;
+    } catch {}
+  }
+
+  // Validate or fallback to protect against phishing/arbitrary hostnames if needed
+  const allowedHostnames = [
+    'localhost',
+    '127.0.0.1',
+    'sccshop.psusci.club',
+  ];
+  
+  // Also parse from NEXTAUTH_URL and NEXT_PUBLIC_BASE_URL
+  const nextAuthUrl = process.env.NEXTAUTH_URL;
+  if (nextAuthUrl) {
+    try {
+      allowedHostnames.push(new URL(nextAuthUrl).hostname);
+    } catch {}
+  }
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+  if (baseUrl) {
+    try {
+      allowedHostnames.push(new URL(baseUrl).hostname);
+    } catch {}
+  }
+
+  const isAllowed = allowedHostnames.includes(hostname) || hostname.endsWith('.psusci.club');
+  if (!isAllowed) {
+    // Fallback to NEXTAUTH_URL configuration
+    try {
+      const u = new URL(process.env.NEXTAUTH_URL || 'http://localhost:3000');
+      hostname = u.hostname;
+      origin = u.origin;
+    } catch {}
+  }
+
   return {
     rpName: 'PSU SCC Shop',
-    rpID: parsed.hostname,
-    origin: parsed.origin,
+    rpID: hostname,
+    origin: origin,
   };
 }
 
@@ -195,8 +242,9 @@ export async function renameCredential(
 export async function generatePasskeyRegistrationOptions(
   userEmail: string,
   userName: string,
+  requestUrl?: string,
 ): Promise<{ options: PublicKeyCredentialCreationOptionsJSON; challengeId: string }> {
-  const { rpName, rpID } = getRpConfig();
+  const { rpName, rpID } = getRpConfig(requestUrl);
   const existingCreds = await getCredentialsByEmail(userEmail);
 
   const options = await generateRegistrationOptions({
@@ -227,8 +275,9 @@ export async function verifyPasskeyRegistration(
   response: RegistrationResponseJSON,
   userEmail: string,
   friendlyName?: string,
+  requestUrl?: string,
 ): Promise<VerifiedRegistrationResponse> {
-  const { rpID, origin } = getRpConfig();
+  const { rpID, origin } = getRpConfig(requestUrl);
   const expectedChallenge = await getAndDeleteChallenge(challengeId, 'registration');
 
   const verification = await verifyRegistrationResponse({
@@ -259,11 +308,13 @@ export async function verifyPasskeyRegistration(
 
 // ==================== AUTHENTICATION ====================
 
-export async function generatePasskeyAuthenticationOptions(): Promise<{
+export async function generatePasskeyAuthenticationOptions(
+  requestUrl?: string,
+): Promise<{
   options: PublicKeyCredentialRequestOptionsJSON;
   challengeId: string;
 }> {
-  const { rpID } = getRpConfig();
+  const { rpID } = getRpConfig(requestUrl);
 
   const options = await generateAuthenticationOptions({
     rpID,
@@ -278,42 +329,61 @@ export async function generatePasskeyAuthenticationOptions(): Promise<{
 export async function verifyPasskeyAuthentication(
   challengeId: string,
   response: AuthenticationResponseJSON,
-): Promise<{ verified: boolean; userEmail: string | null }> {
-  const { rpID, origin } = getRpConfig();
+  requestUrl?: string,
+): Promise<{ verified: boolean; userEmail: string | null; error?: string }> {
+  const { rpID, origin } = getRpConfig(requestUrl);
+  console.log('[Passkey] verifyPasskeyAuthentication debug:', {
+    rpID,
+    origin,
+    challengeId,
+    credentialId: response.id,
+  });
+
   const expectedChallenge = await getAndDeleteChallenge(challengeId, 'authentication');
+  console.log('[Passkey] expectedChallenge:', expectedChallenge);
 
   const credentialId = response.id;
   const storedCred = await getCredentialById(credentialId);
+  console.log('[Passkey] storedCred:', storedCred);
 
   if (!storedCred) {
-    return { verified: false, userEmail: null };
+    console.error('[Passkey] Credential not found in database for ID:', credentialId);
+    return { verified: false, userEmail: null, error: 'credential_not_found' };
   }
 
-  const verification = await verifyAuthenticationResponse({
-    response,
-    expectedChallenge,
-    expectedOrigin: origin,
-    expectedRPID: rpID,
-    requireUserVerification: true,
-    credential: {
-      id: storedCred.credential_id,
-      publicKey: Uint8Array.from(Buffer.from(storedCred.public_key, 'base64url')),
-      counter: storedCred.counter,
-      transports: storedCred.transports,
-    },
-  });
+  try {
+    const verification = await verifyAuthenticationResponse({
+      response,
+      expectedChallenge,
+      expectedOrigin: origin,
+      expectedRPID: rpID,
+      requireUserVerification: true,
+      credential: {
+        id: storedCred.credential_id,
+        publicKey: Uint8Array.from(Buffer.from(storedCred.public_key, 'base64url')),
+        counter: storedCred.counter,
+        transports: storedCred.transports,
+      },
+    });
 
-  if (verification.verified) {
-    await updateCredentialCounter(
-      storedCred.credential_id,
-      verification.authenticationInfo.newCounter,
-    );
+    console.log('[Passkey] verifyAuthenticationResponse result:', verification);
+
+    if (verification.verified) {
+      await updateCredentialCounter(
+        storedCred.credential_id,
+        verification.authenticationInfo.newCounter,
+      );
+    }
+
+    return {
+      verified: verification.verified,
+      userEmail: verification.verified ? storedCred.user_email : null,
+      error: verification.verified ? undefined : 'verification_failed',
+    };
+  } catch (err: unknown) {
+    console.error('[Passkey] verifyAuthenticationResponse exception:', err);
+    throw err;
   }
-
-  return {
-    verified: verification.verified,
-    userEmail: verification.verified ? storedCred.user_email : null,
-  };
 }
 
 // ==================== PASSKEY LOGIN TOKEN ====================

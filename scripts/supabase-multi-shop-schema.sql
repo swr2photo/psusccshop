@@ -181,3 +181,11 @@ BEGIN
   WHERE s.slug = shop_slug_param;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ==================== REALTIME PUBLICATION ====================
+-- Enable realtime for shops table
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.shops;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+

@@ -1,3 +1,4 @@
+// @ts-nocheck
 // prisma.config.ts
 // Prisma 7 configuration file — datasource URL for CLI (migrate, db pull, etc.)
 

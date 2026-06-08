@@ -7,6 +7,9 @@ import { sanitizeOrderForUser, sanitizeOrdersForUser, sanitizeObjectUtf8, saniti
 import { verifyTurnstileToken, getClientIP } from '@/lib/cloudflare';
 import { checkCombinedRateLimit, RATE_LIMITS, getRateLimitHeaders } from '@/lib/rate-limit';
 import { sendOrderConfirmationEmail } from '@/lib/email';
+import { db } from '@/lib/db';
+import { shops, config as dbConfigTable } from '@/db/schema';
+import { eq } from 'drizzle-orm';
 
 // Helper to save user log server-side
 async function saveUserLogServer(log: {
@@ -134,6 +137,100 @@ export async function POST(req: NextRequest) {
     // Sanitize UTF-8 input ก่อนบันทึก (และลบ turnstileToken ออก)
     const { turnstileToken: _, ...bodyWithoutToken } = body;
     const sanitizedBody = sanitizeObjectUtf8(bodyWithoutToken);
+    
+    // Validate shop status and product status in database before order creation
+    let products: any[] = [];
+    let isShopOpen = true;
+
+    if (sanitizedBody.shopId || sanitizedBody.shopSlug) {
+      // Multi-shop validation
+      const shopResult = await db.select()
+        .from(shops)
+        .where(
+          sanitizedBody.shopId 
+            ? eq(shops.id, sanitizedBody.shopId) 
+            : eq(shops.slug, sanitizedBody.shopSlug)
+        )
+        .limit(1);
+        
+      if (shopResult.length > 0) {
+        const s = shopResult[0];
+        products = (s.products as any[]) || [];
+        const settings = (s.settings as any) || {};
+        isShopOpen = settings.isOpen !== false;
+      } else {
+        return NextResponse.json(
+          { status: 'error', message: 'ไม่พบข้อมูลร้านค้า' },
+          { status: 404, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
+        );
+      }
+    } else {
+      // Main shop validation
+      const configResult = await db.select()
+        .from(dbConfigTable)
+        .where(eq(dbConfigTable.key, 'shop-settings'))
+        .limit(1);
+        
+      if (configResult.length > 0) {
+        const cfg = configResult[0].value as any;
+        products = cfg.products || [];
+        isShopOpen = cfg.isOpen !== false;
+      }
+    }
+
+    // 1. Validate if shop is open
+    if (!isShopOpen) {
+      return NextResponse.json(
+        { status: 'error', message: 'ร้านค้าปิดให้บริการชั่วคราว ไม่สามารถสั่งซื้อได้' },
+        { status: 400, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
+      );
+    }
+
+    // 2. Validate all products in the cart are still open and in stock
+    const cartItems = sanitizedBody.cart || [];
+    for (const item of cartItems) {
+      const prod = products.find(p => p.id === item.productId);
+      if (!prod) {
+        return NextResponse.json(
+          { status: 'error', message: `สินค้า "${item.productName || 'ไม่ระบุชื่อ'}" ไม่มีอยู่ในระบบแล้ว` },
+          { status: 400, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
+        );
+      }
+      
+      // Check product status (active, start/end dates)
+      const nowTime = new Date();
+      const isActive = prod.isActive !== false;
+      
+      // Helper to check if a date string is valid
+      const isValidDate = (dateString?: string): boolean => {
+        if (!dateString || dateString.trim() === '') return false;
+        const date = new Date(dateString);
+        return !isNaN(date.getTime());
+      };
+      
+      const start = isValidDate(prod.startDate) ? new Date(prod.startDate) : null;
+      const end = isValidDate(prod.endDate) ? new Date(prod.endDate) : null;
+      
+      const isClosed = !isActive || (start && nowTime < start) || (end && nowTime > end);
+      if (isClosed) {
+        return NextResponse.json(
+          { status: 'error', message: `สินค้า "${item.productName || prod.name}" ปิดการขายแล้ว` },
+          { status: 400, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
+        );
+      }
+
+      // Check stock
+      const isOutOfStock = (
+        (prod.stock !== null && prod.stock !== undefined && prod.stock <= 0) ||
+        (prod.variants && prod.variants.length > 0 && prod.variants.every((v: any) => v.stock !== null && v.stock !== undefined && v.stock <= 0))
+      );
+      if (isOutOfStock) {
+        return NextResponse.json(
+          { status: 'error', message: `สินค้า "${item.productName || prod.name}" หมดชั่วคราว` },
+          { status: 400, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
+        );
+      }
+    }
     
     const ref = sanitizedBody?.ref || generateRef();
     const now = new Date();

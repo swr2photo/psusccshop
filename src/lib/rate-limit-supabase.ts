@@ -34,7 +34,7 @@ export const RATE_LIMITS = {
   auth: { maxRequests: 10, windowSeconds: 60, prefix: 'auth' },
   order: { maxRequests: 5, windowSeconds: 60, prefix: 'order' },
   payment: { maxRequests: 10, windowSeconds: 60, prefix: 'payment' },
-  upload: { maxRequests: 10, windowSeconds: 60, prefix: 'upload' },
+  upload: { maxRequests: 100, windowSeconds: 60, prefix: 'upload' },
   admin: { maxRequests: 30, windowSeconds: 60, prefix: 'admin' },
   strict: { maxRequests: 3, windowSeconds: 60, prefix: 'strict' },
   critical: { maxRequests: 1, windowSeconds: 60, prefix: 'critical' },

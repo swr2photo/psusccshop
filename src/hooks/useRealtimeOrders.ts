@@ -13,7 +13,8 @@
  */
 
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { createClient, RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
+import { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase-client';
 
 // ============== CONFIGURATION ==============
 
@@ -35,37 +36,8 @@ const CONFIG = {
 
 // ============== SINGLETON SUPABASE CLIENT ==============
 
-let supabase: SupabaseClient | null = null;
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL2 || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY2 || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY2 || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
 function getSupabaseClient(): SupabaseClient | null {
-  if (supabase) return supabase;
-  
-  if (!supabaseUrl || !supabaseAnonKey) {
-    if (typeof window !== 'undefined') {
-      console.warn('[Realtime] Missing Supabase configuration');
-    }
-    return null;
-  }
-  
-  try {
-    supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-      realtime: {
-        params: {
-          eventsPerSecond: 10,
-        },
-      },
-    });
-    return supabase;
-  } catch (err) {
-    console.error('[Realtime] Failed to create Supabase client:', err);
-    return null;
-  }
+  return supabase;
 }
 
 // ============== UTILITIES ==============

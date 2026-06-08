@@ -3,6 +3,7 @@
 // Migrated from Prisma to Drizzle for all database queries
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { Redis } from '@upstash/redis';
 import { db } from './db';
 import { orders, config, carts, profiles, emailLogs, userLogs, dataRequests, keyValueStore, adminPermissions, securityAuditLog } from '../db/schema';
 import { eq, lt, gt, and, desc, inArray, like, or, count } from 'drizzle-orm';
@@ -36,9 +37,9 @@ let _supabaseAdmin: SupabaseClient | null = null;
 
 export function getSupabaseAdmin(): SupabaseClient | null {
   if (_supabaseAdmin) return _supabaseAdmin;
-  const storageUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const storageUrl = process.env.NEXT_PUBLIC_SUPABASE_URL2 || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
   if (!storageUrl || !supabaseServiceKey) {
-    console.warn('[supabase] Missing NEXT_PUBLIC_SUPABASE_URL or SERVICE_ROLE_KEY');
+    console.warn('[supabase] Missing NEXT_PUBLIC_SUPABASE_URL/URL2 or SERVICE_ROLE_KEY');
     return null;
   }
   _supabaseAdmin = createClient(storageUrl, supabaseServiceKey, {
@@ -750,6 +751,69 @@ export async function updateShopConfig(configData: any): Promise<void> {
   return putJson('config/shop-settings.json', configData);
 }
 
+let _redis: Redis | null = null;
+
+/**
+ * Lazy initializer for Upstash Redis client.
+ * Returns null if Redis credentials are missing or set to placeholder values.
+ */
+export function getRedisClient(): Redis | null {
+  if (_redis) return _redis;
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token || url.includes('placeholder') || token.includes('placeholder')) {
+    console.warn('[Redis] Upstash Redis credentials not configured or placeholder used');
+    return null;
+  }
+  _redis = new Redis({
+    url,
+    token,
+  });
+  return _redis;
+}
+
+/**
+ * Sync the isOpen status directly to Upstash Redis cache key 'is_order_open'.
+ */
+export async function syncShopOpenStatusToRedis(isOpen: boolean): Promise<boolean> {
+  try {
+    const redis = getRedisClient();
+    if (!redis) {
+      console.warn('[Redis] Cannot sync status: Redis client not configured');
+      return false;
+    }
+    await redis.set('is_order_open', isOpen);
+    console.log(`[Redis] Synced is_order_open to ${isOpen}`);
+    return true;
+  } catch (error) {
+    console.error('[Redis] Failed to sync status to Redis:', error);
+    return false;
+  }
+}
+
+/**
+ * Consistent helper to update shop open status in S3/Postgres first,
+ * and then synchronize that update to the Redis cache.
+ */
+export async function updateShopOpenStatus(isOpen: boolean): Promise<void> {
+  const currentConfig = await getShopConfig();
+  const updatedConfig = {
+    ...(currentConfig || {}),
+    isOpen,
+  };
+  
+  // Save updated config to Postgres/S3 (throws on failure)
+  await updateShopConfig(updatedConfig);
+  
+  // Sync to Redis cache (fail-open: log and proceed even if Redis fails)
+  try {
+    await syncShopOpenStatusToRedis(isOpen);
+  } catch (redisError) {
+    console.error('[Redis] Failed to update Redis cache for shop status:', redisError);
+  }
+}
+
+
 // ==================== SECURITY AUDIT ====================
 
 /**
@@ -848,16 +912,13 @@ export async function uploadImageToStorage(
   filename: string,
   contentType: string
 ): Promise<{ url: string; path: string }> {
-  const adminDb = getSupabaseAdmin();
-  if (!adminDb) throw new Error('Database not available');
-  
   const now = new Date();
   const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const ext = filename.split('.').pop()?.toLowerCase() || 'png';
   const uniqueName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
   const path = `${yearMonth}/${uniqueName}`;
   
-  const { data, error } = await adminDb.storage
+  const { data, error } = await supabase.storage
     .from(STORAGE_BUCKET)
     .upload(path, buffer, {
       contentType,
@@ -870,7 +931,7 @@ export async function uploadImageToStorage(
     throw new Error(`Failed to upload image: ${error.message}`);
   }
   
-  const { data: urlData } = adminDb.storage
+  const { data: urlData } = supabase.storage
     .from(STORAGE_BUCKET)
     .getPublicUrl(path);
   
@@ -884,10 +945,7 @@ export async function uploadImageToStorage(
  * Delete image from Supabase Storage
  */
 export async function deleteImageFromStorage(path: string): Promise<boolean> {
-  const adminDb = getSupabaseAdmin();
-  if (!adminDb) return false;
-  
-  const { error } = await adminDb.storage
+  const { error } = await supabase.storage
     .from(STORAGE_BUCKET)
     .remove([path]);
   
@@ -903,7 +961,7 @@ export async function deleteImageFromStorage(path: string): Promise<boolean> {
  * Get public URL for an image path
  */
 export function getImagePublicUrl(path: string): string {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL2 || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
   return `${supabaseUrl}/storage/v1/object/public/${STORAGE_BUCKET}/${path}`;
 }
 

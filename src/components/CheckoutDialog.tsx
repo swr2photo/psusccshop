@@ -471,13 +471,13 @@ export default function CheckoutDialog({
               maxHeight: 200,
               overflow: 'auto',
             }}>
-              {cart.map((item) => {
+              {cart.map((item, idx) => {
                 const productInfo = products?.find(p => p.id === item.productId);
                 const productImage = productInfo?.coverImage || productInfo?.images?.[0];
                 const displayName = (lang === 'en' && productInfo?.nameEn) ? productInfo.nameEn : (productInfo?.name || item.productName);
                 
                 return (
-                  <Box key={item.id} sx={{ 
+                  <Box key={`${item.id}-${idx}`} sx={{ 
                     display: 'flex', 
                     gap: 1.5,
                     p: 1.5,

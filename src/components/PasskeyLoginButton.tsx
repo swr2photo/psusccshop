@@ -83,9 +83,14 @@ export default function PasskeyLoginButton({
         // User cancelled the prompt
         return;
       }
-      const msg =
-        err.message ||
-        (lang === 'en' ? 'Passkey sign-in failed' : 'เข้าสู่ระบบด้วยพาสคีย์ไม่สำเร็จ');
+      let msg = err.message;
+      if (msg === 'credential_not_found') {
+        msg = lang === 'en'
+          ? 'This passkey is not registered. Please sign in using Google or another method and register your passkey in your profile.'
+          : 'ไม่พบพาสคีย์นี้ในระบบ กรุณาเข้าสู่ระบบด้วย Google หรือวิธีอื่นก่อนเพื่อลงทะเบียนพาสคีย์ใหม่ในโปรไฟล์ของคุณ';
+      } else if (!msg || msg === 'Authentication failed') {
+        msg = lang === 'en' ? 'Passkey sign-in failed' : 'เข้าสู่ระบบด้วยพาสคีย์ไม่สำเร็จ';
+      }
       onError?.(msg);
       console.error('[Passkey] Login error:', err);
     }

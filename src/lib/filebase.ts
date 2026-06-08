@@ -20,6 +20,10 @@ export {
   getExpiredUnpaidOrders,
   getShopConfig,
   updateShopConfig,
+  // Redis helpers
+  getRedisClient,
+  syncShopOpenStatusToRedis,
+  updateShopOpenStatus,
   // Security functions
   logSecurityEvent,
   getSecurityAuditLogs,

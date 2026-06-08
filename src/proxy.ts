@@ -1,8 +1,19 @@
-// src/proxy.ts
-// Next.js Proxy for security headers, CORS, and rate limiting (Next.js 16+)
-
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { Redis } from '@upstash/redis';
+
+/**
+ * Lazy initializer for Upstash Redis client.
+ * Returns null if Redis credentials are missing or set to placeholder values.
+ */
+const getRedisClient = () => {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token || url.includes('placeholder') || token.includes('placeholder')) {
+    return null;
+  }
+  return new Redis({ url, token });
+};
 
 // --- CORS config ---
 const allowedOrigins = [
@@ -176,12 +187,42 @@ const EXTERNAL_API_ROUTES = [
   '/api/image/',          // Image proxy (called from <img> tags)
 ];
 
-export default function proxy(request: NextRequest) {
+export default async function proxy(request: NextRequest) {
   const origin = request.headers.get('origin');
   const pathname = request.nextUrl.pathname;
   const method = request.method;
   const ip = getIP(request);
   const userAgent = request.headers.get('user-agent');
+
+  // --- Shop Open/Closed Check for Orders ---
+  if (pathname.startsWith('/api/orders') && method === 'POST') {
+    try {
+      const redis = getRedisClient();
+      if (redis) {
+        const isOrderOpen = await redis.get<boolean>('is_order_open');
+        if (isOrderOpen === false) {
+          return NextResponse.json(
+            { 
+              success: false, 
+              status: 'error', 
+              message: 'ขออภัย ขณะนี้ระบบปิดรับคำสั่งซื้อแล้ว' 
+            },
+            { 
+              status: 403, 
+              headers: { 
+                'Content-Type': 'application/json; charset=utf-8',
+                ...securityHeaders,
+              } 
+            }
+          );
+        }
+      } else {
+        console.warn('[Proxy] Redis client not configured, bypassing check (Fail-Open)');
+      }
+    } catch (error) {
+      console.error('[Proxy] Redis lookup failed, bypassing check (Fail-Open):', error);
+    }
+  }
 
   // --- CORS Check ---
   if (!isAllowedOrigin(origin)) {
