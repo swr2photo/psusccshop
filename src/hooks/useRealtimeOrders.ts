@@ -230,11 +230,11 @@ export function useRealtimeOrders(options: UseRealtimeOrdersOptions = {}) {
   // Subscribe to orders
   const subscribeToOrders = useCallback(() => {
     const client = getSupabaseClient();
-    if (!client || !enabled) return null;
+    if (!client || !enabled || !onOrderChangeRef.current) return null;
 
     const channelName = adminMode 
-      ? 'orders-admin-v2' 
-      : `orders-user-${emailHash || 'anon'}-v2`;
+      ? `orders-admin-v2-${Math.random().toString(36).substring(2, 9)}` 
+      : `orders-user-${emailHash || 'anon'}-v2-${Math.random().toString(36).substring(2, 9)}`;
 
     try {
       const channel = client
@@ -323,8 +323,9 @@ export function useRealtimeOrders(options: UseRealtimeOrdersOptions = {}) {
     if (!client || !enabled || !onConfigChangeRef.current) return null;
 
     try {
+      const channelName = `config-changes-${Math.random().toString(36).substring(2, 9)}`;
       const channel = client
-        .channel('config-changes-v2')
+        .channel(channelName)
         .on(
           'postgres_changes',
           {
@@ -405,17 +406,25 @@ export function useRealtimeOrders(options: UseRealtimeOrdersOptions = {}) {
     }
     
     // Cleanup existing channels
-    if (channelRef.current) {
-      try {
-        channelRef.current.unsubscribe();
-      } catch {}
-      channelRef.current = null;
-    }
-    if (configChannelRef.current) {
-      try {
-        configChannelRef.current.unsubscribe();
-      } catch {}
-      configChannelRef.current = null;
+    const clientInstance = getSupabaseClient();
+    if (clientInstance) {
+      if (channelRef.current) {
+        try { clientInstance.removeChannel(channelRef.current); } catch {}
+        channelRef.current = null;
+      }
+      if (configChannelRef.current) {
+        try { clientInstance.removeChannel(configChannelRef.current); } catch {}
+        configChannelRef.current = null;
+      }
+    } else {
+      if (channelRef.current) {
+        try { channelRef.current.unsubscribe(); } catch {}
+        channelRef.current = null;
+      }
+      if (configChannelRef.current) {
+        try { configChannelRef.current.unsubscribe(); } catch {}
+        configChannelRef.current = null;
+      }
     }
 
     // Create new subscriptions
@@ -560,15 +569,21 @@ export function useRealtimeOrders(options: UseRealtimeOrdersOptions = {}) {
         clearInterval(heartbeatIntervalRef.current);
       }
 
-      if (channelRef.current) {
-        try {
-          channelRef.current.unsubscribe();
-        } catch {}
-      }
-      if (configChannelRef.current) {
-        try {
-          configChannelRef.current.unsubscribe();
-        } catch {}
+      const clientInstance = getSupabaseClient();
+      if (clientInstance) {
+        if (channelRef.current) {
+          try { clientInstance.removeChannel(channelRef.current); } catch {}
+        }
+        if (configChannelRef.current) {
+          try { clientInstance.removeChannel(configChannelRef.current); } catch {}
+        }
+      } else {
+        if (channelRef.current) {
+          try { channelRef.current.unsubscribe(); } catch {}
+        }
+        if (configChannelRef.current) {
+          try { configChannelRef.current.unsubscribe(); } catch {}
+        }
       }
     };
   }, [enabled, emailHash, adminMode]); // Only re-run when these change

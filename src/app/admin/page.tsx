@@ -4115,6 +4115,8 @@ export default function AdminPage(): JSX.Element {
   const { alert: alertDialog, AlertDialog } = useAlertDialog();
   // Orders filter state (moved from OrdersView to prevent re-render issues)
   const [orderFilterStatus, setOrderFilterStatus] = useState<string>('ALL');
+  const [selectedProductIdForOrders, setSelectedProductIdForOrders] = useState<string | null>(null);
+
   // Slip viewer state
   const [slipViewerOpen, setSlipViewerOpen] = useState(false);
   const [slipViewerData, setSlipViewerData] = useState<{ ref: string; slip?: AdminOrder['slip'] } | null>(null);
@@ -4133,6 +4135,13 @@ export default function AdminPage(): JSX.Element {
   }
   const [myShops, setMyShops] = useState<MyShopInfo[]>([]);
   const [selectedShopId, setSelectedShopId] = useState<string | 'all' | ''>('');
+
+  // Reset order filters when shop changes
+  useEffect(() => {
+    setSelectedProductIdForOrders(null);
+    setSearchTerm('');
+    setOrderFilterStatus('ALL');
+  }, [selectedShopId]);
   const myShopsLoadedRef = useRef(false);
   // Ref to hold the global config when switching to a specific shop
   const globalConfigRef = useRef<ShopConfig | null>(null);
@@ -7258,6 +7267,11 @@ export default function AdminPage(): JSX.Element {
   // Memoize filtered orders outside the render function
   const filteredOrders = useMemo(() => {
     let filtered = shopOrders;
+    if (selectedProductIdForOrders && selectedProductIdForOrders !== 'ALL') {
+      filtered = filtered.filter(o => 
+        o.cart && Array.isArray(o.cart) && o.cart.some((item: any) => item.productId === selectedProductIdForOrders)
+      );
+    }
     if (orderFilterStatus !== 'ALL') {
       filtered = filtered.filter(o => normalizeStatusKey(o.status) === orderFilterStatus);
     }
@@ -7270,9 +7284,146 @@ export default function AdminPage(): JSX.Element {
       );
     }
     return filtered;
-  }, [orderFilterStatus, searchTerm, shopOrders]);
+  }, [selectedProductIdForOrders, orderFilterStatus, searchTerm, shopOrders]);
 
   const OrdersView = () => {
+    if (selectedProductIdForOrders === null) {
+      const activeProducts = config.products || [];
+      return (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, height: '100%', py: 1 }}>
+          {/* Header */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+            <Inventory size={28} color="#a5b4fc" />
+            <Box>
+              <Typography sx={{ fontSize: { xs: '1.1rem', md: '1.4rem' }, fontWeight: 800, color: 'var(--foreground)', lineHeight: 1.2 }}>
+                เลือกสินค้าเพื่อดูออเดอร์
+              </Typography>
+              <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                เลือกสินค้าที่ต้องการตรวจสอบรายละเอียดและสถานะการสั่งซื้อ
+              </Typography>
+            </Box>
+          </Box>
+
+          <Box sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' },
+            gap: 2.5,
+          }}>
+            {/* View All Orders Card */}
+            <Card
+              onClick={() => setSelectedProductIdForOrders('ALL')}
+              sx={{
+                ...glassCardSx,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease-in-out',
+                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(168, 85, 247, 0.08) 100%)',
+                border: '1px solid rgba(139, 92, 246, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                p: 2.5,
+                gap: 2,
+                '&:hover': {
+                  transform: 'translateY(-4px)',
+                  boxShadow: '0 8px 24px rgba(139, 92, 246, 0.12)',
+                  borderColor: 'rgba(139, 92, 246, 0.45)',
+                },
+              }}
+            >
+              <Box sx={{
+                width: 48,
+                height: 48,
+                borderRadius: '10px',
+                background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                flexShrink: 0,
+              }}>
+                <Receipt size={24} />
+              </Box>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                  ออเดอร์ทั้งหมด (ทุกสินค้า)
+                </Typography>
+                <Typography sx={{ fontSize: '0.7rem', color: '#a5b4fc', mt: 0.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  ออเดอร์ทั้งหมดในระบบของร้านนี้
+                </Typography>
+                <Box sx={{ display: 'inline-flex', mt: 1, px: 1.2, py: 0.2, borderRadius: '12px', bgcolor: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)' }}>
+                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: 'white' }}>
+                    {shopOrders.length} ออเดอร์
+                  </Typography>
+                </Box>
+              </Box>
+            </Card>
+
+            {/* Product Cards */}
+            {activeProducts.map((p) => {
+              const productOrdersCount = shopOrders.filter(o => 
+                o.cart && Array.isArray(o.cart) && o.cart.some((item: any) => item.productId === p.id)
+              ).length;
+              const coverImg = p.coverImage || p.images?.[0];
+
+              return (
+                <Card
+                  key={p.id}
+                  onClick={() => setSelectedProductIdForOrders(p.id)}
+                  sx={{
+                    ...glassCardSx,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease-in-out',
+                    display: 'flex',
+                    alignItems: 'center',
+                    p: 2.5,
+                    gap: 2,
+                    '&:hover': {
+                      transform: 'translateY(-4px)',
+                      boxShadow: '0 8px 24px rgba(255, 255, 255, 0.04)',
+                      borderColor: 'var(--primary)',
+                    },
+                  }}
+                >
+                  {/* Thumbnail */}
+                  <Box sx={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: '10px',
+                    overflow: 'hidden',
+                    flexShrink: 0,
+                    bgcolor: 'var(--surface-2)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: '1px solid var(--glass-border)',
+                  }}>
+                    {coverImg ? (
+                      <Box component="img" src={coverImg} alt={p.name} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <Store size={22} color="var(--text-muted)" />
+                    )}
+                  </Box>
+
+                  {/* Info */}
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography noWrap sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                      {p.name}
+                    </Typography>
+                    <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', mt: 0.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {p.category ? `หมวดหมู่: ${p.category}` : 'ไม่มีหมวดหมู่'}
+                    </Typography>
+                    <Box sx={{ display: 'inline-flex', mt: 1, px: 1.2, py: 0.2, borderRadius: '12px', bgcolor: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.15)' }}>
+                      <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#a5b4fc' }}>
+                        {productOrdersCount} ออเดอร์
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Card>
+              );
+            })}
+          </Box>
+        </Box>
+      );
+    }
 
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, height: '100%' }}>
@@ -7296,11 +7447,33 @@ export default function AdminPage(): JSX.Element {
             gap: 1.5,
             mb: 1.5,
           }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Inventory size={28} color="#a5b4fc" />
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Button
+                onClick={() => setSelectedProductIdForOrders(null)}
+                size="small"
+                sx={{
+                  color: 'var(--text-muted)',
+                  bgcolor: 'var(--glass-bg)',
+                  border: `1px solid ${ADMIN_THEME.border}`,
+                  borderRadius: '10px',
+                  textTransform: 'none',
+                  px: 1.2,
+                  py: 0.6,
+                  minWidth: 'auto',
+                  '&:hover': {
+                    bgcolor: 'rgba(255,255,255,0.08)',
+                  }
+                }}
+              >
+                ย้อนกลับ
+              </Button>
               <Box>
-                <Typography sx={{ fontSize: { xs: '1.1rem', md: '1.5rem' }, fontWeight: 800, color: 'var(--foreground)', lineHeight: 1.2 }}>
-                  ออเดอร์
+                <Typography sx={{ fontSize: { xs: '1.1rem', md: '1.3rem' }, fontWeight: 800, color: 'var(--foreground)', lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: 0.8 }}>
+                  {selectedProductIdForOrders === 'ALL' ? (
+                    'ออเดอร์ทั้งหมด'
+                  ) : (
+                    config.products?.find(p => p.id === selectedProductIdForOrders)?.name || 'ออเดอร์สินค้า'
+                  )}
                 </Typography>
                 <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                   {filteredOrders.length}/{orders.length} รายการ

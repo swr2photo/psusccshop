@@ -13,6 +13,7 @@ import {
   Store, ShoppingCart, Plus, Minus, X, ArrowLeft, Search,
   Share2, Heart, Package, Clock, Tag, CreditCard, Trash2,
   History, MapPin, User, Phone, Instagram, Palette, Image as ImageOutlinedIcon,
+  CheckCircle2, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { useSession, signIn } from 'next-auth/react';
 import dynamic from 'next/dynamic';
@@ -26,8 +27,10 @@ import Link from 'next/link';
 import { useCartStore } from '@/store/cartStore';
 import { useWishlistStore } from '@/store/wishlistStore';
 import { useTranslation } from '@/hooks/useTranslation';
-import { usePublicShopQuery } from '@/hooks';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
+import { usePublicShopQuery, queryKeys } from '@/hooks';
 import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabase-client';
 import OptimizedImage from '@/components/OptimizedImage';
 import AnnouncementBar from '@/components/AnnouncementBar';
 import EventBanner, { type ShopEvent } from '@/components/EventBanner';
@@ -41,6 +44,7 @@ import type { Product } from '@/lib/config';
 import {
   getProductName, getProductDescription,
   getCategoryLabel, getCategoryIcon,
+  DEFAULT_SHIRT_NAME, type ShirtNameConfig,
 } from '@/lib/config';
 import { submitOrder as submitOrderApi, getHistory, cancelOrder as cancelOrderApi, saveProfile as saveProfileApi } from '@/lib/api-client';
 import type { OrderHistory } from '@/lib/shop-constants';
@@ -118,10 +122,32 @@ function getEventDiscount(productId: string, events: ShopEvent[] | undefined): {
   };
 }
 
+/** Normalize shirt custom name based on ShirtNameConfig */
+const normalizeShirtName = (value: string, cfg: ShirtNameConfig = DEFAULT_SHIRT_NAME): string => {
+  let pattern = '';
+  if (cfg.allowEnglish) pattern += 'a-zA-Z';
+  if (cfg.allowThai) pattern += '\u0E00-\u0E7F';
+  if (cfg.allowSpecialChars && cfg.allowedSpecialChars) {
+    pattern += cfg.allowedSpecialChars.replace(/[\\\]\^\-]/g, '\\$&');
+  }
+  pattern += '\\s';
+  const regex = new RegExp(`[^${pattern}]`, 'g');
+  let result = value.replace(regex, '');
+  if (cfg.autoUppercase) result = result.toUpperCase();
+  return result.slice(0, cfg.maxLength).trim();
+};
+
+const normalizeDigits99 = (value: string) => {
+  const digits = value.replace(/\D/g, '');
+  if (!digits) return '';
+  return String(Math.min(99, Number(digits)));
+};
+
 // ==================== COMPONENT ====================
 export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefrontProps) {
   const { data: session } = useSession();
   const { t, lang } = useTranslation();
+  const { confirm: showConfirm, ConfirmDialog } = useConfirmDialog();
   const isMobile = useMediaQuery('(max-width:600px)');
   const cart = useCartStore((s) => s.cart);
   const addToCart = useCartStore((s) => s.addToCart);
@@ -154,6 +180,104 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
   const [selectedPattern, setSelectedPattern] = useState<any>(null);
   const [quantity, setQuantity] = useState(1);
   const patternSelectorRef = useRef<HTMLDivElement>(null);
+  const [customName, setCustomName] = useState('');
+  const [customNumber, setCustomNumber] = useState('');
+  const [isLongSleeve, setIsLongSleeve] = useState(false);
+  const customNameInputRef = useRef<HTMLInputElement>(null);
+  const customNumberInputRef = useRef<HTMLInputElement>(null);
+
+  // Product gallery states
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+
+  const imageScrollRef = useRef<HTMLDivElement>(null);
+  const touchStartX = useRef(0);
+  const touchEndX = useRef(0);
+
+  // Compile all unique images for the selected product
+  const productImages = useMemo(() => {
+    if (!selectedProduct) return [];
+    const imgs: string[] = [];
+    
+    if (selectedProduct.coverImage) {
+      imgs.push(selectedProduct.coverImage);
+    }
+    
+    if (selectedProduct.images && selectedProduct.images.length > 0) {
+      selectedProduct.images.forEach((img) => {
+        if (img && !imgs.includes(img)) {
+          imgs.push(img);
+        }
+      });
+    }
+
+    if (selectedProduct.patterns && selectedProduct.patterns.length > 0) {
+      selectedProduct.patterns.forEach((p: any) => {
+        if (p.isActive !== false && p.image && !imgs.includes(p.image)) {
+          imgs.push(p.image);
+        }
+      });
+    }
+
+    return imgs;
+  }, [selectedProduct]);
+
+  // Smooth scroll container to a specific image index
+  const scrollToImage = useCallback((index: number) => {
+    if (!imageScrollRef.current || productImages.length === 0) return;
+    const container = imageScrollRef.current;
+    const targetIndex = (index + productImages.length) % productImages.length;
+    const itemWidth = container.clientWidth;
+    container.scrollTo({
+      left: targetIndex * itemWidth,
+      behavior: 'smooth',
+    });
+    setActiveImageIndex(targetIndex);
+  }, [productImages]);
+
+  // Handle native scroll/swipe index detection
+  const handleImageScroll = useCallback(() => {
+    if (!imageScrollRef.current) return;
+    const container = imageScrollRef.current;
+    const scrollPosition = container.scrollLeft;
+    const itemWidth = container.clientWidth;
+    if (itemWidth > 0) {
+      const roundedIndex = Math.round(scrollPosition / itemWidth);
+      if (roundedIndex >= 0 && roundedIndex < productImages.length) {
+        setActiveImageIndex(prev => prev !== roundedIndex ? roundedIndex : prev);
+      }
+    }
+  }, [productImages]);
+
+  // Sync selected pattern to scroll to its corresponding image
+  useEffect(() => {
+    if (selectedPattern?.image) {
+      const idx = productImages.indexOf(selectedPattern.image);
+      if (idx !== -1) {
+        const timer = setTimeout(() => {
+          scrollToImage(idx);
+        }, 100);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [selectedPattern, productImages, scrollToImage]);
+
+  // Keyboard navigation for fullscreen lightbox
+  useEffect(() => {
+    if (!lightboxOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        setLightboxIndex((prev) => (prev - 1 + productImages.length) % productImages.length);
+      } else if (e.key === 'ArrowRight') {
+        setLightboxIndex((prev) => (prev + 1) % productImages.length);
+      } else if (e.key === 'Escape') {
+        setLightboxOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [lightboxOpen, productImages]);
 
   // Checkout state
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -264,6 +388,60 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       setIsFollowing(!!follows[shopSlug]);
     } catch { /* ignore */ }
   }, [shopSlug]);
+
+  // Realtime shop and product updates
+  useEffect(() => {
+    if (!shopSlug) return;
+
+    const channel = supabase
+      .channel(`shop-realtime-${shopSlug}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'shops',
+          filter: `slug=eq.${shopSlug}`,
+        },
+        (payload) => {
+          console.log('[Realtime] Shop updated:', payload);
+          const updatedShop = payload.new;
+          if (updatedShop) {
+            queryClient.setQueryData([...queryKeys.shop.all, 'public', initialShop.id], (prev: any) => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                shop: {
+                  ...prev.shop,
+                  ...updatedShop,
+                }
+              };
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [shopSlug, queryClient, initialShop.id]);
+
+  // Block purchase / close product details drawer if active product status changes in shop products (e.g. disabled or out of stock)
+  useEffect(() => {
+    if (!selectedProduct || !products.length) return;
+    const updatedProduct = products.find(p => p.id === selectedProduct.id);
+    const isOutOfStock = updatedProduct && (
+      (updatedProduct.stock !== null && updatedProduct.stock !== undefined && updatedProduct.stock <= 0) ||
+      (updatedProduct.variants && updatedProduct.variants.length > 0 && updatedProduct.variants.every(v => v.stock !== null && v.stock !== undefined && v.stock <= 0))
+    );
+    if (!updatedProduct || getProductStatus(updatedProduct) !== 'OPEN' || isOutOfStock) {
+      showToast('warning', lang === 'en' ? 'This product is no longer available' : 'สินค้านี้ไม่พร้อมจำหน่ายแล้ว');
+      setSelectedProduct(null);
+    } else {
+      setSelectedProduct(updatedProduct);
+    }
+  }, [products, selectedProduct, lang, showToast]);
 
   const toggleFollow = useCallback(() => {
     setIsFollowing(prev => {
@@ -564,6 +742,10 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
     setSelectedVariant(null);
     setSelectedPattern(null);
     setQuantity(1);
+    setCustomName('');
+    setCustomNumber('');
+    setIsLongSleeve(false);
+    setActiveImageIndex(0);
   }, []);
 
   const handleAddToCart = useCallback(() => {
@@ -581,13 +763,49 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       return;
     }
 
-    const price = selectedVariant
+    const shirtCfg = DEFAULT_SHIRT_NAME;
+    const normalizedCustomName = selectedProduct.options?.hasCustomName ? normalizeShirtName(customName, shirtCfg) : '';
+
+    if (selectedProduct.options?.hasCustomName && !normalizedCustomName) {
+      customNameInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => {
+        customNameInputRef.current?.focus();
+      }, 300);
+      showToast('warning', lang === 'en' ? 'Please enter a custom name' : 'กรุณากรอกชื่อสกรีน');
+      return;
+    }
+
+    if (selectedProduct.options?.hasCustomName && normalizedCustomName.length < shirtCfg.minLength) {
+      customNameInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => {
+        customNameInputRef.current?.focus();
+      }, 300);
+      showToast('warning', `${lang === 'en' ? 'Name must be at least' : 'ชื่อสกรีนต้องมีความยาวอย่างน้อย'} ${shirtCfg.minLength} ${lang === 'en' ? 'characters' : 'ตัวอักษร'}`);
+      return;
+    }
+
+    if (selectedProduct.options?.hasCustomNumber && !customNumber) {
+      customNumberInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => {
+        customNumberInputRef.current?.focus();
+      }, 300);
+      showToast('warning', lang === 'en' ? 'Please enter a number' : 'กรุณากรอกเบอร์สกรีน');
+      return;
+    }
+
+    const basePrice = selectedVariant
       ? selectedVariant.price
       : selectedProduct.sizePricing?.[selectedSize] || selectedProduct.basePrice;
     
+    const sleeveFee = (selectedProduct.options?.hasLongSleeve && isLongSleeve)
+      ? (selectedProduct.options?.longSleevePrice ?? 50)
+      : 0;
+
+    const price = basePrice + sleeveFee;
+    
     const patternName = selectedPattern?.name || '';
     const item = {
-      id: `${selectedProduct.id}-${selectedSize || '-'}-${selectedVariant?.id || '-'}-${patternName || '-'}`,
+      id: `${selectedProduct.id}-${selectedSize || '-'}-${selectedVariant?.id || '-'}-${patternName || '-'}-${isLongSleeve ? 'LONG' : 'SHORT'}-${normalizedCustomName || '-'}-${customNumber || '-'}`,
       productId: selectedProduct.id,
       name: selectedProduct.name,
       type: selectedProduct.type || 'OTHER' as const,
@@ -599,6 +817,9 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       total: price * quantity,
       selectedVariant: selectedVariant || undefined,
       selectedPattern: selectedPattern || undefined,
+      sleeve: (selectedProduct.options?.hasLongSleeve ? (isLongSleeve ? 'LONG' : 'SHORT') : undefined) as 'LONG' | 'SHORT' | undefined,
+      customName: selectedProduct.options?.hasCustomName ? normalizedCustomName : undefined,
+      customNumber: selectedProduct.options?.hasCustomNumber ? customNumber : undefined,
       shopSlug,
     };
     addToCart(item);
@@ -608,7 +829,10 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
     setSelectedVariant(null);
     setSelectedPattern(null);
     setQuantity(1);
-  }, [selectedProduct, selectedVariant, selectedSize, selectedPattern, quantity, addToCart, showToast, lang, shopSlug]);
+    setCustomName('');
+    setCustomNumber('');
+    setIsLongSleeve(false);
+  }, [selectedProduct, selectedVariant, selectedSize, selectedPattern, quantity, customName, customNumber, isLongSleeve, addToCart, showToast, lang, shopSlug]);
 
   const handleShareProduct = useCallback(async (product: Product) => {
     const url = `${window.location.origin}/shop/${shopSlug}`;
@@ -1336,11 +1560,11 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       <Drawer
         anchor={isMobile ? "bottom" : "right"}
         open={!!selectedProduct}
-        onClose={() => { setSelectedProduct(null); setSelectedSize(''); setSelectedVariant(null); setSelectedPattern(null); setQuantity(1); }}
+        onClose={() => { setSelectedProduct(null); setSelectedSize(''); setSelectedVariant(null); setSelectedPattern(null); setQuantity(1); setActiveImageIndex(0); }}
         PaperProps={{
           sx: {
             width: '100%',
-            maxWidth: isMobile ? 'none' : 960,
+            maxWidth: isMobile ? 'none' : '100%',
             height: isMobile ? '95vh' : '100%',
             maxHeight: isMobile ? '95vh' : '100%',
             borderTopLeftRadius: isMobile ? 28 : 0,
@@ -1357,6 +1581,14 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
         sx={{ zIndex: 8000 }}
       >
         {selectedProduct && (() => {
+          const basePrice = selectedVariant
+            ? selectedVariant.price
+            : selectedProduct.sizePricing?.[selectedSize] || selectedProduct.basePrice;
+          const sleeveFee = (selectedProduct.options?.hasLongSleeve && isLongSleeve)
+            ? (selectedProduct.options?.longSleevePrice ?? 50)
+            : 0;
+          const currentUnitPrice = basePrice + sleeveFee;
+
           const bottomActionsNode = (
             <Box sx={{
               px: { xs: 3, md: 0 },
@@ -1389,7 +1621,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                   '&.Mui-disabled': { bgcolor: 'var(--surface-2)', color: 'var(--text-muted)' },
                 }}
               >
-                {lang === 'en' ? 'Add to Cart' : 'เพิ่มลงตะกร้า'} — ฿{((selectedVariant?.price || selectedProduct.sizePricing?.[selectedSize] || selectedProduct.basePrice) * quantity).toLocaleString()}
+                {lang === 'en' ? 'Add to Cart' : 'เพิ่มลงตะกร้า'} — ฿{(currentUnitPrice * quantity).toLocaleString()}
               </Button>
             </Box>
           );
@@ -1403,25 +1635,31 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                 zIndex: 10,
                 borderBottom: '1px solid var(--glass-border)',
                 bgcolor: 'var(--background)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                px: 3,
-                py: 2,
               }}>
-                <Typography sx={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--foreground)' }}>
-                  {lang === 'en' ? 'Product Details' : 'รายละเอียดสินค้า'}
-                </Typography>
-                <IconButton
-                  onClick={() => { setSelectedProduct(null); setSelectedSize(''); setSelectedVariant(null); setSelectedPattern(null); setQuantity(1); }}
-                  sx={{
-                    bgcolor: 'var(--surface-2)',
-                    color: 'var(--foreground)',
-                    '&:hover': { bgcolor: 'var(--surface-3)' },
-                  }}
-                >
-                  <X size={18} />
-                </IconButton>
+                <Box sx={{
+                  maxWidth: 1200,
+                  mx: 'auto',
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  px: 3,
+                  py: 2,
+                }}>
+                  <Typography sx={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--foreground)' }}>
+                    {lang === 'en' ? 'Product Details' : 'รายละเอียดสินค้า'}
+                  </Typography>
+                  <IconButton
+                    onClick={() => { setSelectedProduct(null); setSelectedSize(''); setSelectedVariant(null); setSelectedPattern(null); setQuantity(1); }}
+                    sx={{
+                      bgcolor: 'var(--surface-2)',
+                      color: 'var(--foreground)',
+                      '&:hover': { bgcolor: 'var(--surface-3)' },
+                    }}
+                  >
+                    <X size={18} />
+                  </IconButton>
+                </Box>
               </Box>
 
               {/* Content body split layout */}
@@ -1429,227 +1667,563 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                 flex: 1,
                 overflow: 'auto',
                 WebkitOverflowScrolling: 'touch',
-                px: 3,
-                py: 2.5,
-                display: 'flex',
-                flexDirection: { xs: 'column', md: 'row' },
-                gap: { xs: 3, md: 4 },
               }}>
-                {/* Left Column */}
-                <Box sx={{ flex: 1.2, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-                  {(selectedProduct.coverImage || selectedProduct.images?.[0]) && (
-                    <Box sx={{ 
-                      position: 'relative', 
-                      width: '100%', 
-                      aspectRatio: '4/3', 
-                      overflow: 'hidden',
-                      borderRadius: '16px',
-                      border: '1px solid var(--glass-border)',
-                    }}>
-                      <OptimizedImage
-                        src={selectedProduct.coverImage || selectedProduct.images?.[0] || ''}
-                        alt={getProductName(selectedProduct, lang)}
-                        width="100%"
-                        height="100%"
-                        objectFit="cover"
-                        priority
-                      />
-                      <Box sx={{
-                        position: 'absolute', bottom: 12, right: 12,
-                        px: 1.5, py: 0.6, borderRadius: '12px',
-                        bgcolor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
-                      }}>
-                        <Typography sx={{ fontSize: '1.2rem', fontWeight: 800, color: '#34c759' }}>
-                          ฿{(selectedVariant?.price || selectedProduct.sizePricing?.[selectedSize] || selectedProduct.basePrice).toLocaleString()}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  )}
-
-                  <Box>
-                    <Typography sx={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--foreground)' }}>
-                      {getProductName(selectedProduct, lang)}
-                    </Typography>
-                    {getProductDescription(selectedProduct, lang) && (
-                      <Typography sx={{ fontSize: '0.85rem', color: 'var(--text-muted)', mt: 1.5, whiteSpace: 'pre-line', lineHeight: 1.6 }}>
-                        {getProductDescription(selectedProduct, lang)}
-                      </Typography>
-                    )}
-                  </Box>
-                </Box>
-
-                {/* Right Column */}
-                <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-                  {/* Pattern Selection */}
-                  {selectedProduct.patterns && selectedProduct.patterns.filter((p: any) => p.isActive !== false).length > 0 && (
-                    <Box
-                      ref={patternSelectorRef}
-                      sx={{
-                        p: 2,
-                        borderRadius: '16px',
-                        background: 'linear-gradient(135deg, rgba(56,189,248,0.15) 0%, rgba(56,189,248,0.05) 100%)',
-                        border: '1px solid rgba(56,189,248,0.3)',
-                      }}
-                    >
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-                        <Box sx={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: '8px',
-                          bgcolor: 'rgba(56,189,248,0.2)',
-                          display: 'grid',
-                          placeItems: 'center',
-                        }}>
-                          <Palette size={16} color="#38bdf8" />
-                        </Box>
-                        <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
-                          <span>{lang === 'en' ? 'Select Design/Pattern' : 'เลือกลายสินค้า'}</span>
-                          {needsPatternFirst && (
-                            <span style={{ fontSize: '0.72rem', color: '#ff453a', fontWeight: 600, animation: 'pulse 1.5s infinite' }}>
-                              ({lang === 'en' ? 'Please select a design first' : 'กรุณาเลือกลายสินค้าก่อน'})
-                            </span>
-                          )}
-                        </Typography>
-                      </Box>
-
-                      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 1.2 }}>
-                        {selectedProduct.patterns
-                          .filter((p: any) => p.isActive !== false)
-                          .map((pattern: any) => {
-                            const active = selectedPattern?.id === pattern.id;
-                            return (
-                              <Box
-                                key={pattern.id}
-                                onClick={() => setSelectedPattern(pattern)}
-                                sx={{
-                                  p: 0.8,
-                                  borderRadius: '10px',
-                                  border: active ? '2px solid #38bdf8' : '1px solid var(--glass-border)',
-                                  bgcolor: active ? 'rgba(56,189,248,0.08)' : 'var(--surface-2)',
-                                  cursor: 'pointer',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  alignItems: 'center',
-                                  gap: 0.5,
-                                  '&:hover': { opacity: 0.9, borderColor: '#38bdf8' },
-                                  transition: 'all 0.2s ease',
-                                  position: 'relative',
-                                }}
-                              >
-                                <Box sx={{
-                                  width: '100%',
-                                  height: 56,
-                                  borderRadius: '6px',
-                                  overflow: 'hidden',
-                                  bgcolor: 'var(--glass-bg)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  border: '1px solid var(--glass-border)',
-                                }}>
-                                  {pattern.image ? (
-                                    <img src={pattern.image} alt={pattern.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                  ) : (
-                                    <ImageOutlinedIcon size={18} style={{ color: 'var(--text-muted)' }} />
-                                  )}
-                                </Box>
-                                <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: active ? 'var(--secondary)' : 'var(--foreground)', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
-                                  {pattern.name}
-                                </Typography>
-                              </Box>
-                            );
-                          })}
-                      </Box>
-                    </Box>
-                  )}
-
-                  <Box sx={{
-                    opacity: needsPatternFirst ? 0.45 : 1,
-                    pointerEvents: needsPatternFirst ? 'none' : 'auto',
-                    transition: 'all 0.3s ease',
-                    display: 'flex',
-                    flexDirection: 'column',
+                <Box sx={{
+                  maxWidth: 1200,
+                  mx: 'auto',
+                  width: '100%',
+                  px: 3,
+                  py: 2.5,
+                  display: 'flex',
+                  flexDirection: { xs: 'column', md: 'row' },
+                  gap: { xs: 3, md: 4 },
+                }}>
+                  {/* Left Column - Pinned on desktop to keep preview and details visible */}
+                  <Box sx={{ 
+                    flex: 1.2, 
+                    minWidth: 0, 
+                    display: 'flex', 
+                    flexDirection: 'column', 
                     gap: 2.5,
+                    position: { md: 'sticky' },
+                    top: { md: 20 },
+                    alignSelf: { md: 'flex-start' },
+                    maxHeight: { md: 'calc(100vh - 100px)' },
+                    overflowY: { md: 'auto' },
+                    '&::-webkit-scrollbar': { display: 'none' },
+                    msOverflowStyle: 'none',
+                    scrollbarWidth: 'none',
                   }}>
-                    {/* Size Selection */}
-                    {selectedProduct.sizePricing && Object.keys(selectedProduct.sizePricing).length > 0 && (
-                      <Box>
-                        <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, mb: 1, color: 'var(--foreground)' }}>
-                          {lang === 'en' ? 'Size' : 'ขนาด'}
-                        </Typography>
-                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                          {Object.entries(selectedProduct.sizePricing).map(([size, price]) => (
-                            <Chip
-                              key={size}
-                              label={`${size} (฿${price})`}
-                              onClick={() => setSelectedSize(size)}
-                              sx={{
-                                bgcolor: selectedSize === size ? '#0071e3' : 'var(--surface-2)',
-                                color: selectedSize === size ? 'white' : 'var(--foreground)',
-                                fontWeight: 600, cursor: 'pointer',
-                                border: `1px solid ${selectedSize === size ? '#0071e3' : 'var(--glass-border)'}`,
-                                '&:hover': { opacity: 0.8 },
+                    {productImages.length > 0 && (
+                      <Box sx={{ 
+                        position: 'relative', 
+                        width: '100%', 
+                        aspectRatio: '4/3', 
+                        overflow: 'hidden',
+                        borderRadius: '16px',
+                        border: '1px solid var(--glass-border)',
+                        bgcolor: 'var(--surface-2)',
+                      }}>
+                        {/* Image Scroll container */}
+                        <Box
+                          ref={imageScrollRef}
+                          onScroll={handleImageScroll}
+                          sx={{
+                            display: 'flex',
+                            width: '100%',
+                            height: '100%',
+                            overflowX: 'auto',
+                            scrollSnapType: 'x mandatory',
+                            WebkitOverflowScrolling: 'touch',
+                            '&::-webkit-scrollbar': { display: 'none' },
+                            scrollbarWidth: 'none',
+                          }}
+                        >
+                          {productImages.map((img, idx) => (
+                            <Box
+                              key={idx}
+                              onClick={() => {
+                                setLightboxIndex(idx);
+                                setLightboxOpen(true);
                               }}
-                            />
+                              sx={{
+                                minWidth: '100%',
+                                height: '100%',
+                                scrollSnapAlign: 'start',
+                                position: 'relative',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <OptimizedImage
+                                src={img}
+                                alt={`${getProductName(selectedProduct, lang)} - ${idx + 1}`}
+                                width="100%"
+                                height="100%"
+                                objectFit="cover"
+                                priority={idx === 0}
+                              />
+                            </Box>
                           ))}
+                        </Box>
+
+                        {/* Navigation Chevrons */}
+                        {productImages.length > 1 && (
+                          <>
+                            <IconButton
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                scrollToImage(activeImageIndex - 1);
+                              }}
+                              sx={{
+                                position: 'absolute',
+                                left: 10,
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                bgcolor: 'rgba(0,0,0,0.5)',
+                                color: 'white',
+                                width: 32,
+                                height: 32,
+                                '&:hover': { bgcolor: 'rgba(0,0,0,0.7)', transform: 'translateY(-50%) scale(1.05)' },
+                                transition: 'all 0.2s ease',
+                                zIndex: 5,
+                              }}
+                              size="small"
+                            >
+                              <ChevronLeft size={18} />
+                            </IconButton>
+                            <IconButton
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                scrollToImage(activeImageIndex + 1);
+                              }}
+                              sx={{
+                                position: 'absolute',
+                                right: 10,
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                bgcolor: 'rgba(0,0,0,0.5)',
+                                color: 'white',
+                                width: 32,
+                                height: 32,
+                                '&:hover': { bgcolor: 'rgba(0,0,0,0.7)', transform: 'translateY(-50%) scale(1.05)' },
+                                transition: 'all 0.2s ease',
+                                zIndex: 5,
+                              }}
+                              size="small"
+                            >
+                              <ChevronRight size={18} />
+                            </IconButton>
+                          </>
+                        )}
+
+                        {/* Custom Teardrop/Pill Dot Indicators */}
+                        {productImages.length > 1 && (
+                          <Box sx={{
+                            position: 'absolute',
+                            bottom: 12,
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1.2,
+                            zIndex: 5,
+                            bgcolor: 'rgba(0,0,0,0.45)',
+                            px: 1.8,
+                            py: 0.8,
+                            borderRadius: '16px',
+                            backdropFilter: 'blur(8px)',
+                          }}>
+                            {productImages.map((_, idx) => {
+                              const active = activeImageIndex === idx;
+                              return (
+                                <Box
+                                  key={idx}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    scrollToImage(idx);
+                                  }}
+                                  sx={{
+                                    cursor: 'pointer',
+                                    width: active ? '18px' : '8px',
+                                    height: active ? '6px' : '8px',
+                                    // Inactive: teardrop shape. Active: flat pill shape.
+                                    borderRadius: active ? '3px' : '0 50% 50% 50%',
+                                    bgcolor: active ? '#0071e3' : 'rgba(255, 255, 255, 0.55)',
+                                    transform: active ? 'rotate(0deg)' : 'rotate(45deg)',
+                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    boxShadow: active ? '0 1px 4px rgba(0,0,0,0.3)' : 'none',
+                                    '&:hover': {
+                                      bgcolor: active ? '#0071e3' : 'rgba(255, 255, 255, 0.85)',
+                                    }
+                                  }}
+                                />
+                              );
+                            })}
+                          </Box>
+                        )}
+
+                        {/* Price Badge */}
+                        <Box sx={{
+                          position: 'absolute', bottom: 12, right: 12,
+                          px: 1.5, py: 0.6, borderRadius: '12px',
+                          bgcolor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
+                          zIndex: 5,
+                        }}>
+                          <Typography sx={{ fontSize: '1.2rem', fontWeight: 800, color: '#34c759' }}>
+                            ฿{currentUnitPrice.toLocaleString()}
+                          </Typography>
                         </Box>
                       </Box>
                     )}
 
-                    {/* Variant Selection */}
-                    {selectedProduct.variants && selectedProduct.variants.length > 0 && (
-                      <Box>
-                        <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, mb: 1, color: 'var(--foreground)' }}>
-                          {lang === 'en' ? 'Options' : 'ตัวเลือก'}
-                        </Typography>
-                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                          {selectedProduct.variants.filter(v => v.isActive).map((variant) => (
-                            <Chip
-                              key={variant.id}
-                              label={`${variant.name} (฿${variant.price})`}
-                              onClick={() => setSelectedVariant(variant)}
-                              sx={{
-                                bgcolor: selectedVariant?.id === variant.id ? '#0071e3' : 'var(--surface-2)',
-                                color: selectedVariant?.id === variant.id ? 'white' : 'var(--foreground)',
-                                fontWeight: 600, cursor: 'pointer',
-                                border: `1px solid ${selectedVariant?.id === variant.id ? '#0071e3' : 'var(--glass-border)'}`,
-                                '&:hover': { opacity: 0.8 },
-                              }}
-                            />
-                          ))}
-                        </Box>
-                      </Box>
-                    )}
-
-                    {/* Quantity */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                        {lang === 'en' ? 'Quantity' : 'จำนวน'}
+                    <Box>
+                      <Typography sx={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--foreground)' }}>
+                        {getProductName(selectedProduct, lang)}
                       </Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <IconButton
-                          size="small"
-                          onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                          sx={{ bgcolor: 'var(--surface-2)', color: 'var(--foreground)', border: '1px solid var(--glass-border)' }}
-                        >
-                          <Minus size={16} />
-                        </IconButton>
-                        <Typography sx={{ fontWeight: 700, minWidth: 30, textAlign: 'center', color: 'var(--foreground)' }}>
-                          {quantity}
+                      {getProductDescription(selectedProduct, lang) && (
+                        <Typography sx={{ fontSize: '0.85rem', color: 'var(--text-muted)', mt: 1.5, whiteSpace: 'pre-line', lineHeight: 1.6 }}>
+                          {getProductDescription(selectedProduct, lang)}
                         </Typography>
-                        <IconButton
-                          size="small"
-                          onClick={() => setQuantity(quantity + 1)}
-                          sx={{ bgcolor: 'var(--surface-2)', color: 'var(--foreground)', border: '1px solid var(--glass-border)' }}
-                        >
-                          <Plus size={16} />
-                        </IconButton>
-                      </Box>
+                      )}
                     </Box>
                   </Box>
 
-                  {/* Desktop Actions */}
-                  {!isMobile && bottomActionsNode}
+                  {/* Right Column */}
+                  <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+                    {/* Pattern Selection */}
+                    {selectedProduct.patterns && selectedProduct.patterns.filter((p: any) => p.isActive !== false).length > 0 && (
+                      <Box
+                        ref={patternSelectorRef}
+                        sx={{
+                          p: 2,
+                          borderRadius: '16px',
+                          background: 'linear-gradient(135deg, rgba(56,189,248,0.15) 0%, rgba(56,189,248,0.05) 100%)',
+                          border: '1px solid rgba(56,189,248,0.3)',
+                        }}
+                      >
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                          <Box sx={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: '8px',
+                            bgcolor: 'rgba(56,189,248,0.2)',
+                            display: 'grid',
+                            placeItems: 'center',
+                          }}>
+                            <Palette size={16} color="#38bdf8" />
+                          </Box>
+                          <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+                            <span>{lang === 'en' ? 'Select Design/Pattern' : 'เลือกลายสินค้า'}</span>
+                            {needsPatternFirst && (
+                              <span style={{ fontSize: '0.72rem', color: '#ff453a', fontWeight: 600, animation: 'pulse 1.5s infinite' }}>
+                                ({lang === 'en' ? 'Please select a design first' : 'กรุณาเลือกลายสินค้าก่อน'})
+                              </span>
+                            )}
+                          </Typography>
+                        </Box>
+
+                        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 1.2 }}>
+                          {selectedProduct.patterns
+                            .filter((p: any) => p.isActive !== false)
+                            .map((pattern: any) => {
+                              const active = selectedPattern?.id === pattern.id;
+                              return (
+                                <Box
+                                  key={pattern.id}
+                                  onClick={() => setSelectedPattern(pattern)}
+                                  sx={{
+                                    p: 0.8,
+                                    borderRadius: '10px',
+                                    border: active ? '2px solid #38bdf8' : '1px solid var(--glass-border)',
+                                    bgcolor: active ? 'rgba(56,189,248,0.08)' : 'var(--surface-2)',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    gap: 0.5,
+                                    '&:hover': { opacity: 0.9, borderColor: '#38bdf8' },
+                                    transition: 'all 0.2s ease',
+                                    position: 'relative',
+                                  }}
+                                >
+                                  <Box sx={{
+                                    width: '100%',
+                                    height: 56,
+                                    borderRadius: '6px',
+                                    overflow: 'hidden',
+                                    bgcolor: 'var(--glass-bg)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    border: '1px solid var(--glass-border)',
+                                  }}>
+                                    {pattern.image ? (
+                                      <img src={pattern.image} alt={pattern.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    ) : (
+                                      <ImageOutlinedIcon size={18} style={{ color: 'var(--text-muted)' }} />
+                                    )}
+                                  </Box>
+                                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: active ? 'var(--secondary)' : 'var(--foreground)', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
+                                    {pattern.name}
+                                  </Typography>
+                                </Box>
+                              );
+                            })}
+                        </Box>
+                      </Box>
+                    )}
+
+                    <Box sx={{
+                      opacity: needsPatternFirst ? 0.45 : 1,
+                      pointerEvents: needsPatternFirst ? 'none' : 'auto',
+                      transition: 'all 0.3s ease',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 2.5,
+                    }}>
+                      {/* Size Selection */}
+                      {selectedProduct.sizePricing && Object.keys(selectedProduct.sizePricing).length > 0 && (
+                        <Box>
+                          <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, mb: 1, color: 'var(--foreground)' }}>
+                            {lang === 'en' ? 'Size' : 'ขนาด'}
+                          </Typography>
+                          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                            {Object.entries(selectedProduct.sizePricing).map(([size, price]) => (
+                              <Chip
+                                key={size}
+                                label={`${size} (฿${price})`}
+                                onClick={() => setSelectedSize(size)}
+                                sx={{
+                                  bgcolor: selectedSize === size ? '#0071e3' : 'var(--surface-2)',
+                                  color: selectedSize === size ? 'white' : 'var(--foreground)',
+                                  fontWeight: 600, cursor: 'pointer',
+                                  border: `1px solid ${selectedSize === size ? '#0071e3' : 'var(--glass-border)'}`,
+                                  '&:hover': { opacity: 0.8 },
+                                }}
+                              />
+                            ))}
+                          </Box>
+                        </Box>
+                      )}
+
+                      {/* Variant Selection */}
+                      {selectedProduct.variants && selectedProduct.variants.length > 0 && (
+                        <Box>
+                          <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, mb: 1, color: 'var(--foreground)' }}>
+                            {lang === 'en' ? 'Options' : 'ตัวเลือก'}
+                          </Typography>
+                          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                            {selectedProduct.variants.filter(v => v.isActive).map((variant) => (
+                              <Chip
+                                key={variant.id}
+                                label={`${variant.name} (฿${variant.price})`}
+                                onClick={() => setSelectedVariant(variant)}
+                                sx={{
+                                  bgcolor: selectedVariant?.id === variant.id ? '#0071e3' : 'var(--surface-2)',
+                                  color: selectedVariant?.id === variant.id ? 'white' : 'var(--foreground)',
+                                  fontWeight: 600, cursor: 'pointer',
+                                  border: `1px solid ${selectedVariant?.id === variant.id ? '#0071e3' : 'var(--glass-border)'}`,
+                                  '&:hover': { opacity: 0.8 },
+                                }}
+                              />
+                            ))}
+                          </Box>
+                        </Box>
+                      )}
+
+                      {/* Additional Options */}
+                      {(selectedProduct.options?.hasCustomName || selectedProduct.options?.hasCustomNumber || selectedProduct.options?.hasLongSleeve) && (
+                        <Box sx={{
+                          p: { xs: 2, sm: 2.5 },
+                          borderRadius: '18px',
+                          bgcolor: 'var(--surface-2)',
+                          border: '1px solid var(--glass-border)',
+                        }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
+                            <Box sx={{
+                              width: 36,
+                              height: 36,
+                              borderRadius: '10px',
+                              bgcolor: 'rgba(16,185,129,0.15)',
+                              display: 'grid',
+                              placeItems: 'center',
+                            }}>
+                              <Tag size={18} color="#30d158" />
+                            </Box>
+                            <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                              {lang === 'en' ? 'Additional Options' : 'ตัวเลือกเพิ่มเติม'}
+                            </Typography>
+                          </Box>
+
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            {selectedProduct.options?.hasCustomName && (() => {
+                              const sc = DEFAULT_SHIRT_NAME;
+                              const langs: string[] = [];
+                              if (sc.allowThai) langs.push(lang === 'en' ? 'Thai' : 'ภาษาไทย');
+                              if (sc.allowEnglish) langs.push(lang === 'en' ? 'English' : 'ภาษาอังกฤษ');
+                              const langLabel = langs.join('/');
+                              const label = `${lang === 'en' ? 'Screen Name' : 'ชื่อสกรีน'} (${langLabel}, ${sc.minLength}-${sc.maxLength} ${lang === 'en' ? 'chars' : 'ตัวอักษร'})`;
+                              return (
+                                <TextField
+                                  label={label}
+                                  fullWidth
+                                  value={customName}
+                                  onChange={(e) => setCustomName(normalizeShirtName(e.target.value, sc))}
+                                  inputProps={{ maxLength: sc.maxLength }}
+                                  inputRef={customNameInputRef}
+                                  placeholder={sc.allowThai ? (lang === 'en' ? 'Example: SOMCHAI' : 'ตัวอย่าง: SOMCHAI') : 'SOMCHAI'}
+                                  helperText={`${customName.length}/${sc.maxLength}`}
+                                  sx={{ 
+                                    '& .MuiOutlinedInput-root': { 
+                                      color: 'var(--foreground)',
+                                      borderRadius: '12px',
+                                      '& fieldset': { borderColor: 'var(--glass-border)' },
+                                      '&:hover fieldset': { borderColor: 'rgba(0,113,227,0.5)' },
+                                      '&.Mui-focused fieldset': { borderColor: '#0071e3' },
+                                    }, 
+                                    '& label': { color: 'var(--text-muted)' },
+                                    '& label.Mui-focused': { color: 'var(--secondary)' },
+                                  }}
+                                />
+                              );
+                            })()}
+
+                            {selectedProduct.options?.hasCustomNumber && (
+                              <TextField
+                                label={lang === 'en' ? 'Screen Number (0-99)' : 'เบอร์สกรีน (0-99)'}
+                                fullWidth
+                                value={customNumber}
+                                onChange={(e) => setCustomNumber(normalizeDigits99(e.target.value))}
+                                inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
+                                inputRef={customNumberInputRef}
+                                placeholder="99"
+                                sx={{ 
+                                  '& .MuiOutlinedInput-root': { 
+                                    color: 'var(--foreground)',
+                                    borderRadius: '12px',
+                                    '& fieldset': { borderColor: 'var(--glass-border)' },
+                                    '&:hover fieldset': { borderColor: 'rgba(0,113,227,0.5)' },
+                                    '&.Mui-focused fieldset': { borderColor: '#0071e3' },
+                                  }, 
+                                  '& label': { color: 'var(--text-muted)' },
+                                  '& label.Mui-focused': { color: 'var(--secondary)' },
+                                }}
+                              />
+                            )}
+
+                            {selectedProduct.options?.hasLongSleeve && (() => {
+                              const sleevePrice = selectedProduct.options?.longSleevePrice ?? 50;
+                              return (
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                                    {lang === 'en' ? 'Sleeve Type' : 'ประเภทแขนเสื้อ'}
+                                  </Typography>
+                                  <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                                    {/* Short Sleeve Card */}
+                                    <Box
+                                      onClick={() => setIsLongSleeve(false)}
+                                      sx={{
+                                        p: 2.2,
+                                        borderRadius: '16px',
+                                        border: !isLongSleeve ? '2px solid #ff9f0a' : '1px solid var(--glass-border)',
+                                        bgcolor: !isLongSleeve ? 'rgba(255,159,10,0.08)' : 'var(--glass-bg)',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        position: 'relative',
+                                        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                                        boxShadow: !isLongSleeve ? '0 8px 20px rgba(255,159,10,0.15)' : 'none',
+                                        '&:hover': {
+                                          borderColor: '#ff9f0a',
+                                          bgcolor: 'rgba(255,159,10,0.04)',
+                                          transform: 'translateY(-2px)',
+                                        },
+                                      }}
+                                    >
+                                      {!isLongSleeve && (
+                                        <Box sx={{
+                                          position: 'absolute',
+                                          top: 8,
+                                          right: 8,
+                                          color: '#ff9f0a',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                        }}>
+                                          <CheckCircle2 size={16} fill="rgba(255,159,10,0.2)" />
+                                        </Box>
+                                      )}
+                                      <Typography sx={{ fontSize: '0.92rem', fontWeight: 800, color: !isLongSleeve ? '#ff9f0a' : 'var(--foreground)' }}>
+                                        {lang === 'en' ? 'Short Sleeve (แขนสั้น)' : 'แขนสั้น (Short Sleeve)'}
+                                      </Typography>
+                                      <Typography sx={{ fontSize: '0.78rem', color: 'var(--text-muted)', mt: 0.5, fontWeight: 600 }}>
+                                        +฿0
+                                      </Typography>
+                                    </Box>
+
+                                    {/* Long Sleeve Card */}
+                                    <Box
+                                      onClick={() => setIsLongSleeve(true)}
+                                      sx={{
+                                        p: 2.2,
+                                        borderRadius: '16px',
+                                        border: isLongSleeve ? '2px solid #ff9f0a' : '1px solid var(--glass-border)',
+                                        bgcolor: isLongSleeve ? 'rgba(255,159,10,0.08)' : 'var(--glass-bg)',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        position: 'relative',
+                                        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                                        boxShadow: isLongSleeve ? '0 8px 20px rgba(255,159,10,0.15)' : 'none',
+                                        '&:hover': {
+                                          borderColor: '#ff9f0a',
+                                          bgcolor: 'rgba(255,159,10,0.04)',
+                                          transform: 'translateY(-2px)',
+                                        },
+                                      }}
+                                    >
+                                      {isLongSleeve && (
+                                        <Box sx={{
+                                          position: 'absolute',
+                                          top: 8,
+                                          right: 8,
+                                          color: '#ff9f0a',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                        }}>
+                                          <CheckCircle2 size={16} fill="rgba(255,159,10,0.2)" />
+                                        </Box>
+                                      )}
+                                      <Typography sx={{ fontSize: '0.92rem', fontWeight: 800, color: isLongSleeve ? '#ff9f0a' : 'var(--foreground)' }}>
+                                        {lang === 'en' ? 'Long Sleeve (แขนยาว)' : 'แขนยาว (Long Sleeve)'}
+                                      </Typography>
+                                      <Typography sx={{ fontSize: '0.78rem', color: isLongSleeve ? '#ff9f0a' : 'var(--text-muted)', mt: 0.5, fontWeight: 700 }}>
+                                        +฿{sleevePrice}
+                                      </Typography>
+                                    </Box>
+                                  </Box>
+                                </Box>
+                              );
+                            })()}
+                          </Box>
+                        </Box>
+                      )}
+
+                      {/* Quantity */}
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                          {lang === 'en' ? 'Quantity' : 'จำนวน'}
+                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <IconButton
+                            size="small"
+                            onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                            sx={{ bgcolor: 'var(--surface-2)', color: 'var(--foreground)', border: '1px solid var(--glass-border)' }}
+                          >
+                            <Minus size={16} />
+                          </IconButton>
+                          <Typography sx={{ fontWeight: 700, minWidth: 30, textAlign: 'center', color: 'var(--foreground)' }}>
+                            {quantity}
+                          </Typography>
+                          <IconButton
+                            size="small"
+                            onClick={() => setQuantity(quantity + 1)}
+                            sx={{ bgcolor: 'var(--surface-2)', color: 'var(--foreground)', border: '1px solid var(--glass-border)' }}
+                          >
+                            <Plus size={16} />
+                          </IconButton>
+                        </Box>
+                      </Box>
+                    </Box>
+
+                    {/* Desktop Actions */}
+                    {!isMobile && bottomActionsNode}
+                  </Box>
                 </Box>
               </Box>
 
@@ -1683,8 +2257,18 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
           <Box sx={{ display: 'flex', gap: 0.5 }}>
             {shopCart.length > 0 && (
               <IconButton
-                onClick={() => {
-                  if (confirm(lang === 'en' ? 'Clear all items?' : 'ล้างตะกร้าทั้งหมด?')) {
+                onClick={async () => {
+                  const ok = await showConfirm({
+                    title: lang === 'en' ? 'Clear entire cart?' : 'ล้างตะกร้าทั้งหมด?',
+                    message: lang === 'en'
+                      ? 'Are you sure you want to remove all items from your cart?'
+                      : 'คุณแน่ใจหรือไม่ว่าต้องการนำสินค้าทั้งหมดออกจากตะกร้าของคุณ?',
+                    variant: 'warning',
+                    confirmText: lang === 'en' ? 'Clear All' : 'ล้างทั้งหมด',
+                    cancelText: lang === 'en' ? 'Cancel' : 'ยกเลิก',
+                    destructive: true,
+                  });
+                  if (ok) {
                     const clearCartByShop = useCartStore.getState().clearCartByShop;
                     clearCartByShop(shopSlug);
                     showToast('success', lang === 'en' ? 'Cart cleared' : 'ล้างตะกร้าแล้ว');
@@ -1956,6 +2540,206 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
           {toast.message}
         </Alert>
       </Snackbar>
+
+      {/* ==================== FULLSCREEN GALLERY LIGHTBOX ==================== */}
+      <Dialog
+        open={lightboxOpen}
+        onClose={() => setLightboxOpen(false)}
+        maxWidth={false}
+        fullScreen
+        PaperProps={{
+          sx: {
+            background: 'rgba(0,0,0,0.96)',
+            boxShadow: 'none',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            overflow: 'hidden',
+          }
+        }}
+        sx={{ zIndex: 9999 }}
+      >
+        {/* Close Button */}
+        <IconButton
+          onClick={() => setLightboxOpen(false)}
+          sx={{
+            position: 'absolute',
+            top: { xs: 16, sm: 24 },
+            right: { xs: 16, sm: 24 },
+            color: 'white',
+            bgcolor: 'rgba(255,255,255,0.12)',
+            backdropFilter: 'blur(8px)',
+            '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' },
+            zIndex: 10,
+            width: 44,
+            height: 44,
+          }}
+        >
+          <X size={24} />
+        </IconButton>
+
+        {/* Counter */}
+        {productImages.length > 1 && (
+          <Box sx={{
+            position: 'absolute',
+            top: { xs: 20, sm: 24 },
+            left: '50%',
+            transform: 'translateX(-50%)',
+            px: 2.5,
+            py: 0.8,
+            borderRadius: '24px',
+            bgcolor: 'rgba(255,255,255,0.12)',
+            backdropFilter: 'blur(8px)',
+            zIndex: 10,
+          }}>
+            <Typography sx={{ fontSize: '0.85rem', color: 'white', fontWeight: 600 }}>
+              {lightboxIndex + 1} / {productImages.length}
+            </Typography>
+          </Box>
+        )}
+
+        {/* Navigation Chevrons */}
+        {productImages.length > 1 && (
+          <>
+            <IconButton
+              onClick={() => setLightboxIndex((prev) => (prev - 1 + productImages.length) % productImages.length)}
+              sx={{
+                position: 'absolute',
+                top: '50%',
+                left: { xs: 12, sm: 24 },
+                transform: 'translateY(-50%)',
+                bgcolor: 'rgba(255,255,255,0.12)',
+                backdropFilter: 'blur(8px)',
+                color: 'white',
+                zIndex: 10,
+                width: { xs: 44, sm: 52 },
+                height: { xs: 44, sm: 52 },
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.22)', transform: 'translateY(-50%) scale(1.05)' },
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <ChevronLeft size={28} />
+            </IconButton>
+            <IconButton
+              onClick={() => setLightboxIndex((prev) => (prev + 1) % productImages.length)}
+              sx={{
+                position: 'absolute',
+                top: '50%',
+                right: { xs: 12, sm: 24 },
+                transform: 'translateY(-50%)',
+                bgcolor: 'rgba(255,255,255,0.12)',
+                backdropFilter: 'blur(8px)',
+                color: 'white',
+                zIndex: 10,
+                width: { xs: 44, sm: 52 },
+                height: { xs: 44, sm: 52 },
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.22)', transform: 'translateY(-50%) scale(1.05)' },
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <ChevronRight size={28} />
+            </IconButton>
+          </>
+        )}
+
+        {/* Image Container with Swipe Support */}
+        {productImages.length > 0 && (
+          <Box
+            onTouchStart={(e) => {
+              touchStartX.current = e.targetTouches[0].clientX;
+              touchEndX.current = e.targetTouches[0].clientX;
+            }}
+            onTouchMove={(e) => {
+              touchEndX.current = e.targetTouches[0].clientX;
+            }}
+            onTouchEnd={() => {
+              const diffX = touchStartX.current - touchEndX.current;
+              if (diffX > 50) {
+                // Swipe Left -> Next
+                setLightboxIndex((prev) => (prev + 1) % productImages.length);
+              } else if (diffX < -50) {
+                // Swipe Right -> Prev
+                setLightboxIndex((prev) => (prev - 1 + productImages.length) % productImages.length);
+              }
+            }}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '100%',
+              height: '100%',
+              p: { xs: 2, sm: 4 },
+              userSelect: 'none',
+            }}
+          >
+            <Box
+              component="img"
+              src={productImages[lightboxIndex]}
+              alt={`Fullscreen ${lightboxIndex + 1}`}
+              sx={{
+                maxWidth: '100%',
+                maxHeight: '80vh',
+                objectFit: 'contain',
+                borderRadius: '8px',
+                userSelect: 'none',
+                transition: 'all 0.3s ease',
+              }}
+            />
+          </Box>
+        )}
+
+        {/* Interactive Thumbnail Strip at Bottom */}
+        {productImages.length > 1 && (
+          <Box sx={{
+            position: 'absolute',
+            bottom: { xs: 24, sm: 32 },
+            left: '50%',
+            transform: 'translateX(-50%)',
+            display: 'flex',
+            gap: 1.5,
+            px: 2.5,
+            py: 1.2,
+            borderRadius: '20px',
+            bgcolor: 'rgba(0,0,0,0.6)',
+            backdropFilter: 'blur(12px)',
+            maxWidth: '92vw',
+            overflowX: 'auto',
+            zIndex: 10,
+            '&::-webkit-scrollbar': { display: 'none' },
+            scrollbarWidth: 'none',
+          }}>
+            {productImages.map((img, idx) => (
+              <Box
+                key={idx}
+                onClick={() => setLightboxIndex(idx)}
+                sx={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: '10px',
+                  border: lightboxIndex === idx ? '2.5px solid white' : '2px solid transparent',
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                  opacity: lightboxIndex === idx ? 1 : 0.45,
+                  transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                  flexShrink: 0,
+                  transform: lightboxIndex === idx ? 'scale(1.08)' : 'scale(1)',
+                  '&:hover': { opacity: 0.95 },
+                }}
+              >
+                <Box
+                  component="img"
+                  src={img}
+                  alt={`Thumbnail ${idx + 1}`}
+                  sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                />
+              </Box>
+            ))}
+          </Box>
+        )}
+      </Dialog>
+
+      <ConfirmDialog />
     </Box>
   );
 }

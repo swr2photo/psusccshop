@@ -109,9 +109,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="SCC Shop" />
         {/* Workaround for React 19 script warnings */}
-        <Script
+        <script
           id="console-filter"
-          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html: `(function(){
               if (window.console && window.console.error) {
@@ -127,17 +126,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
         {/* Inline theme script — runs before React hydration to prevent FOUC */}
-        <Script
+        <script
           id="theme-initializer"
-          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var s=localStorage.getItem('psusccshop-theme');if(s){var m=JSON.parse(s).state.mode;var r=m==='system'?window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark':m;document.documentElement.setAttribute('data-theme',r);document.documentElement.style.colorScheme=r}else{var r=window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark';document.documentElement.setAttribute('data-theme',r);document.documentElement.style.colorScheme=r}}catch(e){}})()`,
           }}
         />
         {/* Force SW update + clear old caches on load */}
-        <Script
+        <script
           id="sw-updater"
-          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html: `(function(){
               if('serviceWorker' in navigator){

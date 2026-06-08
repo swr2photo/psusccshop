@@ -16,6 +16,7 @@ import {
   Select,
   TextField,
   Typography,
+  useMediaQuery,
 } from '@mui/material';
 import {
   CheckCircle,
@@ -108,6 +109,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
 
   const { success: toastSuccess, error: toastError } = useNotification();
   const { t, lang } = useTranslation();
+  const isMobile = useMediaQuery('(max-width:640px)');
 
   // Filter label map for translating static historyFilters
   const filterLabelMap: Record<string, string> = {
@@ -245,19 +247,21 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
 
   return (
     <Drawer
-      anchor="bottom"
+      anchor={isMobile ? 'bottom' : 'right'}
       open={open}
       onClose={onClose}
       PaperProps={{
         sx: {
-          height: { xs: '92vh', sm: '85vh' },
-          maxHeight: '92vh',
-          borderTopLeftRadius: { xs: 20, sm: 24 },
-          borderTopRightRadius: { xs: 20, sm: 24 },
+          height: isMobile ? { xs: '92vh', sm: '85vh' } : '100vh',
+          maxHeight: isMobile ? '92vh' : '100vh',
+          width: isMobile ? '100%' : '520px',
+          borderTopLeftRadius: isMobile ? { xs: 20, sm: 24 } : { xs: 0, sm: 24 },
+          borderTopRightRadius: isMobile ? { xs: 20, sm: 24 } : 0,
+          borderBottomLeftRadius: isMobile ? 0 : { xs: 0, sm: 24 },
           bgcolor: 'var(--background)',
           color: 'var(--foreground)',
           overflow: 'hidden',
-          transform: dragOffset > 0 ? `translateY(${dragOffset}px) !important` : undefined,
+          transform: isMobile && dragOffset > 0 ? `translateY(${dragOffset}px) !important` : undefined,
           transition: isDragging ? 'none !important' : 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1) !important',
         },
       }}
@@ -274,14 +278,16 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
         zIndex: 10,
       }}>
         {/* Drag Handle - Swipe to dismiss */}
-        <Box
-          onTouchStart={handleSwipeStart}
-          onTouchMove={handleSwipeMove}
-          onTouchEnd={handleSwipeEnd}
-          sx={{ width: '100%', display: 'flex', justifyContent: 'center', py: 0.5, cursor: 'grab', touchAction: 'none' }}
-        >
-          <Box sx={{ width: isDragging ? 48 : 36, height: 4, bgcolor: isDragging ? 'var(--text-muted)' : 'var(--glass-bg)', borderRadius: 2, transition: 'all 0.2s ease' }} />
-        </Box>
+        {isMobile && (
+          <Box
+            onTouchStart={handleSwipeStart}
+            onTouchMove={handleSwipeMove}
+            onTouchEnd={handleSwipeEnd}
+            sx={{ width: '100%', display: 'flex', justifyContent: 'center', py: 0.5, cursor: 'grab', touchAction: 'none' }}
+          >
+            <Box sx={{ width: isDragging ? 48 : 36, height: 4, bgcolor: isDragging ? 'var(--text-muted)' : 'var(--glass-bg)', borderRadius: 2, transition: 'all 0.2s ease' }} />
+          </Box>
+        )}
         
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>

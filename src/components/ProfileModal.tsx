@@ -5,6 +5,7 @@ import { X, ShieldCheck, User, Phone, Instagram, AlertTriangle, MapPin, Check, S
 import {
   Drawer, Box, Typography, Button, IconButton, TextField, InputAdornment,
   Slide, Avatar, Autocomplete, CircularProgress, Paper, Dialog, Slider, Chip,
+  useMediaQuery,
 } from '@mui/material';
 import PasskeyManager from '@/components/PasskeyManager';
 import { useThaiAddress, type AddressSelection } from '@/hooks/useThaiAddress';
@@ -52,7 +53,7 @@ const NOTIFICATION_STYLES = {
 };
 
 export default function ProfileModal({ initialData, onClose, onSave, userImage, userEmail, nameValidation }: ProfileModalProps) {
-  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 640;
+  const isMobile = useMediaQuery('(max-width:640px)');
   const nameConfig = { ...DEFAULT_NAME_VALIDATION, ...nameValidation };
   const { t } = useTranslation();
 
@@ -718,19 +719,21 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
 
   return (
     <Drawer
-      anchor="bottom"
+      anchor={isMobile ? 'bottom' : 'right'}
       open={true}
       onClose={onClose}
       PaperProps={{
         sx: {
-          height: { xs: '90vh', sm: '85vh' },
-          maxHeight: { xs: '95vh', sm: '90vh' },
-          borderTopLeftRadius: { xs: 20, sm: 24 },
-          borderTopRightRadius: { xs: 20, sm: 24 },
+          height: isMobile ? { xs: '90vh', sm: '85vh' } : '100vh',
+          maxHeight: isMobile ? { xs: '95vh', sm: '90vh' } : '100vh',
+          width: isMobile ? '100%' : '480px',
+          borderTopLeftRadius: isMobile ? { xs: 20, sm: 24 } : { xs: 0, sm: 24 },
+          borderTopRightRadius: isMobile ? { xs: 20, sm: 24 } : 0,
+          borderBottomLeftRadius: isMobile ? 0 : { xs: 0, sm: 24 },
           bgcolor: 'var(--background)',
           color: 'var(--foreground)',
           overflow: 'hidden',
-          transform: pmDragOffset > 0 ? `translateY(${pmDragOffset}px) !important` : undefined,
+          transform: isMobile && pmDragOffset > 0 ? `translateY(${pmDragOffset}px) !important` : undefined,
           transition: pmIsDragging ? 'none !important' : 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1) !important',
         },
       }}
@@ -809,14 +812,18 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
         top: 0,
         zIndex: 10,
       }}>
-        <Box sx={{ width: 36, height: 4, bgcolor: 'var(--glass-bg)', borderRadius: 3, mx: 'auto', mb: 1.5 }} />
-        {/* Drag Handle Area - Swipe to dismiss */}
-        <Box
-          onTouchStart={handlePmSwipeStart}
-          onTouchMove={handlePmSwipeMove}
-          onTouchEnd={handlePmSwipeEnd}
-          sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: 32, cursor: 'grab', touchAction: 'none', zIndex: 15 }}
-        />
+        {isMobile && (
+          <>
+            <Box sx={{ width: 36, height: 4, bgcolor: 'var(--glass-bg)', borderRadius: 3, mx: 'auto', mb: 1.5 }} />
+            {/* Drag Handle Area - Swipe to dismiss */}
+            <Box
+              onTouchStart={handlePmSwipeStart}
+              onTouchMove={handlePmSwipeMove}
+              onTouchEnd={handlePmSwipeEnd}
+              sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: 32, cursor: 'grab', touchAction: 'none', zIndex: 15 }}
+            />
+          </>
+        )}
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             {/* Clickable Avatar with camera overlay */}

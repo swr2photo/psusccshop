@@ -36,11 +36,12 @@ let _supabaseAdmin: SupabaseClient | null = null;
 
 export function getSupabaseAdmin(): SupabaseClient | null {
   if (_supabaseAdmin) return _supabaseAdmin;
-  if (!supabaseUrl || !supabaseServiceKey) {
-    console.warn('[supabase] Missing SUPABASE_URL or SERVICE_ROLE_KEY');
+  const storageUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  if (!storageUrl || !supabaseServiceKey) {
+    console.warn('[supabase] Missing NEXT_PUBLIC_SUPABASE_URL or SERVICE_ROLE_KEY');
     return null;
   }
-  _supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+  _supabaseAdmin = createClient(storageUrl, supabaseServiceKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
@@ -271,30 +272,48 @@ export async function putJson(key: string, data: any): Promise<void> {
       return;
     }
     
+    const isUuid = (str: any) => typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
+
     if (key.startsWith('email-logs/')) {
       const dbLog = transformLegacyToDBEmailLog(data);
-      await db.insert(emailLogs)
-        .values(dbLog)
-        .onConflictDoUpdate({
-          target: emailLogs.id,
-          set: dbLog,
-        });
+      const hasValidId = dbLog.id && isUuid(dbLog.id);
+      if (!hasValidId) {
+        delete dbLog.id;
+        await db.insert(emailLogs).values(dbLog);
+      } else {
+        await db.insert(emailLogs)
+          .values(dbLog)
+          .onConflictDoUpdate({
+            target: emailLogs.id,
+            set: dbLog,
+          });
+      }
       return;
     }
     
     if (key.startsWith('user-logs/')) {
       const dbLog = transformLegacyToDBUserLog(data);
+      if (dbLog.id && !isUuid(dbLog.id)) {
+        delete dbLog.id;
+      }
       await db.insert(userLogs).values(dbLog);
       return;
     }
     
     if (key.startsWith('data-requests/')) {
-      await db.insert(dataRequests)
-        .values(data)
-        .onConflictDoUpdate({
-          target: dataRequests.id,
-          set: data,
-        });
+      const dbData = { ...data };
+      const hasValidId = dbData.id && isUuid(dbData.id);
+      if (!hasValidId) {
+        delete dbData.id;
+        await db.insert(dataRequests).values(dbData);
+      } else {
+        await db.insert(dataRequests)
+          .values(dbData)
+          .onConflictDoUpdate({
+            target: dataRequests.id,
+            set: dbData,
+          });
+      }
       return;
     }
     
@@ -518,9 +537,8 @@ function transformDBEmailLogToLegacy(dbLog: any): any {
 }
 
 function transformLegacyToDBEmailLog(data: any): any {
-  const id = data.id || `email-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  return {
-    id,
+  const isUuid = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
+  const dbLog: any = {
     orderRef: data.orderRef || null,
     toEmail: data.to || '',
     fromEmail: data.from || '',
@@ -532,6 +550,10 @@ function transformLegacyToDBEmailLog(data: any): any {
     error: data.error || null,
     createdAt: data.timestamp ? new Date(data.timestamp) : new Date(),
   };
+  if (data.id && isUuid(data.id)) {
+    dbLog.id = data.id;
+  }
+  return dbLog;
 }
 
 function transformDBUserLogToLegacy(dbLog: any): any {
@@ -549,8 +571,8 @@ function transformDBUserLogToLegacy(dbLog: any): any {
 }
 
 function transformLegacyToDBUserLog(data: any): any {
-  return {
-    id: data.id,
+  const isUuid = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
+  const dbLog: any = {
     email: data.email || '',
     name: data.name || null,
     action: data.action || '',
@@ -560,6 +582,10 @@ function transformLegacyToDBUserLog(data: any): any {
     userAgent: data.userAgent || null,
     createdAt: data.timestamp ? new Date(data.timestamp) : new Date(),
   };
+  if (data.id && isUuid(data.id)) {
+    dbLog.id = data.id;
+  }
+  return dbLog;
 }
 
 // ==================== DIRECT DATABASE QUERIES ====================
@@ -877,7 +903,7 @@ export async function deleteImageFromStorage(path: string): Promise<boolean> {
  * Get public URL for an image path
  */
 export function getImagePublicUrl(path: string): string {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL2 || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
   return `${supabaseUrl}/storage/v1/object/public/${STORAGE_BUCKET}/${path}`;
 }
 
