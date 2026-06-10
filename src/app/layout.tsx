@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Providers from "@/components/Providers";
-import AppPurposeSection from "@/components/AppPurposeSection";
 import ThemeRegistry from "../components/ThemeRegistry";
 import Script from "next/script";
 
@@ -239,7 +238,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Providers>
             <div className="relative z-10 min-h-screen">
               <main id="main-content" tabIndex={-1}>
-                <AppPurposeSection />
                 {children}
               </main>
             </div>
