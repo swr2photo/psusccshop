@@ -174,6 +174,10 @@ export async function GET(req: NextRequest) {
         // สถานะระบบชำระเงิน
         paymentEnabled,
         paymentDisabledMessage: paymentEnabled ? null : paymentDisabledMessage,
+        // Stripe PromptPay (auto-verified QR) — main shop only, requires env keys
+        stripePromptPayEnabled:
+          !orderShopId &&
+          Boolean(process.env.STRIPE_SECRET_KEY && process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY),
       },
     };
 

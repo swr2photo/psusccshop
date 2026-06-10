@@ -84,14 +84,14 @@ const nextConfig: NextConfig = {
           value: [
             "default-src 'self';",
             // 'unsafe-eval' needed for Next.js (both dev HMR and production hydration in some cases)
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://static.cloudflareinsights.com https://connect.facebook.net https://cdn.jsdelivr.net;",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://static.cloudflareinsights.com https://connect.facebook.net https://cdn.jsdelivr.net https://js.stripe.com https://*.js.stripe.com https://m.stripe.network;",
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;",
-            "img-src 'self' data: blob: https://*.filebase.io https://*.filebase.com https://*.googleusercontent.com https://ui-avatars.com https://*.supabase.co https://profile.line-scdn.net https://platform-lookaside.fbsbx.com https://*.fbcdn.net https://graph.microsoft.com https://i.ytimg.com https://*.ggpht.com;",
+            "img-src 'self' data: blob: https://*.filebase.io https://*.filebase.com https://*.googleusercontent.com https://ui-avatars.com https://*.supabase.co https://profile.line-scdn.net https://platform-lookaside.fbsbx.com https://*.fbcdn.net https://graph.microsoft.com https://i.ytimg.com https://*.ggpht.com https://*.stripe.com;",
             "font-src 'self' https://fonts.gstatic.com;",
-            "connect-src 'self' https://*.filebase.com https://*.filebase.io https://api.resend.com https://challenges.cloudflare.com https://*.supabase.co wss://*.supabase.co https://*.googlevideo.com https://*.youtube.com https://*.facebook.com;",
+            "connect-src 'self' https://*.filebase.com https://*.filebase.io https://api.resend.com https://challenges.cloudflare.com https://*.supabase.co wss://*.supabase.co https://*.googlevideo.com https://*.youtube.com https://*.facebook.com https://api.stripe.com https://js.stripe.com https://r.stripe.com https://q.stripe.com https://m.stripe.com https://m.stripe.network https://errors.stripe.com https://merchant-ui-api.stripe.com;",
             "media-src 'self' blob: https://*.cdn.jsdelivr.net https://*.cloudflarestream.com;",
             "worker-src 'self';",
-            "frame-src https://challenges.cloudflare.com https://www.youtube.com https://www.youtube-nocookie.com https://www.facebook.com https://web.facebook.com https://player.vimeo.com;",
+            "frame-src https://challenges.cloudflare.com https://www.youtube.com https://www.youtube-nocookie.com https://www.facebook.com https://web.facebook.com https://player.vimeo.com https://js.stripe.com https://*.js.stripe.com https://hooks.stripe.com https://m.stripe.network;",
             "frame-ancestors 'none';",
             "object-src 'none';",
             "base-uri 'self';",

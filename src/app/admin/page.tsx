@@ -2357,7 +2357,7 @@ const EventsView = React.memo(function EventsView({
                       width: { xs: '100%', sm: 80 }, height: { xs: 120, sm: 56 }, borderRadius: '10px', overflow: 'hidden',
                       flexShrink: 0, border: '1px solid var(--glass-border)',
                     }}>
-                      <img src={event.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <Box component="img" src={event.imageUrl} alt="" sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     </Box>
                   )}
 
@@ -2795,7 +2795,7 @@ const EventsView = React.memo(function EventsView({
                 </Typography>
                 {editingEvent.imageUrl ? (
                   <Box sx={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--glass-border)' }}>
-                    <img src={editingEvent.imageUrl} alt="" style={{ width: '100%', height: 150, objectFit: 'cover' }} />
+                    <Box component="img" src={editingEvent.imageUrl} alt="" sx={{ width: '100%', height: 150, objectFit: 'cover' }} />
                     <IconButton
                       onClick={() => setEditingEvent(prev => prev ? { ...prev, imageUrl: undefined } : null)}
                       sx={{
@@ -3663,11 +3663,14 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
                     placeholder="#3b82f6"
                     sx={{ flex: 1, ...inputSx }}
                   />
-                  <input
+                  <Box
+                    component="input"
                     type="color"
+                    aria-label="เลือกสี"
+                    title="เลือกสี"
                     value={editingAnn.color}
-                    onChange={(e) => setEditingAnn({ ...editingAnn, color: e.target.value })}
-                    style={{ width: 45, height: 45, padding: 0, border: 'none', borderRadius: '10px', cursor: 'pointer' }}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditingAnn({ ...editingAnn, color: e.target.value })}
+                    sx={{ width: 45, height: 45, p: 0, border: 'none', borderRadius: '10px', cursor: 'pointer' }}
                   />
                 </Box>
               </Box>
@@ -6798,9 +6801,10 @@ export default function AdminPage(): JSX.Element {
                       )}
 
                       {/* ZXing video element for QR scanning */}
-                      <video 
-                        id="qr-video" 
-                        style={{
+                      <Box
+                        component="video"
+                        id="qr-video"
+                        sx={{
                           width: '100%',
                           maxHeight: '320px',
                           objectFit: 'cover',
@@ -8465,9 +8469,9 @@ export default function AdminPage(): JSX.Element {
                         <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                           ราคาต่อชิ้น: ฿{Number(item.unitPrice).toLocaleString()}
                           {product && item.unitPrice !== calculateItemUnitPrice(item, product) && (
-                            <span style={{ color: '#f59e0b', marginLeft: 8 }}>
+                            <Box component="span" sx={{ color: '#f59e0b', ml: 1 }}>
                               → ฿{calculateItemUnitPrice(item, product).toLocaleString()}
-                            </span>
+                            </Box>
                           )}
                         </Typography>
                       </Box>

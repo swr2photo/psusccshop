@@ -60,15 +60,21 @@ export function useOrderCountdown(orderDate: string | Date | undefined, expiryMs
   useEffect(() => {
     if (!orderDate) return;
     
+    let timer: ReturnType<typeof setInterval> | undefined;
     const update = () => {
       const r = getTimeRemaining(orderDate, expiryMs);
       setRemaining(r);
-      if (r <= 0) clearInterval(timer);
+      if (r <= 0 && timer !== undefined) clearInterval(timer);
     };
     
     update();
-    const timer = setInterval(update, 1000);
-    return () => clearInterval(timer);
+    // Don't start ticking for orders that are already expired
+    if (getTimeRemaining(orderDate, expiryMs) > 0) {
+      timer = setInterval(update, 1000);
+    }
+    return () => {
+      if (timer !== undefined) clearInterval(timer);
+    };
   }, [orderDate, expiryMs]);
 
   const time = useMemo(() => formatTimeLeft(remaining), [remaining]);

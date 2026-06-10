@@ -89,10 +89,18 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
       gatewayTransactionId: paymentIntent.latest_charge,
       cardLast4: cardLast4,
       cardBrand: cardBrand,
+      verified: true,
+      verificationMethod: 'gateway',
+      verifiedAt: new Date(),
       updatedAt: new Date(),
       rawResponse: paymentIntent,
     })
     .where(eq(paymentTransactions.gatewayChargeId, intentId));
+
+  // Determine actual payment method (promptpay, card, ...)
+  const methodType: string = paymentIntent.payment_method_types?.includes('promptpay')
+    ? 'promptpay'
+    : 'credit_card';
 
   // Update order status
   await db
@@ -100,7 +108,8 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
     .set({
       status: 'PAID',
       paymentStatus: 'paid',
-      paymentMethod: 'credit_card',
+      paymentMethod: methodType,
+      paymentGateway: 'stripe',
       paymentVerified: true,
       paymentVerifiedAt: new Date().toISOString(),
       updatedAt: new Date(),

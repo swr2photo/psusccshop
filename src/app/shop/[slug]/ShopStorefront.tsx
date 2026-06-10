@@ -1232,7 +1232,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                   background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
                   display: 'flex', alignItems: 'center', gap: 0.75,
                 }}>
-                  <span style={{ fontSize: '0.9rem' }}>{getCategoryIcon(category)}</span>
+                  <Box component="span" sx={{ fontSize: '0.9rem' }}>{getCategoryIcon(category)}</Box>
                   <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: 'white' }}>
                     {(t.category as Record<string, string>)[category] || getCategoryLabel(category, lang) || category}
                   </Typography>
@@ -1987,9 +1987,9 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                           <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
                             <span>{lang === 'en' ? 'Select Design/Pattern' : 'เลือกลายสินค้า'}</span>
                             {needsPatternFirst && (
-                              <span style={{ fontSize: '0.72rem', color: '#ff453a', fontWeight: 600, animation: 'pulse 1.5s infinite' }}>
+                              <Box component="span" sx={{ fontSize: '0.72rem', color: '#ff453a', fontWeight: 600, animation: 'pulse 1.5s infinite' }}>
                                 ({lang === 'en' ? 'Please select a design first' : 'กรุณาเลือกลายสินค้าก่อน'})
-                              </span>
+                              </Box>
                             )}
                           </Typography>
                         </Box>
@@ -2030,7 +2030,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                                     border: '1px solid var(--glass-border)',
                                   }}>
                                     {pattern.image ? (
-                                      <img src={pattern.image} alt={pattern.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                      <Box component="img" src={pattern.image} alt={pattern.name} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                     ) : (
                                       <ImageOutlinedIcon size={18} style={{ color: 'var(--text-muted)' }} />
                                     )}

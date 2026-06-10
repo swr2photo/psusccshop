@@ -466,6 +466,19 @@ const payment = {
     thankYouPrefix: 'ขอบคุณ',
     accountHolderName: '',
     secretaryRole: '',
+    // Stripe PromptPay (auto-verified)
+    autoPromptPay: 'พร้อมเพย์อัตโนมัติ',
+    autoPromptPayDesc: 'สแกนจ่ายแล้วระบบยืนยันทันที ไม่ต้องแนบสลิป',
+    manualTransfer: 'โอนเอง + แนบสลิป',
+    creatingQR: 'กำลังสร้าง QR Code...',
+    waitingPayment: 'รอการชำระเงิน',
+    autoVerifyHint: 'ระบบจะยืนยันการชำระเงินอัตโนมัติทันทีหลังสแกนจ่ายสำเร็จ',
+    qrExpired: 'QR Code หมดอายุแล้ว',
+    createNewQR: 'สร้าง QR ใหม่',
+    stripeError: 'สร้างรายการชำระเงินไม่สำเร็จ',
+    expiresIn: 'QR หมดอายุใน',
+    paymentDetected: 'ตรวจพบการชำระเงินแล้ว!',
+    securedByStripe: 'ชำระเงินปลอดภัยผ่าน Stripe',
   },
   en: {
     title: 'Payment',
@@ -556,6 +569,19 @@ const payment = {
     thankYouPrefix: 'Thank you',
     accountHolderName: '',
     secretaryRole: '',
+    // Stripe PromptPay (auto-verified)
+    autoPromptPay: 'Auto PromptPay',
+    autoPromptPayDesc: 'Scan to pay — verified instantly, no slip needed',
+    manualTransfer: 'Manual transfer + slip',
+    creatingQR: 'Generating QR Code...',
+    waitingPayment: 'Waiting for payment',
+    autoVerifyHint: 'Payment is verified automatically right after you scan and pay',
+    qrExpired: 'QR Code expired',
+    createNewQR: 'Generate new QR',
+    stripeError: 'Failed to create payment',
+    expiresIn: 'QR expires in',
+    paymentDetected: 'Payment detected!',
+    securedByStripe: 'Secured by Stripe',
   },
 } as const;
 
@@ -778,6 +804,9 @@ const profile = {
     nameExample: 'เช่น สมชาย ใจดี',
     nameExampleBilingual: 'เช่น สมชาย ใจดี / Somchai Jaidee',
     contactSection: 'ข้อมูลติดต่อ',
+    tabPersonal: 'ข้อมูลส่วนตัว',
+    tabAddress: 'ที่อยู่จัดส่ง',
+    tabSecurity: 'ความปลอดภัย',
   },
   en: {
     contactInfo: 'Contact Information',
@@ -841,6 +870,9 @@ const profile = {
     nameExample: 'e.g. Somchai Jaidee',
     nameExampleBilingual: 'e.g. สมชาย ใจดี / Somchai Jaidee',
     contactSection: 'Contact Info',
+    tabPersonal: 'Personal',
+    tabAddress: 'Addresses',
+    tabSecurity: 'Security',
   },
 } as const;
 

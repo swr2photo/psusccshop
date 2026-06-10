@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { JSX } from 'react';
-import { X, Upload, Check, Loader2, AlertCircle, CheckCircle2, Image, Clock3, Download, CreditCard, QrCode, Copy, Smartphone, ArrowRight, Sparkles, AlertTriangle, Info, ShoppingBag, Tag, Hash, Shirt, Clock, Palette } from 'lucide-react';
+import { X, Upload, Check, Loader2, AlertCircle, CheckCircle2, Image, Clock3, Download, CreditCard, QrCode, Copy, Smartphone, Sparkles, AlertTriangle, Info, ShoppingBag, Tag, Hash, Shirt, Clock, Palette } from 'lucide-react';
 import { Drawer, Box, Typography, Button, IconButton, Skeleton, useMediaQuery, LinearProgress, Slide, Collapse } from '@mui/material';
 import { QRCodeSVG } from 'qrcode.react';
 import { PaymentCountdown } from './OrderCountdown';
+import StripePromptPay from './StripePromptPay';
 import { useTranslation } from '@/hooks/useTranslation';
 
 interface PaymentModalProps {
@@ -220,6 +221,10 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
   const [paymentDisabledMessage, setPaymentDisabledMessage] = useState<string | null>(null);
   const [accountHolderName, setAccountHolderName] = useState<string>('');
   const [promptPayId, setPromptPayId] = useState<string>('');
+
+  // Stripe PromptPay (auto-verified QR via Stripe.js)
+  const [stripeEnabled, setStripeEnabled] = useState(false);
+  const [payMethod, setPayMethod] = useState<'stripe' | 'manual'>('manual');
   
   // Check if already paid
   const isPaid = PAID_STATUSES.includes(orderStatus.toUpperCase());
@@ -228,9 +233,6 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
-
-  // Step tracking: 0 = QR, 1 = Upload, 2 = Confirm
-  const [activeStep, setActiveStep] = useState(0);
 
   const hasSlip = Boolean(selectedFile);
   const discountValue = Math.abs(discount);
@@ -267,11 +269,6 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
     fetchPaymentInfo();
   }, [orderRef]);
 
-  useEffect(() => {
-    if (hasSlip) setActiveStep(2);
-    else if (!loading) setActiveStep(0);
-  }, [hasSlip, loading]);
-
   const fetchPaymentInfo = async () => {
     setLoading(true);
     try {
@@ -293,6 +290,10 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
         setPaymentDisabledMessage(info.paymentDisabledMessage || null);
         setAccountHolderName(info.accountName || '');
         setPromptPayId(info.promptPayId || '');
+        // Prefer the auto-verified Stripe flow when available
+        const stripeOk = info.stripePromptPayEnabled === true;
+        setStripeEnabled(stripeOk);
+        if (stripeOk) setPayMethod('stripe');
       } else {
         addToast('error', t.common.error, data.message || t.payment.noPaymentInfo);
       }
@@ -301,6 +302,15 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
     } finally {
       setLoading(false);
     }
+  };
+
+  // Stripe PromptPay paid — webhook marks the order PAID server-side
+  const handleStripeSuccess = () => {
+    addToast('success', t.payment.paymentSuccessToast, t.payment.paymentDetected);
+    setTimeout(() => {
+      setOrderStatus('PAID');
+      onSuccess();
+    }, 2000);
   };
 
   const processFile = (file: File) => {
@@ -385,7 +395,6 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
           if (errorCode === 1012 || errorCode === 1014) {
             setSelectedFile(null);
             setPreviewUrl(null);
-            setActiveStep(0);
           }
         }
       } catch (error) {
@@ -572,8 +581,6 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
     addToast('success', t.payment.copiedAmount);
   };
 
-  const steps = [t.payment.scanQR, t.payment.attachSlip, t.payment.confirmPay];
-
   return (
     <Drawer
       anchor={isMobile ? "bottom" : "right"}
@@ -656,62 +663,6 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
           </IconButton>
         </Box>
 
-        {/* Progress Steps - Compact */}
-        <Box sx={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center',
-          gap: 0.5,
-          mt: 1.5,
-        }}>
-          {steps.map((step, index) => (
-            <Box key={step} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <Box sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 0.5,
-                px: 1,
-                py: 0.4,
-                borderRadius: '16px',
-                bgcolor: activeStep >= index 
-                  ? index === 2 && hasSlip ? 'rgba(16, 185, 129, 0.15)' : 'rgba(6, 182, 212, 0.15)'
-                  : 'rgba(255,255,255,0.03)',
-                border: `1px solid ${activeStep >= index 
-                  ? index === 2 && hasSlip ? 'rgba(16, 185, 129, 0.3)' : 'rgba(6, 182, 212, 0.3)'
-                  : 'transparent'}`,
-                transition: 'all 0.3s ease',
-              }}>
-                <Box sx={{
-                  width: 16,
-                  height: 16,
-                  borderRadius: '50%',
-                  bgcolor: activeStep >= index 
-                    ? index === 2 && hasSlip ? '#34c759' : '#64d2ff'
-                    : 'var(--glass-border)',
-                  display: 'grid',
-                  placeItems: 'center',
-                  fontSize: '0.6rem',
-                  fontWeight: 700,
-                  color: activeStep >= index ? 'white' : 'var(--text-muted)',
-                }}>
-                  {activeStep > index ? <Check size={10} /> : index + 1}
-                </Box>
-                <Typography sx={{ 
-                  fontSize: '0.65rem', 
-                  fontWeight: 600, 
-                  color: activeStep >= index 
-                    ? index === 2 && hasSlip ? 'var(--success)' : 'var(--secondary)'
-                    : 'var(--text-muted)',
-                }}>
-                  {step}
-                </Typography>
-              </Box>
-              {index < steps.length - 1 && (
-                <ArrowRight size={12} style={{ color: 'var(--text-muted)' }} />
-              )}
-            </Box>
-          ))}
-        </Box>
       </Box>
 
       {/* Content */}
@@ -725,72 +676,53 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
         ) : isPaid ? (
           /* ============== ALREADY PAID UI ============== */
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, maxWidth: 500, mx: 'auto' }}>
-            {/* Success Hero Card */}
+            {/* Success Hero Card — formal, theme-aware */}
             <Box sx={{
               p: 4,
-              borderRadius: '24px',
-              background: 'linear-gradient(135deg, #34c759 0%, #34c759 100%)',
-              color: 'white',
+              borderRadius: '20px',
+              bgcolor: 'var(--surface-2)',
+              border: '1px solid var(--glass-border)',
+              borderTop: '4px solid #34c759',
               textAlign: 'center',
-              position: 'relative',
-              overflow: 'hidden',
             }}>
-              {/* Decorative circles */}
-              <Box sx={{
-                position: 'absolute',
-                top: -40,
-                right: -40,
-                width: 120,
-                height: 120,
-                borderRadius: '50%',
-                bgcolor: 'var(--glass-bg)',
-              }} />
-              <Box sx={{
-                position: 'absolute',
-                bottom: -30,
-                left: -30,
-                width: 80,
-                height: 80,
-                borderRadius: '50%',
-                bgcolor: 'var(--glass-bg)',
-              }} />
-              
               {/* Success Icon */}
               <Box sx={{
-                width: 80,
-                height: 80,
+                width: 64,
+                height: 64,
                 borderRadius: '50%',
-                bgcolor: 'var(--glass-bg)',
+                bgcolor: 'rgba(52,199,89,0.12)',
+                border: '2px solid rgba(52,199,89,0.35)',
                 display: 'grid',
                 placeItems: 'center',
                 mx: 'auto',
                 mb: 2,
-                boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
               }}>
-                <Check size={40} strokeWidth={3} />
+                <Check size={32} strokeWidth={3} style={{ color: '#34c759' }} />
               </Box>
               
-              <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, mb: 1 }}>
+              <Typography sx={{ fontSize: '1.35rem', fontWeight: 700, mb: 0.75, color: 'var(--foreground)' }}>
                 {t.payment.paymentSuccess}
               </Typography>
-              <Typography sx={{ fontSize: '0.9rem', opacity: 0.9, mb: 2 }}>
+              <Typography sx={{ fontSize: '0.875rem', color: 'var(--text-muted)', mb: 2.5 }}>
                 {t.payment.paymentSuccessDesc}
               </Typography>
               
               {/* Order Reference */}
               <Box sx={{
-                display: 'inline-flex',
+                display: 'flex',
                 alignItems: 'center',
+                justifyContent: 'space-between',
                 gap: 1,
                 px: 2,
-                py: 0.8,
-                borderRadius: '20px',
+                py: 1.25,
+                borderRadius: '12px',
                 bgcolor: 'var(--glass-bg)',
+                border: '1px solid var(--glass-border)',
               }}>
-                <Typography sx={{ fontSize: '0.8rem', opacity: 0.9 }}>
+                <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                   {t.payment.orderRef}
                 </Typography>
-                <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, fontFamily: 'monospace' }}>
+                <Typography sx={{ fontSize: '0.875rem', fontWeight: 700, fontFamily: 'monospace', color: 'var(--foreground)', letterSpacing: 0.5 }}>
                   {orderRef}
                 </Typography>
               </Box>
@@ -875,27 +807,6 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                 </Typography>
               </Box>
             </Box>
-
-            {/* Close Button */}
-            <Button
-              fullWidth
-              onClick={onClose}
-              sx={{
-                py: 1.8,
-                borderRadius: '16px',
-                background: 'linear-gradient(135deg, #0071e3 0%, #0071e3 100%)',
-                color: 'white',
-                fontSize: '1rem',
-                fontWeight: 700,
-                textTransform: 'none',
-                boxShadow: '0 8px 24px rgba(0,113,227,0.35)',
-                '&:hover': {
-                  background: 'linear-gradient(135deg, #0071e3 0%, #1d4ed8 100%)',
-                },
-              }}
-            >
-              {t.common.close}
-            </Button>
           </Box>
         ) : (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, maxWidth: 500, mx: 'auto' }}>
@@ -1229,6 +1140,100 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
               </Box>
             )}
 
+            {/* Payment Method Switcher (Stripe auto vs manual transfer) */}
+            {stripeEnabled && paymentEnabled && (
+              <Box sx={{
+                display: 'flex',
+                gap: 0.75,
+                p: 0.75,
+                borderRadius: '18px',
+                bgcolor: 'var(--surface-2)',
+                border: '1px solid var(--glass-border)',
+              }}>
+                {([
+                  { key: 'stripe' as const, label: t.payment.autoPromptPay, icon: <Sparkles size={15} /> },
+                  { key: 'manual' as const, label: t.payment.manualTransfer, icon: <Upload size={15} /> },
+                ]).map((m) => {
+                  const active = payMethod === m.key;
+                  return (
+                    <Box
+                      key={m.key}
+                      onClick={() => setPayMethod(m.key)}
+                      sx={{
+                        flex: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 0.75,
+                        py: 1.25,
+                        px: 1,
+                        borderRadius: '13px',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        transition: 'all 0.2s ease',
+                        color: active ? '#fff' : 'var(--text-muted)',
+                        background: active
+                          ? (m.key === 'stripe'
+                            ? 'linear-gradient(135deg, #0891b2 0%, #0071e3 100%)'
+                            : 'linear-gradient(135deg, #34c759 0%, #0891b2 100%)')
+                          : 'transparent',
+                        boxShadow: active ? '0 4px 16px rgba(8,145,178,0.35)' : 'none',
+                        '&:hover': { bgcolor: active ? undefined : 'var(--glass-bg)' },
+                      }}
+                    >
+                      {m.icon}
+                      <Typography sx={{ fontSize: 'inherit', fontWeight: 'inherit' }}>{m.label}</Typography>
+                    </Box>
+                  );
+                })}
+              </Box>
+            )}
+
+            {/* Stripe PromptPay — custom QR via Stripe.js, auto-verified */}
+            {stripeEnabled && paymentEnabled && payMethod === 'stripe' && (
+              <Box sx={{
+                borderRadius: '24px',
+                bgcolor: 'var(--surface-2)',
+                border: '1px solid var(--glass-border)',
+                overflow: 'hidden',
+              }}>
+                <Box sx={{
+                  px: 2.5,
+                  py: 2,
+                  borderBottom: '1px solid var(--glass-border)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <Box sx={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: '12px',
+                      background: 'linear-gradient(135deg, rgba(8,145,178,0.2) 0%, rgba(0,113,227,0.2) 100%)',
+                      display: 'grid',
+                      placeItems: 'center',
+                    }}>
+                      <QrCode size={20} style={{ color: '#64d2ff' }} />
+                    </Box>
+                    <Box>
+                      <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                        {t.payment.autoPromptPay}
+                      </Typography>
+                      <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        {t.payment.autoPromptPayDesc}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Box>
+                <Box sx={{ p: 3 }}>
+                  <StripePromptPay orderRef={orderRef} onSuccess={handleStripeSuccess} />
+                </Box>
+              </Box>
+            )}
+
+            {payMethod === 'manual' && (<>
             {/* QR Code Card */}
             <Box sx={{
               borderRadius: '24px',
@@ -1663,6 +1668,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                 {t.payment.uploadSlipFooter}
               </Typography>
             </Box>
+            </>)}
           </Box>
         )}
       </Box>
@@ -1720,6 +1726,23 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
             >
               {t.payment.paymentDisabledOverlay}
             </Button>
+          ) : payMethod === 'stripe' ? (
+            /* Stripe auto flow — no slip needed, payment confirms itself */
+            <Box sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 1,
+              py: 1.5,
+              borderRadius: '16px',
+              bgcolor: 'rgba(8,145,178,0.08)',
+              border: '1px solid rgba(8,145,178,0.2)',
+            }}>
+              <Sparkles size={16} style={{ color: '#64d2ff' }} />
+              <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: '#64d2ff' }}>
+                {t.payment.autoVerifyHint}
+              </Typography>
+            </Box>
           ) : (
             /* Normal Payment Button */
             <Button
@@ -1755,32 +1778,35 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
               {verifying ? t.payment.verifyingSlip : hasSlip ? t.payment.confirmPayment : t.payment.attachFirst}
             </Button>
           )}
-          {!hasSlip && paymentEnabled && !isPaid && (
+          {!hasSlip && paymentEnabled && !isPaid && payMethod === 'manual' && (
             <Typography sx={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)', mt: 1.5 }}>
               {t.payment.attachBeforeConfirm}
             </Typography>
           )}
 
-          {/* Close Button */}
-          <Button
-            fullWidth
-            onClick={onClose}
-            startIcon={<X size={18} />}
-            sx={{
-              mt: 1.5,
-              py: 1.2,
-              borderRadius: '12px',
-              bgcolor: 'rgba(100,116,139,0.15)',
-              border: '1px solid rgba(100,116,139,0.3)',
-              color: 'var(--text-muted)',
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              textTransform: 'none',
-              '&:hover': { bgcolor: 'rgba(100,116,139,0.25)' },
-            }}
-          >
-            {t.common.close}
-          </Button>
+          {/* Secondary Close Button — hidden when paid (primary button already closes) */}
+          {!isPaid && (
+            <Button
+              fullWidth
+              onClick={onClose}
+              startIcon={<X size={16} />}
+              sx={{
+                mt: 1.5,
+                py: 1.2,
+                borderRadius: '12px',
+                bgcolor: 'transparent',
+                border: '1px solid var(--glass-border)',
+                color: 'var(--foreground)',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                textTransform: 'none',
+                opacity: 0.85,
+                '&:hover': { bgcolor: 'var(--glass-bg)', opacity: 1 },
+              }}
+            >
+              {t.common.close}
+            </Button>
+          )}
         </Box>
       </Box>
     </Drawer>

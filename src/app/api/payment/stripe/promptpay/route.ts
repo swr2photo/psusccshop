@@ -1,0 +1,228 @@
+// src/app/api/payment/stripe/promptpay/route.ts
+// Stripe PromptPay — custom QR flow (Direct API)
+//
+// POST: creates AND confirms a PaymentIntent server-side, returning the QR
+//       code data (next_action.promptpay_display_qr_code) for the client to
+//       render with its own UI.
+// GET:  polls the intent status server-side (verified against Stripe with the
+//       secret key) and marks the order PAID on success — so payment works
+//       even without webhook delivery (e.g. localhost). The webhook remains
+//       the authoritative production path.
+
+import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/lib/db';
+import { orders, paymentTransactions } from '@/db/schema';
+import { eq, and } from 'drizzle-orm';
+import { requireAuth, isResourceOwner, isAdminEmail } from '@/lib/auth';
+import { createStripePaymentIntent } from '@/lib/payment';
+import { sanitizeUtf8Input } from '@/lib/sanitize';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+const PAID_STATUSES = ['PAID', 'READY', 'SHIPPED', 'RECEIVED', 'COMPLETED'];
+
+const isStripePromptPayConfigured = (): boolean =>
+  Boolean(process.env.STRIPE_SECRET_KEY && process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
+
+export async function POST(req: NextRequest) {
+  const authResult = await requireAuth();
+  if (authResult instanceof NextResponse) {
+    return authResult;
+  }
+  const userEmail = authResult.email;
+
+  try {
+    if (!isStripePromptPayConfigured()) {
+      return NextResponse.json(
+        { status: 'error', message: 'Stripe PromptPay is not configured' },
+        { status: 503 }
+      );
+    }
+
+    const body = await req.json();
+    const ref = sanitizeUtf8Input(String(body?.ref || ''));
+    if (!ref) {
+      return NextResponse.json({ status: 'error', message: 'missing ref' }, { status: 400 });
+    }
+
+    const orderRows = await db.select().from(orders).where(eq(orders.ref, ref)).limit(1);
+    const order = orderRows[0];
+    if (!order) {
+      return NextResponse.json({ status: 'error', message: 'order not found' }, { status: 404 });
+    }
+
+    // Only the order owner (or an admin) can create a payment for it
+    if (!isResourceOwner(order.customerEmail, userEmail) && !isAdminEmail(userEmail)) {
+      return NextResponse.json(
+        { status: 'error', message: 'ไม่มีสิทธิ์ชำระเงินสำหรับคำสั่งซื้อนี้' },
+        { status: 403 }
+      );
+    }
+
+    if (PAID_STATUSES.includes(order.status) || order.paymentVerified) {
+      return NextResponse.json(
+        { status: 'error', message: 'คำสั่งซื้อนี้ชำระเงินแล้ว' },
+        { status: 409 }
+      );
+    }
+
+    // Amount is always computed server-side from the order record
+    const amountTHB = Number(order.totalAmount) || 0;
+    if (amountTHB < 10) {
+      // Stripe PromptPay minimum charge is 10 THB
+      return NextResponse.json(
+        { status: 'error', message: 'ยอดชำระต่ำกว่าขั้นต่ำของ PromptPay (10 บาท)' },
+        { status: 400 }
+      );
+    }
+
+    // Create AND confirm server-side (Direct API flow) so the QR code data
+    // comes back in this response — the client renders it without needing
+    // stripe.confirmPromptPayPayment (which can hang in some browsers).
+    const intent = await createStripePaymentIntent({
+      amount: Math.round(amountTHB * 100), // satang
+      currency: 'thb',
+      paymentMethodTypes: ['promptpay'],
+      confirm: true,
+      paymentMethodData: {
+        type: 'promptpay',
+        billingEmail: order.customerEmail,
+      },
+      description: `Order ${ref}`,
+      metadata: {
+        orderId: ref,
+        email: order.customerEmail,
+      },
+    });
+
+    if (!intent) {
+      return NextResponse.json(
+        { status: 'error', message: 'สร้างรายการชำระเงินไม่สำเร็จ กรุณาลองใหม่' },
+        { status: 502 }
+      );
+    }
+
+    // Record the pending transaction (webhook flips it to paid)
+    await db.insert(paymentTransactions).values({
+      orderId: order.id,
+      method: 'promptpay',
+      gateway: 'stripe',
+      amount: amountTHB,
+      currency: 'THB',
+      status: 'pending',
+      gatewayChargeId: intent.id,
+    });
+
+    return NextResponse.json({
+      status: 'success',
+      data: {
+        clientSecret: intent.clientSecret,
+        paymentIntentId: intent.id,
+        amount: amountTHB,
+        email: order.customerEmail,
+        publishableKey: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
+        // QR code data from server-side confirm (render directly, no JS confirm needed)
+        qrCode: intent.nextAction?.promptpay_display_qr_code || null,
+        intentStatus: intent.status,
+      },
+    });
+  } catch (error: any) {
+    console.error('[Stripe PromptPay] error:', error);
+    return NextResponse.json(
+      { status: 'error', message: error?.message || 'failed to create payment' },
+      { status: 500 }
+    );
+  }
+}
+
+// ==================== STATUS POLLING ====================
+
+export async function GET(req: NextRequest) {
+  const authResult = await requireAuth();
+  if (authResult instanceof NextResponse) {
+    return authResult;
+  }
+  const userEmail = authResult.email;
+
+  try {
+    const ref = sanitizeUtf8Input(req.nextUrl.searchParams.get('ref') || '');
+    const intentId = sanitizeUtf8Input(req.nextUrl.searchParams.get('intent') || '');
+    if (!ref || !intentId.startsWith('pi_')) {
+      return NextResponse.json({ status: 'error', message: 'missing ref/intent' }, { status: 400 });
+    }
+
+    const orderRows = await db.select().from(orders).where(eq(orders.ref, ref)).limit(1);
+    const order = orderRows[0];
+    if (!order) {
+      return NextResponse.json({ status: 'error', message: 'order not found' }, { status: 404 });
+    }
+    if (!isResourceOwner(order.customerEmail, userEmail) && !isAdminEmail(userEmail)) {
+      return NextResponse.json({ status: 'error', message: 'forbidden' }, { status: 403 });
+    }
+
+    // The intent must be one we created for this order
+    const txRows = await db
+      .select({ id: paymentTransactions.id, status: paymentTransactions.status })
+      .from(paymentTransactions)
+      .where(and(
+        eq(paymentTransactions.gatewayChargeId, intentId),
+        eq(paymentTransactions.orderId, order.id),
+      ))
+      .limit(1);
+    if (!txRows[0]) {
+      return NextResponse.json({ status: 'error', message: 'unknown payment intent' }, { status: 404 });
+    }
+
+    // Verify the real status with Stripe using the secret key
+    const res = await fetch(`https://api.stripe.com/v1/payment_intents/${intentId}`, {
+      headers: { Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}` },
+    });
+    if (!res.ok) {
+      return NextResponse.json({ status: 'error', message: 'stripe lookup failed' }, { status: 502 });
+    }
+    const intent = await res.json();
+
+    // Mark paid (idempotent) — same effect as the webhook, but pull-based
+    if (intent.status === 'succeeded' && txRows[0].status !== 'paid') {
+      await db
+        .update(paymentTransactions)
+        .set({
+          status: 'paid',
+          gatewayTransactionId: intent.latest_charge || null,
+          verified: true,
+          verificationMethod: 'gateway',
+          verifiedAt: new Date(),
+          updatedAt: new Date(),
+          rawResponse: intent,
+        })
+        .where(eq(paymentTransactions.id, txRows[0].id));
+
+      await db
+        .update(orders)
+        .set({
+          status: 'PAID',
+          paymentStatus: 'paid',
+          paymentMethod: 'promptpay',
+          paymentGateway: 'stripe',
+          paymentVerified: true,
+          paymentVerifiedAt: new Date().toISOString(),
+          updatedAt: new Date(),
+        })
+        .where(eq(orders.id, order.id));
+
+      console.log('[Stripe PromptPay] Poll detected payment success for order:', ref);
+    }
+
+    return NextResponse.json({
+      status: 'success',
+      data: { intentStatus: intent.status },
+    });
+  } catch (error: any) {
+    console.error('[Stripe PromptPay] poll error:', error);
+    return NextResponse.json(
+      { status: 'error', message: error?.message || 'poll failed' },
+      { status: 500 }
+    );
+  }
+}

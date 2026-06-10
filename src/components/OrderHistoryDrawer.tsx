@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Box,
   Button,
@@ -14,6 +14,7 @@ import {
   IconButton,
   MenuItem,
   Select,
+  Skeleton,
   TextField,
   Typography,
   useMediaQuery,
@@ -85,6 +86,56 @@ const historyFilters: HistoryFilter[] = [
   { key: 'RECEIVED', label: 'รับแล้ว' },
   { key: 'CANCELLED', label: 'ยกเลิก' },
 ];
+
+// Number of orders rendered per chunk (progressive rendering)
+const ORDERS_PER_CHUNK = 10;
+
+const skeletonSx = { bgcolor: 'var(--glass-bg)' } as const;
+
+/** Skeleton placeholder matching the collapsed order card layout */
+function OrderCardSkeleton() {
+  return (
+    <Box sx={{
+      borderRadius: '16px',
+      bgcolor: 'var(--surface-2)',
+      border: '1px solid var(--glass-border)',
+      overflow: 'hidden',
+    }}>
+      <Skeleton variant="rectangular" height={3} sx={skeletonSx} animation="wave" />
+      <Box sx={{ p: { xs: 1.5, sm: 2 }, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+        <Skeleton variant="rounded" width={52} height={52} animation="wave" sx={{ ...skeletonSx, borderRadius: '12px', flexShrink: 0 }} />
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.6 }}>
+            <Skeleton variant="text" width="38%" height={20} animation="wave" sx={skeletonSx} />
+            <Skeleton variant="rounded" width={70} height={22} animation="wave" sx={{ ...skeletonSx, borderRadius: '8px' }} />
+          </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Skeleton variant="text" width="48%" height={15} animation="wave" sx={skeletonSx} />
+            <Skeleton variant="text" width="22%" height={20} animation="wave" sx={skeletonSx} />
+          </Box>
+        </Box>
+      </Box>
+    </Box>
+  );
+}
+
+/** Vertical list of skeleton cards */
+function OrderListSkeleton({ count = 5 }: { count?: number }) {
+  return (
+    <Box sx={{
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 2,
+      maxWidth: 800,
+      mx: 'auto',
+      width: '100%',
+    }}>
+      {Array.from({ length: count }).map((_, i) => (
+        <OrderCardSkeleton key={i} />
+      ))}
+    </Box>
+  );
+}
 
 export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
   const {
@@ -214,6 +265,51 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
       return category === historyFilter;
     });
   }, [orderHistory, historyFilter]);
+
+  // Progressive rendering: only mount a chunk of order cards at a time so the
+  // drawer opens instantly even with a long history; more cards render as the
+  // user scrolls near the bottom (and remote pages auto-load via onLoadMore)
+  const [visibleCount, setVisibleCount] = useState(ORDERS_PER_CHUNK);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  // Reset chunk size when the drawer reopens or the filter changes
+  useEffect(() => {
+    setVisibleCount(ORDERS_PER_CHUNK);
+  }, [open, historyFilter]);
+
+  const visibleOrders = React.useMemo(
+    () => filteredOrders.slice(0, visibleCount),
+    [filteredOrders, visibleCount]
+  );
+  const hasLocalMore = visibleCount < filteredOrders.length;
+
+  // Keep latest values in refs so the observer callback stays current
+  const loadStateRef = useRef({ hasLocalMore, historyHasMore, loadingHistoryMore, onLoadMore });
+  loadStateRef.current = { hasLocalMore, historyHasMore, loadingHistoryMore, onLoadMore };
+
+  useEffect(() => {
+    if (!open || loadingHistory) return;
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return;
+        const { hasLocalMore, historyHasMore, loadingHistoryMore, onLoadMore } = loadStateRef.current;
+        if (hasLocalMore) {
+          setVisibleCount((c) => c + ORDERS_PER_CHUNK);
+        } else if (historyHasMore && !loadingHistoryMore) {
+          onLoadMore();
+        }
+      },
+      { root: scrollContainerRef.current, rootMargin: '200px' }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+    // visibleCount in deps: re-observe after each chunk reveal so the observer
+    // fires again if the sentinel is still within the viewport
+  }, [open, loadingHistory, filteredOrders.length, visibleCount]);
 
   // Swipe-to-dismiss state
   const [dragOffset, setDragOffset] = useState(0);
@@ -373,7 +469,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
       </Box>
 
       {/* Content */}
-      <Box sx={{
+      <Box ref={scrollContainerRef} sx={{
         flex: 1,
         overflow: 'auto',
         px: { xs: 1.5, sm: 2.5 },
@@ -381,10 +477,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
         WebkitOverflowScrolling: 'touch',
       }}>
         {loadingHistory ? (
-          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 8, gap: 2 }}>
-            <CircularProgress size={36} sx={{ color: 'var(--primary)' }} />
-            <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>{t.orderHistory.loading}</Typography>
-          </Box>
+          <OrderListSkeleton count={5} />
         ) : filteredOrders.length === 0 ? (
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 8, gap: 2 }}>
             <Box sx={{
@@ -411,7 +504,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
             mx: 'auto',
             width: '100%',
           }}>
-            {filteredOrders.map((order, idx) => {
+            {visibleOrders.map((order, idx) => {
               const statusKey = normalizeStatus(order.status);
               const statusLabel = getStatusLabel(statusKey, lang);
               const statusColor = getStatusColor(statusKey);
@@ -477,10 +570,11 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                         position: 'relative',
                       }}>
                         {firstProductImage ? (
-                          <img
+                          <Box
+                            component="img"
                             src={firstProductImage}
                             alt=""
-                            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                            sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                             loading="lazy"
                           />
                         ) : (
@@ -743,10 +837,11 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                                   >
                                     {productImage ? (
                                       <>
-                                        <img
+                                        <Box
+                                          component="img"
                                           src={productImage}
                                           alt={itemName}
-                                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                                          sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                                           loading="lazy"
                                         />
                                         <Box
@@ -1092,8 +1187,21 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
               );
             })}
 
-            {/* Load More */}
-            {historyHasMore && (
+            {/* Skeletons while fetching the next remote page */}
+            {loadingHistoryMore && (
+              <>
+                <OrderCardSkeleton />
+                <OrderCardSkeleton />
+              </>
+            )}
+
+            {/* Infinite-scroll sentinel: reveals the next chunk / triggers remote load */}
+            {(hasLocalMore || historyHasMore) && (
+              <Box ref={sentinelRef} sx={{ height: 1 }} />
+            )}
+
+            {/* Load More (manual fallback for the auto infinite scroll) */}
+            {!hasLocalMore && historyHasMore && !loadingHistoryMore && (
               <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
                 <Button
                   onClick={onLoadMore}
@@ -1112,14 +1220,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                     '&:disabled': { color: 'var(--text-muted)' },
                   }}
                 >
-                  {loadingHistoryMore ? (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <CircularProgress size={16} sx={{ color: 'var(--secondary)' }} />
-                      {t.orderHistory.loadingMore}
-                    </Box>
-                  ) : (
-                    t.orderHistory.loadMore
-                  )}
+                  {t.orderHistory.loadMore}
                 </Button>
               </Box>
             )}

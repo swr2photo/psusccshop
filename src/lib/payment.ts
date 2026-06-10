@@ -4,7 +4,8 @@
 // ==================== TYPES ====================
 
 export type PaymentMethod = 
-  | 'bank_transfer'     // โอนผ่านธนาคาร / QR PromptPay
+  | 'bank_transfer'     // โอนผ่านธนาคาร / QR PromptPay (manual + slip)
+  | 'promptpay'         // PromptPay ผ่าน gateway (ยืนยันอัตโนมัติ)
   | 'credit_card'       // บัตรเครดิต/เดบิต
   | 'installment'       // ผ่อนชำระ
   | 'true_money'        // TrueMoney Wallet
@@ -138,6 +139,15 @@ export const PAYMENT_METHODS: Record<PaymentMethod, {
     requiresGateway: false,
     supportedGateways: [],
   },
+  promptpay: {
+    name: 'PromptPay (Auto-verified)',
+    nameThai: 'พร้อมเพย์ (ยืนยันอัตโนมัติ)',
+    icon: '',
+    description: 'Scan QR code, payment confirmed instantly',
+    descriptionThai: 'สแกน QR Code ระบบยืนยันการชำระเงินทันที ไม่ต้องแนบสลิป',
+    requiresGateway: true,
+    supportedGateways: ['stripe'],
+  },
   credit_card: {
     name: 'Credit/Debit Card',
     nameThai: 'บัตรเครดิต/เดบิต',
@@ -214,7 +224,7 @@ export const PAYMENT_GATEWAYS: Record<PaymentGateway, {
     name: 'Stripe',
     nameThai: 'สไตรพ์',
     website: 'https://stripe.com',
-    supportedMethods: ['credit_card'],
+    supportedMethods: ['credit_card', 'promptpay'],
     testModeAvailable: true,
     docUrl: 'https://stripe.com/docs',
   },
@@ -563,6 +573,21 @@ export interface StripePaymentIntentParams {
   description?: string;
   metadata?: Record<string, any>;
   returnUrl?: string;
+  /** Confirm server-side immediately (Direct API flow) */
+  confirm?: boolean;
+  /** Inline payment method data used with confirm=true */
+  paymentMethodData?: {
+    type: string;
+    billingEmail?: string;
+  };
+}
+
+export interface StripePaymentIntentResult {
+  clientSecret: string;
+  id: string;
+  status: string;
+  /** e.g. next_action.promptpay_display_qr_code when confirmed server-side */
+  nextAction?: any;
 }
 
 /**
@@ -570,7 +595,7 @@ export interface StripePaymentIntentParams {
  */
 export async function createStripePaymentIntent(
   params: StripePaymentIntentParams
-): Promise<{ clientSecret: string; id: string } | null> {
+): Promise<StripePaymentIntentResult | null> {
   const secretKey = process.env.STRIPE_SECRET_KEY;
   
   if (!secretKey) {
@@ -582,8 +607,23 @@ export async function createStripePaymentIntent(
     const body = new URLSearchParams({
       amount: params.amount.toString(),
       currency: params.currency || 'thb',
-      'payment_method_types[]': params.paymentMethodTypes?.join(',') || 'card',
     });
+    
+    // Each payment method type must be appended as a separate array entry
+    for (const type of params.paymentMethodTypes?.length ? params.paymentMethodTypes : ['card']) {
+      body.append('payment_method_types[]', type);
+    }
+    
+    if (params.confirm) {
+      body.append('confirm', 'true');
+    }
+    
+    if (params.paymentMethodData) {
+      body.append('payment_method_data[type]', params.paymentMethodData.type);
+      if (params.paymentMethodData.billingEmail) {
+        body.append('payment_method_data[billing_details][email]', params.paymentMethodData.billingEmail);
+      }
+    }
     
     if (params.description) {
       body.append('description', params.description);
@@ -614,6 +654,8 @@ export async function createStripePaymentIntent(
     return {
       clientSecret: data.client_secret,
       id: data.id,
+      status: data.status,
+      nextAction: data.next_action || null,
     };
   } catch (error) {
     console.error('[Payment] Stripe PaymentIntent error:', error);

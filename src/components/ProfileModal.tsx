@@ -104,6 +104,10 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [notification, setNotification] = useState<InlineNotification | null>(null);
 
+  // Category tabs: keep the popup compact instead of one long scrolling form
+  type ProfileTab = 'personal' | 'address' | 'security';
+  const [activeTab, setActiveTab] = useState<ProfileTab>('personal');
+
   // Profile image upload
   const [customProfileImage, setCustomProfileImage] = useState(initialData.profileImage || '');
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -404,6 +408,8 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
       showNotification('warning', Object.values(nextErrors)[0]);
+      // All required fields live on the personal tab — jump there so the user sees the error
+      setActiveTab('personal');
     }
     return Object.keys(nextErrors).length === 0;
   };
@@ -891,6 +897,90 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
             <X size={20} />
           </IconButton>
         </Box>
+
+        {/* Category Tabs */}
+        <Box sx={{
+          display: 'flex',
+          gap: 1,
+          mt: 1.5,
+          overflowX: 'auto',
+          pb: 0.5,
+          mx: -2,
+          px: 2,
+          '&::-webkit-scrollbar': { display: 'none' },
+          scrollbarWidth: 'none',
+        }}>
+          {([
+            {
+              key: 'personal' as const,
+              label: t.profile.tabPersonal,
+              icon: <User size={14} />,
+              complete: !!(formData.name && formData.phone && formData.instagram && pdpaAccepted),
+              show: true,
+            },
+            {
+              key: 'address' as const,
+              label: t.profile.tabAddress,
+              icon: <MapPin size={14} />,
+              complete: savedAddresses.length > 0,
+              show: true,
+              badge: savedAddresses.length || undefined,
+            },
+            {
+              key: 'security' as const,
+              label: t.profile.tabSecurity,
+              icon: <ShieldCheck size={14} />,
+              complete: false,
+              show: !!userEmail,
+            },
+          ]).filter(tab => tab.show).map((tab) => {
+            const isActive = activeTab === tab.key;
+            return (
+              <Box
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                sx={{
+                  px: 1.8,
+                  py: 0.8,
+                  borderRadius: '20px',
+                  bgcolor: isActive ? 'rgba(0,113,227,0.15)' : 'var(--surface-2)',
+                  border: isActive ? '1px solid rgba(0,113,227,0.4)' : '1px solid var(--glass-border)',
+                  color: isActive ? 'var(--primary)' : 'var(--text-muted)',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.7,
+                  '&:hover': {
+                    bgcolor: isActive ? 'rgba(0,113,227,0.2)' : 'var(--glass-bg)',
+                  },
+                }}
+              >
+                {tab.icon}
+                {tab.label}
+                {tab.badge !== undefined && (
+                  <Box sx={{
+                    px: 0.7,
+                    borderRadius: '8px',
+                    bgcolor: isActive ? 'rgba(0,113,227,0.3)' : 'var(--glass-bg)',
+                    fontSize: '0.68rem',
+                    fontWeight: 700,
+                    minWidth: 18,
+                    textAlign: 'center',
+                  }}>
+                    {tab.badge}
+                  </Box>
+                )}
+                {tab.complete && (
+                  <Check size={13} style={{ color: 'var(--success)' }} />
+                )}
+              </Box>
+            );
+          })}
+        </Box>
       </Box>
 
       {/* Content */}
@@ -907,6 +997,9 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
       >
         <Box sx={{ maxWidth: 520, mx: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
 
+          {/* ============ TAB: Personal Info (name + contact + consent) ============ */}
+          {activeTab === 'personal' && (
+          <>
           {/* ====== Name Card ====== */}
           <Box sx={{
             p: 2,
@@ -1011,8 +1104,12 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
               />
             </Box>
           </Box>
+          </>
+          )}
 
-          {/* ====== Address Card - Multi-Address Management ====== */}
+          {/* ============ TAB: Shipping Addresses ============ */}
+          {activeTab === 'address' && (
+          /* ====== Address Card - Multi-Address Management ====== */
           <Box sx={{
             p: 2,
             borderRadius: '16px',
@@ -1310,9 +1407,11 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
               </Box>
             )}
           </Box>
+          )}
 
-          {/* ====== Passkey Card ====== */}
-          {userEmail && (
+          {/* ============ TAB: Security ============ */}
+          {activeTab === 'security' && userEmail && (
+            /* ====== Passkey Card ====== */
             <Box sx={{
               p: 2,
               borderRadius: '16px',
@@ -1323,7 +1422,8 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
             </Box>
           )}
 
-          {/* ====== PDPA Card ====== */}
+          {/* ====== PDPA Card (personal tab) ====== */}
+          {activeTab === 'personal' && (
           <Box sx={{
             p: 2,
             borderRadius: '16px',
@@ -1396,6 +1496,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
               </Box>
             )}
           </Box>
+          )}
         </Box>
       </Box>
 

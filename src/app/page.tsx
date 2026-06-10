@@ -681,7 +681,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
     return parts.map((part, i) => {
       // Bold
       if (part.startsWith('**') && part.endsWith('**')) {
-        return <strong key={i} style={{ color: 'var(--primary)' }}>{part.slice(2, -2)}</strong>;
+        return <Box key={i} component="strong" sx={{ color: 'var(--primary)' }}>{part.slice(2, -2)}</Box>;
       }
       // Link
       const linkMatch = part.match(/\[(.*?)\]\((.*?)\)/);
@@ -1659,7 +1659,9 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
               ref={fileInputRef}
               onChange={handleImageUpload}
               accept="image/png,image/jpeg,image/jpg,image/webp"
-              style={{ display: 'none' }}
+              aria-label="อัปโหลดรูปภาพ"
+              title="อัปโหลดรูปภาพ"
+              hidden
             />
             
             {/* Upload Image Button */}
@@ -2821,6 +2823,13 @@ export default function HomePage() {
   const [loadingHistoryMore, setLoadingHistoryMore] = useState(false);
   const [historyCursor, setHistoryCursor] = useState<string | null>(null);
   const [historyHasMore, setHistoryHasMore] = useState(false);
+  // True once the full history list has been fetched from the server at least
+  // once. Orders added locally (after checkout / realtime INSERT) do NOT count —
+  // gating "should we fetch?" on orderHistory.length caused the drawer to show
+  // only those few local orders and never load the rest.
+  const historyLoadedRef = useRef(false);
+  // Stable handle to the latest loadOrderHistory for use inside effects
+  const loadOrderHistoryRef = useRef<(opts?: { append?: boolean; silent?: boolean }) => void>(() => {});
   const [historyFilter, setHistoryFilter] = useState<'ALL' | 'WAITING_PAYMENT' | 'COMPLETED' | 'SHIPPED' | 'RECEIVED' | 'CANCELLED'>('ALL');
   const [cancellingRef, setCancellingRef] = useState<string | null>(null);
   const [confirmCancelRef, setConfirmCancelRef] = useState<string | null>(null);
@@ -3445,6 +3454,16 @@ export default function HomePage() {
         if (prev.some((o) => o.ref === newOrder.ref)) return prev;
         return [newOrder, ...prev];
       });
+    } else if (change.type === 'DELETE') {
+      // DELETE payloads usually carry only the primary key (no ref unless the
+      // table has REPLICA IDENTITY FULL) — remove by ref when available,
+      // otherwise resync the list from the server in the background
+      const deletedRef = change.oldOrder?.ref;
+      if (deletedRef) {
+        setOrderHistory((prev) => prev.filter((o) => o.ref !== deletedRef));
+      } else if (historyLoadedRef.current) {
+        loadOrderHistoryRef.current({ silent: true });
+      }
     }
   }, []);
 
@@ -3456,6 +3475,22 @@ export default function HomePage() {
     handleOrderChange,
     handleConfigChange
   );
+
+  // Resync order history after a realtime disconnect - events fired while the
+  // socket was down are lost, so refetch from the server once we reconnect
+  const realtimeWasDownRef = useRef(false);
+  useEffect(() => {
+    if (!realtimeConnected) {
+      realtimeWasDownRef.current = true;
+      return;
+    }
+    if (realtimeWasDownRef.current) {
+      realtimeWasDownRef.current = false;
+      if (historyLoadedRef.current) {
+        loadOrderHistoryRef.current({ silent: true });
+      }
+    }
+  }, [realtimeConnected]);
 
   // Fallback: Refresh on visibility change (in case realtime disconnects)
 
@@ -6034,11 +6069,12 @@ export default function HomePage() {
     }
   };
 
-  const loadOrderHistory = async (opts?: { append?: boolean }) => {
+  const loadOrderHistory = async (opts?: { append?: boolean; silent?: boolean }) => {
     if (!session?.user?.email) return;
     const append = opts?.append;
+    const silent = opts?.silent;
     const pageSize = isMobile ? 20 : 50;
-    append ? setLoadingHistoryMore(true) : setLoadingHistory(true);
+    if (!silent) { append ? setLoadingHistoryMore(true) : setLoadingHistory(true); }
     try {
       const res = await getHistory(session.user.email, append ? historyCursor || undefined : undefined, pageSize);
 
@@ -6089,6 +6125,7 @@ export default function HomePage() {
           });
           setHistoryHasMore(hasMore);
           setHistoryCursor(nextCursor);
+          historyLoadedRef.current = true;
         } else {
           console.warn('History response missing array', { res });
           if (!append) setOrderHistory([]);
@@ -6098,11 +6135,12 @@ export default function HomePage() {
       }
     } catch (error) {
       console.error('Failed to load history:', error);
-      showToast('error', t.misc.cannotLoadHistory);
+      if (!silent) showToast('error', t.misc.cannotLoadHistory);
     } finally {
-      append ? setLoadingHistoryMore(false) : setLoadingHistory(false);
+      if (!silent) { append ? setLoadingHistoryMore(false) : setLoadingHistory(false); }
     }
   };
+  loadOrderHistoryRef.current = loadOrderHistory;
 
   // ===== Auto-cancel expired unpaid orders (24h) =====
   // Check if waiting_payment orders have expired and auto-cancel them client-side
@@ -6192,8 +6230,9 @@ export default function HomePage() {
     } else if (tab === 'history') {
       setShowHistoryDialog(true);
       setShowCart(false);
-      // Only load if history is empty (first time or needs refresh)
-      if (orderHistory.length === 0) {
+      // Only load if the full list was never fetched (locally-added orders
+      // from checkout/realtime don't count as a loaded history)
+      if (!historyLoadedRef.current) {
         setHistoryCursor(null);
         setHistoryHasMore(false);
         loadOrderHistory();
