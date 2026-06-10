@@ -45,6 +45,7 @@ import type { Product } from '@/lib/config';
 import {
   getProductName, getProductDescription,
   getCategoryLabel, getCategoryIcon,
+  sortProductsNewestFirst,
   DEFAULT_SHIRT_NAME, type ShirtNameConfig,
 } from '@/lib/config';
 import { submitOrder as submitOrderApi, getHistory, cancelOrder as cancelOrderApi, saveProfile as saveProfileApi } from '@/lib/api-client';
@@ -789,7 +790,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
 
   // Grouped products by category
   const filteredGroupedProducts = useMemo(() => {
-    const filtered = products.filter((p) => {
+    const filtered = sortProductsNewestFirst(products.filter((p) => {
       if (!p.isActive) return false;
       if (selectedCategory !== 'all' && p.category !== selectedCategory) return false;
       if (searchQuery) {
@@ -799,7 +800,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
           (p.description && p.description.toLowerCase().includes(q));
       }
       return true;
-    });
+    }));
 
     const grouped: Record<string, Product[]> = {};
     filtered.forEach((p) => {

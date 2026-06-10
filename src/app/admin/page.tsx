@@ -10795,6 +10795,7 @@ function ProductsView({ config, searchTerm, setSearchTerm, saveFullConfig, showT
   }, [searchTerm, config.products]);
 
   const createNewProduct = () => {
+    const now = new Date().toISOString();
     const newP: Product = {
       id: `prod_${Date.now()}`,
       name: 'New Product',
@@ -10809,7 +10810,9 @@ function ProductsView({ config, searchTerm, setSearchTerm, saveFullConfig, showT
       endDate: '',
       isActive: true,
       options: { hasCustomName: false, hasCustomNumber: false, hasLongSleeve: false, longSleevePrice: 50 },
-      customTags: []
+      customTags: [],
+      createdAt: now,
+      updatedAt: now,
     };
     setEditingProduct(newP);
   };
@@ -10868,10 +10871,15 @@ function ProductsView({ config, searchTerm, setSearchTerm, saveFullConfig, showT
     const idx = config.products.findIndex((p) => p.id === nextProduct.id);
     const newProducts = [...config.products];
 
+    const now = new Date().toISOString();
     if (idx >= 0) {
-      newProducts[idx] = nextProduct;
+      newProducts[idx] = { ...nextProduct, updatedAt: now };
     } else {
-      newProducts.push(nextProduct);
+      newProducts.unshift({
+        ...nextProduct,
+        createdAt: nextProduct.createdAt || now,
+        updatedAt: now,
+      });
     }
 
     // Save and close popup immediately for better UX
@@ -11339,8 +11347,13 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving, showT
   };
 
   const handleRemovePattern = (patternId: string) => {
+    const removed = ((product as any).patterns || []).find((p: any) => p.id === patternId);
     const patterns = ((product as any).patterns || []).filter((p: any) => p.id !== patternId);
-    onChange({ ...product, patterns } as any);
+    const nextCover =
+      removed?.image && removed.image === product.coverImage
+        ? ((product.images || []).find((img: string) => img !== removed.image) || '')
+        : product.coverImage;
+    onChange({ ...product, patterns, coverImage: nextCover } as any);
   };
 
   const handlePatternImageUpload = async (patternId: string, files: FileList | null) => {
@@ -11421,7 +11434,10 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving, showT
   };
 
   const handleSetCover = (img: string) => {
-    onChange({ ...product, coverImage: img });
+    if (!img) return;
+    const images = product.images || [];
+    const nextImages = images.includes(img) ? images : [img, ...images];
+    onChange({ ...product, coverImage: img, images: nextImages });
   };
 
   const handleCoverUpload = async (files: FileList | null) => {
@@ -12112,17 +12128,20 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving, showT
           </Box>
 
           <Typography variant="caption" sx={{ color: ADMIN_THEME.muted }}>
-            รองรับหลายไฟล์ บันทึกเป็น Data URL · กด "ตั้งเป็นปก" เพื่อใช้ภาพหน้าปกสินค้า
+            รองรับหลายไฟล์ บันทึกเป็น Data URL · ตั้งปกได้จากรูปสินค้าหรือรูปลายเสื้อด้านล่าง
           </Typography>
 
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)' }, gap: 1.5 }}>
             {(() => {
               const images = product.images || [];
               const coverImage = product.coverImage;
-              // เรียงให้ coverImage ขึ้นก่อน
-              const sortedImages = coverImage && images.includes(coverImage)
-                ? [coverImage, ...images.filter((img: string) => img !== coverImage)]
+              // รวมรูปปกจากลายเสื้อ (อาจไม่อยู่ใน images) และเรียงให้ cover ขึ้นก่อน
+              const merged = coverImage && !images.includes(coverImage)
+                ? [coverImage, ...images]
                 : images;
+              const sortedImages = coverImage
+                ? [coverImage, ...merged.filter((img: string) => img !== coverImage)]
+                : merged;
               return sortedImages;
             })().map((img: string, idx: number) => {
               const isCover = product.coverImage === img;
@@ -12165,6 +12184,7 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving, showT
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                 {(((product as any).patterns || []) as any[]).map((pattern: any) => {
                   const isActive = pattern.isActive !== false;
+                  const isPatternCover = Boolean(pattern.image && product.coverImage === pattern.image);
                   return (
                     <Box
                       key={pattern.id}
@@ -12176,7 +12196,8 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving, showT
                         p: 1.2,
                         bgcolor: 'var(--glass-bg)',
                         borderRadius: 1,
-                        border: `1px solid ${ADMIN_THEME.border}`,
+                        border: `1px solid ${isPatternCover ? '#6366f1' : ADMIN_THEME.border}`,
+                        boxShadow: isPatternCover ? '0 0 0 2px rgba(99,102,241,0.35)' : 'none',
                       }}
                     >
                       <Box sx={{
@@ -12189,7 +12210,11 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving, showT
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
+                        position: 'relative',
                       }}>
+                        {isPatternCover && (
+                          <Chip label="รูปปก" size="small" sx={{ position: 'absolute', top: 4, left: 4, bgcolor: '#6366f1', color: '#fff', zIndex: 1, height: 20, fontSize: '0.65rem' }} />
+                        )}
                         {pattern.image ? (
                           <Box component="img" src={pattern.image} alt={pattern.name} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         ) : (
@@ -12204,10 +12229,23 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving, showT
                           onChange={(e) => handleUpdatePattern(pattern.id, 'name', e.target.value)}
                           sx={inputSx}
                         />
-                        <Button variant="outlined" component="label" size="small" sx={{ borderColor: ADMIN_THEME.border, color: ADMIN_THEME.text, textTransform: 'none', width: 'fit-content' }}>
-                          แนบ/เปลี่ยนรูปลาย
-                          <input hidden accept="image/*" type="file" onChange={(e) => handlePatternImageUpload(pattern.id, e.target.files)} />
-                        </Button>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                          <Button variant="outlined" component="label" size="small" sx={{ borderColor: ADMIN_THEME.border, color: ADMIN_THEME.text, textTransform: 'none' }}>
+                            แนบ/เปลี่ยนรูปลาย
+                            <input hidden accept="image/*" type="file" onChange={(e) => handlePatternImageUpload(pattern.id, e.target.files)} />
+                          </Button>
+                          {pattern.image && (
+                            <Button
+                              size="small"
+                              variant="contained"
+                              disabled={isPatternCover}
+                              onClick={() => handleSetCover(pattern.image)}
+                              sx={{ background: 'rgba(99,102,241,0.9)', color: '#fff', textTransform: 'none' }}
+                            >
+                              {isPatternCover ? 'เป็นปกแล้ว' : 'ตั้งเป็นปก'}
+                            </Button>
+                          )}
+                        </Box>
                       </Box>
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                         <IconButton

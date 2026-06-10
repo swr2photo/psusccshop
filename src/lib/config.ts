@@ -252,6 +252,29 @@ export interface Product {
   updatedAt?: string;
 }
 
+/** Timestamp used for "newest first" ordering (ms). Falls back to prod_<epoch> id. */
+export function getProductSortTime(product: Product): number {
+  if (product.createdAt) {
+    const t = new Date(product.createdAt).getTime();
+    if (!Number.isNaN(t)) return t;
+  }
+  const idMatch = /^prod_(\d+)$/.exec(product.id);
+  if (idMatch) return Number(idMatch[1]);
+  return 0;
+}
+
+/** Newest products first — left-to-right in the product grid. */
+export function sortProductsNewestFirst(products: Product[]): Product[] {
+  return [...products].sort((a, b) => {
+    const aOrder = a.sortOrder;
+    const bOrder = b.sortOrder;
+    if (aOrder != null && bOrder != null && aOrder !== bOrder) return aOrder - bOrder;
+    if (aOrder != null && bOrder == null) return -1;
+    if (aOrder == null && bOrder != null) return 1;
+    return getProductSortTime(b) - getProductSortTime(a);
+  });
+}
+
 /** Get product name in the active language */
 export const getProductName = (product: Product, lang?: 'th' | 'en'): string => {
   if (lang === 'en' && (product as any).nameEn) return (product as any).nameEn;

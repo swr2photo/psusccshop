@@ -2201,6 +2201,8 @@ import {
   getCategoryIcon,
   getProductName,
   getProductDescription,
+  getProductSortTime,
+  sortProductsNewestFirst,
   DEFAULT_SHIRT_NAME,
   type ShirtNameConfig,
 } from '@/lib/config';
@@ -6384,7 +6386,7 @@ export default function HomePage() {
   // In dev mode, merge test products with real products
   const allGroupedProducts = useMemo(() => {
     const realProducts = config?.products || [];
-    const items = isDev ? [...devTestProducts, ...realProducts] : realProducts;
+    const items = sortProductsNewestFirst(isDev ? [...devTestProducts, ...realProducts] : realProducts);
     const map: Record<string, Product[]> = {};
     items.forEach((p) => {
       // Use category if available, otherwise infer from type
@@ -6398,7 +6400,7 @@ export default function HomePage() {
   // Only active products (for counting and filtering)
   const groupedProducts = useMemo(() => {
     const realProducts = config?.products || [];
-    const items = isDev ? [...devTestProducts, ...realProducts] : realProducts;
+    const items = sortProductsNewestFirst(isDev ? [...devTestProducts, ...realProducts] : realProducts);
     const activeItems = items.filter((p) => isProductCurrentlyOpen(p));
     const map: Record<string, Product[]> = {};
     activeItems.forEach((p) => {
@@ -6472,7 +6474,7 @@ export default function HomePage() {
           switch (sortBy) {
             case 'price-low': return getBasePrice(a) - getBasePrice(b);
             case 'price-high': return getBasePrice(b) - getBasePrice(a);
-            case 'newest': return new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime();
+            case 'newest': return getProductSortTime(b) - getProductSortTime(a);
             case 'name': return getProductName(a, lang).localeCompare(getProductName(b, lang), lang === 'th' ? 'th' : 'en');
             default: return 0;
           }
