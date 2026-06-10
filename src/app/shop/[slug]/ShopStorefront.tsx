@@ -1899,7 +1899,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                           </>
                         )}
 
-                        {/* Custom Teardrop/Pill Dot Indicators */}
+                        {/* Dot indicators */}
                         {productImages.length > 1 && (
                           <Box sx={{
                             position: 'absolute',
@@ -1908,13 +1908,8 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                             transform: 'translateX(-50%)',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: 1.2,
+                            gap: 0.75,
                             zIndex: 5,
-                            bgcolor: 'rgba(0,0,0,0.45)',
-                            px: 1.8,
-                            py: 0.8,
-                            borderRadius: '16px',
-                            backdropFilter: 'blur(8px)',
                           }}>
                             {productImages.map((_, idx) => {
                               const active = activeImageIndex === idx;
@@ -1927,17 +1922,15 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                                   }}
                                   sx={{
                                     cursor: 'pointer',
-                                    width: active ? '18px' : '8px',
-                                    height: active ? '6px' : '8px',
-                                    // Inactive: teardrop shape. Active: flat pill shape.
-                                    borderRadius: active ? '3px' : '0 50% 50% 50%',
-                                    bgcolor: active ? '#0071e3' : 'rgba(255, 255, 255, 0.55)',
-                                    transform: active ? 'rotate(0deg)' : 'rotate(45deg)',
-                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                    boxShadow: active ? '0 1px 4px rgba(0,0,0,0.3)' : 'none',
+                                    width: active ? 8 : 6,
+                                    height: active ? 8 : 6,
+                                    borderRadius: '50%',
+                                    bgcolor: active ? '#0071e3' : 'rgba(255, 255, 255, 0.45)',
+                                    transition: 'background-color 0.2s ease',
+                                    flexShrink: 0,
                                     '&:hover': {
-                                      bgcolor: active ? '#0071e3' : 'rgba(255, 255, 255, 0.85)',
-                                    }
+                                      bgcolor: active ? '#0071e3' : 'rgba(255, 255, 255, 0.75)',
+                                    },
                                   }}
                                 />
                               );
@@ -2681,26 +2674,6 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
         >
           <X size={24} />
         </IconButton>
-
-        {/* Counter */}
-        {productImages.length > 1 && (
-          <Box sx={{
-            position: 'absolute',
-            top: { xs: 20, sm: 24 },
-            left: '50%',
-            transform: 'translateX(-50%)',
-            px: 2.5,
-            py: 0.8,
-            borderRadius: '24px',
-            bgcolor: 'rgba(255,255,255,0.12)',
-            backdropFilter: 'blur(8px)',
-            zIndex: 10,
-          }}>
-            <Typography sx={{ fontSize: '0.85rem', color: 'white', fontWeight: 600 }}>
-              {lightboxIndex + 1} / {productImages.length}
-            </Typography>
-          </Box>
-        )}
 
         {/* Navigation Chevrons */}
         {productImages.length > 1 && (

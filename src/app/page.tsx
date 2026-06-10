@@ -1892,28 +1892,6 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
         </IconButton>
 
         {/* Image Counter */}
-        {lightboxImages.length > 1 && (
-          <Box sx={{
-            position: 'absolute',
-            top: { xs: 16, sm: 20 },
-            left: '50%',
-            transform: 'translateX(-50%)',
-            px: 2.5,
-            py: 0.75,
-            borderRadius: '24px',
-            bgcolor: 'rgba(255,255,255,0.12)',
-            backdropFilter: 'blur(8px)',
-            zIndex: 10,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 0.75,
-          }}>
-            <Typography sx={{ fontSize: '0.85rem', color: 'white', fontWeight: 600 }}>
-              {lightboxIndex + 1} / {lightboxImages.length}
-            </Typography>
-          </Box>
-        )}
-
         {/* Navigation Arrows */}
         {lightboxImages.length > 1 && (
           <>
@@ -4390,7 +4368,7 @@ export default function HomePage() {
                         <ChevronRight size={24} />
                       </IconButton>
 
-                      {/* Custom Teardrop/Pill Dot Indicators */}
+                      {/* Dot indicators */}
                       <Box sx={{
                         position: 'absolute',
                         bottom: 16,
@@ -4398,13 +4376,8 @@ export default function HomePage() {
                         transform: 'translateX(-50%)',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: 1.2,
+                        gap: 0.75,
                         zIndex: 2,
-                        bgcolor: 'rgba(0,0,0,0.45)',
-                        px: 1.8,
-                        py: 0.8,
-                        borderRadius: '16px',
-                        backdropFilter: 'blur(8px)',
                       }}>
                         {productImages.map((_, idx) => {
                           const active = activeImageIndex === idx;
@@ -4417,52 +4390,19 @@ export default function HomePage() {
                               }}
                               sx={{
                                 cursor: 'pointer',
-                                width: active ? '18px' : '8px',
-                                height: active ? '6px' : '8px',
-                                borderRadius: active ? '3px' : '0 50% 50% 50%',
-                                bgcolor: active ? '#0071e3' : 'rgba(255, 255, 255, 0.55)',
-                                transform: active ? 'rotate(0deg)' : 'rotate(45deg)',
-                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                boxShadow: active ? '0 1px 4px rgba(0,0,0,0.3)' : 'none',
+                                width: active ? 8 : 6,
+                                height: active ? 8 : 6,
+                                borderRadius: '50%',
+                                bgcolor: active ? '#0071e3' : 'rgba(255, 255, 255, 0.45)',
+                                transition: 'background-color 0.2s ease, transform 0.2s ease',
+                                flexShrink: 0,
                                 '&:hover': {
-                                  bgcolor: active ? '#0071e3' : 'rgba(255, 255, 255, 0.85)',
-                                }
+                                  bgcolor: active ? '#0071e3' : 'rgba(255, 255, 255, 0.75)',
+                                },
                               }}
                             />
                           );
                         })}
-                      </Box>
-
-                      {/* Image Counter - Enhanced */}
-                      <Box sx={{
-                        position: 'absolute',
-                        bottom: 16,
-                        right: 16,
-                        px: 2,
-                        py: 0.75,
-                        borderRadius: '24px',
-                        bgcolor: 'rgba(0,0,0,0.65)',
-                        zIndex: 2,
-                        backdropFilter: 'blur(12px)',
-                        border: '1px solid var(--glass-border)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 0.75,
-                      }}>
-                        <Box sx={{ 
-                          width: 6, 
-                          height: 6, 
-                          borderRadius: '50%', 
-                          bgcolor: '#0071e3',
-                          animation: 'pulse 2s infinite',
-                          '@keyframes pulse': {
-                            '0%, 100%': { opacity: 1 },
-                            '50%': { opacity: 0.5 },
-                          },
-                        }} />
-                        <Typography sx={{ fontSize: '0.8rem', color: 'white', fontWeight: 700, letterSpacing: '0.05em' }}>
-                          {activeImageIndex + 1} / {totalImages}
-                        </Typography>
                       </Box>
                     </>
                   )}
@@ -9678,24 +9618,6 @@ export default function HomePage() {
         >
           <X size={24} />
         </IconButton>
-        {lightboxImages.length > 1 && (
-          <Box sx={{
-            position: 'absolute',
-            top: { xs: 16, sm: 20 },
-            left: '50%',
-            transform: 'translateX(-50%)',
-            px: 2.5,
-            py: 0.75,
-            borderRadius: '24px',
-            bgcolor: 'rgba(255,255,255,0.12)',
-            backdropFilter: 'blur(8px)',
-            zIndex: 10,
-          }}>
-            <Typography sx={{ fontSize: '0.85rem', color: 'white', fontWeight: 600 }}>
-              {lightboxIndex + 1} / {lightboxImages.length}
-            </Typography>
-          </Box>
-        )}
         {lightboxImages.length > 1 && (
           <>
             <IconButton
