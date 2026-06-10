@@ -2,6 +2,18 @@
 
 const TYPING_STALE_MS = 5000;
 
+/** True when message list length or latest id changed (for poll dedup). */
+export function chatMessagesChanged(
+  prev: { id: string }[] | undefined,
+  next: { id: string }[] | undefined,
+): boolean {
+  const a = prev || [];
+  const b = next || [];
+  if (a.length !== b.length) return true;
+  if (a.length === 0) return false;
+  return a[a.length - 1].id !== b[b.length - 1].id;
+}
+
 export function isRecentTyping(
   typing: boolean | null | undefined,
   typingAt: string | Date | null | undefined,

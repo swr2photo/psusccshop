@@ -63,7 +63,7 @@ import {
 } from 'lucide-react';
 
 import { ADMIN_THEME } from '@/lib/adminTheme';
-import { getDbTypingFromSession } from '@/lib/support-chat-typing';
+import { chatMessagesChanged, getDbTypingFromSession } from '@/lib/support-chat-typing';
 
 interface ChatSession {
   id: string;
@@ -300,40 +300,78 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     }
   }, [selectedChat?.id, selectedChat?.messages?.length, broadcastRead]);
 
-  // Fallback polling: when Realtime is not connected (publication/RLS not set up,
-  // or connection dropped), poll the API to keep everything fresh.
-  // When Realtime IS connected, only refresh stats every 30s.
+  // Sidebar list polling — slower when Realtime is healthy
   useEffect(() => {
     const isRealtimeUp = connectionState === 'connected' && listConnectionState === 'connected';
     const pollInterval = isRealtimeUp ? 30000 : 5000;
-    
+
     let cancelled = false;
     const poll = async () => {
       if (cancelled) return;
       try {
         await fetchChats();
-        // When realtime isn't working, also refresh the active chat details
-        if (!isRealtimeUp && selectedChat) {
-          const res = await fetch('/api/support-chat/' + selectedChat.id);
-          const data = await res.json();
-          if (!cancelled && data.chat) {
-            const newLen = data.chat.messages?.length || 0;
-            const oldLen = selectedChat.messages?.length || 0;
-            if (newLen !== oldLen || data.chat.status !== selectedChat.status) {
-              setSelectedChat(data.chat);
-              setRealtimeMessages(data.chat.messages || []);
-            }
-          }
-          // Mark as read
-          if (!cancelled) {
-            fetch('/api/support-chat/' + selectedChat.id + '/read', { method: 'POST' }).catch(() => {});
-          }
-        }
       } catch {}
     };
     const interval = setInterval(poll, pollInterval);
     return () => { cancelled = true; clearInterval(interval); };
-  }, [fetchChats, connectionState, listConnectionState, selectedChat?.id, selectedChat?.messages?.length, selectedChat?.status, setRealtimeMessages]);
+  }, [fetchChats, connectionState, listConnectionState]);
+
+  // Active chat message polling — always run (Realtime INSERT may not fire)
+  useEffect(() => {
+    if (!selectedChat?.id) return;
+    if (selectedChat.status !== 'active' && selectedChat.status !== 'pending') return;
+
+    let cancelled = false;
+    const chatId = selectedChat.id;
+    const refreshMessages = async () => {
+      if (cancelled) return;
+      try {
+        const res = await fetch('/api/support-chat/' + chatId);
+        const data = await res.json();
+        if (cancelled || !data.chat) return;
+
+        const incoming = (data.chat.messages || []) as ChatMessage[];
+        let didUpdate = false;
+        setSelectedChat((prev) => {
+          if (!prev || prev.id !== chatId) return prev;
+          const changed =
+            chatMessagesChanged(prev.messages, incoming) ||
+            data.chat.status !== prev.status;
+          if (!changed) return prev;
+          didUpdate = true;
+          setRealtimeMessages(incoming);
+          return { ...data.chat, messages: incoming };
+        });
+        if (didUpdate) {
+          fetch('/api/support-chat/' + chatId + '/read', { method: 'POST' }).catch(() => {});
+        }
+      } catch {}
+    };
+
+    refreshMessages();
+    const interval = setInterval(refreshMessages, 3000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [selectedChat?.id, selectedChat?.status, setRealtimeMessages]);
+
+  // Refetch active chat when admin returns to the tab
+  useEffect(() => {
+    if (!selectedChat?.id) return;
+
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      fetch('/api/support-chat/' + selectedChat.id)
+        .then((res) => res.json())
+        .then((data) => {
+          if (!data.chat?.messages) return;
+          setSelectedChat(data.chat);
+          setRealtimeMessages(data.chat.messages || []);
+        })
+        .catch(() => {});
+    };
+
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [selectedChat?.id, setRealtimeMessages]);
 
   // Poll typing status every 2s while a chat is open (works even when Realtime broadcast is down)
   useEffect(() => {

@@ -29,7 +29,7 @@ import { useNotification } from './NotificationContext';
 import { usePushNotification } from '@/hooks/usePushNotification';
 import { useRealtimeChat } from '@/hooks/useRealtimeChat';
 import { useTranslation } from '@/hooks/useTranslation';
-import { getDbTypingFromSession } from '@/lib/support-chat-typing';
+import { chatMessagesChanged, getDbTypingFromSession } from '@/lib/support-chat-typing';
 
 // ชื่อแอดมินเริ่มต้น (ดึงจากตั้งค่าแชท)
 const DEFAULT_ADMIN_NAME = 'ทีมงาน PSU SCC';
@@ -362,40 +362,58 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
     }
   }, [open, chat?.id, showHistory, showNewChat, showRating, chat?.status, broadcastRead]);
 
-  // Fallback polling: when Realtime is not connected/available,
-  // poll the API to keep chat data fresh. Stops when Realtime connects.
+  // Message polling: always run as safety net — Realtime channel can show
+  // "connected" while postgres_changes INSERT events are not delivered (publication/RLS).
   useEffect(() => {
     if (!open || !chat?.id || showHistory || showNewChat || showRating) return;
-    // Only poll when realtime is NOT connected
-    if (connectionState === 'connected') return;
+    if (chat.status !== 'active' && chat.status !== 'pending') return;
 
     let cancelled = false;
-    const poll = async () => {
+    const refreshMessages = async () => {
       if (cancelled) return;
       try {
         const res = await fetch(`/api/support-chat/${chat.id}`);
         const data = await res.json();
-        if (!cancelled && data.chat) {
-          setChat(prev => {
-            if (!prev) return prev;
-            // Only update if messages actually changed
-            const newLen = data.chat.messages?.length || 0;
-            const oldLen = prev.messages?.length || 0;
-            if (newLen !== oldLen || data.chat.status !== prev.status) {
-              // Seed realtime with fresh data
-              setRealtimeMessages(data.chat.messages || []);
-              return { ...prev, ...data.chat };
-            }
-            return prev;
-          });
-        }
+        if (cancelled || !data.chat) return;
+
+        const incoming = (data.chat.messages || []) as ChatMessage[];
+        setChat((prev) => {
+          if (!prev) return prev;
+          const changed =
+            chatMessagesChanged(prev.messages, incoming) ||
+            data.chat.status !== prev.status;
+          if (!changed) return prev;
+          setRealtimeMessages(incoming);
+          return { ...prev, ...data.chat, messages: incoming };
+        });
       } catch {}
     };
-    // Poll immediately then every 5s
-    poll();
-    const interval = setInterval(poll, 5000);
+
+    refreshMessages();
+    const interval = setInterval(refreshMessages, 3000);
     return () => { cancelled = true; clearInterval(interval); };
-  }, [open, chat?.id, showHistory, showNewChat, showRating, connectionState, chat?.status, setRealtimeMessages]);
+  }, [open, chat?.id, chat?.status, showHistory, showNewChat, showRating, setRealtimeMessages]);
+
+  // Refetch when user returns to the tab (missed events while backgrounded)
+  useEffect(() => {
+    if (!open || !chat?.id || showHistory || showNewChat || showRating) return;
+
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      fetch(`/api/support-chat/${chat.id}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (!data.chat?.messages) return;
+          const incoming = data.chat.messages as ChatMessage[];
+          setRealtimeMessages(incoming);
+          setChat((prev) => (prev ? { ...prev, ...data.chat, messages: incoming } : prev));
+        })
+        .catch(() => {});
+    };
+
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [open, chat?.id, showHistory, showNewChat, showRating, setRealtimeMessages]);
 
   // Scroll to bottom when messages change
   useEffect(() => {

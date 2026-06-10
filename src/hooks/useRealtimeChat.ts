@@ -92,6 +92,25 @@ interface TypingUser {
   timestamp: number;
 }
 
+/** Normalize postgres_changes row (snake_case) to app message shape. */
+function normalizeRealtimeMessage(raw: Record<string, unknown>): RealtimeChatMessage {
+  const createdAt = raw.created_at ?? raw.createdAt;
+  const readAt = raw.read_at ?? raw.readAt;
+  return {
+    id: String(raw.id),
+    session_id: String(raw.session_id ?? raw.sessionId ?? ''),
+    sender: raw.sender as RealtimeChatMessage['sender'],
+    sender_email: (raw.sender_email ?? raw.senderEmail) as string | undefined,
+    sender_name: (raw.sender_name ?? raw.senderName) as string | undefined,
+    sender_avatar: (raw.sender_avatar ?? raw.senderAvatar) as string | undefined,
+    message: String(raw.message ?? ''),
+    created_at: typeof createdAt === 'string' ? createdAt : (createdAt as Date)?.toISOString?.() || new Date().toISOString(),
+    is_read: Boolean(raw.is_read ?? raw.isRead),
+    read_at: typeof readAt === 'string' ? readAt : (readAt as Date)?.toISOString?.() || undefined,
+    is_unsent: Boolean(raw.is_unsent ?? raw.isUnsent),
+  };
+}
+
 // ==================== HOOK: useRealtimeChat ====================
 // Subscribe to a single chat session — live messages, typing, read receipts
 
@@ -219,7 +238,7 @@ export function useRealtimeChat(sessionId: string | null, userEmail: string | nu
       { event: 'INSERT', schema: 'public', table: 'support_messages', filter: `session_id=eq.${sessionId}` },
       (payload) => {
         if (!mountedRef.current) return;
-        const newMsg = payload.new as RealtimeChatMessage;
+        const newMsg = normalizeRealtimeMessage(payload.new as Record<string, unknown>);
         setMessages(prev => {
           // Deduplicate — replace optimistic msg or skip if already exists
           const existsIdx = prev.findIndex(m => m.id === newMsg.id || (m._optimistic && m.message === newMsg.message && m.sender_email === newMsg.sender_email));
@@ -240,7 +259,7 @@ export function useRealtimeChat(sessionId: string | null, userEmail: string | nu
       { event: 'UPDATE', schema: 'public', table: 'support_messages', filter: `session_id=eq.${sessionId}` },
       (payload) => {
         if (!mountedRef.current) return;
-        const updated = payload.new as RealtimeChatMessage;
+        const updated = normalizeRealtimeMessage(payload.new as Record<string, unknown>);
         setMessages(prev => prev.map(m => m.id === updated.id ? { ...updated, _optimistic: false } : m));
       }
     );
