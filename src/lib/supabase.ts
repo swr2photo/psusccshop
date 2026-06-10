@@ -558,12 +558,13 @@ function transformDBEmailLogToLegacy(dbLog: any): any {
 
 function transformLegacyToDBEmailLog(data: any): any {
   const isUuid = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str);
+  const defaultFrom = process.env.EMAIL_FROM?.trim() || 'SCC Shop <no_reply@psuscc.club>';
   const dbLog: any = {
     orderRef: data.orderRef || null,
     toEmail: data.to || '',
-    fromEmail: data.from || '',
+    fromEmail: data.from || defaultFrom,
     subject: data.subject || '',
-    body: data.body || '',
+    body: data.body || data.html || data.text || '',
     emailType: data.type || 'custom',
     status: data.status || 'pending',
     sentAt: data.sentAt || null,

@@ -2,6 +2,7 @@
 // Sends transactional emails based on order status changes
 
 import { NextRequest, NextResponse } from 'next/server';
+import { sendEmail, getOrderRecipientEmail } from '@/lib/email';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -147,57 +148,25 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Unknown email type' }, { status: 400 });
     }
 
-    const email = order.customer_email || order.email;
+    const email = getOrderRecipientEmail(order);
     if (!email) {
       return NextResponse.json({ error: 'No email address' }, { status: 400 });
     }
 
-    // Send email using Resend
-    const resendKey = process.env.RESEND_API_KEY;
-    const fromEmail = process.env.EMAIL_FROM || 'SCC Shop <noreply@sccshop.com>';
-
-    if (!resendKey) {
-      console.warn('RESEND_API_KEY not set, skipping email');
-      return NextResponse.json({ success: true, message: 'Email skipped (no API key)', template });
-    }
-
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${resendKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: fromEmail,
-        to: email,
-        subject: template.subject,
-        text: template.body,
-      }),
+    const htmlBody = template.body.replace(/\n/g, '<br>');
+    const result = await sendEmail({
+      to: email,
+      subject: template.subject,
+      html: `<div style="font-family:sans-serif;line-height:1.6">${htmlBody}</div>`,
+      text: template.body,
+      type: type === 'order_confirmation' ? 'order_confirmation'
+        : type === 'payment_received' ? 'payment_received'
+        : 'custom',
+      orderRef: order.ref,
     });
 
-    if (!response.ok) {
-      const errBody = await response.text();
-      throw new Error(`Resend error: ${response.status} ${errBody}`);
-    }
-
-    const result = await response.json();
-
-    // Log the email
-    try {
-      const { db } = await import('@/lib/db');
-      const { emailLogs } = await import('@/db/schema');
-      await db.insert(emailLogs).values({
-        orderRef: order.ref,
-        toEmail: email,
-        fromEmail: fromEmail,
-        subject: template.subject,
-        body: template.body,
-        emailType: type,
-        status: 'sent',
-        sentAt: new Date().toISOString(),
-      });
-    } catch (err) {
-      console.error('Failed to log email to DB:', err);
+    if (!result.success) {
+      return NextResponse.json({ error: result.error || 'Failed to send email' }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, emailId: result.id });

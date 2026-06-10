@@ -61,7 +61,7 @@ Add these for email notifications via Resend:
 
 ```
 RESEND_API_KEY=re_xxxxxxxxxxxxx
-EMAIL_FROM=SCC Shop <noreply@your-domain.com>
+EMAIL_FROM=SCC Shop <no_reply@psuscc.club>
 ```
 
 Email notifications are sent automatically when:

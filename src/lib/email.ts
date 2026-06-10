@@ -43,33 +43,72 @@ export interface SendEmailOptions {
 }
 
 // ==================== EMAIL CONFIGURATION ====================
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const EMAIL_FROM = process.env.EMAIL_FROM || 'SCC Shop <psuscc@psusci.club>';
+const DEFAULT_EMAIL_FROM = 'SCC Shop <no_reply@psuscc.club>';
 const SHOP_NAME = 'SCC Shop';
-const SHOP_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://sccshop.psusci.club';
+
+function getResendApiKey(): string | undefined {
+  return process.env.RESEND_API_KEY?.trim() || undefined;
+}
+
+function getEmailFrom(): string {
+  return process.env.EMAIL_FROM?.trim() || DEFAULT_EMAIL_FROM;
+}
+
+function getShopUrl(): string {
+  return process.env.NEXT_PUBLIC_BASE_URL || 'https://sccshop.psusci.club';
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Resolve recipient email from order objects (legacy + current field names). */
+export function getOrderRecipientEmail(order: {
+  customerEmail?: string | null;
+  email?: string | null;
+  customer_email?: string | null;
+} | null | undefined): string {
+  const raw = order?.customerEmail || order?.email || order?.customer_email || '';
+  return raw.trim().toLowerCase();
+}
+
+function parseResendError(result: unknown, status: number): string {
+  if (result && typeof result === 'object') {
+    const r = result as Record<string, unknown>;
+    if (typeof r.message === 'string' && r.message) return r.message;
+    if (Array.isArray(r.errors) && r.errors.length > 0) {
+      const first = r.errors[0] as Record<string, unknown>;
+      if (typeof first.message === 'string') return first.message;
+    }
+  }
+  return `Resend API error (${status})`;
+}
 
 // ==================== EMAIL LOG HELPERS ====================
 const emailLogKey = (id: string) => `email-logs/${id}.json`;
 
-export async function saveEmailLog(log: EmailLog): Promise<void> {
-  await putJson(emailLogKey(log.id), log);
-  
+export async function saveEmailLog(log: EmailLog & { from?: string; html?: string; text?: string; body?: string }): Promise<void> {
+  const from = log.from || getEmailFrom();
+  const body = log.body || log.html || log.text || '';
+  await putJson(emailLogKey(log.id), { ...log, from, body });
+
   // Also update index by date
-  const date = new Date(log.sentAt);
-  const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-  const indexKey = `email-logs/index/${dateKey}.json`;
-  const existing = (await getJson<string[]>(indexKey)) || [];
-  if (!existing.includes(log.id)) {
-    await putJson(indexKey, [...existing, log.id]);
+  try {
+    const date = new Date(log.sentAt);
+    const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const indexKey = `email-logs/index/${dateKey}.json`;
+    const existing = (await getJson<string[]>(indexKey)) || [];
+    if (!existing.includes(log.id)) {
+      await putJson(indexKey, [...existing, log.id]);
+    }
+  } catch (indexError) {
+    console.warn('[Email] Failed to update email log index:', indexError);
   }
 }
 
 export async function getEmailLogs(limit = 100): Promise<EmailLog[]> {
   const keys = await listKeys('email-logs/');
   const logKeys = keys.filter(k => k.endsWith('.json') && !k.includes('/index/'));
-  
-  // Sort by newest first
-  const sortedKeys = logKeys.sort().reverse().slice(0, limit);
+  // listKeys already returns newest-first from the database
+  const sortedKeys = logKeys.slice(0, limit);
   
   const logs = await Promise.all(
     sortedKeys.map(async (k) => {
@@ -94,67 +133,90 @@ export async function getEmailLogsByEmail(email: string): Promise<EmailLog[]> {
 // ==================== SEND EMAIL ====================
 export async function sendEmail(options: SendEmailOptions): Promise<{ success: boolean; error?: string; id?: string }> {
   const logId = `email-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  
-  // Create log entry
-  const log: EmailLog = {
+  const to = options.to?.trim().toLowerCase();
+  const from = getEmailFrom();
+  const textBody = options.text || stripHtml(options.html);
+
+  const log: EmailLog & { from: string; html: string; text: string } = {
     id: logId,
-    to: options.to,
+    to,
+    from,
     subject: options.subject,
     type: options.type,
     status: 'pending',
     orderRef: options.orderRef,
     sentAt: new Date().toISOString(),
     metadata: options.metadata,
+    html: options.html,
+    text: textBody,
   };
 
-  try {
-    if (!RESEND_API_KEY) {
-      // Fallback: Log only mode if no API key
-      console.log('[Email] No RESEND_API_KEY, logging only:', {
-        to: options.to,
-        subject: options.subject,
-        type: options.type,
-      });
-      log.status = 'sent';
-      log.metadata = { ...log.metadata, mode: 'log_only' };
+  const persistLog = async () => {
+    try {
       await saveEmailLog(log);
-      return { success: true, id: logId };
+    } catch (saveError) {
+      console.error('[Email] Failed to persist email log:', saveError);
     }
+  };
 
+  if (!to || !EMAIL_RE.test(to)) {
+    const error = 'Invalid or missing recipient email address';
+    log.status = 'failed';
+    log.error = error;
+    await persistLog();
+    return { success: false, error, id: logId };
+  }
+
+  const apiKey = getResendApiKey();
+  if (!apiKey) {
+    const error = 'RESEND_API_KEY is not configured — email was not sent';
+    console.error('[Email]', error, { to, subject: options.subject, type: options.type });
+    log.status = 'failed';
+    log.error = error;
+    log.metadata = { ...log.metadata, mode: 'log_only' };
+    await persistLog();
+    return { success: false, error, id: logId };
+  }
+
+  try {
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${RESEND_API_KEY}`,
+        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: EMAIL_FROM,
-        to: options.to,
+        from,
+        to,
         subject: options.subject,
         html: options.html,
-        text: options.text || stripHtml(options.html),
+        text: textBody,
       }),
     });
 
-    const result = await response.json();
+    let result: Record<string, unknown> = {};
+    try {
+      result = await response.json();
+    } catch {
+      result = {};
+    }
 
     if (!response.ok) {
-      throw new Error(result.message || 'Failed to send email');
+      throw new Error(parseResendError(result, response.status));
     }
 
     log.status = 'sent';
     log.metadata = { ...log.metadata, resendId: result.id };
-    await saveEmailLog(log);
+    await persistLog();
 
-    console.log('[Email] Sent successfully:', { to: options.to, subject: options.subject, id: result.id });
+    console.log('[Email] Sent successfully:', { to, subject: options.subject, id: result.id });
     return { success: true, id: logId };
-
   } catch (error: any) {
     log.status = 'failed';
     log.error = error.message;
-    await saveEmailLog(log);
+    await persistLog();
 
-    console.error('[Email] Failed to send:', { to: options.to, error: error.message });
+    console.error('[Email] Failed to send:', { to, error: error.message });
     return { success: false, error: error.message, id: logId };
   }
 }
@@ -218,7 +280,7 @@ function baseTemplate(content: string, preheader?: string): string {
     <div class="footer">
       <p>ขอบคุณที่ใช้บริการ ${SHOP_NAME}</p>
       <p style="margin-top: 8px;">
-        <a href="${SHOP_URL}">เว็บไซต์</a> • 
+        <a href="${getShopUrl()}">เว็บไซต์</a> • 
         <a href="https://facebook.com/psuscc">Facebook</a> • 
         <a href="https://instagram.com/psuscc">Instagram</a>
       </p>
@@ -277,14 +339,14 @@ export function generateOrderConfirmationEmail(order: {
     </div>
     
     <center>
-      <a href="${SHOP_URL}" class="btn">ชำระเงินตอนนี้</a>
+      <a href="${getShopUrl()}" class="btn">ชำระเงินตอนนี้</a>
     </center>
   `;
 
   return {
     subject: `ยืนยันคำสั่งซื้อ #${order.ref} - ${SHOP_NAME}`,
     html: baseTemplate(content, `คำสั่งซื้อ #${order.ref} ได้รับการยืนยันแล้ว`),
-    text: `ขอบคุณสำหรับการสั่งซื้อ! หมายเลขคำสั่งซื้อ: ${order.ref} ยอดรวม: ฿${order.totalAmount.toLocaleString()} กรุณาชำระเงินที่ ${SHOP_URL}`,
+    text: `ขอบคุณสำหรับการสั่งซื้อ! หมายเลขคำสั่งซื้อ: ${order.ref} ยอดรวม: ฿${order.totalAmount.toLocaleString()} กรุณาชำระเงินที่ ${getShopUrl()}`,
   };
 }
 
@@ -317,14 +379,14 @@ export function generatePaymentReceivedEmail(order: {
     </div>
     
     <center>
-      <a href="${SHOP_URL}" class="btn">ดูสถานะคำสั่งซื้อ</a>
+      <a href="${getShopUrl()}" class="btn">ดูสถานะคำสั่งซื้อ</a>
     </center>
   `;
 
   return {
     subject: `ชำระเงินสำเร็จ #${order.ref} - ${SHOP_NAME}`,
     html: baseTemplate(content, `การชำระเงินคำสั่งซื้อ #${order.ref} สำเร็จแล้ว`),
-    text: `ชำระเงินสำเร็จ! คำสั่งซื้อ: ${order.ref} ยอด: ฿${order.totalAmount.toLocaleString()} ติดตามสถานะที่ ${SHOP_URL}`,
+    text: `ชำระเงินสำเร็จ! คำสั่งซื้อ: ${order.ref} ยอด: ฿${order.totalAmount.toLocaleString()} ติดตามสถานะที่ ${getShopUrl()}`,
   };
 }
 
@@ -356,7 +418,7 @@ export function generateOrderReadyEmail(order: {
     </div>
     
     <center>
-      <a href="${SHOP_URL}" class="btn">ดูรายละเอียด</a>
+      <a href="${getShopUrl()}" class="btn">ดูรายละเอียด</a>
     </center>
   `;
 
@@ -395,7 +457,7 @@ export function generateOrderShippedEmail(order: {
     ` : ''}
     
     <center>
-      <a href="${SHOP_URL}" class="btn">ติดตามสถานะ</a>
+      <a href="${getShopUrl()}" class="btn">ติดตามสถานะ</a>
     </center>
   `;
 
@@ -432,7 +494,7 @@ export function generateOrderCompletedEmail(order: {
     </div>
     
     <center>
-      <a href="${SHOP_URL}" class="btn">ดูสินค้าอื่นๆ</a>
+      <a href="${getShopUrl()}" class="btn">ดูสินค้าอื่นๆ</a>
     </center>
   `;
 
@@ -471,7 +533,7 @@ export function generateOrderCancelledEmail(order: {
     <p style="color: #94a3b8;">หากคุณมีคำถามหรือต้องการสั่งซื้อใหม่ สามารถติดต่อเราได้ตลอดเวลา</p>
     
     <center>
-      <a href="${SHOP_URL}" class="btn">กลับไปหน้าร้าน</a>
+      <a href="${getShopUrl()}" class="btn">กลับไปหน้าร้าน</a>
     </center>
   `;
 
@@ -495,7 +557,7 @@ export function generateCustomEmail(options: {
     </div>
     
     <center>
-      <a href="${SHOP_URL}" class="btn">ไปที่ร้านค้า</a>
+      <a href="${getShopUrl()}" class="btn">ไปที่ร้านค้า</a>
     </center>
   `;
 
@@ -508,6 +570,12 @@ export function generateCustomEmail(options: {
 
 // ==================== AUTO EMAIL TRIGGERS ====================
 export async function sendOrderConfirmationEmail(order: any): Promise<void> {
+  const to = getOrderRecipientEmail(order);
+  if (!to) {
+    console.warn('[Email] Skipping order confirmation — no recipient email', { ref: order?.ref });
+    return;
+  }
+
   const template = generateOrderConfirmationEmail({
     ref: order.ref,
     customerName: order.customerName || order.name,
@@ -516,7 +584,7 @@ export async function sendOrderConfirmationEmail(order: any): Promise<void> {
   });
 
   await sendEmail({
-    to: order.customerEmail || order.email,
+    to,
     subject: template.subject,
     html: template.html,
     text: template.text,
@@ -526,6 +594,12 @@ export async function sendOrderConfirmationEmail(order: any): Promise<void> {
 }
 
 export async function sendPaymentReceivedEmail(order: any): Promise<void> {
+  const to = getOrderRecipientEmail(order);
+  if (!to) {
+    console.warn('[Email] Skipping payment received email — no recipient email', { ref: order?.ref });
+    return;
+  }
+
   const template = generatePaymentReceivedEmail({
     ref: order.ref,
     customerName: order.customerName || order.name,
@@ -533,7 +607,7 @@ export async function sendPaymentReceivedEmail(order: any): Promise<void> {
   });
 
   await sendEmail({
-    to: order.customerEmail || order.email,
+    to,
     subject: template.subject,
     html: template.html,
     text: template.text,
@@ -543,7 +617,11 @@ export async function sendPaymentReceivedEmail(order: any): Promise<void> {
 }
 
 export async function sendOrderStatusEmail(order: any, newStatus: string, options?: { pickupLocation?: string; pickupNotes?: string }): Promise<void> {
-  const email = order.customerEmail || order.email;
+  const email = getOrderRecipientEmail(order);
+  if (!email) {
+    console.warn('[Email] Skipping status email — no recipient email', { ref: order?.ref, status: newStatus });
+    return;
+  }
   const name = order.customerName || order.name;
   
   let template: EmailTemplate;
@@ -604,8 +682,14 @@ export async function sendOrderCancelledEmail(order: {
     reason: order.reason,
   });
 
+  const to = getOrderRecipientEmail(order);
+  if (!to) {
+    console.warn('[Email] Skipping cancellation email — no recipient email', { ref: order?.ref });
+    return;
+  }
+
   await sendEmail({
-    to: order.customerEmail,
+    to,
     subject: template.subject,
     html: template.html,
     text: template.text,
@@ -636,7 +720,7 @@ export function generateChatReplyEmail(options: {
     </div>
     
     <center>
-      <a href="${SHOP_URL}" class="btn">เปิดแชทเพื่อตอบกลับ</a>
+      <a href="${getShopUrl()}" class="btn">เปิดแชทเพื่อตอบกลับ</a>
     </center>
     
     <div class="box">
@@ -649,7 +733,7 @@ export function generateChatReplyEmail(options: {
   return {
     subject: `แอดมินตอบกลับแชทของคุณ - ${SHOP_NAME}`,
     html: baseTemplate(content, `${adminName} ตอบกลับข้อความของคุณ`),
-    text: `สวัสดีคุณ ${customerName} - แอดมิน ${adminName} ตอบกลับข้อความของคุณ: "${messagePreview.substring(0, 200)}" เปิดเว็บไซต์เพื่อดูข้อความเพิ่มเติม: ${SHOP_URL}`,
+    text: `สวัสดีคุณ ${customerName} - แอดมิน ${adminName} ตอบกลับข้อความของคุณ: "${messagePreview.substring(0, 200)}" เปิดเว็บไซต์เพื่อดูข้อความเพิ่มเติม: ${getShopUrl()}`,
   };
 }
 
