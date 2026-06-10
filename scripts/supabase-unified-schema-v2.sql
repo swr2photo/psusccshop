@@ -769,10 +769,12 @@ BEGIN
   END LOOP;
 END $$;
 
--- Exception: config table needs limited anon read for client-side shop settings
-CREATE POLICY "anon_read_public_config" ON public.config
+-- Exception: config table needs limited anon read for the realtime version
+-- signal row only. Full shop settings must be fetched via the sanitized
+-- /api/config endpoint (the raw row contains adminEmails, sheetId, etc.)
+CREATE POLICY "anon_read_config_version" ON public.config
   FOR SELECT TO anon, authenticated
-  USING (key IN ('shop-settings', 'shipping_config', 'payment_config'));
+  USING (key = 'config-version');
 
 -- Exception: reviews need public read access
 CREATE POLICY "public_read_reviews" ON public.reviews
@@ -805,6 +807,12 @@ END $$;
 
 DO $$ BEGIN
   ALTER PUBLICATION supabase_realtime ADD TABLE public.orders;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+-- Config changes are signaled via the lightweight `config-version` row
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.config;
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
@@ -1082,6 +1090,11 @@ VALUES (
     ]
   }'::jsonb
 )
+ON CONFLICT (key) DO NOTHING;
+
+-- Realtime config-change signal row (bumped by server on every config save)
+INSERT INTO public.config (key, value)
+VALUES ('config-version', jsonb_build_object('updatedAt', now(), 'isOpen', null))
 ON CONFLICT (key) DO NOTHING;
 
 -- Default payment config

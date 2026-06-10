@@ -83,7 +83,10 @@ export async function GET() {
     { status: 'success', data: sanitizedConfig },
     { headers: {
       'Content-Type': 'application/json; charset=utf-8',
-      'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+      // Short CDN cache: realtime-triggered refetches use a cache-busting
+      // query param, but normal polling/visibility refetches should not see
+      // data older than ~10s after an admin change.
+      'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=30',
     } }
   );
 }

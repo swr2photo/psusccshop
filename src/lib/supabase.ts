@@ -247,6 +247,25 @@ export async function putJson(key: string, data: any): Promise<void> {
           target: config.key,
           set: { value: data, updatedAt: new Date() },
         });
+      // Bump the lightweight realtime signal row so clients refetch the
+      // sanitized config immediately (the full row is too large / unsafe
+      // to broadcast via postgres_changes).
+      if (configKey === 'shop-settings') {
+        try {
+          const versionValue = {
+            updatedAt: new Date().toISOString(),
+            isOpen: typeof data?.isOpen === 'boolean' ? data.isOpen : null,
+          };
+          await db.insert(config)
+            .values({ key: 'config-version', value: versionValue })
+            .onConflictDoUpdate({
+              target: config.key,
+              set: { value: versionValue, updatedAt: new Date() },
+            });
+        } catch (versionError) {
+          console.error('[drizzle] Failed to bump config-version signal:', versionError);
+        }
+      }
       return;
     }
     

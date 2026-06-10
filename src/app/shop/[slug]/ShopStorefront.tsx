@@ -38,7 +38,7 @@ import Footer from '@/components/Footer';
 import SupportChatWidget from '@/components/SupportChatWidget';
 import PaymentModal from '@/components/PaymentModal';
 import {
-  getProductStatus, SHOP_STATUS_CONFIG, type ShopStatusType,
+  getProductStatus, getShopStatus, SHOP_STATUS_CONFIG, type ShopStatusType,
 } from '@/components/ShopStatusCard';
 import type { Product } from '@/lib/config';
 import {

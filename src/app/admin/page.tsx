@@ -5043,23 +5043,13 @@ export default function AdminPage(): JSX.Element {
     }
   }, [applyRealtimeOrderChange]); // stable — no config/logs closure
 
-  // Handle realtime config changes from other admins
-  const handleRealtimeConfigChange = useCallback((newConfig: any) => {
-    console.log('[Admin Realtime] Config updated by another admin');
-    if (newConfig) {
-      setConfig(prev => {
-        // Quick scalar check first
-        if (prev.isOpen === newConfig.isOpen &&
-            prev.sheetId === newConfig.sheetId &&
-            (prev.products?.length ?? 0) === (newConfig.products?.length ?? 0)) {
-          const prevJson = JSON.stringify(prev);
-          const nextJson = JSON.stringify(newConfig);
-          if (prevJson === nextJson) return prev;
-        }
-        return newConfig;
-      });
-    }
-  }, []);
+  // Handle realtime config changes from other admins.
+  // The realtime payload is only a lightweight signal ({ updatedAt, isOpen });
+  // refetch /api/admin/data to get the full (unsanitized) config.
+  const handleRealtimeConfigChange = useCallback((signal?: { updatedAt?: string; isOpen?: boolean | null }) => {
+    console.log('[Admin Realtime] Config changed — refetching admin data. Open status:', signal?.isOpen);
+    swrRefresh({ silent: true });
+  }, [swrRefresh]);
 
   // Use realtime subscriptions for admin (orders + config)
   const { isConnected: realtimeConnected } = useRealtimeAdminOrders(

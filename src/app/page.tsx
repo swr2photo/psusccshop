@@ -2735,6 +2735,9 @@ export default function HomePage() {
   const [currentAnnouncementIndex, setCurrentAnnouncementIndex] = useState(0); // For cycling announcements
   const [showAnnouncementImage, setShowAnnouncementImage] = useState(false); // For image lightbox
   const [isShopOpen, setIsShopOpen] = useState(true);
+  // Health of the public config realtime channel — gates fallback polling.
+  // (realtimeConnected from useRealtimeOrders only reflects the orders channel)
+  const [configRealtimeOk, setConfigRealtimeOk] = useState(false);
   const configFetchInFlight = useRef(false);
   const configPollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -3017,11 +3020,13 @@ export default function HomePage() {
     Object.values(cartHoldTimers.current).forEach((t) => t && clearInterval(t));
   }, []);
 
-  const refreshConfig = useCallback(async () => {
-    if (configFetchInFlight.current) return;
+  const refreshConfig = useCallback(async (fresh = false) => {
+    // fresh = realtime signaled a change: bypass the in-flight guard and all
+    // caches so we never miss the update
+    if (configFetchInFlight.current && !fresh) return;
     configFetchInFlight.current = true;
     try {
-      const res = await getPublicConfig();
+      const res = await getPublicConfig(fresh);
       if (res.status === 'success') {
         const cfg = (res.data as ShopConfig | undefined) ?? (res.config as ShopConfig | undefined);
         if (cfg) {
@@ -3368,20 +3373,12 @@ export default function HomePage() {
   }, [config?.products, selectedProduct, lang, showToast]);
 
   //  Realtime config updates via Supabase + fallback polling for visibility changes
-  const handleConfigChange = useCallback((newConfig: ShopConfig) => {
-    console.log('[Realtime] Config updated from server. Open status:', newConfig?.isOpen);
-    // Set the full config (realtime gives us the complete config)
-    setConfig(newConfig);
-    
-    // Calculate actual shop open status based on isOpen flag AND closeDate
-    const shopStatus = getShopStatus(newConfig.isOpen, newConfig.closeDate, newConfig.openDate);
-    const actuallyOpen = shopStatus === 'OPEN';
-    setIsShopOpen(prev => prev === actuallyOpen ? prev : actuallyOpen);
-    
-    // Also cache it as lean for session storage
-    const lean = sanitizeConfig(newConfig);
-    cacheConfig(lean);
-  }, []);
+  // The realtime payload is a lightweight signal ({ updatedAt, isOpen }) —
+  // we refetch the full sanitized config from the API (bypassing CDN cache).
+  const handleConfigChange = useCallback((signal?: { updatedAt?: string; isOpen?: boolean | null }) => {
+    console.log('[Realtime] Config change signal received. Open status:', signal?.isOpen);
+    refreshConfig(true);
+  }, [refreshConfig]);
 
   const handleOrderChange = useCallback((change: { type: string; order: any; oldOrder?: any }) => {
     console.log('[Realtime] Order change received:', change.type);
@@ -3466,7 +3463,9 @@ export default function HomePage() {
   // Render at the end of the page
   useEffect(() => {
     const handleVisibility = () => {
-      if (!document.hidden && !realtimeConnected) {
+      // Always refresh when the tab becomes visible again — realtime events
+      // may have been missed while the socket was suspended in background
+      if (!document.hidden) {
         refreshConfig();
       }
     };
@@ -3478,12 +3477,14 @@ export default function HomePage() {
       window.removeEventListener('focus', handleVisibility);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [refreshConfig, realtimeConnected]);
+  }, [refreshConfig]);
 
-  // Fallback polling only when realtime is disconnected
+  // Fallback polling only when the CONFIG realtime channel is unhealthy
+  // (previously gated on the orders channel, which stayed "connected" even
+  // though config events were never delivered)
   useEffect(() => {
-    if (realtimeConnected) {
-      // Realtime connected, clear polling
+    if (configRealtimeOk) {
+      // Config realtime healthy, clear polling
       if (configPollTimer.current) {
         clearInterval(configPollTimer.current);
         configPollTimer.current = null;
@@ -3491,7 +3492,7 @@ export default function HomePage() {
       return;
     }
 
-    // Fallback polling when realtime is not available
+    // Fallback polling when config realtime is not available
     const intervalMs = 30000; // 30s polling as fallback
     configPollTimer.current = setInterval(() => {
       refreshConfig();
@@ -3500,7 +3501,7 @@ export default function HomePage() {
     return () => {
       if (configPollTimer.current) clearInterval(configPollTimer.current);
     };
-  }, [refreshConfig, realtimeConnected]);
+  }, [refreshConfig, configRealtimeOk]);
 
   // Subscribe to config updates in realtime (for both logged-in and guest users)
   useEffect(() => {
@@ -3515,21 +3516,22 @@ export default function HomePage() {
           event: 'UPDATE',
           schema: 'public',
           table: 'config',
-          filter: 'key=eq.shop-settings',
+          // Lightweight version row bumped by the server on every config save
+          filter: 'key=eq.config-version',
         },
         (payload) => {
           console.log('[Realtime] Public config change payload:', payload);
           const newData = payload.new as Record<string, any> | null;
-          if (newData?.value) {
-            handleConfigChange(newData.value);
-          }
+          handleConfigChange(newData?.value || {});
         }
       )
       .subscribe((status) => {
         console.log('[Realtime] Public config subscription status:', status);
+        setConfigRealtimeOk(status === 'SUBSCRIBED');
       });
 
     return () => {
+      setConfigRealtimeOk(false);
       channel.unsubscribe();
     };
   }, [handleConfigChange]);

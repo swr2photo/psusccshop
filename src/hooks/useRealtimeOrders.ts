@@ -116,7 +116,12 @@ interface UseRealtimeOrdersOptions {
   emailHash?: string;
   adminMode?: boolean;
   onOrderChange?: (change: OrderChange) => void;
-  onConfigChange?: (config: any) => void;
+  /**
+   * Called when shop config changes. Receives the lightweight signal value
+   * ({ updatedAt, isOpen }) — NOT the full config. Consumers must refetch
+   * the config from their own API endpoint (/api/config or /api/admin/data).
+   */
+  onConfigChange?: (signal: { updatedAt?: string; isOpen?: boolean | null }) => void;
   onStateChange?: (state: RealtimeState) => void;
   enabled?: boolean;
 }
@@ -304,13 +309,16 @@ export function useRealtimeOrders(options: UseRealtimeOrdersOptions = {}) {
             event: '*',
             schema: 'public',
             table: 'config',
-            filter: 'key=eq.shop-settings',
+            // Lightweight signal row bumped by the server on every config
+            // save. The full shop-settings row is too large for realtime
+            // payloads and contains unsanitized admin data.
+            filter: 'key=eq.config-version',
           },
           (payload) => {
             console.log('[Realtime] Config change detected');
             const newData = payload.new as Record<string, any> | null;
-            if (newData?.value && onConfigChangeRef.current) {
-              onConfigChangeRef.current(newData.value);
+            if (onConfigChangeRef.current) {
+              onConfigChangeRef.current(newData?.value || {});
             }
           }
         )
@@ -575,7 +583,7 @@ export function useRealtimeOrders(options: UseRealtimeOrdersOptions = {}) {
 export function useRealtimeAdminOrders(
   onOrderChange: (change: OrderChange) => void,
   onStateChange?: (state: RealtimeState) => void,
-  onConfigChange?: (config: any) => void
+  onConfigChange?: (signal: { updatedAt?: string; isOpen?: boolean | null }) => void
 ) {
   return useRealtimeOrders({
     adminMode: true,
@@ -607,7 +615,7 @@ export function useRealtimeUserOrders(
 export function useRealtimeOrdersByEmail(
   email: string | undefined | null,
   onOrderChange: (change: OrderChange) => void,
-  onConfigChange?: (config: any) => void
+  onConfigChange?: (signal: { updatedAt?: string; isOpen?: boolean | null }) => void
 ) {
   const [emailHash, setEmailHash] = useState<string | undefined>(undefined);
 

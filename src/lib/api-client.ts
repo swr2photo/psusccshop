@@ -556,7 +556,12 @@ export async function getCart(email: string): Promise<APIResponse> {
 /**
  * Get public shop configuration
  */
-export async function getPublicConfig(): Promise<APIResponse> {
+export async function getPublicConfig(fresh = false): Promise<APIResponse> {
+  if (fresh) {
+    // Bypass browser cache AND CDN cache (unique query string = CDN cache miss).
+    // Used when realtime signals a config change and we need the latest data now.
+    return fetchJson(`/api/config?v=${Date.now()}`, { cache: 'no-store' as RequestCache });
+  }
   return fetchJson('/api/config');
 }
 
