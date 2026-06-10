@@ -4,8 +4,7 @@ import "./globals.css";
 import Providers from "@/components/Providers";
 import ThemeRegistry from "../components/ThemeRegistry";
 import Script from "next/script";
-
-const SITE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://sccshop.psuscc.club";
+import { SITE_URL } from "@/lib/site";
 // Google Search Console — HTML tag (URL prefix). Override via GOOGLE_SITE_VERIFICATION in Vercel.
 const GOOGLE_SITE_VERIFICATION =
   process.env.GOOGLE_SITE_VERIFICATION?.trim() ||
@@ -23,6 +22,9 @@ export const metadata: Metadata = {
     template: "%s | SCC Shop",
   },
   verification: { google: GOOGLE_SITE_VERIFICATION },
+  alternates: {
+    canonical: SITE_URL,
+  },
   description: "SCC Shop คือร้านค้าออนไลน์ของชุมนุมคอมพิวเตอร์ (Science Computer Club) คณะวิทยาศาสตร์ มหาวิทยาลัยสงขลานครินทร์ จำหน่ายเสื้อชุมนุม เสื้อคณะ และสินค้าที่ระลึก สั่งซื้อง่าย ชำระเงินผ่าน PromptPay พร้อมระบบติดตามคำสั่งซื้อแบบเรียลไทม์ | The official online store of the PSU Science Computer Club for club shirts, faculty apparel, and souvenir merchandise.",
   keywords: ["SCC Shop", "ชุมนุมคอมพิวเตอร์", "PSU", "มหาวิทยาลัยสงขลานครินทร์", "เสื้อชุมนุม", "คณะวิทยาศาสตร์", "Prince of Songkla University", "online store", "ร้านค้าออนไลน์"],
   authors: [{ name: "PSU Science Computer Club" }],
@@ -123,18 +125,38 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           dangerouslySetInnerHTML={{
             __html: JSON.stringify({
               '@context': 'https://schema.org',
-              '@type': 'WebApplication',
-              name: 'SCC Shop',
-              alternateName: 'PSU SCC Shop',
-              url: SITE_URL,
-              applicationCategory: 'ShoppingApplication',
-              operatingSystem: 'Web',
-              description:
-                'Official online store of the Science Computer Club (SCC), Faculty of Science, Prince of Songkla University. Browse club merchandise, place orders, pay via PromptPay, and track orders.',
-              publisher: {
-                '@type': 'Organization',
-                name: 'Science Computer Club, Faculty of Science, Prince of Songkla University',
-              },
+              '@graph': [
+                {
+                  '@type': 'Organization',
+                  '@id': `${SITE_URL}/#organization`,
+                  name: 'SCC Shop',
+                  alternateName: ['PSU SCC Shop', 'ชุมนุมคอมพิวเตอร์ ม.อ.'],
+                  url: SITE_URL,
+                  logo: `${SITE_URL}/logo.png`,
+                  description:
+                    'ร้านค้าออนไลน์ของชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ มหาวิทยาลัยสงขลานครินทร์',
+                },
+                {
+                  '@type': 'WebSite',
+                  '@id': `${SITE_URL}/#website`,
+                  name: 'SCC Shop',
+                  url: SITE_URL,
+                  publisher: { '@id': `${SITE_URL}/#organization` },
+                  inLanguage: ['th-TH', 'en'],
+                },
+                {
+                  '@type': 'OnlineStore',
+                  '@id': `${SITE_URL}/#store`,
+                  name: 'SCC Shop',
+                  url: SITE_URL,
+                  image: `${SITE_URL}/logo.png`,
+                  description:
+                    'Official online store of the Science Computer Club (SCC), Faculty of Science, Prince of Songkla University.',
+                  publisher: { '@id': `${SITE_URL}/#organization` },
+                  paymentAccepted: 'PromptPay',
+                  currenciesAccepted: 'THB',
+                },
+              ],
             }),
           }}
         />

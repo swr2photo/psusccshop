@@ -3,6 +3,7 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getShopBySlug, toPublicShopData } from '@/lib/shops';
+import { absoluteUrl } from '@/lib/site';
 import ShopStorefrontClient from './ShopStorefrontClient';
 
 export const runtime = 'nodejs';
@@ -28,12 +29,18 @@ export async function generateMetadata(
   if (!shop) {
     return { title: 'ไม่พบร้านค้า' };
   }
+  const description = shop.description || shop.descriptionEn || `ร้านค้า ${shop.name} — SCC Shop`;
+  const canonical = absoluteUrl(`/shop/${shop.slug}`);
   return {
     title: shop.name,
-    description: shop.description || `ร้านค้า ${shop.name}`,
+    description,
+    alternates: { canonical },
+    robots: { index: true, follow: true },
     openGraph: {
       title: shop.name,
-      description: shop.description || `ร้านค้า ${shop.name}`,
+      description,
+      url: canonical,
+      type: 'website',
       ...(shop.logoUrl ? { images: [{ url: shop.logoUrl }] } : {}),
     },
   };
@@ -45,5 +52,28 @@ export default async function ShopPage({ params }: { params: Promise<{ slug: str
   if (!shop) {
     notFound();
   }
-  return <ShopStorefrontClient shopSlug={slug} initialShop={shop} />;
+  const shopUrl = absoluteUrl(`/shop/${slug}`);
+  const storeJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Store',
+    name: shop.name,
+    description: shop.description || shop.descriptionEn,
+    url: shopUrl,
+    ...(shop.logoUrl ? { image: shop.logoUrl } : {}),
+    parentOrganization: {
+      '@type': 'Organization',
+      name: 'SCC Shop',
+      url: absoluteUrl('/'),
+    },
+  };
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(storeJsonLd) }}
+      />
+      <ShopStorefrontClient shopSlug={slug} initialShop={shop} />
+    </>
+  );
 }
