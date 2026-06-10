@@ -49,6 +49,7 @@ function getRpConfig(requestUrl?: string) {
     'localhost',
     '127.0.0.1',
     'sccshop.psusci.club',
+    'sccshop.psuscc.club',
   ];
   
   // Also parse from NEXTAUTH_URL and NEXT_PUBLIC_BASE_URL
@@ -65,7 +66,10 @@ function getRpConfig(requestUrl?: string) {
     } catch {}
   }
 
-  const isAllowed = allowedHostnames.includes(hostname) || hostname.endsWith('.psusci.club');
+  const isAllowed =
+    allowedHostnames.includes(hostname) ||
+    hostname.endsWith('.psusci.club') ||
+    hostname.endsWith('.psuscc.club');
   if (!isAllowed) {
     // Fallback to NEXTAUTH_URL configuration
     try {

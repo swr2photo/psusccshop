@@ -19,6 +19,8 @@ const getRedisClient = () => {
 const allowedOrigins = [
   'https://sccshop.psusci.club',
   'https://www.sccshop.psusci.club',
+  'https://sccshop.psuscc.club',
+  'https://www.sccshop.psuscc.club',
 ];
 
 // Check if origin is allowed
@@ -29,8 +31,8 @@ function isAllowedOrigin(origin: string | null): boolean {
   // Exact match for production domains
   if (allowedOrigins.includes(origin)) return true;
 
-  // Allow subdomains of psusci.club
-  if (origin.endsWith('.psusci.club')) return true;
+  // Allow subdomains of psusci.club / psuscc.club
+  if (origin.endsWith('.psusci.club') || origin.endsWith('.psuscc.club')) return true;
 
   // Allow localhost for development
   if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) return true;
@@ -224,8 +226,8 @@ export default async function proxy(request: NextRequest) {
     }
   }
 
-  // --- CORS Check ---
-  if (!isAllowedOrigin(origin)) {
+  // --- CORS Check (skip auth — NextAuth sets CSRF/state cookies on POST sign-in) ---
+  if (!pathname.startsWith('/api/auth/') && !isAllowedOrigin(origin)) {
     return NextResponse.json(
       { status: 'error', message: 'CORS policy: This origin is not allowed' },
       { status: 403 }
