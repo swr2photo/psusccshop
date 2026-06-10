@@ -12,7 +12,8 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   };
 }
 
-import React, { Component, ErrorInfo, useMemo, useEffect, lazy, Suspense } from 'react';
+import React, { Component, ErrorInfo, useMemo, useEffect, useState, lazy, Suspense } from 'react';
+import { useHydrated } from '@/hooks/useHydrated';
 import { SessionProvider } from "next-auth/react";
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
@@ -424,14 +425,30 @@ const lightTheme = createTheme({
 });
 
 export default function Providers({ children }: { children: React.ReactNode }) {
+  const hydrated = useHydrated();
+  const [themeReady, setThemeReady] = useState(false);
   const resolvedMode = useThemeStore((s) => s.resolvedMode);
-  const activeTheme = useMemo(() => resolvedMode === 'light' ? lightTheme : darkTheme, [resolvedMode]);
 
-  // Sync data-theme attribute on mount and mode change
   useEffect(() => {
+    if (!hydrated) return;
+    useThemeStore.getState()._resolveSystemMode();
+    const mode = useThemeStore.getState().resolvedMode;
+    document.documentElement.setAttribute('data-theme', mode);
+    document.documentElement.style.colorScheme = mode;
+    setThemeReady(true);
+  }, [hydrated]);
+
+  const activeTheme = useMemo(() => {
+    const mode = themeReady ? resolvedMode : 'light';
+    return mode === 'light' ? lightTheme : darkTheme;
+  }, [resolvedMode, themeReady]);
+
+  // Sync data-theme after hydration and on user theme changes
+  useEffect(() => {
+    if (!themeReady) return;
     document.documentElement.setAttribute('data-theme', resolvedMode);
     document.documentElement.style.colorScheme = resolvedMode;
-  }, [resolvedMode]);
+  }, [resolvedMode, themeReady]);
 
   return (
     <ErrorBoundary>

@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useThemeStore } from '@/store/themeStore';
 import { useTranslation } from '@/hooks/useTranslation';
 
@@ -12,10 +12,25 @@ interface ThemeToggleProps {
 export default function ThemeToggle({ compact = true, size = 'medium' }: ThemeToggleProps) {
   const { mode, resolvedMode, toggleMode } = useThemeStore();
   const { t } = useTranslation();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const btnSize = size === 'small' ? 34 : 40;
   const iconSize = size === 'small' ? 18 : 22;
-  const isDark = resolvedMode === 'dark';
+  const isDark = mounted && resolvedMode === 'dark';
+
+  if (!mounted) {
+    return (
+      <div
+        style={{ display: 'inline-block', width: btnSize, height: btnSize, flexShrink: 0 }}
+        aria-hidden
+        suppressHydrationWarning
+      />
+    );
+  }
 
   const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -25,9 +40,11 @@ export default function ThemeToggle({ compact = true, size = 'medium' }: ThemeTo
   return (
     <div style={{ display: 'inline-block' }}>
       <button
+        type="button"
         onClick={handleToggle}
         title={`${t.theme.changeTheme} (${t.theme[mode === 'system' ? 'auto' : mode] || mode})`}
         className="magic-theme-toggle"
+        suppressHydrationWarning
         style={{
           width: btnSize,
           height: btnSize,
@@ -113,18 +130,6 @@ export default function ThemeToggle({ compact = true, size = 'medium' }: ThemeTo
           })}
         </svg>
       </button>
-
-      {/* Inline styles for animations */}
-      <style jsx>{`
-        .magic-theme-toggle:hover {
-          border-color: rgba(0,113,227,0.3) !important;
-          background: var(--surface-2) !important;
-          transform: scale(1.05);
-        }
-        .magic-theme-toggle:active {
-          transform: scale(0.92) !important;
-        }
-      `}</style>
     </div>
   );
 }

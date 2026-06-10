@@ -36,7 +36,8 @@ export const useThemeStore = create<ThemeState>()(
   persist(
     (set, get) => ({
       mode: 'system',
-      resolvedMode: typeof window === 'undefined' ? 'dark' : resolveMode('system'),
+      // Stable default for SSR + first client paint (updated after persist rehydrate)
+      resolvedMode: 'light',
       
       setMode: (mode: ThemeMode) => {
         const resolved = resolveMode(mode);
@@ -75,12 +76,8 @@ export const useThemeStore = create<ThemeState>()(
       partialize: (state) => ({ mode: state.mode }),
       onRehydrateStorage: () => (state) => {
         if (state) {
-          const resolved = resolveMode(state.mode);
-          state.resolvedMode = resolved;
-          if (typeof document !== 'undefined') {
-            document.documentElement.setAttribute('data-theme', resolved);
-            document.documentElement.style.colorScheme = resolved;
-          }
+          // Resolve mode in memory only; DOM sync happens in Providers after hydration
+          state.resolvedMode = resolveMode(state.mode);
         }
       },
     }

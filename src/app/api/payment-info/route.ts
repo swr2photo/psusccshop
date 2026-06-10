@@ -64,56 +64,25 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // All orders (main + sub-shops) use the same PromptPay / bank account as the main shop
     const bankName = process.env.PAYMENT_BANK || 'พร้อมเพย์ (โอนได้ทุกธนาคาร)';
     const accountName = process.env.PAYMENT_ACCOUNT_NAME || '';
     const accountNumber = process.env.PAYMENT_ACCOUNT || '';
+    const effectivePromptPayId = process.env.PROMPTPAY_ID || '';
 
-    // Check if order belongs to a shop — use shop-specific payment info
     const orderShopId = order.shopId || order.shop_id;
-    let shopPaymentInfo: { bankName: string; accountName: string; accountNumber: string; promptPayId: string } | null = null;
-    if (orderShopId) {
-      const shop = await getShopById(orderShopId);
-      if (shop?.paymentInfo) {
-        const pi = shop.paymentInfo;
-        if (pi.promptPayId || pi.bankName) {
-          shopPaymentInfo = {
-            bankName: pi.bankName || bankName,
-            accountName: pi.accountName || accountName,
-            accountNumber: pi.accountNumber || accountNumber,
-            promptPayId: pi.promptPayId || process.env.PROMPTPAY_ID || '',
-          };
-        }
-      }
-    }
 
-    const effectiveBankName = shopPaymentInfo?.bankName || bankName;
-    const effectiveAccountName = shopPaymentInfo?.accountName || accountName;
-    const effectiveAccountNumber = shopPaymentInfo?.accountNumber || accountNumber;
-    const effectivePromptPayId = shopPaymentInfo?.promptPayId || process.env.PROMPTPAY_ID || '';
-
-    // ตรวจสอบสถานะระบบชำระเงิน
-    // For shop orders, check shop-specific settings first; fallback to global
-    let paymentEnabled = true;
-    let paymentDisabledMessage = 'ระบบชำระเงินปิดให้บริการชั่วคราว';
-    if (orderShopId) {
-      // Use shop-specific payment settings if available
-      const shopData = await getShopById(orderShopId);
-      if (shopData?.settings && typeof shopData.settings.paymentEnabled === 'boolean') {
-        paymentEnabled = shopData.settings.paymentEnabled;
-        paymentDisabledMessage = shopData.settings.paymentDisabledMessage || paymentDisabledMessage;
-      }
-    } else {
-      // Global payment config for main shop
-      const CONFIG_KEY = 'config/shop-settings.json';
-      const shopConfig = await getJson<any>(CONFIG_KEY);
-      paymentEnabled = shopConfig?.paymentEnabled !== false;
-      paymentDisabledMessage = shopConfig?.paymentDisabledMessage || paymentDisabledMessage;
-    }
+    // ตรวจสอบสถานะระบบชำระเงิน — ใช้ config ร้านหลักสำหรับทุกออเดอร์
+    const CONFIG_KEY = 'config/shop-settings.json';
+    const shopConfig = await getJson<any>(CONFIG_KEY);
+    const paymentEnabled = shopConfig?.paymentEnabled !== false;
+    const paymentDisabledMessage =
+      shopConfig?.paymentDisabledMessage || 'ระบบชำระเงินปิดให้บริการชั่วคราว';
 
     const baseAmount = Number(order.totalAmount ?? order.amount ?? calculateOrderTotal(order.cart || [])) || 0;
     const discount = Number(order.discount ?? 0);
     const finalAmount = Math.max(0, baseAmount - discount);
-    // Generate QR payload — use shop-specific PromptPay ID if available
+    // Generate QR payload — main shop PromptPay ID for all orders
     const qrPayload = finalAmount > 0 ? generatePromptPayPayloadForId(effectivePromptPayId, finalAmount) : null;
     const qrUrl = finalAmount > 0 && qrPayload ? `https://quickchart.io/qr?size=300&text=${encodeURIComponent(qrPayload)}` : null;
 
@@ -124,12 +93,8 @@ export async function GET(req: NextRequest) {
       if (shop?.products) {
         productsList = shop.products;
       }
-    } else {
-      const CONFIG_KEY = 'config/shop-settings.json';
-      const shopConfig = await getJson<any>(CONFIG_KEY);
-      if (shopConfig?.products) {
-        productsList = shopConfig.products;
-      }
+    } else if (shopConfig?.products) {
+      productsList = shopConfig.products;
     }
 
     // ดึงข้อมูลสินค้าจาก order และ sanitize
@@ -155,10 +120,10 @@ export async function GET(req: NextRequest) {
       status: 'success',
       data: {
         ref: sanitizedRef,
-        bankName: effectiveBankName,
-        accountName: effectiveAccountName,
+        bankName,
+        accountName,
         // SECURITY: Mask account number - แสดงแค่ 4 ตัวท้าย
-        accountNumber: maskAccountNumber(effectiveAccountNumber),
+        accountNumber: maskAccountNumber(accountNumber),
         promptPayId: effectivePromptPayId,
         baseAmount,
         discount,
@@ -174,10 +139,10 @@ export async function GET(req: NextRequest) {
         // สถานะระบบชำระเงิน
         paymentEnabled,
         paymentDisabledMessage: paymentEnabled ? null : paymentDisabledMessage,
-        // Stripe PromptPay (auto-verified QR) — main shop only, requires env keys
-        stripePromptPayEnabled:
-          !orderShopId &&
-          Boolean(process.env.STRIPE_SECRET_KEY && process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY),
+        // Stripe PromptPay (auto-verified QR) — same flow for main + sub-shop orders
+        stripePromptPayEnabled: Boolean(
+          process.env.STRIPE_SECRET_KEY && process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+        ),
       },
     };
 

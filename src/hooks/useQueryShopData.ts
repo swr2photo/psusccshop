@@ -225,9 +225,12 @@ export function usePublicShopQuery(shopId: string | undefined, initialShopData?:
     queryKey: [...queryKeys.shop.all, 'public', shopId || ''],
     queryFn: () => fetchJSON<{ status: string; shop?: any }>(`/api/shops/${shopId}/public`),
     enabled: !!shopId,
-    staleTime: 20 * 1000, // 20 seconds
+    staleTime: 0,
+    refetchInterval: 30 * 1000,
     refetchOnWindowFocus: 'always',
-    initialData: initialShopData ? { status: 'success', shop: initialShopData } : undefined,
+    refetchOnMount: 'always',
+    // placeholderData shows server snapshot immediately, then always refetches fresh data
+    placeholderData: initialShopData ? { status: 'success', shop: initialShopData } : undefined,
   });
 }
 

@@ -1,6 +1,113 @@
 // ==================== SHOP CONSTANTS & HELPERS ====================
 // Extracted from page.tsx for better code organization
 
+import { DEFAULT_NAME_VALIDATION, getCategoryFromType, SIZES, type NameValidationConfig, type Product } from './config';
+
+export function productRequiresSize(product: Product): boolean {
+  if (product.options?.requiresSize === false) return false;
+  const category = product.category || getCategoryFromType(product.type);
+  return category === 'APPAREL';
+}
+
+export function getDisplaySizes(product: Product, freeSizeLabel = 'Free Size'): string[] {
+  const sizeKeys = Object.keys(product.sizePricing || {});
+  if (sizeKeys.length === 0) return [freeSizeLabel];
+  return sizeKeys.sort((a, b) => {
+    const indexA = SIZES.indexOf(a);
+    const indexB = SIZES.indexOf(b);
+    if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+    if (indexA !== -1) return -1;
+    if (indexB !== -1) return 1;
+    return a.localeCompare(b);
+  });
+}
+
+export function resolveProductUnitPrice(
+  product: Product,
+  selectedSize: string,
+  isLongSleeve: boolean | null,
+): number {
+  const hasVariants = !productRequiresSize(product) && !!product.variants?.length;
+  let basePrice = product.basePrice;
+  if (hasVariants && selectedSize) {
+    const variant = product.variants!.find((v) => v.id === selectedSize);
+    if (variant) basePrice = variant.price || product.basePrice;
+  } else if (productRequiresSize(product) && selectedSize) {
+    basePrice = product.sizePricing?.[selectedSize] ?? product.basePrice;
+  }
+  const sleeveFee = product.options?.hasLongSleeve && isLongSleeve === true
+    ? (product.options?.longSleevePrice ?? 50)
+    : 0;
+  return basePrice + sleeveFee;
+}
+
+export type ShopOpenFields = {
+  isOpen: boolean;
+  closeDate?: string;
+  openDate?: string;
+  closedMessage?: string;
+};
+
+/** Read shop open/close fields from flattened or nested settings (sub-shop public API shape). */
+export function resolveShopOpenFields(shop: {
+  isOpen?: boolean;
+  closeDate?: string;
+  openDate?: string;
+  closedMessage?: string;
+  settings?: {
+    isOpen?: boolean;
+    closeDate?: string;
+    openDate?: string;
+    closedMessage?: string;
+  };
+} | null | undefined): ShopOpenFields {
+  if (!shop) {
+    return { isOpen: true, closeDate: '', openDate: undefined, closedMessage: undefined };
+  }
+  return {
+    isOpen: shop.isOpen ?? shop.settings?.isOpen ?? true,
+    closeDate: shop.closeDate ?? shop.settings?.closeDate,
+    openDate: shop.openDate ?? shop.settings?.openDate,
+    closedMessage: shop.closedMessage ?? shop.settings?.closedMessage,
+  };
+}
+
+/** Merge a Supabase realtime `shops` row into the public shop snapshot (client-safe). */
+export function applyRealtimeShopRow(prevShop: Record<string, any>, row: Record<string, any>) {
+  const settings = (row.settings as Record<string, any>) || {};
+  const mergedSettings = {
+    ...(prevShop.settings || {}),
+    ...(settings.isOpen !== undefined ? { isOpen: settings.isOpen } : {}),
+    ...(settings.closeDate !== undefined ? { closeDate: settings.closeDate } : {}),
+    ...(settings.openDate !== undefined ? { openDate: settings.openDate } : {}),
+    ...(settings.closedMessage !== undefined ? { closedMessage: settings.closedMessage } : {}),
+    ...(settings.paymentEnabled !== undefined ? { paymentEnabled: settings.paymentEnabled } : {}),
+    ...(settings.paymentDisabledMessage !== undefined ? { paymentDisabledMessage: settings.paymentDisabledMessage } : {}),
+  };
+
+  const isOpen = settings.isOpen !== undefined
+    ? settings.isOpen
+    : (prevShop.isOpen ?? prevShop.settings?.isOpen ?? true);
+
+  return {
+    ...prevShop,
+    ...(row.name !== undefined ? { name: row.name } : {}),
+    ...(row.name_en !== undefined ? { nameEn: row.name_en } : {}),
+    ...(row.description !== undefined ? { description: row.description } : {}),
+    ...(row.description_en !== undefined ? { descriptionEn: row.description_en } : {}),
+    ...(row.logo_url !== undefined ? { logoUrl: row.logo_url } : {}),
+    ...(row.banner_url !== undefined ? { bannerUrl: row.banner_url } : {}),
+    ...(row.products !== undefined ? { products: row.products } : {}),
+    isOpen,
+    closeDate: settings.closeDate ?? prevShop.closeDate ?? prevShop.settings?.closeDate ?? '',
+    openDate: settings.openDate ?? prevShop.openDate ?? prevShop.settings?.openDate,
+    closedMessage: settings.closedMessage ?? prevShop.closedMessage ?? prevShop.settings?.closedMessage,
+    paymentEnabled: settings.paymentEnabled ?? prevShop.paymentEnabled ?? prevShop.settings?.paymentEnabled,
+    paymentDisabledMessage: settings.paymentDisabledMessage ?? prevShop.paymentDisabledMessage ?? prevShop.settings?.paymentDisabledMessage,
+    settings: mergedSettings,
+  };
+}
+
 // ==================== STATUS LABELS ====================
 export const STATUS_LABELS: Record<string, string> = {
   PENDING: 'รอดำเนินการ',
@@ -201,7 +308,53 @@ export const normalizeDigits99 = (value: string) => {
 
 export const isThaiText = (value: string) => /^[\u0E00-\u0E7F\s]+$/.test(value.trim());
 
+export function buildNameCharPattern(cfg: NameValidationConfig): string {
+  let pattern = '';
+  if (cfg.allowThai) pattern += '\u0E00-\u0E7F';
+  if (cfg.allowEnglish) pattern += 'a-zA-Z';
+  if (cfg.allowSpecialChars && cfg.allowedSpecialChars) {
+    pattern += cfg.allowedSpecialChars.replace(/[\\\]\^\-]/g, '\\$&');
+  }
+  pattern += '\\s';
+  return pattern;
+}
+
+export function isValidCustomerName(
+  name: string,
+  cfg: NameValidationConfig = DEFAULT_NAME_VALIDATION,
+): boolean {
+  const trimmed = name.trim();
+  if (!trimmed || trimmed.length < cfg.minLength || trimmed.length > cfg.maxLength) return false;
+  return new RegExp(`^[${buildNameCharPattern(cfg)}]+$`).test(trimmed);
+}
+
+export function sanitizeCustomerName(
+  value: string,
+  cfg: NameValidationConfig = DEFAULT_NAME_VALIDATION,
+): string {
+  return value.replace(new RegExp(`[^${buildNameCharPattern(cfg)}]`, 'g'), '').trim().slice(0, cfg.maxLength);
+}
+
 export const onlyDigitsPhone = (value: string) => value.replace(/\D/g, '').slice(0, 12);
+
+export interface ProfileSavedAddress {
+  id: string;
+  label: string;
+  address: string;
+  isDefault: boolean;
+}
+
+/** Prefer flat address; fall back to default / first saved address */
+export function resolveProfileAddress(
+  flatAddress?: string,
+  savedAddresses?: ProfileSavedAddress[],
+): string {
+  const flat = flatAddress?.trim() || '';
+  if (flat) return flat;
+  const def = savedAddresses?.find((a) => a.isDefault)?.address?.trim();
+  if (def) return def;
+  return savedAddresses?.[0]?.address?.trim() || '';
+}
 
 export const getBasePrice = (p: { basePrice: number; sizePricing?: Record<string, number> }) => {
   const prices = Object.values(p.sizePricing || {});
@@ -238,6 +391,8 @@ export type CartItem = {
     customNumber?: string;
     isLongSleeve?: boolean;
     pattern?: string;
+    variantId?: string;
+    variantName?: string;
   };
 };
 

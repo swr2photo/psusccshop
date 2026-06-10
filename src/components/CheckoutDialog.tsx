@@ -99,6 +99,8 @@ interface CheckoutDialogProps {
   isMobile?: boolean;
   savedAddresses?: SavedAddress[];
   onAddressChange?: (address: string) => void;
+  /** Multi-shop: validate promo codes against this shop's config */
+  shopId?: string;
 }
 
 // ==================== ICONS ====================
@@ -139,6 +141,7 @@ export default function CheckoutDialog({
   isMobile = false,
   savedAddresses = [],
   onAddressChange,
+  shopId,
 }: CheckoutDialogProps) {
   // Config states
   const [shippingConfig, setShippingConfig] = useState<ShippingConfig | null>(null);
@@ -161,6 +164,15 @@ export default function CheckoutDialog({
   const [promoError, setPromoError] = useState('');
 
   const { t, lang } = useTranslation();
+
+  // Auto-select default saved address when checkout opens
+  useEffect(() => {
+    if (!open || orderData.address?.trim()) return;
+    const def = savedAddresses.find((a) => a.isDefault) || savedAddresses[0];
+    if (def?.address?.trim()) {
+      onAddressChange?.(def.address.trim());
+    }
+  }, [open, savedAddresses, orderData.address, onAddressChange]);
 
   // i18n helpers for shipping/payment option names
   const getShippingName = (option: ShippingOption) => lang === 'en' && option.nameEn ? option.nameEn : option.name;
@@ -308,7 +320,7 @@ export default function CheckoutDialog({
       const res = await fetch('/api/promo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: promoCode.trim(), subtotal }),
+        body: JSON.stringify({ code: promoCode.trim(), subtotal, ...(shopId ? { shopId } : {}) }),
       });
       const data = await res.json();
       if (res.ok && data.valid) {

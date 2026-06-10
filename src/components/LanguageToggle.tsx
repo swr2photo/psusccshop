@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLanguageStore } from '@/store/languageStore';
 import { useThemeStore } from '@/store/themeStore';
 
@@ -16,9 +16,24 @@ export default function LanguageToggle({ size = 'medium' }: LanguageToggleProps)
   const language = useLanguageStore((s) => s.language);
   const setLanguage = useLanguageStore((s) => s.setLanguage);
   const resolvedMode = useThemeStore((s) => s.resolvedMode);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const btnSize = size === 'small' ? 34 : 40;
-  const isDark = resolvedMode === 'dark';
+  const isDark = mounted && resolvedMode === 'dark';
+
+  if (!mounted) {
+    return (
+      <div
+        style={{ display: 'inline-block', width: btnSize, height: btnSize, flexShrink: 0 }}
+        aria-hidden
+        suppressHydrationWarning
+      />
+    );
+  }
 
   const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -28,9 +43,11 @@ export default function LanguageToggle({ size = 'medium' }: LanguageToggleProps)
   return (
     <div style={{ display: 'inline-block' }}>
       <button
+        type="button"
         onClick={handleToggle}
         title={language === 'th' ? 'Switch to English' : 'เปลี่ยนเป็นภาษาไทย'}
         className="magic-lang-toggle"
+        suppressHydrationWarning
         style={{
           width: btnSize,
           height: btnSize,
@@ -67,18 +84,6 @@ export default function LanguageToggle({ size = 'medium' }: LanguageToggleProps)
           {language.toUpperCase()}
         </span>
       </button>
-
-      {/* Inline styles for hover/active states */}
-      <style jsx>{`
-        .magic-lang-toggle:hover {
-          border-color: rgba(0,113,227,0.3) !important;
-          background: var(--surface-2) !important;
-          transform: scale(1.05);
-        }
-        .magic-lang-toggle:active {
-          transform: scale(0.92) !important;
-        }
-      `}</style>
     </div>
   );
 }

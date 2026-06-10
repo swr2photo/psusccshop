@@ -119,6 +119,13 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   const [showAddressForm, setShowAddressForm] = useState(!initialData.savedAddresses?.length);
 
+  // Sync saved addresses when parent finishes async profile load (avoid empty overwrite on save)
+  useEffect(() => {
+    if (initialData.savedAddresses?.length && savedAddresses.length === 0) {
+      setSavedAddresses(initialData.savedAddresses);
+    }
+  }, [initialData.savedAddresses, savedAddresses.length]);
+
   // Crop preview state
   const [cropPreview, setCropPreview] = useState<string | null>(null);
   const [cropFileName, setCropFileName] = useState('');
@@ -669,9 +676,13 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
-    // Use default address from saved addresses, or compose current fields
+    // Never send blank address if we already have one on file
     const defaultAddr = savedAddresses.find(a => a.isDefault);
-    const composedAddress = defaultAddr ? defaultAddr.address : composeAddress(addressFields);
+    const composedAddress =
+      defaultAddr?.address?.trim() ||
+      composeAddress(addressFields).trim() ||
+      initialData.address?.trim() ||
+      '';
     onSave({
       ...formData,
       address: composedAddress,

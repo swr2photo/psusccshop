@@ -86,6 +86,9 @@ export async function POST(req: NextRequest) {
     for (const [k, v] of Object.entries(data)) {
       if (EXTRA_FIELDS.includes(k)) {
         extrasData[k] = v;
+      } else if (PROFILE_TABLE_FIELDS.includes(k) && (v === '' || v === null || v === undefined)) {
+        // Skip empty profile fields — avoid wiping saved name/phone/address on partial saves
+        continue;
       } else {
         profileData[k] = v;
       }

@@ -1347,6 +1347,30 @@ const chatbot = {
   },
 } as const;
 
+// ==================== STOREFRONT (sub-shop) ====================
+const storefront = {
+  th: {
+    shopContact: 'ข้อมูลร้านค้า',
+    email: 'อีเมล',
+    phone: 'โทรศัพท์',
+    backToMain: 'กลับร้านหลัก',
+    mainShop: 'ร้านหลัก',
+    selectShop: 'เลือกร้าน',
+    viewShopPage: 'ดูหน้าร้าน',
+    mixedCartWarning: 'กรุณาสั่งซื้อทีละร้าน — ล้างตะกร้าก่อนเปลี่ยนร้าน',
+  },
+  en: {
+    shopContact: 'Shop Contact',
+    email: 'Email',
+    phone: 'Phone',
+    backToMain: 'Back to main shop',
+    mainShop: 'Main Shop',
+    selectShop: 'Select shop',
+    viewShopPage: 'View shop page',
+    mixedCartWarning: 'Please checkout one shop at a time — clear your cart before switching shops',
+  },
+} as const;
+
 // ==================== SHOP STATUS ====================
 const shopStatus = {
   th: {
@@ -1985,6 +2009,7 @@ export function getTranslations(lang: Language) {
     product: product[lang],
     search: search[lang],
     chatbot: chatbot[lang],
+    storefront: storefront[lang],
     shopStatus: shopStatus[lang],
     countdown: countdown[lang],
     cookie: cookie[lang],

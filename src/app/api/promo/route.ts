@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, requireAdmin } from '@/lib/auth';
 import { getShopConfig } from '@/lib/filebase';
+import { getShopById } from '@/lib/shops';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -15,19 +16,27 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { code, subtotal } = body;
+    const { code, subtotal, shopId } = body;
 
     if (!code || typeof code !== 'string') {
       return NextResponse.json({ error: 'กรุณากรอกรหัสส่วนลด' }, { status: 400 });
     }
 
-    const config = await getShopConfig();
-    if (!config?.promoCodes?.length) {
+    let promoCodes: Array<{ code: string; enabled: boolean; [key: string]: any }> = [];
+    if (shopId) {
+      const shop = await getShopById(shopId);
+      promoCodes = shop?.config?.promoCodes || [];
+    } else {
+      const config = await getShopConfig();
+      promoCodes = config?.promoCodes || [];
+    }
+
+    if (!promoCodes.length) {
       return NextResponse.json({ error: 'รหัสส่วนลดไม่ถูกต้อง' }, { status: 400 });
     }
 
     const normalizedCode = code.trim().toUpperCase();
-    const promo = config.promoCodes.find(
+    const promo = promoCodes.find(
       (p: { code: string; enabled: boolean; [key: string]: any }) => p.code.toUpperCase() === normalizedCode && p.enabled
     );
 

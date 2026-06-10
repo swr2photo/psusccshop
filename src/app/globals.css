@@ -1463,4 +1463,17 @@ textarea::placeholder {
   text-shadow: none;
 }
 
+/* ---- Theme / Language toggle buttons (client-only; avoid styled-jsx hydration drift) ---- */
+.magic-theme-toggle:hover,
+.magic-lang-toggle:hover {
+  border-color: rgba(0, 113, 227, 0.3) !important;
+  background: var(--surface-2) !important;
+  transform: scale(1.05);
+}
+
+.magic-theme-toggle:active,
+.magic-lang-toggle:active {
+  transform: scale(0.92) !important;
+}
+
 

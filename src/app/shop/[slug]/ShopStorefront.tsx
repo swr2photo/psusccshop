@@ -6,22 +6,28 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import {
   Box, Typography, Button, Chip, Avatar, IconButton, Badge,
   Dialog, DialogContent, DialogActions, TextField,
-  Snackbar, Alert, useMediaQuery, Skeleton,
+  useMediaQuery, Skeleton,
   CircularProgress, Tooltip, Drawer,
 } from '@mui/material';
 import {
   Store, ShoppingCart, Plus, Minus, X, ArrowLeft, Search,
-  Share2, Heart, Package, Clock, Tag, CreditCard, Trash2,
-  History, MapPin, User, Phone, Instagram, Palette, Image as ImageOutlinedIcon,
-  CheckCircle2, ChevronLeft, ChevronRight,
+  Share2, Heart, Package, Clock, Tag,
+  History, MapPin, User, Phone, Mail, Instagram, Facebook, Palette, Image as ImageOutlinedIcon,
+  CheckCircle2, ChevronLeft, ChevronRight, Zap, Ruler,
 } from 'lucide-react';
 import { useSession, signIn } from 'next-auth/react';
 import dynamic from 'next/dynamic';
-const PasskeyLoginButton = dynamic(() => import('@/components/PasskeyLoginButton'), { ssr: false });
 const TurnstileWidget = dynamic(() => import('@/components/TurnstileWidget'), { ssr: false });
 const OrderHistoryDrawer = dynamic(() => import('@/components/OrderHistoryDrawer'), { ssr: false });
 const CheckoutDialog = dynamic(() => import('@/components/CheckoutDialog'), { ssr: false });
 const ProfileModal = dynamic(() => import('@/components/ProfileModal'), { ssr: false });
+const CartDrawer = dynamic(() => import('@/components/CartDrawer'), { ssr: false });
+const PaymentFlow = dynamic(() => import('@/components/PaymentFlow'), { ssr: false });
+function TogglePlaceholder() {
+  return <div style={{ display: 'inline-block', width: 40, height: 40, flexShrink: 0 }} aria-hidden />;
+}
+const ThemeToggle = dynamic(() => import('@/components/ThemeToggle'), { ssr: false, loading: TogglePlaceholder });
+const LanguageToggle = dynamic(() => import('@/components/LanguageToggle'), { ssr: false, loading: TogglePlaceholder });
 import { type SavedAddress } from '@/components/ProfileModal';
 import Link from 'next/link';
 import { useCartStore } from '@/store/cartStore';
@@ -37,20 +43,30 @@ import AnnouncementBar from '@/components/AnnouncementBar';
 import EventBanner, { type ShopEvent } from '@/components/EventBanner';
 import Footer from '@/components/Footer';
 import SupportChatWidget from '@/components/SupportChatWidget';
-import PaymentModal from '@/components/PaymentModal';
+import { useNotification } from '@/components/NotificationContext';
 import {
-  getProductStatus, getShopStatus, SHOP_STATUS_CONFIG, type ShopStatusType,
+  getProductStatus, getShopStatus, SHOP_STATUS_CONFIG, ShopStatusBanner, type ShopStatusType,
 } from '@/components/ShopStatusCard';
-import type { Product } from '@/lib/config';
+import type { Product, ShopConfig } from '@/lib/config';
+import type { ShippingConfig } from '@/lib/shipping';
+import type { CartItem as DrawerCartItem } from '@/lib/shop-constants';
+import { zustandCartToDrawerCart, drawerCartToZustandItem } from '@/lib/cart-mapper';
+import { useRealtimeOrdersByEmail } from '@/hooks/useRealtimeOrders';
 import {
   getProductName, getProductDescription,
   getCategoryLabel, getCategoryIcon,
   sortProductsNewestFirst,
   DEFAULT_SHIRT_NAME, type ShirtNameConfig,
+  DEFAULT_NAME_VALIDATION,
 } from '@/lib/config';
-import { submitOrder as submitOrderApi, getHistory, cancelOrder as cancelOrderApi, saveProfile as saveProfileApi } from '@/lib/api-client';
+import { submitOrder as submitOrderApi, getHistory, cancelOrder as cancelOrderApi, saveProfile as saveProfileApi, getProfile } from '@/lib/api-client';
 import type { OrderHistory } from '@/lib/shop-constants';
-import { isThaiText, getStatusCategory, normalizeStatus } from '@/lib/shop-constants';
+import {
+  isValidCustomerName, sanitizeCustomerName, onlyDigitsPhone, resolveProfileAddress,
+  getStatusCategory, normalizeStatus,
+  productRequiresSize, getDisplaySizes, SIZE_MEASUREMENTS, resolveProductUnitPrice,
+  resolveShopOpenFields, applyRealtimeShopRow,
+} from '@/lib/shop-constants';
 
 // ==================== TYPES ====================
 interface ShopInfo {
@@ -77,7 +93,40 @@ interface ShopInfo {
   };
   contactEmail?: string;
   contactPhone?: string;
+  socialLinks?: Record<string, string>;
+  products?: Product[];
   productCount?: number;
+}
+
+const SOCIAL_LINK_LABELS: Record<string, { th: string; en: string }> = {
+  facebook: { th: 'Facebook', en: 'Facebook' },
+  instagram: { th: 'Instagram', en: 'Instagram' },
+  line: { th: 'LINE', en: 'LINE' },
+  tiktok: { th: 'TikTok', en: 'TikTok' },
+  twitter: { th: 'X (Twitter)', en: 'X (Twitter)' },
+  website: { th: 'เว็บไซต์', en: 'Website' },
+};
+
+function isLikelyUrl(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length < 4) return false;
+  if (/^https?:\/\//i.test(trimmed)) return true;
+  if (/^www\./i.test(trimmed)) return true;
+  if (/^[\w.-]+\.[a-z]{2,}(\/|$)/i.test(trimmed)) return true;
+  return /^(line\.me|facebook\.com|instagram\.com|tiktok\.com)/i.test(trimmed);
+}
+
+function normalizeSocialUrl(url: string): string {
+  const trimmed = url.trim();
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
+function getSocialLinkEntries(links?: Record<string, string>) {
+  if (!links || typeof links !== 'object' || Array.isArray(links)) return [];
+  return Object.entries(links)
+    .filter(([, url]) => typeof url === 'string' && isLikelyUrl(url))
+    .map(([key, url]) => ({ key: key.toLowerCase(), url: url.trim() }));
 }
 
 interface ShopStorefrontProps {
@@ -150,7 +199,8 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
   const { data: session } = useSession();
   const { t, lang } = useTranslation();
   const { confirm: showConfirm, ConfirmDialog } = useConfirmDialog();
-  const isMobile = useMediaQuery('(max-width:600px)');
+  const { success: toastSuccess, error: toastError, warning: toastWarning, info: toastInfo } = useNotification();
+  const isMobile = useMediaQuery('(max-width:600px)', { noSsr: true });
   const cart = useCartStore((s) => s.cart);
   const addToCart = useCartStore((s) => s.addToCart);
   const wishlistStore = useWishlistStore();
@@ -159,31 +209,37 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
   const shopCart = useMemo(() => cart.filter(item => item.shopSlug === shopSlug), [cart, shopSlug]);
 
   const queryClient = useQueryClient();
-  const { data: shopQueryResult, isLoading: isQueryLoading } = usePublicShopQuery(initialShop.id, initialShop);
+  const { data: shopQueryResult, isFetching: isShopFetching } = usePublicShopQuery(initialShop.id, initialShop);
 
   const shop = shopQueryResult?.shop || initialShop;
   const products: Product[] = (shop as any)?.products || [];
-  const isShopOpen = getShopStatus(
-    (shop as any).isOpen ?? shop.settings?.isOpen ?? true,
-    (shop as any).closeDate ?? shop.settings?.closeDate,
-    (shop as any).openDate ?? shop.settings?.openDate,
-  ) === 'OPEN';
+  const shopOpenFields = useMemo(() => resolveShopOpenFields(shop), [shop]);
+  const shopStatusType = useMemo(
+    () => getShopStatus(shopOpenFields.isOpen, shopOpenFields.closeDate, shopOpenFields.openDate),
+    [shopOpenFields],
+  );
+  const isShopOpen = shopStatusType === 'OPEN';
   const announcements: any[] = (shop as any)?.announcements || [];
   const announcementHistory: any[] = (shop as any)?.announcementHistory || [];
   const events: ShopEvent[] = (shop as any)?.events || [];
   const socialMediaNews: any[] = (shop as any)?.socialMediaNews || [];
-  const loading = isQueryLoading && !shopQueryResult;
+  const loading = isShopFetching && products.length === 0;
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [toast, setToast] = useState<{ open: boolean; type: 'success' | 'error' | 'info' | 'warning'; message: string }>({
-    open: false, type: 'info', message: '',
-  });
   const [cartOpen, setCartOpen] = useState(false);
+  const paymentOpenerRef = useRef<((ref: string) => void) | null>(null);
+  const cartHoldTimers = useRef<Record<string, ReturnType<typeof setInterval> | null>>({});
+  const shopCartRef = useRef(shopCart);
+  const loadOrderHistoryRef = useRef<(opts?: { append?: boolean }) => Promise<void>>(async () => {});
+  const historyLoadedRef = useRef(false);
+  const [editingCartItem, setEditingCartItem] = useState<DrawerCartItem | null>(null);
+  const [shippingConfig, setShippingConfig] = useState<ShippingConfig | null>(null);
+  const [confirmCancelRef, setConfirmCancelRef] = useState<string | null>(null);
 
   // Product dialog state
   const [selectedSize, setSelectedSize] = useState('');
-  const [selectedVariant, setSelectedVariant] = useState<any>(null);
+  const sizeSelectorRef = useRef<HTMLDivElement>(null);
   const [selectedPattern, setSelectedPattern] = useState<any>(null);
   const [quantity, setQuantity] = useState(1);
   const patternSelectorRef = useRef<HTMLDivElement>(null);
@@ -296,7 +352,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
   const [orderPhone, setOrderPhone] = useState('');
   const [orderAddress, setOrderAddress] = useState('');
   const [orderInstagram, setOrderInstagram] = useState('');
-  const [paymentRef, setPaymentRef] = useState<string | null>(null);
+  const [orderProfileImage, setOrderProfileImage] = useState('');
   const [turnstileToken, setTurnstileToken] = useState('');
 
   // Profile modal state
@@ -310,13 +366,18 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
     phone: orderPhone,
     address: orderAddress,
     instagram: orderInstagram,
-    profileImage: '',
+    profileImage: orderProfileImage,
     email: session?.user?.email || '',
-  }), [orderName, orderPhone, orderAddress, orderInstagram, session?.user?.email]);
+  }), [orderName, orderPhone, orderAddress, orderInstagram, orderProfileImage, session?.user?.email]);
+
+  const nameValidation = useMemo(
+    () => ({ ...DEFAULT_NAME_VALIDATION, ...(shop as any).nameValidation }),
+    [shop],
+  );
 
   const profileComplete = useMemo(() => {
-    return isThaiText(orderName) && !!orderPhone && !!orderInstagram;
-  }, [orderName, orderPhone, orderInstagram]);
+    return isValidCustomerName(orderName, nameValidation) && !!orderPhone && !!orderInstagram;
+  }, [orderName, orderPhone, orderInstagram, nameValidation]);
 
   const mappedShopCart = useMemo(() => {
     return shopCart.map((item) => ({
@@ -357,31 +418,113 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
     return Boolean(selectedProduct.patterns && selectedProduct.patterns.filter((p: any) => p.isActive !== false).length > 0 && !selectedPattern);
   }, [selectedProduct, selectedPattern]);
 
+  const displaySizes = useMemo(() => {
+    if (!selectedProduct) return [] as string[];
+    return getDisplaySizes(selectedProduct, t.common.freeSize);
+  }, [selectedProduct, t.common.freeSize]);
+
+  const shopSocialLinks = useMemo(
+    () => getSocialLinkEntries(shop.socialLinks),
+    [shop.socialLinks],
+  );
+
+  const hasShopContact = Boolean(shop.contactEmail || shop.contactPhone || shopSocialLinks.length > 0);
+
   // Follow shop state
   const [isFollowing, setIsFollowing] = useState(false);
 
   const showToast = useCallback((type: 'success' | 'error' | 'info' | 'warning', message: string) => {
-    setToast({ open: true, type, message });
+    if (type === 'success') toastSuccess(message);
+    else if (type === 'error') toastError(message);
+    else if (type === 'warning') toastWarning(message);
+    else toastInfo(message);
+  }, [toastSuccess, toastError, toastWarning, toastInfo]);
+
+  const shopConfig = useMemo((): ShopConfig => ({
+    isOpen: shopOpenFields.isOpen,
+    closeDate: shopOpenFields.closeDate ?? '',
+    openDate: shopOpenFields.openDate,
+    closedMessage: shopOpenFields.closedMessage,
+    products,
+    announcements,
+    announcementHistory,
+    events,
+    socialMediaNews,
+    liveStream: (shop as any).liveStream,
+    promoCodes: (shop as any).promoCodes,
+    nameValidation: (shop as any).nameValidation,
+    shirtNameConfig: (shop as any).shirtNameConfig ?? DEFAULT_SHIRT_NAME,
+    pickup: (shop as any).pickup,
+  }), [shopOpenFields, products, announcements, announcementHistory, events, socialMediaNews]);
+
+  const shirtCfg = shopConfig.shirtNameConfig ?? DEFAULT_SHIRT_NAME;
+  const drawerCart = useMemo(() => zustandCartToDrawerCart(shopCart), [shopCart]);
+
+  const liveStream = (shop as any).liveStream;
+  const isLiveActive = Boolean(
+    liveStream?.enabled &&
+    (!liveStream.endedAt || new Date(liveStream.endedAt) > new Date())
+  );
+  const liveTitle = liveStream?.title || '';
+
+  const openLiveStream = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('open-live-stream'));
   }, []);
 
-  // Load user profile for checkout
+  const openPaymentFlow = useCallback((ref: string) => {
+    setShowOrderHistory(false);
+    setShowProfileModal(false);
+    setCartOpen(false);
+    setCheckoutOpen(false);
+    paymentOpenerRef.current?.(ref);
+  }, []);
+
   useEffect(() => {
-    if (session?.user?.email) {
-      fetch(`/api/profile?email=${encodeURIComponent(session.user.email)}`)
-        .then(r => r.json())
-        .then(data => {
-          if (data.status === 'success' && data.data) {
-            if (data.data.name && !orderName) setOrderName(data.data.name);
-            if (data.data.phone && !orderPhone) setOrderPhone(data.data.phone);
-            if (data.data.address && !orderAddress) setOrderAddress(data.data.address);
-            if (data.data.instagram && !orderInstagram) setOrderInstagram(data.data.instagram);
-            if (data.data.savedAddresses) setSavedAddresses(data.data.savedAddresses);
-          }
-        })
-        .catch(() => {});
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.user?.email]);
+    shopCartRef.current = shopCart;
+  }, [shopCart]);
+
+  // Load user profile for checkout (API returns { data: { profile: {...} } })
+  useEffect(() => {
+    if (!session?.user?.email) return;
+    getProfile(session.user.email)
+      .then((res) => {
+        const profile = (res.data as { profile?: Record<string, unknown> })?.profile;
+        if (res.status !== 'success' || !profile) return;
+
+        const sanitized = {
+          name: typeof profile.name === 'string' ? profile.name.trim() : '',
+          phone: typeof profile.phone === 'string' ? onlyDigitsPhone(profile.phone) : '',
+          address: typeof profile.address === 'string' ? profile.address.trim() : '',
+          instagram: typeof profile.instagram === 'string' ? profile.instagram.trim() : '',
+          profileImage: typeof profile.profileImage === 'string' ? profile.profileImage : '',
+        };
+
+        const loadedAddresses = Array.isArray(profile.savedAddresses)
+          ? (profile.savedAddresses as SavedAddress[])
+          : [];
+        const resolvedAddress = resolveProfileAddress(sanitized.address, loadedAddresses);
+
+        setOrderName((prev) => sanitized.name || prev || session.user?.name || '');
+        setOrderPhone((prev) => sanitized.phone || prev);
+        setOrderAddress((prev) => resolvedAddress || prev);
+        setOrderInstagram((prev) => sanitized.instagram || prev);
+        if (sanitized.profileImage) setOrderProfileImage(sanitized.profileImage);
+        if (loadedAddresses.length > 0) {
+          setSavedAddresses(loadedAddresses);
+        }
+      })
+      .catch(() => {});
+  }, [session?.user?.email, session?.user?.name]);
+
+  // Shipping options preview (same as main store cart drawer)
+  useEffect(() => {
+    fetch('/api/shipping/options', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.config) setShippingConfig(data.config);
+      })
+      .catch(() => {});
+  }, []);
 
   // Load order history on mount for badge count
   useEffect(() => {
@@ -415,42 +558,13 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
         },
         (payload) => {
           console.log('[Realtime] Shop updated:', payload);
-          const updatedRow = payload.new;
+          const updatedRow = payload.new as Record<string, any> | null;
           if (updatedRow) {
             queryClient.setQueryData([...queryKeys.shop.all, 'public', initialShop.id], (prev: any) => {
-              if (!prev) return prev;
-              // Map DB row columns → API-formatted fields
-              // The DB row has nested `settings` JSONB, but prev.shop is flattened
-              const settings = updatedRow.settings || {};
-              const mappedFields: Record<string, any> = {
-                // Map DB columns that have direct equivalents
-                name: updatedRow.name,
-                nameEn: updatedRow.name_en,
-                description: updatedRow.description,
-                descriptionEn: updatedRow.description_en,
-                logoUrl: updatedRow.logo_url,
-                bannerUrl: updatedRow.banner_url,
-                isActive: updatedRow.is_active,
-                // Flatten the `settings` JSONB to top-level fields
-                isOpen: settings.isOpen ?? prev.shop.isOpen,
-                closeDate: settings.closeDate ?? prev.shop.closeDate,
-                openDate: settings.openDate ?? prev.shop.openDate,
-                closedMessage: settings.closedMessage ?? prev.shop.closedMessage,
-                paymentEnabled: settings.paymentEnabled ?? prev.shop.paymentEnabled,
-                paymentDisabledMessage: settings.paymentDisabledMessage ?? prev.shop.paymentDisabledMessage,
-                // Products are stored directly in the JSONB `products` column
-                products: updatedRow.products ?? prev.shop.products,
-              };
-              // Remove undefined fields to avoid overwriting valid prev values
-              const cleanMapped = Object.fromEntries(
-                Object.entries(mappedFields).filter(([, v]) => v !== undefined)
-              );
+              if (!prev?.shop) return prev;
               return {
                 ...prev,
-                shop: {
-                  ...prev.shop,
-                  ...cleanMapped,
-                }
+                shop: applyRealtimeShopRow(prev.shop, updatedRow),
               };
             });
           }
@@ -462,6 +576,17 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       channel.unsubscribe();
     };
   }, [shopSlug, queryClient, initialShop.id]);
+
+  // Refetch shop status when user returns to the tab (same as main shop)
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        queryClient.invalidateQueries({ queryKey: [...queryKeys.shop.all, 'public', initialShop.id] });
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [queryClient, initialShop.id]);
 
   // Block purchase / close product details drawer if active product status changes in shop products (e.g. disabled or out of stock)
   useEffect(() => {
@@ -485,7 +610,6 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       if (selectedProduct) {
         setSelectedProduct(null);
         setSelectedSize('');
-        setSelectedVariant(null);
         setSelectedPattern(null);
         setQuantity(1);
         setCustomName('');
@@ -559,6 +683,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
           });
           setHistoryHasMore(hasMore);
           setHistoryCursor(nextCursor);
+          historyLoadedRef.current = true;
         } else {
           if (!append) setOrderHistory([]);
           setHistoryHasMore(false);
@@ -573,6 +698,51 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
     }
   }, [session?.user?.email, isMobile, historyCursor, shopSlug, showToast, lang]);
 
+  useEffect(() => {
+    loadOrderHistoryRef.current = loadOrderHistory;
+  }, [loadOrderHistory]);
+
+  const handleOrderChange = useCallback((change: any) => {
+    const orderShopSlug = change.order?.shop_slug || change.order?.shopSlug;
+    if (orderShopSlug && orderShopSlug !== shopSlug) return;
+
+    if (change.type === 'UPDATE' && change.order) {
+      setOrderHistory((prev) => {
+        const existingIndex = prev.findIndex((o) => o.ref === change.order.ref);
+        if (existingIndex < 0) return prev;
+        const updated = [...prev];
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          status: change.order.status,
+          total: change.order.total_amount ?? change.order.totalAmount ?? updated[existingIndex].total,
+          items: change.order.cart || change.order.items || updated[existingIndex].items,
+        };
+        return updated;
+      });
+    } else if (change.type === 'INSERT' && change.order) {
+      const newOrder: OrderHistory = {
+        ref: change.order.ref,
+        date: change.order.date || change.order.created_at,
+        status: change.order.status,
+        total: change.order.total_amount ?? change.order.totalAmount,
+        items: change.order.cart || change.order.items || [],
+      };
+      setOrderHistory((prev) => (prev.some((o) => o.ref === newOrder.ref) ? prev : [newOrder, ...prev]));
+    } else if (change.type === 'DELETE') {
+      const deletedRef = change.oldOrder?.ref;
+      if (deletedRef) {
+        setOrderHistory((prev) => prev.filter((o) => o.ref !== deletedRef));
+      } else if (historyLoadedRef.current) {
+        loadOrderHistoryRef.current({ append: false });
+      }
+    }
+  }, [shopSlug]);
+
+  const { isConnected: realtimeConnected } = useRealtimeOrdersByEmail(
+    session?.user?.email,
+    handleOrderChange,
+  );
+
   // Load order history when drawer opens
   useEffect(() => {
     if (showOrderHistory && session?.user?.email) {
@@ -583,7 +753,12 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
 
   // Cancel order handler
   const handleCancelOrder = useCallback(async (ref: string) => {
-    if (!confirm(lang === 'en' ? `Cancel order ${ref}?` : `ยกเลิกคำสั่งซื้อ ${ref}?`)) return;
+    setConfirmCancelRef(ref);
+  }, []);
+
+  const confirmCancelOrder = useCallback(async () => {
+    const ref = confirmCancelRef;
+    if (!ref) return;
     try {
       setCancellingRef(ref);
       const res = await cancelOrderApi(ref);
@@ -598,8 +773,9 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       showToast('error', error.message || (lang === 'en' ? 'Cancel failed' : 'ยกเลิกไม่สำเร็จ'));
     } finally {
       setCancellingRef(null);
+      setConfirmCancelRef(null);
     }
-  }, [lang, showToast, loadOrderHistory]);
+  }, [confirmCancelRef, lang, showToast, loadOrderHistory]);
 
   // Cart operations
   const removeFromCart = useCartStore((s) => s.removeFromCart);
@@ -622,7 +798,69 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
     }
   }, [cart, removeFromCart, updateItem, showToast, lang]);
 
+  const findCartIndexById = useCallback((id: string) => {
+    return cart.findIndex((c) => c.id === id && c.shopSlug === shopSlug);
+  }, [cart, shopSlug]);
 
+  const updateDrawerCartQuantity = useCallback((id: string, quantity: number) => {
+    const idx = findCartIndexById(id);
+    if (idx < 0) return;
+    handleUpdateCartQty(idx, quantity);
+  }, [findCartIndexById, handleUpdateCartQty]);
+
+  const removeDrawerCartItem = useCallback((id: string) => {
+    const idx = findCartIndexById(id);
+    if (idx >= 0) handleRemoveCartItem(idx);
+  }, [findCartIndexById, handleRemoveCartItem]);
+
+  const stopCartHold = useCallback((id: string) => {
+    const timer = cartHoldTimers.current[id];
+    if (timer) {
+      clearInterval(timer);
+      cartHoldTimers.current[id] = null;
+    }
+  }, []);
+
+  const startCartHold = useCallback((id: string, delta: number) => {
+    stopCartHold(id);
+    cartHoldTimers.current[id] = setInterval(() => {
+      const target = shopCartRef.current.find((item) => item.id === id);
+      if (!target) {
+        stopCartHold(id);
+        return;
+      }
+      updateDrawerCartQuantity(id, target.qty + delta);
+    }, 200);
+  }, [stopCartHold, updateDrawerCartQuantity]);
+
+  const getTotalPrice = useCallback(() => {
+    return shopCart.reduce((sum, item) => sum + item.total, 0);
+  }, [shopCart]);
+
+  const updateDrawerCartItem = useCallback((id: string, item: DrawerCartItem) => {
+    const idx = findCartIndexById(id);
+    const zItem = drawerCartToZustandItem(item, shopSlug, products);
+    if (idx >= 0 && zItem) {
+      updateItem(idx, zItem);
+      showToast('success', lang === 'en' ? 'Cart updated' : 'อัปเดตตะกร้าแล้ว');
+    }
+    setEditingCartItem(null);
+  }, [findCartIndexById, shopSlug, products, updateItem, showToast, lang]);
+
+  const requireProfileBeforeCheckout = useCallback(() => {
+    if (!session?.user?.email) {
+      showToast('warning', lang === 'en' ? 'Please sign in to checkout' : 'กรุณาเข้าสู่ระบบก่อนสั่งซื้อ');
+      signIn();
+      return false;
+    }
+    if (!profileComplete) {
+      showToast('warning', t.profile.profileSaveRequired);
+      setShowProfileModal(true);
+      setPendingCheckout(true);
+      return false;
+    }
+    return true;
+  }, [session?.user?.email, profileComplete, showToast, t.profile.profileSaveRequired]);
 
   // Profile save handler
   const handleSaveProfile = async (data: Partial<typeof orderData> & { savedAddresses?: SavedAddress[] }) => {
@@ -632,34 +870,50 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
     }
 
     setSavingProfile(true);
+    const nameCfg = { ...DEFAULT_NAME_VALIDATION, ...shopConfig.nameValidation };
+    const addressList = data.savedAddresses ?? savedAddresses;
+    const resolvedAddress = resolveProfileAddress(
+      data.address?.trim() || orderAddress,
+      addressList,
+    );
+
     const sanitized = {
-      name: data.name ? data.name.replace(/[^\u0E00-\u0E7F\s]/g, '').trim() : orderName,
-      phone: data.phone ? data.phone.replace(/\D/g, '').slice(0, 12) : orderPhone,
-      address: data.address ? data.address.trim() : orderAddress,
+      name: data.name ? sanitizeCustomerName(data.name, nameCfg) : orderName,
+      phone: data.phone ? onlyDigitsPhone(data.phone) : orderPhone,
+      address: resolvedAddress,
       instagram: data.instagram ? data.instagram.trim() : orderInstagram,
+      profileImage: data.profileImage !== undefined ? (data.profileImage || '') : orderProfileImage,
     };
 
     if (sanitized.name) setOrderName(sanitized.name);
     if (sanitized.phone) setOrderPhone(sanitized.phone);
     if (sanitized.address) setOrderAddress(sanitized.address);
     if (sanitized.instagram) setOrderInstagram(sanitized.instagram);
+    if (data.profileImage !== undefined) setOrderProfileImage(sanitized.profileImage);
 
     if (data.savedAddresses) {
       setSavedAddresses(data.savedAddresses);
     }
 
     try {
-      await saveProfileApi(session.user.email, {
+      const profilePayload: Parameters<typeof saveProfileApi>[1] = {
         name: sanitized.name,
         phone: sanitized.phone,
-        address: sanitized.address,
         instagram: sanitized.instagram,
-        ...(data.savedAddresses && { savedAddresses: data.savedAddresses }),
-      });
+      };
+      if (sanitized.address) profilePayload.address = sanitized.address;
+      if (data.savedAddresses && data.savedAddresses.length > 0) {
+        profilePayload.savedAddresses = data.savedAddresses;
+      }
+      if (sanitized.profileImage) {
+        profilePayload.profileImage = sanitized.profileImage;
+      }
+
+      await saveProfileApi(session.user.email, profilePayload);
 
       showToast('success', lang === 'en' ? 'Profile saved' : 'บันทึกข้อมูลจัดส่งแล้ว');
       setShowProfileModal(false);
-      if (pendingCheckout && isThaiText(sanitized.name) && sanitized.phone && sanitized.instagram) {
+      if (pendingCheckout && isValidCustomerName(sanitized.name, nameCfg) && sanitized.phone && sanitized.instagram) {
         setCheckoutOpen(true);
         setPendingCheckout(false);
       }
@@ -745,8 +999,8 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
         })),
         totalAmount,
         turnstileToken,
-        shippingOptionId: options?.shippingOptionId || 'pickup',
-        paymentOptionId: options?.paymentOptionId || 'bank_transfer',
+        shippingOptionId: options?.shippingOptionId,
+        paymentOptionId: options?.paymentOptionId,
         shippingFee: options?.shippingFee,
         promoCode: options?.promoCode,
         promoDiscount: options?.promoDiscount,
@@ -756,18 +1010,32 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
 
       if (res.status === 'success' && res.ref) {
         showToast('success', `${lang === 'en' ? 'Order placed!' : 'สั่งซื้อสำเร็จ!'} ${res.ref}`);
+
+        // Persist latest shipping info so address does not disappear next visit
+        if (session.user.email) {
+          const postOrderPayload: Parameters<typeof saveProfileApi>[1] = {
+            name: orderName.trim(),
+            phone: orderPhone.trim(),
+            instagram: orderInstagram.trim(),
+          };
+          const addrToSave = orderAddress.trim() || resolveProfileAddress('', savedAddresses);
+          if (addrToSave) postOrderPayload.address = addrToSave;
+          if (savedAddresses.length > 0) postOrderPayload.savedAddresses = savedAddresses;
+          saveProfileApi(session.user.email, postOrderPayload).catch(() => {});
+        }
+
         // Clear only this shop's cart items
         const clearCartByShop = useCartStore.getState().clearCartByShop;
         clearCartByShop(shopSlug);
         setCartOpen(false);
         setCheckoutOpen(false);
         setTurnstileToken('');
-        // Open payment
-        setPaymentRef(res.ref);
-        
+        openPaymentFlow(res.ref);
+        setTimeout(() => loadOrderHistory(), 500);
+
         // Invalidate shop public query to refresh inventory/stock
         queryClient.invalidateQueries({
-          queryKey: ['shop', 'public', shop.id],
+          queryKey: [...queryKeys.shop.all, 'public', shop.id],
         });
       } else {
         showToast('error', (res as any).message || (lang === 'en' ? 'Order failed' : 'สั่งซื้อไม่สำเร็จ'));
@@ -777,7 +1045,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
     } finally {
       setCheckoutProcessing(false);
     }
-  }, [session, shopCart, orderName, orderPhone, orderAddress, orderInstagram, shop.id, shop.slug, shopSlug, lang, showToast, turnstileToken, queryClient]);
+  }, [session, shopCart, orderName, orderPhone, orderAddress, orderInstagram, shop.id, shop.slug, shopSlug, lang, showToast, turnstileToken, queryClient, openPaymentFlow, loadOrderHistory, products, isShopOpen]);
 
   // Categories from products
   const categories = useMemo(() => {
@@ -791,7 +1059,6 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
   // Grouped products by category
   const filteredGroupedProducts = useMemo(() => {
     const filtered = sortProductsNewestFirst(products.filter((p) => {
-      if (!p.isActive) return false;
       if (selectedCategory !== 'all' && p.category !== selectedCategory) return false;
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
@@ -817,7 +1084,6 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
   const handleSelectProduct = useCallback((product: Product) => {
     setSelectedProduct(product);
     setSelectedSize('');
-    setSelectedVariant(null);
     setSelectedPattern(null);
     setQuantity(1);
     setCustomName('');
@@ -826,27 +1092,52 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
     setActiveImageIndex(0);
   }, []);
 
-  const handleAddToCart = useCallback(() => {
-    if (!selectedProduct) return;
+  const handleAnnouncementProductClick = useCallback((productId: string) => {
+    const target = products.find((p) => p.id === productId);
+    if (target) handleSelectProduct(target);
+  }, [products, handleSelectProduct]);
+
+  const handleEventClick = useCallback((event: ShopEvent) => {
+    const linkedId = event.linkedProducts?.[0];
+    if (linkedId) {
+      const target = products.find((p) => p.id === linkedId);
+      if (target) handleSelectProduct(target);
+    }
+  }, [products, handleSelectProduct]);
+
+  const resetProductDialog = useCallback(() => {
+    setSelectedProduct(null);
+    setSelectedSize('');
+    setSelectedPattern(null);
+    setQuantity(1);
+    setCustomName('');
+    setCustomNumber('');
+    setIsLongSleeve(null);
+  }, []);
+
+  const buildCartItem = useCallback(() => {
+    if (!selectedProduct) return null;
 
     if (!isShopOpen) {
       showToast('warning', lang === 'en' ? 'Shop is closed' : 'ร้านค้าปิดให้บริการอยู่');
-      return;
+      return null;
     }
 
-    // Validate size selection
-    if (selectedProduct.sizePricing && Object.keys(selectedProduct.sizePricing).length > 0 && !selectedSize) {
-      showToast('warning', lang === 'en' ? 'Please select a size' : 'กรุณาเลือกขนาดไซส์');
-      return;
+    const needsSize = productRequiresSize(selectedProduct);
+    const hasVariants = !needsSize && !!selectedProduct.variants?.length;
+
+    if ((needsSize || hasVariants) && !selectedSize) {
+      sizeSelectorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setTimeout(() => {
+        sizeSelectorRef.current?.classList.add('shake-highlight');
+        setTimeout(() => sizeSelectorRef.current?.classList.remove('shake-highlight'), 600);
+      }, 300);
+      showToast('warning', needsSize
+        ? (lang === 'en' ? 'Please select a size' : 'กรุณาเลือกขนาดไซส์')
+        : (lang === 'en' ? 'Please select an option' : 'กรุณาเลือกตัวเลือกสินค้า'));
+      return null;
     }
 
-    // Validate variant selection
-    if (selectedProduct.variants && selectedProduct.variants.length > 0 && !selectedVariant) {
-      showToast('warning', lang === 'en' ? 'Please select an option' : 'กรุณาเลือกตัวเลือกสินค้า');
-      return;
-    }
-
-    // Check if product has patterns
     const hasPatterns = selectedProduct.patterns && selectedProduct.patterns.filter((p: any) => p.isActive !== false).length > 0;
     if (hasPatterns && !selectedPattern) {
       patternSelectorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -855,57 +1146,51 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
         setTimeout(() => patternSelectorRef.current?.classList.remove('shake-highlight'), 600);
       }, 300);
       showToast('warning', lang === 'en' ? 'Please select a design/pattern' : 'กรุณาเลือกลายสินค้า');
-      return;
+      return null;
     }
 
-    const shirtCfg = DEFAULT_SHIRT_NAME;
     const normalizedCustomName = selectedProduct.options?.hasCustomName ? normalizeShirtName(customName, shirtCfg) : '';
 
     if (selectedProduct.options?.hasCustomName && !normalizedCustomName) {
       customNameInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      setTimeout(() => {
-        customNameInputRef.current?.focus();
-      }, 300);
+      setTimeout(() => customNameInputRef.current?.focus(), 300);
       showToast('warning', lang === 'en' ? 'Please enter a custom name' : 'กรุณากรอกชื่อสกรีน');
-      return;
+      return null;
     }
 
     if (selectedProduct.options?.hasCustomName && normalizedCustomName.length < shirtCfg.minLength) {
       customNameInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      setTimeout(() => {
-        customNameInputRef.current?.focus();
-      }, 300);
+      setTimeout(() => customNameInputRef.current?.focus(), 300);
       showToast('warning', `${lang === 'en' ? 'Name must be at least' : 'ชื่อสกรีนต้องมีความยาวอย่างน้อย'} ${shirtCfg.minLength} ${lang === 'en' ? 'characters' : 'ตัวอักษร'}`);
-      return;
+      return null;
     }
 
     if (selectedProduct.options?.hasCustomNumber && !customNumber) {
       customNumberInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      setTimeout(() => {
-        customNumberInputRef.current?.focus();
-      }, 300);
+      setTimeout(() => customNumberInputRef.current?.focus(), 300);
       showToast('warning', lang === 'en' ? 'Please enter a number' : 'กรุณากรอกเบอร์สกรีน');
-      return;
+      return null;
     }
 
     if (selectedProduct.options?.hasLongSleeve && isLongSleeve === null) {
       showToast('warning', lang === 'en' ? 'Please select a sleeve type' : 'กรุณาเลือกประเภทแขนเสื้อ');
-      return;
+      return null;
     }
 
-    const basePrice = selectedVariant
-      ? selectedVariant.price
-      : selectedProduct.sizePricing?.[selectedSize] || selectedProduct.basePrice;
-    
-    const sleeveFee = (selectedProduct.options?.hasLongSleeve && isLongSleeve === true)
-      ? (selectedProduct.options?.longSleevePrice ?? 50)
-      : 0;
-
-    const price = basePrice + sleeveFee;
-    
+    const price = resolveProductUnitPrice(selectedProduct, selectedSize, isLongSleeve);
     const patternName = selectedPattern?.name || '';
-    const item = {
-      id: `${selectedProduct.id}-${selectedSize || '-'}-${selectedVariant?.id || '-'}-${patternName || '-'}-${isLongSleeve === true ? 'LONG' : 'SHORT'}-${normalizedCustomName || '-'}-${customNumber || '-'}`,
+
+    let sizeToUse = needsSize ? selectedSize : '-';
+    let variantForCart: NonNullable<Product['variants']>[number] | undefined;
+    if (hasVariants) {
+      const variant = selectedProduct.variants!.find((v) => v.id === selectedSize);
+      if (!variant) return null;
+      variantForCart = variant;
+      sizeToUse = variant.name;
+    }
+
+    return {
+      id: `${selectedProduct.id}-${selectedSize || '-'}-${variantForCart?.id || '-'}-${patternName || '-'}-${isLongSleeve === true ? 'LONG' : 'SHORT'}-${normalizedCustomName || '-'}-${customNumber || '-'}`,
       productId: selectedProduct.id,
       name: selectedProduct.name,
       type: selectedProduct.type || 'OTHER' as const,
@@ -913,26 +1198,42 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       subType: selectedProduct.subType,
       price,
       qty: quantity,
-      size: selectedSize || '-',
+      size: sizeToUse || '-',
       total: price * quantity,
-      selectedVariant: selectedVariant || undefined,
+      selectedVariant: variantForCart || undefined,
       selectedPattern: selectedPattern || undefined,
       sleeve: (selectedProduct.options?.hasLongSleeve ? (isLongSleeve === true ? 'LONG' : 'SHORT') : undefined) as 'LONG' | 'SHORT' | undefined,
       customName: selectedProduct.options?.hasCustomName ? normalizedCustomName : undefined,
       customNumber: selectedProduct.options?.hasCustomNumber ? customNumber : undefined,
       shopSlug,
     };
+  }, [selectedProduct, selectedSize, selectedPattern, quantity, customName, customNumber, isLongSleeve, showToast, lang, shopSlug, isShopOpen, shirtCfg]);
+
+  const commitCartItem = useCallback((item: NonNullable<ReturnType<typeof buildCartItem>>, options?: { goCheckout?: boolean }) => {
+    const productName = selectedProduct ? getProductName(selectedProduct, lang) : item.name;
     addToCart(item);
-    showToast('success', `เพิ่ม "${getProductName(selectedProduct, lang)}" ลงตะกร้าแล้ว`);
-    setSelectedProduct(null);
-    setSelectedSize('');
-    setSelectedVariant(null);
-    setSelectedPattern(null);
-    setQuantity(1);
-    setCustomName('');
-    setCustomNumber('');
-    setIsLongSleeve(null);
-  }, [selectedProduct, selectedVariant, selectedSize, selectedPattern, quantity, customName, customNumber, isLongSleeve, addToCart, showToast, lang, shopSlug, isShopOpen]);
+    showToast(
+      'success',
+      options?.goCheckout ? t.cart.addedGoCheckout : `${t.cart.addedToCart}: ${productName}`,
+    );
+    resetProductDialog();
+    if (options?.goCheckout) {
+      setCheckoutOpen(true);
+    }
+  }, [addToCart, showToast, t.cart.addedGoCheckout, t.cart.addedToCart, resetProductDialog, selectedProduct, lang]);
+
+  const handleAddToCart = useCallback(() => {
+    const item = buildCartItem();
+    if (!item) return;
+    commitCartItem(item);
+  }, [buildCartItem, commitCartItem]);
+
+  const handleBuyNow = useCallback(() => {
+    const item = buildCartItem();
+    if (!item) return;
+    if (!requireProfileBeforeCheckout()) return;
+    commitCartItem(item, { goCheckout: true });
+  }, [buildCartItem, commitCartItem, requireProfileBeforeCheckout]);
 
   const handleShareProduct = useCallback(async (product: Product) => {
     const url = `${window.location.origin}/shop/${shopSlug}`;
@@ -977,7 +1278,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
             </Typography>
             {!isShopOpen && (
               <Typography sx={{ fontSize: '0.7rem', color: 'var(--error)' }}>
-                {shop.settings?.closedMessage || (lang === 'en' ? 'Orders closed' : 'ปิดรับออเดอร์')}
+                {shopOpenFields.closedMessage || (lang === 'en' ? 'Orders closed' : 'ปิดรับออเดอร์')}
               </Typography>
             )}
           </Box>
@@ -994,6 +1295,29 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
               <Heart size={20} fill={isFollowing ? '#ff453a' : 'none'} />
             </IconButton>
           </Tooltip>
+          {isLiveActive && (
+            <Tooltip title={liveTitle || (lang === 'en' ? 'Live now' : 'กำลังไลฟ์')}>
+              <Button
+                size="small"
+                onClick={openLiveStream}
+                sx={{
+                  minWidth: 'auto',
+                  px: 1.2,
+                  py: 0.5,
+                  borderRadius: '999px',
+                  bgcolor: 'rgba(255,69,58,0.15)',
+                  color: '#ff453a',
+                  fontWeight: 800,
+                  fontSize: '0.72rem',
+                  '&:hover': { bgcolor: 'rgba(255,69,58,0.25)' },
+                }}
+              >
+                LIVE
+              </Button>
+            </Tooltip>
+          )}
+          <ThemeToggle />
+          <LanguageToggle />
           {/* Order History button */}
           {session?.user?.email && (
             <Tooltip title={lang === 'en' ? 'Order History' : 'ประวัติคำสั่งซื้อ'}>
@@ -1012,8 +1336,45 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
               <ShoppingCart size={22} />
             </Badge>
           </IconButton>
+          {session?.user?.email ? (
+            <Tooltip title={lang === 'en' ? 'Profile' : 'โปรไฟล์'}>
+              <Avatar
+                src={orderProfileImage || session.user?.image || ''}
+                onClick={() => setShowProfileModal(true)}
+                sx={{
+                  width: 32,
+                  height: 32,
+                  cursor: 'pointer',
+                  border: '1px solid var(--glass-border)',
+                  bgcolor: 'var(--surface-2)',
+                }}
+              >
+                {!orderProfileImage && !session.user?.image && (
+                  session.user?.name?.[0] || <User size={16} />
+                )}
+              </Avatar>
+            </Tooltip>
+          ) : (
+            <Tooltip title={lang === 'en' ? 'Sign in' : 'เข้าสู่ระบบ'}>
+              <IconButton
+                onClick={() => signIn()}
+                sx={{ p: 0.25 }}
+              >
+                <Avatar sx={{ width: 32, height: 32, bgcolor: 'var(--surface-2)', border: '1px solid var(--glass-border)' }}>
+                  <User size={16} color="var(--text-muted)" />
+                </Avatar>
+              </IconButton>
+            </Tooltip>
+          )}
         </Box>
       </Box>
+
+      <ShopStatusBanner
+        isOpen={shopOpenFields.isOpen}
+        closeDate={shopOpenFields.closeDate}
+        openDate={shopOpenFields.openDate}
+        customMessage={shopOpenFields.closedMessage}
+      />
 
       {/* ==================== BANNER ==================== */}
       <Box sx={{
@@ -1087,6 +1448,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
             announcements={announcements}
             history={announcementHistory}
             socialMediaNews={socialMediaNews}
+            onProductClick={handleAnnouncementProductClick}
           />
         </Box>
       )}
@@ -1094,48 +1456,11 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       {/* ==================== EVENTS ==================== */}
       {events.filter(e => e.enabled).length > 0 && (
         <Box sx={{ maxWidth: '1200px', mx: 'auto', px: { xs: 0, sm: 2 }, pt: 2 }}>
-          <EventBanner events={events.filter(e => e.enabled)} compact />
-        </Box>
-      )}
-
-      {/* ==================== SHOP CLOSED BANNER ==================== */}
-      {!isShopOpen && (
-        <Box sx={{
-          maxWidth: '1200px', mx: 'auto', px: 2, pt: 2,
-        }}>
-          <Box sx={{
-            p: 2.5, borderRadius: '16px',
-            background: 'linear-gradient(135deg, rgba(239,68,68,0.15) 0%, rgba(239,68,68,0.05) 100%)',
-            border: '1px solid rgba(239,68,68,0.3)',
-            display: 'flex', alignItems: 'center', gap: 2,
-          }}>
-            <Box sx={{
-              width: 44, height: 44, borderRadius: '12px',
-              bgcolor: 'rgba(239,68,68,0.15)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0,
-            }}>
-              <Clock size={22} color="#ef4444" />
-            </Box>
-            <Box>
-              <Typography sx={{ fontWeight: 700, fontSize: '0.9rem', color: '#ef4444' }}>
-                {lang === 'en' ? 'Orders are currently closed' : 'ปิดรับออเดอร์ชั่วคราว'}
-              </Typography>
-              <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)', mt: 0.3 }}>
-                {shop.settings?.closedMessage || (lang === 'en'
-                  ? 'This shop is temporarily not accepting orders. Please check back later.'
-                  : 'ร้านค้านี้ปิดรับคำสั่งซื้อชั่วคราว กรุณากลับมาใหม่ภายหลัง')}
-              </Typography>
-              {shop.settings?.openDate && (
-                <Typography sx={{ fontSize: '0.75rem', color: '#f59e0b', mt: 0.5, fontWeight: 600 }}>
-                  {lang === 'en' ? 'Opens: ' : 'เปิด: '}
-                  {new Date(shop.settings.openDate).toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-US', {
-                    year: 'numeric', month: 'long', day: 'numeric'
-                  })}
-                </Typography>
-              )}
-            </Box>
-          </Box>
+          <EventBanner
+            events={events.filter(e => e.enabled)}
+            compact
+            onEventClick={handleEventClick}
+          />
         </Box>
       )}
 
@@ -1292,6 +1617,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                         scrollSnapAlign: { xs: 'start', sm: 'unset' },
                       }}>
                         <Box
+                          className={isProductAvailable ? 'product-card-hover' : ''}
                           onClick={() => {
                             if (!isShopOpen) {
                               showToast('warning', t.checkout.shopClosedWarning);
@@ -1315,17 +1641,18 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                             display: 'flex',
                             flexDirection: 'column',
                             cursor: isProductAvailable ? 'pointer' : 'default',
-                            borderRadius: '20px',
+                            borderRadius: 'var(--card-radius, 20px)',
                             overflow: 'hidden',
                             bgcolor: 'var(--surface)',
-                            border: `1px solid ${isProductClosed ? SHOP_STATUS_CONFIG[productStatus].borderColor : 'var(--glass-border)'}`,
+                            boxShadow: 'var(--card-shadow, none)',
+                            border: isProductClosed ? `1px solid ${SHOP_STATUS_CONFIG[productStatus].borderColor}` : '1px solid transparent',
                             transition: 'all 0.25s ease',
                             position: 'relative',
                             opacity: isProductClosed ? 0.85 : 1,
                             '&:hover': isProductAvailable ? {
-                              transform: 'translateY(-4px)',
-                              boxShadow: '0 20px 40px rgba(0,113,227,0.2)',
-                              borderColor: 'rgba(0,113,227,0.4)',
+                              boxShadow: (theme: any) => theme.palette.mode === 'dark'
+                                ? '0 12px 40px rgba(0,0,0,0.45), 0 0 0 1px rgba(0,113,227,0.15)'
+                                : '0 8px 30px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,113,227,0.08)',
                             } : {},
                           }}
                         >
@@ -1351,8 +1678,9 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                                   position: 'absolute',
                                   inset: 0,
                                   filter: isProductClosed ? 'grayscale(40%) brightness(0.7)' : 'none',
-                                  transition: 'filter 0.3s ease',
+                                  transition: 'filter 0.3s ease, transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
                                 }}
+                                className={!isProductClosed ? 'product-image-zoom' : ''}
                               />
                             ) : (
                               <Box sx={{
@@ -1598,20 +1926,25 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                               {!isProductClosed ? (
                                 <Button
                                   fullWidth
+                                  className={isProductAvailable ? 'shimmer-btn' : ''}
                                   disabled={!isProductAvailable}
+                                  size="small"
                                   sx={{
-                                    py: 0.8, borderRadius: '10px',
-                                    background: isProductAvailable
-                                      ? 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)'
-                                      : 'rgba(100,116,139,0.2)',
-                                    color: isProductAvailable ? 'white' : '#86868b',
-                                    fontSize: '0.75rem', fontWeight: 700,
+                                    py: 0.7,
+                                    px: 2,
+                                    borderRadius: '10px',
+                                    bgcolor: isProductAvailable ? 'var(--primary)' : 'var(--surface-3)',
+                                    color: isProductAvailable ? 'white' : 'var(--text-muted)',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 700,
                                     textTransform: 'none',
+                                    boxShadow: isProductAvailable ? '0 3px 10px rgba(0,113,227,0.25)' : 'none',
                                     '&:hover': {
-                                      background: isProductAvailable
-                                        ? 'linear-gradient(135deg, #0071e3 0%, #0071e3 100%)'
-                                        : 'rgba(100,116,139,0.2)',
+                                      bgcolor: isProductAvailable ? 'var(--primary)' : 'var(--surface-3)',
+                                      filter: isProductAvailable ? 'brightness(1.1)' : 'none',
+                                      boxShadow: isProductAvailable ? '0 5px 16px rgba(0,113,227,0.35)' : 'none',
                                     },
+                                    whiteSpace: 'nowrap',
                                   }}
                                 >
                                   {isShopOpen ? t.product.viewDetail : t.product.shopClosedTemp}
@@ -1660,7 +1993,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       <Drawer
         anchor={isMobile ? "bottom" : "right"}
         open={!!selectedProduct}
-        onClose={() => { setSelectedProduct(null); setSelectedSize(''); setSelectedVariant(null); setSelectedPattern(null); setQuantity(1); setActiveImageIndex(0); setIsLongSleeve(null); setCustomName(''); setCustomNumber(''); }}
+        onClose={() => { setSelectedProduct(null); setSelectedSize(''); setSelectedPattern(null); setQuantity(1); setActiveImageIndex(0); setIsLongSleeve(null); setCustomName(''); setCustomNumber(''); }}
         PaperProps={{
           sx: {
             width: '100%',
@@ -1681,13 +2014,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
         sx={{ zIndex: 8000 }}
       >
         {selectedProduct && (() => {
-          const basePrice = selectedVariant
-            ? selectedVariant.price
-            : selectedProduct.sizePricing?.[selectedSize] || selectedProduct.basePrice;
-          const sleeveFee = (selectedProduct.options?.hasLongSleeve && isLongSleeve === true)
-            ? (selectedProduct.options?.longSleevePrice ?? 50)
-            : 0;
-          const currentUnitPrice = basePrice + sleeveFee;
+          const currentUnitPrice = resolveProductUnitPrice(selectedProduct, selectedSize, isLongSleeve);
 
           const bottomActionsNode = (
             <Box sx={{
@@ -1700,26 +2027,58 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
               pointerEvents: needsPatternFirst ? 'none' : 'auto',
               transition: 'all 0.3s ease',
             }}>
-              <Button
-                fullWidth
-                variant="contained"
-                onClick={handleAddToCart}
-                disabled={!isShopOpen}
-                startIcon={<ShoppingCart size={18} />}
-                sx={{
-                  background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
-                  borderRadius: '12px',
-                  textTransform: 'none',
-                  fontWeight: 700,
-                  py: 1.2,
-                  fontSize: '1rem',
-                  color: 'white',
-                  '&:hover': { background: 'linear-gradient(135deg, #0071e3 0%, #0071e3 100%)' },
-                  '&.Mui-disabled': { bgcolor: 'var(--surface-2)', color: 'var(--text-muted)' },
-                }}
-              >
-                {lang === 'en' ? 'Add to Cart' : 'เพิ่มลงตะกร้า'} — ฿{(currentUnitPrice * quantity).toLocaleString()}
-              </Button>
+              <Box sx={{ display: 'flex', gap: 1.2 }}>
+                <Button
+                  onClick={handleAddToCart}
+                  disabled={!isShopOpen}
+                  startIcon={<ShoppingCart size={18} />}
+                  sx={{
+                    flex: 1,
+                    py: 1.4,
+                    borderRadius: '14px',
+                    border: '1px solid var(--glass-border)',
+                    bgcolor: 'var(--surface)',
+                    color: isShopOpen ? 'var(--foreground)' : 'var(--text-muted)',
+                    fontSize: '0.9rem',
+                    fontWeight: 700,
+                    textTransform: 'none',
+                    boxShadow: 'none',
+                    '&:hover': {
+                      bgcolor: isShopOpen ? 'var(--surface-2)' : 'var(--surface)',
+                      transform: isShopOpen ? 'scale(0.98)' : 'none',
+                    },
+                    '&.Mui-disabled': { color: 'var(--text-muted)' },
+                  }}
+                >
+                  {t.product.addToCart}
+                  <Box component="span" sx={{ ml: 0.5, opacity: 0.85, fontSize: '0.82rem' }}>
+                    ฿{(currentUnitPrice * quantity).toLocaleString()}
+                  </Box>
+                </Button>
+                <Button
+                  onClick={handleBuyNow}
+                  disabled={!isShopOpen}
+                  startIcon={<Zap size={18} />}
+                  sx={{
+                    flex: 1.3,
+                    py: 1.4,
+                    borderRadius: '14px',
+                    bgcolor: isShopOpen ? 'var(--primary)' : 'var(--surface-2)',
+                    color: isShopOpen ? 'white' : 'var(--text-muted)',
+                    fontSize: '0.95rem',
+                    fontWeight: 800,
+                    textTransform: 'none',
+                    boxShadow: 'none',
+                    '&:hover': {
+                      bgcolor: isShopOpen ? '#0062cc' : 'var(--surface-2)',
+                      transform: isShopOpen ? 'scale(0.98)' : 'none',
+                    },
+                    '&.Mui-disabled': { bgcolor: 'var(--surface-2)', color: 'var(--text-muted)' },
+                  }}
+                >
+                  {t.product.buyNow}
+                </Button>
+              </Box>
             </Box>
           );
 
@@ -1747,7 +2106,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                     {lang === 'en' ? 'Product Details' : 'รายละเอียดสินค้า'}
                   </Typography>
                   <IconButton
-                    onClick={() => { setSelectedProduct(null); setSelectedSize(''); setSelectedVariant(null); setSelectedPattern(null); setQuantity(1); }}
+                    onClick={() => { setSelectedProduct(null); setSelectedSize(''); setSelectedPattern(null); setQuantity(1); }}
                     sx={{
                       bgcolor: 'var(--surface-2)',
                       color: 'var(--foreground)',
@@ -2057,52 +2416,180 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                       flexDirection: 'column',
                       gap: 2.5,
                     }}>
-                      {/* Size Selection */}
-                      {selectedProduct.sizePricing && Object.keys(selectedProduct.sizePricing).length > 0 && (
-                        <Box>
-                          <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, mb: 1, color: 'var(--foreground)' }}>
-                            {lang === 'en' ? 'Size' : 'ขนาด'}
-                          </Typography>
-                          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                            {Object.entries(selectedProduct.sizePricing).map(([size, price]) => (
-                              <Chip
-                                key={size}
-                                label={`${size} (฿${price})`}
-                                onClick={() => setSelectedSize(size)}
-                                sx={{
-                                  bgcolor: selectedSize === size ? '#0071e3' : 'var(--surface-2)',
-                                  color: selectedSize === size ? 'white' : 'var(--foreground)',
-                                  fontWeight: 600, cursor: 'pointer',
-                                  border: `1px solid ${selectedSize === size ? '#0071e3' : 'var(--glass-border)'}`,
-                                  '&:hover': { opacity: 0.8 },
-                                }}
-                              />
-                            ))}
+                      {/* Size Chart & Selection — same as main shop */}
+                      {productRequiresSize(selectedProduct) && (
+                        <Box sx={{
+                          p: { xs: 2.5, sm: 3 },
+                          borderRadius: '20px',
+                          background: (theme: any) => theme.palette.mode === 'dark'
+                            ? 'linear-gradient(135deg, rgba(29,29,31,0.6) 0%, rgba(29,29,31,0.3) 100%)'
+                            : 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(245,245,247,0.6) 100%)',
+                          border: '1px solid var(--glass-border)',
+                          boxShadow: (theme: any) => theme.palette.mode === 'dark'
+                            ? 'inset 0 1px 0 rgba(255,255,255,0.05)'
+                            : 'inset 0 1px 0 rgba(255,255,255,0.8)',
+                        }}>
+                          <Box ref={sizeSelectorRef} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                            <Box sx={{
+                              width: 36, height: 36, borderRadius: '10px',
+                              bgcolor: 'rgba(0,113,227,0.15)',
+                              display: 'grid', placeItems: 'center',
+                            }}>
+                              <Ruler size={18} color="#2997ff" />
+                            </Box>
+                            <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                              {t.product.sizeChart} & {t.product.selectSize}
+                            </Typography>
+                          </Box>
+
+                          <Box sx={{ borderRadius: '16px', bgcolor: 'var(--surface)', border: '1px solid var(--glass-border)', overflow: 'hidden' }}>
+                            <Box sx={{
+                              display: 'grid', gridTemplateColumns: '1.2fr 1fr 1.2fr 1fr',
+                              p: 1.5, bgcolor: 'rgba(0,113,227,0.08)',
+                              borderBottom: '1px solid var(--glass-border)', textAlign: 'center',
+                            }}>
+                              <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--primary)', textAlign: 'left', pl: 2 }}>
+                                {lang === 'en' ? 'Size' : 'ขนาดไซส์'}
+                              </Typography>
+                              <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--primary)' }}>
+                                {lang === 'en' ? 'Chest (in)' : 'รอบอก (นิ้ว)'}
+                              </Typography>
+                              <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--primary)' }}>
+                                {lang === 'en' ? 'Length (in)' : 'ความยาว (นิ้ว)'}
+                              </Typography>
+                              <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--primary)', pr: 1 }}>
+                                {lang === 'en' ? 'Price' : 'ราคา'}
+                              </Typography>
+                            </Box>
+
+                            <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                              {displaySizes.map((size) => {
+                                const measurement = SIZE_MEASUREMENTS[size];
+                                const isSelected = selectedSize === size;
+                                const rowPrice = resolveProductUnitPrice(selectedProduct, size, isLongSleeve);
+                                return (
+                                  <Box
+                                    key={size}
+                                    onClick={() => setSelectedSize(size)}
+                                    sx={{
+                                      display: 'grid', gridTemplateColumns: '1.2fr 1fr 1.2fr 1fr',
+                                      p: 1.5, alignItems: 'center', textAlign: 'center',
+                                      cursor: 'pointer',
+                                      bgcolor: isSelected ? 'rgba(0,113,227,0.08)' : 'transparent',
+                                      borderBottom: '1px solid var(--glass-border)',
+                                      '&:last-child': { borderBottom: 'none' },
+                                      position: 'relative', transition: 'all 0.2s ease',
+                                      '&:hover': { bgcolor: isSelected ? 'rgba(0,113,227,0.12)' : 'var(--surface-2)' },
+                                    }}
+                                  >
+                                    {isSelected && (
+                                      <Box sx={{
+                                        position: 'absolute', left: 0, top: 0, bottom: 0, width: 4,
+                                        bgcolor: 'var(--primary)', borderRadius: '0 4px 4px 0',
+                                      }} />
+                                    )}
+                                    <Typography sx={{
+                                      fontSize: '0.85rem', fontWeight: 700,
+                                      color: isSelected ? 'var(--primary)' : 'var(--foreground)',
+                                      textAlign: 'left', pl: 2,
+                                    }}>
+                                      {size}
+                                    </Typography>
+                                    <Typography sx={{
+                                      fontSize: '0.82rem', fontWeight: isSelected ? 600 : 500,
+                                      color: isSelected ? 'var(--foreground)' : 'var(--text-muted)',
+                                    }}>
+                                      {measurement?.chest ? `${measurement.chest}"` : '-'}
+                                    </Typography>
+                                    <Typography sx={{
+                                      fontSize: '0.82rem', fontWeight: isSelected ? 600 : 500,
+                                      color: isSelected ? 'var(--foreground)' : 'var(--text-muted)',
+                                    }}>
+                                      {measurement?.length ? `${measurement.length}"` : '-'}
+                                    </Typography>
+                                    <Typography sx={{
+                                      fontSize: '0.82rem', fontWeight: 700,
+                                      color: isSelected ? 'var(--success)' : 'var(--foreground)', pr: 1,
+                                    }}>
+                                      ฿{rowPrice.toLocaleString()}
+                                    </Typography>
+                                  </Box>
+                                );
+                              })}
+                            </Box>
                           </Box>
                         </Box>
                       )}
 
-                      {/* Variant Selection */}
-                      {selectedProduct.variants && selectedProduct.variants.length > 0 && (
-                        <Box>
-                          <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, mb: 1, color: 'var(--foreground)' }}>
-                            {lang === 'en' ? 'Options' : 'ตัวเลือก'}
-                          </Typography>
-                          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                            {selectedProduct.variants.filter(v => v.isActive).map((variant) => (
-                              <Chip
-                                key={variant.id}
-                                label={`${variant.name} (฿${variant.price})`}
-                                onClick={() => setSelectedVariant(variant)}
-                                sx={{
-                                  bgcolor: selectedVariant?.id === variant.id ? '#0071e3' : 'var(--surface-2)',
-                                  color: selectedVariant?.id === variant.id ? 'white' : 'var(--foreground)',
-                                  fontWeight: 600, cursor: 'pointer',
-                                  border: `1px solid ${selectedVariant?.id === variant.id ? '#0071e3' : 'var(--glass-border)'}`,
-                                  '&:hover': { opacity: 0.8 },
-                                }}
-                              />
-                            ))}
+                      {/* Variant Selection — non-apparel products */}
+                      {!productRequiresSize(selectedProduct) && selectedProduct.variants && selectedProduct.variants.length > 0 && (
+                        <Box sx={{
+                          p: { xs: 2.5, sm: 3 },
+                          borderRadius: '20px',
+                          background: 'linear-gradient(135deg, rgba(0,113,227,0.15) 0%, rgba(0,113,227,0.05) 100%)',
+                          border: '1px solid rgba(0,113,227,0.3)',
+                        }}>
+                          <Box ref={sizeSelectorRef} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                            <Box sx={{
+                              width: 36, height: 36, borderRadius: '10px',
+                              bgcolor: 'rgba(0,113,227,0.2)',
+                              display: 'grid', placeItems: 'center',
+                            }}>
+                              <Tag size={18} color="#2997ff" />
+                            </Box>
+                            <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--secondary)' }}>
+                              {t.product.selectOption}
+                            </Typography>
+                          </Box>
+
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                            {selectedProduct.variants
+                              .filter((v) => v.isActive !== false)
+                              .map((variant) => {
+                                const active = selectedSize === variant.id;
+                                const isOutOfStock = variant.stock !== null && variant.stock !== undefined && variant.stock <= 0;
+                                return (
+                                  <Box
+                                    key={variant.id}
+                                    onClick={() => { if (!isOutOfStock) setSelectedSize(variant.id); }}
+                                    sx={{
+                                      px: 2, py: 1.5, borderRadius: '12px',
+                                      border: active ? '2px solid var(--primary)' : '1px solid var(--glass-border)',
+                                      bgcolor: active ? 'rgba(0,122,255,0.08)' : isOutOfStock ? 'var(--surface)' : 'var(--surface-2)',
+                                      cursor: isOutOfStock ? 'not-allowed' : 'pointer',
+                                      opacity: isOutOfStock ? 0.5 : 1,
+                                      transition: 'all 0.2s ease',
+                                      display: 'flex', flexDirection: 'column', alignItems: 'center',
+                                      minWidth: 90, position: 'relative',
+                                      '&:hover': !isOutOfStock ? {
+                                        borderColor: active ? '#0077ED' : 'rgba(0,113,227,0.5)',
+                                        bgcolor: active ? 'rgba(0,113,227,0.2)' : 'rgba(0,113,227,0.08)',
+                                      } : {},
+                                    }}
+                                  >
+                                    {isOutOfStock && (
+                                      <Box sx={{
+                                        position: 'absolute', top: -8, right: -8,
+                                        px: 0.8, py: 0.2, bgcolor: '#ff453a',
+                                        borderRadius: '6px', fontSize: '0.6rem', fontWeight: 700, color: 'white',
+                                      }}>
+                                        {t.common.outOfStock}
+                                      </Box>
+                                    )}
+                                    <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: active ? 'var(--secondary)' : 'var(--foreground)' }}>
+                                      {variant.name}
+                                    </Typography>
+                                    <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: active ? 'var(--secondary)' : 'var(--text-muted)' }}>
+                                      ฿{(variant.price || selectedProduct.basePrice).toLocaleString()}
+                                    </Typography>
+                                    {variant.stock !== null && variant.stock !== undefined && variant.stock > 0 && (
+                                      <Typography sx={{ fontSize: '0.6rem', color: 'var(--text-muted)', mt: 0.3 }}>
+                                        {t.common.remaining} {variant.stock}
+                                      </Typography>
+                                    )}
+                                  </Box>
+                                );
+                              })}
                           </Box>
                         </Box>
                       )}
@@ -2133,7 +2620,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
 
                           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                             {selectedProduct.options?.hasCustomName && (() => {
-                              const sc = DEFAULT_SHIRT_NAME;
+                              const sc = shirtCfg;
                               const langs: string[] = [];
                               if (sc.allowThai) langs.push(lang === 'en' ? 'Thai' : 'ภาษาไทย');
                               if (sc.allowEnglish) langs.push(lang === 'en' ? 'English' : 'ภาษาอังกฤษ');
@@ -2330,227 +2817,69 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
         })()}
       </Drawer>
 
-      {/* ==================== CART DIALOG ==================== */}
-      <Dialog
+      {/* ==================== CART DRAWER (same as main store) ==================== */}
+      <CartDrawer
         open={cartOpen}
         onClose={() => setCartOpen(false)}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{
-          sx: {
-            bgcolor: 'var(--surface)',
-            color: 'var(--foreground)',
-            borderRadius: '20px',
-            border: '1px solid var(--glass-border)',
-            maxHeight: '85vh',
-          },
+        cart={drawerCart}
+        config={shopConfig}
+        shippingConfig={shippingConfig}
+        isShopOpen={isShopOpen}
+        onClearCart={async () => {
+          const ok = await showConfirm({
+            title: lang === 'en' ? 'Clear entire cart?' : 'ล้างตะกร้าทั้งหมด?',
+            message: lang === 'en'
+              ? 'Are you sure you want to remove all items from your cart?'
+              : 'คุณแน่ใจหรือไม่ว่าต้องการนำสินค้าทั้งหมดออกจากตะกร้าของคุณ?',
+            variant: 'warning',
+            confirmText: lang === 'en' ? 'Clear All' : 'ล้างทั้งหมด',
+            cancelText: lang === 'en' ? 'Cancel' : 'ยกเลิก',
+            destructive: true,
+          });
+          if (ok) {
+            useCartStore.getState().clearCartByShop(shopSlug);
+            showToast('success', lang === 'en' ? 'Cart cleared' : 'ล้างตะกร้าแล้ว');
+          }
         }}
-      >
-        <Box sx={{ px: 3, py: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--glass-border)' }}>
-          <Typography sx={{ fontWeight: 800, fontSize: '1.1rem' }}>
-            🛒 {lang === 'en' ? 'Cart' : 'ตะกร้าสินค้า'} ({shopCart.length})
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 0.5 }}>
-            {shopCart.length > 0 && (
-              <IconButton
-                onClick={async () => {
-                  const ok = await showConfirm({
-                    title: lang === 'en' ? 'Clear entire cart?' : 'ล้างตะกร้าทั้งหมด?',
-                    message: lang === 'en'
-                      ? 'Are you sure you want to remove all items from your cart?'
-                      : 'คุณแน่ใจหรือไม่ว่าต้องการนำสินค้าทั้งหมดออกจากตะกร้าของคุณ?',
-                    variant: 'warning',
-                    confirmText: lang === 'en' ? 'Clear All' : 'ล้างทั้งหมด',
-                    cancelText: lang === 'en' ? 'Cancel' : 'ยกเลิก',
-                    destructive: true,
-                  });
-                  if (ok) {
-                    const clearCartByShop = useCartStore.getState().clearCartByShop;
-                    clearCartByShop(shopSlug);
-                    showToast('success', lang === 'en' ? 'Cart cleared' : 'ล้างตะกร้าแล้ว');
-                  }
-                }}
-                size="small"
-                sx={{ color: 'var(--error)' }}
-              >
-                <Trash2 size={18} />
-              </IconButton>
-            )}
-            <IconButton onClick={() => setCartOpen(false)} sx={{ color: 'var(--text-muted)' }}>
-              <X size={20} />
-            </IconButton>
-          </Box>
-        </Box>
-        <DialogContent sx={{ px: 3, py: 2 }}>
-          {shopCart.length === 0 ? (
-            <Box sx={{ py: 4, textAlign: 'center' }}>
-              <ShoppingCart size={48} style={{ color: 'var(--text-muted)', marginBottom: 8 }} />
-              <Typography sx={{ color: 'var(--text-muted)' }}>
-                {lang === 'en' ? 'Your cart is empty' : 'ยังไม่มีสินค้าในตะกร้า'}
-              </Typography>
-            </Box>
-          ) : (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-              {shopCart.map((item, idx) => {
-                // Find global index in full cart for operations
-                const globalIdx = cart.findIndex((c, i) => {
-                  const shopItems = cart.filter(ci => ci.shopSlug === shopSlug);
-                  const localIdx = shopItems.indexOf(c);
-                  return c.shopSlug === shopSlug && localIdx === idx;
-                });
-                const actualGlobalIdx = cart.indexOf(item);
-                
-                return (
-                  <Box key={idx} sx={{
-                    p: 2, borderRadius: '14px',
-                    bgcolor: 'var(--surface-2)',
-                    border: '1px solid var(--glass-border)',
-                  }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography sx={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--foreground)' }} noWrap>
-                          {item.name}
-                        </Typography>
-                        <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                          {item.size !== '-' ? `${lang === 'en' ? 'Size' : 'ขนาด'}: ${item.size}` : ''}
-                          {item.selectedVariant ? ` · ${item.selectedVariant.name}` : ''}
-                          {item.selectedPattern ? ` · ${item.selectedPattern.name}` : ''}
-                        </Typography>
-                      </Box>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleRemoveCartItem(actualGlobalIdx)}
-                        sx={{ color: 'var(--error)', ml: 1 }}
-                      >
-                        <X size={16} />
-                      </IconButton>
-                    </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      {/* Quantity controls */}
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleUpdateCartQty(actualGlobalIdx, item.qty - 1)}
-                          sx={{
-                            width: 28, height: 28,
-                            bgcolor: 'var(--surface)',
-                            border: '1px solid var(--glass-border)',
-                            color: 'var(--foreground)',
-                          }}
-                        >
-                          <Minus size={14} />
-                        </IconButton>
-                        <Typography sx={{ fontWeight: 700, minWidth: 28, textAlign: 'center', fontSize: '0.9rem', color: 'var(--foreground)' }}>
-                          {item.qty}
-                        </Typography>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleUpdateCartQty(actualGlobalIdx, item.qty + 1)}
-                          sx={{
-                            width: 28, height: 28,
-                            bgcolor: 'var(--surface)',
-                            border: '1px solid var(--glass-border)',
-                            color: 'var(--foreground)',
-                          }}
-                        >
-                          <Plus size={14} />
-                        </IconButton>
-                      </Box>
-                      <Box sx={{ textAlign: 'right' }}>
-                        <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                          ฿{item.price.toLocaleString()} × {item.qty}
-                        </Typography>
-                        <Typography sx={{ fontWeight: 800, color: '#34c759', fontSize: '0.95rem' }}>
-                          ฿{item.total.toLocaleString()}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </Box>
-                );
-              })}
-              <Box sx={{ pt: 2, borderTop: '2px solid var(--glass-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography sx={{ fontWeight: 700, fontSize: '1rem' }}>
-                  {lang === 'en' ? 'Total' : 'รวมทั้งหมด'}
-                </Typography>
-                <Typography sx={{ fontWeight: 800, color: '#34c759', fontSize: '1.3rem' }}>
-                  ฿{shopCart.reduce((sum, item) => sum + item.total, 0).toLocaleString()}
-                </Typography>
-              </Box>
+        onUpdateQuantity={updateDrawerCartQuantity}
+        onRemoveItem={removeDrawerCartItem}
+        onEditItem={(item) => setEditingCartItem(item)}
+        onCheckout={() => {
+          if (!isShopOpen) {
+            showToast('warning', lang === 'en' ? 'Shop is closed' : 'ร้านค้าปิดรับออเดอร์แล้ว');
+            return;
+          }
+          if (!requireProfileBeforeCheckout()) return;
+          setCartOpen(false);
+          setCheckoutOpen(true);
+        }}
+        onStartHold={startCartHold}
+        onStopHold={stopCartHold}
+        onGoHome={() => setCartOpen(false)}
+        getTotalPrice={getTotalPrice}
+        editingCartItem={editingCartItem}
+        onSetEditingCartItem={setEditingCartItem}
+        onUpdateCartItem={updateDrawerCartItem}
+      />
 
-              <Button
-                fullWidth
-                variant="contained"
-                onClick={() => {
-                  if (!isShopOpen) {
-                    showToast('warning', lang === 'en' ? 'Shop is closed' : 'ร้านค้าปิดรับออเดอร์แล้ว');
-                    return;
-                  }
-                  if (!session?.user?.email) {
-                    showToast('warning', lang === 'en' ? 'Please sign in to checkout' : 'กรุณาเข้าสู่ระบบก่อนสั่งซื้อ');
-                    signIn();
-                    return;
-                  }
-                  setCartOpen(false);
-                  if (!profileComplete) {
-                    showToast('warning', lang === 'en' ? 'Please complete your profile details' : 'กรุณากรอกข้อมูลส่วนตัว/ที่อยู่ก่อนทำการสั่งซื้อ');
-                    setShowProfileModal(true);
-                    setPendingCheckout(true);
-                  } else {
-                    setCheckoutOpen(true);
-                  }
-                }}
-                disabled={!isShopOpen}
-                startIcon={<ShoppingCart size={18} />}
-                sx={{
-                  mt: 2,
-                  background: 'linear-gradient(135deg, #0071e3 0%, #0071e3 100%)',
-                  borderRadius: '12px',
-                  textTransform: 'none',
-                  fontWeight: 700,
-                  py: 1.2,
-                  fontSize: '1rem',
-                  color: 'white',
-                  '&:hover': { background: 'linear-gradient(135deg, #0077ed 0%, #0077ed 100%)' },
-                  '&.Mui-disabled': { bgcolor: 'var(--surface-2)', color: 'var(--text-muted)' },
-                }}
-              >
-                {lang === 'en' ? 'Checkout' : 'สั่งซื้อสินค้า'}
-              </Button>
-
-              <Link href="/" style={{ textDecoration: 'none' }}>
-                <Button
-                  fullWidth
-                  variant="outlined"
-                  sx={{
-                    mt: 1,
-                    borderColor: 'var(--glass-border)',
-                    borderRadius: '12px',
-                    textTransform: 'none',
-                    fontWeight: 600,
-                    py: 1,
-                    color: 'var(--text-muted)',
-                    fontSize: '0.85rem',
-                  }}
-                >
-                  {lang === 'en' ? 'Continue Shopping at Main Store' : 'ช้อปต่อที่ร้านหลัก'}
-                </Button>
-              </Link>
-            </Box>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* ==================== PAYMENT MODAL ==================== */}
-      {paymentRef && (
-        <PaymentModal
-          orderRef={paymentRef}
-          onClose={() => setPaymentRef(null)}
-          onSuccess={() => {
-            setPaymentRef(null);
-            showToast('success', lang === 'en' ? 'Payment submitted!' : 'ส่งหลักฐานการชำระเงินแล้ว!');
-          }}
-        />
-      )}
+      <PaymentFlow
+        registerOpener={(opener) => {
+          paymentOpenerRef.current = opener;
+        }}
+        onPaymentSuccess={(ref) => {
+          setOrderHistory((prev) => {
+            const orderExists = prev.some((order) => order.ref === ref);
+            if (orderExists) {
+              return prev.map((order) =>
+                order.ref === ref ? { ...order, status: 'PAID' } : order
+              );
+            }
+            return [{ ref, status: 'PAID', date: new Date().toISOString(), total: 0, items: [] }, ...prev];
+          });
+          showToast('success', lang === 'en' ? 'Payment submitted!' : 'ส่งหลักฐานการชำระเงินแล้ว!');
+          setTimeout(() => loadOrderHistory(), 500);
+        }}
+      />
 
       {/* ==================== ORDER HISTORY DRAWER ==================== */}
       <OrderHistoryDrawer
@@ -2563,24 +2892,109 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
         historyFilter={historyFilter}
         onFilterChange={(filter) => setHistoryFilter(filter)}
         onLoadMore={() => loadOrderHistory({ append: true })}
-        onOpenPayment={(ref) => {
-          setShowOrderHistory(false);
-          setPaymentRef(ref);
-        }}
+        onOpenPayment={(ref) => openPaymentFlow(ref)}
         onCancelOrder={(ref) => handleCancelOrder(ref)}
-        onShowQR={(ref) => {
-          // Show payment modal for this order
-          setShowOrderHistory(false);
-          setPaymentRef(ref);
-        }}
+        onShowQR={(ref) => openPaymentFlow(ref)}
         cancellingRef={cancellingRef}
         isShopOpen={isShopOpen}
-        realtimeConnected={false}
-        config={null}
+        realtimeConnected={realtimeConnected}
+        config={shopConfig}
       />
 
       {/* ==================== SUPPORT CHAT ==================== */}
       <SupportChatWidget shopId={shop.id} shopName={shop.name} />
+
+      {/* ==================== SHOP CONTACT ==================== */}
+      {hasShopContact && (
+        <Box sx={{
+          maxWidth: '1200px', mx: 'auto', px: 2, py: 4,
+          borderTop: '1px solid var(--glass-border)',
+        }}>
+          <Typography sx={{
+            fontSize: '0.95rem', fontWeight: 700, mb: 1.5,
+            display: 'flex', alignItems: 'center', gap: 1, color: 'var(--foreground)',
+          }}>
+            <Store size={16} /> {t.storefront.shopContact}
+          </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.8 }}>
+            {shop.contactEmail && (
+              <Typography
+                component="a"
+                href={`mailto:${shop.contactEmail}`}
+                sx={{
+                  fontSize: '0.85rem', color: 'var(--text-muted)',
+                  display: 'flex', alignItems: 'center', gap: 1,
+                  textDecoration: 'none', '&:hover': { color: 'var(--primary)' },
+                }}
+              >
+                <Mail size={14} />
+                <Box component="span" sx={{ fontWeight: 600, color: 'var(--foreground)', minWidth: 52 }}>
+                  {t.storefront.email}:
+                </Box>
+                {shop.contactEmail}
+              </Typography>
+            )}
+            {shop.contactPhone && (
+              <Typography
+                component="a"
+                href={`tel:${shop.contactPhone.replace(/\s/g, '')}`}
+                sx={{
+                  fontSize: '0.85rem', color: 'var(--text-muted)',
+                  display: 'flex', alignItems: 'center', gap: 1,
+                  textDecoration: 'none', '&:hover': { color: 'var(--primary)' },
+                }}
+              >
+                <Phone size={14} />
+                <Box component="span" sx={{ fontWeight: 600, color: 'var(--foreground)', minWidth: 52 }}>
+                  {t.storefront.phone}:
+                </Box>
+                {shop.contactPhone}
+              </Typography>
+            )}
+            {shopSocialLinks.map(({ key, url }) => {
+              const label = SOCIAL_LINK_LABELS[key]?.[lang] || key.charAt(0).toUpperCase() + key.slice(1);
+              const SocialIcon = key === 'facebook' ? Facebook : key === 'instagram' ? Instagram : Share2;
+              return (
+                <Typography
+                  key={`${key}-${url}`}
+                  component="a"
+                  href={normalizeSocialUrl(url)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  sx={{
+                    fontSize: '0.85rem', color: 'var(--text-muted)',
+                    display: 'flex', alignItems: 'center', gap: 1,
+                    textDecoration: 'none', '&:hover': { color: 'var(--primary)' },
+                  }}
+                >
+                  <SocialIcon size={14} />
+                  <Box component="span" sx={{ fontWeight: 600, color: 'var(--foreground)' }}>
+                    {label}
+                  </Box>
+                </Typography>
+              );
+            })}
+          </Box>
+          <Box sx={{ mt: 3 }}>
+            <Link href="/" style={{ textDecoration: 'none' }}>
+              <Button
+                variant="outlined"
+                startIcon={<ArrowLeft size={16} />}
+                sx={{
+                  color: 'var(--text-muted)',
+                  borderColor: 'var(--glass-border)',
+                  borderRadius: '12px',
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  '&:hover': { borderColor: 'var(--primary)', color: 'var(--primary)' },
+                }}
+              >
+                {t.storefront.backToMain}
+              </Button>
+            </Link>
+          </Box>
+        </Box>
+      )}
 
       {/* ==================== FOOTER ==================== */}
       <Footer />
@@ -2601,6 +3015,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
         isMobile={isMobile}
         savedAddresses={savedAddresses}
         onAddressChange={(address) => setOrderAddress(address)}
+        shopId={shop.id}
       />
 
       {/* ==================== PROFILE MODAL ==================== */}
@@ -2618,24 +3033,28 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
           onSave={handleSaveProfile}
           userImage={session?.user?.image || ''}
           userEmail={session?.user?.email || ''}
+          nameValidation={shopConfig.nameValidation}
         />
       )}
 
-      {/* ==================== TOAST ==================== */}
-      <Snackbar
-        open={toast.open}
-        autoHideDuration={3000}
-        onClose={() => setToast(prev => ({ ...prev, open: false }))}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert
-          severity={toast.type}
-          onClose={() => setToast(prev => ({ ...prev, open: false }))}
-          sx={{ borderRadius: '12px' }}
-        >
-          {toast.message}
-        </Alert>
-      </Snackbar>
+      <Dialog open={!!confirmCancelRef} onClose={() => setConfirmCancelRef(null)}>
+        <DialogContent sx={{ bgcolor: 'var(--surface)', color: 'var(--foreground)' }}>
+          <Typography sx={{ fontWeight: 700, mb: 1 }}>
+            {lang === 'en' ? 'Cancel order?' : 'ยกเลิกคำสั่งซื้อ?'}
+          </Typography>
+          <Typography sx={{ color: 'var(--text-muted)', mb: 2 }}>
+            {confirmCancelRef}
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+            <Button onClick={() => setConfirmCancelRef(null)}>
+              {lang === 'en' ? 'Back' : 'ย้อนกลับ'}
+            </Button>
+            <Button color="error" variant="contained" onClick={confirmCancelOrder}>
+              {lang === 'en' ? 'Confirm cancel' : 'ยืนยันยกเลิก'}
+            </Button>
+          </Box>
+        </DialogContent>
+      </Dialog>
 
       {/* ==================== FULLSCREEN GALLERY LIGHTBOX ==================== */}
       <Dialog

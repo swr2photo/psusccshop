@@ -2,23 +2,18 @@
 // Multi-shop individual storefront page
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import ShopStorefront from './ShopStorefront';
+import { getShopBySlug, toPublicShopData } from '@/lib/shops';
+import ShopStorefrontClient from './ShopStorefrontClient';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// Server-side: fetch shop data for metadata and SSR
+// Server-side: fetch full shop data (products, contact, config)
 async function getShopData(slug: string) {
-  const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
   try {
-    // Fetch shop info via internal API
-    const res = await fetch(`${baseUrl}/api/shops?public=1`, {
-      cache: 'no-store',
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const shops = data.shops || [];
-    return shops.find((s: any) => s.slug === slug) || null;
+    const shop = await getShopBySlug(slug);
+    if (!shop || !shop.isActive) return null;
+    return toPublicShopData(shop);
   } catch {
     return null;
   }
@@ -50,5 +45,5 @@ export default async function ShopPage({ params }: { params: Promise<{ slug: str
   if (!shop) {
     notFound();
   }
-  return <ShopStorefront shopSlug={slug} initialShop={shop} />;
+  return <ShopStorefrontClient shopSlug={slug} initialShop={shop} />;
 }

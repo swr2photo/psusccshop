@@ -113,6 +113,58 @@ export const ALL_SHOP_ADMIN_PERMISSIONS: ShopAdminPermissions = {
   canAddAdmins: true,
 };
 
+/** Public-facing shop payload for storefronts (no sensitive admin data) */
+export function toPublicShopData(shop: Shop) {
+  return {
+    id: shop.id,
+    slug: shop.slug,
+    name: shop.name,
+    nameEn: shop.nameEn,
+    description: shop.description,
+    descriptionEn: shop.descriptionEn,
+    logoUrl: shop.logoUrl,
+    bannerUrl: shop.bannerUrl,
+    isOpen: shop.settings?.isOpen ?? true,
+    closeDate: shop.settings?.closeDate || '',
+    openDate: shop.settings?.openDate,
+    closedMessage: shop.settings?.closedMessage,
+    paymentEnabled: shop.settings?.paymentEnabled ?? true,
+    paymentDisabledMessage: shop.settings?.paymentDisabledMessage,
+    settings: shop.settings,
+    contactEmail: shop.contactEmail,
+    contactPhone: shop.contactPhone,
+    socialLinks: shop.socialLinks,
+    products: shop.products || [],
+    announcements: shop.config?.announcements || [],
+    announcementHistory: shop.config?.announcementHistory || [],
+    announcement: shop.config?.announcement,
+    events: shop.config?.events || [],
+    socialMediaNews: shop.config?.socialMediaNews || [],
+    liveStream: shop.config?.liveStream,
+    pickup: shop.config?.pickup,
+    promoCodes: shop.config?.promoCodes || [],
+    nameValidation: shop.config?.nameValidation,
+    shirtNameConfig: shop.config?.shirtNameConfig,
+    shippingOptions: shop.config?.shippingOptions || [],
+    promptPayId: shop.paymentInfo?.promptPayId,
+    bankAccount: shop.paymentInfo
+      ? {
+          bankName: shop.paymentInfo.bankName,
+          accountName: shop.paymentInfo.accountName,
+          accountNumber: shop.paymentInfo.accountNumber,
+        }
+      : undefined,
+    paymentInfo: shop.paymentInfo
+      ? {
+          promptPayId: shop.paymentInfo.promptPayId,
+          bankName: shop.paymentInfo.bankName,
+          accountName: shop.paymentInfo.accountName,
+          accountNumber: shop.paymentInfo.accountNumber,
+        }
+      : undefined,
+  };
+}
+
 export interface ShopSummary {
   id: string;
   slug: string;
@@ -254,6 +306,23 @@ export async function listActiveShops(): Promise<ShopSummary[]> {
     return data.map(dbToShopSummary);
   } catch (error: any) {
     console.error('[shops] listActiveShops error:', error.message);
+    return [];
+  }
+}
+
+/** Active sub-shops with at least one active product — for main storefront catalog */
+export async function listActivePublicShopCatalog() {
+  try {
+    const data = await db.select()
+      .from(shops)
+      .where(eq(shops.isActive, true))
+      .orderBy(shops.sortOrder, shops.name);
+    return data
+      .map(dbToShop)
+      .filter((shop: Shop) => (shop.products || []).some((p: { isActive?: boolean }) => p.isActive !== false))
+      .map(toPublicShopData);
+  } catch (error: any) {
+    console.error('[shops] listActivePublicShopCatalog error:', error.message);
     return [];
   }
 }
