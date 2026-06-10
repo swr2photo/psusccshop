@@ -2,19 +2,26 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Providers from "@/components/Providers";
+import AppPurposeSection from "@/components/AppPurposeSection";
 import ThemeRegistry from "../components/ThemeRegistry";
 import Script from "next/script";
+
+const SITE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://sccshop.psuscc.club";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 // SEO & Open Graph Metadata
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || 'https://sccshop.psusci.club'),
+  metadataBase: new URL(SITE_URL),
+  applicationName: "SCC Shop",
   title: {
     default: "SCC Shop - ร้านค้าออนไลน์ชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ มหาวิทยาลัยสงขลานครินทร์",
     template: "%s | SCC Shop",
   },
+  verification: process.env.GOOGLE_SITE_VERIFICATION
+    ? { google: process.env.GOOGLE_SITE_VERIFICATION }
+    : undefined,
   description: "SCC Shop คือร้านค้าออนไลน์ของชุมนุมคอมพิวเตอร์ (Science Computer Club) คณะวิทยาศาสตร์ มหาวิทยาลัยสงขลานครินทร์ จำหน่ายเสื้อชุมนุม เสื้อคณะ และสินค้าที่ระลึก สั่งซื้อง่าย ชำระเงินผ่าน PromptPay พร้อมระบบติดตามคำสั่งซื้อแบบเรียลไทม์ | The official online store of the PSU Science Computer Club for club shirts, faculty apparel, and souvenir merchandise.",
   keywords: ["SCC Shop", "ชุมนุมคอมพิวเตอร์", "PSU", "มหาวิทยาลัยสงขลานครินทร์", "เสื้อชุมนุม", "คณะวิทยาศาสตร์", "Prince of Songkla University", "online store", "ร้านค้าออนไลน์"],
   authors: [{ name: "PSU Science Computer Club" }],
@@ -108,6 +115,27 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="SCC Shop" />
+        <meta name="application-name" content="SCC Shop" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'WebApplication',
+              name: 'SCC Shop',
+              alternateName: 'PSU SCC Shop',
+              url: SITE_URL,
+              applicationCategory: 'ShoppingApplication',
+              operatingSystem: 'Web',
+              description:
+                'Official online store of the Science Computer Club (SCC), Faculty of Science, Prince of Songkla University. Browse club merchandise, place orders, pay via PromptPay, and track orders.',
+              publisher: {
+                '@type': 'Organization',
+                name: 'Science Computer Club, Faculty of Science, Prince of Songkla University',
+              },
+            }),
+          }}
+        />
         {/* Workaround for React 19 script warnings */}
         <script
           id="console-filter"
@@ -208,6 +236,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Providers>
             <div className="relative z-10 min-h-screen">
               <main id="main-content" tabIndex={-1}>
+                <AppPurposeSection />
                 {children}
               </main>
             </div>
