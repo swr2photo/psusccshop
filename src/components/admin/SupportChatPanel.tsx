@@ -63,6 +63,7 @@ import {
 } from 'lucide-react';
 
 import { ADMIN_THEME } from '@/lib/adminTheme';
+import { getDbTypingFromSession } from '@/lib/support-chat-typing';
 
 interface ChatSession {
   id: string;
@@ -167,8 +168,13 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     'admin'
   );
   
-  // Merge typing from realtime + API fallback
-  const otherTyping = rtOtherTyping || fallbackTyping;
+  const dbCustomerTyping = React.useMemo(() => {
+    const source = (realtimeSession || selectedChat) as Record<string, unknown> | null;
+    return getDbTypingFromSession(source).customerTyping;
+  }, [realtimeSession, selectedChat]);
+
+  // Merge typing from realtime broadcast + API poll + DB session fields
+  const otherTyping = rtOtherTyping || fallbackTyping || dbCustomerTyping;
 
   // Realtime chat list — live updates to sidebar
   const {
@@ -318,15 +324,6 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
               setRealtimeMessages(data.chat.messages || []);
             }
           }
-          // Also check typing via API when realtime broadcast isn't available
-          if (!cancelled) {
-            fetch('/api/support-chat/' + selectedChat.id + '/typing')
-              .then(res => res.json())
-              .then(data => {
-                if (!cancelled) setFallbackTyping(data.isTyping || false);
-              })
-              .catch(() => { if (!cancelled) setFallbackTyping(false); });
-          }
           // Mark as read
           if (!cancelled) {
             fetch('/api/support-chat/' + selectedChat.id + '/read', { method: 'POST' }).catch(() => {});
@@ -337,6 +334,22 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     const interval = setInterval(poll, pollInterval);
     return () => { cancelled = true; clearInterval(interval); };
   }, [fetchChats, connectionState, listConnectionState, selectedChat?.id, selectedChat?.messages?.length, selectedChat?.status, setRealtimeMessages]);
+
+  // Poll typing status every 2s while a chat is open (works even when Realtime broadcast is down)
+  useEffect(() => {
+    if (!selectedChat?.id) return;
+    if (selectedChat.status !== 'active' && selectedChat.status !== 'pending') return;
+
+    const pollTyping = () => {
+      fetch('/api/support-chat/' + selectedChat.id + '/typing')
+        .then((res) => res.json())
+        .then((data) => setFallbackTyping(data.isTyping || false))
+        .catch(() => setFallbackTyping(false));
+    };
+    pollTyping();
+    const interval = setInterval(pollTyping, 2000);
+    return () => clearInterval(interval);
+  }, [selectedChat?.id, selectedChat?.status]);
 
   useEffect(() => {
     if (selectedChat?.messages) {
@@ -1201,7 +1214,8 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
                   const messages = selectedChat.messages;
                   const lastAdminMsgIndex = messages.map(m => m.sender).lastIndexOf('admin');
                   return messages.map((msg, index) => {
-                  const { text, imageUrl } = parseMessage(msg.message);
+                  const { text, imageUrl, orderRef } = parseMessage(msg.message);
+                  const isImageOnly = Boolean(imageUrl && !text && !orderRef);
                   const isLastAdminMessage = msg.sender === 'admin' && index === lastAdminMsgIndex;
                   return (
                     <Box key={msg.id} sx={{ display: 'flex', justifyContent: msg.sender === 'admin' ? 'flex-end' : msg.sender === 'system' ? 'center' : 'flex-start' }}>
@@ -1220,77 +1234,100 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
                             </Avatar>
                           )}
                           <Box sx={{ minWidth: 0 }}>
-                            <Paper elevation={0} sx={{
-                              px: 1.5, py: 1,
-                              bgcolor: (msg as any)._failed ? '#ff453a' : msg.sender === 'admin' ? '#2563eb' : ADMIN_THEME.bgCard,
-                              color: ADMIN_THEME.text,
-                              borderRadius: 2,
-                              borderBottomRightRadius: msg.sender === 'admin' ? 4 : 16,
-                              borderBottomLeftRadius: msg.sender === 'customer' ? 4 : 16,
-                              opacity: (msg as any)._optimistic ? 0.6 : 1,
-                              transition: 'opacity 0.3s ease',
-                            }}>
-                              {text && <Typography sx={{ fontSize: '0.85rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.4 }}>{text}</Typography>}
-                              {/* Order Reference Card */}
-                              {parseMessage(msg.message).orderRef && (
-                                <Box
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setOrderSearchRef(parseMessage(msg.message).orderRef || '');
-                                    setOrderLookupOpen(true);
-                                    handleSearchOrder();
-                                  }}
-                                  sx={{
-                                    mt: text ? 1 : 0,
-                                    p: 1.5,
-                                    bgcolor: msg.sender === 'admin' ? 'var(--glass-bg)' : 'var(--surface)',
-                                    borderRadius: 1.5,
-                                    border: '1px solid',
-                                    borderColor: msg.sender === 'admin' ? 'var(--glass-border)' : ADMIN_THEME.border,
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s',
-                                    '&:hover': { 
-                                      bgcolor: msg.sender === 'admin' ? 'var(--glass-strong)' : 'rgba(37, 99, 235, 0.1)',
-                                    },
-                                  }}
-                                >
-                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <Box sx={{
-                                      width: 32,
-                                      height: 32,
-                                      borderRadius: 1,
-                                      bgcolor: '#22c55e',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                    }}>
-                                      <ReceiptIcon size={18} color="white" />
-                                    </Box>
-                                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                                      <Typography sx={{ 
-                                        fontSize: '0.8rem', 
-                                        fontWeight: 600,
-                                        color: msg.sender === 'admin' ? 'white' : ADMIN_THEME.text,
+                            {isImageOnly ? (
+                              <Box
+                                component="img"
+                                src={imageUrl!}
+                                alt="รูปภาพ"
+                                loading="lazy"
+                                onClick={(e) => { e.stopPropagation(); setLightboxImage(imageUrl!); }}
+                                sx={{
+                                  display: 'block',
+                                  maxWidth: { xs: 200, sm: 260 },
+                                  maxHeight: { xs: 260, sm: 340 },
+                                  width: 'auto',
+                                  height: 'auto',
+                                  objectFit: 'contain',
+                                  borderRadius: '14px',
+                                  cursor: 'zoom-in',
+                                  boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+                                  opacity: (msg as any)._optimistic ? 0.6 : 1,
+                                  transition: 'opacity 0.3s ease',
+                                  '&:hover': { opacity: 0.92 },
+                                }}
+                              />
+                            ) : (
+                              <Paper elevation={0} sx={{
+                                px: 1.5, py: 1,
+                                bgcolor: (msg as any)._failed ? '#ff453a' : msg.sender === 'admin' ? '#2563eb' : ADMIN_THEME.bgCard,
+                                color: ADMIN_THEME.text,
+                                borderRadius: 2,
+                                borderBottomRightRadius: msg.sender === 'admin' ? 4 : 16,
+                                borderBottomLeftRadius: msg.sender === 'customer' ? 4 : 16,
+                                opacity: (msg as any)._optimistic ? 0.6 : 1,
+                                transition: 'opacity 0.3s ease',
+                              }}>
+                                {text && <Typography sx={{ fontSize: '0.85rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.4 }}>{text}</Typography>}
+                                {orderRef && (
+                                  <Box
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOrderSearchRef(orderRef || '');
+                                      setOrderLookupOpen(true);
+                                      handleSearchOrder();
+                                    }}
+                                    sx={{
+                                      mt: text ? 1 : 0,
+                                      p: 1.5,
+                                      bgcolor: msg.sender === 'admin' ? 'var(--glass-bg)' : 'var(--surface)',
+                                      borderRadius: 1.5,
+                                      border: '1px solid',
+                                      borderColor: msg.sender === 'admin' ? 'var(--glass-border)' : ADMIN_THEME.border,
+                                      cursor: 'pointer',
+                                      transition: 'all 0.2s',
+                                      '&:hover': { 
+                                        bgcolor: msg.sender === 'admin' ? 'var(--glass-strong)' : 'rgba(37, 99, 235, 0.1)',
+                                      },
+                                    }}
+                                  >
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                      <Box sx={{
+                                        width: 32,
+                                        height: 32,
+                                        borderRadius: 1,
+                                        bgcolor: '#22c55e',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
                                       }}>
-                                        ออเดอร์ #{parseMessage(msg.message).orderRef}
-                                      </Typography>
-                                      <Typography sx={{ 
-                                        fontSize: '0.7rem',
-                                        color: msg.sender === 'admin' ? ADMIN_THEME.text : ADMIN_THEME.textMuted,
-                                      }}>
-                                        คลิกเพื่อดูรายละเอียด
-                                      </Typography>
+                                        <ReceiptIcon size={18} color="white" />
+                                      </Box>
+                                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                                        <Typography sx={{ 
+                                          fontSize: '0.8rem', 
+                                          fontWeight: 600,
+                                          color: msg.sender === 'admin' ? 'white' : ADMIN_THEME.text,
+                                        }}>
+                                          ออเดอร์ #{orderRef}
+                                        </Typography>
+                                        <Typography sx={{ 
+                                          fontSize: '0.7rem',
+                                          color: msg.sender === 'admin' ? ADMIN_THEME.text : ADMIN_THEME.textMuted,
+                                        }}>
+                                          คลิกเพื่อดูรายละเอียด
+                                        </Typography>
+                                      </Box>
+                                      <ViewIcon size={16} color={msg.sender === 'admin' ? 'var(--text-muted)' : ADMIN_THEME.textMuted} />
                                     </Box>
-                                    <ViewIcon size={16} color={msg.sender === 'admin' ? 'var(--text-muted)' : ADMIN_THEME.textMuted} />
                                   </Box>
-                                </Box>
-                              )}
-                              {imageUrl && (
-                                <Box component="img" src={imageUrl} alt="รูปภาพ" loading="lazy"
-                                  sx={{ width: '100%', maxWidth: { xs: 160, sm: 200 }, height: 'auto', maxHeight: { xs: 140, sm: 180 }, objectFit: 'cover', borderRadius: 1.5, mt: text ? 1 : 0, cursor: 'zoom-in', transition: 'transform 0.2s', '&:hover': { transform: 'scale(1.02)' } }}
-                                  onClick={(e) => { e.stopPropagation(); setLightboxImage(imageUrl); }} />
-                              )}
-                            </Paper>
+                                )}
+                                {imageUrl && (
+                                  <Box component="img" src={imageUrl} alt="รูปภาพ" loading="lazy"
+                                    sx={{ width: '100%', maxWidth: { xs: 160, sm: 200 }, height: 'auto', maxHeight: { xs: 140, sm: 180 }, objectFit: 'cover', borderRadius: 1.5, mt: text || orderRef ? 1 : 0, cursor: 'zoom-in', transition: 'transform 0.2s', '&:hover': { transform: 'scale(1.02)' } }}
+                                    onClick={(e) => { e.stopPropagation(); setLightboxImage(imageUrl); }} />
+                                )}
+                              </Paper>
+                            )}
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.25, justifyContent: msg.sender === 'admin' ? 'flex-end' : 'flex-start', flexWrap: 'wrap' }}>
                               <Typography sx={{ fontSize: '0.6rem', color: ADMIN_THEME.textMuted }}>
                                 {new Date(msg.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} · {formatTime(msg.created_at)}
@@ -1322,6 +1359,9 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Avatar sx={{ width: 28, height: 28, bgcolor: '#fbbf24' }}><PersonIcon size={16} /></Avatar>
                     <Paper sx={{ px: 2, py: 1, bgcolor: ADMIN_THEME.bgCard, borderRadius: 2 }}>
+                      <Typography sx={{ fontSize: '0.75rem', color: ADMIN_THEME.textMuted, mb: 0.5 }}>
+                        {typingDisplay || 'ลูกค้ากำลังพิมพ์...'}
+                      </Typography>
                       <Box sx={{ display: 'flex', gap: 0.5 }}>
                         <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: ADMIN_THEME.textMuted, animation: 'bounce 1.4s infinite ease-in-out both', animationDelay: '0s' }} />
                         <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: ADMIN_THEME.textMuted, animation: 'bounce 1.4s infinite ease-in-out both', animationDelay: '0.2s' }} />

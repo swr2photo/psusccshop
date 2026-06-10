@@ -29,6 +29,7 @@ import { useNotification } from './NotificationContext';
 import { usePushNotification } from '@/hooks/usePushNotification';
 import { useRealtimeChat } from '@/hooks/useRealtimeChat';
 import { useTranslation } from '@/hooks/useTranslation';
+import { getDbTypingFromSession } from '@/lib/support-chat-typing';
 
 // ชื่อแอดมินเริ่มต้น (ดึงจากตั้งค่าแชท)
 const DEFAULT_ADMIN_NAME = 'ทีมงาน PSU SCC';
@@ -135,8 +136,13 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
     'customer'
   );
 
-  // Merge typing from realtime + API fallback
-  const adminTyping = rtAdminTyping || fallbackTyping;
+  const dbAdminTyping = React.useMemo(() => {
+    const source = (realtimeSession || chat) as Record<string, unknown> | null;
+    return getDbTypingFromSession(source).adminTyping;
+  }, [realtimeSession, chat]);
+
+  // Merge typing from realtime broadcast + API poll + DB session fields
+  const adminTyping = rtAdminTyping || fallbackTyping || dbAdminTyping;
 
   // Sync realtime messages into chat state
   useEffect(() => {
@@ -307,7 +313,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
 
   // Send typing indicator: Realtime broadcast when connected, API fallback otherwise
   const sendTypingIndicator = useCallback(() => {
-    if (!chat || chat.status !== 'active') return;
+    if (!chat || (chat.status !== 'active' && chat.status !== 'pending')) return;
     if (connectionState === 'connected') {
       rtSendTyping(true, session?.user?.name || undefined);
     } else {
@@ -327,6 +333,22 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
       }, 3000);
     }
   }, [chat?.id, chat?.status, rtSendTyping, session?.user?.name, connectionState]);
+
+  // Poll typing status (API/DB fallback — keeps working when Realtime broadcast is down)
+  useEffect(() => {
+    if (!open || !chat?.id || showHistory || showNewChat || showRating) return;
+    if (chat.status !== 'active' && chat.status !== 'pending') return;
+
+    const pollTyping = () => {
+      fetch(`/api/support-chat/${chat.id}/typing`)
+        .then((res) => res.json())
+        .then((data) => setFallbackTyping(data.isTyping || false))
+        .catch(() => setFallbackTyping(false));
+    };
+    pollTyping();
+    const interval = setInterval(pollTyping, 2000);
+    return () => clearInterval(interval);
+  }, [open, chat?.id, chat?.status, showHistory, showNewChat, showRating]);
 
   // === Realtime replaces polling ===
   // Instead of polling every 5s, Supabase Realtime pushes changes instantly.
@@ -366,15 +388,6 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
             }
             return prev;
           });
-        }
-        // Also check typing via API fallback
-        if (!cancelled && chat.status === 'active') {
-          fetch(`/api/support-chat/${chat.id}/typing`)
-            .then(res => res.json())
-            .then(data => {
-              if (!cancelled) setFallbackTyping(data.isTyping || false);
-            })
-            .catch(() => { if (!cancelled) setFallbackTyping(false); });
         }
       } catch {}
     };
@@ -1455,6 +1468,8 @@ ${getStatusLabel(order.status)}
                 )}
                 {showHistory 
                   ? t.supportChat.recentChats
+                  : adminTyping && chat
+                  ? (typingDisplay || `${chat.admin_name || displayAdminName} กำลังพิมพ์...`)
                   : chat?.status === 'active' 
                   ? `${t.supportChat.activeChats} - ${chat.admin_name || t.supportChat.admin}`
                   : chat?.status === 'pending'
@@ -2000,7 +2015,8 @@ ${getStatusLabel(order.status)}
                   }}
                 >
                   {(chat.messages || []).filter(msg => !msg.is_unsent).map((msg, index, filteredMessages) => {
-                    const { text, imageUrl } = parseMessage(msg.message);
+                    const { text, imageUrl, orderRef } = parseMessage(msg.message);
+                    const isImageOnly = Boolean(imageUrl && !text && !orderRef);
                     const showTime = isLastInGroup(filteredMessages, index);
                     const canUnsend = msg.sender === 'customer' && chat.status !== 'closed';
                     // Check if this is the last customer message (for showing read receipt)
@@ -2064,112 +2080,133 @@ ${getStatusLabel(order.status)}
                             )}
                             
                             <Box sx={{ position: 'relative' }}>
-                              {/* Message Bubble with long-press/click support */}
-                              <Paper
-                                elevation={0}
-                                onContextMenu={canUnsend ? (e) => handleMessageMenu(e, msg.id) : undefined}
-                                onClick={canUnsend ? (e) => {
-                                  // Double-click to open menu on mobile-friendly way
-                                  if (e.detail === 2) {
-                                    handleMessageMenu(e, msg.id);
-                                  }
-                                } : undefined}
-                                sx={{
-                                  px: 1.5,
-                                  py: 0.75,
-                                  bgcolor: (msg as any)._failed ? '#ff453a' : msg.sender === 'customer' ? '#0071e3' : 'var(--surface)',
-                                  color: msg.sender === 'customer' ? '#ffffff' : 'var(--foreground)',
-                                  borderRadius: '18px',
-                                  borderBottomRightRadius: msg.sender === 'customer' ? '6px' : '18px',
-                                  borderBottomLeftRadius: msg.sender === 'admin' ? '6px' : '18px',
-                                  boxShadow: msg.sender === 'admin' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                                  cursor: canUnsend ? 'pointer' : 'default',
-                                  opacity: (msg as any)._optimistic ? 0.6 : 1,
-                                  transition: 'all 0.15s ease',
-                                  '&:hover': canUnsend ? {
-                                    opacity: 0.9,
-                                  } : {},
-                                  '&:active': canUnsend ? {
-                                    transform: 'scale(0.98)',
-                                  } : {},
-                                }}
-                              >
-                                {text && (
-                                  <Typography sx={{ fontSize: '0.9rem', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>
-                                    {text}
-                                  </Typography>
-                                )}
-                                {/* Order Reference Card */}
-                                {parseMessage(msg.message).orderRef && (
-                                  <Box
-                                    sx={{
-                                      mt: text ? 0.75 : 0,
-                                      p: 1.5,
-                                      bgcolor: msg.sender === 'customer' ? 'var(--glass-bg)' : 'var(--surface-2)',
-                                      borderRadius: 1.5,
-                                      border: '1px solid',
-                                      borderColor: msg.sender === 'customer' ? 'var(--glass-border)' : 'var(--glass-border)',
-                                    }}
-                                  >
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                      <Box sx={{
-                                        width: 32,
-                                        height: 32,
-                                        borderRadius: 1,
-                                        bgcolor: '#0071e3',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                      }}>
-                                        <ReceiptIcon size={18} color="white" />
-                                      </Box>
-                                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                                        <Typography sx={{ 
-                                          fontSize: '0.8rem', 
-                                          fontWeight: 600,
-                                          color: msg.sender === 'customer' ? 'white' : 'var(--foreground)',
+                              {isImageOnly ? (
+                                <Box
+                                  component="img"
+                                  src={imageUrl!}
+                                  alt={t.supportChat.image}
+                                  loading="lazy"
+                                  onContextMenu={canUnsend ? (e) => handleMessageMenu(e, msg.id) : undefined}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (canUnsend && e.detail === 2) {
+                                      handleMessageMenu(e, msg.id);
+                                      return;
+                                    }
+                                    setLightboxImage(imageUrl!);
+                                  }}
+                                  sx={{
+                                    display: 'block',
+                                    maxWidth: { xs: 220, sm: 280 },
+                                    maxHeight: { xs: 280, sm: 360 },
+                                    width: 'auto',
+                                    height: 'auto',
+                                    objectFit: 'contain',
+                                    borderRadius: '14px',
+                                    cursor: 'zoom-in',
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+                                    opacity: (msg as any)._optimistic ? 0.6 : 1,
+                                    transition: 'transform 0.2s ease, opacity 0.15s ease',
+                                    '&:hover': { opacity: 0.92 },
+                                  }}
+                                />
+                              ) : (
+                                <Paper
+                                  elevation={0}
+                                  onContextMenu={canUnsend ? (e) => handleMessageMenu(e, msg.id) : undefined}
+                                  onClick={canUnsend ? (e) => {
+                                    if (e.detail === 2) {
+                                      handleMessageMenu(e, msg.id);
+                                    }
+                                  } : undefined}
+                                  sx={{
+                                    px: 1.5,
+                                    py: 0.75,
+                                    bgcolor: (msg as any)._failed ? '#ff453a' : msg.sender === 'customer' ? '#0071e3' : 'var(--surface)',
+                                    color: msg.sender === 'customer' ? '#ffffff' : 'var(--foreground)',
+                                    borderRadius: '18px',
+                                    borderBottomRightRadius: msg.sender === 'customer' ? '6px' : '18px',
+                                    borderBottomLeftRadius: msg.sender === 'admin' ? '6px' : '18px',
+                                    boxShadow: msg.sender === 'admin' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                                    cursor: canUnsend ? 'pointer' : 'default',
+                                    opacity: (msg as any)._optimistic ? 0.6 : 1,
+                                    transition: 'all 0.15s ease',
+                                    '&:hover': canUnsend ? { opacity: 0.9 } : {},
+                                    '&:active': canUnsend ? { transform: 'scale(0.98)' } : {},
+                                  }}
+                                >
+                                  {text && (
+                                    <Typography sx={{ fontSize: '0.9rem', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>
+                                      {text}
+                                    </Typography>
+                                  )}
+                                  {orderRef && (
+                                    <Box
+                                      sx={{
+                                        mt: text ? 0.75 : 0,
+                                        p: 1.5,
+                                        bgcolor: msg.sender === 'customer' ? 'var(--glass-bg)' : 'var(--surface-2)',
+                                        borderRadius: 1.5,
+                                        border: '1px solid',
+                                        borderColor: 'var(--glass-border)',
+                                      }}
+                                    >
+                                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <Box sx={{
+                                          width: 32,
+                                          height: 32,
+                                          borderRadius: 1,
+                                          bgcolor: '#0071e3',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
                                         }}>
-                                          {t.supportChat.orderRef} #{parseMessage(msg.message).orderRef}
-                                        </Typography>
-                                        <Typography sx={{ 
-                                          fontSize: '0.7rem',
-                                          color: msg.sender === 'customer' ? 'rgba(255,255,255,0.8)' : 'var(--text-muted)',
-                                        }}>
-                                          คลิกเพื่อดูรายละเอียด
-                                        </Typography>
+                                          <ReceiptIcon size={18} color="white" />
+                                        </Box>
+                                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                                          <Typography sx={{ 
+                                            fontSize: '0.8rem', 
+                                            fontWeight: 600,
+                                            color: msg.sender === 'customer' ? 'white' : 'var(--foreground)',
+                                          }}>
+                                            {t.supportChat.orderRef} #{orderRef}
+                                          </Typography>
+                                          <Typography sx={{ 
+                                            fontSize: '0.7rem',
+                                            color: msg.sender === 'customer' ? 'rgba(255,255,255,0.8)' : 'var(--text-muted)',
+                                          }}>
+                                            คลิกเพื่อดูรายละเอียด
+                                          </Typography>
+                                        </Box>
                                       </Box>
                                     </Box>
-                                  </Box>
-                                )}
-                                {imageUrl && (
-                                  <Box
-                                    component="img"
-                                    src={imageUrl}
-                                    alt={t.supportChat.image}
-                                    loading="lazy"
-                                    sx={{
-                                      width: '100%',
-                                      maxWidth: { xs: 200, sm: 250 },
-                                      height: 'auto',
-                                      maxHeight: { xs: 180, sm: 220 },
-                                      objectFit: 'cover',
-                                      borderRadius: 1.5,
-                                      mt: text ? 0.75 : 0,
-                                      cursor: 'zoom-in',
-                                      border: '1px solid rgba(0,0,0,0.1)',
-                                      transition: 'transform 0.2s ease',
-                                      '&:hover': {
-                                        opacity: 0.9,
-                                        transform: 'scale(1.02)',
-                                      },
-                                    }}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setLightboxImage(imageUrl);
-                                    }}
-                                  />
-                                )}
-                              </Paper>
+                                  )}
+                                  {imageUrl && (
+                                    <Box
+                                      component="img"
+                                      src={imageUrl}
+                                      alt={t.supportChat.image}
+                                      loading="lazy"
+                                      sx={{
+                                        width: '100%',
+                                        maxWidth: { xs: 200, sm: 250 },
+                                        height: 'auto',
+                                        maxHeight: { xs: 180, sm: 220 },
+                                        objectFit: 'cover',
+                                        borderRadius: 1.5,
+                                        mt: text || orderRef ? 0.75 : 0,
+                                        cursor: 'zoom-in',
+                                        transition: 'transform 0.2s ease',
+                                        '&:hover': { opacity: 0.9, transform: 'scale(1.02)' },
+                                      }}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setLightboxImage(imageUrl);
+                                      }}
+                                    />
+                                  )}
+                                </Paper>
+                              )}
                               
                               {/* Time & Read Receipt - IG Style (only on last message of group) */}
                               {showTime && (
@@ -2218,6 +2255,9 @@ ${getStatusLabel(order.status)}
                         <SupportAgentIcon size={18} />
                       </Avatar>
                       <Paper sx={{ px: 2, py: 1, bgcolor: 'var(--surface)', borderRadius: 2 }}>
+                        <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', mb: 0.5 }}>
+                          {typingDisplay || `${chat?.admin_name || displayAdminName} กำลังพิมพ์...`}
+                        </Typography>
                         <Box sx={{ display: 'flex', gap: 0.5 }}>
                           {[0, 1, 2].map((i) => (
                             <Box
