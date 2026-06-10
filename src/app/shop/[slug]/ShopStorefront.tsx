@@ -32,6 +32,7 @@ import { usePublicShopQuery, queryKeys } from '@/hooks';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase-client';
 import OptimizedImage from '@/components/OptimizedImage';
+import { useGalleryImagePreload, isGalleryImageInRange } from '@/hooks/useGalleryImagePreload';
 import AnnouncementBar from '@/components/AnnouncementBar';
 import EventBanner, { type ShopEvent } from '@/components/EventBanner';
 import Footer from '@/components/Footer';
@@ -267,6 +268,9 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       }
     }
   }, [selectedPattern, productImages, scrollToImage]);
+
+  useGalleryImagePreload(productImages, activeImageIndex);
+  useGalleryImagePreload(productImages, lightboxIndex);
 
   // Keyboard navigation for fullscreen lightbox
   useEffect(() => {
@@ -1826,14 +1830,20 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                                 cursor: 'pointer',
                               }}
                             >
-                              <OptimizedImage
-                                src={img}
-                                alt={`${getProductName(selectedProduct, lang)} - ${idx + 1}`}
-                                width="100%"
-                                height="100%"
-                                objectFit="cover"
-                                priority={idx === 0}
-                              />
+                              {isGalleryImageInRange(idx, activeImageIndex) ? (
+                                <OptimizedImage
+                                  src={img}
+                                  alt={`${getProductName(selectedProduct, lang)} - ${idx + 1}`}
+                                  width="100%"
+                                  height="100%"
+                                  objectFit="cover"
+                                  priority={idx === activeImageIndex}
+                                  disableFade={idx !== activeImageIndex}
+                                  placeholder={idx === activeImageIndex ? 'shimmer' : 'none'}
+                                />
+                              ) : (
+                                <Box sx={{ width: '100%', height: '100%', bgcolor: 'var(--surface-2)' }} />
+                              )}
                             </Box>
                           ))}
                         </Box>
@@ -2765,18 +2775,16 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
               userSelect: 'none',
             }}
           >
-            <Box
-              component="img"
+            <OptimizedImage
               src={productImages[lightboxIndex]}
               alt={`Fullscreen ${lightboxIndex + 1}`}
-              sx={{
-                maxWidth: '100%',
-                maxHeight: '80vh',
-                objectFit: 'contain',
-                borderRadius: '8px',
-                userSelect: 'none',
-                transition: 'all 0.3s ease',
-              }}
+              width="100%"
+              height="100%"
+              objectFit="contain"
+              priority
+              disableFade
+              placeholder="none"
+              style={{ maxWidth: '100%', maxHeight: '80vh', borderRadius: '8px', userSelect: 'none' }}
             />
           </Box>
         )}
@@ -2819,11 +2827,15 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                   '&:hover': { opacity: 0.95 },
                 }}
               >
-                <Box
-                  component="img"
+                <OptimizedImage
                   src={img}
                   alt={`Thumbnail ${idx + 1}`}
-                  sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  width="100%"
+                  height="100%"
+                  objectFit="cover"
+                  disableFade
+                  placeholder="none"
+                  priority={lightboxIndex === idx}
                 />
               </Box>
             ))}

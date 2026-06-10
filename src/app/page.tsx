@@ -1,6 +1,8 @@
 'use client';
 
 import React from 'react';
+import OptimizedImage, { preloadImages, OptimizedBackground } from '@/components/OptimizedImage';
+import { useGalleryImagePreload, isGalleryImageInRange } from '@/hooks/useGalleryImagePreload';
 import { Palette, MessageCircle as ChatIcon, Send as SendIcon, X as CloseIcon, Bot as SmartToyIcon, RotateCcw as RefreshIcon, Sparkles as AutoAwesomeIcon, Store as StorefrontIcon, Copy as ContentCopyIcon, Check as CheckIcon, Maximize2 as FullscreenIcon, Minimize2 as FullscreenExitIcon, ImagePlus as AddPhotoAlternateIcon, ShoppingCart as ShoppingCartOutlinedIcon, Coins as PaidOutlinedIcon, Ruler as StraightenOutlinedIcon, Truck as LocalShippingOutlinedIcon, Wallet as AccountBalanceWalletOutlinedIcon, HelpCircle as HelpOutlineOutlinedIcon, Image as ImageOutlinedIcon, User as PersonOutlineIcon, BadgeCheck as VerifiedIcon, BookOpen as MenuBookOutlinedIcon, Hand as WavingHandIcon, Reply as ReplyIcon, Pencil as EditIcon, ClipboardList as ClipboardListIcon, Tag as TagIcon, ChevronUp, ChevronDown } from 'lucide-react';
 
 // ==================== CHATBOT COMPONENT (Enhanced with Logo & AI) ====================
@@ -77,6 +79,7 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
   const [lightboxImage, setLightboxImage] = React.useState<string | null>(null);
   const [lightboxImages, setLightboxImages] = React.useState<string[]>([]);
   const [lightboxIndex, setLightboxIndex] = React.useState(0);
+  useGalleryImagePreload(lightboxImages, lightboxIndex);
   const [uploadedImage, setUploadedImage] = React.useState<{ base64: string; preview: string } | null>(null);
   const [isUploading, setIsUploading] = React.useState(false);
   const [replyToMessage, setReplyToMessage] = React.useState<{ id: string; text: string; sender: 'user' | 'bot' } | null>(null);
@@ -1985,17 +1988,16 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
               userSelect: 'none',
             }}
           >
-            <Box
-              component="img"
+            <OptimizedImage
               src={lightboxImages.length > 1 ? lightboxImages[lightboxIndex] : lightboxImage}
               alt="Full size"
-              sx={{
-                maxWidth: '100%',
-                maxHeight: '100%',
-                objectFit: 'contain',
-                borderRadius: '8px',
-                userSelect: 'none',
-              }}
+              width="100%"
+              height="100%"
+              objectFit="contain"
+              priority
+              disableFade
+              placeholder="none"
+              style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: '8px', userSelect: 'none' }}
             />
           </Box>
         )}
@@ -2034,11 +2036,15 @@ function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                   '&:hover': { opacity: 1 },
                 }}
               >
-                <Box
-                  component="img"
+                <OptimizedImage
                   src={img}
                   alt={`Thumbnail ${idx + 1}`}
-                  sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  width="100%"
+                  height="100%"
+                  objectFit="cover"
+                  disableFade
+                  placeholder="none"
+                  priority={lightboxIndex === idx}
                 />
               </Box>
             ))}
@@ -2180,7 +2186,6 @@ const TAG_TRANSLATIONS_TH_TO_EN: Record<string, string> = {
   'สินค้าพิเศษ': 'Special',
   'ของใหม่': 'New Arrival',
 };
-import OptimizedImage, { preloadImages, OptimizedBackground } from '@/components/OptimizedImage';
 import LoadingScreen from '@/components/LoadingScreen';
 import ThemeToggle from '@/components/ThemeToggle';
 import LanguageToggle from '@/components/LanguageToggle';
@@ -4280,14 +4285,20 @@ export default function HomePage() {
                           cursor: 'pointer',
                         }}
                       >
-                        <OptimizedImage
-                          src={img}
-                          alt={`${selectedProduct.name} - รูปที่ ${idx + 1}`}
-                          width="100%"
-                          height="100%"
-                          objectFit="cover"
-                          priority={idx === 0}
-                        />
+                        {isGalleryImageInRange(idx, activeImageIndex) ? (
+                          <OptimizedImage
+                            src={img}
+                            alt={`${selectedProduct.name} - รูปที่ ${idx + 1}`}
+                            width="100%"
+                            height="100%"
+                            objectFit="cover"
+                            priority={idx === activeImageIndex}
+                            disableFade={idx !== activeImageIndex}
+                            placeholder={idx === activeImageIndex ? 'shimmer' : 'none'}
+                          />
+                        ) : (
+                          <Box sx={{ width: '100%', height: '100%', bgcolor: 'var(--surface-2)' }} />
+                        )}
                       </Box>
                     ))}
                   </Box>
@@ -4486,12 +4497,15 @@ export default function HomePage() {
                           '&:hover': { opacity: 1, borderColor: 'rgba(0,113,227,0.5)' },
                         }}
                       >
-                        <Box 
-                          component="img" 
-                          src={img} 
-                          alt={`${selectedProduct.name}-${idx}`} 
-                          loading="lazy" 
-                          sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} 
+                        <OptimizedImage
+                          src={img}
+                          alt={`${selectedProduct.name}-${idx}`}
+                          width="100%"
+                          height="100%"
+                          objectFit="cover"
+                          disableFade
+                          placeholder="none"
+                          priority={activeImageIndex === idx}
                         />
                       </Box>
                     ))}
@@ -6320,6 +6334,8 @@ export default function HomePage() {
       }
     }
   }, [productOptions.pattern, selectedProduct, productImages, scrollToImage]);
+
+  useGalleryImagePreload(productImages, activeImageIndex);
 
   // Keyboard navigation for fullscreen lightbox on the main page
   useEffect(() => {

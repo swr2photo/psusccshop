@@ -347,24 +347,32 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid content type' }, { status: 400 });
     }
 
-    // Get image data
-    const imageBuffer = Buffer.from(await response.arrayBuffer());
+    // Stream to client immediately; cache in background (faster first paint on MISS)
+    const body = response.body;
+    if (!body) {
+      return NextResponse.json({ error: 'Empty image response' }, { status: 502 });
+    }
 
-    //  Save to cache for permanent storage (async, don't wait)
-    saveToCache(cacheKey, imageBuffer, contentType).catch(() => {});
+    const [clientStream, cacheStream] = body.tee();
+    (async () => {
+      try {
+        const imageBuffer = Buffer.from(await new Response(cacheStream).arrayBuffer());
+        await saveToCache(cacheKey, imageBuffer, contentType);
+      } catch {
+        // cache write is best-effort
+      }
+    })();
 
-    // Return image with long cache headers
-    return new NextResponse(new Uint8Array(imageBuffer), {
+    return new NextResponse(clientStream, {
       status: 200,
       headers: {
         'Content-Type': contentType,
-        'Content-Length': imageBuffer.length.toString(),
         'Cache-Control': 'public, max-age=31536000, s-maxage=31536000, stale-while-revalidate=86400, immutable',
         'CDN-Cache-Control': 'public, max-age=31536000',
         'Vercel-CDN-Cache-Control': 'public, max-age=31536000',
         'X-Content-Type-Options': 'nosniff',
         'X-Cache': 'MISS',
-          'Vary': 'Accept, Sec-Fetch-Dest',
+        'Vary': 'Accept, Sec-Fetch-Dest',
       },
     });
 

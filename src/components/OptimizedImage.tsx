@@ -23,6 +23,7 @@ interface OptimizedImageProps {
   disableFade?: boolean; // Skip fade animation
   keepMounted?: boolean; // Keep image loaded even when hidden
   showLoadingIndicator?: boolean; // Show circular progress on top
+  fetchPriority?: 'high' | 'low' | 'auto';
 }
 
 // Default blur placeholder (1x1 transparent base64)
@@ -134,6 +135,7 @@ function OptimizedImageComponent({
   disableFade = false,
   keepMounted = false,
   showLoadingIndicator = false,
+  fetchPriority,
 }: OptimizedImageProps) {
   const { t } = useTranslation();
   // Check if this image was already loaded before (prevents flicker on remount)
@@ -174,13 +176,6 @@ function OptimizedImageComponent({
     return function() { observer.disconnect(); };
   }, [priority, isInView]);
 
-  // Preload priority images immediately
-  useEffect(() => {
-    if (priority && src) {
-      preloadImage(src).catch(() => {});
-    }
-  }, [priority, src]);
-
   // Handle image load
   const handleLoad = () => {
     setLoaded(true);
@@ -208,13 +203,14 @@ function OptimizedImageComponent({
   // Determine if we should use fade animation
   // Skip fade if: image was already loaded before, or disableFade is true
   const skipFade = disableFade || wasLoaded;
+  const effectivePlaceholder = wasLoaded ? 'none' : placeholder;
   
   const imageStyles: CSSProperties = {
     width: '100%',
     height: '100%',
     objectFit,
     opacity: loaded ? 1 : (skipFade ? 1 : 0),
-    transition: skipFade ? 'none' : 'opacity 0.3s ease-out',
+    transition: skipFade ? 'none' : 'opacity 0.12s ease-out',
     display: 'block',
   };
 
@@ -226,7 +222,7 @@ function OptimizedImageComponent({
         className={className}
         sx={containerStyles}
       >
-        {(placeholder === 'skeleton' || placeholder === 'shimmer') && (
+        {(effectivePlaceholder === 'skeleton' || effectivePlaceholder === 'shimmer') && (
           <Box
             sx={{
               position: 'absolute',
@@ -234,7 +230,7 @@ function OptimizedImageComponent({
               bgcolor: 'var(--glass-bg)',
               borderRadius,
               overflow: 'hidden',
-              '&::after': placeholder === 'shimmer' ? {
+              '&::after': effectivePlaceholder === 'shimmer' ? {
                 content: '""',
                 position: 'absolute',
                 inset: 0,
@@ -260,7 +256,7 @@ function OptimizedImageComponent({
             </Box>
           </Box>
         )}
-        {placeholder === 'blur' && (
+        {effectivePlaceholder === 'blur' && (
           <Box
             component="img"
             src={blurDataURL || DEFAULT_BLUR}
@@ -339,7 +335,7 @@ function OptimizedImageComponent({
       {/* Enhanced placeholder while loading (skip if already loaded to prevent flicker) */}
       {!loaded && !skipFade && (
         <>
-          {(placeholder === 'skeleton' || placeholder === 'shimmer') && (
+          {(effectivePlaceholder === 'skeleton' || effectivePlaceholder === 'shimmer') && (
             <Box
               sx={{
                 position: 'absolute',
@@ -347,7 +343,7 @@ function OptimizedImageComponent({
                 bgcolor: 'var(--glass-bg)',
                 borderRadius,
                 overflow: 'hidden',
-                '&::after': placeholder === 'shimmer' ? {
+                '&::after': effectivePlaceholder === 'shimmer' ? {
                   content: '""',
                   position: 'absolute',
                   inset: 0,
@@ -400,7 +396,7 @@ function OptimizedImageComponent({
               )}
             </Box>
           )}
-          {placeholder === 'blur' && blurDataURL && (
+          {effectivePlaceholder === 'blur' && blurDataURL && (
             <Box
               component="img"
               src={blurDataURL}
@@ -427,6 +423,7 @@ function OptimizedImageComponent({
         alt={alt}
         loading={priority ? 'eager' : 'lazy'}
         decoding="async"
+        fetchPriority={fetchPriority ?? (priority ? 'high' : 'auto')}
         onLoad={handleLoad}
         onError={handleError}
         sx={imageStyles}
