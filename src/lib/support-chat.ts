@@ -107,13 +107,11 @@ export async function createChatSession(
   shopId?: string,
   shopName?: string
 ): Promise<ChatSession> {
-  const sessionId = `chat_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
   const now = new Date();
   const normalizedEmail = normalizeEmail(customerEmail);
   
   const data = await db.insert(supportChats)
     .values({
-      id: sessionId,
       customerEmail: normalizedEmail,
       customerName,
       customerAvatar,
@@ -125,9 +123,13 @@ export async function createChatSession(
       customerUnreadCount: 0,
       lastMessagePreview: initialMessage?.substring(0, 100),
       lastMessageAt: initialMessage ? now : undefined,
+      createdAt: now,
+      updatedAt: now,
     })
     .returning();
   
+  const sessionId = data[0].id;
+
   if (initialMessage) {
     await addChatMessage(sessionId, 'customer', normalizedEmail, customerName, initialMessage, customerAvatar);
   }
@@ -302,12 +304,10 @@ export async function addChatMessage(
   message?: string,
   senderAvatar?: string
 ): Promise<ChatMessage> {
-  const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
   const now = new Date();
   
   const data = await db.insert(supportMessages)
     .values({
-      id: msgId,
       sessionId,
       sender,
       senderEmail,
@@ -315,6 +315,7 @@ export async function addChatMessage(
       senderAvatar,
       message: message || '',
       isRead: sender === 'system',
+      createdAt: now,
     })
     .returning();
   
