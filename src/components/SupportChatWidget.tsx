@@ -82,6 +82,7 @@ interface ChatWithMessages extends ChatSession {
 
 export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, externalOpen, onExternalOpenHandled, shopId, shopName }: SupportChatWidgetProps) {
   const { data: session, status: authStatus } = useSession();
+  const isLoggedIn = !!session?.user?.email;
   const { t, lang } = useTranslation();
   const { warning: toastWarning, error: toastError } = useNotification();
   const { permission: pushPermission, isSupported: pushSupported, isSubscribed: pushSubscribed, loading: pushLoading, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotification();
@@ -251,10 +252,13 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
           }
           setUnreadCount(chatData.chat.customer_unread_count || 0);
           setShowHistory(false);
+          setShowNewChat(false);
           
           // Show rating dialog if chat is closed and not rated
           if (chatData.chat.status === 'closed' && !chatData.chat.rating) {
             setShowRating(true);
+          } else {
+            setShowRating(false);
           }
         }
       } else {
@@ -400,6 +404,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
   const handleCreateChat = async () => {
     if (!message.trim()) return;
     
+    const messageText = message.trim();
     setSending(true);
     try {
       const res = await fetch('/api/support-chat', {
@@ -407,32 +412,52 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           subject: subject.trim() || 'สอบถามข้อมูล',
-          message: message.trim(),
+          message: messageText,
           shopId: shopId || undefined,
           shopName: shopName || undefined,
         }),
       });
       
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       
-      if (data.chat) {
-        // Fetch full chat with messages
-        const chatRes = await fetch(`/api/support-chat/${data.chat.id}`);
-        const chatData = await chatRes.json();
-        
-        if (chatData.chat) {
-          setChat(chatData.chat);
-          // Seed realtime with initial messages
-          if (chatData.chat.messages) {
-            setRealtimeMessages(chatData.chat.messages);
-          }
-          setShowNewChat(false);
-          setMessage('');
-          setSubject('');
+      if (!res.ok || !data.chat) {
+        toastError(data.error || t.supportChat.sendFailed);
+        return;
+      }
+
+      // Existing active chat — initial message was not added by POST, send it now
+      const isExistingChat = typeof data.message === 'string' && data.message.includes('กำลังดำเนินอยู่แล้ว');
+      if (isExistingChat) {
+        const msgRes = await fetch(`/api/support-chat/${data.chat.id}/message`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: messageText }),
+        });
+        if (!msgRes.ok) {
+          const msgData = await msgRes.json().catch(() => ({}));
+          toastError(msgData.error || t.supportChat.sendFailed);
+          return;
         }
+      }
+
+      const chatRes = await fetch(`/api/support-chat/${data.chat.id}`);
+      const chatData = await chatRes.json();
+      
+      if (chatData.chat) {
+        setChat(chatData.chat);
+        if (chatData.chat.messages) {
+          setRealtimeMessages(chatData.chat.messages);
+        }
+        setShowNewChat(false);
+        setShowRating(false);
+        setMessage('');
+        setSubject('');
+      } else {
+        toastError(t.supportChat.sendFailed);
       }
     } catch (error) {
       console.error('Error creating chat:', error);
+      toastError(t.supportChat.sendFailed);
     } finally {
       setSending(false);
     }
@@ -544,6 +569,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
     if (!message.trim() || !chat) return;
     
     setSending(true);
+    let tempId: string | null = null;
     try {
       // Build message with reply prefix if replying
       let finalMessage = message.trim();
@@ -555,7 +581,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
       }
       
       // Optimistic UI: show message instantly
-      const tempId = `temp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      tempId = `temp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
       addOptimisticMessage(tempId, finalMessage, session?.user?.name || undefined, session?.user?.image || undefined);
       setMessage('');
       setReplyToMessage(null);
@@ -569,17 +595,18 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
         body: JSON.stringify({ message: finalMessage }),
       });
       
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       
-      if (data.success && data.message) {
-        // Realtime will handle merging the real message
+      if (res.ok && data.success && data.message) {
         resolveOptimistic(tempId, data.message);
       } else {
-        // Mark optimistic as failed
         resolveOptimistic(tempId, null);
+        toastError(data?.error || t.supportChat.sendFailed);
       }
     } catch (error) {
       console.error('Error sending message:', error);
+      if (tempId) resolveOptimistic(tempId, null);
+      toastError(t.supportChat.sendFailed);
     } finally {
       setSending(false);
     }
@@ -859,8 +886,8 @@ ${getStatusLabel(order.status)}
   // Show loading spinner while checking auth
   if (authStatus === 'loading') return null;
 
-  // Check if logged in for support mode
-  const isLoggedIn = !!session?.user?.email;
+  const isLiveChat = Boolean(chat && (chat.status === 'pending' || chat.status === 'active'));
+  const showNewChatForm = !isLiveChat && (!chat || showNewChat);
 
   return (
     <>
@@ -1671,7 +1698,7 @@ ${getStatusLabel(order.status)}
                   )}
                 </Button>
               </Box>
-            ) : (showNewChat && (!chat || chat.status !== 'pending')) || !chat ? (
+            ) : showNewChatForm ? (
               /* New Chat Form - Modern Design */
               <Box sx={{ 
                 flex: 1, 
@@ -1876,7 +1903,7 @@ ${getStatusLabel(order.status)}
                   </Button>
                 </Box>
               </Box>
-            ) : (
+            ) : chat ? (
               /* Chat Messages */
               <>
                 {/* Status Chip */}
@@ -2522,7 +2549,7 @@ ${getStatusLabel(order.status)}
                   </Box>
                 )}
               </>
-            )}
+            ) : null}
           </Box>
         </Paper>
       </Fade>

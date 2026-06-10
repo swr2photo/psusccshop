@@ -49,22 +49,7 @@ import {
   Monitor as Computer,
 } from 'lucide-react';
 
-// Theme
-const THEME = {
-  bg: 'var(--background)',
-  bgCard: 'var(--glass-bg)',
-  glass: 'var(--glass-bg)',
-  glassSoft: 'var(--glass-bg)',
-  text: 'var(--foreground)',
-  textSecondary: 'var(--text-muted)',
-  muted: 'var(--text-muted)',
-  border: 'var(--glass-border)',
-  primary: '#2563eb',
-  success: '#10b981',
-  warning: '#f59e0b',
-  error: '#ef4444',
-  info: '#0ea5e9',
-};
+import { ADMIN_THEME as THEME } from '@/lib/adminTheme';
 
 interface UserLog {
   id: string;

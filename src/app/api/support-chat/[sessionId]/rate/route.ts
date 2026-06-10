@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { authOptions, isResourceOwner } from '@/lib/auth';
 import { 
   getChatSession,
   rateChatSession 
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
     
     // Only the customer can rate
-    if (chat.customer_email !== session.user.email) {
+    if (!isResourceOwner(chat.customer_email, session.user.email)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
     

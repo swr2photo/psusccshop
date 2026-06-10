@@ -4,6 +4,7 @@
 import { db } from './db';
 import { supportChats, supportMessages } from '../db/schema';
 import { eq, lt, gt, and, desc, inArray, like, count, sql, avg } from 'drizzle-orm';
+import { normalizeEmail } from './auth';
 
 // ==================== TYPES ====================
 
@@ -108,11 +109,12 @@ export async function createChatSession(
 ): Promise<ChatSession> {
   const sessionId = `chat_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
   const now = new Date();
+  const normalizedEmail = normalizeEmail(customerEmail);
   
   const data = await db.insert(supportChats)
     .values({
       id: sessionId,
-      customerEmail,
+      customerEmail: normalizedEmail,
       customerName,
       customerAvatar,
       status: 'pending',
@@ -127,7 +129,7 @@ export async function createChatSession(
     .returning();
   
   if (initialMessage) {
-    await addChatMessage(sessionId, 'customer', customerEmail, customerName, initialMessage, customerAvatar);
+    await addChatMessage(sessionId, 'customer', normalizedEmail, customerName, initialMessage, customerAvatar);
   }
   
   return toChat(data[0]);
@@ -202,9 +204,10 @@ export async function getAllChats(status?: ChatStatus, limit = 50): Promise<Chat
  * Get customer's chat sessions
  */
 export async function getCustomerChats(customerEmail: string): Promise<ChatSession[]> {
+  const normalized = normalizeEmail(customerEmail);
   const data = await db.select()
     .from(supportChats)
-    .where(eq(supportChats.customerEmail, customerEmail))
+    .where(sql`lower(${supportChats.customerEmail}) = ${normalized}`)
     .orderBy(desc(supportChats.createdAt))
     .limit(10);
   return data.map(toChat);
@@ -214,10 +217,11 @@ export async function getCustomerChats(customerEmail: string): Promise<ChatSessi
  * Get customer's active chat session (if any)
  */
 export async function getCustomerActiveChat(customerEmail: string): Promise<ChatSession | null> {
+  const normalized = normalizeEmail(customerEmail);
   const data = await db.select()
     .from(supportChats)
     .where(and(
-      eq(supportChats.customerEmail, customerEmail),
+      sql`lower(${supportChats.customerEmail}) = ${normalized}`,
       inArray(supportChats.status, ['pending', 'active'])
     ))
     .orderBy(desc(supportChats.createdAt))

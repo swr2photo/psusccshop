@@ -55,38 +55,11 @@ import {
   PAYMENT_GATEWAYS,
   DEFAULT_PAYMENT_CONFIG,
 } from '@/lib/payment';
+import { ADMIN_THEME, adminCardSx, adminDialogPaperSx, adminInputSxCompact as inputSx } from '@/lib/adminTheme';
 
 interface PaymentSettingsProps {
   onSave?: () => void;
 }
-
-const inputSx = {
-  '& .MuiOutlinedInput-root': {
-    borderRadius: '8px',
-    bgcolor: 'rgba(255, 255, 255, 0.05)',
-    '&:hover': {
-      bgcolor: 'rgba(255, 255, 255, 0.08)',
-    },
-    '& fieldset': {
-      borderColor: 'rgba(255, 255, 255, 0.1)',
-    },
-    '&:hover fieldset': {
-      borderColor: 'rgba(255, 255, 255, 0.2)',
-    },
-    '&.Mui-focused fieldset': {
-      borderColor: '#1e40af',
-    },
-  },
-  '& .MuiInputLabel-root': {
-    color: 'rgba(255, 255, 255, 0.6)',
-    '&.Mui-focused': {
-      color: '#1e40af',
-    },
-  },
-  '& .MuiInputBase-input': {
-    color: '#fff',
-  },
-};
 
 export default function PaymentSettings({ onSave }: PaymentSettingsProps) {
   const [config, setConfig] = useState<PaymentConfig>(DEFAULT_PAYMENT_CONFIG);
@@ -223,7 +196,7 @@ export default function PaymentSettings({ onSave }: PaymentSettingsProps) {
       {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <CreditCard size={28} color="#1e40af" />
+          <CreditCard size={28} color={ADMIN_THEME.primary} />
           <Typography variant="h5" fontWeight="bold">
             ตั้งค่าการชำระเงิน
           </Typography>
@@ -234,8 +207,8 @@ export default function PaymentSettings({ onSave }: PaymentSettingsProps) {
           onClick={saveConfig}
           disabled={saving}
           sx={{
-            bgcolor: '#1e40af',
-            '&:hover': { bgcolor: '#7c3aed' },
+            bgcolor: ADMIN_THEME.primary,
+            '&:hover': { bgcolor: ADMIN_THEME.accent },
           }}
         >
           {saving ? 'กำลังบันทึก...' : 'บันทึก'}
@@ -266,12 +239,7 @@ export default function PaymentSettings({ onSave }: PaymentSettingsProps) {
       </Alert>
 
       {/* Payment Gateways */}
-      <Card sx={{ 
-        mb: 3, 
-        bgcolor: 'rgba(255, 255, 255, 0.03)', 
-        border: '1px solid rgba(255, 255, 255, 0.1)',
-        borderRadius: '12px',
-      }}>
+      <Card sx={{ ...adminCardSx, mb: 3 }}>
         <CardContent>
           <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
             <Security size={20} />
@@ -287,8 +255,8 @@ export default function PaymentSettings({ onSave }: PaymentSettingsProps) {
                 <Card 
                   key={key}
                   sx={{
-                    bgcolor: gatewayConfig?.enabled ? 'rgba(34, 197, 94, 0.1)' : 'rgba(255, 255, 255, 0.02)',
-                    border: `1px solid ${gatewayConfig?.enabled ? 'rgba(34, 197, 94, 0.3)' : 'rgba(255, 255, 255, 0.08)'}`,
+                    bgcolor: gatewayConfig?.enabled ? 'rgba(34, 197, 94, 0.1)' : ADMIN_THEME.glassSoft,
+                    border: `1px solid ${gatewayConfig?.enabled ? 'rgba(34, 197, 94, 0.3)' : ADMIN_THEME.border}`,
                     borderRadius: '10px',
                   }}
                 >
@@ -331,7 +299,7 @@ export default function PaymentSettings({ onSave }: PaymentSettingsProps) {
                         setEditingGateway(gateway);
                         setGatewayDialogOpen(true);
                       }}
-                      sx={{ color: '#1e40af' }}
+                      sx={{ color: ADMIN_THEME.primary }}
                     >
                       ตั้งค่า
                     </Button>
@@ -344,12 +312,7 @@ export default function PaymentSettings({ onSave }: PaymentSettingsProps) {
       </Card>
 
       {/* Payment Options */}
-      <Card sx={{ 
-        mb: 3,
-        bgcolor: 'rgba(255, 255, 255, 0.03)', 
-        border: '1px solid rgba(255, 255, 255, 0.1)',
-        borderRadius: '12px',
-      }}>
+      <Card sx={{ ...adminCardSx, mb: 3 }}>
         <CardContent>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
             <Typography variant="subtitle1" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -362,9 +325,9 @@ export default function PaymentSettings({ onSave }: PaymentSettingsProps) {
               startIcon={<Add />}
               onClick={() => setAddDialogOpen(true)}
               sx={{
-                borderColor: '#1e40af',
-                color: '#1e40af',
-                '&:hover': { borderColor: '#7c3aed', bgcolor: 'rgba(30, 64, 175, 0.1)' },
+                borderColor: ADMIN_THEME.primary,
+                color: ADMIN_THEME.primary,
+                '&:hover': { borderColor: ADMIN_THEME.accent, bgcolor: 'rgba(99,102,241,0.1)' },
               }}
             >
               เพิ่ม
@@ -389,11 +352,7 @@ export default function PaymentSettings({ onSave }: PaymentSettingsProps) {
       </Card>
 
       {/* COD Settings */}
-      <Card sx={{ 
-        bgcolor: 'rgba(255, 255, 255, 0.03)', 
-        border: '1px solid rgba(255, 255, 255, 0.1)',
-        borderRadius: '12px',
-      }}>
+      <Card sx={adminCardSx}>
         <CardContent>
           <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
             <AttachMoney size={20} />
@@ -482,8 +441,8 @@ function PaymentOptionCard({
 
   return (
     <Card sx={{
-      bgcolor: option.enabled ? 'rgba(30, 64, 175, 0.1)' : 'rgba(255, 255, 255, 0.02)',
-      border: `1px solid ${option.enabled ? 'rgba(30, 64, 175, 0.3)' : 'rgba(255, 255, 255, 0.08)'}`,
+      bgcolor: option.enabled ? 'rgba(99,102,241,0.1)' : ADMIN_THEME.glassSoft,
+      border: `1px solid ${option.enabled ? 'rgba(99,102,241,0.3)' : ADMIN_THEME.border}`,
       borderRadius: '10px',
       transition: 'all 0.2s',
       opacity: canEnable ? 1 : 0.6,
@@ -513,7 +472,7 @@ function PaymentOptionCard({
                   label={PAYMENT_GATEWAYS[option.gateway]?.name} 
                   size="small" 
                   sx={{ 
-                    bgcolor: 'rgba(255, 255, 255, 0.1)',
+                    bgcolor: ADMIN_THEME.glassSoft,
                     fontSize: '0.7rem',
                     height: '20px',
                   }}
@@ -548,7 +507,7 @@ function PaymentOptionCard({
 
         {/* Expanded Content */}
         <Collapse in={expanded}>
-          <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+          <Box sx={{ mt: 2, pt: 2, borderTop: `1px solid ${ADMIN_THEME.border}` }}>
             <Stack spacing={2}>
               <TextField
                 label="ชื่อแสดง (ไทย)"
@@ -697,7 +656,7 @@ function AddPaymentOptionDialog({
   const canAdd = !methodInfo?.requiresGateway || (gateway && enabledGateways.includes(gateway));
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: adminDialogPaperSx }}>
       <DialogTitle>เพิ่มตัวเลือกการชำระเงิน</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
@@ -798,7 +757,7 @@ function GatewayConfigDialog({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: adminDialogPaperSx }}>
       <DialogTitle>
         ตั้งค่า {gatewayInfo.name}
       </DialogTitle>
@@ -873,7 +832,7 @@ function GatewayConfigDialog({
             variant="outlined"
             href={gatewayInfo.docUrl}
             target="_blank"
-            sx={{ borderColor: '#1e40af', color: '#1e40af' }}
+            sx={{ borderColor: ADMIN_THEME.primary, color: ADMIN_THEME.primary }}
           >
             เอกสาร API
           </Button>

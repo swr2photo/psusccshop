@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions, isAdminEmail } from '@/lib/auth';
+import { authOptions, isAdminEmail, isResourceOwner } from '@/lib/auth';
 import { 
   getChatSessionWithMessages,
   markMessagesAsRead 
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     
     // Check authorization
     const isAdminUser = isAdminEmail(session.user.email);
-    const isOwner = chat.customer_email === session.user.email;
+    const isOwner = isResourceOwner(chat.customer_email, session.user.email);
     
     if (!isAdminUser && !isOwner) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });

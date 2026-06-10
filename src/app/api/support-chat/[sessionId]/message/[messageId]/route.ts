@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { authOptions, isResourceOwner } from '@/lib/auth';
 import { 
   getChatSession,
   unsendChatMessage
@@ -41,7 +41,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     }
     
     // Only the message owner can unsend
-    const isOwner = chat.customer_email === session.user.email;
+    const isOwner = isResourceOwner(chat.customer_email, session.user.email);
     
     if (!isOwner) {
       return NextResponse.json(

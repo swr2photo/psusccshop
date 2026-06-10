@@ -12,6 +12,12 @@ import {
   ExternalLink, Settings, DollarSign, ChevronDown, ChevronUp, UserPlus, Check,
   Image, Upload,
 } from 'lucide-react';
+import {
+  ADMIN_THEME,
+  DIALOG_THEME,
+  dialogPaperSx,
+  dialogInputSx,
+} from '@/lib/adminTheme';
 
 // ==================== TYPES ====================
 interface Shop {
@@ -72,14 +78,23 @@ interface ShopManagementProps {
   userEmail: string;
 }
 
-// ==================== THEME ====================
-const ADMIN_THEME = {
-  gradient: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
-  glass: 'rgba(255,255,255,0.03)',
-  border: 'rgba(255,255,255,0.08)',
-  muted: '#94a3b8',
-  accent: '#8b5cf6',
-};
+function normalizeShopDetail(shop: ShopDetail): ShopDetail {
+  return {
+    ...shop,
+    settings: {
+      isOpen: shop.settings?.isOpen ?? true,
+      closeDate: shop.settings?.closeDate,
+      closedMessage: shop.settings?.closedMessage,
+      paymentEnabled: shop.settings?.paymentEnabled,
+    },
+    paymentInfo: {
+      promptPayId: shop.paymentInfo?.promptPayId || '',
+      bankName: shop.paymentInfo?.bankName || '',
+      accountName: shop.paymentInfo?.accountName || '',
+      accountNumber: shop.paymentInfo?.accountNumber || '',
+    },
+  };
+}
 
 const PERM_LABELS: Record<string, string> = {
   canManageProducts: 'จัดการสินค้า',
@@ -348,18 +363,44 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
     }
   };
 
-  // ==================== INPUT STYLES ====================
-  const inputSx = {
-    '& .MuiOutlinedInput-root': {
+  const inputSx = dialogInputSx;
+
+  const SettingToggle = ({
+    title,
+    description,
+    checked,
+    onChange,
+  }: {
+    title: string;
+    description: string;
+    checked: boolean;
+    onChange: (checked: boolean) => void;
+  }) => (
+    <Box sx={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 2,
+      p: 1.5,
       borderRadius: '10px',
-      bgcolor: 'rgba(255,255,255,0.03)',
-      '& fieldset': { borderColor: ADMIN_THEME.border },
-      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.15)' },
-      '&.Mui-focused fieldset': { borderColor: ADMIN_THEME.accent },
-    },
-    '& .MuiInputLabel-root': { color: ADMIN_THEME.muted },
-    '& .MuiInputBase-input': { color: 'var(--foreground)', fontSize: '0.9rem' },
-  };
+      bgcolor: 'rgba(255,255,255,0.04)',
+      border: `1px solid ${DIALOG_THEME.border}`,
+    }}>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: DIALOG_THEME.text }}>{title}</Typography>
+        <Typography sx={{ fontSize: '0.75rem', color: DIALOG_THEME.muted, mt: 0.25 }}>{description}</Typography>
+      </Box>
+      <Switch
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        sx={{
+          flexShrink: 0,
+          '& .MuiSwitch-switchBase.Mui-checked': { color: '#10b981' },
+          '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: '#10b981' },
+        }}
+      />
+    </Box>
+  );
 
   // ==================== RENDER ====================
   if (loading) {
@@ -375,7 +416,7 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
         <Box>
-          <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--foreground)', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: ADMIN_THEME.text, display: 'flex', alignItems: 'center', gap: 1 }}>
             <Store size={24} />
             จัดการร้านค้า
           </Typography>
@@ -437,7 +478,7 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
                   sx={{
                     p: 2.5, display: 'flex', alignItems: 'center', gap: 2,
                     cursor: 'pointer',
-                    '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' },
+                    '&:hover': { bgcolor: ADMIN_THEME.cardHover },
                   }}
                 >
                   <Avatar
@@ -448,7 +489,7 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
                   </Avatar>
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '1rem' }}>
+                      <Typography sx={{ fontWeight: 700, color: ADMIN_THEME.text, fontSize: '1rem' }}>
                         {shop.name}
                       </Typography>
                       <Chip
@@ -478,7 +519,7 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
                         startIcon={<Edit size={14} />}
                         onClick={async () => {
                           const detail = await fetchShopDetail(shop.id);
-                          if (detail) setEditingShop(detail);
+                          if (detail) setEditingShop(normalizeShopDetail(detail));
                         }}
                         sx={{ color: '#60a5fa', textTransform: 'none', fontSize: '0.8rem' }}
                       >
@@ -516,7 +557,7 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
                     {adminsShopId === shop.id && (
                       <Box sx={{
                         mt: 1, p: 2, borderRadius: '12px',
-                        bgcolor: 'rgba(139,92,246,0.05)',
+                        bgcolor: ADMIN_THEME.glassSoft,
                         border: '1px solid rgba(139,92,246,0.15)',
                       }}>
                         <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#a78bfa', mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -554,11 +595,11 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
                         {shopAdmins.map((admin) => (
                           <Box key={admin.id} sx={{
                             p: 1.5, mb: 1, borderRadius: '10px',
-                            bgcolor: 'rgba(255,255,255,0.02)',
+                            bgcolor: ADMIN_THEME.glassSoft,
                             border: `1px solid ${ADMIN_THEME.border}`,
                           }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                              <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)', flex: 1 }}>
+                              <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: ADMIN_THEME.text, flex: 1 }}>
                                 {admin.email}
                               </Typography>
                               <Chip
@@ -592,13 +633,13 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
                                     height: 22, fontSize: '0.65rem', cursor: 'pointer',
                                     bgcolor: admin.permissions[key]
                                       ? 'rgba(16,185,129,0.15)'
-                                      : 'rgba(255,255,255,0.05)',
-                                    color: admin.permissions[key] ? '#10b981' : '#64748b',
-                                    border: `1px solid ${admin.permissions[key] ? 'rgba(16,185,129,0.3)' : 'transparent'}`,
+                                      : ADMIN_THEME.glassSoft,
+                                    color: admin.permissions[key] ? '#10b981' : ADMIN_THEME.muted,
+                                    border: `1px solid ${admin.permissions[key] ? 'rgba(16,185,129,0.3)' : ADMIN_THEME.border}`,
                                     '&:hover': {
                                       bgcolor: admin.permissions[key]
                                         ? 'rgba(16,185,129,0.25)'
-                                        : 'rgba(255,255,255,0.1)',
+                                        : ADMIN_THEME.cardHover,
                                     },
                                   }}
                                 />
@@ -622,19 +663,12 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
         onClose={() => setCreateOpen(false)}
         maxWidth="sm"
         fullWidth
-        PaperProps={{
-          sx: {
-            bgcolor: '#1a1a2e',
-            color: 'var(--foreground)',
-            borderRadius: '16px',
-            border: `1px solid ${ADMIN_THEME.border}`,
-          },
-        }}
+        PaperProps={{ sx: dialogPaperSx }}
       >
-        <DialogTitle sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+        <DialogTitle sx={{ fontWeight: 700, color: DIALOG_THEME.title, display: 'flex', alignItems: 'center', gap: 1 }}>
           <Store size={20} /> สร้างร้านค้าใหม่
         </DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '12px !important' }}>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '12px !important', color: DIALOG_THEME.text }}>
           <TextField
             label="ชื่อร้านค้า *"
             value={newShop.name}
@@ -666,7 +700,7 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
             sx={inputSx}
           />
           <TextField
-            label="คำอธิบายร้าน"
+            label="คำอธิบาย (ไทย)"
             value={newShop.description}
             onChange={(e) => setNewShop(prev => ({ ...prev, description: e.target.value }))}
             fullWidth
@@ -674,44 +708,23 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
             rows={2}
             sx={inputSx}
           />
-
-          {/* Payment Section */}
-          <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#a78bfa', mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <DollarSign size={16} /> ข้อมูลการชำระเงิน
-          </Typography>
           <TextField
-            label="PromptPay ID"
-            value={newShop.promptPayId}
-            onChange={(e) => setNewShop(prev => ({ ...prev, promptPayId: e.target.value }))}
+            label="คำอธิบาย (อังกฤษ)"
+            value={newShop.descriptionEn}
+            onChange={(e) => setNewShop(prev => ({ ...prev, descriptionEn: e.target.value }))}
             fullWidth
+            multiline
+            rows={2}
             sx={inputSx}
           />
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <TextField
-              label="ชื่อธนาคาร"
-              value={newShop.bankName}
-              onChange={(e) => setNewShop(prev => ({ ...prev, bankName: e.target.value }))}
-              fullWidth
-              sx={inputSx}
-            />
-            <TextField
-              label="เลขบัญชี"
-              value={newShop.accountNumber}
-              onChange={(e) => setNewShop(prev => ({ ...prev, accountNumber: e.target.value }))}
-              fullWidth
-              sx={inputSx}
-            />
+          <Box sx={{ p: 1.5, borderRadius: '10px', bgcolor: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.25)' }}>
+            <Typography sx={{ fontSize: '0.78rem', color: DIALOG_THEME.muted, lineHeight: 1.5 }}>
+              การชำระเงินใช้บัญชี PromptPay ของร้านหลัก (SCC Shop) ร่วมกัน — ไม่ต้องตั้งค่าแยกต่อร้านย่อย
+            </Typography>
           </Box>
-          <TextField
-            label="ชื่อบัญชี"
-            value={newShop.accountName}
-            onChange={(e) => setNewShop(prev => ({ ...prev, accountName: e.target.value }))}
-            fullWidth
-            sx={inputSx}
-          />
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setCreateOpen(false)} sx={{ color: ADMIN_THEME.muted, textTransform: 'none' }}>
+          <Button onClick={() => setCreateOpen(false)} sx={{ color: DIALOG_THEME.muted, textTransform: 'none' }}>
             ยกเลิก
           </Button>
           <Button
@@ -732,23 +745,16 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
         onClose={() => setEditingShop(null)}
         maxWidth="sm"
         fullWidth
-        PaperProps={{
-          sx: {
-            bgcolor: '#1a1a2e',
-            color: 'var(--foreground)',
-            borderRadius: '16px',
-            border: `1px solid ${ADMIN_THEME.border}`,
-          },
-        }}
+        PaperProps={{ sx: dialogPaperSx }}
       >
         {editingShop && (
           <>
-            <DialogTitle sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <DialogTitle sx={{ fontWeight: 700, color: DIALOG_THEME.title, display: 'flex', alignItems: 'center', gap: 1 }}>
               <Edit size={20} /> แก้ไขร้าน: {editingShop.name}
             </DialogTitle>
-            <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '12px !important' }}>
+            <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '12px !important', color: DIALOG_THEME.text }}>
               {/* Banner & Logo Upload */}
-              <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#a78bfa', display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: DIALOG_THEME.section, display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Image size={16} /> รูปภาพร้านค้า
               </Typography>
               {/* Banner Preview & Upload */}
@@ -817,7 +823,7 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
                 sx={inputSx}
               />
               <TextField
-                label="คำอธิบาย"
+                label="คำอธิบาย (ไทย)"
                 value={editingShop.description || ''}
                 onChange={(e) => setEditingShop(prev => prev ? { ...prev, description: e.target.value } : null)}
                 fullWidth
@@ -825,67 +831,47 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
                 rows={2}
                 sx={inputSx}
               />
+              <TextField
+                label="คำอธิบาย (อังกฤษ)"
+                value={editingShop.descriptionEn || ''}
+                onChange={(e) => setEditingShop(prev => prev ? { ...prev, descriptionEn: e.target.value } : null)}
+                fullWidth
+                multiline
+                rows={2}
+                sx={inputSx}
+              />
 
-              {/* Active Toggle */}
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1.5, borderRadius: '10px', bgcolor: 'rgba(255,255,255,0.02)' }}>
-                <Typography sx={{ fontSize: '0.9rem', color: 'var(--foreground)' }}>เปิดร้าน</Typography>
-                <Switch
-                  checked={editingShop.isActive}
-                  onChange={(e) => setEditingShop(prev => prev ? { ...prev, isActive: e.target.checked } : null)}
-                  sx={{
-                    '& .MuiSwitch-switchBase.Mui-checked': { color: '#10b981' },
-                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: '#10b981' },
-                  }}
-                />
-              </Box>
-
-              {/* Shop Open Toggle */}
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1.5, borderRadius: '10px', bgcolor: 'rgba(255,255,255,0.02)' }}>
-                <Typography sx={{ fontSize: '0.9rem', color: 'var(--foreground)' }}>เปิดรับออเดอร์</Typography>
-                <Switch
-                  checked={editingShop.settings.isOpen}
-                  onChange={(e) => setEditingShop(prev => prev ? { ...prev, settings: { ...prev.settings, isOpen: e.target.checked } } : null)}
-                  sx={{
-                    '& .MuiSwitch-switchBase.Mui-checked': { color: '#10b981' },
-                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: '#10b981' },
-                  }}
-                />
-              </Box>
-
-              {/* Payment Info */}
-              <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#a78bfa', mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                <DollarSign size={16} /> ข้อมูลการชำระเงิน
+              <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: DIALOG_THEME.section, mt: 0.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Settings size={16} /> สถานะร้าน
               </Typography>
-              <TextField
-                label="PromptPay ID"
-                value={editingShop.paymentInfo.promptPayId}
-                onChange={(e) => setEditingShop(prev => prev ? { ...prev, paymentInfo: { ...prev.paymentInfo, promptPayId: e.target.value } } : null)}
-                fullWidth
-                sx={inputSx}
+              <SettingToggle
+                title="แสดงร้านบนเว็บ"
+                description="ปิด = ซ่อนร้านจากหน้าร้านหลักและ /shop/slug"
+                checked={editingShop.isActive}
+                onChange={(checked) => setEditingShop(prev => prev ? { ...prev, isActive: checked } : null)}
               />
-              <Box sx={{ display: 'flex', gap: 1 }}>
+              <SettingToggle
+                title="เปิดรับออเดอร์"
+                description="ปิด = ลูกค้ายังดูสินค้าได้ แต่สั่งซื้อไม่ได้"
+                checked={editingShop.settings.isOpen}
+                onChange={(checked) => setEditingShop(prev => prev ? { ...prev, settings: { ...prev.settings, isOpen: checked } } : null)}
+              />
+              {!editingShop.settings.isOpen && (
                 <TextField
-                  label="ชื่อธนาคาร"
-                  value={editingShop.paymentInfo.bankName}
-                  onChange={(e) => setEditingShop(prev => prev ? { ...prev, paymentInfo: { ...prev.paymentInfo, bankName: e.target.value } } : null)}
+                  label="ข้อความเมื่อปิดรับออเดอร์"
+                  value={editingShop.settings.closedMessage || ''}
+                  onChange={(e) => setEditingShop(prev => prev ? { ...prev, settings: { ...prev.settings, closedMessage: e.target.value } } : null)}
                   fullWidth
+                  multiline
+                  rows={2}
+                  placeholder="เช่น ปิดรับออเดอร์ชั่วคราว"
                   sx={inputSx}
                 />
-                <TextField
-                  label="เลขบัญชี"
-                  value={editingShop.paymentInfo.accountNumber}
-                  onChange={(e) => setEditingShop(prev => prev ? { ...prev, paymentInfo: { ...prev.paymentInfo, accountNumber: e.target.value } } : null)}
-                  fullWidth
-                  sx={inputSx}
-                />
-              </Box>
-              <TextField
-                label="ชื่อบัญชี"
-                value={editingShop.paymentInfo.accountName}
-                onChange={(e) => setEditingShop(prev => prev ? { ...prev, paymentInfo: { ...prev.paymentInfo, accountName: e.target.value } } : null)}
-                fullWidth
-                sx={inputSx}
-              />
+              )}
+
+              <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: DIALOG_THEME.section, mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Users size={16} /> ข้อมูลติดต่อ
+              </Typography>
               <TextField
                 label="อีเมลติดต่อ"
                 value={editingShop.contactEmail || ''}
@@ -900,17 +886,26 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
                 fullWidth
                 sx={inputSx}
               />
+              <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: DIALOG_THEME.section, mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Store size={16} /> การแสดงผล
+              </Typography>
               <TextField
-                label="ลำดับการแสดง"
+                label="ลำดับการแสดง (น้อย = ขึ้นก่อน)"
                 type="number"
                 value={editingShop.sortOrder}
                 onChange={(e) => setEditingShop(prev => prev ? { ...prev, sortOrder: Number(e.target.value) || 0 } : null)}
                 fullWidth
+                helperText="ใช้เรียงร้านย่อยบนหน้าร้านหลัก"
                 sx={inputSx}
               />
+              <Box sx={{ p: 1.5, borderRadius: '10px', bgcolor: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.25)' }}>
+                <Typography sx={{ fontSize: '0.78rem', color: DIALOG_THEME.muted, lineHeight: 1.5 }}>
+                  การชำระเงินใช้บัญชี PromptPay ของร้านหลัก (SCC Shop) ร่วมกัน — ไม่ต้องตั้งค่าแยกต่อร้านย่อย
+                </Typography>
+              </Box>
             </DialogContent>
             <DialogActions sx={{ px: 3, pb: 2 }}>
-              <Button onClick={() => setEditingShop(null)} sx={{ color: ADMIN_THEME.muted, textTransform: 'none' }}>
+              <Button onClick={() => setEditingShop(null)} sx={{ color: DIALOG_THEME.muted, textTransform: 'none' }}>
                 ยกเลิก
               </Button>
               <Button

@@ -32,17 +32,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 
-const ADMIN_THEME = {
-  bg: '#0f172a',
-  glass: 'rgba(15,23,42,0.8)',
-  glassSoft: 'rgba(30,41,59,0.5)',
-  border: 'rgba(148,163,184,0.1)',
-  gradient: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-  text: '#e2e8f0',
-  textSecondary: '#94a3b8',
-  muted: '#64748b',
-  accent: '#6366f1',
-};
+import { ADMIN_THEME } from '@/lib/adminTheme';
 
 interface RefundOrder {
   ref: string;
@@ -224,7 +214,7 @@ export default function RefundManagement({ showToast, selectedShopId }: Props) {
               label={`${info.label} (${statusCounts[status]})`}
               onClick={() => setFilterStatus(status)}
               sx={{
-                bgcolor: isActive ? info.bg : 'rgba(255,255,255,0.03)',
+                bgcolor: isActive ? info.bg : ADMIN_THEME.glassSoft,
                 color: isActive ? info.color : ADMIN_THEME.muted,
                 border: `1px solid ${isActive ? `${info.color}40` : ADMIN_THEME.border}`,
                 fontWeight: 600,
@@ -310,7 +300,7 @@ export default function RefundManagement({ showToast, selectedShopId }: Props) {
                     display: 'flex',
                     alignItems: 'center',
                     gap: 2,
-                    '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' },
+                    '&:hover': { bgcolor: ADMIN_THEME.cardHover },
                   }}
                 >
                   {/* Status Icon */}
@@ -380,7 +370,7 @@ export default function RefundManagement({ showToast, selectedShopId }: Props) {
                       <Box sx={{
                         p: 2,
                         borderRadius: '12px',
-                        bgcolor: 'rgba(255,255,255,0.02)',
+                        bgcolor: ADMIN_THEME.glassSoft,
                         border: `1px solid ${ADMIN_THEME.border}`,
                       }}>
                         <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: '#a5b4fc', mb: 1.5, display: 'flex', alignItems: 'center', gap: 0.7 }}>
@@ -643,11 +633,11 @@ export default function RefundManagement({ showToast, selectedShopId }: Props) {
 function DetailRow({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
-      <Typography sx={{ fontSize: '0.72rem', color: '#64748b', flexShrink: 0 }}>{label}</Typography>
+      <Typography sx={{ fontSize: '0.72rem', color: ADMIN_THEME.muted, flexShrink: 0 }}>{label}</Typography>
       <Typography sx={{
         fontSize: '0.72rem',
         fontWeight: highlight ? 700 : 500,
-        color: highlight ? '#f59e0b' : '#e2e8f0',
+        color: highlight ? ADMIN_THEME.warning : ADMIN_THEME.text,
         textAlign: 'right',
         wordBreak: 'break-all',
       }}>

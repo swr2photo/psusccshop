@@ -29,6 +29,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import type { ShopConfig } from '@/lib/config';
+import { ADMIN_THEME, adminInputSx as inputSx, adminSelectSx as selectSx } from '@/lib/adminTheme';
 
 interface LiveStreamSettingsProps {
   config: ShopConfig;
@@ -37,35 +38,14 @@ interface LiveStreamSettingsProps {
   userEmail?: string | null;
 }
 
-// ==================== STYLES ====================
 const glassCardSx = {
-  background: 'rgba(255,255,255,0.03)',
+  background: ADMIN_THEME.glass,
   backdropFilter: 'blur(20px)',
-  border: '1px solid rgba(255,255,255,0.08)',
+  border: `1px solid ${ADMIN_THEME.border}`,
   borderRadius: '16px',
   p: 3,
   mb: 3,
-};
-
-const inputSx = {
-  '& .MuiOutlinedInput-root': {
-    borderRadius: '12px',
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
-    '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.2)' },
-    '&.Mui-focused fieldset': { borderColor: '#6366f1' },
-  },
-  '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.5)' },
-  '& .MuiInputBase-input': { color: '#f5f5f7' },
-};
-
-const selectSx = {
-  borderRadius: '12px',
-  backgroundColor: 'rgba(255,255,255,0.03)',
-  '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
-  '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.2)' },
-  '&.Mui-focused fieldset': { borderColor: '#6366f1' },
-  color: '#f5f5f7',
+  color: ADMIN_THEME.text,
 };
 
 // ==================== HELPER ====================
@@ -190,14 +170,14 @@ export default function LiveStreamSettings({ config, saveConfig, showToast, user
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Box sx={{
             width: 48, height: 48, borderRadius: '14px',
-            background: live.enabled ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'rgba(255,255,255,0.05)',
+            background: live.enabled ? 'linear-gradient(135deg, #ef4444, #dc2626)' : ADMIN_THEME.glassSoft,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             animation: live.enabled ? 'pulse 2s ease-in-out infinite' : 'none',
           }}>
             <Video size={24} color={live.enabled ? '#fff' : '#64748b'} />
           </Box>
           <Box>
-            <Typography variant="h5" sx={{ color: '#f5f5f7', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="h5" sx={{ color: ADMIN_THEME.text, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
               ไลฟ์สด
               {live.enabled && (
                 <Chip
@@ -218,7 +198,7 @@ export default function LiveStreamSettings({ config, saveConfig, showToast, user
                 />
               )}
             </Typography>
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+            <Typography variant="body2" sx={{ color: ADMIN_THEME.textSecondary }}>
               จัดการไลฟ์สดขายของผ่าน OBS หรือ YouTube/Facebook Live
             </Typography>
           </Box>
@@ -253,14 +233,14 @@ export default function LiveStreamSettings({ config, saveConfig, showToast, user
 
       {/* Stream Configuration */}
       <Card sx={glassCardSx}>
-        <Typography variant="subtitle1" sx={{ color: '#f5f5f7', fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Typography variant="subtitle1" sx={{ color: ADMIN_THEME.text, fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
           <Settings size={18} /> ตั้งค่าสตรีม
         </Typography>
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
           {/* Stream Type */}
           <FormControl fullWidth size="small">
-            <InputLabel sx={{ color: 'rgba(255,255,255,0.5)' }}>ประเภทสตรีม</InputLabel>
+            <InputLabel sx={{ color: ADMIN_THEME.textSecondary }}>ประเภทสตรีม</InputLabel>
             <Select
               value={live.streamType}
               onChange={(e) => setLive({ ...live, streamType: e.target.value as typeof live.streamType })}
@@ -383,14 +363,14 @@ export default function LiveStreamSettings({ config, saveConfig, showToast, user
 
       {/* Options */}
       <Card sx={glassCardSx}>
-        <Typography variant="subtitle1" sx={{ color: '#f5f5f7', fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Typography variant="subtitle1" sx={{ color: ADMIN_THEME.text, fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
           <Sparkles size={18} /> ตัวเลือก
         </Typography>
 
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
           <Box>
-            <Typography variant="body2" sx={{ color: '#f5f5f7', fontWeight: 500 }}>แสดง Popup อัตโนมัติ</Typography>
-            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)' }}>
+            <Typography variant="body2" sx={{ color: ADMIN_THEME.text, fontWeight: 500 }}>แสดง Popup อัตโนมัติ</Typography>
+            <Typography variant="caption" sx={{ color: ADMIN_THEME.muted }}>
               แสดงหน้าต่างไลฟ์สดอัตโนมัติเมื่อผู้ใช้เข้าเว็บ
             </Typography>
           </Box>
@@ -406,7 +386,7 @@ export default function LiveStreamSettings({ config, saveConfig, showToast, user
       {live.streamUrl && (
         <Card sx={glassCardSx}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-            <Typography variant="subtitle1" sx={{ color: '#f5f5f7', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="subtitle1" sx={{ color: ADMIN_THEME.text, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
               <Eye size={18} /> ตัวอย่าง
             </Typography>
             <Button
@@ -436,12 +416,12 @@ export default function LiveStreamSettings({ config, saveConfig, showToast, user
               ) : live.streamType === 'hls' ? (
                 <Box sx={{ 
                   display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                  height: '100%', color: 'rgba(255,255,255,0.5)',
+                  height: '100%', color: ADMIN_THEME.textSecondary,
                   flexDirection: 'column', gap: 1,
                 }}>
                   <MonitorPlay size={48} />
                   <Typography variant="body2">HLS Stream จะแสดงเมื่อเปิดไลฟ์จริง</Typography>
-                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.3)' }}>
+                  <Typography variant="caption" sx={{ color: ADMIN_THEME.muted }}>
                     {live.streamUrl}
                   </Typography>
                 </Box>
@@ -491,7 +471,7 @@ export default function LiveStreamSettings({ config, saveConfig, showToast, user
               <Typography variant="body2" sx={{ color: '#fca5a5', fontWeight: 600 }}>
                 กำลังไลฟ์สดอยู่
               </Typography>
-              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Typography variant="caption" sx={{ color: ADMIN_THEME.muted, display: 'flex', alignItems: 'center', gap: 0.5 }}>
                 <Clock size={12} /> เริ่มเมื่อ {new Date(config.liveStream.startedAt).toLocaleString('th-TH')}
                 {config.liveStream.updatedBy && ` • โดย ${config.liveStream.updatedBy}`}
               </Typography>

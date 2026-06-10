@@ -69,6 +69,7 @@ import {
   useUpdateTracking,
   useTrackShipment,
 } from '@/hooks/useShippingOrders';
+import { ADMIN_THEME, adminInputSxCompact as inputSx } from '@/lib/adminTheme';
 
 interface TrackingManagementProps {
   showToast?: (type: 'success' | 'error' | 'warning' | 'info', message: string) => void;
@@ -100,22 +101,6 @@ const STATUS_ICONS: Record<TrackingStatus, React.ReactNode> = {
   returned: <ErrorIcon size={18} color="#f59e0b" />,
   failed: <ErrorIcon size={18} color="#ef4444" />,
   unknown: <Schedule size={18} color="#94a3b8" />,
-};
-
-const inputSx = {
-  '& .MuiOutlinedInput-root': {
-    borderRadius: '8px',
-    bgcolor: 'rgba(255, 255, 255, 0.05)',
-    '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.08)' },
-    '& fieldset': { borderColor: 'rgba(255, 255, 255, 0.1)' },
-    '&:hover fieldset': { borderColor: 'rgba(255, 255, 255, 0.2)' },
-    '&.Mui-focused fieldset': { borderColor: '#1e40af' },
-  },
-  '& .MuiInputLabel-root': {
-    color: 'rgba(255, 255, 255, 0.6)',
-    '&.Mui-focused': { color: '#1e40af' },
-  },
-  '& .MuiInputBase-input': { color: '#fff' },
 };
 
 // Label printing URLs for different carriers
@@ -407,7 +392,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1400, mx: 'auto' }}>
       {/* Header */}
       <Box sx={{ mb: 3 }}>
-        <Typography variant="h5" sx={{ fontWeight: 700, color: 'var(--foreground)', mb: 1, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+        <Typography variant="h5" sx={{ fontWeight: 700, color: ADMIN_THEME.text, mb: 1, display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <LocalShipping size={24} color="#1e40af" />
           จัดการการจัดส่ง
         </Typography>
@@ -609,7 +594,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                         key={order.ref}
                         selected={selectedOrders.has(order.ref)}
                         sx={{ 
-                          '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' },
+                          '&:hover': { bgcolor: ADMIN_THEME.cardHover },
                           '&.Mui-selected': { bgcolor: 'rgba(30, 64, 175, 0.1)' },
                         }}
                       >
@@ -621,7 +606,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                           />
                         </TableCell>
                         <TableCell sx={{ borderColor: 'var(--glass-border)' }}>
-                          <Typography sx={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--foreground)' }}>
+                          <Typography sx={{ fontWeight: 600, fontSize: '0.85rem', color: ADMIN_THEME.text }}>
                             {order.ref}
                           </Typography>
                           <Chip
@@ -639,7 +624,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.3 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                               <Person size={14} color="#a78bfa" />
-                              <Typography sx={{ color: 'var(--foreground)', fontSize: '0.85rem' }}>
+                              <Typography sx={{ color: ADMIN_THEME.text, fontSize: '0.85rem' }}>
                                 {order.customerName || order.name || '-'}
                               </Typography>
                             </Box>
@@ -840,7 +825,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
       {activeTab === 1 && (
         <Card sx={{ bgcolor: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 3 }}>
           <CardContent sx={{ p: 3 }}>
-            <Typography sx={{ fontWeight: 700, color: 'var(--foreground)', mb: 2 }}>
+            <Typography sx={{ fontWeight: 700, color: ADMIN_THEME.text, mb: 2 }}>
               เพิ่มเลขพัสดุแบบกลุ่ม
             </Typography>
             <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem', mb: 2 }}>
@@ -902,10 +887,10 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                       justifyContent: 'space-between', 
                       alignItems: 'center',
                       py: 0.5,
-                      borderBottom: '1px solid rgba(255,255,255,0.05)',
+                      borderBottom: `1px solid ${ADMIN_THEME.border}`,
                     }}
                   >
-                    <Typography sx={{ color: 'var(--foreground)', fontSize: '0.8rem', fontFamily: 'monospace' }}>
+                    <Typography sx={{ color: ADMIN_THEME.text, fontSize: '0.8rem', fontFamily: 'monospace' }}>
                       {order.ref}
                     </Typography>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -928,7 +913,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
       {activeTab === 2 && (
         <Card sx={{ bgcolor: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 3 }}>
           <CardContent sx={{ p: 3 }}>
-            <Typography sx={{ fontWeight: 700, color: 'var(--foreground)', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography sx={{ fontWeight: 700, color: ADMIN_THEME.text, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
               <Search size={20} color="#60a5fa" />
               ค้นหาสถานะพัสดุ
             </Typography>
@@ -983,7 +968,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                   <Box>
                     <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>เลขพัสดุ</Typography>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography sx={{ color: 'var(--foreground)', fontWeight: 700, fontSize: '1.1rem' }}>
+                      <Typography sx={{ color: ADMIN_THEME.text, fontWeight: 700, fontSize: '1.1rem' }}>
                         {trackingResult.trackingNumber}
                       </Typography>
                       <IconButton size="small" onClick={() => copyToClipboard(trackingResult.trackingNumber)}>
@@ -1016,13 +1001,13 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                             display: 'flex',
                             gap: 2,
                             py: 1,
-                            borderBottom: idx < trackingResult.events.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+                            borderBottom: idx < trackingResult.events.length - 1 ? `1px solid ${ADMIN_THEME.border}` : 'none',
                           }}
                         >
                           <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.75rem', minWidth: 90 }}>
                             {new Date(event.timestamp).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}
                           </Typography>
-                          <Typography sx={{ color: 'var(--foreground)', fontSize: '0.8rem', flex: 1 }}>
+                          <Typography sx={{ color: ADMIN_THEME.text, fontSize: '0.8rem', flex: 1 }}>
                             {event.descriptionThai || event.description}
                           </Typography>
                         </Box>
@@ -1071,7 +1056,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
         PaperProps={{
           sx: {
             bgcolor: 'var(--surface)',
-            color: 'var(--foreground)',
+            color: ADMIN_THEME.text,
             borderRadius: 2,
           },
         }}
@@ -1089,7 +1074,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
           {editingOrder && (
             <>
               <Box sx={{ mb: 2, p: 2, bgcolor: 'var(--glass-bg)', borderRadius: 2 }}>
-                <Typography sx={{ color: 'var(--foreground)', fontWeight: 600, mb: 1 }}>
+                <Typography sx={{ color: ADMIN_THEME.text, fontWeight: 600, mb: 1 }}>
                   {editingOrder.ref}
                 </Typography>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>

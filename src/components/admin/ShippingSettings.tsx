@@ -47,38 +47,11 @@ import {
   SHIPPING_PROVIDERS,
   DEFAULT_SHIPPING_CONFIG,
 } from '@/lib/shipping';
+import { ADMIN_THEME, adminCardSx, adminDialogPaperSx, adminInputSxCompact as inputSx } from '@/lib/adminTheme';
 
 interface ShippingSettingsProps {
   onSave?: () => void;
 }
-
-const inputSx = {
-  '& .MuiOutlinedInput-root': {
-    borderRadius: '8px',
-    bgcolor: 'rgba(255, 255, 255, 0.05)',
-    '&:hover': {
-      bgcolor: 'rgba(255, 255, 255, 0.08)',
-    },
-    '& fieldset': {
-      borderColor: 'rgba(255, 255, 255, 0.1)',
-    },
-    '&:hover fieldset': {
-      borderColor: 'rgba(255, 255, 255, 0.2)',
-    },
-    '&.Mui-focused fieldset': {
-      borderColor: '#1e40af',
-    },
-  },
-  '& .MuiInputLabel-root': {
-    color: 'rgba(255, 255, 255, 0.6)',
-    '&.Mui-focused': {
-      color: '#1e40af',
-    },
-  },
-  '& .MuiInputBase-input': {
-    color: '#fff',
-  },
-};
 
 export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
   const [config, setConfig] = useState<ShippingConfig>(DEFAULT_SHIPPING_CONFIG);
@@ -188,7 +161,7 @@ export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
       {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <LocalShipping size={28} color="#1e40af" />
+          <LocalShipping size={28} color={ADMIN_THEME.primary} />
           <Typography variant="h5" fontWeight="bold">
             ตั้งค่าการจัดส่ง
           </Typography>
@@ -199,8 +172,8 @@ export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
           onClick={saveConfig}
           disabled={saving}
           sx={{
-            bgcolor: '#1e40af',
-            '&:hover': { bgcolor: '#7c3aed' },
+            bgcolor: ADMIN_THEME.primary,
+            '&:hover': { bgcolor: ADMIN_THEME.accent },
           }}
         >
           {saving ? 'กำลังบันทึก...' : 'บันทึก'}
@@ -222,8 +195,8 @@ export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
       {/* General Settings */}
       <Card sx={{ 
         mb: 3, 
-        bgcolor: 'rgba(255, 255, 255, 0.03)', 
-        border: '1px solid rgba(255, 255, 255, 0.1)',
+        bgcolor: ADMIN_THEME.glass,
+        border: `1px solid ${ADMIN_THEME.border}`,
         borderRadius: '12px',
       }}>
         <CardContent>
@@ -247,7 +220,7 @@ export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
               />
             </Box>
 
-            <Divider sx={{ borderColor: 'rgba(255, 255, 255, 0.1)' }} />
+            <Divider sx={{ borderColor: ADMIN_THEME.border }} />
 
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <Box>
@@ -287,7 +260,7 @@ export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
               </Box>
             )}
 
-            <Divider sx={{ borderColor: 'rgba(255, 255, 255, 0.1)' }} />
+            <Divider sx={{ borderColor: ADMIN_THEME.border }} />
 
             <TextField
               label="ส่งฟรีขั้นต่ำ (บาท)"
@@ -331,22 +304,22 @@ export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
               <Chip 
                 label="Thailand Post" 
                 size="small"
-                sx={{ bgcolor: 'rgba(255,255,255,0.1)' }}
+                sx={{ bgcolor: ADMIN_THEME.glassSoft }}
               />
               <Chip 
                 label="Kerry Express" 
                 size="small"
-                sx={{ bgcolor: 'rgba(255,255,255,0.1)' }}
+                sx={{ bgcolor: ADMIN_THEME.glassSoft }}
               />
               <Chip 
                 label="J&T Express" 
                 size="small"
-                sx={{ bgcolor: 'rgba(255,255,255,0.1)' }}
+                sx={{ bgcolor: ADMIN_THEME.glassSoft }}
               />
               <Chip 
                 label="Flash Express" 
                 size="small"
-                sx={{ bgcolor: 'rgba(255,255,255,0.1)' }}
+                sx={{ bgcolor: ADMIN_THEME.glassSoft }}
               />
               <Chip 
                 label="+1700 carriers" 
@@ -365,7 +338,7 @@ export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
                 sx={{
                   borderColor: 'rgba(30, 64, 175, 0.5)',
                   color: '#a78bfa',
-                  '&:hover': { borderColor: '#1e40af', bgcolor: 'rgba(30, 64, 175, 0.1)' },
+                  '&:hover': { borderColor: ADMIN_THEME.primary, bgcolor: 'rgba(99,102,241,0.1)' },
                 }}
               >
                 ดู API Key
@@ -377,9 +350,9 @@ export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
                 href="https://docs.track123.com/reference/request"
                 target="_blank"
                 sx={{
-                  borderColor: 'rgba(255,255,255,0.2)',
+                  borderColor: ADMIN_THEME.border,
                   color: 'var(--text-muted)',
-                  '&:hover': { borderColor: '#1e40af' },
+                  '&:hover': { borderColor: ADMIN_THEME.primary },
                 }}
               >
                 API Docs
@@ -397,8 +370,8 @@ export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
 
       {/* Shipping Options */}
       <Card sx={{ 
-        bgcolor: 'rgba(255, 255, 255, 0.03)', 
-        border: '1px solid rgba(255, 255, 255, 0.1)',
+        bgcolor: ADMIN_THEME.glass,
+        border: `1px solid ${ADMIN_THEME.border}`,
         borderRadius: '12px',
       }}>
         <CardContent>
@@ -413,8 +386,8 @@ export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
               startIcon={<Add />}
               onClick={() => setAddDialogOpen(true)}
               sx={{
-                borderColor: '#1e40af',
-                color: '#1e40af',
+                borderColor: ADMIN_THEME.primary,
+                color: ADMIN_THEME.primary,
                 '&:hover': { borderColor: '#7c3aed', bgcolor: 'rgba(30, 64, 175, 0.1)' },
               }}
             >
@@ -468,8 +441,8 @@ function ShippingOptionCard({
 
   return (
     <Card sx={{
-      bgcolor: option.enabled ? 'rgba(30, 64, 175, 0.1)' : 'rgba(255, 255, 255, 0.02)',
-      border: `1px solid ${option.enabled ? 'rgba(30, 64, 175, 0.3)' : 'rgba(255, 255, 255, 0.08)'}`,
+      bgcolor: option.enabled ? 'rgba(99,102,241,0.1)' : ADMIN_THEME.glassSoft,
+      border: `1px solid ${option.enabled ? 'rgba(99,102,241,0.3)' : ADMIN_THEME.border}`,
       borderRadius: '10px',
       transition: 'all 0.2s',
     }}>
@@ -490,7 +463,7 @@ function ShippingOptionCard({
                 label={providerInfo?.nameThai || option.provider} 
                 size="small" 
                 sx={{ 
-                  bgcolor: 'rgba(255, 255, 255, 0.1)',
+                  bgcolor: ADMIN_THEME.glassSoft,
                   fontSize: '0.7rem',
                   height: '20px',
                 }}
@@ -514,7 +487,7 @@ function ShippingOptionCard({
 
         {/* Expanded Content */}
         <Collapse in={expanded}>
-          <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+          <Box sx={{ mt: 2, pt: 2, borderTop: `1px solid ${ADMIN_THEME.border}` }}>
             <Stack spacing={2}>
               <TextField
                 label="ชื่อ"
@@ -674,7 +647,7 @@ function AddShippingOptionDialog({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: adminDialogPaperSx }}>
       <DialogTitle>เพิ่มตัวเลือกการจัดส่ง</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>

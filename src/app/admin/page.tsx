@@ -156,6 +156,15 @@ import {
 } from 'lucide-react';
 
 import { isAdmin, isSuperAdmin, setDynamicAdminEmails, SUPER_ADMIN_EMAIL, Product, ShopConfig, SIZES, AdminPermissions, DEFAULT_ADMIN_PERMISSIONS, DEFAULT_NAME_VALIDATION, type NameValidationConfig, DEFAULT_SHIRT_NAME, type ShirtNameConfig } from '@/lib/config';
+import {
+  ADMIN_THEME,
+  STATUS_THEME,
+  adminGlassCardSx as glassCardSx,
+  adminInputSx as inputSx,
+  adminGradientButtonSx as gradientButtonSx,
+  adminSecondaryButtonSx as secondaryButtonSx,
+  adminTableSx as tableSx,
+} from '@/lib/adminTheme';
 import { deleteOrderAdmin, saveShopConfig, syncOrdersSheet, updateOrderAdmin, updateOrderStatusAPI } from '@/lib/api-client';
 import SupportChatPanel from '@/components/admin/SupportChatPanel';
 import EmailManagement from '@/components/admin/EmailManagement';
@@ -515,117 +524,6 @@ function localDatetimeToIso(local: string): string | undefined {
   if (isNaN(d.getTime())) return undefined;
   return d.toISOString();
 }
-
-// ============== NEW MODERN THEME ==============
-const ADMIN_THEME = {
-  // Base colors
-  bg: 'var(--background)',
-  bgCard: 'var(--glass-bg)',
-  bgSidebar: 'var(--surface)',
-  bgHeader: 'var(--glass-strong)',
-  
-  // Text colors
-  text: 'var(--foreground)',
-  textSecondary: 'var(--text-muted)',
-  muted: 'var(--text-muted)',
-  
-  // Borders
-  border: 'var(--glass-border)',
-  borderActive: 'rgba(99,102,241,0.5)',
-  
-  // Glass effects
-  glass: 'var(--glass-bg)',
-  glassSoft: 'var(--glass-bg)',
-  glassHover: 'var(--glass-strong)',
-  
-  // Gradients
-  gradient: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-  gradientAlt: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-  gradientWarm: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)',
-  gradientCool: 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%)',
-  
-  // Accent colors
-  primary: '#6366f1',
-  primaryLight: '#a5b4fc',
-  success: '#10b981',
-  warning: '#f59e0b',
-  error: '#ef4444',
-  info: '#06b6d4',
-};
-
-// Status color mapping
-const STATUS_THEME: Record<string, { bg: string; text: string; border: string }> = {
-  WAITING_PAYMENT: { bg: 'rgba(245,158,11,0.15)', text: '#fbbf24', border: 'rgba(245,158,11,0.4)' },
-  PENDING: { bg: 'rgba(245,158,11,0.15)', text: '#fbbf24', border: 'rgba(245,158,11,0.4)' },
-  PAID: { bg: 'rgba(59,130,246,0.15)', text: '#60a5fa', border: 'rgba(59,130,246,0.4)' },
-  READY: { bg: 'rgba(16,185,129,0.15)', text: '#34d399', border: 'rgba(16,185,129,0.4)' },
-  SHIPPED: { bg: 'rgba(6,182,212,0.15)', text: '#22d3ee', border: 'rgba(6,182,212,0.4)' },
-  COMPLETED: { bg: 'rgba(34,197,94,0.15)', text: '#4ade80', border: 'rgba(34,197,94,0.4)' },
-  CANCELLED: { bg: 'rgba(239,68,68,0.15)', text: '#f87171', border: 'rgba(239,68,68,0.4)' },
-  REFUND_REQUESTED: { bg: 'rgba(124,58,237,0.15)', text: '#a78bfa', border: 'rgba(124,58,237,0.4)' },
-  REFUNDED: { bg: 'rgba(168,85,247,0.15)', text: '#c084fc', border: 'rgba(168,85,247,0.4)' },
-};
-
-const glassCardSx = {
-  background: ADMIN_THEME.glass,
-  border: `1px solid ${ADMIN_THEME.border}`,
-  borderRadius: '20px',
-  boxShadow: '0 8px 32px rgba(0,0,0,0.25)',
-  backdropFilter: 'blur(20px)',
-  color: ADMIN_THEME.text,
-  overflow: 'hidden',
-};
-
-const inputSx = {
-  '& .MuiOutlinedInput-root': {
-    backgroundColor: ADMIN_THEME.glassSoft,
-    borderRadius: '12px',
-    color: ADMIN_THEME.text,
-    '& fieldset': { borderColor: ADMIN_THEME.border },
-    '&:hover fieldset': { borderColor: 'rgba(99,102,241,0.4)' },
-    '&.Mui-focused fieldset': { borderColor: '#6366f1', boxShadow: '0 0 0 3px rgba(99,102,241,0.15)' },
-  },
-  '& .MuiInputLabel-root': { color: ADMIN_THEME.textSecondary },
-  '& .MuiFormHelperText-root': { color: ADMIN_THEME.muted },
-  '& .MuiSelect-icon': { color: ADMIN_THEME.textSecondary },
-};
-
-const gradientButtonSx = {
-  background: ADMIN_THEME.gradient,
-  color: '#fff',
-  borderRadius: '12px',
-  fontWeight: 700,
-  textTransform: 'none',
-  px: 3,
-  py: 1.2,
-  boxShadow: '0 4px 14px rgba(99,102,241,0.35)',
-  '&:hover': { 
-    background: 'linear-gradient(135deg, #5458e9 0%, #7c3aed 100%)', 
-    boxShadow: '0 6px 20px rgba(99,102,241,0.45)',
-    transform: 'translateY(-1px)',
-  },
-  transition: 'all 0.2s ease',
-};
-
-const secondaryButtonSx = {
-  bgcolor: 'var(--glass-bg)',
-  color: ADMIN_THEME.textSecondary,
-  borderRadius: '12px',
-  border: `1px solid ${ADMIN_THEME.border}`,
-  fontWeight: 600,
-  textTransform: 'none',
-  px: 2.5,
-  py: 1,
-  '&:hover': { 
-    bgcolor: 'var(--glass-bg)',
-    borderColor: 'var(--glass-border)',
-  },
-};
-
-const tableSx = {
-  '& th, & td': { borderColor: 'var(--glass-border)', color: ADMIN_THEME.text },
-  '& thead th': { backgroundColor: 'var(--glass-bg)', color: ADMIN_THEME.text },
-};
 
 // ============== SETTINGS COMPONENTS (Stable - defined outside to prevent remount) ==============
 const SettingSection = ({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) => (

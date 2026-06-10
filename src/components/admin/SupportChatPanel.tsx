@@ -62,13 +62,7 @@ import {
   WifiOff as WifiOffIcon,
 } from 'lucide-react';
 
-const ADMIN_THEME = {
-  bg: 'var(--surface)',
-  bgCard: 'var(--surface-2)',
-  text: 'var(--foreground)',
-  textMuted: 'var(--text-muted)',
-  border: 'var(--glass-border)',
-};
+import { ADMIN_THEME } from '@/lib/adminTheme';
 
 interface ChatSession {
   id: string;
@@ -1078,7 +1072,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
                 {chats.map((chat) => (
                   <React.Fragment key={chat.id}>
                     <ListItemButton selected={selectedChat?.id === chat.id} onClick={() => handleSelectChat(chat.id)}
-                      sx={{ py: 1.5, '&.Mui-selected': { bgcolor: 'rgba(37, 99, 235, 0.1)', borderLeft: '3px solid #2563eb' }, '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.05)' } }}>
+                      sx={{ py: 1.5, '&.Mui-selected': { bgcolor: 'rgba(37, 99, 235, 0.1)', borderLeft: '3px solid #2563eb' }, '&:hover': { bgcolor: ADMIN_THEME.cardHover } }}>
                       <ListItemAvatar>
                         <Badge badgeContent={chat.unread_count} color="error" overlap="circular">
                           <Avatar 
@@ -1282,7 +1276,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
                                       </Typography>
                                       <Typography sx={{ 
                                         fontSize: '0.7rem',
-                                        color: msg.sender === 'admin' ? 'var(--foreground)' : ADMIN_THEME.textMuted,
+                                        color: msg.sender === 'admin' ? ADMIN_THEME.text : ADMIN_THEME.textMuted,
                                       }}>
                                         คลิกเพื่อดูรายละเอียด
                                       </Typography>
