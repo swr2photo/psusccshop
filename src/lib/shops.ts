@@ -124,6 +124,7 @@ export function toPublicShopData(shop: Shop) {
     descriptionEn: shop.descriptionEn,
     logoUrl: shop.logoUrl,
     bannerUrl: shop.bannerUrl,
+    isActive: shop.isActive,
     isOpen: shop.settings?.isOpen ?? true,
     closeDate: shop.settings?.closeDate || '',
     openDate: shop.settings?.openDate,

@@ -129,7 +129,7 @@ function getSocialLinkEntries(links?: Record<string, string>) {
     .map(([key, url]) => ({ key: key.toLowerCase(), url: url.trim() }));
 }
 
-interface ShopStorefrontProps {
+export interface ShopStorefrontProps {
   shopSlug: string;
   initialShop: ShopInfo;
 }
@@ -2464,7 +2464,8 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
 
                             <Box sx={{ display: 'flex', flexDirection: 'column' }}>
                               {displaySizes.map((size) => {
-                                const measurement = SIZE_MEASUREMENTS[size];
+                                const sizeKey = size as keyof typeof SIZE_MEASUREMENTS;
+                                const measurement = SIZE_MEASUREMENTS[sizeKey];
                                 const isSelected = selectedSize === size;
                                 const rowPrice = resolveProductUnitPrice(selectedProduct, size, isLongSleeve);
                                 return (

@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import type { ShopStorefrontProps } from './ShopStorefront';
 import ShopStorefrontLoader from './ShopStorefrontLoader';
 
 const ShopStorefront = dynamic(() => import('./ShopStorefront'), {
@@ -8,12 +9,6 @@ const ShopStorefront = dynamic(() => import('./ShopStorefront'), {
   loading: () => <ShopStorefrontLoader />,
 });
 
-interface ShopStorefrontClientProps {
-  shopSlug: string;
-  // Passed from server-fetched shop record; full shape validated in ShopStorefront
-  initialShop: Record<string, unknown>;
-}
-
-export default function ShopStorefrontClient(props: ShopStorefrontClientProps) {
+export default function ShopStorefrontClient(props: ShopStorefrontProps) {
   return <ShopStorefront {...props} />;
 }
