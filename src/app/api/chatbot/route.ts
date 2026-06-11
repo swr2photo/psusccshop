@@ -5,15 +5,17 @@ import * as Sentry from '@sentry/nextjs';
 import { processChat, buildDetailedShopContext, getShopData, ChatMessage, getCurrentModelName } from '@/lib/ai-chatbot';
 import { QUICK_QUESTIONS, SHIRT_FAQ } from '@/lib/shirt-faq';
 import { checkCombinedRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
+import { API_CACHE } from '@/lib/api-helpers';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { recordChatbotRequest } from '@/lib/sentry-metrics';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
  * POST /api/chatbot
- * Body: { message: string, conversationHistory?: ChatMessage[] }
+ * Body: { message: string, conversationHistory?: ChatMessage[], conversationId?: string }
  * Returns: { answer: string, source: string, suggestions?: string[], relatedQuestions?: string[], confidence?: number }
  */
 export async function POST(req: NextRequest) {
@@ -24,6 +26,7 @@ export async function POST(req: NextRequest) {
     prefix: 'chatbot' 
   });
   if (!rateLimitResult.allowed) {
+    recordChatbotRequest('rate_limit');
     return NextResponse.json({ 
       answer: 'คุณส่งคำถามเร็วเกินไป กรุณารอสักครู่แล้วลองใหม่ค่ะ',
       source: 'rate-limit',
@@ -33,7 +36,11 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { message, conversationHistory, image } = body;
+    const { message, conversationHistory, image, conversationId } = body;
+
+    if (typeof conversationId === 'string' && conversationId.trim()) {
+      Sentry.setConversationId(conversationId.trim().slice(0, 128));
+    }
     
     // Get user session (optional — chatbot works for anonymous users too)
     let userEmail: string | undefined;
@@ -46,6 +53,37 @@ export async function POST(req: NextRequest) {
       }
     } catch {
       // Session fetch failed — continue without user context
+    }
+    
+    // Anonymous users must pass Turnstile
+    if (!userEmail) {
+      const { verifyTurnstileToken, getClientIP } = await import('@/lib/cloudflare');
+      const turnstileResult = await verifyTurnstileToken(
+        body.turnstileToken || '',
+        getClientIP(req)
+      );
+      if (!turnstileResult.success) {
+        recordChatbotRequest('error');
+        return NextResponse.json(
+          {
+            answer: 'กรุณายืนยันว่าคุณไม่ใช่บอทก่อนใช้แชทบอทค่ะ',
+            source: 'turnstile',
+            suggestions: QUICK_QUESTIONS,
+          },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Image uploads require login
+    if (image && !userEmail) {
+      return NextResponse.json(
+        {
+          answer: 'กรุณาเข้าสู่ระบบก่อนส่งรูปภาพในแชทค่ะ',
+          source: 'auth-required',
+        },
+        { status: 401 }
+      );
     }
     
     // Log if image is received
@@ -83,8 +121,16 @@ export async function POST(req: NextRequest) {
     }
 
     // Process with AI (include image + user context)
-    const result = await processChat(trimmedMessage, history, image, userEmail, userName);
-    
+    const result = await processChat(
+      trimmedMessage,
+      history,
+      image,
+      userEmail,
+      userName,
+      typeof conversationId === 'string' ? conversationId.trim().slice(0, 128) : undefined,
+    );
+
+    recordChatbotRequest('success');
     return NextResponse.json({
       answer: result.answer,
       source: result.source,
@@ -100,6 +146,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Chatbot API error:', error);
     Sentry.captureException(error);
+    recordChatbotRequest('error');
     return NextResponse.json({ 
       answer: 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้งค่ะ', 
       source: 'error',
@@ -113,6 +160,18 @@ export async function POST(req: NextRequest) {
  * Returns: Quick questions, FAQ categories, shop status, and shop info
  */
 export async function GET(req: NextRequest) {
+  const rateLimitResult = checkCombinedRateLimit(req, {
+    maxRequests: 60,
+    windowSeconds: 60,
+    prefix: 'chatbot-get',
+  });
+  if (!rateLimitResult.allowed) {
+    return NextResponse.json(
+      { quickQuestions: QUICK_QUESTIONS, categories: [], totalFAQs: SHIRT_FAQ.length, shopStatus: 'unknown', aiEnabled: false, shopInfo: null },
+      { status: 429 }
+    );
+  }
+
   try {
     const categories = [...new Set(SHIRT_FAQ.map(f => f.category))];
     
@@ -130,6 +189,8 @@ export async function GET(req: NextRequest) {
         availableProducts: shopData.stats?.availableProducts || 0,
         priceRange: shopData.stats?.priceRange || { min: 0, max: 0 },
       },
+    }, {
+      headers: { 'Cache-Control': API_CACHE.short },
     });
   } catch (error) {
     console.error('Chatbot GET error:', error);

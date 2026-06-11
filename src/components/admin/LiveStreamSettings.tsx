@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { invalidateLiveStreamCache } from '@/hooks/useLiveStream';
 import {
   Box,
   Typography,
@@ -119,6 +120,7 @@ export default function LiveStreamSettings({ config, saveConfig, showToast, user
 
       if (!res.ok) throw new Error('Failed to save');
       
+      await invalidateLiveStreamCache();
       showToast('success', live.enabled ? '🔴 เปิดไลฟ์สดแล้ว!' : 'ปิดไลฟ์สดแล้ว');
       
       // Also update the parent config
@@ -152,6 +154,7 @@ export default function LiveStreamSettings({ config, saveConfig, showToast, user
         body: JSON.stringify({ liveStream: newState }),
       });
       if (!res.ok) throw new Error('Failed');
+      await invalidateLiveStreamCache();
       showToast(newState.enabled ? 'success' : 'info', newState.enabled ? '🔴 กำลังไลฟ์สด!' : '⏹ หยุดไลฟ์สดแล้ว');
     } catch {
       showToast('error', 'เกิดข้อผิดพลาด');

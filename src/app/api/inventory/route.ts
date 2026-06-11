@@ -1,49 +1,59 @@
-// API route for inventory/stock management
+// src/app/api/inventory/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { inventory } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
+import { requireAdmin, isAdminEmailAsync, authOptions } from '@/lib/auth';
+import { getServerSession } from 'next-auth';
+import { API_CACHE } from '@/lib/api-helpers';
+import { getCached, invalidateCachePrefix, CACHE_TTL } from '@/lib/server-cache';
+import { groupInventoryRows, toPublicInventory } from '@/lib/inventory-public';
+
+type InventoryDbRow = typeof inventory.$inferSelect;
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// GET /api/inventory?productId=xxx
+async function fetchInventoryRows(productId: string | null): Promise<InventoryDbRow[]> {
+  if (productId) {
+    return db
+      .select()
+      .from(inventory)
+      .where(eq(inventory.productId, productId))
+      .orderBy(inventory.productId);
+  }
+  return db.select().from(inventory).orderBy(inventory.productId);
+}
+
+// GET /api/inventory?productId=xxx — public: coarse availability; admin: full counts
 export async function GET(request: NextRequest) {
   try {
     const productId = request.nextUrl.searchParams.get('productId');
+    const session = await getServerSession(authOptions);
+    const adminView = session?.user?.email
+      ? await isAdminEmailAsync(session.user.email)
+      : false;
 
-    let data;
-    if (productId) {
-      data = await db
-        .select()
-        .from(inventory)
-        .where(eq(inventory.productId, productId))
-        .orderBy(inventory.productId);
-    } else {
-      data = await db
-        .select()
-        .from(inventory)
-        .orderBy(inventory.productId);
-    }
+    const cacheKey = adminView
+      ? `inventory:admin:${productId || 'all'}`
+      : `inventory:public:${productId || 'all'}`;
 
-    // Group by product_id
-    const grouped: Record<string, any> = {};
-    for (const row of data || []) {
-      if (!grouped[row.productId]) {
-        grouped[row.productId] = {
+    const payload = await getCached(cacheKey, CACHE_TTL.inventory, async () => {
+      const data = await fetchInventoryRows(productId);
+      const grouped = groupInventoryRows(
+        (data || []).map((row) => ({
           productId: row.productId,
-          totalStock: 0,
-          bySize: {} as Record<string, number>,
-          lowStockThreshold: row.lowStockThreshold || 5,
-        };
-      }
-      grouped[row.productId].totalStock += row.quantity;
-      grouped[row.productId].bySize[row.size || 'FREE'] = row.quantity;
-    }
+          quantity: row.quantity,
+          size: row.size,
+          lowStockThreshold: row.lowStockThreshold,
+        }))
+      );
+      return adminView ? grouped : toPublicInventory(grouped);
+    });
 
     return NextResponse.json(
-      { inventory: Object.values(grouped) },
-      { headers: { 'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60' } }
+      { inventory: payload, view: adminView ? 'admin' : 'public' },
+      { headers: { 'Cache-Control': API_CACHE.short } }
     );
   } catch (error: any) {
     console.error('GET /api/inventory error:', error);
@@ -53,6 +63,9 @@ export async function GET(request: NextRequest) {
 
 // POST /api/inventory - Update stock (admin only)
 export async function POST(request: NextRequest) {
+  const authResult = await requireAdmin();
+  if (authResult instanceof NextResponse) return authResult;
+
   try {
     const body = await request.json();
     const { productId, size, quantity, lowStockThreshold } = body;
@@ -99,6 +112,8 @@ export async function POST(request: NextRequest) {
       resultData = inserted[0];
     }
 
+    invalidateCachePrefix('inventory:');
+
     return NextResponse.json({
       success: true,
       inventory: {
@@ -108,7 +123,7 @@ export async function POST(request: NextRequest) {
         quantity: resultData.quantity,
         low_stock_threshold: resultData.lowStockThreshold,
         updated_at: resultData.updatedAt?.toISOString(),
-      }
+      },
     });
   } catch (error: any) {
     console.error('POST /api/inventory error:', error);

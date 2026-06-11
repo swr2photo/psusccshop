@@ -148,10 +148,10 @@ export default function TurnstileWidget({
       return;
     }
 
-    // Skip if no site key configured
+    // Skip if no site key configured — do not auto-bypass in production
     if (!hasSiteKey) {
-      console.warn('[Turnstile] Site key not configured, widget disabled');
-      onSuccessRef.current('dev-bypass');
+      console.error('[Turnstile] Site key not configured');
+      onErrorRef.current?.(new Error('Turnstile not configured'));
       initializedRef.current = true;
       return;
     }
@@ -187,9 +187,6 @@ export default function TurnstileWidget({
           },
           'error-callback': (error: any) => {
             console.error('[Turnstile] Error:', error);
-            // If Turnstile fails, still allow the form to work
-            console.warn('[Turnstile] Widget error, allowing form submission with fallback token');
-            onSuccessRef.current('turnstile-error-bypass');
             onErrorRef.current?.(error);
           },
           theme,
@@ -204,8 +201,7 @@ export default function TurnstileWidget({
         initializedRef.current = true;
       } catch (e) {
         console.error('[Turnstile] Failed to render widget:', e);
-        // Allow form submission on render failure
-        onSuccessRef.current('turnstile-error-bypass');
+        onErrorRef.current?.(e);
         initializedRef.current = true;
       }
     };

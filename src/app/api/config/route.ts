@@ -4,6 +4,13 @@ import { ShopConfig } from '@/lib/config';
 import { requireAdmin, requireAuth, isSuperAdminEmail } from '@/lib/auth';
 import { sanitizeConfigForPublic, sanitizeObjectUtf8 } from '@/lib/sanitize';
 import { saveAllAdminPermissionsToDB, getAllAdminPermissionsFromDB, deleteAdminPermissionsFromDB } from '@/lib/supabase';
+import {
+  getCached,
+  invalidateCacheKey,
+  CACHE_TTL,
+  PUBLIC_CONFIG_CACHE_KEY,
+  LIVE_CACHE_KEY,
+} from '@/lib/server-cache';
 
 // Helper to save user log server-side
 const userLogKey = (id: string) => `user-logs/${id}.json`;
@@ -66,28 +73,32 @@ const DEFAULT_CONFIG: ShopConfig = {
 };
 
 export async function GET() {
-  let cfg = DEFAULT_CONFIG;
-  try {
-    const dbConfig = await getJson<ShopConfig>(CONFIG_KEY);
-    if (dbConfig) {
-      cfg = dbConfig;
+  const payload = await getCached(PUBLIC_CONFIG_CACHE_KEY, CACHE_TTL.config, async () => {
+    let cfg = DEFAULT_CONFIG;
+    try {
+      const dbConfig = await getJson<ShopConfig>(CONFIG_KEY);
+      if (dbConfig) {
+        cfg = dbConfig;
+      }
+    } catch (error) {
+      console.error('[Config API] Failed to load config from database, falling back to default:', error);
     }
-  } catch (error) {
-    console.error('[Config API] Failed to load config from database, falling back to default:', error);
-  }
-  
-  // Sanitize: ลบ adminEmails, adminPermissions, sheetId ก่อนส่งให้ frontend
-  const sanitizedConfig = sanitizeConfigForPublic(cfg);
-  
+
+    const sanitizedConfig = sanitizeConfigForPublic(cfg);
+    return { status: 'success' as const, data: sanitizedConfig };
+  });
+
   return NextResponse.json(
-    { status: 'success', data: sanitizedConfig },
-    { headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-      // Short CDN cache: realtime-triggered refetches use a cache-busting
-      // query param, but normal polling/visibility refetches should not see
-      // data older than ~10s after an admin change.
-      'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=30',
-    } }
+    payload,
+    {
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        // Short CDN cache: realtime-triggered refetches use a cache-busting
+        // query param, but normal polling/visibility refetches should not see
+        // data older than ~10s after an admin change.
+        'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=30',
+      },
+    }
   );
 }
 
@@ -127,8 +138,8 @@ export async function POST(req: NextRequest) {
     const sanitizedConfig = sanitizeObjectUtf8(config);
     
     await putJson(CONFIG_KEY, sanitizedConfig);
-    
-    // Sync the updated isOpen status to Redis cache
+    invalidateCacheKey(PUBLIC_CONFIG_CACHE_KEY);
+    invalidateCacheKey(LIVE_CACHE_KEY);
     if (sanitizedConfig.isOpen !== undefined) {
       try {
         await syncShopOpenStatusToRedis(sanitizedConfig.isOpen);

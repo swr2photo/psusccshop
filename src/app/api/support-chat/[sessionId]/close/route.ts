@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions, isAdminEmail } from '@/lib/auth';
+import { authOptions, isAdminEmailAsync } from '@/lib/auth';
 import { 
   getChatSession,
   closeChatSession 
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
     
     // Only admin can close chats
-    if (!isAdminEmail(session.user.email)) {
+    if (!(await isAdminEmailAsync(session.user.email))) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
     

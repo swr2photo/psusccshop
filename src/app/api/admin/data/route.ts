@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getShopConfig, getAllOrders } from '@/lib/filebase';
 import { ShopConfig } from '@/lib/config';
-import { requireAdmin, isSuperAdminEmail, ADMIN_EMAILS, isAdminEmail } from '@/lib/auth';
+import { requireAdmin, isSuperAdminEmail, ADMIN_EMAILS, isAdminEmailAsync } from '@/lib/auth';
 import { sanitizeConfigForAdmin, sanitizeOrdersForAdmin } from '@/lib/sanitize';
 import { getShopAdminPermissions } from '@/lib/shops';
 
@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
     let shopAdminPerms: Record<string, boolean> | undefined;
     if (isSuperAdminEmail(normalizedEmail)) {
       userRole = 'superadmin';
-    } else if (isAdminEmail(normalizedEmail) || configAdminEmails.includes(normalizedEmail)) {
+    } else if (await isAdminEmailAsync(normalizedEmail) || configAdminEmails.includes(normalizedEmail)) {
       // In static env admin list OR dynamic config admin list → full admin
       userRole = 'admin';
     } else {

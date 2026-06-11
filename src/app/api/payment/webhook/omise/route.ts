@@ -6,18 +6,21 @@ import { db } from '@/lib/db';
 import { orders, paymentTransactions } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { verifyOmiseWebhook } from '@/lib/payment';
+import { webhookSecretMissingResponse } from '@/lib/api-helpers';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
+    const missingSecret = webhookSecretMissingResponse('OMISE_WEBHOOK_SECRET');
+    if (missingSecret) return missingSecret;
+
     const payload = await request.text();
     const signature = request.headers.get('x-omise-signature') || '';
 
-    // Verify webhook signature if configured
     const webhookSecret = process.env.OMISE_WEBHOOK_SECRET;
-    if (webhookSecret && !verifyOmiseWebhook(payload, signature)) {
+    if (!webhookSecret || !verifyOmiseWebhook(payload, signature)) {
       console.error('[Webhook] Invalid Omise signature');
       return NextResponse.json(
         { success: false, error: 'Invalid signature' },

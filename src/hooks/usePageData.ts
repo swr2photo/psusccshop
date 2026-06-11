@@ -16,10 +16,12 @@ import { fetcher, postFetcher } from './useSWRConfig';
 
 export const PAGE_CACHE_KEYS = {
   CONFIG: '/api/config',
+  CATALOG: '/api/shops/catalog',
   PROFILE: (email: string) => `/api/profile?email=${encodeURIComponent(email)}`,
   CART: (email: string) => `/api/cart?email=${encodeURIComponent(email)}`,
   ORDERS: (email: string) => `/api/orders?email=${encodeURIComponent(email)}`,
   SHIPPING: '/api/shipping/options',
+  REVIEWS: (productId: string) => `/api/reviews?productId=${encodeURIComponent(productId)}`,
 };
 
 // ============== LOCAL STORAGE CACHE ==============
@@ -78,12 +80,11 @@ export function usePageConfig() {
     {
       // Use cached data as fallback
       fallbackData: cached?.config ? { status: 'success', config: cached.config } : undefined,
-      // Revalidate in background
-      revalidateOnFocus: true,
+      revalidateOnFocus: false,
       revalidateOnReconnect: true,
-      // Keep data fresh
-      refreshInterval: 2 * 60 * 1000, // 2 minutes (config rarely changes mid-session)
-      dedupingInterval: 5000,
+      // Realtime + visibility handler refresh config; SWR is safety net only
+      refreshInterval: 5 * 60 * 1000,
+      dedupingInterval: 30_000,
       // Error retry
       errorRetryCount: 3,
       errorRetryInterval: 5000,
@@ -131,6 +132,49 @@ export function usePageConfig() {
     refresh: () => mutate(),
     mutate,
   };
+}
+
+// ============== SHOP CATALOG HOOK ==============
+
+export function useShopCatalog() {
+  const { data, error, isLoading, mutate } = useSWR(
+    PAGE_CACHE_KEYS.CATALOG,
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: true,
+      refreshInterval: 5 * 60 * 1000,
+      dedupingInterval: 120_000,
+      keepPreviousData: true,
+    }
+  );
+
+  const shops = useMemo(() => {
+    if (data?.status === 'success' && Array.isArray(data.shops)) return data.shops;
+    return [];
+  }, [data]);
+
+  return { shops, isLoading, error, refresh: () => mutate(), mutate };
+}
+
+// ============== PRODUCT REVIEWS HOOK ==============
+
+const EMPTY_REVIEWS: never[] = [];
+
+export function useProductReviews(productId: string | undefined | null) {
+  const { data, error, isLoading, mutate } = useSWR(
+    productId ? PAGE_CACHE_KEYS.REVIEWS(productId) : null,
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      dedupingInterval: 120_000,
+      keepPreviousData: true,
+    }
+  );
+
+  const reviews = useMemo(() => data?.reviews ?? EMPTY_REVIEWS, [data]);
+
+  return { reviews, isLoading, error, refresh: () => mutate(), mutate };
 }
 
 // ============== SHIPPING CONFIG HOOK ==============
@@ -402,6 +446,8 @@ export function useShopPageData(email: string | undefined | null) {
 
 export default {
   usePageConfig,
+  useShopCatalog,
+  useProductReviews,
   usePageShipping,
   usePageProfile,
   usePageCart,

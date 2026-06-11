@@ -3,10 +3,11 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions, isAdminEmail } from '@/lib/auth';
+import { authOptions, isAdminEmailAsync } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { supportChats } from '@/db/schema';
 import { eq } from 'drizzle-orm';
+import { getCached, invalidateCacheKey, CACHE_TTL } from '@/lib/server-cache';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -26,7 +27,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
     
     const { isTyping } = await request.json();
-    const isAdmin = isAdminEmail(session.user.email);
+    const isAdmin = await isAdminEmailAsync(session.user.email);
     
     const updateData: any = {
       updatedAt: new Date(),
@@ -42,6 +43,8 @@ export async function POST(request: NextRequest, { params }: Params) {
     await db.update(supportChats)
       .set(updateData)
       .where(eq(supportChats.id, sessionId));
+
+    invalidateCacheKey(`chat:typing:${sessionId}`);
     
     return NextResponse.json({ success: true });
     
@@ -64,24 +67,26 @@ export async function GET(request: NextRequest, { params }: Params) {
       return NextResponse.json('Unauthorized', { status: 401 });
     }
     
-    const dataResults = await db.select({
-      adminTyping: supportChats.adminTyping,
-      adminTypingAt: supportChats.adminTypingAt,
-      customerTyping: supportChats.customerTyping,
-      customerTypingAt: supportChats.customerTypingAt,
-    })
-    .from(supportChats)
-    .where(eq(supportChats.id, sessionId))
-    .limit(1);
-    
-    const data = dataResults[0];
+    const cacheKey = `chat:typing:${sessionId}`;
+    const data = await getCached(cacheKey, CACHE_TTL.typing, async () => {
+      const dataResults = await db.select({
+        adminTyping: supportChats.adminTyping,
+        adminTypingAt: supportChats.adminTypingAt,
+        customerTyping: supportChats.customerTyping,
+        customerTypingAt: supportChats.customerTypingAt,
+      })
+        .from(supportChats)
+        .where(eq(supportChats.id, sessionId))
+        .limit(1);
+      return dataResults[0] ?? null;
+    });
     
     if (!data) {
       return NextResponse.json({ isTyping: false });
     }
     
     const now = new Date().getTime();
-    const isAdmin = isAdminEmail(session.user.email);
+    const isAdmin = await isAdminEmailAsync(session.user.email);
     
     let otherTyping = false;
     if (isAdmin) {

@@ -258,14 +258,25 @@ export async function getOrderStats(): Promise<OrderStats> {
 }
 
 /**
- * ค้นหาออเดอร์จาก reference number
+ * ค้นหาออเดอร์จาก reference number (ต้องเป็นเจ้าของออเดอร์)
  */
-export async function lookupOrderByRef(ref: string): Promise<string> {
+export async function lookupOrderByRef(ref: string, userEmail?: string | null): Promise<string> {
   try {
+    if (!userEmail) {
+      return 'กรุณาเข้าสู่ระบบก่อนตรวจสอบสถานะออเดอร์ค่ะ';
+    }
+
     const order = await getOrderByRef(ref.toUpperCase());
     if (!order) {
-      return `ไม่พบออเดอร์หมายเลข "${ref}" ในระบบค่ะ กรุณาตรวจสอบหมายเลขออเดอร์อีกครั้งนะคะ`;
+      return `ไม่พบออเดอร์หมายเลข "${ref}" ในบัญชีของคุณค่ะ กรุณาตรวจสอบหมายเลขออเดอร์อีกครั้งนะคะ`;
     }
+
+    const orderEmail = order.customerEmail || order.email;
+    const { isResourceOwner } = await import('@/lib/auth');
+    if (!isResourceOwner(orderEmail, userEmail)) {
+      return `ไม่พบออเดอร์หมายเลข "${ref}" ในบัญชีของคุณค่ะ กรุณาตรวจสอบหมายเลขออเดอร์อีกครั้งนะคะ`;
+    }
+
     return formatOrderForChat(order);
   } catch (error) {
     console.error('Order lookup error:', error);
@@ -498,27 +509,6 @@ export async function buildDetailedShopContext(): Promise<string> {
 
   const { products, announcements, bankAccount, isOpen, stats } = shopData;
   
-  // Get order stats (cached)
-  let orderStatsText = '';
-  try {
-    const orderStats = await getOrderStats();
-    if (orderStats.totalOrders > 0) {
-      const statusEntries = Object.entries(orderStats.statusBreakdown)
-        .map(([status, count]) => `${getStatusThai(status)}: ${count}`)
-        .join(', ');
-      
-      orderStatsText = `
-[สถิติออเดอร์]
-- ออเดอร์ทั้งหมด: ${orderStats.totalOrders} รายการ
-- ออเดอร์วันนี้: ${orderStats.recentOrders} รายการ
-- ยอดเฉลี่ย: ${orderStats.avgOrderAmount.toLocaleString()} บาท/ออเดอร์
-- สถานะ: ${statusEntries}
-${orderStats.popularProducts.length > 0 ? `- สินค้าขายดี: ${orderStats.popularProducts.map(p => `${p.name} (${p.count} ชิ้น)`).join(', ')}` : ''}`;
-    }
-  } catch (e) {
-    // Order stats are optional, don't fail
-  }
-
   // Build detailed product info
   const productDetails = products.map((p: any, idx: number) => {
     // Handle sizes - may be array (sizes) or object (sizePricing) or basePrice
@@ -702,7 +692,6 @@ ${!isOpen && shopData.config.closedMessage ? `- ข้อความ: ${shopDat
 ${activeAnnouncements || '(ไม่มีประกาศ)'}
 
 ${activeEvents ? `[กิจกรรม/โปรโมชั่น]\n${activeEvents}` : ''}
-${orderStatsText}
 
 ═══════════════════════════════════════════════════════════════
 [สินค้าทั้งหมด] (${stats?.totalProducts || 0} รายการ, พร้อมจำหน่าย ${stats?.availableProducts || 0} รายการ)
@@ -980,6 +969,7 @@ async function callGeminiAPI(
   imageBase64?: string,
   userContext?: string,
   orderContext?: string,
+  conversationId?: string,
 ): Promise<string | null> {
   if (!GEMINI_API_KEY) {
     console.log('No Gemini API key configured');
@@ -1005,15 +995,18 @@ async function callGeminiAPI(
     try {
       const responseText = await Sentry.startSpan(
         {
-          name: `gemini ${model.name}`,
-          op: 'gen_ai.request',
+          name: `chat ${model.name}`,
+          op: 'gen_ai.generate_content',
           attributes: {
             'gen_ai.system': 'google',
             'gen_ai.request.model': model.name,
+            'gen_ai.operation.name': 'generate_content',
+            'gen_ai.agent.name': 'scc_shop_chatbot',
             'gen_ai.request.has_image': Boolean(imageBase64),
+            ...(conversationId ? { 'gen_ai.conversation.id': conversationId } : {}),
           },
         },
-        async () => {
+        async (span) => {
       console.log(`[AI] Trying ${model.name}...${imageBase64 ? ' (with image)' : ''}`);
       
       // Build user content parts - for multimodal requests
@@ -1112,6 +1105,18 @@ async function callGeminiAPI(
         // Success! Reset error count and potentially upgrade tier
         modelErrorCount[tier] = 0;
         lastUsedModel = model.name; // Track which model was used
+
+        span.setAttribute('gen_ai.response.text', text.slice(0, 2000));
+        const usage = data.usageMetadata;
+        if (usage?.promptTokenCount != null) {
+          span.setAttribute('gen_ai.usage.input_tokens', usage.promptTokenCount);
+        }
+        if (usage?.candidatesTokenCount != null) {
+          span.setAttribute('gen_ai.usage.output_tokens', usage.candidatesTokenCount);
+        }
+        if (usage?.totalTokenCount != null) {
+          span.setAttribute('gen_ai.usage.total_tokens', usage.totalTokenCount);
+        }
         
         // If we succeeded with a better tier, set it as current
         if (modelOrder.indexOf(tier) < modelOrder.indexOf(currentModelTier)) {
@@ -1155,6 +1160,7 @@ export async function processChat(
   imageBase64?: string,
   userEmail?: string,
   userName?: string,
+  conversationId?: string,
 ): Promise<ChatResponse> {
   const trimmedMessage = message.trim();
   
@@ -1267,11 +1273,12 @@ export async function processChat(
   if (orderDetection.isOrderQuery) {
     try {
       if (orderDetection.orderRef) {
-        // Lookup specific order by ref
-        orderContext = await lookupOrderByRef(orderDetection.orderRef);
+        orderContext = await lookupOrderByRef(orderDetection.orderRef, userEmail);
       } else if (orderDetection.isMyOrders && userEmail) {
         // Lookup user's orders
         orderContext = await lookupOrdersByEmail(userEmail);
+      } else if (orderDetection.orderRef && !userEmail) {
+        orderContext = 'กรุณาเข้าสู่ระบบก่อนตรวจสอบสถานะออเดอร์ค่ะ';
       } else if (orderDetection.isMyOrders && !userEmail) {
         // User not logged in
         orderContext = 'ลูกค้ายังไม่ได้ล็อกอิน — ไม่สามารถดึงประวัติการสั่งซื้อได้ แนะนำให้ล็อกอินก่อน หรือบอกหมายเลขออเดอร์มาเพื่อตรวจสอบ';
@@ -1292,7 +1299,7 @@ export async function processChat(
   if (shouldUseAI) {
     try {
       const shopContext = await buildDetailedShopContext();
-      const aiResponse = await callGeminiAPI(trimmedMessage, shopContext, conversationHistory, imageBase64, userContext, orderContext);
+      const aiResponse = await callGeminiAPI(trimmedMessage, shopContext, conversationHistory, imageBase64, userContext, orderContext, conversationId);
       
       if (aiResponse) {
         // Clean up response
@@ -1337,7 +1344,7 @@ export async function processChat(
   // Fallback to AI for any question
   try {
     const shopContext = await buildDetailedShopContext();
-    const aiResponse = await callGeminiAPI(trimmedMessage, shopContext, conversationHistory, imageBase64, userContext, orderContext);
+    const aiResponse = await callGeminiAPI(trimmedMessage, shopContext, conversationHistory, imageBase64, userContext, orderContext, conversationId);
     
     if (aiResponse) {
       return {

@@ -12,7 +12,11 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || process.env.RAILWAY_PUBLIC_DO
   ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` 
   : 'http://localhost:3000';
 
-const CRON_SECRET = process.env.CRON_SECRET || 'psusccshop-cron-2026';
+const CRON_SECRET = process.env.CRON_SECRET;
+if (!CRON_SECRET) {
+  console.error('CRON_SECRET is required. Set it in environment variables.');
+  process.exit(1);
+}
 
 console.log('🚀 Cron Worker Starting...');
 console.log(`📍 App URL: ${APP_URL}`);

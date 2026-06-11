@@ -11,25 +11,15 @@ import { GET as cancelExpired } from './cancel-expired/route';
 import { GET as cleanup } from './cleanup/route';
 import { GET as updateTracking } from './update-tracking/route';
 import { withCronMonitor } from '@/lib/sentry-cron';
+import { recordCronRun } from '@/lib/sentry-metrics';
+import { verifyCronAuth } from '@/lib/cron-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) {
-    return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 });
-  }
-
-  const authHeader = req.headers.get('authorization');
-  const isVercelCron = req.headers.get('x-vercel-cron') === '1';
-  const isValidSecret =
-    authHeader === `Bearer ${cronSecret}` ||
-    req.nextUrl.searchParams.get('secret') === cronSecret;
-
-  if (!isVercelCron && !isValidSecret) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const authError = verifyCronAuth(req);
+  if (authError) return authError;
 
   return withCronMonitor(
     {
@@ -79,9 +69,11 @@ export async function GET(req: NextRequest) {
       }
 
       if (hasError) {
+        recordCronRun('vercel-unified-cron', 'failed');
         return NextResponse.json({ success: false, results }, { status: 500 });
       }
 
+      recordCronRun('vercel-unified-cron', 'success');
       return NextResponse.json({
         success: true,
         results,

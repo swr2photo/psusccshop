@@ -7,6 +7,7 @@ import { putJson, getExpiredUnpaidOrders } from '@/lib/filebase';
 import { withCronMonitor } from '@/lib/sentry-cron';
 import { sendOrderCancelledEmail } from '@/lib/email';
 import { triggerSheetSync } from '@/lib/sheet-sync';
+import { verifyCronAuth } from '@/lib/cron-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -22,29 +23,8 @@ if (!CRON_SECRET) {
 }
 
 export async function GET(req: NextRequest) {
-  // ตรวจสอบว่าตั้งค่า CRON_SECRET แล้ว
-  if (!CRON_SECRET) {
-    console.error('[Cron] CRON_SECRET not configured');
-    return NextResponse.json(
-      { status: 'error', message: 'Server configuration error' },
-      { status: 500 }
-    );
-  }
-
-  // ตรวจสอบ authorization
-  const authHeader = req.headers.get('authorization');
-  const cronSecretFromHeader = authHeader?.replace('Bearer ', '');
-  
-  // รองรับทั้ง Vercel Cron และ manual call ด้วย secret
-  const isVercelCron = req.headers.get('x-vercel-cron') === '1';
-  const isValidSecret = cronSecretFromHeader === CRON_SECRET;
-  
-  if (!isVercelCron && !isValidSecret) {
-    return NextResponse.json(
-      { status: 'error', message: 'Unauthorized' },
-      { status: 401 }
-    );
-  }
+  const authError = verifyCronAuth(req);
+  if (authError) return authError;
 
   return withCronMonitor(
     { monitorSlug: 'cancel-expired', schedule: '*/30 * * * *', maxRuntime: 10 },
@@ -136,19 +116,9 @@ export async function GET(req: NextRequest) {
   });
 }
 
-// POST method สำหรับ manual trigger จาก admin
+// POST method สำหรับ manual trigger (ต้องส่ง Authorization: Bearer CRON_SECRET)
 export async function POST(req: NextRequest) {
-  // ต้องมี secret key
-  const body = await req.json().catch(() => ({}));
-  const secret = body.secret;
-  
-  if (secret !== CRON_SECRET) {
-    return NextResponse.json(
-      { status: 'error', message: 'Invalid secret' },
-      { status: 401 }
-    );
-  }
-  
-  // Redirect to GET handler
+  const authError = verifyCronAuth(req);
+  if (authError) return authError;
   return GET(req);
 }

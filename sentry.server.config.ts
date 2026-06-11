@@ -1,7 +1,9 @@
 import * as Sentry from '@sentry/nextjs';
+import { nodeProfilingIntegration } from '@sentry/profiling-node';
 import {
-  sentryEnvironment,
-  sentryRelease,
+  sentryAgentMonitoringOptions,
+  sentryProfilingOptions,
+  sentrySharedInitOptions,
   sentryTracesSampler,
 } from './src/lib/sentry-options';
 
@@ -10,11 +12,11 @@ const dsn = process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN;
 if (dsn) {
   Sentry.init({
     dsn,
-    environment: sentryEnvironment,
-    release: sentryRelease,
-    sendDefaultPii: true,
+    ...sentrySharedInitOptions,
+    ...sentryProfilingOptions,
+    ...sentryAgentMonitoringOptions,
     tracesSampler: sentryTracesSampler,
     includeLocalVariables: true,
-    enableLogs: true,
+    integrations: [nodeProfilingIntegration()],
   });
 }

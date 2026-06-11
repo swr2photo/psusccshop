@@ -3,10 +3,11 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions, isAdminEmail } from '@/lib/auth';
+import { authOptions, isAdminEmailAsync } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { config } from '@/db/schema';
 import { eq } from 'drizzle-orm';
+import { invalidatePublicChatSettingsCache } from '@/lib/support-chat-settings-cache';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -34,7 +35,7 @@ const DEFAULT_SETTINGS = {
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.email || !isAdminEmail(session.user.email)) {
+    if (!session?.user?.email || !(await isAdminEmailAsync(session.user.email))) {
       return NextResponse.json('Unauthorized', { status: 401 });
     }
     
@@ -62,7 +63,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.email || !isAdminEmail(session.user.email)) {
+    if (!session?.user?.email || !(await isAdminEmailAsync(session.user.email))) {
       return NextResponse.json('Unauthorized', { status: 401 });
     }
     
@@ -75,6 +76,8 @@ export async function POST(request: NextRequest) {
         target: config.key,
         set: { value: merged, updatedAt: new Date() },
       });
+
+    invalidatePublicChatSettingsCache();
     
     return NextResponse.json({ success: true, settings: merged });
     

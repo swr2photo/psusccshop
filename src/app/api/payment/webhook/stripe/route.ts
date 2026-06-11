@@ -6,18 +6,21 @@ import { db } from '@/lib/db';
 import { orders, paymentTransactions } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { verifyStripeWebhook } from '@/lib/payment';
+import { webhookSecretMissingResponse } from '@/lib/api-helpers';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
+    const missingSecret = webhookSecretMissingResponse('STRIPE_WEBHOOK_SECRET');
+    if (missingSecret) return missingSecret;
+
     const payload = await request.text();
     const signature = request.headers.get('stripe-signature') || '';
 
-    // Verify webhook signature if configured
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-    if (webhookSecret && !verifyStripeWebhook(payload, signature)) {
+    if (!webhookSecret || !verifyStripeWebhook(payload, signature)) {
       console.error('[Webhook] Invalid Stripe signature');
       return NextResponse.json(
         { success: false, error: 'Invalid signature' },

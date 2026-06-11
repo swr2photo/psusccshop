@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getJson, putJson } from '@/lib/filebase';
 import crypto from 'crypto';
-import { requireAuth, normalizeEmail, isResourceOwner, isAdminEmail, getCurrentUserEmail } from '@/lib/auth';
+import { requireAuth, normalizeEmail, isResourceOwner, isAdminEmailAsync, getCurrentUserEmail } from '@/lib/auth';
 
 const emailHash = (email: string) => crypto.createHash('sha256').update(email.toLowerCase()).digest('hex');
 const profileKey = (email: string) => `users/${emailHash(email)}.json`;
@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
 
   // ตรวจสอบว่าเป็นเจ้าของหรือเป็น admin
   const currentEmail = authResult.email;
-  if (!isResourceOwner(email, currentEmail) && !isAdminEmail(currentEmail)) {
+  if (!isResourceOwner(email, currentEmail) && !(await isAdminEmailAsync(currentEmail))) {
     return NextResponse.json({ status: 'error', message: 'ไม่มีสิทธิ์เข้าถึงข้อมูลนี้' }, { status: 403 });
   }
 
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
 
     // ตรวจสอบว่าเป็นเจ้าของหรือเป็น admin
     const currentEmail = authResult.email;
-    if (!isResourceOwner(email, currentEmail) && !isAdminEmail(currentEmail)) {
+    if (!isResourceOwner(email, currentEmail) && !(await isAdminEmailAsync(currentEmail))) {
       return NextResponse.json({ status: 'error', message: 'ไม่มีสิทธิ์แก้ไขข้อมูลนี้' }, { status: 403 });
     }
 
@@ -86,10 +86,8 @@ export async function POST(req: NextRequest) {
     for (const [k, v] of Object.entries(data)) {
       if (EXTRA_FIELDS.includes(k)) {
         extrasData[k] = v;
-      } else if (PROFILE_TABLE_FIELDS.includes(k) && (v === '' || v === null || v === undefined)) {
-        // Skip empty profile fields — avoid wiping saved name/phone/address on partial saves
-        continue;
-      } else {
+      } else if (PROFILE_TABLE_FIELDS.includes(k)) {
+        if (v === '' || v === null || v === undefined) continue;
         profileData[k] = v;
       }
     }

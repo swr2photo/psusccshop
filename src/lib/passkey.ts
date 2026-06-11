@@ -392,7 +392,13 @@ export async function verifyPasskeyAuthentication(
 
 // ==================== PASSKEY LOGIN TOKEN ====================
 
-const SECRET_KEY = new TextEncoder().encode(process.env.NEXTAUTH_SECRET || 'fallback-secret');
+const SECRET_KEY = (() => {
+  const secret = process.env.NEXTAUTH_SECRET;
+  if (!secret) {
+    throw new Error('NEXTAUTH_SECRET is required for passkey login tokens');
+  }
+  return new TextEncoder().encode(secret);
+})();
 
 export async function createPasskeyLoginToken(email: string): Promise<string> {
   return new SignJWT({ email, purpose: 'passkey-login' })

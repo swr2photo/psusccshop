@@ -1,23 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { listKeys, getJson } from '@/lib/filebase';
+import { getJson } from '@/lib/filebase';
 import { generatePromptPayPayload, generatePromptPayPayloadForId, generatePromptPayQR, calculateOrderTotal } from '@/lib/payment-utils';
-import { requireAuth, isResourceOwner, isAdminEmail } from '@/lib/auth';
-import { maskPhone } from '@/lib/sanitize';
+import { requireAuth, isResourceOwner, isAdminEmailAsync } from '@/lib/auth';
+import { maskPhone, sanitizeUtf8Input } from '@/lib/sanitize';
 import { getShopById } from '@/lib/shops';
+import { resolveOrderByRef } from '@/lib/order-lookup';
 
-// Mask account number - แสดงแค่ 4 ตัวท้าย
 const maskAccountNumber = (accountNumber: string): string => {
   if (!accountNumber) return '';
   const cleaned = accountNumber.replace(/\D/g, '');
   if (cleaned.length <= 4) return accountNumber;
   const lastFour = cleaned.slice(-4);
   return `${'*'.repeat(cleaned.length - 4)}${lastFour}`;
-};
-import { sanitizeUtf8Input, sanitizeObjectUtf8 } from '@/lib/sanitize';
-
-const findOrderKey = async (ref: string): Promise<string | null> => {
-  const keys = await listKeys('orders/');
-  return keys.find((k) => k.endsWith(`${ref}.json`)) || null;
 };
 
 export async function GET(req: NextRequest) {
@@ -39,25 +33,17 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const key = await findOrderKey(sanitizedRef);
-    if (!key) {
+    const order = await resolveOrderByRef(sanitizedRef);
+    if (!order) {
       return NextResponse.json(
         { status: 'error', message: 'order not found' },
         { status: 404, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
       );
     }
 
-    const order = await getJson<any>(key);
-    if (!order) {
-      return NextResponse.json(
-        { status: 'error', message: 'order data missing' },
-        { status: 404, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
-      );
-    }
-
     // ตรวจสอบว่าเป็นเจ้าของ order หรือเป็น admin
     const orderEmail = order.customerEmail || order.email;
-    if (!isResourceOwner(orderEmail, currentUserEmail) && !isAdminEmail(currentUserEmail)) {
+    if (!isResourceOwner(orderEmail, currentUserEmail) && !(await isAdminEmailAsync(currentUserEmail))) {
       return NextResponse.json(
         { status: 'error', message: 'ไม่มีสิทธิ์ดูข้อมูลการชำระเงินของ order นี้' },
         { status: 403, headers: { 'Content-Type': 'application/json; charset=utf-8' } }

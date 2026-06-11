@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions, isAdminEmail, ADMIN_EMAILS, isResourceOwner } from '@/lib/auth';
+import { authOptions, isAdminEmailAsync, ADMIN_EMAILS, isResourceOwner } from '@/lib/auth';
 import { 
   getChatSession,
   addChatMessage 
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
     
     // Check authorization
-    const isAdminUser = isAdminEmail(session.user.email);
+    const isAdminUser = await isAdminEmailAsync(session.user.email);
     const isOwner = isResourceOwner(chat.customer_email, session.user.email);
     
     console.log('[support-chat/message] Auth check:', { isAdminUser, isOwner });

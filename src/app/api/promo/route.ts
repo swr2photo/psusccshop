@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, requireAdmin } from '@/lib/auth';
 import { getShopConfig } from '@/lib/filebase';
 import { getShopById } from '@/lib/shops';
+import { rateLimitOrNull } from '@/lib/api-helpers';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -11,6 +12,9 @@ export const dynamic = 'force-dynamic';
  * Body: { code: string, subtotal: number }
  */
 export async function POST(req: NextRequest) {
+  const rateLimited = rateLimitOrNull(req, { maxRequests: 20, windowSeconds: 60, prefix: 'promo' });
+  if (rateLimited) return rateLimited;
+
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
 

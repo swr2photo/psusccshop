@@ -1,19 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { Redis } from '@upstash/redis';
-
-/**
- * Lazy initializer for Upstash Redis client.
- * Returns null if Redis credentials are missing or set to placeholder values.
- */
-const getRedisClient = () => {
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token || url.includes('placeholder') || token.includes('placeholder')) {
-    return null;
-  }
-  return new Redis({ url, token });
-};
+import { getRedisClient } from '@/lib/redis';
 
 // --- CORS config ---
 const allowedOrigins = [
@@ -156,8 +143,9 @@ function isSuspiciousUserAgent(userAgent: string | null): boolean {
  */
 const STRICT_RATE_LIMIT_ROUTES = [
   '/api/payment',
-  '/payment/verify',
   '/api/upload',
+  '/api/auto-email',
+  '/api/gas',
 ];
 
 /**
@@ -189,6 +177,26 @@ const EXTERNAL_API_ROUTES = [
   '/api/image/',          // Image proxy (called from <img> tags)
 ];
 
+/** Opened in new tab for print/PDF — must allow browser navigation */
+const NAVIGABLE_API_ROUTES = [
+  '/api/invoice',
+];
+
+/**
+ * GET responses from these routes set their own Cache-Control.
+ * Do not force no-store in middleware (would override CDN caching).
+ */
+const CACHEABLE_API_PREFIXES = [
+  '/api/config',
+  '/api/live',
+  '/api/shops/catalog',
+  '/api/reviews',
+  '/api/inventory',
+  '/api/chatbot',
+  '/api/support-chat/settings/public',
+  '/api/image/',
+];
+
 export default async function proxy(request: NextRequest) {
   const origin = request.headers.get('origin');
   const pathname = request.nextUrl.pathname;
@@ -218,11 +226,44 @@ export default async function proxy(request: NextRequest) {
             }
           );
         }
+      } else if (process.env.NODE_ENV === 'production') {
+        console.error('[Proxy] Redis unavailable — blocking order POST (fail-closed)');
+        return NextResponse.json(
+          {
+            success: false,
+            status: 'error',
+            message: 'ระบบไม่พร้อมรับคำสั่งซื้อชั่วคราว กรุณาลองใหม่ภายหลัง',
+          },
+          {
+            status: 503,
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              ...securityHeaders,
+            },
+          }
+        );
       } else {
-        console.warn('[Proxy] Redis client not configured, bypassing check (Fail-Open)');
+        console.warn('[Proxy] Redis client not configured, bypassing check (dev only)');
       }
     } catch (error) {
-      console.error('[Proxy] Redis lookup failed, bypassing check (Fail-Open):', error);
+      if (process.env.NODE_ENV === 'production') {
+        console.error('[Proxy] Redis lookup failed — blocking order POST (fail-closed):', error);
+        return NextResponse.json(
+          {
+            success: false,
+            status: 'error',
+            message: 'ระบบไม่พร้อมรับคำสั่งซื้อชั่วคราว กรุณาลองใหม่ภายหลัง',
+          },
+          {
+            status: 503,
+            headers: {
+              'Content-Type': 'application/json; charset=utf-8',
+              ...securityHeaders,
+            },
+          }
+        );
+      }
+      console.error('[Proxy] Redis lookup failed, bypassing check (dev only):', error);
     }
   }
 
@@ -263,7 +304,8 @@ export default async function proxy(request: NextRequest) {
     // Allow: fetch/XHR (mode=cors/same-origin/no-cors), server calls (no header)
     if (secFetchMode === 'navigate' || secFetchDest === 'document') {
       const isExternalRoute = EXTERNAL_API_ROUTES.some(route => pathname.startsWith(route));
-      if (!isExternalRoute) {
+      const isNavigableRoute = NAVIGABLE_API_ROUTES.some(route => pathname.startsWith(route));
+      if (!isExternalRoute && !isNavigableRoute) {
         return new NextResponse(
           JSON.stringify({ status: 'error', message: 'Direct API access is not allowed' }),
           {
@@ -344,8 +386,9 @@ export default async function proxy(request: NextRequest) {
   response.headers.set('X-Frame-Options', 'DENY');
   response.headers.set('X-XSS-Protection', '1; mode=block');
   
-  // Prevent caching of API responses (except image proxy which has its own cache headers)
-  if (pathname.startsWith('/api/') && !pathname.startsWith('/api/image/')) {
+  // Default no-store for API; cacheable routes set Cache-Control in route handlers
+  const isCacheableApi = CACHEABLE_API_PREFIXES.some(prefix => pathname.startsWith(prefix));
+  if (pathname.startsWith('/api/') && !isCacheableApi) {
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     response.headers.set('Pragma', 'no-cache');
     response.headers.set('Expires', '0');

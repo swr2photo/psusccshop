@@ -7,9 +7,7 @@ import ThemeRegistry from "../components/ThemeRegistry";
 import Script from "next/script";
 import { SITE_URL } from "@/lib/site";
 // Google Search Console — HTML tag (URL prefix). Override via GOOGLE_SITE_VERIFICATION in Vercel.
-const GOOGLE_SITE_VERIFICATION =
-  process.env.GOOGLE_SITE_VERIFICATION?.trim() ||
-  "rndia91Prh7p_rfkyVD8NN8h6EtfjrBe8qbvCLnW7m0";
+const GOOGLE_SITE_VERIFICATION = process.env.GOOGLE_SITE_VERIFICATION?.trim() || '';
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -22,7 +20,7 @@ const siteMetadata = {
     default: "SCC Shop - ร้านค้าออนไลน์ชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ มหาวิทยาลัยสงขลานครินทร์",
     template: "%s | SCC Shop",
   },
-  verification: { google: GOOGLE_SITE_VERIFICATION },
+  verification: GOOGLE_SITE_VERIFICATION ? { google: GOOGLE_SITE_VERIFICATION } : undefined,
   alternates: {
     canonical: SITE_URL,
   },
@@ -96,9 +94,10 @@ export function generateMetadata(): Metadata {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 5,
+  maximumScale: 1,
   minimumScale: 1,
-  userScalable: true,
+  userScalable: false,
+  interactiveWidget: "resizes-content",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#f8fafc" },
     { media: "(prefers-color-scheme: dark)", color: "#040818" },
@@ -129,7 +128,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="SCC Shop" />
         <meta name="application-name" content="SCC Shop" />
-        <meta name="google-site-verification" content={GOOGLE_SITE_VERIFICATION} />
+        {GOOGLE_SITE_VERIFICATION ? (
+          <meta name="google-site-verification" content={GOOGLE_SITE_VERIFICATION} />
+        ) : null}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{

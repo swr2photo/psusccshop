@@ -2,7 +2,7 @@
 // Background sheet sync utility - auto-syncs orders to Google Sheets
 
 import { getSheets } from '@/lib/google';
-import { getJson, listKeys, putJson } from '@/lib/filebase';
+import { getJson, putJson, getAllOrders } from '@/lib/filebase';
 
 const ORDERS_SHEET_TITLE = 'Orders';
 const VENDOR_SHEET_TITLE = 'Orders Vendor';
@@ -301,15 +301,12 @@ async function performSync(baseUrl?: string): Promise<void> {
   await ensureSheet(sheets, sheetId, FACTORY_EXPORT_TITLE);
 
   // Get all orders
-  const keys = await listKeys('orders/');
-  const orders = (await Promise.all(keys.map(async (k) => {
-    const data = await getJson<any>(k);
-    return data ? { ...data, _key: k } : null;
-  }))).filter(Boolean) as any[];
+  const { orders } = await getAllOrders({ limit: 10000 });
+  const orderList = orders.map((data: any) => ({ ...data, _key: `orders/${data.ref}.json` }));
 
   // Sync main orders sheet
   const header = ['Ref', 'Date', 'Name', 'Email', 'Phone', 'Amount', 'Status', 'Address', 'Items (summary)', 'Notes', 'Slip', 'Slip Date', 'Slip Verified', 'Slip Link'];
-  const values = [header, ...buildRows(orders, url)];
+  const values = [header, ...buildRows(orderList, url)];
 
   await sheets.spreadsheets.values.update({
     spreadsheetId: sheetId,
@@ -319,7 +316,7 @@ async function performSync(baseUrl?: string): Promise<void> {
   });
 
   // Factory export tab - ONLY PAID orders (important for production tracking)
-  const paidOrders = orders.filter((o) => o?.status === 'PAID');
+  const paidOrders = orderList.filter((o) => o?.status === 'PAID');
   const factoryValues = buildFactoryExport(paidOrders);
   
   // Clear the factory sheet first to avoid stale data when orders get cancelled

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getJson, putJson } from '@/lib/filebase';
 import crypto from 'crypto';
-import { requireAuth, isResourceOwner, isAdminEmail } from '@/lib/auth';
+import { requireAuth, isResourceOwner, isAdminEmailAsync } from '@/lib/auth';
 
 const cartKey = (email: string) => `carts/${crypto.createHash('sha256').update(email.toLowerCase()).digest('hex')}.json`;
 
@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
 
   // ตรวจสอบว่าเป็นเจ้าของหรือเป็น admin
   const currentEmail = authResult.email;
-  if (!isResourceOwner(email, currentEmail) && !isAdminEmail(currentEmail)) {
+  if (!isResourceOwner(email, currentEmail) && !(await isAdminEmailAsync(currentEmail))) {
     return NextResponse.json({ status: 'error', message: 'ไม่มีสิทธิ์เข้าถึงข้อมูลนี้' }, { status: 403 });
   }
 
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
 
     // ตรวจสอบว่าเป็นเจ้าของหรือเป็น admin
     const currentEmail = authResult.email;
-    if (!isResourceOwner(email, currentEmail) && !isAdminEmail(currentEmail)) {
+    if (!isResourceOwner(email, currentEmail) && !(await isAdminEmailAsync(currentEmail))) {
       return NextResponse.json({ status: 'error', message: 'ไม่มีสิทธิ์แก้ไขข้อมูลนี้' }, { status: 403 });
     }
 

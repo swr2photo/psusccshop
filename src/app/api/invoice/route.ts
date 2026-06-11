@@ -1,11 +1,16 @@
 // API route for generating invoice/receipt HTML (can be printed/saved as PDF)
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth, isResourceOwner, isAdminEmailAsync } from '@/lib/auth';
+import { API_CACHE } from '@/lib/api-helpers';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 // GET /api/invoice?ref=xxx&lang=th
 export async function GET(request: NextRequest) {
+  const authResult = await requireAuth();
+  if (authResult instanceof NextResponse) return authResult;
+
   try {
     const ref = request.nextUrl.searchParams.get('ref');
     const lang = (request.nextUrl.searchParams.get('lang') || 'th') as 'th' | 'en';
@@ -33,6 +38,12 @@ export async function GET(request: NextRequest) {
 
     if (!order) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+    }
+
+    const orderEmail = order.customerEmail || order.customer_email || order.email;
+    const userEmail = authResult.email;
+    if (!(await isAdminEmailAsync(userEmail)) && !isResourceOwner(orderEmail, userEmail)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const labels = lang === 'en' ? {
@@ -190,6 +201,7 @@ export async function GET(request: NextRequest) {
     return new NextResponse(html, {
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': API_CACHE.private,
       },
     });
   } catch (error: any) {

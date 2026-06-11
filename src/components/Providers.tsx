@@ -25,6 +25,7 @@ const NotificationPrompt = lazy(() => import('./NotificationPrompt'));
 const LiveStreamPopup = lazy(() => import('./LiveStreamPopup'));
 import { SWRProvider } from '@/hooks/useSWRConfig';
 import { TanStackQueryProvider } from '@/hooks/useTanStackQuery';
+import { LiveStreamProvider } from '@/context/LiveStreamProvider';
 import { useThemeStore } from '@/store/themeStore';
 import { getTranslations } from '@/lib/i18n/translations';
 import { useLanguageStore } from '@/store/languageStore';
@@ -455,6 +456,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       <SessionProvider>
         <TanStackQueryProvider>
           <SWRProvider>
+            <LiveStreamProvider>
             <ThemeProvider theme={activeTheme}>
               <CssBaseline />
               <NotificationProvider>
@@ -467,6 +469,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
                 </Suspense>
               </NotificationProvider>
             </ThemeProvider>
+            </LiveStreamProvider>
           </SWRProvider>
         </TanStackQueryProvider>
       </SessionProvider>

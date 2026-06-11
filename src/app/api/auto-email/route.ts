@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { sendEmail, getOrderRecipientEmail } from '@/lib/email';
+import { requireInternalSecret } from '@/lib/api-helpers';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -123,8 +124,11 @@ ${trackingNumber ? `📦 เลขพัสดุ: ${trackingNumber}` : ''}
   };
 }
 
-// POST /api/auto-email - Send automated email based on event type
+// POST /api/auto-email - Send automated email based on event type (internal only)
 export async function POST(request: NextRequest) {
+  const authError = requireInternalSecret(request);
+  if (authError) return authError;
+
   try {
     const body = await request.json();
     const { type, order, trackingNumber, lang = 'th' } = body;

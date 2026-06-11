@@ -30,6 +30,7 @@ import { usePushNotification } from '@/hooks/usePushNotification';
 import { useRealtimeChat } from '@/hooks/useRealtimeChat';
 import { useTranslation } from '@/hooks/useTranslation';
 import { chatMessagesChanged, getDbTypingFromSession } from '@/lib/support-chat-typing';
+import { fetchChatSync, mergeChatMessages, getChatPollIntervalMs } from '@/lib/support-chat-sync';
 
 // ชื่อแอดมินเริ่มต้น (ดึงจากตั้งค่าแชท)
 const DEFAULT_ADMIN_NAME = 'ทีมงาน PSU SCC';
@@ -114,6 +115,8 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
   const [pushBannerDismissed, setPushBannerDismissed] = useState(false);
   const [adminDisplayName, setAdminDisplayName] = useState(DEFAULT_ADMIN_NAME);
   const [fallbackTyping, setFallbackTyping] = useState(false);
+  const chatEtagRef = useRef<string | null>(null);
+  const lastMessageAtRef = useRef<string | null>(null);
   const displayAdminName = adminDisplayName === DEFAULT_ADMIN_NAME ? t.supportChat.adminName : adminDisplayName;
   
   // === Supabase Realtime: live messages, typing, read receipts ===
@@ -334,21 +337,23 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
     }
   }, [chat?.id, chat?.status, rtSendTyping, session?.user?.name, connectionState]);
 
-  // Poll typing status (API/DB fallback — keeps working when Realtime broadcast is down)
+  // Poll typing status (API/DB fallback — skip when Realtime broadcast is active)
   useEffect(() => {
     if (!open || !chat?.id || showHistory || showNewChat || showRating) return;
     if (chat.status !== 'active' && chat.status !== 'pending') return;
+    if (connectionState === 'connected') return;
 
     const pollTyping = () => {
+      if (document.visibilityState === 'hidden') return;
       fetch(`/api/support-chat/${chat.id}/typing`)
         .then((res) => res.json())
         .then((data) => setFallbackTyping(data.isTyping || false))
         .catch(() => setFallbackTyping(false));
     };
     pollTyping();
-    const interval = setInterval(pollTyping, 2000);
+    const interval = setInterval(pollTyping, getChatPollIntervalMs(connectionState, 'typing'));
     return () => clearInterval(interval);
-  }, [open, chat?.id, chat?.status, showHistory, showNewChat, showRating]);
+  }, [open, chat?.id, chat?.status, showHistory, showNewChat, showRating, connectionState]);
 
   // === Realtime replaces polling ===
   // Instead of polling every 5s, Supabase Realtime pushes changes instantly.
@@ -362,37 +367,65 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
     }
   }, [open, chat?.id, showHistory, showNewChat, showRating, chat?.status, broadcastRead]);
 
-  // Message polling: always run as safety net — Realtime channel can show
-  // "connected" while postgres_changes INSERT events are not delivered (publication/RLS).
+  useEffect(() => {
+    lastMessageAtRef.current = chat?.messages?.[chat.messages.length - 1]?.created_at ?? null;
+  }, [chat?.messages]);
+
+  // Message polling safety net — delta sync + ETag when Realtime may miss events
   useEffect(() => {
     if (!open || !chat?.id || showHistory || showNewChat || showRating) return;
     if (chat.status !== 'active' && chat.status !== 'pending') return;
 
     let cancelled = false;
-    const refreshMessages = async () => {
-      if (cancelled) return;
-      try {
-        const res = await fetch(`/api/support-chat/${chat.id}`);
-        const data = await res.json();
-        if (cancelled || !data.chat) return;
+    const chatId = chat.id;
 
-        const incoming = (data.chat.messages || []) as ChatMessage[];
+    const refreshMessages = async () => {
+      if (cancelled || document.visibilityState === 'hidden') return;
+      try {
+        const result = await fetchChatSync<ChatWithMessages>(chatId, {
+          etag: chatEtagRef.current,
+          since: lastMessageAtRef.current,
+        });
+
+        if (cancelled || result.kind === 'unchanged') return;
+        chatEtagRef.current = result.etag;
+
+        if (result.kind === 'delta') {
+          setChat((prev) => {
+            if (!prev || prev.id !== chatId) return prev;
+            const merged = mergeChatMessages(prev.messages, result.chat.messages || []);
+            const changed =
+              chatMessagesChanged(prev.messages, merged) ||
+              result.chat.status !== prev.status;
+            if (!changed) return prev;
+            setRealtimeMessages(merged);
+            lastMessageAtRef.current = merged[merged.length - 1]?.created_at ?? lastMessageAtRef.current;
+            return { ...prev, ...result.chat, messages: merged };
+          });
+          return;
+        }
+
+        const incoming = (result.chat.messages || []) as ChatMessage[];
         setChat((prev) => {
-          if (!prev) return prev;
+          if (!prev || prev.id !== chatId) return prev;
           const changed =
             chatMessagesChanged(prev.messages, incoming) ||
-            data.chat.status !== prev.status;
+            result.chat.status !== prev.status;
           if (!changed) return prev;
           setRealtimeMessages(incoming);
-          return { ...prev, ...data.chat, messages: incoming };
+          lastMessageAtRef.current = incoming[incoming.length - 1]?.created_at ?? null;
+          return { ...prev, ...result.chat, messages: incoming };
         });
       } catch {}
     };
 
     refreshMessages();
-    const interval = setInterval(refreshMessages, 3000);
+    const interval = setInterval(
+      refreshMessages,
+      getChatPollIntervalMs(connectionState, 'messages')
+    );
     return () => { cancelled = true; clearInterval(interval); };
-  }, [open, chat?.id, chat?.status, showHistory, showNewChat, showRating, setRealtimeMessages]);
+  }, [open, chat?.id, chat?.status, showHistory, showNewChat, showRating, setRealtimeMessages, connectionState]);
 
   // Refetch when user returns to the tab (missed events while backgrounded)
   useEffect(() => {
@@ -2395,11 +2428,13 @@ ${getStatusLabel(order.status)}
                     
                     {/* Input Area */}
                     <Box
+                      className="mobile-chat-input-bar"
                       sx={{
                         p: 1.5,
                         display: 'flex',
                         alignItems: 'center',
                         gap: 1,
+                        flexShrink: 0,
                       }}
                     >
                     <IconButton
@@ -2477,7 +2512,7 @@ ${getStatusLabel(order.status)}
                         },
                         '& .MuiInputBase-input': {
                           color: 'var(--foreground)',
-                          fontSize: '0.9rem',
+                          fontSize: '16px',
                           '&::placeholder': { color: 'var(--text-muted)', opacity: 1 },
                         },
                       }}

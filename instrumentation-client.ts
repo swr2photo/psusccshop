@@ -1,8 +1,8 @@
 import * as Sentry from '@sentry/nextjs';
 import {
-  sentryEnvironment,
-  sentryRelease,
+  sentryProfilingOptions,
   sentryReplaySessionSampleRate,
+  sentrySharedInitOptions,
   sentryTracesSampler,
 } from './src/lib/sentry-options';
 
@@ -11,19 +11,18 @@ const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
 if (dsn) {
   Sentry.init({
     dsn,
-    environment: sentryEnvironment,
-    release: sentryRelease,
-    sendDefaultPii: true,
+    ...sentrySharedInitOptions,
+    ...sentryProfilingOptions,
     tracesSampler: sentryTracesSampler,
     replaysSessionSampleRate: sentryReplaySessionSampleRate,
     replaysOnErrorSampleRate: 1.0,
-    enableLogs: true,
     tracePropagationTargets: ['localhost', /^\//],
     integrations: [
       Sentry.browserTracingIntegration({
         shouldCreateSpanForRequest: (url) =>
           !url.includes('/api/live') && !url.includes('/health'),
       }),
+      Sentry.browserProfilingIntegration(),
       Sentry.replayIntegration({
         maskAllText: true,
         maskAllInputs: true,

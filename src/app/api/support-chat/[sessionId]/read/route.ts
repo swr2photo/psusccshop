@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions, isAdminEmail, isResourceOwner } from '@/lib/auth';
+import { authOptions, isAdminEmailAsync, isResourceOwner } from '@/lib/auth';
 import { markMessagesAsRead, getChatSession } from '@/lib/support-chat';
 
 export const runtime = 'nodejs';
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     // - If user is the chat owner (customer_email), they're reading as customer
     // - If user is admin AND not the owner, they're reading as admin
     const isOwner = isResourceOwner(chat.customer_email, session.user.email);
-    const isAdmin = isAdminEmail(session.user.email);
+    const isAdmin = await isAdminEmailAsync(session.user.email);
     
     // Owner always reads as customer, even if they're also an admin
     const reader = isOwner ? 'customer' : (isAdmin ? 'admin' : 'customer');

@@ -8,6 +8,7 @@ import { withCronMonitor } from '@/lib/sentry-cron';
 import { orders } from '@/db/schema';
 import { eq, and, desc, isNotNull } from 'drizzle-orm';
 import { trackShipment, TrackingStatus, ShippingProvider } from '@/lib/shipping';
+import { verifyCronAuth } from '@/lib/cron-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -21,20 +22,9 @@ const TRACKING_TO_ORDER_STATUS: Partial<Record<TrackingStatus, string>> = {
   failed: 'SHIPPED',
 };
 
-function verifyCronSecret(request: NextRequest): boolean {
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) return false;
-  const authHeader = request.headers.get('authorization');
-  if (authHeader === `Bearer ${cronSecret}`) return true;
-  const secretParam = request.nextUrl.searchParams.get('secret');
-  if (secretParam === cronSecret) return true;
-  return false;
-}
-
 export async function GET(request: NextRequest) {
-  if (!verifyCronSecret(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const authError = verifyCronAuth(request);
+  if (authError) return authError;
 
   return withCronMonitor(
     { monitorSlug: 'update-tracking', schedule: '0 */2 * * *', maxRuntime: 15 },

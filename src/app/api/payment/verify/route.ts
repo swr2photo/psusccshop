@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { listKeys, getJson, putJson } from '@/lib/filebase';
+import { getJson, putJson } from '@/lib/filebase';
+import { resolveOrderByRef, updateOrderByRef } from '@/lib/order-lookup';
 import { calculateOrderTotal } from '@/lib/payment-utils';
-import { requireAuth, isResourceOwner, isAdminEmail, ADMIN_EMAILS } from '@/lib/auth';
+import { requireAuth, isResourceOwner, isAdminEmailAsync, ADMIN_EMAILS } from '@/lib/auth';
 import { triggerSheetSync } from '@/lib/sheet-sync';
 import { sendPaymentReceivedEmail } from '@/lib/email';
 import { sendPushNotification } from '@/lib/push-notification';
+import { rateLimitOrNull } from '@/lib/api-helpers';
+import { RATE_LIMITS } from '@/lib/rate-limit';
 import crypto from 'crypto';
 
 // Helper to save user log server-side
@@ -231,21 +234,19 @@ const checkSlipWithSlipOK = async (
   }
 };
 
-const findOrderKey = async (ref: string): Promise<string | null> => {
-  const keys = await listKeys('orders/');
-  return keys.find((k) => k.endsWith(`${ref}.json`)) || null;
-};
-
 const CONFIG_KEY = 'config/shop-settings.json';
 
 export async function POST(req: NextRequest) {
+  const rateLimited = rateLimitOrNull(req, RATE_LIMITS.payment);
+  if (rateLimited) return rateLimited;
+
   // ต้องเข้าสู่ระบบก่อน
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) {
     return authResult;
   }
   const currentUserEmail = authResult.email;
-  const isAdmin = isAdminEmail(currentUserEmail);
+  const isAdmin = await isAdminEmailAsync(currentUserEmail);
 
   try {
     // ตรวจสอบว่าระบบชำระเงินเปิดอยู่หรือไม่ (admin ข้ามได้)
@@ -265,14 +266,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: 'error', message: 'กรุณาอัพโหลดสลิปและระบุหมายเลขคำสั่งซื้อ' }, { status: 400 });
     }
 
-    const key = await findOrderKey(ref);
-    if (!key) {
-      return NextResponse.json({ status: 'error', message: 'ไม่พบคำสั่งซื้อนี้ในระบบ' }, { status: 404 });
-    }
-
-    const order = await getJson<any>(key);
+    const order = await resolveOrderByRef(ref);
     if (!order) {
-      return NextResponse.json({ status: 'error', message: 'ข้อมูลคำสั่งซื้อไม่ถูกต้อง' }, { status: 404 });
+      return NextResponse.json({ status: 'error', message: 'ไม่พบคำสั่งซื้อนี้ในระบบ' }, { status: 404 });
     }
 
     // ตรวจสอบว่าเป็นเจ้าของ order หรือเป็น admin
@@ -372,7 +368,7 @@ export async function POST(req: NextRequest) {
     };
 
     // บันทึก order ที่อัปเดตแล้ว
-    await putJson(key, updated);
+    await updateOrderByRef(ref, updated);
 
     // อัปเดต index สำหรับ user เพื่อให้ history เห็นสถานะใหม่ทันที
     const customerEmail = updated.customerEmail || updated.email;

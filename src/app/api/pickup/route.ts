@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getJson, putJson, listKeys, getOrderByRef, getAllOrders } from '@/lib/filebase';
+import { getJson, putJson, listKeys, getAllOrders } from '@/lib/filebase';
 import { db } from '@/lib/db';
 import { orders } from '@/db/schema';
 import { and, or, eq, ilike } from 'drizzle-orm';
-import { requireAuth, requireAdmin, requireAdminWithPermission, isAdminEmail } from '@/lib/auth';
+import { requireAuth, requireAdmin, requireAdminWithPermission, isAdminEmailAsync } from '@/lib/auth';
+import { getOrderByRef, updateOrderByRef } from '@/lib/order-lookup';
 import { sanitizeUtf8Input } from '@/lib/sanitize';
 import crypto from 'crypto';
 
@@ -87,7 +88,7 @@ export async function GET(req: NextRequest) {
   const ref = req.nextUrl.searchParams.get('ref');
   const search = req.nextUrl.searchParams.get('search');
   const shopId = req.nextUrl.searchParams.get('shopId');
-  const isAdmin = isAdminEmail(authResult.email);
+  const isAdmin = await isAdminEmailAsync(authResult.email);
 
   try {
     // Admin search by ref/name/email - use Supabase directly for speed
@@ -258,17 +259,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const keys = await listKeys('orders/');
-    const targetKey = keys.find(k => k.endsWith(`${ref}.json`));
-
-    if (!targetKey) {
-      return NextResponse.json(
-        { status: 'error', message: 'Order not found' },
-        { status: 404 }
-      );
-    }
-
-    const order = await getJson<any>(targetKey);
+    const order = await getOrderByRef(ref);
     if (!order) {
       return NextResponse.json(
         { status: 'error', message: 'Order not found' },
@@ -298,7 +289,7 @@ export async function POST(req: NextRequest) {
         },
       };
 
-      await putJson(targetKey, updatedOrder);
+      await updateOrderByRef(ref, updatedOrder);
       
       // Update user's index so they see the new status immediately
       const customerEmail = order.customerEmail || order.email;
@@ -348,7 +339,7 @@ export async function POST(req: NextRequest) {
         },
       };
 
-      await putJson(targetKey, updatedOrder);
+      await updateOrderByRef(ref, updatedOrder);
 
       // Log pickup cancel action
       const userAgent = req.headers.get('user-agent') || undefined;

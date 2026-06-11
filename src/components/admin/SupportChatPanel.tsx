@@ -64,6 +64,7 @@ import {
 
 import { ADMIN_THEME } from '@/lib/adminTheme';
 import { chatMessagesChanged, getDbTypingFromSession } from '@/lib/support-chat-typing';
+import { fetchChatSync, mergeChatMessages, getChatPollIntervalMs } from '@/lib/support-chat-sync';
 
 interface ChatSession {
   id: string;
@@ -147,6 +148,8 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const chatEtagRef = useRef<string | null>(null);
+  const lastMessageAtRef = useRef<string | null>(null);
   const prevMessageCountRef = useRef<number>(0);
   const isUserScrollingRef = useRef<boolean>(false);
   
@@ -303,7 +306,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
   // Sidebar list polling — slower when Realtime is healthy
   useEffect(() => {
     const isRealtimeUp = connectionState === 'connected' && listConnectionState === 'connected';
-    const pollInterval = isRealtimeUp ? 30000 : 5000;
+    const pollInterval = isRealtimeUp ? 60_000 : 8000;
 
     let cancelled = false;
     const poll = async () => {
@@ -316,31 +319,57 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     return () => { cancelled = true; clearInterval(interval); };
   }, [fetchChats, connectionState, listConnectionState]);
 
-  // Active chat message polling — always run (Realtime INSERT may not fire)
+  // Active chat message polling — delta sync + adaptive interval
   useEffect(() => {
     if (!selectedChat?.id) return;
     if (selectedChat.status !== 'active' && selectedChat.status !== 'pending') return;
 
+    lastMessageAtRef.current = selectedChat.messages?.[selectedChat.messages.length - 1]?.created_at ?? null;
+
     let cancelled = false;
     const chatId = selectedChat.id;
     const refreshMessages = async () => {
-      if (cancelled) return;
+      if (cancelled || document.visibilityState === 'hidden') return;
       try {
-        const res = await fetch('/api/support-chat/' + chatId);
-        const data = await res.json();
-        if (cancelled || !data.chat) return;
+        const result = await fetchChatSync<ChatWithMessages>(chatId, {
+          etag: chatEtagRef.current,
+          since: lastMessageAtRef.current,
+        });
+        if (cancelled || result.kind === 'unchanged') return;
+        chatEtagRef.current = result.etag;
 
-        const incoming = (data.chat.messages || []) as ChatMessage[];
+        if (result.kind === 'delta') {
+          let didUpdate = false;
+          setSelectedChat((prev) => {
+            if (!prev || prev.id !== chatId) return prev;
+            const merged = mergeChatMessages(prev.messages, result.chat.messages || []);
+            const changed =
+              chatMessagesChanged(prev.messages, merged) ||
+              result.chat.status !== prev.status;
+            if (!changed) return prev;
+            didUpdate = true;
+            setRealtimeMessages(merged);
+            lastMessageAtRef.current = merged[merged.length - 1]?.created_at ?? lastMessageAtRef.current;
+            return { ...prev, ...result.chat, messages: merged };
+          });
+          if (didUpdate) {
+            fetch('/api/support-chat/' + chatId + '/read', { method: 'POST' }).catch(() => {});
+          }
+          return;
+        }
+
+        const incoming = (result.chat.messages || []) as ChatMessage[];
         let didUpdate = false;
         setSelectedChat((prev) => {
           if (!prev || prev.id !== chatId) return prev;
           const changed =
             chatMessagesChanged(prev.messages, incoming) ||
-            data.chat.status !== prev.status;
+            result.chat.status !== prev.status;
           if (!changed) return prev;
           didUpdate = true;
           setRealtimeMessages(incoming);
-          return { ...data.chat, messages: incoming };
+          lastMessageAtRef.current = incoming[incoming.length - 1]?.created_at ?? null;
+          return { ...result.chat, messages: incoming };
         });
         if (didUpdate) {
           fetch('/api/support-chat/' + chatId + '/read', { method: 'POST' }).catch(() => {});
@@ -349,9 +378,12 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     };
 
     refreshMessages();
-    const interval = setInterval(refreshMessages, 3000);
+    const interval = setInterval(
+      refreshMessages,
+      getChatPollIntervalMs(connectionState, 'messages')
+    );
     return () => { cancelled = true; clearInterval(interval); };
-  }, [selectedChat?.id, selectedChat?.status, setRealtimeMessages]);
+  }, [selectedChat?.id, selectedChat?.status, setRealtimeMessages, connectionState]);
 
   // Refetch active chat when admin returns to the tab
   useEffect(() => {
@@ -373,21 +405,26 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [selectedChat?.id, setRealtimeMessages]);
 
-  // Poll typing status every 2s while a chat is open (works even when Realtime broadcast is down)
+  // Poll typing status (skip when Realtime broadcast is active)
   useEffect(() => {
     if (!selectedChat?.id) return;
     if (selectedChat.status !== 'active' && selectedChat.status !== 'pending') return;
+    if (connectionState === 'connected') return;
 
     const pollTyping = () => {
+      if (document.visibilityState === 'hidden') return;
       fetch('/api/support-chat/' + selectedChat.id + '/typing')
         .then((res) => res.json())
         .then((data) => setFallbackTyping(data.isTyping || false))
         .catch(() => setFallbackTyping(false));
     };
     pollTyping();
-    const interval = setInterval(pollTyping, 2000);
+    const interval = setInterval(
+      pollTyping,
+      getChatPollIntervalMs(connectionState, 'typing')
+    );
     return () => clearInterval(interval);
-  }, [selectedChat?.id, selectedChat?.status]);
+  }, [selectedChat?.id, selectedChat?.status, connectionState]);
 
   useEffect(() => {
     if (selectedChat?.messages) {

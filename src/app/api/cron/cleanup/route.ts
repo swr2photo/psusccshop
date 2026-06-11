@@ -8,6 +8,7 @@ import { withCronMonitor } from '@/lib/sentry-cron';
 import { cleanupExpiredRateLimits } from '@/lib/rate-limit-supabase';
 import { autoRotateExpiringKeys, cleanupOldKeys } from '@/lib/api-key-rotation';
 import { cleanupOldChatImages } from '@/lib/support-chat';
+import { verifyCronAuth } from '@/lib/cron-auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -20,29 +21,8 @@ if (!CRON_SECRET) {
 }
 
 export async function GET(req: NextRequest) {
-  // ตรวจสอบว่าตั้งค่า CRON_SECRET แล้ว
-  if (!CRON_SECRET) {
-    console.error('[Cron] CRON_SECRET not configured');
-    return NextResponse.json(
-      { status: 'error', message: 'Server configuration error' },
-      { status: 500 }
-    );
-  }
-
-  // ตรวจสอบ authorization
-  const authHeader = req.headers.get('authorization');
-  const cronSecretFromHeader = authHeader?.replace('Bearer ', '');
-  
-  // รองรับทั้ง Vercel Cron และ manual call ด้วย secret
-  const isVercelCron = req.headers.get('x-vercel-cron') === '1';
-  const isValidSecret = cronSecretFromHeader === CRON_SECRET;
-  
-  if (!isVercelCron && !isValidSecret) {
-    return NextResponse.json(
-      { status: 'error', message: 'Unauthorized' },
-      { status: 401 }
-    );
-  }
+  const authError = verifyCronAuth(req);
+  if (authError) return authError;
 
   return withCronMonitor(
     { monitorSlug: 'cleanup', schedule: '0 */6 * * *', maxRuntime: 15 },

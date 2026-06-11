@@ -111,7 +111,8 @@ const getAdminPermissions = async (email: string): Promise<AdminPermissions> => 
 };
 
 /**
- * Check if an email belongs to an admin (static list only - for sync checks)
+ * Check if an email belongs to an admin (static env list only).
+ * @deprecated Prefer isAdminEmailAsync() for authorization — includes config + shop admins.
  */
 export const isAdminEmail = (email: string | null | undefined): boolean => {
   if (!email) return false;

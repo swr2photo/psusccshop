@@ -342,6 +342,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
           body: JSON.stringify({ 
             message: msgToSend,
             conversationHistory: historyForEdit,
+            conversationId: getSessionId(),
           }),
           signal: editController.signal,
         });
@@ -404,6 +405,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
         body: JSON.stringify({ 
           message: contextMessage,
           conversationHistory: getConversationHistory(),
+          conversationId: getSessionId(),
         }),
         signal: sendController.signal,
       });
@@ -541,6 +543,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
           message: contextMessage,
           conversationHistory: getConversationHistory(),
           image: imageToSend,
+          conversationId: getSessionId(),
         }),
       });
       const data = await res.json();
@@ -784,9 +787,12 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
         fullScreen={isFullscreen}
         PaperProps={{
           sx: {
+            display: 'flex',
+            flexDirection: 'column',
             borderRadius: isFullscreen ? 0 : 2.5,
             overflow: 'hidden',
-            maxHeight: isFullscreen ? '100vh' : '85vh',
+            height: isFullscreen ? '100dvh' : { xs: 'min(85dvh, 100%)', sm: 'auto' },
+            maxHeight: isFullscreen ? '100dvh' : { xs: '85dvh', sm: '85vh' },
             background: isDark
               ? 'linear-gradient(180deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.03) 100%)'
               : 'linear-gradient(180deg, #ffffff 0%, #f5f5f7 100%)',
@@ -805,6 +811,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
             justifyContent: 'space-between',
             px: 2.5,
             py: 2,
+            flexShrink: 0,
             background: isDark
               ? 'linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 100%)'
               : 'linear-gradient(180deg, #f5f5f7 0%, #ffffff 100%)',
@@ -959,8 +966,14 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
             background: isDark
               ? 'linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(29,29,31,0.9) 100%)'
               : 'linear-gradient(180deg, #f5f5f7 0%, #f5f5f7 100%)',
-            minHeight: isFullscreen ? 'calc(100vh - 160px)' : 320,
-            maxHeight: isFullscreen ? 'calc(100vh - 160px)' : 380,
+            flex: 1,
+            minHeight: 0,
+            ...(isFullscreen
+              ? {}
+              : {
+                  minHeight: { xs: 200, sm: 320 },
+                  maxHeight: { xs: 'none', sm: 380 },
+                }),
             overflowY: 'auto',
             px: 2,
             py: 2.5,
@@ -1662,10 +1675,11 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
         )}
 
         {/* Input Area */}
-        <Box sx={{ 
+        <Box className="mobile-chat-input-bar" sx={{ 
           px: 1.5,
           pt: (replyToMessage || editingMessage) ? 0.5 : 1,
           pb: 1.25,
+          flexShrink: 0,
           background: isDark ? 'rgba(255,255,255,0.05)' : '#f5f5f7',
           borderTop: (replyToMessage || editingMessage) ? 'none' : `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'}`,
         }}>
@@ -1780,6 +1794,11 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                 placeholder={editingMessage ? t.chatbot.editPlaceholder : uploadedImage ? t.chatbot.imagePlaceholder : t.chatbot.defaultPlaceholder}
                 value={input}
                 onChange={e => setInput(e.target.value)}
+                onFocus={() => {
+                  requestAnimationFrame(() => {
+                    inputRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                  });
+                }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey && !loading) {
                     e.preventDefault();
@@ -1792,7 +1811,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
                   '& .MuiOutlinedInput-root': {
                     background: 'transparent',
                     color: isDark ? 'rgba(255,255,255,0.95)' : 'rgba(0,0,0,0.87)',
-                    fontSize: 14,
+                    fontSize: 16,
                     '& fieldset': { 
                       border: 'none',
                     },

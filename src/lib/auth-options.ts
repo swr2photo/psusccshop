@@ -185,7 +185,9 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
     async signIn({ user, account }) {
-      console.log("[NextAuth] Sign in attempt:", { email: user.email, provider: account?.provider });
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[NextAuth] Sign in attempt:', { provider: account?.provider });
+      }
       return true;
     },
     async redirect({ url, baseUrl }) {

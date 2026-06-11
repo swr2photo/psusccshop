@@ -77,8 +77,8 @@ export function SWRProvider({ children }: SWRProviderProps) {
         revalidateOnReconnect: true,
         revalidateIfStale: true,
         
-        // Performance: increase dedup interval (prevent duplicate requests within 5s)
-        dedupingInterval: 5000,
+        // Performance: increase dedup interval (prevent duplicate requests within 10s)
+        dedupingInterval: 10000,
         
         // Performance: throttle focus revalidation (min 10s between focus events)
         focusThrottleInterval: 10000,

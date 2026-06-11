@@ -3,10 +3,11 @@
 // Migrated from Prisma to Drizzle for all database queries
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { Redis } from '@upstash/redis';
+import { getRedisClient } from './redis';
 import { db } from './db';
 import { orders, config, carts, profiles, emailLogs, userLogs, dataRequests, keyValueStore, adminPermissions, securityAuditLog } from '../db/schema';
 import { eq, lt, gt, and, desc, inArray, like, or, count } from 'drizzle-orm';
+import { getCached, invalidateCacheKey, CACHE_TTL } from './server-cache';
 
 // ==================== CONFIGURATION ====================
 
@@ -172,8 +173,11 @@ export async function getJson<T = any>(key: string): Promise<T | null> {
     
     if (key.startsWith('config/')) {
       const configKey = key.replace('config/', '').replace('.json', '');
-      const data = await db.select().from(config).where(eq(config.key, configKey)).limit(1);
-      return (data[0]?.value as T) || null;
+      const cacheKey = `json:config:${configKey}`;
+      return getCached(cacheKey, CACHE_TTL.config, async () => {
+        const data = await db.select().from(config).where(eq(config.key, configKey)).limit(1);
+        return (data[0]?.value as T) || null;
+      });
     }
     
     if (key.startsWith('carts/')) {
@@ -247,6 +251,7 @@ export async function putJson(key: string, data: any): Promise<void> {
           target: config.key,
           set: { value: data, updatedAt: new Date() },
         });
+      invalidateCacheKey(`json:config:${configKey}`);
       // Bump the lightweight realtime signal row so clients refetch the
       // sanitized config immediately (the full row is too large / unsafe
       // to broadcast via postgres_changes).
@@ -771,26 +776,7 @@ export async function updateShopConfig(configData: any): Promise<void> {
   return putJson('config/shop-settings.json', configData);
 }
 
-let _redis: Redis | null = null;
-
-/**
- * Lazy initializer for Upstash Redis client.
- * Returns null if Redis credentials are missing or set to placeholder values.
- */
-export function getRedisClient(): Redis | null {
-  if (_redis) return _redis;
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token || url.includes('placeholder') || token.includes('placeholder')) {
-    console.warn('[Redis] Upstash Redis credentials not configured or placeholder used');
-    return null;
-  }
-  _redis = new Redis({
-    url,
-    token,
-  });
-  return _redis;
-}
+export { getRedisClient } from './redis';
 
 /**
  * Sync the isOpen status directly to Upstash Redis cache key 'is_order_open'.

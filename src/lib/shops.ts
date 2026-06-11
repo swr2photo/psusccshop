@@ -5,6 +5,7 @@ import { db } from './db';
 import { shops, shopAdmins, orders } from '../db/schema';
 import { eq, and, desc, inArray, count, or, like } from 'drizzle-orm';
 import { Product, ShopConfig } from './config';
+import { getCached, invalidateCacheKey, CACHE_TTL } from './server-cache';
 
 // ==================== TYPES ====================
 
@@ -312,20 +313,28 @@ export async function listActiveShops(): Promise<ShopSummary[]> {
 }
 
 /** Active sub-shops with at least one active product — for main storefront catalog */
+export const PUBLIC_SHOP_CATALOG_CACHE_KEY = 'shops:public-catalog';
+
+export function invalidatePublicShopCatalogCache() {
+  invalidateCacheKey(PUBLIC_SHOP_CATALOG_CACHE_KEY);
+}
+
 export async function listActivePublicShopCatalog() {
-  try {
-    const data = await db.select()
-      .from(shops)
-      .where(eq(shops.isActive, true))
-      .orderBy(shops.sortOrder, shops.name);
-    return data
-      .map(dbToShop)
-      .filter((shop: Shop) => (shop.products || []).some((p: { isActive?: boolean }) => p.isActive !== false))
-      .map(toPublicShopData);
-  } catch (error: any) {
-    console.error('[shops] listActivePublicShopCatalog error:', error.message);
-    return [];
-  }
+  return getCached(PUBLIC_SHOP_CATALOG_CACHE_KEY, CACHE_TTL.catalog, async () => {
+    try {
+      const data = await db.select()
+        .from(shops)
+        .where(eq(shops.isActive, true))
+        .orderBy(shops.sortOrder, shops.name);
+      return data
+        .map(dbToShop)
+        .filter((shop: Shop) => (shop.products || []).some((p: { isActive?: boolean }) => p.isActive !== false))
+        .map(toPublicShopData);
+    } catch (error: any) {
+      console.error('[shops] listActivePublicShopCatalog error:', error.message);
+      return [];
+    }
+  });
 }
 
 export async function getShopBySlug(slug: string): Promise<Shop | null> {
@@ -366,6 +375,7 @@ export async function createShop(input: {
       .returning();
     
     await addShopAdmin(data[0].id, input.ownerEmail, 'owner', ALL_SHOP_ADMIN_PERMISSIONS, input.ownerEmail);
+    invalidatePublicShopCatalogCache();
     return dbToShop(data[0]);
   } catch (error: any) {
     console.error('[shops] createShop error:', error.message);
@@ -415,6 +425,7 @@ export async function updateShop(id: string, updates: Partial<{
       .set(dbUpdates)
       .where(eq(shops.id, id))
       .returning();
+    invalidatePublicShopCatalogCache();
     return dbToShop(data[0]);
   } catch (error: any) {
     console.error('[shops] updateShop error:', error.message);
@@ -425,6 +436,7 @@ export async function updateShop(id: string, updates: Partial<{
 export async function deleteShop(id: string): Promise<boolean> {
   try {
     await db.delete(shops).where(eq(shops.id, id));
+    invalidatePublicShopCatalogCache();
     return true;
   } catch (error: any) {
     console.error('[shops] deleteShop error:', error.message);

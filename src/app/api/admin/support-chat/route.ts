@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions, isAdminEmail } from '@/lib/auth';
+import { authOptions, isAdminEmailAsync } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { orders } from '@/db/schema';
 import { and, eq, ne } from 'drizzle-orm';
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json('Unauthorized', { status: 401 });
     }
     
-    if (!isAdminEmail(session.user.email)) {
+    if (!(await isAdminEmailAsync(session.user.email))) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
     

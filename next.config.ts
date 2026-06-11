@@ -132,6 +132,11 @@ const nextConfig: NextConfig = {
           key: 'X-DNS-Prefetch-Control',
           value: 'off',
         },
+        // Required for Sentry browser profiling (JS self-profiling API)
+        {
+          key: 'Document-Policy',
+          value: 'js-profiling',
+        },
         // Cross-Origin Embedder Policy
         {
           key: 'Cross-Origin-Embedder-Policy',

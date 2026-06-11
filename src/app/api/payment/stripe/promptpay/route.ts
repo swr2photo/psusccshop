@@ -13,7 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { orders, paymentTransactions } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
-import { requireAuth, isResourceOwner, isAdminEmail } from '@/lib/auth';
+import { requireAuth, isResourceOwner, isAdminEmailAsync } from '@/lib/auth';
 import { createStripePaymentIntent } from '@/lib/payment';
 import { sanitizeUtf8Input } from '@/lib/sanitize';
 
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Only the order owner (or an admin) can create a payment for it
-    if (!isResourceOwner(order.customerEmail, userEmail) && !isAdminEmail(userEmail)) {
+    if (!isResourceOwner(order.customerEmail, userEmail) && !(await isAdminEmailAsync(userEmail))) {
       return NextResponse.json(
         { status: 'error', message: 'ไม่มีสิทธิ์ชำระเงินสำหรับคำสั่งซื้อนี้' },
         { status: 403 }
@@ -157,7 +157,7 @@ export async function GET(req: NextRequest) {
     if (!order) {
       return NextResponse.json({ status: 'error', message: 'order not found' }, { status: 404 });
     }
-    if (!isResourceOwner(order.customerEmail, userEmail) && !isAdminEmail(userEmail)) {
+    if (!isResourceOwner(order.customerEmail, userEmail) && !(await isAdminEmailAsync(userEmail))) {
       return NextResponse.json({ status: 'error', message: 'forbidden' }, { status: 403 });
     }
 

@@ -4,6 +4,8 @@ import { db } from '@/lib/db';
 import { stockAlerts } from '@/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { createHash } from 'crypto';
+import { requireAuth } from '@/lib/auth';
+import { rateLimitOrNull } from '@/lib/api-helpers';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -14,15 +16,21 @@ function hashEmail(email: string): string {
 
 // POST /api/stock-alert - Register for back-in-stock alert
 export async function POST(request: NextRequest) {
+  const rateLimited = rateLimitOrNull(request, { maxRequests: 10, windowSeconds: 60, prefix: 'stock-alert' });
+  if (rateLimited) return rateLimited;
+
+  const authResult = await requireAuth();
+  if (authResult instanceof NextResponse) return authResult;
+
   try {
     const body = await request.json();
-    const { productId, email, size } = body;
+    const { productId, size } = body;
 
-    if (!productId || !email) {
+    if (!productId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const emailHash = hashEmail(email);
+    const emailHash = hashEmail(authResult.email);
     const sizeVal = size || null;
 
     // Upsert stock alert
@@ -71,15 +79,18 @@ export async function POST(request: NextRequest) {
 
 // DELETE /api/stock-alert - Unsubscribe from alert
 export async function DELETE(request: NextRequest) {
+  const authResult = await requireAuth();
+  if (authResult instanceof NextResponse) return authResult;
+
   try {
     const body = await request.json();
-    const { productId, email } = body;
+    const { productId } = body;
 
-    if (!productId || !email) {
+    if (!productId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const emailHash = hashEmail(email);
+    const emailHash = hashEmail(authResult.email);
 
     await db
       .delete(stockAlerts)
@@ -97,15 +108,13 @@ export async function DELETE(request: NextRequest) {
   }
 }
 
-// GET /api/stock-alert?email=xxx - Get user's active alerts
+// GET /api/stock-alert - Get user's active alerts
 export async function GET(request: NextRequest) {
-  try {
-    const email = request.nextUrl.searchParams.get('email');
-    if (!email) {
-      return NextResponse.json({ error: 'Missing email' }, { status: 400 });
-    }
+  const authResult = await requireAuth();
+  if (authResult instanceof NextResponse) return authResult;
 
-    const emailHash = hashEmail(email);
+  try {
+    const emailHash = hashEmail(authResult.email);
 
     const data = await db
       .select()

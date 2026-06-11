@@ -1,13 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getJson, listKeys } from '@/lib/filebase';
+import { resolveOrderByRef } from '@/lib/order-lookup';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
-import { isAdminEmail } from '@/lib/auth';
-
-const findOrderKey = async (ref: string): Promise<string | null> => {
-  const keys = await listKeys('orders/');
-  return keys.find((k) => k.endsWith(`${ref}.json`)) || null;
-};
+import { isAdminEmailAsync } from '@/lib/auth';
 
 export async function GET(
   req: NextRequest,
@@ -18,7 +13,7 @@ export async function GET(
     const session = await getServerSession(authOptions);
     const userEmail = session?.user?.email;
     
-    if (!userEmail || !isAdminEmail(userEmail)) {
+    if (!userEmail || !(await isAdminEmailAsync(userEmail))) {
       return new NextResponse(
         `<!DOCTYPE html>
         <html>
@@ -41,14 +36,9 @@ export async function GET(
       return NextResponse.json({ status: 'error', message: 'missing ref' }, { status: 400 });
     }
 
-    const key = await findOrderKey(ref);
-    if (!key) {
-      return NextResponse.json({ status: 'error', message: 'order not found' }, { status: 404 });
-    }
-
-    const order = await getJson<any>(key);
+    const order = await resolveOrderByRef(ref);
     if (!order) {
-      return NextResponse.json({ status: 'error', message: 'order data missing' }, { status: 404 });
+      return NextResponse.json({ status: 'error', message: 'order not found' }, { status: 404 });
     }
 
     // Support both 'slip' and 'slipData' field names (backward compatibility)

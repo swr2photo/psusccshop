@@ -3,7 +3,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminWithPermission } from '@/lib/auth';
-import { getJson, listKeys } from '@/lib/filebase';
+import { getOrdersByEmail } from '@/lib/supabase';
+import { getOrderByRef } from '@/lib/order-lookup';
 
 // Ensure Node runtime and skip static caching
 export const runtime = 'nodejs';
@@ -24,76 +25,47 @@ export async function GET(req: NextRequest) {
 
     // Search by specific order ref
     if (ref) {
-      const keys = await listKeys('orders/');
-      const targetKey = keys.find((k) => k.includes(ref) || k.endsWith(`${ref}.json`));
-      
-      if (targetKey) {
-        const order = await getJson<any>(targetKey);
-        if (order) {
-          // Sanitize - remove raw slip base64 data
-          const sanitized = { ...order };
-          if (sanitized.slip?.base64) {
-            sanitized.slip = { 
-              ...sanitized.slip, 
-              base64: undefined,
-              hasBase64: true,
-            };
-          }
-          return NextResponse.json({ 
-            status: 'success', 
-            data: sanitized 
-          });
+      const order = await getOrderByRef(ref);
+
+      if (order) {
+        const sanitized = { ...order };
+        if (sanitized.slip?.base64) {
+          sanitized.slip = {
+            ...sanitized.slip,
+            base64: undefined,
+            hasBase64: true,
+          };
         }
+        return NextResponse.json({
+          status: 'success',
+          data: sanitized,
+        });
       }
-      
-      return NextResponse.json({ 
-        status: 'error', 
-        message: 'Order not found' 
+
+      return NextResponse.json({
+        status: 'error',
+        message: 'Order not found',
       }, { status: 404 });
     }
 
     // Search by customer email
     if (email) {
-      const keys = await listKeys('orders/');
-      const allOrders = await Promise.all(
-        keys.map(async (k) => {
-          const data = await getJson<any>(k);
-          return data ? { ...data, _key: k } : null;
-        })
-      );
+      const { orders: customerOrders } = await getOrdersByEmail(email, { limit });
+      const sanitizedOrders = customerOrders.map((o: any) => {
+        const sanitized = { ...o };
+        if (sanitized.slip?.base64) {
+          sanitized.slip = {
+            ...sanitized.slip,
+            base64: undefined,
+            hasBase64: true,
+          };
+        }
+        return sanitized;
+      });
 
-      // Filter by email
-      const customerOrders = allOrders
-        .filter(Boolean)
-        .filter((o: any) => {
-          const orderEmail = (o?.customerEmail || o?.email || '').toLowerCase();
-          return orderEmail === email;
-        })
-        // Sort by date (newest first)
-        .sort((a: any, b: any) => {
-          const dateA = new Date(a?.date || a?.createdAt || 0).getTime();
-          const dateB = new Date(b?.date || b?.createdAt || 0).getTime();
-          return dateB - dateA;
-        })
-        // Limit results
-        .slice(0, limit)
-        // Sanitize
-        .map((o: any) => {
-          const sanitized = { ...o };
-          delete sanitized._key;
-          if (sanitized.slip?.base64) {
-            sanitized.slip = { 
-              ...sanitized.slip, 
-              base64: undefined,
-              hasBase64: true,
-            };
-          }
-          return sanitized;
-        });
-
-      return NextResponse.json({ 
-        status: 'success', 
-        data: customerOrders 
+      return NextResponse.json({
+        status: 'success',
+        data: sanitizedOrders,
       });
     }
 

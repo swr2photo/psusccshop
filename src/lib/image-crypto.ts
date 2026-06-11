@@ -11,8 +11,8 @@ import crypto from 'crypto';
  * ใช้ HMAC-SHA256 เพื่อ derive key ที่มีความยาวถูกต้อง
  */
 const MASTER_SECRET = process.env.IMAGE_CRYPTO_SECRET;
-if (!MASTER_SECRET && typeof window === 'undefined') {
-  console.error('[SECURITY] IMAGE_CRYPTO_SECRET is not set! Image encryption will fail.');
+if (!MASTER_SECRET && typeof window === 'undefined' && process.env.NODE_ENV === 'production') {
+  throw new Error('[SECURITY] IMAGE_CRYPTO_SECRET is required in production');
 }
 const EFFECTIVE_SECRET = MASTER_SECRET || '';
 

@@ -1,6 +1,6 @@
 /** Canonical public site URL (no trailing slash). */
 export const SITE_URL = (
-  process.env.NEXT_PUBLIC_BASE_URL || 'https://sccshop.psuscc.club'
+  process.env.NEXT_PUBLIC_BASE_URL || 'https://sccshop.psusci.club'
 ).replace(/\/$/, '');
 
 export function absoluteUrl(path = '/'): string {

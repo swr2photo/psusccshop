@@ -1,5 +1,9 @@
 import type { SamplingContext } from '@sentry/core';
 import pkg from '../../package.json';
+import {
+  sentryBeforeSend,
+  sentryIgnoredErrors,
+} from './sentry-error-filters';
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -12,8 +16,35 @@ export const sentryTracesSampleRate = isDev ? 1.0 : 0.1;
 
 export const sentryReplaySessionSampleRate = isDev ? 1.0 : 0.1;
 
+export const sentryProfileSessionSampleRate = isDev ? 1.0 : 0.1;
+
+export const sentryProfilingOptions = {
+  profileSessionSampleRate: sentryProfileSessionSampleRate,
+  profileLifecycle: 'trace' as const,
+};
+
+export const sentryAgentMonitoringOptions = {
+  streamGenAiSpans: true,
+  dataCollection: {
+    genAI: {
+      inputs: true,
+      outputs: true,
+    },
+  },
+} as const;
+
 export const sentryEnvironment =
   process.env.SENTRY_ENVIRONMENT || process.env.VERCEL_ENV || process.env.NODE_ENV;
+
+export const sentrySharedInitOptions = {
+  environment: sentryEnvironment,
+  release: sentryRelease,
+  sendDefaultPii: true,
+  enableLogs: true,
+  enableMetrics: true,
+  ignoreErrors: sentryIgnoredErrors,
+  beforeSend: sentryBeforeSend,
+};
 
 export function sentryTracesSampler({
   name,

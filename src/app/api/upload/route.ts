@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { checkCombinedRateLimit, RATE_LIMITS, getRateLimitHeaders } from '@/lib/rate-limit';
 import { putJson, uploadImageToStorage, isSupabaseStorageUrl } from '@/lib/supabase';
+import { validateImageBuffer, isAllowedPassThroughImageUrl } from '@/lib/upload-validation';
 
 // Helper to save user log server-side
 const userLogKey = (id: string) => `user-logs/${id}.json`;
@@ -157,6 +158,20 @@ export async function POST(req: NextRequest) {
 
 // Handle multiple images upload
 export async function PUT(req: NextRequest) {
+  const rateLimitResult = checkCombinedRateLimit(req, RATE_LIMITS.upload);
+  if (!rateLimitResult.allowed) {
+    return NextResponse.json(
+      { status: 'error', message: 'คุณอัปโหลดไฟล์เร็วเกินไป กรุณารอสักครู่' },
+      {
+        status: 429,
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          ...getRateLimitHeaders(rateLimitResult),
+        },
+      }
+    );
+  }
+
   // ต้องเข้าสู่ระบบก่อนถึงจะ upload ได้
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) {
@@ -178,21 +193,14 @@ export async function PUT(req: NextRequest) {
     for (let i = 0; i < images.length; i++) {
       const { base64, filename, mime } = images[i];
       
-      // Skip if already a Supabase Storage URL or other permanent URL
-      if (typeof base64 === 'string' && isSupabaseStorageUrl(base64)) {
+      // Only allow known permanent URLs — block arbitrary external URLs
+      if (typeof base64 === 'string' && isAllowedPassThroughImageUrl(base64)) {
         results.push({ url: base64, path: '', originalIndex: i });
         continue;
       }
-      
-      // Skip if already a URL (not base64) - keep as-is
+
       if (typeof base64 === 'string' && (base64.startsWith('http://') || base64.startsWith('https://'))) {
-        results.push({ url: base64, path: '', originalIndex: i });
-        continue;
-      }
-      
-      // Skip if it's an encrypted proxy URL
-      if (typeof base64 === 'string' && base64.startsWith('/api/image/')) {
-        results.push({ url: base64, path: '', originalIndex: i });
+        errors.push({ index: i, message: 'External URLs are not allowed' });
         continue;
       }
 
@@ -203,6 +211,11 @@ export async function PUT(req: NextRequest) {
 
       try {
         const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
+        if (!/^[A-Za-z0-9+/=]+$/.test(base64Data)) {
+          errors.push({ index: i, message: 'Invalid base64 data' });
+          continue;
+        }
+
         const buffer = Buffer.from(base64Data, 'base64');
 
         if (buffer.length > MAX_SIZE) {
@@ -210,8 +223,14 @@ export async function PUT(req: NextRequest) {
           continue;
         }
 
+        const validated = validateImageBuffer(buffer, mime);
+        if (!validated.ok) {
+          errors.push({ index: i, message: validated.message });
+          continue;
+        }
+
         const fileName = generateFileName(filename || 'image.png');
-        const contentType = mime || 'image/png';
+        const contentType = validated.contentType;
 
         // Upload to Supabase Storage
         const { url, path } = await uploadImageToStorage(buffer, fileName, contentType);

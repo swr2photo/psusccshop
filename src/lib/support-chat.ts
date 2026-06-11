@@ -164,6 +164,23 @@ export async function getChatSessionWithMessages(sessionId: string): Promise<Cha
   };
 }
 
+/** Lightweight ETag from session metadata (no message fetch). */
+export function buildChatEtag(session: ChatSession): string {
+  return `"${session.updated_at}|${session.last_message_at || ''}|${session.unread_count}|${session.customer_unread_count}|${session.status}"`;
+}
+
+/** Fetch only messages newer than `since` (for polling delta sync). */
+export async function getMessagesSince(sessionId: string, since: Date): Promise<ChatMessage[]> {
+  const msgRows = await db.select()
+    .from(supportMessages)
+    .where(and(
+      eq(supportMessages.sessionId, sessionId),
+      gt(supportMessages.createdAt, since)
+    ))
+    .orderBy(supportMessages.createdAt);
+  return msgRows.map(toMsg);
+}
+
 /**
  * Get all pending chat sessions (for admin)
  */

@@ -13,3 +13,7 @@ SENTRY_PROJECT=psuscc-shop
 # Optional
 # SENTRY_ENVIRONMENT=production
 # SENTRY_RELEASE=psuscc-shop@2.1.0
+
+# Metrics (SDK >= 10.25.0) — enabled via enableMetrics in Sentry.init()
+# Verify: place an order or run cron, then check Metrics in Sentry dashboard.
+# Dev smoke test: import { recordTestMetric } from '@/lib/sentry-metrics'; recordTestMetric();

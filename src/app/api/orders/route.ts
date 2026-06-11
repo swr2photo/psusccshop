@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getJson, putJson, listKeys, deleteObject, getOrdersByEmail, getAllOrders, getOrderByRef, updateOrderByRef } from '@/lib/filebase';
+import { deleteOrderByRef } from '@/lib/order-lookup';
 import crypto from 'crypto';
-import { requireAuth, requireAdmin, isAdminEmail, isResourceOwner, normalizeEmail as authNormalizeEmail } from '@/lib/auth';
+import { requireAuth, requireAdmin, isAdminEmailAsync, isResourceOwner, normalizeEmail as authNormalizeEmail } from '@/lib/auth';
 import { triggerSheetSync } from '@/lib/sheet-sync';
 import { sanitizeOrderForUser, sanitizeOrdersForUser, sanitizeObjectUtf8, sanitizeUtf8Input } from '@/lib/sanitize';
 import { verifyTurnstileToken, getClientIP } from '@/lib/cloudflare';
@@ -10,6 +11,9 @@ import { sendOrderConfirmationEmail } from '@/lib/email';
 import { db } from '@/lib/db';
 import { shops, config as dbConfigTable } from '@/db/schema';
 import { eq } from 'drizzle-orm';
+import { recordOrderCreated } from '@/lib/sentry-metrics';
+import { buildValidatedCart, clampShippingFee } from '@/lib/order-pricing';
+import { computePromoDiscount } from '@/lib/promo';
 
 // Helper to save user log server-side
 async function saveUserLogServer(log: {
@@ -40,7 +44,7 @@ const orderKey = (ref: string, date: Date) => {
   return `orders/${yyyy}-${mm}/${ref}.json`;
 };
 
-const generateRef = () => `ORD-${Date.now()}`;
+const generateRef = () => `ORD-${crypto.randomBytes(6).toString('hex').toUpperCase()}`;
 
 const normalizeEmail = (email?: string | null) => (email || '').trim().toLowerCase();
 
@@ -68,7 +72,7 @@ export async function GET(req: NextRequest) {
     return authResult;
   }
   const currentUserEmail = authResult.email;
-  const isAdmin = isAdminEmail(currentUserEmail);
+  const isAdmin = await isAdminEmailAsync(currentUserEmail);
 
   const email = req.nextUrl.searchParams.get('email');
   const offsetParam = Number(req.nextUrl.searchParams.get('offset'));
@@ -104,6 +108,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const start = Date.now();
   // Rate limiting สำหรับ order submission
   const rateLimitResult = checkCombinedRateLimit(req, RATE_LIMITS.order);
   if (!rateLimitResult.allowed) {
@@ -232,17 +237,50 @@ export async function POST(req: NextRequest) {
       }
     }
     
-    const ref = sanitizedBody?.ref || generateRef();
+    let validatedCart: Record<string, unknown>[];
+    let subtotal: number;
+    try {
+      const built = buildValidatedCart(cartItems, products);
+      validatedCart = built.cart;
+      subtotal = built.subtotal;
+    } catch (pricingError: any) {
+      return NextResponse.json(
+        { status: 'error', message: pricingError?.message || 'ไม่สามารถคำนวณราคาได้' },
+        { status: 400, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
+      );
+    }
+
+    const shippingFee = clampShippingFee(sanitizedBody.shippingFee, subtotal);
+    const { discount: promoDiscount, code: appliedPromoCode } = await computePromoDiscount({
+      code: sanitizedBody.promoCode,
+      subtotal,
+      shopId: sanitizedBody.shopId,
+    });
+    const totalAmount = Math.max(0, subtotal + shippingFee - promoDiscount);
+
+    const ref = sanitizedBody?.ref ? String(sanitizedBody.ref) : generateRef();
     const now = new Date();
     const customerEmail = normalizeEmail(sanitizedBody.customerEmail || sanitizedBody.email);
     const order = {
       ref,
       date: now.toISOString(),
+      createdAt: now.toISOString(),
       status: 'WAITING_PAYMENT',
-      ...sanitizedBody,
       customerEmail,
       customerName: sanitizedBody.customerName || sanitizedBody.name || '',
-      // Multi-shop support: preserve shopId/shopSlug if provided
+      customerPhone: sanitizedBody.customerPhone || sanitizedBody.phone || '',
+      customerAddress: sanitizedBody.customerAddress || sanitizedBody.address || '',
+      customerInstagram: sanitizedBody.customerInstagram || sanitizedBody.instagram || '',
+      cart: validatedCart,
+      subtotal,
+      shippingFee,
+      shippingOptionId: sanitizedBody.shippingOptionId,
+      paymentOptionId: sanitizedBody.paymentOptionId,
+      promoCode: appliedPromoCode,
+      promoDiscount,
+      discount: promoDiscount,
+      totalAmount,
+      amount: totalAmount,
       ...(sanitizedBody.shopId ? { shopId: sanitizedBody.shopId } : {}),
       ...(sanitizedBody.shopSlug ? { shopSlug: sanitizedBody.shopSlug } : {}),
     };
@@ -283,11 +321,13 @@ export async function POST(req: NextRequest) {
     
     // Auto sync to Google Sheets
     triggerSheetSync().catch(() => {});
+    recordOrderCreated('success', Date.now() - start);
     return NextResponse.json(
       { status: 'success', ref },
       { headers: { 'Content-Type': 'application/json; charset=utf-8' } }
     );
   } catch (error: any) {
+    recordOrderCreated('failed', Date.now() - start);
     return NextResponse.json(
       { status: 'error', message: error?.message || 'submit failed' },
       { status: 500, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
@@ -302,7 +342,7 @@ export async function PUT(req: NextRequest) {
     return authResult;
   }
   const currentUserEmail = authResult.email;
-  const isAdmin = isAdminEmail(currentUserEmail);
+  const isAdmin = await isAdminEmailAsync(currentUserEmail);
 
   try {
     const body = await req.json();
@@ -315,16 +355,14 @@ export async function PUT(req: NextRequest) {
       );
     }
 
-    const keys = await listKeys('orders/');
-    const targetKey = keys.find((k) => k.endsWith(`${ref}.json`));
-    if (!targetKey) {
+    const existing = (await getOrderByRef(ref)) || {};
+
+    if (!existing || !(existing as { ref?: string }).ref) {
       return NextResponse.json(
         { status: 'error', message: 'order not found' },
         { status: 404, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
       );
     }
-
-    const existing = (await getJson<any>(targetKey)) || {};
 
     // ตรวจสอบว่าเป็นเจ้าของ order หรือเป็น admin
     const orderEmail = existing.customerEmail || existing.email;
@@ -366,7 +404,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const next = { ...existing, ...sanitizedUpdates };
-    await putJson(targetKey, next);
+    await updateOrderByRef(ref, next);
     if (next.customerEmail) {
       await upsertIndexEntry(next.customerEmail, next);
     }
@@ -395,7 +433,7 @@ export async function DELETE(req: NextRequest) {
     return authResult;
   }
   const currentUserEmail = authResult.email;
-  const isAdmin = isAdminEmail(currentUserEmail);
+  const isAdmin = await isAdminEmailAsync(currentUserEmail);
 
   const ref = sanitizeUtf8Input(req.nextUrl.searchParams.get('ref') || '');
   const hard = req.nextUrl.searchParams.get('hard') === 'true';
@@ -416,17 +454,15 @@ export async function DELETE(req: NextRequest) {
   }
 
   try {
-    const keys = await listKeys('orders/');
-    const targetKey = keys.find((k) => k.endsWith(`${ref}.json`));
-    if (!targetKey) {
+    const existing = await getOrderByRef(ref);
+    if (!existing) {
       return NextResponse.json(
         { status: 'error', message: 'order not found' },
         { status: 404, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
       );
     }
 
-    const existing = await getJson<any>(targetKey);
-    const orderEmail = existing?.customerEmail || existing?.email;
+    const orderEmail = existing.customerEmail || existing.email;
 
     // ตรวจสอบสิทธิ์
     if (!isResourceOwner(orderEmail, currentUserEmail) && !isAdmin) {
@@ -440,8 +476,7 @@ export async function DELETE(req: NextRequest) {
       if (existing?.customerEmail) {
         await removeIndexEntry(existing.customerEmail, ref);
       }
-      await deleteObject(targetKey);
-      // Auto sync to Google Sheets
+      await deleteOrderByRef(ref);
       triggerSheetSync().catch(() => {});
       return NextResponse.json(
         { status: 'success', message: 'deleted' },
@@ -449,13 +484,10 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    const order = await getJson<any>(targetKey);
-    if (order) {
-      order.status = 'CANCELLED';
-      await putJson(targetKey, order);
-      if (order.customerEmail) {
-        await upsertIndexEntry(order.customerEmail, order);
-      }
+    const order = { ...existing, status: 'CANCELLED' };
+    await updateOrderByRef(ref, order);
+    if (order.customerEmail) {
+      await upsertIndexEntry(order.customerEmail, order);
     }
     // Auto sync to Google Sheets
     triggerSheetSync().catch(() => {});

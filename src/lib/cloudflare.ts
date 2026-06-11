@@ -40,9 +40,13 @@ export async function verifyTurnstileToken(
   token: string,
   remoteip?: string
 ): Promise<{ success: boolean; error?: string }> {
-  // Skip verification in development or if no secret key configured
+  // Fail closed in production when secret is not configured
   if (!TURNSTILE_SECRET_KEY) {
-    console.warn('[Turnstile] Secret key not configured, skipping verification');
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[Turnstile] Secret key not configured in production');
+      return { success: false, error: 'ระบบยืนยันตัวตนไม่พร้อมใช้งาน กรุณาติดต่อผู้ดูแล' };
+    }
+    console.warn('[Turnstile] Secret key not configured, skipping verification (dev only)');
     return { success: true };
   }
 
@@ -55,11 +59,13 @@ export async function verifyTurnstileToken(
     return { success: true };
   }
 
-  // Accept error-bypass token when Turnstile widget fails (e.g., pre-clearance not available)
-  // This is a fallback to prevent blocking users when Cloudflare infrastructure is misconfigured
+  // Error-bypass only allowed in non-production development
   if (token === 'turnstile-error-bypass') {
-    console.warn('[Turnstile] Error-bypass token received - Turnstile widget failed, allowing with warning');
-    // Log but allow - better UX than blocking users
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[Turnstile] Rejected error-bypass token in production');
+      return { success: false, error: 'การยืนยันไม่สำเร็จ กรุณารีเฟรชหน้าแล้วลองใหม่' };
+    }
+    console.warn('[Turnstile] Error-bypass token accepted (dev only)');
     return { success: true };
   }
 

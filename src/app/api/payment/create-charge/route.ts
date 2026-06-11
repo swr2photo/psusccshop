@@ -15,6 +15,9 @@ import {
   createOmiseSource,
   createStripePaymentIntent,
 } from '@/lib/payment';
+import { isResourceOwner } from '@/lib/auth';
+import { rateLimitOrNull } from '@/lib/api-helpers';
+import { RATE_LIMITS } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -35,6 +38,9 @@ interface CreateChargeRequest {
 }
 
 export async function POST(request: NextRequest) {
+  const rateLimited = rateLimitOrNull(request, RATE_LIMITS.payment);
+  if (rateLimited) return rateLimited;
+
   try {
     // User must be logged in
     const session = await getServerSession(authOptions);
@@ -71,16 +77,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check order belongs to user (via email hash or direct email)
-    // For simplicity, we allow any logged-in user to pay for now
-    // In production, verify ownership properly
+    if (!isResourceOwner(order.customerEmail, session.user.email)) {
+      return NextResponse.json(
+        { success: false, error: 'ไม่มีสิทธิ์ชำระเงินสำหรับออเดอร์นี้' },
+        { status: 403 }
+      );
+    }
+
+    const expectedAmount = Number(order.totalAmount) || 0;
+    if (expectedAmount < 1) {
+      return NextResponse.json(
+        { success: false, error: 'ยอดชำระไม่ถูกต้อง' },
+        { status: 400 }
+      );
+    }
+    if (Math.abs(Number(amount) - expectedAmount) > 0.01) {
+      return NextResponse.json(
+        { success: false, error: 'ยอดชำระไม่ตรงกับคำสั่งซื้อ' },
+        { status: 400 }
+      );
+    }
+
+    const chargeAmount = expectedAmount;
 
     // Create charge based on gateway
     let chargeResult: any;
 
     if (gateway === 'omise') {
       chargeResult = await createOmiseChargeForMethod(method, {
-        amount: amount * 100, // Omise uses satang
+        amount: chargeAmount * 100, // Omise uses satang
         orderId,
         token,
         phoneNumber,
@@ -90,7 +115,7 @@ export async function POST(request: NextRequest) {
       });
     } else if (gateway === 'stripe') {
       chargeResult = await createStripeChargeForMethod(method, {
-        amount: amount * 100, // Stripe uses smallest unit
+        amount: chargeAmount * 100, // Stripe uses smallest unit
         orderId,
         returnUrl: returnUrl || `${process.env.NEXTAUTH_URL}/payment/complete?ref=${orderId}`,
         email: session.user.email,
