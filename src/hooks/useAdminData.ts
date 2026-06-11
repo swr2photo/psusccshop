@@ -54,8 +54,18 @@ export interface AdminDataResponse {
 
 // ============== CACHE KEYS ==============
 
+export const ADMIN_CACHE_KEYS = {
+  BOOTSTRAP: '/api/admin/bootstrap',
+  CONFIG: '/api/admin/config',
+  ORDERS_LIST: '/api/admin/orders-list?limit=100',
+  DATA: '/api/admin/data',
+} as const;
+
 export const CACHE_KEYS = {
-  ADMIN_DATA: '/api/admin/data',
+  ADMIN_DATA: ADMIN_CACHE_KEYS.DATA,
+  ADMIN_BOOTSTRAP: ADMIN_CACHE_KEYS.BOOTSTRAP,
+  ADMIN_CONFIG: ADMIN_CACHE_KEYS.CONFIG,
+  ADMIN_ORDERS_LIST: ADMIN_CACHE_KEYS.ORDERS_LIST,
   CONFIG: '/api/config',
   ORDERS: (email: string) => `/api/orders?email=${encodeURIComponent(email)}`,
   PROFILE: (email: string) => `/api/profile?email=${encodeURIComponent(email)}`,
@@ -615,7 +625,10 @@ export function useSyncSheet() {
  * Invalidate all admin data caches
  */
 export function invalidateAdminData() {
-  mutate(CACHE_KEYS.ADMIN_DATA);
+  mutate(ADMIN_CACHE_KEYS.BOOTSTRAP);
+  mutate(ADMIN_CACHE_KEYS.CONFIG);
+  mutate(ADMIN_CACHE_KEYS.ORDERS_LIST);
+  mutate(ADMIN_CACHE_KEYS.DATA);
 }
 
 /**

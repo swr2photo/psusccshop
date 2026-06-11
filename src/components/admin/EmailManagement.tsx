@@ -133,29 +133,64 @@ export default function EmailManagement({ showToast }: Props) {
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedLog, setSelectedLog] = useState<EmailLog | null>(null);
 
-  const fetchData = useCallback(async () => {
+  const fetchLogs = useCallback(async () => {
     setLoading(true);
     try {
-      const [logsRes, statsRes, customersRes] = await Promise.all([
-        fetch('/api/admin/email?action=logs&limit=200').then(r => r.json()),
-        fetch('/api/admin/email?action=stats').then(r => r.json()),
-        fetch('/api/admin/email?action=customers').then(r => r.json()),
-      ]);
-      
+      const logsRes = await fetch('/api/admin/email?action=logs&limit=200').then((r) => r.json());
       setLogs(logsRes.logs || []);
-      setStats(statsRes.stats || null);
-      setCustomers(customersRes.customers || []);
     } catch (error: any) {
-      console.error('Failed to fetch email data:', error);
-      showToast('error', 'ไม่สามารถโหลดข้อมูลอีเมลได้');
+      console.error('Failed to fetch email logs:', error);
+      showToast('error', 'ไม่สามารถโหลดประวัติอีเมลได้');
     } finally {
       setLoading(false);
     }
   }, [showToast]);
 
+  const fetchStats = useCallback(async () => {
+    if (stats) return;
+    try {
+      const statsRes = await fetch('/api/admin/email?action=stats').then((r) => r.json());
+      setStats(statsRes.stats || null);
+    } catch (error: any) {
+      console.error('Failed to fetch email stats:', error);
+    }
+  }, [stats]);
+
+  const fetchCustomers = useCallback(async () => {
+    if (customers.length > 0) return;
+    try {
+      const customersRes = await fetch('/api/admin/email?action=customers').then((r) => r.json());
+      setCustomers(customersRes.customers || []);
+    } catch (error: any) {
+      console.error('Failed to fetch email customers:', error);
+    }
+  }, [customers.length]);
+
+  const fetchData = useCallback(async () => {
+    await fetchLogs();
+    if (activeTab === 1) {
+      await fetch('/api/admin/email?action=customers')
+        .then((r) => r.json())
+        .then((res) => setCustomers(res.customers || []))
+        .catch(() => {});
+    }
+    if (activeTab === 2) {
+      setStats(null);
+      await fetch('/api/admin/email?action=stats')
+        .then((r) => r.json())
+        .then((res) => setStats(res.stats || null))
+        .catch(() => {});
+    }
+  }, [fetchLogs, activeTab]);
+
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchLogs();
+  }, [fetchLogs]);
+
+  useEffect(() => {
+    if (activeTab === 1) fetchCustomers();
+    if (activeTab === 2) fetchStats();
+  }, [activeTab, fetchStats, fetchCustomers]);
 
   const filteredLogs = logs.filter(log => {
     const term = searchTerm.toLowerCase();

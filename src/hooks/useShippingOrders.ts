@@ -13,7 +13,7 @@ import useSWR from 'swr';
 import useSWRMutation from 'swr/mutation';
 import { useCallback, useMemo } from 'react';
 import { fetcher } from './useSWRConfig';
-import { CACHE_KEYS, invalidateAdminData } from './useAdminData';
+import { ADMIN_CACHE_KEYS, invalidateAdminData } from './useAdminData';
 
 // ============== TYPES ==============
 
@@ -38,7 +38,7 @@ interface Order {
 
 export function useShippingOrders(selectedShopId?: string) {
   const { data, error, isLoading, mutate: revalidate } = useSWR(
-    CACHE_KEYS.ADMIN_DATA,
+    ADMIN_CACHE_KEYS.ORDERS_LIST,
     fetcher,
     {
       revalidateOnFocus: true,

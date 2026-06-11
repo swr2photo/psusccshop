@@ -1,0 +1,41 @@
+import { NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/auth';
+import { mergeConfigAdminEmails } from '@/lib/admin-context';
+import { getShopConfig } from '@/lib/filebase';
+import { ShopConfig } from '@/lib/config';
+import { sanitizeConfigForAdmin } from '@/lib/sanitize';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+/** Shop config only — for admin settings/products tabs. */
+export async function GET() {
+  const authResult = await requireAdmin();
+  if (authResult instanceof NextResponse) return authResult;
+
+  try {
+    const cfg = (await getShopConfig()) || {
+      isOpen: true,
+      closeDate: '',
+      announcement: { enabled: false, message: '', color: 'blue' },
+      products: [],
+      sheetId: '',
+      sheetUrl: '',
+      vendorSheetId: '',
+      vendorSheetUrl: '',
+    };
+
+    const merged = mergeConfigAdminEmails(cfg as ShopConfig);
+    const sanitizedConfig = sanitizeConfigForAdmin(merged as ShopConfig);
+
+    return NextResponse.json(
+      { status: 'success', data: { config: sanitizedConfig } },
+      { headers: { 'Content-Type': 'application/json; charset=utf-8' } },
+    );
+  } catch (error: any) {
+    return NextResponse.json(
+      { status: 'error', message: error?.message || 'config load failed' },
+      { status: 500 },
+    );
+  }
+}

@@ -15,9 +15,12 @@ import { QRCodeSVG } from 'qrcode.react';
 import { CheckCircle2, RefreshCw, ShieldCheck, Clock3, AlertCircle } from 'lucide-react';
 import { getStripe, preloadStripeJs, type StripeJS, type StripePromptPayQrCode } from '@/lib/stripe-client';
 import { useTranslation } from '@/hooks/useTranslation';
+import { CountdownBadge } from './OrderCountdown';
 
 interface StripePromptPayProps {
   orderRef: string;
+  orderDate?: string;
+  onExpired?: () => void;
   onSuccess: () => void;
   size?: number;
 }
@@ -51,7 +54,13 @@ async function createPromptPayIntent(orderRef: string): Promise<any> {
   return promise;
 }
 
-export default function StripePromptPay({ orderRef, onSuccess, size = 232 }: StripePromptPayProps) {
+export default function StripePromptPay({
+  orderRef,
+  orderDate,
+  onExpired,
+  onSuccess,
+  size = 232,
+}: StripePromptPayProps) {
   const { t, lang } = useTranslation();
   const [phase, setPhase] = useState<Phase>('creating');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -363,18 +372,19 @@ export default function StripePromptPay({ orderRef, onSuccess, size = 232 }: Str
           ) : null}
         </Box>
 
-        <Typography sx={{ color: '#fff', fontWeight: 700, fontSize: '1.2rem', mt: 1.5 }}>
-          ฿{amount.toLocaleString(lang === 'th' ? 'th-TH' : 'en-US', { minimumFractionDigits: 2 })}
-        </Typography>
-
-        {secondsLeft !== null && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
-            <Clock3 size={12} color="rgba(255,255,255,0.85)" />
-            <Typography sx={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.72rem' }}>
-              {t.payment.expiresIn} {formatCountdown(secondsLeft)}
-            </Typography>
-          </Box>
-        )}
+        <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+          {orderDate && (
+            <CountdownBadge orderDate={orderDate} compact tone="inverse" onExpired={onExpired} />
+          )}
+          {secondsLeft !== null && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.4 }}>
+              <Clock3 size={12} color="#ffffff" />
+              <Typography sx={{ color: '#ffffff', fontSize: '0.72rem', fontWeight: 600, textShadow: '0 1px 2px rgba(0,0,0,0.35)' }}>
+                {t.payment.expiresIn} {formatCountdown(secondsLeft)}
+              </Typography>
+            </Box>
+          )}
+        </Box>
       </Box>
 
       {/* Waiting indicator */}

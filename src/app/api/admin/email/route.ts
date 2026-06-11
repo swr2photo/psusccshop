@@ -16,7 +16,13 @@ import {
   EmailLog,
   EmailType,
 } from '@/lib/email';
-import { getJson, listKeys } from '@/lib/filebase';
+import {
+  getEmailLogsFromDb,
+  getEmailLogStats,
+  getOrderCustomerAggregates,
+  getJson,
+  getOrderByRef,
+} from '@/lib/filebase';
 
 // GET: Retrieve email logs
 export async function GET(request: NextRequest) {
@@ -41,72 +47,19 @@ export async function GET(request: NextRequest) {
         } else if (email) {
           logs = await getEmailLogsByEmail(email);
         } else {
-          logs = await getEmailLogs(limit);
+          logs = await getEmailLogsFromDb(limit);
         }
         break;
 
-      case 'stats':
-        const allLogs = await getEmailLogs(1000);
-        const stats = {
-          total: allLogs.length,
-          sent: allLogs.filter(l => l.status === 'sent').length,
-          failed: allLogs.filter(l => l.status === 'failed').length,
-          pending: allLogs.filter(l => l.status === 'pending').length,
-          byType: {} as Record<string, number>,
-          last24h: allLogs.filter(l => {
-            const sent = new Date(l.sentAt).getTime();
-            const now = Date.now();
-            return now - sent < 24 * 60 * 60 * 1000;
-          }).length,
-          last7days: allLogs.filter(l => {
-            const sent = new Date(l.sentAt).getTime();
-            const now = Date.now();
-            return now - sent < 7 * 24 * 60 * 60 * 1000;
-          }).length,
-        };
-
-        allLogs.forEach(log => {
-          stats.byType[log.type] = (stats.byType[log.type] || 0) + 1;
-        });
-
+      case 'stats': {
+        const stats = await getEmailLogStats();
         return NextResponse.json({ stats });
+      }
 
-      case 'customers':
-        // Get unique customer emails from orders
-        const orderKeys = await listKeys('orders/');
-        const emails = new Set<string>();
-        const customers: { email: string; name: string; orderCount: number }[] = [];
-        const customerMap = new Map<string, { name: string; count: number }>();
-
-        for (const key of orderKeys) {
-          if (key.endsWith('.json') && !key.includes('/index/')) {
-            const order = await getJson<any>(key);
-            if (order?.customerEmail || order?.email) {
-              const customerEmail = order.customerEmail || order.email;
-              const customerName = order.customerName || order.name || 'ไม่ระบุชื่อ';
-              
-              if (!customerMap.has(customerEmail)) {
-                customerMap.set(customerEmail, { name: customerName, count: 1 });
-              } else {
-                const existing = customerMap.get(customerEmail)!;
-                existing.count++;
-              }
-            }
-          }
-        }
-
-        customerMap.forEach((value, email) => {
-          customers.push({
-            email,
-            name: value.name,
-            orderCount: value.count,
-          });
-        });
-
-        return NextResponse.json({
-          customers: customers.sort((a, b) => b.orderCount - a.orderCount),
-          totalCustomers: customers.length,
-        });
+      case 'customers': {
+        const { customers, totalCustomers } = await getOrderCustomerAggregates(500);
+        return NextResponse.json({ customers, totalCustomers });
+      }
 
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
@@ -213,16 +166,7 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: 'Missing orderRef' }, { status: 400 });
         }
 
-        // Get order data
-        const orderKeys = await listKeys(`orders/`);
-        let order = null;
-
-        for (const key of orderKeys) {
-          if (key.includes(orderRef)) {
-            order = await getJson(key);
-            break;
-          }
-        }
+        const order = await getOrderByRef(orderRef);
 
         if (!order) {
           return NextResponse.json({ error: 'Order not found' }, { status: 404 });

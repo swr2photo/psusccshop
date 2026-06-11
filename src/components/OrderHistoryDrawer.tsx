@@ -44,6 +44,7 @@ import {
   PAYABLE_STATUSES,
   CANCELABLE_STATUSES,
   REFUNDABLE_STATUSES,
+  isOrderPaidForReceipt,
   type OrderHistory,
 } from '@/lib/shop-constants';
 import { ShopConfig, getProductName } from '@/lib/config';
@@ -511,6 +512,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
               const canCancel = CANCELABLE_STATUSES.includes(statusKey);
               const canPay = isShopOpen && PAYABLE_STATUSES.includes(statusKey);
               const canRequestRefund = REFUNDABLE_STATUSES.includes(statusKey) && !order.refundStatus;
+              const canViewReceipt = isOrderPaidForReceipt(order);
               const category = getStatusCategory(statusKey);
               const isExpanded = expandedOrders.has(order.ref);
               const orderItems = order.items || order.cart || [];
@@ -1164,8 +1166,8 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                               {t.orderHistory.requestRefund}
                             </Button>
                           )}
-                          {/* Invoice Download */}
-                          {statusKey !== 'CANCELLED' && (
+                          {/* Invoice — only after payment confirmed */}
+                          {canViewReceipt && (
                             <IconButton
                               size="small"
                               onClick={() => window.open(`/api/invoice?ref=${order.ref}&lang=${lang}`, '_blank')}

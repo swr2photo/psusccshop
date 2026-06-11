@@ -382,8 +382,8 @@ body {
   animation-delay: 250ms;
 }
 
-/* Focus States */
-*:focus-visible {
+/* Focus States — skip inputs (no blue ring while typing) */
+*:focus-visible:not(input):not(textarea):not(select):not(.MuiInputBase-input) {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
@@ -591,9 +591,6 @@ body {
 
 button:focus-visible,
 a:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible,
 [tabindex]:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
@@ -635,16 +632,24 @@ select {
 
 input:focus,
 textarea:focus,
-select:focus {
+select:focus,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
   outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.2);
+  box-shadow: none;
 }
 
-[data-theme="light"] input:focus,
-[data-theme="light"] textarea:focus,
-[data-theme="light"] select:focus {
-  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
+/* MUI TextField — no light-blue focus ring while typing */
+.MuiOutlinedInput-root.Mui-focused,
+.MuiInputBase-root.Mui-focused,
+.MuiFilledInput-root.Mui-focused {
+  box-shadow: none !important;
+}
+
+.MuiOutlinedInput-root.Mui-focused fieldset {
+  box-shadow: none !important;
+  border-width: 1px !important;
 }
 
 input::placeholder,

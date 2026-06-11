@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getShopConfig, getAllOrders } from '@/lib/filebase';
+import { getShopConfig, getAllOrdersForAdminList } from '@/lib/filebase';
 import { ShopConfig } from '@/lib/config';
-import { requireAdmin, isSuperAdminEmail, ADMIN_EMAILS, isAdminEmailAsync } from '@/lib/auth';
+import { requireAdmin } from '@/lib/auth';
 import { sanitizeConfigForAdmin, sanitizeOrdersForAdmin } from '@/lib/sanitize';
-import { getShopAdminPermissions } from '@/lib/shops';
+import { mergeConfigAdminEmails, resolveAdminSession } from '@/lib/admin-context';
 
 // Ensure Node runtime (uses Supabase client) and skip static caching
 export const runtime = 'nodejs';
@@ -29,28 +29,9 @@ export async function GET(req: NextRequest) {
       vendorSheetUrl: '',
     };
     
-    // Merge env-var admin emails into config's adminEmails for the client
-    // This ensures the client knows about ALL admins (env vars + config JSON)
-    const configAdminEmails = ((cfg as any).adminEmails || []).map((e: string) => e.trim().toLowerCase());
-    const mergedAdminEmails = [...new Set([...ADMIN_EMAILS, ...configAdminEmails])].filter(Boolean);
-    (cfg as any).adminEmails = mergedAdminEmails;
+    const mergedCfg = mergeConfigAdminEmails(cfg as ShopConfig);
+    const session = await resolveAdminSession(authResult.email);
 
-    // Determine user role (server-validated)
-    // superadmin > admin (env/config list) > shopAdmin (shop_admins table only)
-    const normalizedEmail = authResult.email.trim().toLowerCase();
-    let userRole: 'superadmin' | 'admin' | 'shopAdmin' = 'admin';
-    let shopAdminPerms: Record<string, boolean> | undefined;
-    if (isSuperAdminEmail(normalizedEmail)) {
-      userRole = 'superadmin';
-    } else if (await isAdminEmailAsync(normalizedEmail) || configAdminEmails.includes(normalizedEmail)) {
-      // In static env admin list OR dynamic config admin list → full admin
-      userRole = 'admin';
-    } else {
-      // Not in any admin list — must be a shop admin (since requireAdmin passed)
-      userRole = 'shopAdmin';
-      shopAdminPerms = await getShopAdminPermissions(normalizedEmail) as unknown as Record<string, boolean>;
-    }
-    
     // Get pagination params
     const url = new URL(req.url);
     const limit = parseInt(url.searchParams.get('limit') || '100');
@@ -59,10 +40,9 @@ export async function GET(req: NextRequest) {
     const search = url.searchParams.get('search') || undefined;
     
     // Get orders using optimized Supabase query with pagination
-    const { orders, total } = await getAllOrders({ limit, offset, status, search });
+    const { orders, total } = await getAllOrdersForAdminList({ limit, offset, status, search });
     
-    // Sanitize: Admin เห็นได้มากกว่า แต่ยังต้องซ่อน raw slip base64
-    const sanitizedConfig = sanitizeConfigForAdmin(cfg as ShopConfig);
+    const sanitizedConfig = sanitizeConfigForAdmin(mergedCfg as ShopConfig);
     const sanitizedOrders = sanitizeOrdersForAdmin(orders);
     
     return NextResponse.json(
@@ -74,11 +54,9 @@ export async function GET(req: NextRequest) {
           total,
           hasMore: offset + orders.length < total,
           logs: [],
-          // Server-validated role — client MUST trust this instead of re-checking env vars
-          userRole,
-          userEmail: authResult.email,
-          // Shop admin permissions (merged across all shops) — only set for shopAdmin role
-          ...(shopAdminPerms ? { shopAdminPermissions: shopAdminPerms } : {}),
+          userRole: session.userRole,
+          userEmail: session.userEmail,
+          ...(session.shopAdminPermissions ? { shopAdminPermissions: session.shopAdminPermissions } : {}),
         } 
       },
       { headers: { 'Content-Type': 'application/json; charset=utf-8' } }

@@ -37,7 +37,6 @@ import {
   IconButton,
   InputAdornment,
   LinearProgress,
-  Slider,
   Paper,
   Skeleton,
   Snackbar,
@@ -94,7 +93,6 @@ import {
   Ticket,
   Heart,
   ArrowUpDown,
-  SlidersHorizontal,
   Star,
   ThumbsUp,
   Filter,
@@ -161,6 +159,7 @@ import {
   DEFAULT_SHIRT_NAME,
   type ShirtNameConfig,
 } from '@/lib/config';
+import { productMatchesSearch, rankProductSearch } from '@/lib/product-search';
 import { ShippingConfig } from '@/lib/shipping';
 import { useRealtimeOrdersByEmail } from '@/hooks/useRealtimeOrders';
 import { supabase } from '@/lib/supabase-client';
@@ -861,6 +860,26 @@ export default function HomePage() {
   // Live stream status for navbar indicator (shared SWR — no duplicate /api/live polling)
   const { isActive: isLiveActive, liveTitle, openLiveStream } = useLiveStreamContext();
 
+  const pendingOrderCount = useMemo(() => {
+    const EXPIRY_MS = 24 * 60 * 60 * 1000;
+    return orderHistory.filter((order) => {
+      const status = normalizeStatus(order.status);
+      if (!PAYABLE_STATUSES.includes(status)) return false;
+      if (!order.date) return true;
+      const created = new Date(order.date).getTime();
+      return Date.now() - created < EXPIRY_MS;
+    }).length;
+  }, [orderHistory]);
+
+  const historyBadgeSx = {
+    '& .MuiBadge-badge': {
+      fontSize: '0.6rem',
+      minWidth: 16,
+      height: 16,
+      fontWeight: 700,
+    },
+  } as const;
+
   const bottomTabs = useMemo(() => {
     const leftTabs = [
       { key: 'home', label: t.nav.home, icon: <Home size={24} />, center: false },
@@ -877,7 +896,22 @@ export default function HomePage() {
     ];
     const centerTab = { key: 'chat', label: t.nav.chat, icon: <Headphones size={28} />, center: true };
     const rightTabs = [
-      { key: 'history', label: t.nav.history, icon: <History size={24} />, center: false },
+      {
+        key: 'history',
+        label: t.nav.history,
+        icon: (
+          <Badge
+            badgeContent={pendingOrderCount > 0 ? pendingOrderCount : undefined}
+            color="warning"
+            max={99}
+            invisible={pendingOrderCount === 0}
+            sx={historyBadgeSx}
+          >
+            <History size={24} />
+          </Badge>
+        ),
+        center: false,
+      },
       { key: 'profile', label: t.nav.profile, icon: <User size={24} />, center: false },
     ];
     // For left-handed: swap sides so primary actions are on the left
@@ -885,7 +919,7 @@ export default function HomePage() {
       return [...rightTabs.reverse(), centerTab, ...leftTabs.reverse()];
     }
     return [...leftTabs, centerTab, ...rightTabs];
-  }, [cart.length, navHandedness, t, lang]);
+  }, [cart.length, pendingOrderCount, navHandedness, t, lang]);
 
 
   const BrandMark = ({ size = 36, showText = true }: { size?: number; showText?: boolean }) => (
@@ -4228,6 +4262,14 @@ export default function HomePage() {
   };
   loadOrderHistoryRef.current = loadOrderHistory;
 
+  // Prefetch order history for navbar pending-payment badge
+  useEffect(() => {
+    if (!session?.user?.email) return;
+    if (!historyLoadedRef.current) {
+      void loadOrderHistoryRef.current({ silent: true });
+    }
+  }, [session?.user?.email]);
+
   // ===== Auto-cancel expired unpaid orders (24h) =====
   // Check if waiting_payment orders have expired and auto-cancel them client-side
   useEffect(() => {
@@ -4515,14 +4557,10 @@ export default function HomePage() {
     const entries = Object.entries(allGroupedProducts)
       .filter(([key]) => categoryFilter === 'ALL' || key === categoryFilter)
       .map(([key, items]) => {
-        const bySearch = term ? items.filter((p) => {
-          const name = getProductName(p, lang).toLowerCase();
-          const nameAlt = p.name?.toLowerCase() || ''; // always search Thai name too
-          const desc = getProductDescription(p, lang).toLowerCase();
-          const type = (TYPE_LABELS_I18N[p.type] || p.type || '').toLowerCase();
-          const cat = ((t.category as Record<string, string>)[key] || getCategoryLabel(key, lang) || key || '').toLowerCase();
-          return name.includes(term) || nameAlt.includes(term) || desc.includes(term) || type.includes(term) || cat.includes(term);
-        }) : items;
+        const catLabel = (t.category as Record<string, string>)[key] || getCategoryLabel(key, lang) || key || '';
+        const bySearch = term
+          ? items.filter((p) => productMatchesSearch(p, term, lang, catLabel))
+          : items;
         const byPrice = bySearch.filter((p) => {
           const price = getBasePrice(p);
           return priceRange[0] <= price && price <= priceRange[1];
@@ -4537,9 +4575,11 @@ export default function HomePage() {
       .filter(([, items]) => items.length > 0);
     
     // Apply sorting
-    if (sortBy !== 'default') {
-      for (const entry of entries) {
-        const items = [...entry[1]];
+    for (const entry of entries) {
+      const items = [...entry[1]];
+      if (term && sortBy === 'default') {
+        items.sort((a, b) => rankProductSearch(b, term, lang) - rankProductSearch(a, term, lang));
+      } else if (sortBy !== 'default') {
         items.sort((a, b) => {
           switch (sortBy) {
             case 'price-low': return getBasePrice(a) - getBasePrice(b);
@@ -4549,17 +4589,70 @@ export default function HomePage() {
             default: return 0;
           }
         });
-        (entry as any)[1] = items;
       }
+      (entry as any)[1] = items;
+    }
+
+    if (term && sortBy === 'default') {
+      entries.sort(([, aItems], [, bItems]) => {
+        const aBest = aItems.reduce((max, p) => Math.max(max, rankProductSearch(p, term, lang)), 0);
+        const bBest = bItems.reduce((max, p) => Math.max(max, rankProductSearch(p, term, lang)), 0);
+        return bBest - aBest;
+      });
     }
     
     return Object.fromEntries(entries);
-  }, [categoryFilter, allGroupedProducts, priceRange, productSearch, sortBy, showOnlyAvailable]);
+  }, [categoryFilter, allGroupedProducts, priceRange, productSearch, sortBy, showOnlyAvailable, lang]);
+
+  const displayGroupedProducts = useMemo(() => {
+    const term = productSearch.trim();
+    if (!term) return filteredGroupedProducts;
+    const flat = Object.values(filteredGroupedProducts).flat();
+    if (flat.length === 0) return filteredGroupedProducts;
+    const ranked = [...flat].sort((a, b) => rankProductSearch(b, term, lang) - rankProductSearch(a, term, lang));
+    return { __SEARCH__: ranked };
+  }, [filteredGroupedProducts, productSearch, lang]);
 
   const filteredProductCount = useMemo(
     () => Object.values(filteredGroupedProducts).reduce((acc, items) => acc + items.length, 0),
     [filteredGroupedProducts]
   );
+
+  const hasActiveSearchFilters = Boolean(
+    productSearch.trim() || categoryFilter !== 'ALL' || showOnlyAvailable || sortBy !== 'default',
+  );
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (productSearch.trim()) count += 1;
+    if (categoryFilter !== 'ALL') count += 1;
+    if (showOnlyAvailable) count += 1;
+    if (sortBy !== 'default') count += 1;
+    return count;
+  }, [productSearch, categoryFilter, showOnlyAvailable, sortBy]);
+
+  const resetSearchFilters = useCallback(() => {
+    setProductSearch('');
+    setCategoryFilter('ALL');
+    setSortBy('default');
+    setShowOnlyAvailable(false);
+    if (priceBounds.max > priceBounds.min) {
+      setPriceRange([priceBounds.min, priceBounds.max]);
+    }
+  }, [priceBounds.max, priceBounds.min]);
+
+  // Ctrl/Cmd+K toggles product search
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'k') return;
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return;
+      e.preventDefault();
+      setShowSearchBar((v) => !v);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   if (!mounted || loading) {
     return <LoadingScreen />;
@@ -4597,7 +4690,11 @@ export default function HomePage() {
           <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 1, mr: 2 }}>
             <Button
               variant={showSearchBar ? 'contained' : 'outlined'}
-              startIcon={<Search size={18} />}
+              startIcon={(
+                <Badge badgeContent={activeFilterCount || undefined} color="warning" invisible={activeFilterCount === 0}>
+                  <Search size={18} />
+                </Badge>
+              )}
               onClick={() => setShowSearchBar((v) => !v)}
               sx={{
                 color: (theme) => showSearchBar ? '#fff' : theme.palette.text.primary,
@@ -4659,7 +4756,17 @@ export default function HomePage() {
             </Button>
             <Button
               variant="outlined"
-              startIcon={<History size={18} />}
+              startIcon={(
+                <Badge
+                  badgeContent={pendingOrderCount > 0 ? pendingOrderCount : undefined}
+                  color="warning"
+                  max={99}
+                  invisible={pendingOrderCount === 0}
+                  sx={historyBadgeSx}
+                >
+                  <History size={18} />
+                </Badge>
+              )}
               onClick={() => handleTabChange('history')}
               sx={{
                 color: (theme) => activeTab === 'history' ? '#0071e3' : theme.palette.text.primary,
@@ -4789,7 +4896,16 @@ export default function HomePage() {
                   size="small"
                   value={productSearch}
                   onChange={(e) => setProductSearch(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Escape') { setProductSearch(''); setShowSearchBar(false); } }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      if (productSearch) setProductSearch('');
+                      else setShowSearchBar(false);
+                    }
+                    if (e.key === 'Enter') {
+                      setShowSearchBar(false);
+                      document.getElementById('product-grid')?.scrollIntoView({ behavior: 'smooth' });
+                    }
+                  }}
                   placeholder={t.search.placeholder}
                   inputProps={{ maxLength: 50 }}
                   fullWidth
@@ -4817,101 +4933,126 @@ export default function HomePage() {
                       </InputAdornment>
                     ) : (
                       <InputAdornment position="end">
-                        <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)', opacity: 0.5 }}>ESC</Typography>
+                        <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)', opacity: 0.5 }}>
+                          {t.search.shortcutHint}
+                        </Typography>
                       </InputAdornment>
                     ),
                   }}
                 />
+                {hasActiveSearchFilters && (
+                  <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', mt: 1 }}>
+                    {t.search.activeFilters}: {filteredProductCount} {t.common.items}
+                  </Typography>
+                )}
               </Box>
 
-              {/* Category Quick Chips - always visible */}
-              <Box sx={{ px: 2, pb: 1.5, display: 'flex', gap: 0.6, overflowX: 'auto', '&::-webkit-scrollbar': { display: 'none' } }}>
-                {categoryMeta.slice(0, 8).map((cat) => (
-                  <Chip
-                    key={cat.key}
-                    label={`${cat.icon ? cat.icon + ' ' : ''}${cat.label}`}
-                    size="small"
-                    onClick={() => {
-                      setCategoryFilter(prev => prev === cat.key ? 'ALL' : cat.key);
-                      if (!productSearch) setProductSearch('');
-                    }}
-                    sx={{
-                      bgcolor: categoryFilter === cat.key ? 'rgba(0,113,227,0.15)' : 'transparent',
-                      color: categoryFilter === cat.key ? '#0071e3' : 'var(--text-muted)',
-                      border: '1px solid',
-                      borderColor: categoryFilter === cat.key ? 'rgba(0,113,227,0.3)' : (theme: any) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-                      fontSize: '0.72rem',
-                      fontWeight: 600,
-                      height: 28,
-                      flexShrink: 0,
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                      '&:hover': { bgcolor: 'rgba(0,113,227,0.1)', borderColor: 'rgba(0,113,227,0.2)' },
-                    }}
-                  />
-                ))}
+              {/* Categories */}
+              <Box sx={{ px: 2, pb: 1.25 }}>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.6 }}>
+                  {categoryMeta.map((cat) => (
+                    <Chip
+                      key={cat.key}
+                      label={`${cat.icon ? `${cat.icon} ` : ''}${cat.label}${cat.key !== 'ALL' ? ` (${cat.count})` : ''}`}
+                      size="small"
+                      onClick={() => setCategoryFilter(cat.key)}
+                      sx={{
+                        bgcolor: categoryFilter === cat.key ? 'rgba(0,113,227,0.15)' : 'transparent',
+                        color: categoryFilter === cat.key ? '#0071e3' : 'var(--text-muted)',
+                        border: '1px solid',
+                        borderColor: categoryFilter === cat.key ? 'rgba(0,113,227,0.3)' : (theme: any) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                        fontSize: '0.72rem',
+                        fontWeight: 600,
+                        height: 28,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        '&:hover': { bgcolor: 'rgba(0,113,227,0.1)', borderColor: 'rgba(0,113,227,0.2)' },
+                      }}
+                    />
+                  ))}
+                </Box>
               </Box>
 
-              {/* Sort & Filter Controls */}
-              <Box sx={{ px: 2, pb: 1.5, display: 'flex', gap: 0.6, alignItems: 'center', overflowX: 'auto', '&::-webkit-scrollbar': { display: 'none' } }}>
-                {/* Sort dropdown chips */}
-                {([
-                  { key: 'default' as const, label: t.search.sortDefault },
-                  { key: 'price-low' as const, label: t.search.sortPriceLow },
-                  { key: 'price-high' as const, label: t.search.sortPriceHigh },
-                  { key: 'newest' as const, label: t.search.sortNewest },
-                  { key: 'name' as const, label: t.search.sortName },
-                ] as const).map((opt) => (
+              {/* Sort & filters */}
+              <Box sx={{ px: 2, pb: 1.5, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+                  <Typography sx={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    {t.search.sortBy}
+                  </Typography>
+                  {([
+                    { key: 'default' as const, label: t.search.sortPopular },
+                    { key: 'price-low' as const, label: t.search.sortPriceLow },
+                    { key: 'price-high' as const, label: t.search.sortPriceHigh },
+                    { key: 'newest' as const, label: t.search.sortNewest },
+                    { key: 'name' as const, label: t.search.sortName },
+                  ] as const).map((opt) => (
+                    <Chip
+                      key={opt.key}
+                      label={opt.label}
+                      size="small"
+                      onClick={() => setSortBy(opt.key)}
+                      sx={{
+                        bgcolor: sortBy === opt.key ? 'rgba(52,199,89,0.15)' : 'transparent',
+                        color: sortBy === opt.key ? '#34c759' : 'var(--text-muted)',
+                        border: '1px solid',
+                        borderColor: sortBy === opt.key ? 'rgba(52,199,89,0.3)' : (theme: any) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                        fontSize: '0.68rem',
+                        fontWeight: 600,
+                        height: 26,
+                        cursor: 'pointer',
+                        '&:hover': { bgcolor: 'rgba(52,199,89,0.1)' },
+                      }}
+                    />
+                  ))}
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, flexWrap: 'wrap' }}>
                   <Chip
-                    key={opt.key}
-                    icon={<ArrowUpDown size={10} />}
-                    label={opt.label}
+                    icon={<Eye size={10} />}
+                    label={t.search.filterAvailable}
                     size="small"
-                    onClick={() => setSortBy(opt.key)}
+                    onClick={() => setShowOnlyAvailable(!showOnlyAvailable)}
                     sx={{
-                      bgcolor: sortBy === opt.key ? 'rgba(52,199,89,0.15)' : 'transparent',
-                      color: sortBy === opt.key ? '#34c759' : 'var(--text-muted)',
+                      bgcolor: showOnlyAvailable ? 'rgba(0,113,227,0.15)' : 'transparent',
+                      color: showOnlyAvailable ? '#0071e3' : 'var(--text-muted)',
                       border: '1px solid',
-                      borderColor: sortBy === opt.key ? 'rgba(52,199,89,0.3)' : (theme: any) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                      borderColor: showOnlyAvailable ? 'rgba(0,113,227,0.3)' : (theme: any) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
                       fontSize: '0.68rem',
                       fontWeight: 600,
                       height: 26,
-                      flexShrink: 0,
                       cursor: 'pointer',
-                      transition: 'all 0.2s ease',
                       '& .MuiChip-icon': { color: 'inherit', ml: 0.5 },
-                      '&:hover': { bgcolor: 'rgba(52,199,89,0.1)' },
+                      '&:hover': { bgcolor: 'rgba(0,113,227,0.1)' },
                     }}
                   />
-                ))}
-                <Box sx={{ width: 1, height: 20, bgcolor: 'var(--glass-border)', flexShrink: 0, mx: 0.3 }} />
-                {/* Available only toggle */}
-                <Chip
-                  icon={<Eye size={10} />}
-                  label={t.search.filterAvailable}
-                  size="small"
-                  onClick={() => setShowOnlyAvailable(!showOnlyAvailable)}
-                  sx={{
-                    bgcolor: showOnlyAvailable ? 'rgba(0,113,227,0.15)' : 'transparent',
-                    color: showOnlyAvailable ? '#0071e3' : 'var(--text-muted)',
-                    border: '1px solid',
-                    borderColor: showOnlyAvailable ? 'rgba(0,113,227,0.3)' : (theme: any) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-                    fontSize: '0.68rem',
-                    fontWeight: 600,
-                    height: 26,
-                    flexShrink: 0,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    '& .MuiChip-icon': { color: 'inherit', ml: 0.5 },
-                    '&:hover': { bgcolor: 'rgba(0,113,227,0.1)' },
-                  }}
-                />
+                  {hasActiveSearchFilters && (
+                    <Chip
+                      label={t.search.resetFilters}
+                      size="small"
+                      onClick={resetSearchFilters}
+                      sx={{
+                        bgcolor: 'rgba(239,68,68,0.08)',
+                        color: '#ff453a',
+                        border: '1px solid rgba(239,68,68,0.25)',
+                        fontSize: '0.68rem',
+                        fontWeight: 600,
+                        height: 26,
+                        cursor: 'pointer',
+                        '&:hover': { bgcolor: 'rgba(239,68,68,0.14)' },
+                      }}
+                    />
+                  )}
+                </Box>
               </Box>
 
-              {/* Instant Search Results Preview */}
-              {productSearch.trim() && (() => {
+              {/* Search results preview */}
+              {hasActiveSearchFilters && (() => {
                 const allResults = Object.values(filteredGroupedProducts).flat();
-                const previewItems = allResults.slice(0, 5);
+                const ranked = productSearch.trim()
+                  ? [...allResults].sort(
+                      (a, b) => rankProductSearch(b, productSearch, lang) - rankProductSearch(a, productSearch, lang),
+                    )
+                  : allResults;
+                const previewItems = ranked.slice(0, 5);
                 return (
                   <Box sx={{ borderTop: '1px solid', borderColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }}>
                     {/* Results header */}
@@ -5014,8 +5155,8 @@ export default function HomePage() {
                 );
               })()}
 
-              {/* No search - show suggestions */}
-              {!productSearch.trim() && totalProductCount > 0 && (
+              {/* Popular suggestions — only when no filters applied */}
+              {!hasActiveSearchFilters && totalProductCount > 0 && (
                 <Box sx={{ borderTop: '1px solid', borderColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', px: 2, py: 1.5 }}>
                   <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', mb: 1 }}>
                     {t.search.popular}
@@ -5189,7 +5330,17 @@ export default function HomePage() {
                   boxShadow: (theme: any) => theme.palette.mode === 'dark' ? '0 12px 30px rgba(0,0,0,0.25)' : '0 4px 12px rgba(0,0,0,0.06)',
                   '&:hover': { borderColor: 'rgba(16,185,129,0.5)', background: 'linear-gradient(120deg, rgba(16,185,129,0.22), rgba(14,165,233,0.16))' },
                 }}
-                startIcon={<History size={20} />}
+                startIcon={(
+                  <Badge
+                    badgeContent={pendingOrderCount > 0 ? pendingOrderCount : undefined}
+                    color="warning"
+                    max={99}
+                    invisible={pendingOrderCount === 0}
+                    sx={historyBadgeSx}
+                  >
+                    <History size={20} />
+                  </Badge>
+                )}
               >
                 {t.nav.orderHistory}
               </Button>
@@ -5436,108 +5587,66 @@ export default function HomePage() {
                           bgcolor: showSearchBar ? 'rgba(0,113,227,0.15)' : 'var(--glass-bg)',
                         }}
                       >
-                        <Search size={18} />
+                        <Badge badgeContent={activeFilterCount || undefined} color="warning" invisible={activeFilterCount === 0}>
+                          <Search size={18} />
+                        </Badge>
                       </IconButton>
                     </Box>
                   </Box>
 
-                  {/* Category Chips */}
-                  <Box sx={{
-                    display: 'flex',
-                    gap: 0.8,
-                    flexWrap: 'nowrap',
-                    overflowX: 'auto',
-                    pb: 0.5,
-                    mx: -1,
-                    px: 1,
-                    '&::-webkit-scrollbar': { display: 'none' },
-                  }}>
-                    {categoryMeta.map((cat) => {
-                      const active = categoryFilter === cat.key;
-                      return (
-                        <Box
-                          key={cat.key}
-                          className={active ? 'category-chip-active' : ''}
-                          onClick={() => setCategoryFilter(cat.key)}
-                          sx={{
-                            px: 1.8,
-                            py: 0.8,
-                            borderRadius: '12px',
-                            bgcolor: active ? 'rgba(0,113,227,0.2)' : 'var(--glass-bg)',
-                            border: active ? '1px solid rgba(0,113,227,0.5)' : '1px solid var(--glass-border)',
-                            color: active ? 'var(--primary)' : 'var(--text-muted)',
-                            fontSize: '0.8rem',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            whiteSpace: 'nowrap',
-                            transition: 'all 0.2s ease',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 0.8,
-                            '&:hover': {
-                              bgcolor: active ? 'rgba(0,113,227,0.25)' : 'rgba(0,113,227,0.08)',
-                              borderColor: active ? 'rgba(0,113,227,0.6)' : 'rgba(0,113,227,0.2)',
-                              color: 'var(--primary)',
-                            },
-                          }}
-                        >
-                          <span style={{ fontSize: '0.9rem' }}>{(cat as any).icon || ''}</span>
-                          {cat.label}
-                          <Box sx={{
-                            px: 0.7,
-                            py: 0.1,
-                            borderRadius: '6px',
-                            bgcolor: active ? 'rgba(0,113,227,0.4)' : 'var(--glass-bg)',
-                            fontSize: '0.65rem',
-                            fontWeight: 700,
-                          }}>
-                            {cat.count}
+                  {!showSearchBar && (
+                    <Box sx={{ display: 'flex', gap: 0.8, flexWrap: 'wrap', pb: 0.5 }}>
+                      {categoryMeta.map((cat) => {
+                        const active = categoryFilter === cat.key;
+                        return (
+                          <Box
+                            key={cat.key}
+                            className={active ? 'category-chip-active' : ''}
+                            onClick={() => setCategoryFilter(cat.key)}
+                            sx={{
+                              px: 1.8,
+                              py: 0.8,
+                              borderRadius: '12px',
+                              bgcolor: active ? 'rgba(0,113,227,0.2)' : 'var(--glass-bg)',
+                              border: active ? '1px solid rgba(0,113,227,0.5)' : '1px solid var(--glass-border)',
+                              color: active ? 'var(--primary)' : 'var(--text-muted)',
+                              fontSize: '0.8rem',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 0.8,
+                              '&:hover': {
+                                bgcolor: active ? 'rgba(0,113,227,0.25)' : 'rgba(0,113,227,0.08)',
+                                borderColor: active ? 'rgba(0,113,227,0.6)' : 'rgba(0,113,227,0.2)',
+                                color: 'var(--primary)',
+                              },
+                            }}
+                          >
+                            <span style={{ fontSize: '0.9rem' }}>{(cat as any).icon || ''}</span>
+                            {cat.label}
+                            <Box sx={{
+                              px: 0.7,
+                              py: 0.1,
+                              borderRadius: '6px',
+                              bgcolor: active ? 'rgba(0,113,227,0.4)' : 'var(--glass-bg)',
+                              fontSize: '0.65rem',
+                              fontWeight: 700,
+                            }}>
+                              {cat.count}
+                            </Box>
                           </Box>
-                        </Box>
-                      );
-                    })}
-                  </Box>
-
-                  {/* Price Range Filter */}
-                  {priceBounds.max > 0 && priceBounds.max !== priceBounds.min && (
-                    <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid var(--glass-border)' }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                        <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-                          {t.product.filterByPrice}
-                        </Typography>
-                        <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--success)' }}>
-                          ฿{priceRange[0].toLocaleString()} - ฿{priceRange[1].toLocaleString()}
-                        </Typography>
-                      </Box>
-                      <Slider
-                        value={priceRange}
-                        min={priceBounds.min}
-                        max={priceBounds.max}
-                        step={10}
-                        onChange={(_, value) => setPriceRange(value as [number, number])}
-                        valueLabelDisplay="off"
-                        sx={{
-                          color: '#0071e3',
-                          height: 6,
-                          '& .MuiSlider-track': { border: 'none', bgcolor: '#0071e3' },
-                          '& .MuiSlider-rail': { bgcolor: 'var(--glass-bg)' },
-                          '& .MuiSlider-thumb': {
-                            width: 18,
-                            height: 18,
-                            backgroundColor: '#fff',
-                            border: '2px solid #0071e3',
-                            '&:hover': { boxShadow: '0 0 0 8px rgba(0,113,227,0.16)' },
-                          },
-                        }}
-                      />
+                        );
+                      })}
                     </Box>
                   )}
                 </Box>
               </Box>
             )}
 
-            {catalogContext.products.length > 0 && Object.keys(filteredGroupedProducts).length > 0 ? (
-              Object.entries(filteredGroupedProducts).map(([category, items]) => (
+            {catalogContext.products.length > 0 && Object.keys(displayGroupedProducts).length > 0 ? (
+              Object.entries(displayGroupedProducts).map(([category, items]) => (
                 <Box key={category} sx={{ mb: 5 }}>
                   {/* Category Header — Redesigned */}
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
@@ -5552,7 +5661,7 @@ export default function HomePage() {
                       fontSize: '1.15rem',
                       flexShrink: 0,
                     }}>
-                      {getCategoryIcon(category)}
+                      {category === '__SEARCH__' ? '🔍' : getCategoryIcon(category)}
                     </Box>
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Typography sx={{ 
@@ -5562,7 +5671,9 @@ export default function HomePage() {
                         letterSpacing: '-0.02em',
                         lineHeight: 1.2,
                       }}>
-                        {(t.category as Record<string, string>)[category] || getCategoryLabel(category, lang) || TYPE_LABELS_I18N[category] || category || t.type.OTHER}
+                        {category === '__SEARCH__'
+                          ? t.search.results
+                          : (t.category as Record<string, string>)[category] || getCategoryLabel(category, lang) || TYPE_LABELS_I18N[category] || category || t.type.OTHER}
                       </Typography>
                       <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 500 }}>
                         {items.length} {t.common.items}
@@ -6208,10 +6319,8 @@ export default function HomePage() {
         shippingConfig={shippingConfig}
         isShopOpen={cartCheckoutOpen}
         onClearCart={() => {
-          if (confirm(t.cart.clearAllConfirm)) {
-            saveCart([]);
-            showToast('success', t.cart.cleared);
-          }
+          saveCart([]);
+          showToast('success', t.cart.cleared);
         }}
         onUpdateQuantity={(itemId, quantity) => updateCartQuantity(itemId, quantity)}
         onRemoveItem={(itemId) => removeFromCart(itemId)}

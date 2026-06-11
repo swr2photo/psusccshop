@@ -4,6 +4,7 @@ import { requireAuth, isResourceOwner, isAdminEmailAsync } from '@/lib/auth';
 import { API_CACHE } from '@/lib/api-helpers';
 import { buildInvoiceHtml } from '@/lib/invoice-html';
 import { fetchStripeReceiptUrl, readStoredStripeReceiptUrl } from '@/lib/stripe-receipt';
+import { isOrderPaidForReceipt } from '@/lib/shop-constants';
 import { eq, desc } from 'drizzle-orm';
 
 export const runtime = 'nodejs';
@@ -66,6 +67,10 @@ export async function GET(request: NextRequest) {
     const userEmail = authResult.email;
     if (!(await isAdminEmailAsync(userEmail)) && !isResourceOwner(orderEmail, userEmail)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    if (!isOrderPaidForReceipt(order)) {
+      return NextResponse.json({ error: 'Receipt available after payment is confirmed' }, { status: 403 });
     }
 
     const isStripePaid =

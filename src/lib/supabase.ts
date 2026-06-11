@@ -6,7 +6,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { getRedisClient } from './redis';
 import { db } from './db';
 import { orders, config, carts, profiles, emailLogs, userLogs, dataRequests, keyValueStore, adminPermissions, securityAuditLog } from '../db/schema';
-import { eq, lt, gt, and, desc, inArray, like, or, count } from 'drizzle-orm';
+import { eq, lt, lte, gt, gte, and, desc, inArray, like, or, count } from 'drizzle-orm';
 import { getCached, invalidateCacheKey, CACHE_TTL } from './server-cache';
 
 // ==================== CONFIGURATION ====================
@@ -724,6 +724,184 @@ export async function getAllOrders(
     orders: (data || []).map(transformDBOrderToLegacy),
     total: totalResult[0]?.value || 0,
   };
+}
+
+function slimCartForAdminList(cart: unknown): any[] {
+  if (!Array.isArray(cart)) return [];
+  return cart.map((item: any) => ({
+    id: item?.id,
+    productId: item?.productId,
+    name: item?.name,
+    quantity: item?.quantity ?? item?.qty,
+    unitPrice: item?.unitPrice ?? item?.price,
+    size: item?.size,
+  }));
+}
+
+function slimSlipForAdminList(slipData: any): any | undefined {
+  if (!slipData || typeof slipData !== 'object') return undefined;
+  const { base64: _base64, ...rest } = slipData as Record<string, unknown>;
+  return {
+    ...rest,
+    hasData: Boolean(_base64 || rest.imageUrl),
+    imageUrl: rest.imageUrl,
+    uploadedAt: rest.uploadedAt,
+    mime: rest.mime,
+    fileName: rest.fileName,
+    slipData: rest.slipData,
+  };
+}
+
+/** Admin order list — trims heavy cart/slip payloads before sending to client. */
+export async function getAllOrdersForAdminList(
+  options: { limit?: number; offset?: number; status?: string[]; search?: string } = {},
+): Promise<{ orders: any[]; total: number }> {
+  const { orders: rawOrders, total } = await getAllOrders(options);
+  return {
+    total,
+    orders: rawOrders.map((order) => {
+      const slim = {
+        ...order,
+        cart: slimCartForAdminList(order.cart),
+        slip: slimSlipForAdminList(order.slip || order.slipData),
+      };
+      delete slim.slipData;
+      return slim;
+    }),
+  };
+}
+
+/** Fast status counts for admin dashboard (no order rows). */
+export async function getOrderStatusCounts(): Promise<{ byStatus: Record<string, number>; total: number }> {
+  const rows = await db
+    .select({ status: orders.status, value: count() })
+    .from(orders)
+    .groupBy(orders.status);
+
+  const byStatus: Record<string, number> = {};
+  let total = 0;
+  for (const row of rows) {
+    const key = row.status || 'UNKNOWN';
+    byStatus[key] = row.value;
+    total += row.value;
+  }
+  return { byStatus, total };
+}
+
+/** Paginated user activity logs (single SQL query). */
+export async function getUserLogsPaginated(options: {
+  email?: string;
+  action?: string;
+  date?: string;
+  limit?: number;
+  offset?: number;
+} = {}): Promise<{ logs: any[]; total: number }> {
+  const { email, action, date, limit = 100, offset = 0 } = options;
+  const conditions = [];
+  if (email) conditions.push(eq(userLogs.email, email.trim().toLowerCase()));
+  if (action) conditions.push(eq(userLogs.action, action));
+  if (date) {
+    const start = new Date(`${date}T00:00:00.000Z`);
+    const end = new Date(`${date}T23:59:59.999Z`);
+    conditions.push(and(gte(userLogs.createdAt, start), lte(userLogs.createdAt, end)));
+  }
+
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+  let selectQuery = db.select().from(userLogs);
+  let countQuery = db.select({ value: count() }).from(userLogs);
+  if (whereClause) {
+    selectQuery = selectQuery.where(whereClause) as typeof selectQuery;
+    countQuery = countQuery.where(whereClause) as typeof countQuery;
+  }
+
+  const [rows, totalResult] = await Promise.all([
+    selectQuery.orderBy(desc(userLogs.createdAt)).offset(offset).limit(limit),
+    countQuery,
+  ]);
+
+  return {
+    logs: rows.map(transformDBUserLogToLegacy),
+    total: totalResult[0]?.value || 0,
+  };
+}
+
+/** Aggregate unique customers from orders (single SQL query). */
+export async function getOrderCustomerAggregates(limit = 500): Promise<{
+  customers: { email: string; name: string; orderCount: number }[];
+  totalCustomers: number;
+}> {
+  const rows = await db
+    .select({
+      email: orders.customerEmail,
+      name: orders.customerName,
+      orderCount: count(),
+    })
+    .from(orders)
+    .groupBy(orders.customerEmail, orders.customerName)
+    .orderBy(desc(count()))
+    .limit(limit);
+
+  const customers = rows.map((row: { email: string; name: string | null; orderCount: number }) => ({
+    email: row.email,
+    name: row.name || 'ไม่ระบุชื่อ',
+    orderCount: row.orderCount,
+  }));
+
+  return { customers, totalCustomers: customers.length };
+}
+
+/** Email log stats via SQL aggregates. */
+export async function getEmailLogStats(): Promise<{
+  total: number;
+  sent: number;
+  failed: number;
+  pending: number;
+  byType: Record<string, number>;
+  last24h: number;
+  last7days: number;
+}> {
+  const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+  const [statusRows, typeRows, last24hRow, last7daysRow] = await Promise.all([
+    db.select({ status: emailLogs.status, value: count() }).from(emailLogs).groupBy(emailLogs.status),
+    db.select({ emailType: emailLogs.emailType, value: count() }).from(emailLogs).groupBy(emailLogs.emailType),
+    db.select({ value: count() }).from(emailLogs).where(gte(emailLogs.createdAt, dayAgo)),
+    db.select({ value: count() }).from(emailLogs).where(gte(emailLogs.createdAt, weekAgo)),
+  ]);
+
+  const byStatus: Record<string, number> = {};
+  let total = 0;
+  for (const row of statusRows) {
+    byStatus[row.status] = row.value;
+    total += row.value;
+  }
+
+  const byType: Record<string, number> = {};
+  for (const row of typeRows) {
+    byType[row.emailType] = row.value;
+  }
+
+  return {
+    total,
+    sent: byStatus.sent || 0,
+    failed: byStatus.failed || 0,
+    pending: byStatus.pending || 0,
+    byType,
+    last24h: last24hRow[0]?.value || 0,
+    last7days: last7daysRow[0]?.value || 0,
+  };
+}
+
+/** Email logs list via single SQL query. */
+export async function getEmailLogsFromDb(limit = 100): Promise<any[]> {
+  const rows = await db
+    .select()
+    .from(emailLogs)
+    .orderBy(desc(emailLogs.createdAt))
+    .limit(limit);
+  return rows.map(transformDBEmailLogToLegacy);
 }
 
 /**

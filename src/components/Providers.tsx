@@ -327,7 +327,20 @@ const darkTheme = createTheme({
       styleOverrides: {
         root: {
           fieldset: { borderColor: 'rgba(255,255,255,0.12)' },
-          '&:hover fieldset': { borderColor: 'rgba(41,151,255,0.5)' },
+          '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.2)' },
+          '&.Mui-focused': { boxShadow: 'none' },
+          '&.Mui-focused fieldset': {
+            borderColor: 'rgba(255,255,255,0.25)',
+            borderWidth: '1px',
+            boxShadow: 'none',
+          },
+        },
+      },
+    },
+    MuiInputBase: {
+      styleOverrides: {
+        root: {
+          '&.Mui-focused': { boxShadow: 'none' },
         },
       },
     },
@@ -418,7 +431,20 @@ const lightTheme = createTheme({
       styleOverrides: {
         root: {
           fieldset: { borderColor: 'rgba(0,0,0,0.08)' },
-          '&:hover fieldset': { borderColor: 'rgba(0,113,227,0.4)' },
+          '&:hover fieldset': { borderColor: 'rgba(0,0,0,0.16)' },
+          '&.Mui-focused': { boxShadow: 'none' },
+          '&.Mui-focused fieldset': {
+            borderColor: 'rgba(0,0,0,0.2)',
+            borderWidth: '1px',
+            boxShadow: 'none',
+          },
+        },
+      },
+    },
+    MuiInputBase: {
+      styleOverrides: {
+        root: {
+          '&.Mui-focused': { boxShadow: 'none' },
         },
       },
     },

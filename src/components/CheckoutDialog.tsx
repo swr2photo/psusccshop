@@ -164,15 +164,56 @@ export default function CheckoutDialog({
   const [promoError, setPromoError] = useState('');
 
   const { t, lang } = useTranslation();
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
 
-  // Auto-select default saved address when checkout opens
-  useEffect(() => {
-    if (!open || orderData.address?.trim()) return;
-    const def = savedAddresses.find((a) => a.isDefault) || savedAddresses[0];
-    if (def?.address?.trim()) {
-      onAddressChange?.(def.address.trim());
+  const checkoutAddresses = useMemo(() => {
+    const seen = new Set<string>();
+    const list: SavedAddress[] = [];
+    for (const addr of savedAddresses) {
+      const key = addr.address.trim();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      list.push(addr);
     }
-  }, [open, savedAddresses, orderData.address, onAddressChange]);
+    const fallback = orderData.address?.trim();
+    if (fallback && !seen.has(fallback)) {
+      list.push({
+        id: '__profile__',
+        label: t.checkout.profileAddressLabel,
+        address: fallback,
+        isDefault: false,
+      });
+    }
+    return list;
+  }, [savedAddresses, orderData.address, t.checkout.profileAddressLabel]);
+
+  const showAddressPicker = checkoutAddresses.length >= 2;
+
+  // Sync selected address when checkout opens or address list changes
+  useEffect(() => {
+    if (!open) {
+      setSelectedAddressId(null);
+      return;
+    }
+    if (checkoutAddresses.length === 0) return;
+
+    const current = orderData.address?.trim();
+    const matched = checkoutAddresses.find((a) => a.address.trim() === current);
+    const pick = matched || checkoutAddresses.find((a) => a.isDefault) || checkoutAddresses[0];
+
+    setSelectedAddressId(pick.id);
+    if (!matched && pick.address.trim() !== current) {
+      onAddressChange?.(pick.address.trim());
+    }
+  }, [open, checkoutAddresses, orderData.address, onAddressChange]);
+
+  const handleSelectAddress = useCallback(
+    (addr: SavedAddress) => {
+      setSelectedAddressId(addr.id);
+      onAddressChange?.(addr.address.trim());
+    },
+    [onAddressChange],
+  );
 
   // i18n helpers for shipping/payment option names
   const getShippingName = (option: ShippingOption) => lang === 'en' && option.nameEn ? option.nameEn : option.name;
@@ -850,42 +891,62 @@ export default function CheckoutDialog({
             <Typography sx={{ color: 'var(--foreground)', fontSize: '0.9rem' }}>
               <Box component="span" sx={{ color: 'var(--text-muted)', mr: 1 }}>IG:</Box>{orderData.instagram || '—'}
             </Typography>
-            {/* Address - always show with required indicator for delivery */}
-            {savedAddresses.length > 1 && requiresAddress ? (
+            {/* Address — pick from saved list when user has multiple */}
+            {showAddressPicker ? (
               <Box sx={{ mt: 0.5 }}>
-                <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem', mb: 0.5 }}>
-                  {t.checkout.address}<Box component="span" sx={{ color: '#ff453a', ml: 0.3 }}>*</Box>
+                <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem', mb: 0.25 }}>
+                  {t.checkout.selectAddress}
+                  {requiresAddress && <Box component="span" sx={{ color: '#ff453a', ml: 0.3 }}>*</Box>}
                 </Typography>
+                {!requiresAddress && (
+                  <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.72rem', mb: 0.75 }}>
+                    {t.checkout.addressPickupHint}
+                  </Typography>
+                )}
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                  {savedAddresses.map((addr) => (
-                    <Box
-                      key={addr.id}
-                      onClick={() => onAddressChange?.(addr.address)}
-                      sx={{
-                        p: 1,
-                        borderRadius: '10px',
-                        cursor: 'pointer',
-                        bgcolor: orderData.address === addr.address ? 'rgba(0,113,227,0.08)' : 'var(--surface)',
-                        border: orderData.address === addr.address ? '2px solid rgba(0,113,227,0.4)' : '1px solid var(--glass-border)',
-                        transition: 'all 0.2s ease',
-                        '&:hover': { borderColor: 'rgba(0,113,227,0.3)' },
-                      }}
-                    >
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.3 }}>
-                        <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: orderData.address === addr.address ? 'var(--primary)' : 'var(--text-muted)' }}>
-                          {addr.label}
+                  {checkoutAddresses.map((addr) => {
+                    const isSelected = selectedAddressId === addr.id;
+                    return (
+                      <Box
+                        key={addr.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => handleSelectAddress(addr)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            handleSelectAddress(addr);
+                          }
+                        }}
+                        sx={{
+                          p: 1.1,
+                          borderRadius: '10px',
+                          cursor: 'pointer',
+                          bgcolor: isSelected ? 'rgba(0,113,227,0.08)' : 'var(--surface)',
+                          border: isSelected ? '2px solid rgba(0,113,227,0.45)' : '1px solid var(--glass-border)',
+                          transition: 'all 0.2s ease',
+                          '&:hover': { borderColor: 'rgba(0,113,227,0.35)' },
+                        }}
+                      >
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mb: 0.3 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
+                            <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: isSelected ? 'var(--primary)' : 'var(--text-muted)' }}>
+                              {addr.label}
+                            </Typography>
+                            {addr.isDefault && (
+                              <Typography sx={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--success)', bgcolor: 'rgba(16,185,129,0.1)', px: 0.5, borderRadius: '4px' }}>
+                                {t.common.default}
+                              </Typography>
+                            )}
+                          </Box>
+                          {isSelected && <Check size={14} color="#0071e3" />}
+                        </Box>
+                        <Typography sx={{ fontSize: '0.8rem', color: 'var(--foreground)', lineHeight: 1.4 }}>
+                          {addr.address}
                         </Typography>
-                        {addr.isDefault && (
-                          <Typography sx={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--success)', bgcolor: 'rgba(16,185,129,0.1)', px: 0.5, borderRadius: '4px' }}>
-                            {t.common.default}
-                          </Typography>
-                        )}
                       </Box>
-                      <Typography sx={{ fontSize: '0.8rem', color: 'var(--foreground)', lineHeight: 1.4 }}>
-                        {addr.address}
-                      </Typography>
-                    </Box>
-                  ))}
+                    );
+                  })}
                 </Box>
               </Box>
             ) : (

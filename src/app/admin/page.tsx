@@ -4022,7 +4022,7 @@ export default function AdminPage(): JSX.Element {
   const [slipViewerOpen, setSlipViewerOpen] = useState(false);
   const [slipViewerData, setSlipViewerData] = useState<{ ref: string; slip?: AdminOrder['slip'] } | null>(null);
   const isDesktop = useMediaQuery('(min-width:900px)');
-  const hasInitialData = orders.length > 0 || (config.products || []).length > 0 || logs.length > 0 || !!lastSavedTime;
+  const hasInitialData = serverRoleChecked || orders.length > 0 || (config.products || []).length > 0 || logs.length > 0 || !!lastSavedTime;
   const fetchInFlightRef = useRef(false);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -4159,74 +4159,90 @@ export default function AdminPage(): JSX.Element {
     });
   }, [session?.user?.email]);
 
-  // 📥 SWR Data Handler - processes data from SWR hook
-  const handleSWRDataReceived = useCallback((data: { orders: any[]; config: any; logs: any[]; userRole?: string; userEmail?: string; shopAdminPermissions?: Record<string, boolean> }) => {
-    const normalizedOrders = Array.isArray(data.orders) 
-      ? data.orders.map(normalizeOrder).filter((o) => o.ref) 
-      : [];
-    const nextConfig = data.config || DEFAULT_CONFIG;
-    let nextLogs = data.logs || [];
-    
-    // Set server-validated role (if provided)
-    if (data.userRole) {
-      setServerUserRole(data.userRole as 'superadmin' | 'admin' | 'shopAdmin');
-      setServerRoleChecked(true);
-    }
-    // Store shop admin permissions if present
-    if (data.shopAdminPermissions) {
-      setShopAdminPermissions(data.shopAdminPermissions);
-    }
-    
-    if ((!nextLogs || nextLogs.length === 0) && normalizedOrders.length > 0) {
-      nextLogs = normalizedOrders.slice(0, 50).map((o) => [
-        o.date || new Date().toISOString(),
-        o.email || o.name || 'system',
-        'ORDER',
-        `${o.ref} : ${o.status}`
-      ]);
-    }
-    
-    // Efficient diffing: compare lightweight fingerprints instead of full JSON.stringify
-    // Skip config update when viewing a specific shop (don't overwrite shop config with global)
-    if (!isShopModeRef.current) {
-      setConfig(prev => {
-        // Quick check: compare key scalar fields first before falling back to JSON
-        if (prev.isOpen === nextConfig.isOpen &&
-            prev.sheetId === nextConfig.sheetId &&
-            (prev.products?.length ?? 0) === (nextConfig.products?.length ?? 0) &&
-            (prev.adminEmails?.length ?? 0) === (nextConfig.adminEmails?.length ?? 0)) {
-          // Fields match — do deeper check only if shallow looks same
-          const prevJson = JSON.stringify(prev);
-          const nextJson = JSON.stringify(nextConfig);
-          if (prevJson === nextJson) return prev;
-        }
-        return nextConfig;
-      });
-    } else {
-      // Still update the global config ref so switching back restores the latest
-      globalConfigRef.current = nextConfig;
-    }
-    setDynamicAdminEmails(nextConfig.adminEmails || []);
-    setOrders(prev => {
-      // Fast path: length changed → definitely different
-      if (prev.length !== normalizedOrders.length) return normalizedOrders;
-      // Lightweight fingerprint: ref + status + slip presence
-      const prevKey = prev.map(o => `${o.ref}:${o.status}`).join(',');
-      const nextKey = normalizedOrders.map(o => `${o.ref}:${o.status}`).join(',');
-      return prevKey === nextKey ? prev : normalizedOrders;
-    });
-    setLogs(prev => {
-      if (prev.length === nextLogs.length && prev.length > 0) {
-        // Compare only first entry timestamp
-        const prevTs = prev[0]?.[0];
-        const nextTs = nextLogs[0]?.[0];
-        if (prevTs === nextTs) return prev;
+  // 📥 Progressive admin data — merge each section as it arrives
+  const handleAdminSectionReceived = useCallback((payload: {
+    section: 'bootstrap' | 'config' | 'orders';
+    orders?: any[];
+    config?: any;
+    logs?: any[];
+    userRole?: string;
+    userEmail?: string;
+    shopAdminPermissions?: Record<string, boolean>;
+  }) => {
+    if (payload.section === 'bootstrap') {
+      if (payload.userRole) {
+        setServerUserRole(payload.userRole as 'superadmin' | 'admin' | 'shopAdmin');
+        setServerRoleChecked(true);
       }
-      return nextLogs;
-    });
-    
-    setLastSavedTime(new Date());
-    saveAdminCache({ config: nextConfig, orders: normalizedOrders, logs: nextLogs });
+      if (payload.shopAdminPermissions) {
+        setShopAdminPermissions(payload.shopAdminPermissions);
+      }
+      return;
+    }
+
+    if (payload.section === 'config' && payload.config) {
+      const nextConfig = payload.config || DEFAULT_CONFIG;
+      if (!isShopModeRef.current) {
+        setConfig((prev) => {
+          if (prev.isOpen === nextConfig.isOpen &&
+              prev.sheetId === nextConfig.sheetId &&
+              (prev.products?.length ?? 0) === (nextConfig.products?.length ?? 0) &&
+              (prev.adminEmails?.length ?? 0) === (nextConfig.adminEmails?.length ?? 0)) {
+            const prevJson = JSON.stringify(prev);
+            const nextJson = JSON.stringify(nextConfig);
+            if (prevJson === nextJson) return prev;
+          }
+          return nextConfig;
+        });
+      } else {
+        globalConfigRef.current = nextConfig;
+      }
+      setDynamicAdminEmails(nextConfig.adminEmails || []);
+      setLastSavedTime(new Date());
+      saveAdminCache({
+        config: nextConfig,
+        orders: ordersRef.current,
+        logs: logsRef.current,
+      });
+      return;
+    }
+
+    if (payload.section === 'orders') {
+      const normalizedOrders = Array.isArray(payload.orders)
+        ? payload.orders.map(normalizeOrder).filter((o) => o.ref)
+        : [];
+      let nextLogs = payload.logs || [];
+      if ((!nextLogs || nextLogs.length === 0) && normalizedOrders.length > 0) {
+        nextLogs = normalizedOrders.slice(0, 50).map((o) => [
+          o.date || new Date().toISOString(),
+          o.email || o.name || 'system',
+          'ORDER',
+          `${o.ref} : ${o.status}`,
+        ]);
+      }
+
+      setOrders((prev) => {
+        if (prev.length !== normalizedOrders.length) return normalizedOrders;
+        const prevKey = prev.map((o) => `${o.ref}:${o.status}`).join(',');
+        const nextKey = normalizedOrders.map((o) => `${o.ref}:${o.status}`).join(',');
+        return prevKey === nextKey ? prev : normalizedOrders;
+      });
+      setLogs((prev) => {
+        if (prev.length === nextLogs.length && prev.length > 0) {
+          const prevTs = prev[0]?.[0];
+          const nextTs = nextLogs[0]?.[0];
+          if (prevTs === nextTs) return prev;
+        }
+        return nextLogs;
+      });
+
+      setLastSavedTime(new Date());
+      saveAdminCache({
+        config: configRef.current,
+        orders: normalizedOrders,
+        logs: nextLogs,
+      });
+    }
   }, []);
 
   // ========== Fetch My Shops (after auth) ==========
@@ -4328,12 +4344,14 @@ export default function AdminPage(): JSX.Element {
   const { 
     isLoading: swrLoading, 
     isRefreshing: swrRefreshing,
+    sectionsLoading,
     refresh: swrRefresh,
+    refreshConfig: swrRefreshConfig,
     invalidate: swrInvalidate,
     applyRealtimeOrderChange,
   } = useAdminDataSWR({
     enabled: status === 'authenticated',
-    onDataReceived: handleSWRDataReceived,
+    onSectionReceived: handleAdminSectionReceived,
     onError: (error) => {
       // Mark role check complete so auth useEffect can proceed
       setServerRoleChecked(true);
@@ -4359,8 +4377,8 @@ export default function AdminPage(): JSX.Element {
   });
 
   // 📥 Fetch Data wrapper (for compatibility with existing code)
-  const fetchData = useCallback(async (opts?: { silent?: boolean }) => {
-    await swrRefresh(opts);
+  const fetchData = useCallback(async (_opts?: { silent?: boolean }) => {
+    await swrRefresh();
   }, [swrRefresh]);
 
   // Batch update order statuses
@@ -4948,9 +4966,9 @@ export default function AdminPage(): JSX.Element {
   // The realtime payload is only a lightweight signal ({ updatedAt, isOpen });
   // refetch /api/admin/data to get the full (unsanitized) config.
   const handleRealtimeConfigChange = useCallback((signal?: { updatedAt?: string; isOpen?: boolean | null }) => {
-    console.log('[Admin Realtime] Config changed — refetching admin data. Open status:', signal?.isOpen);
-    swrRefresh({ silent: true });
-  }, [swrRefresh]);
+    console.log('[Admin Realtime] Config changed — refetching config. Open status:', signal?.isOpen);
+    swrRefreshConfig();
+  }, [swrRefreshConfig]);
 
   // Use realtime subscriptions for admin (orders + config)
   const { isConnected: realtimeConnected } = useRealtimeAdminOrders(
@@ -9406,6 +9424,28 @@ export default function AdminPage(): JSX.Element {
               },
             }}
           />
+          {(sectionsLoading?.config || sectionsLoading?.orders) && (
+            <Typography
+              sx={{
+                position: 'fixed',
+                top: 6,
+                right: 12,
+                zIndex: 10000,
+                fontSize: '0.65rem',
+                color: 'var(--text-muted)',
+                bgcolor: 'rgba(0,0,0,0.45)',
+                px: 1,
+                py: 0.25,
+                borderRadius: 1,
+              }}
+            >
+              {sectionsLoading.config && sectionsLoading.orders
+                ? 'กำลังโหลดตั้งค่าและออเดอร์...'
+                : sectionsLoading.config
+                  ? 'กำลังโหลดตั้งค่า...'
+                  : 'กำลังโหลดออเดอร์...'}
+            </Typography>
+          )}
         </Box>
       )}
 

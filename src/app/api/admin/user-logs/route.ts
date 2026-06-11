@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireSuperAdmin } from '@/lib/auth';
-import { getJson, putJson, listKeys } from '@/lib/filebase';
+import { putJson, getUserLogsPaginated } from '@/lib/filebase';
 
 export interface UserLog {
   id: string;
@@ -44,16 +44,16 @@ export async function saveUserLog(log: Omit<UserLog, 'id' | 'timestamp'>): Promi
     timestamp: new Date().toISOString(),
   };
   await putJson(userLogKey(id), fullLog);
-  
-  // Update daily index
+
   const date = new Date();
   const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   const indexKey = `user-logs/index/${dateKey}.json`;
+  const { getJson } = await import('@/lib/filebase');
   const existing = (await getJson<string[]>(indexKey)) || [];
   await putJson(indexKey, [...existing, id]);
 }
 
-// GET: Retrieve user logs
+// GET: Retrieve user logs (single SQL query + pagination)
 export async function GET(request: NextRequest) {
   try {
     const admin = await requireSuperAdmin();
@@ -62,44 +62,25 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const email = searchParams.get('email');
-    const action = searchParams.get('action');
-    const date = searchParams.get('date');
-    const limit = parseInt(searchParams.get('limit') || '100');
+    const email = searchParams.get('email') || undefined;
+    const action = searchParams.get('action') || undefined;
+    const date = searchParams.get('date') || undefined;
+    const limit = parseInt(searchParams.get('limit') || '100', 10);
+    const offset = parseInt(searchParams.get('offset') || '0', 10);
 
-    let keys = await listKeys('user-logs/');
-    keys = keys.filter(k => k.endsWith('.json') && !k.includes('/index/'));
-    
-    // Sort by newest first
-    keys = keys.sort().reverse().slice(0, Math.min(limit * 2, 500));
+    const { logs, total } = await getUserLogsPaginated({ email, action, date, limit, offset });
 
-    let logs: UserLog[] = [];
-
-    for (const key of keys) {
-      const log = await getJson<UserLog>(key);
-      if (log) {
-        // Apply filters
-        if (email && log.email.toLowerCase() !== email.toLowerCase()) continue;
-        if (action && log.action !== action) continue;
-        if (date && !log.timestamp.startsWith(date)) continue;
-        
-        logs.push(log);
-        if (logs.length >= limit) break;
-      }
-    }
-
-    // Calculate stats
     const stats = {
-      total: logs.length,
+      total,
       byAction: {} as Record<string, number>,
-      uniqueUsers: new Set(logs.map(l => l.email)).size,
-      last24h: logs.filter(l => {
+      uniqueUsers: new Set(logs.map((l) => l.email)).size,
+      last24h: logs.filter((l) => {
         const ts = new Date(l.timestamp).getTime();
         return Date.now() - ts < 24 * 60 * 60 * 1000;
       }).length,
     };
 
-    logs.forEach(log => {
+    logs.forEach((log) => {
       stats.byAction[log.action] = (stats.byAction[log.action] || 0) + 1;
     });
 
@@ -114,7 +95,6 @@ export async function GET(request: NextRequest) {
 // POST: Log user action (requires authentication)
 export async function POST(request: NextRequest) {
   try {
-    // Verify the user is authenticated
     const { getServerSession } = await import('next-auth');
     const { authOptions } = await import('@/lib/auth');
     const session = await getServerSession(authOptions);
@@ -125,7 +105,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { action, details, metadata } = body;
 
-    // Use session email to prevent spoofing
     const email = session.user.email;
     const name = session.user.name || undefined;
 
@@ -133,7 +112,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing action' }, { status: 400 });
     }
 
-    // Get IP and User Agent
     const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
     const userAgent = request.headers.get('user-agent') || 'unknown';
 

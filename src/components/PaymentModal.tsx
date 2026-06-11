@@ -5,7 +5,7 @@ import type { JSX } from 'react';
 import { X, Upload, Check, Loader2, AlertCircle, CheckCircle2, Image, Clock3, Download, CreditCard, QrCode, Copy, Smartphone, Sparkles, AlertTriangle, Info, ShoppingBag, Tag, Hash, Shirt, Clock, Palette } from 'lucide-react';
 import { Drawer, Box, Typography, Button, IconButton, Skeleton, useMediaQuery, LinearProgress, Slide, Collapse } from '@mui/material';
 import { QRCodeSVG } from 'qrcode.react';
-import { PaymentCountdown } from './OrderCountdown';
+import { CountdownBadge } from './OrderCountdown';
 import StripePromptPay from './StripePromptPay';
 import { useTranslation } from '@/hooks/useTranslation';
 
@@ -810,85 +810,6 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
         ) : (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, maxWidth: 500, mx: 'auto' }}>
             
-            {/* Amount Card - Hero Style */}
-            <Box sx={{
-              p: 3,
-              borderRadius: '24px',
-              background: 'linear-gradient(135deg, #34c759 0%, #0891b2 100%)',
-              color: 'white',
-              textAlign: 'center',
-              position: 'relative',
-              overflow: 'hidden',
-            }}>
-              {/* Decorative circles */}
-              <Box sx={{
-                position: 'absolute',
-                top: -30,
-                right: -30,
-                width: 100,
-                height: 100,
-                borderRadius: '50%',
-                bgcolor: 'var(--glass-bg)',
-              }} />
-              <Box sx={{
-                position: 'absolute',
-                bottom: -20,
-                left: -20,
-                width: 60,
-                height: 60,
-                borderRadius: '50%',
-                bgcolor: 'var(--glass-bg)',
-              }} />
-              
-              <Typography sx={{ fontSize: '0.85rem', opacity: 0.9, mb: 1, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'center' }}>
-                <CreditCard size={16} /> {t.payment.amountToPay}
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1.5 }}>
-                <Typography sx={{ fontSize: '3rem', fontWeight: 900, letterSpacing: '-2px' }}>
-                  ฿{amount.toLocaleString()}
-                </Typography>
-                <IconButton 
-                  onClick={copyAmount} 
-                  sx={{ 
-                    color: 'var(--foreground)', 
-                    bgcolor: 'var(--glass-bg)',
-                    '&:hover': { bgcolor: 'var(--glass-bg)' },
-                  }}
-                >
-                  <Copy size={16} />
-                </IconButton>
-              </Box>
-              {discountValue > 0 && (
-                <Box sx={{ 
-                  display: 'inline-flex', 
-                  alignItems: 'center',
-                  gap: 1.5, 
-                  mt: 1.5, 
-                  px: 2,
-                  py: 0.5,
-                  borderRadius: '20px',
-                  bgcolor: 'var(--glass-bg)',
-                  fontSize: '0.8rem',
-                }}>
-                  <Typography sx={{ opacity: 0.9, textDecoration: 'line-through' }}>฿{baseAmount.toLocaleString()}</Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Sparkles size={12} />
-                    <Typography sx={{ color: 'var(--success)', fontWeight: 600 }}>{t.payment.discount} ฿{discountValue.toLocaleString()}</Typography>
-                  </Box>
-                </Box>
-              )}
-            </Box>
-
-            {/* Payment Countdown Timer */}
-            {orderDate && !isPaid && (
-              <PaymentCountdown
-                orderDate={orderDate}
-                onExpired={() => {
-                  addToast('warning', t.payment.expiredPayment, t.payment.autoCancel);
-                }}
-              />
-            )}
-
             {/* Payment Disabled Alert */}
             {!paymentEnabled && (
               <Box sx={{
@@ -1227,7 +1148,12 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                   </Box>
                 </Box>
                 <Box sx={{ p: 3 }}>
-                  <StripePromptPay orderRef={orderRef} onSuccess={handleStripeSuccess} />
+                  <StripePromptPay
+                    orderRef={orderRef}
+                    orderDate={orderDate ?? undefined}
+                    onExpired={() => addToast('warning', t.payment.expiredPayment, t.payment.autoCancel)}
+                    onSuccess={handleStripeSuccess}
+                  />
                 </Box>
               </Box>
             )}
@@ -1339,6 +1265,16 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                         fgColor="#1a237e"
                       />
                     </Box>
+                    {orderDate && !isPaid && (
+                      <Box sx={{ mt: 1, display: 'flex', justifyContent: 'center' }}>
+                        <CountdownBadge
+                          orderDate={orderDate}
+                          compact
+                          tone="inverse"
+                          onExpired={() => addToast('warning', t.payment.expiredPayment, t.payment.autoCancel)}
+                        />
+                      </Box>
+                    )}
                     {/* Amount */}
                     <Box sx={{ mt: 1.5, textAlign: 'center' }}>
                       <Typography sx={{ color: 'var(--foreground)', fontSize: '0.75rem', mb: 0.25 }}>

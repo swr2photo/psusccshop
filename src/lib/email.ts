@@ -70,16 +70,32 @@ export function getOrderRecipientEmail(order: {
   return raw.trim().toLowerCase();
 }
 
-function parseResendError(result: unknown, status: number): string {
+function extractFromDomain(from: string): string | null {
+  const match = from.match(/<([^>]+)>/) || from.match(/([\w.-]+@[\w.-]+\.\w+)/);
+  const email = (match?.[1] || from).trim();
+  const domain = email.split('@')[1]?.toLowerCase();
+  return domain || null;
+}
+
+function parseResendError(result: unknown, status: number, from?: string): string {
+  let message = '';
   if (result && typeof result === 'object') {
     const r = result as Record<string, unknown>;
-    if (typeof r.message === 'string' && r.message) return r.message;
-    if (Array.isArray(r.errors) && r.errors.length > 0) {
+    if (typeof r.message === 'string' && r.message) message = r.message;
+    else if (Array.isArray(r.errors) && r.errors.length > 0) {
       const first = r.errors[0] as Record<string, unknown>;
-      if (typeof first.message === 'string') return first.message;
+      if (typeof first.message === 'string') message = first.message;
     }
   }
-  return `Resend API error (${status})`;
+  if (!message) message = `Resend API error (${status})`;
+
+  if (/domain is not verified/i.test(message) && from) {
+    const domain = extractFromDomain(from);
+    if (domain) {
+      message += ` — verify ${domain} at https://resend.com/domains or set EMAIL_FROM to an address on a verified domain (e.g. no_reply@psuscc.club).`;
+    }
+  }
+  return message;
 }
 
 // ==================== EMAIL LOG HELPERS ====================
@@ -202,7 +218,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ success: b
     }
 
     if (!response.ok) {
-      throw new Error(parseResendError(result, response.status));
+      throw new Error(parseResendError(result, response.status, from));
     }
 
     log.status = 'sent';

@@ -13,6 +13,8 @@ interface OrderCountdownProps {
   orderDate: string | Date;
   /** Compact mode - single line (default: false) */
   compact?: boolean;
+  /** `inverse` — high-contrast on dark backgrounds (e.g. PromptPay QR card) */
+  tone?: 'default' | 'inverse';
   /** Called when the countdown reaches zero */
   onExpired?: () => void;
   /** Custom expiry duration in ms (default: 24h) */
@@ -91,7 +93,7 @@ export function useOrderCountdown(orderDate: string | Date | undefined, expiryMs
 /**
  * Compact countdown badge for order cards.
  */
-export function CountdownBadge({ orderDate, compact, onExpired, expiryMs }: OrderCountdownProps) {
+export function CountdownBadge({ orderDate, compact, tone = 'default', onExpired, expiryMs }: OrderCountdownProps) {
   const { t } = useTranslation();
   const { time, isExpired, isUrgent, isWarning } = useOrderCountdown(orderDate, expiryMs);
 
@@ -119,9 +121,22 @@ export function CountdownBadge({ orderDate, compact, onExpired, expiryMs }: Orde
     );
   }
 
-  const color = isUrgent ? '#ef4444' : isWarning ? '#f59e0b' : '#0071e3';
-  const bgColor = isUrgent ? 'rgba(239,68,68,0.1)' : isWarning ? 'rgba(245,158,11,0.1)' : 'rgba(0,113,227,0.1)';
-  const borderColor = isUrgent ? 'rgba(239,68,68,0.25)' : isWarning ? 'rgba(245,158,11,0.25)' : 'rgba(0,113,227,0.25)';
+  const onDark = tone === 'inverse';
+  const color = isUrgent
+    ? (onDark ? '#fecaca' : '#ef4444')
+    : isWarning
+      ? (onDark ? '#fde68a' : '#f59e0b')
+      : (onDark ? '#ffffff' : '#0071e3');
+  const bgColor = isUrgent
+    ? (onDark ? 'rgba(248,113,113,0.28)' : 'rgba(239,68,68,0.1)')
+    : isWarning
+      ? (onDark ? 'rgba(251,191,36,0.22)' : 'rgba(245,158,11,0.1)')
+      : (onDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,113,227,0.1)');
+  const borderColor = isUrgent
+    ? (onDark ? 'rgba(254,202,202,0.55)' : 'rgba(239,68,68,0.25)')
+    : isWarning
+      ? (onDark ? 'rgba(253,230,138,0.5)' : 'rgba(245,158,11,0.25)')
+      : (onDark ? 'rgba(255,255,255,0.42)' : 'rgba(0,113,227,0.25)');
 
   if (compact) {
     return (
@@ -129,19 +144,21 @@ export function CountdownBadge({ orderDate, compact, onExpired, expiryMs }: Orde
         display: 'inline-flex',
         alignItems: 'center',
         gap: 0.5,
-        px: 1,
-        py: 0.3,
+        px: 1.1,
+        py: 0.4,
         borderRadius: '8px',
         bgcolor: bgColor,
         border: `1px solid ${borderColor}`,
+        boxShadow: onDark ? '0 2px 8px rgba(0,0,0,0.2)' : 'none',
       }}>
-        <Clock size={11} style={{ color }} />
+        <Clock size={onDark ? 12 : 11} style={{ color }} />
         <Typography sx={{
-          fontSize: '0.68rem',
+          fontSize: onDark ? '0.8rem' : '0.68rem',
           fontWeight: 700,
           color,
           fontFamily: 'monospace',
           letterSpacing: '0.5px',
+          textShadow: onDark ? '0 1px 2px rgba(0,0,0,0.35)' : 'none',
         }}>
           {time.hours}:{time.minutes}:{time.seconds}
         </Typography>

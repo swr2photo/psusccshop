@@ -170,6 +170,41 @@ export const STATUS_COLORS: Record<string, string> = {
 export const PAYABLE_STATUSES = ['PENDING', 'WAITING_PAYMENT', 'AWAITING_PAYMENT', 'UNPAID', 'DRAFT'];
 export const CANCELABLE_STATUSES = ['PENDING', 'WAITING_PAYMENT', 'AWAITING_PAYMENT', 'UNPAID', 'DRAFT'];
 
+const RECEIPT_BLOCKED_STATUSES = [
+  'WAITING_PAYMENT',
+  'AWAITING_PAYMENT',
+  'UNPAID',
+  'DRAFT',
+  'PENDING',
+  'VERIFYING',
+  'WAITING_SLIP',
+  'CANCELLED',
+  'REJECTED',
+  'FAILED',
+] as const;
+
+const RECEIPT_PAID_STATUSES = [
+  'PAID',
+  'READY',
+  'SHIPPED',
+  'COMPLETED',
+  'RECEIVED',
+  'REFUNDED',
+  'REFUND_REQUESTED',
+] as const;
+
+/** Receipt / invoice is only available after payment is confirmed. */
+export function isOrderPaidForReceipt(order: {
+  status?: string;
+  paymentVerified?: boolean;
+  payment_verified?: boolean;
+}): boolean {
+  const status = normalizeStatus(order.status || '');
+  if ((RECEIPT_BLOCKED_STATUSES as readonly string[]).includes(status)) return false;
+  if (order.paymentVerified === true || order.payment_verified === true) return true;
+  return (RECEIPT_PAID_STATUSES as readonly string[]).includes(status);
+}
+
 export const normalizeStatus = (status: string) => (status || '').trim().toUpperCase();
 
 export const getStatusCategory = (status: string): 'WAITING_PAYMENT' | 'COMPLETED' | 'SHIPPED' | 'RECEIVED' | 'CANCELLED' | 'OTHER' => {

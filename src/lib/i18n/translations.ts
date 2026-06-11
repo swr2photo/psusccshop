@@ -334,6 +334,9 @@ const checkout = {
     processing: 'กำลังดำเนินการ...',
     confirmOrder: 'ยืนยันสั่งซื้อ',
     address: 'ที่อยู่จัดส่ง:',
+    selectAddress: 'เลือกที่อยู่จัดส่ง',
+    addressPickupHint: 'จะใช้เมื่อเลือกการจัดส่งสินค้า',
+    profileAddressLabel: 'ที่อยู่จากโปรไฟล์',
     addressEmpty: 'กรุณากรอกที่อยู่จัดส่ง',
     profileWarning: 'กรุณาบันทึกโปรไฟล์ (ชื่อไทย, เบอร์, IG) ก่อนยืนยัน',
     addressRequired: 'กรุณากรอกที่อยู่สำหรับจัดส่งสินค้า',
@@ -363,6 +366,9 @@ const checkout = {
     processing: 'Processing...',
     confirmOrder: 'Confirm Order',
     address: 'Shipping Address:',
+    selectAddress: 'Select shipping address',
+    addressPickupHint: 'Used when delivery shipping is selected',
+    profileAddressLabel: 'Profile address',
     addressEmpty: 'Please enter a shipping address',
     profileWarning: 'Please complete your profile (name, phone, IG) first',
     addressRequired: 'Please enter a shipping address',
@@ -1019,6 +1025,8 @@ const search = {
     filterSize: 'ไซส์',
     filterAvailable: 'เฉพาะเปิดขาย',
     resetFilters: 'ล้างตัวกรอง',
+    shortcutHint: 'Ctrl+K',
+    activeFilters: 'ตัวกรองที่ใช้',
   },
   en: {
     placeholder: 'Search products, categories...',
@@ -1037,6 +1045,8 @@ const search = {
     filterSize: 'Size',
     filterAvailable: 'Available only',
     resetFilters: 'Reset filters',
+    shortcutHint: 'Ctrl+K',
+    activeFilters: 'Active filters',
   },
 } as const;
 
