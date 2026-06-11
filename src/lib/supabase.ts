@@ -547,7 +547,7 @@ const USER_LOG_ACTION_LIST_COLUMNS = {
 function transformDBOrderListRow(dbOrder: any): any {
   const legacy = transformDBOrderToLegacy({
     ...dbOrder,
-    cart: [],
+    cart: slimCartForAdminList(dbOrder.cart),
     slipData: undefined,
     customerAddress: '',
     customerInstagram: null,
@@ -808,8 +808,9 @@ function slimCartForAdminList(cart: unknown): any[] {
   if (!Array.isArray(cart)) return [];
   return cart.map((item: any) => ({
     id: item?.id,
-    productId: item?.productId,
-    name: item?.name,
+    productId: item?.productId || item?.product_id,
+    productName: item?.productName || item?.name,
+    name: item?.name || item?.productName,
     quantity: item?.quantity ?? item?.qty,
     unitPrice: item?.unitPrice ?? item?.price,
     size: item?.size,
@@ -863,7 +864,7 @@ export async function getAllOrdersForAdminList(
 
   const listColumns = status?.length ? ORDER_STATUS_LIST_COLUMNS : ORDER_ADMIN_LIST_COLUMNS;
 
-  let selectQuery = db.select(listColumns).from(orders);
+  let selectQuery = db.select({ ...listColumns, cart: orders.cart }).from(orders);
   let countQuery = db.select({ value: count() }).from(orders);
   if (whereClause) {
     selectQuery = selectQuery.where(whereClause) as typeof selectQuery;

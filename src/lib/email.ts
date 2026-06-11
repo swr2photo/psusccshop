@@ -59,6 +59,16 @@ function getShopUrl(): string {
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const SUPPORT_EMAIL = 'psuscc@psusci.club';
+
+/** Extract no-reply mailbox from EMAIL_FROM for reply_to header. */
+function getNoReplyAddress(): string {
+  const from = getEmailFrom();
+  const bracket = from.match(/<([^>]+)>/);
+  if (bracket?.[1]) return bracket[1].trim().toLowerCase();
+  if (EMAIL_RE.test(from.trim())) return from.trim().toLowerCase();
+  return 'no_reply@psuscc.club';
+}
 
 /** Resolve recipient email from order objects (legacy + current field names). */
 export function getOrderRecipientEmail(order: {
@@ -204,9 +214,15 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ success: b
       body: JSON.stringify({
         from,
         to,
+        reply_to: getNoReplyAddress(),
         subject: options.subject,
         html: options.html,
         text: textBody,
+        headers: {
+          'Auto-Submitted': 'auto-generated',
+          'X-Auto-Response-Suppress': 'All',
+          Precedence: 'bulk',
+        },
       }),
     });
 
@@ -243,6 +259,7 @@ function stripHtml(html: string): string {
 }
 
 function baseTemplate(content: string, preheader?: string): string {
+  const year = new Date().getFullYear();
   return `
 <!DOCTYPE html>
 <html lang="th">
@@ -252,57 +269,63 @@ function baseTemplate(content: string, preheader?: string): string {
   <title>${SHOP_NAME}</title>
   ${preheader ? `<span style="display:none;font-size:1px;color:#ffffff;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;">${preheader}</span>` : ''}
   <style>
-    body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; }
-    .container { max-width: 600px; margin: 0 auto; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); }
-    .header { background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%); padding: 32px; text-align: center; }
-    .header h1 { margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; }
-    .header p { margin: 8px 0 0; color: rgba(255,255,255,0.8); font-size: 14px; }
-    .content { padding: 32px; color: #e2e8f0; }
-    .content h2 { color: #f1f5f9; font-size: 22px; margin: 0 0 16px; }
-    .content p { margin: 0 0 16px; line-height: 1.6; color: #94a3b8; }
-    .box { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 20px; margin: 20px 0; }
-    .box-success { border-color: rgba(16,185,129,0.3); background: rgba(16,185,129,0.1); }
-    .box-warning { border-color: rgba(245,158,11,0.3); background: rgba(245,158,11,0.1); }
-    .box-error { border-color: rgba(239,68,68,0.3); background: rgba(239,68,68,0.1); }
-    .box-info { border-color: rgba(37,99,235,0.3); background: rgba(37,99,235,0.1); }
-    .btn { display: inline-block; padding: 14px 28px; background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%); color: #ffffff !important; text-decoration: none; border-radius: 10px; font-weight: 600; margin: 16px 0; }
-    .btn:hover { opacity: 0.9; }
-    .order-item { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    body { margin: 0; padding: 0; font-family: 'Sarabun', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #eef2f6; color: #1f2937; }
+    .wrapper { padding: 24px 12px; }
+    .container { max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #d8dee6; border-radius: 4px; overflow: hidden; }
+    .header { background: #1e3a5f; padding: 28px 32px; border-bottom: 3px solid #c9a227; }
+    .header h1 { margin: 0; color: #ffffff; font-size: 22px; font-weight: 700; letter-spacing: 0.3px; }
+    .header p { margin: 6px 0 0; color: rgba(255,255,255,0.88); font-size: 13px; }
+    .content { padding: 32px; font-size: 15px; line-height: 1.75; color: #374151; }
+    .content h2 { color: #1e3a5f; font-size: 20px; font-weight: 700; margin: 0 0 16px; border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; }
+    .content h3 { color: #1e3a5f; font-size: 16px; font-weight: 700; margin: 24px 0 12px; }
+    .content p { margin: 0 0 14px; }
+    .box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 18px 20px; margin: 18px 0; }
+    .box-success { border-color: #86efac; background: #f0fdf4; }
+    .box-warning { border-color: #fcd34d; background: #fffbeb; }
+    .box-error { border-color: #fca5a5; background: #fef2f2; }
+    .box-info { border-color: #93c5fd; background: #eff6ff; }
+    .btn { display: inline-block; padding: 12px 24px; background: #1e3a5f; color: #ffffff !important; text-decoration: none; border-radius: 4px; font-weight: 600; font-size: 14px; margin: 16px 0; }
+    .order-item { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid #e5e7eb; }
     .order-item:last-child { border-bottom: none; }
-    .total { font-size: 20px; font-weight: 700; color: #10b981; }
-    .footer { background: #0a0f1a; padding: 24px; text-align: center; border-top: 1px solid rgba(255,255,255,0.1); }
-    .footer p { margin: 0; color: #64748b; font-size: 12px; }
-    .footer a { color: #2563eb; text-decoration: none; }
-    .status-badge { display: inline-block; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
-    .status-success { background: rgba(16,185,129,0.2); color: #10b981; }
-    .status-pending { background: rgba(245,158,11,0.2); color: #f59e0b; }
-    .status-cancelled { background: rgba(239,68,68,0.2); color: #ef4444; }
+    .total { font-size: 18px; font-weight: 700; color: #1e3a5f; }
+    .status-badge { display: inline-block; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 700; letter-spacing: 0.2px; }
+    .status-success { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+    .status-pending { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+    .status-cancelled { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+    .noreply { background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; padding: 12px 14px; margin-top: 20px; font-size: 12px; color: #64748b; line-height: 1.6; }
+    .footer { background: #f8fafc; padding: 20px 32px; text-align: center; border-top: 1px solid #e5e7eb; }
+    .footer p { margin: 0 0 6px; color: #64748b; font-size: 12px; line-height: 1.6; }
+    .footer a { color: #1e3a5f; text-decoration: none; }
+    .sign-off { margin-top: 24px; color: #374151; }
     @media (max-width: 600px) {
-      .content { padding: 20px; }
-      .header { padding: 24px; }
-      .header h1 { font-size: 24px; }
+      .content { padding: 22px 18px; }
+      .header { padding: 22px 18px; }
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <h1>${SHOP_NAME}</h1>
-      <p>ร้านค้าชุมนุมคอมพิวเตอร์ ม.อ.</p>
-    </div>
-    <div class="content">
-      ${content}
-    </div>
-    <div class="footer">
-      <p>ขอบคุณที่ใช้บริการ ${SHOP_NAME}</p>
-      <p style="margin-top: 8px;">
-        <a href="${getShopUrl()}">เว็บไซต์</a> • 
-        <a href="https://facebook.com/psuscc">Facebook</a> • 
-        <a href="https://instagram.com/psuscc">Instagram</a>
-      </p>
-      <p style="margin-top: 16px; font-size: 11px;">
-        หากคุณมีคำถามหรือข้อสงสัย กรุณาติดต่อ psuscc@psusci.club
-      </p>
+  <div class="wrapper">
+    <div class="container">
+      <div class="header">
+        <h1>${SHOP_NAME}</h1>
+        <p>ชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ มหาวิทยาลัยสงขลานครินทร์</p>
+      </div>
+      <div class="content">
+        ${content}
+        <p class="sign-off">ขอแสดงความนับถือ<br><strong>${SHOP_NAME}</strong></p>
+        <div class="noreply">
+          <strong>อีเมลฉบับนี้ส่งจากระบบอัตโนมัติ (no-reply)</strong><br>
+          กรุณาอย่าตอบกลับอีเมลนี้ หากต้องการสอบถามเพิ่มเติม กรุณาติดต่อผ่านระบบแชทบนเว็บไซต์หรืออีเมล ${SUPPORT_EMAIL}
+        </div>
+      </div>
+      <div class="footer">
+        <p>&copy; ${year} ${SHOP_NAME} — ชุมนุมคอมพิวเตอร์ มหาวิทยาลัยสงขลานครินทร์</p>
+        <p>
+          <a href="${getShopUrl()}">เว็บไซต์ร้านค้า</a> &nbsp;|&nbsp;
+          <a href="https://facebook.com/psuscc">Facebook</a> &nbsp;|&nbsp;
+          <a href="https://instagram.com/psuscc">Instagram</a>
+        </p>
+      </div>
     </div>
   </div>
 </body>
@@ -318,51 +341,51 @@ export function generateOrderConfirmationEmail(order: {
   const itemsHtml = order.cart.map(item => `
     <div class="order-item">
       <div>
-        <strong style="color: #f1f5f9;">${item.productName || item.name}</strong>
-        <br><span style="font-size: 12px; color: #64748b;">ไซส์: ${item.size} | จำนวน: ${item.quantity || item.qty}</span>
-        ${item.options?.isLongSleeve ? '<br><span style="font-size: 12px; color: #f59e0b;">แขนยาว</span>' : ''}
-        ${item.options?.customName ? `<br><span style="font-size: 12px; color: #2563eb;">ชื่อ: ${item.options.customName}</span>` : ''}
-        ${item.options?.customNumber ? `<span style="font-size: 12px; color: #2563eb;"> | เบอร์: ${item.options.customNumber}</span>` : ''}
+        <strong style="color: #1f2937;">${item.productName || item.name}</strong>
+        <br><span style="font-size: 12px; color: #6b7280;">ไซส์: ${item.size || '-'} | จำนวน: ${item.quantity || item.qty}</span>
+        ${item.options?.isLongSleeve ? '<br><span style="font-size: 12px; color: #92400e;">แขนยาว</span>' : ''}
+        ${item.options?.customName ? `<br><span style="font-size: 12px; color: #1e3a5f;">ชื่อ: ${item.options.customName}</span>` : ''}
+        ${item.options?.customNumber ? `<span style="font-size: 12px; color: #1e3a5f;"> | เบอร์: ${item.options.customNumber}</span>` : ''}
       </div>
-      <div style="color: #10b981; font-weight: 600;">฿${(item.unitPrice * (item.quantity || item.qty || 1)).toLocaleString()}</div>
+      <div style="color: #1e3a5f; font-weight: 600;">฿${(item.unitPrice * (item.quantity || item.qty || 1)).toLocaleString()}</div>
     </div>
   `).join('');
 
   const content = `
-    <h2>ขอบคุณสำหรับการสั่งซื้อ!</h2>
-    <p>สวัสดีคุณ ${order.customerName}</p>
-    <p>เราได้รับคำสั่งซื้อของคุณเรียบร้อยแล้ว กรุณาชำระเงินเพื่อยืนยันคำสั่งซื้อ</p>
+    <h2>ยืนยันคำสั่งซื้อ</h2>
+    <p>เรียน คุณ${order.customerName}</p>
+    <p>ทางร้านได้รับคำสั่งซื้อของท่านเรียบร้อยแล้ว กรุณาดำเนินการชำระเงินเพื่อยืนยันคำสั่งซื้อภายในระยะเวลาที่กำหนด</p>
     
     <div class="box box-info">
-      <p style="margin: 0; color: #93c5fd;"><strong>หมายเลขคำสั่งซื้อ:</strong></p>
-      <p style="margin: 8px 0 0; font-size: 24px; font-weight: 700; color: #f1f5f9;">${order.ref}</p>
+      <p style="margin: 0; color: #1e40af;"><strong>หมายเลขคำสั่งซื้อ</strong></p>
+      <p style="margin: 8px 0 0; font-size: 22px; font-weight: 700; color: #1e3a5f;">${order.ref}</p>
     </div>
     
-    <h3 style="color: #f1f5f9; margin-top: 24px;">รายการสินค้า</h3>
+    <h3>รายการสินค้า</h3>
     <div class="box">
       ${itemsHtml}
-      <div style="margin-top: 16px; padding-top: 16px; border-top: 2px solid rgba(255,255,255,0.1);">
+      <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-          <span style="color: #94a3b8;">ยอดรวมทั้งหมด</span>
+          <span style="color: #6b7280;">ยอดรวมทั้งหมด</span>
           <span class="total">฿${order.totalAmount.toLocaleString()}</span>
         </div>
       </div>
     </div>
     
     <div class="box box-warning">
-      <p style="margin: 0; color: #fbbf24;"><strong>กรุณาชำระเงินภายใน 24 ชั่วโมง</strong></p>
-      <p style="margin: 8px 0 0; color: #94a3b8;">หากไม่ชำระเงินภายในเวลาที่กำหนด คำสั่งซื้ออาจถูกยกเลิกอัตโนมัติ</p>
+      <p style="margin: 0; color: #92400e;"><strong>กรุณาชำระเงินภายใน 24 ชั่วโมง</strong></p>
+      <p style="margin: 8px 0 0; color: #6b7280;">หากไม่ชำระเงินภายในเวลาที่กำหนด ระบบอาจยกเลิกคำสั่งซื้อโดยอัตโนมัติ</p>
     </div>
     
     <center>
-      <a href="${getShopUrl()}" class="btn">ชำระเงินตอนนี้</a>
+      <a href="${getShopUrl()}" class="btn">ดำเนินการชำระเงิน</a>
     </center>
   `;
 
   return {
-    subject: `ยืนยันคำสั่งซื้อ #${order.ref} - ${SHOP_NAME}`,
+    subject: `[${SHOP_NAME}] ยืนยันคำสั่งซื้อ #${order.ref}`,
     html: baseTemplate(content, `คำสั่งซื้อ #${order.ref} ได้รับการยืนยันแล้ว`),
-    text: `ขอบคุณสำหรับการสั่งซื้อ! หมายเลขคำสั่งซื้อ: ${order.ref} ยอดรวม: ฿${order.totalAmount.toLocaleString()} กรุณาชำระเงินที่ ${getShopUrl()}`,
+    text: `เรียน คุณ${order.customerName}\n\nยืนยันคำสั่งซื้อ #${order.ref}\nยอดรวม: ฿${order.totalAmount.toLocaleString()}\nกรุณาชำระเงินที่ ${getShopUrl()}\n\n(อีเมลฉบับนี้ส่งจากระบบอัตโนมัติ กรุณาอย่าตอบกลับ)`,
   };
 }
 
@@ -372,35 +395,35 @@ export function generatePaymentReceivedEmail(order: {
   totalAmount: number;
 }): EmailTemplate {
   const content = `
-    <h2>ชำระเงินสำเร็จ!</h2>
-    <p>สวัสดีคุณ ${order.customerName}</p>
-    <p>เราได้รับการชำระเงินของคุณเรียบร้อยแล้ว ขอบคุณที่ไว้วางใจ ${SHOP_NAME}</p>
+    <h2>แจ้งผลการชำระเงิน</h2>
+    <p>เรียน คุณ${order.customerName}</p>
+    <p>ทางร้านได้รับการชำระเงินสำหรับคำสั่งซื้อของท่านเรียบร้อยแล้ว ขอขอบพระคุณที่ไว้วางใจ ${SHOP_NAME}</p>
     
     <div class="box box-success">
       <div style="text-align: center;">
         <span class="status-badge status-success">ชำระเงินแล้ว</span>
-        <p style="margin: 16px 0 0; color: #94a3b8;">หมายเลขคำสั่งซื้อ</p>
-        <p style="margin: 8px 0 0; font-size: 24px; font-weight: 700; color: #f1f5f9;">${order.ref}</p>
-        <p style="margin: 16px 0 0; color: #10b981; font-size: 20px; font-weight: 700;">฿${order.totalAmount.toLocaleString()}</p>
+        <p style="margin: 16px 0 0; color: #6b7280;">หมายเลขคำสั่งซื้อ</p>
+        <p style="margin: 8px 0 0; font-size: 22px; font-weight: 700; color: #1e3a5f;">${order.ref}</p>
+        <p style="margin: 16px 0 0; color: #166534; font-size: 18px; font-weight: 700;">฿${order.totalAmount.toLocaleString()}</p>
       </div>
     </div>
     
-    <h3 style="color: #f1f5f9;">ขั้นตอนถัดไป</h3>
+    <h3>ขั้นตอนถัดไป</h3>
     <div class="box">
-      <p style="margin: 0; color: #94a3b8;">
-        1. ทีมงานจะตรวจสอบและเตรียมสินค้าให้คุณ<br>
-        2. เมื่อสินค้าพร้อม จะมีอีเมลแจ้งให้ทราบ<br>
-        3. สามารถติดตามสถานะได้ที่เว็บไซต์
+      <p style="margin: 0; color: #4b5563;">
+        1. ทีมงานจะตรวจสอบและเตรียมสินค้า<br>
+        2. เมื่อสินค้าพร้อม ระบบจะแจ้งเตือนท่านทางอีเมล<br>
+        3. สามารถติดตามสถานะได้ที่เว็บไซต์ร้านค้า
       </p>
     </div>
     
     <center>
-      <a href="${getShopUrl()}" class="btn">ดูสถานะคำสั่งซื้อ</a>
+      <a href="${getShopUrl()}" class="btn">ตรวจสอบสถานะคำสั่งซื้อ</a>
     </center>
   `;
 
   return {
-    subject: `ชำระเงินสำเร็จ #${order.ref} - ${SHOP_NAME}`,
+    subject: `[${SHOP_NAME}] ชำระเงินสำเร็จ #${order.ref}`,
     html: baseTemplate(content, `การชำระเงินคำสั่งซื้อ #${order.ref} สำเร็จแล้ว`),
     text: `ชำระเงินสำเร็จ! คำสั่งซื้อ: ${order.ref} ยอด: ฿${order.totalAmount.toLocaleString()} ติดตามสถานะที่ ${getShopUrl()}`,
   };
@@ -439,7 +462,7 @@ export function generateOrderReadyEmail(order: {
   `;
 
   return {
-    subject: `สินค้าพร้อมรับ #${order.ref} - ${SHOP_NAME}`,
+    subject: `[${SHOP_NAME}] สินค้าพร้อมรับ #${order.ref}`,
     html: baseTemplate(content, `คำสั่งซื้อ #${order.ref} พร้อมให้รับแล้ว`),
     text: `สินค้าพร้อมรับแล้ว! คำสั่งซื้อ: ${order.ref} รับได้ที่ ${location}`,
   };
@@ -478,7 +501,7 @@ export function generateOrderShippedEmail(order: {
   `;
 
   return {
-    subject: `จัดส่งแล้ว #${order.ref} - ${SHOP_NAME}`,
+    subject: `[${SHOP_NAME}] จัดส่งแล้ว #${order.ref}`,
     html: baseTemplate(content, `คำสั่งซื้อ #${order.ref} ได้ถูกจัดส่งแล้ว`),
     text: `จัดส่งแล้ว! คำสั่งซื้อ: ${order.ref}${order.trackingNumber ? ` เลขพัสดุ: ${order.trackingNumber}` : ''}`,
   };
@@ -515,7 +538,7 @@ export function generateOrderCompletedEmail(order: {
   `;
 
   return {
-    subject: `ขอบคุณที่ใช้บริการ #${order.ref} - ${SHOP_NAME}`,
+    subject: `[${SHOP_NAME}] คำสั่งซื้อเสร็จสมบูรณ์ #${order.ref}`,
     html: baseTemplate(content, `คำสั่งซื้อ #${order.ref} เสร็จสมบูรณ์`),
     text: `ขอบคุณที่ใช้บริการ ${SHOP_NAME}! คำสั่งซื้อ: ${order.ref} เสร็จสมบูรณ์แล้ว`,
   };
@@ -554,7 +577,7 @@ export function generateOrderCancelledEmail(order: {
   `;
 
   return {
-    subject: `ยกเลิกคำสั่งซื้อ #${order.ref} - ${SHOP_NAME}`,
+    subject: `[${SHOP_NAME}] ยกเลิกคำสั่งซื้อ #${order.ref}`,
     html: baseTemplate(content, `คำสั่งซื้อ #${order.ref} ถูกยกเลิกแล้ว`),
     text: `คำสั่งซื้อถูกยกเลิก: ${order.ref}${order.reason ? ` เหตุผล: ${order.reason}` : ''}`,
   };
@@ -578,7 +601,7 @@ export function generateCustomEmail(options: {
   `;
 
   return {
-    subject: `${options.subject} - ${SHOP_NAME}`,
+    subject: `[${SHOP_NAME}] ${options.subject}`,
     html: baseTemplate(content),
     text: `${options.subject}\n\nสวัสดีคุณ ${options.customerName}\n\n${options.message}`,
   };
@@ -726,28 +749,28 @@ export function generateChatReplyEmail(options: {
   const escapedMessage = messagePreview.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
   
   const content = `
-    <h2>มีข้อความใหม่จากทีมงาน</h2>
-    <p>สวัสดีคุณ ${customerName}</p>
-    <p>แอดมิน <strong>${adminName}</strong> ตอบกลับข้อความของคุณแล้ว</p>
+    <h2>แจ้งเตือนข้อความจากทีมงาน</h2>
+    <p>เรียน คุณ${customerName}</p>
+    <p>เจ้าหน้าที่ <strong>${adminName}</strong> ได้ตอบกลับข้อความของท่านผ่านระบบแชทสนับสนุน</p>
     
     <div class="box box-info">
-      <p style="margin: 0 0 8px; color: #94a3b8; font-size: 12px;">ข้อความจากแอดมิน:</p>
-      <p style="margin: 0; color: #f1f5f9; line-height: 1.6; white-space: pre-wrap;">${escapedMessage}</p>
+      <p style="margin: 0 0 8px; color: #6b7280; font-size: 12px;">ข้อความจากเจ้าหน้าที่</p>
+      <p style="margin: 0; color: #1f2937; line-height: 1.6; white-space: pre-wrap;">${escapedMessage}</p>
     </div>
     
     <center>
-      <a href="${getShopUrl()}" class="btn">เปิดแชทเพื่อตอบกลับ</a>
+      <a href="${getShopUrl()}" class="btn">เปิดระบบแชทสนับสนุน</a>
     </center>
     
     <div class="box">
-      <p style="margin: 0; color: #94a3b8; text-align: center; font-size: 13px;">
-        คุณสามารถเปิดเว็บไซต์และกดไอคอนแชทเพื่อดูข้อความเพิ่มเติม
+      <p style="margin: 0; color: #6b7280; text-align: center; font-size: 13px;">
+        กรุณาตอบกลับผ่านระบบแชทบนเว็บไซต์เท่านั้น (ไม่สามารถตอบกลับอีเมลฉบับนี้ได้)
       </p>
     </div>
   `;
 
   return {
-    subject: `แอดมินตอบกลับแชทของคุณ - ${SHOP_NAME}`,
+    subject: `[${SHOP_NAME}] แจ้งเตือนข้อความจากทีมงาน`,
     html: baseTemplate(content, `${adminName} ตอบกลับข้อความของคุณ`),
     text: `สวัสดีคุณ ${customerName} - แอดมิน ${adminName} ตอบกลับข้อความของคุณ: "${messagePreview.substring(0, 200)}" เปิดเว็บไซต์เพื่อดูข้อความเพิ่มเติม: ${getShopUrl()}`,
   };

@@ -316,6 +316,18 @@ let ADMIN_CACHE_DISABLED = false;
 
 const normalizeStatusKey = (status?: string): string => (status || 'PENDING').toString().trim().toUpperCase();
 
+const getOrderCartItems = (order: AdminOrder | any): CartItemAdmin[] => {
+  const cart = order?.cart || order?.items || order?.raw?.cart || [];
+  return Array.isArray(cart) ? cart : [];
+};
+
+const orderContainsProduct = (order: AdminOrder | any, productId: string): boolean => {
+  return getOrderCartItems(order).some((item) => {
+    const pid = item.productId || (item as { product_id?: string }).product_id || item.id;
+    return pid === productId;
+  });
+};
+
 const normalizeOrder = (order: any): AdminOrder => {
   const ref = order?.ref || order?.Ref || order?.orderRef || (order?._key ? String(order._key).split('/').pop()?.replace('.json', '') : '') || '';
   // Calculate total from cart if amount is 0
@@ -7157,9 +7169,7 @@ export default function AdminPage(): JSX.Element {
   const filteredOrders = useMemo(() => {
     let filtered = shopOrders;
     if (selectedProductIdForOrders && selectedProductIdForOrders !== 'ALL') {
-      filtered = filtered.filter(o => 
-        o.cart && Array.isArray(o.cart) && o.cart.some((item: any) => item.productId === selectedProductIdForOrders)
-      );
+      filtered = filtered.filter((o) => orderContainsProduct(o, selectedProductIdForOrders));
     }
     if (orderFilterStatus !== 'ALL') {
       filtered = filtered.filter(o => normalizeStatusKey(o.status) === orderFilterStatus);
@@ -7248,9 +7258,7 @@ export default function AdminPage(): JSX.Element {
 
             {/* Product Cards */}
             {activeProducts.map((p) => {
-              const productOrdersCount = shopOrders.filter(o => 
-                o.cart && Array.isArray(o.cart) && o.cart.some((item: any) => item.productId === p.id)
-              ).length;
+              const productOrdersCount = shopOrders.filter((o) => orderContainsProduct(o, p.id)).length;
               const coverImg = p.coverImage || p.images?.[0];
 
               return (
