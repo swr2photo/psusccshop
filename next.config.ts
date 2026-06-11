@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 // Semantic versioning — matches package.json
 const pkg = require('./package.json');
@@ -88,9 +89,10 @@ const nextConfig: NextConfig = {
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;",
             "img-src 'self' data: blob: https://*.filebase.io https://*.filebase.com https://*.googleusercontent.com https://ui-avatars.com https://*.supabase.co https://profile.line-scdn.net https://platform-lookaside.fbsbx.com https://*.fbcdn.net https://graph.microsoft.com https://i.ytimg.com https://*.ggpht.com https://*.stripe.com;",
             "font-src 'self' https://fonts.gstatic.com;",
-            "connect-src 'self' https://*.filebase.com https://*.filebase.io https://api.resend.com https://challenges.cloudflare.com https://*.supabase.co wss://*.supabase.co https://*.googlevideo.com https://*.youtube.com https://*.facebook.com https://api.stripe.com https://js.stripe.com https://r.stripe.com https://q.stripe.com https://m.stripe.com https://m.stripe.network https://errors.stripe.com https://merchant-ui-api.stripe.com;",
+            "connect-src 'self' https://*.filebase.com https://*.filebase.io https://api.resend.com https://challenges.cloudflare.com https://*.supabase.co wss://*.supabase.co https://*.googlevideo.com https://*.youtube.com https://*.facebook.com https://api.stripe.com https://js.stripe.com https://r.stripe.com https://q.stripe.com https://m.stripe.com https://m.stripe.network https://errors.stripe.com https://merchant-ui-api.stripe.com https://*.ingest.sentry.io https://*.sentry.io;",
             "media-src 'self' blob: https://*.cdn.jsdelivr.net https://*.cloudflarestream.com;",
-            "worker-src 'self';",
+            "worker-src 'self' blob:;",
+            "child-src 'self' blob:;",
             "frame-src https://challenges.cloudflare.com https://www.youtube.com https://www.youtube-nocookie.com https://www.facebook.com https://web.facebook.com https://player.vimeo.com https://js.stripe.com https://*.js.stripe.com https://hooks.stripe.com https://m.stripe.network;",
             "frame-ancestors 'none';",
             "object-src 'none';",
@@ -288,4 +290,40 @@ if (process.env.NODE_ENV === 'production') {
   process.env.NEXT_PUBLIC_DEBUG = 'false';
 }
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  // For all available options, see:
+  // https://www.npmjs.com/package/@sentry/webpack-plugin#options
+
+  org: "doralaikon",
+
+  project: "psuscc-shop",
+
+  // Only print logs for uploading source maps in CI
+  silent: !process.env.CI,
+
+  // For all available options, see:
+  // https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/
+
+  // Upload a larger set of source maps for prettier stack traces (increases build time)
+  widenClientFileUpload: true,
+
+  // Route browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers.
+  // This can increase your server load as well as your hosting bill.
+  // Note: Check that the configured route will not match with your Next.js middleware, otherwise reporting of client-
+  // side errors will fail.
+  tunnelRoute: "/monitoring",
+
+  webpack: {
+    // Enables automatic instrumentation of Vercel Cron Monitors. (Does not yet work with App Router route handlers.)
+    // See the following for more information:
+    // https://docs.sentry.io/product/crons/
+    // https://vercel.com/docs/cron-jobs
+    automaticVercelMonitors: true,
+
+    // Tree-shaking options for reducing bundle size
+    treeshake: {
+      // Automatically tree-shake Sentry logger statements to reduce bundle size
+      removeDebugLogging: true,
+    },
+  },
+});

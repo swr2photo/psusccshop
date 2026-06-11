@@ -1,0 +1,15 @@
+# Sentry — copy into .env.local (dev) and Vercel/Railway (production)
+#
+# DSN: https://sentry.io → Project → Settings → Client Keys
+NEXT_PUBLIC_SENTRY_DSN=https://examplePublicKey@o0.ingest.sentry.io/0
+SENTRY_DSN=https://examplePublicKey@o0.ingest.sentry.io/0
+
+# Source maps (https://sentry.io/settings/auth-tokens/) — scopes: project:releases, org:read
+# Can also live in .env.sentry-build-plugin (gitignored via .env*)
+SENTRY_AUTH_TOKEN=sntrys_eyJ...
+SENTRY_ORG=doralaikon
+SENTRY_PROJECT=javascript-nextjs-xy
+
+# Optional
+# SENTRY_ENVIRONMENT=production
+# SENTRY_RELEASE=psuscc-shop@2.1.0

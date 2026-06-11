@@ -1,6 +1,7 @@
 // src/lib/ai-chatbot.ts
 // AI-powered chatbot using Google Gemini with real-time shop database context + order lookup
 
+import * as Sentry from '@sentry/nextjs';
 import { getShopConfig, getAllOrders, getOrdersByEmail, getOrderByRef } from './supabase';
 import { SHIRT_FAQ, findShirtFAQ, QUICK_QUESTIONS } from './shirt-faq';
 
@@ -1002,6 +1003,17 @@ async function callGeminiAPI(
     const model = GEMINI_MODELS[tier];
     
     try {
+      const responseText = await Sentry.startSpan(
+        {
+          name: `gemini ${model.name}`,
+          op: 'gen_ai.request',
+          attributes: {
+            'gen_ai.system': 'google',
+            'gen_ai.request.model': model.name,
+            'gen_ai.request.has_image': Boolean(imageBase64),
+          },
+        },
+        async () => {
       console.log(`[AI] Trying ${model.name}...${imageBase64 ? ' (with image)' : ''}`);
       
       // Build user content parts - for multimodal requests
@@ -1084,11 +1096,11 @@ async function callGeminiAPI(
               console.log(`[AI] Switching default to ${GEMINI_MODELS[currentModelTier].name}`);
             }
           }
-          continue; // Try next model
+          return null;
         }
         
         // Other errors - still try next model
-        continue;
+        return null;
       }
 
       const data = await response.json();
@@ -1112,8 +1124,17 @@ async function callGeminiAPI(
       } else {
         console.warn(`[AI] ${model.name} returned empty text. Data:`, JSON.stringify(data).slice(0, 500));
       }
+
+      return null;
+        },
+      );
+
+      if (responseText) {
+        return responseText;
+      }
     } catch (error) {
       console.error(`[AI] ${model.name} exception:`, error);
+      Sentry.captureException(error);
       modelErrorCount[tier]++;
       continue; // Try next model
     }

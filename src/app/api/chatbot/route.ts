@@ -1,6 +1,7 @@
 // src/app/api/chatbot/route.ts
 // AI-powered chatbot API with real-time database context + order lookup
 import { NextRequest, NextResponse } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 import { processChat, buildDetailedShopContext, getShopData, ChatMessage, getCurrentModelName } from '@/lib/ai-chatbot';
 import { QUICK_QUESTIONS, SHIRT_FAQ } from '@/lib/shirt-faq';
 import { checkCombinedRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
@@ -98,6 +99,7 @@ export async function POST(req: NextRequest) {
 
   } catch (error) {
     console.error('Chatbot API error:', error);
+    Sentry.captureException(error);
     return NextResponse.json({ 
       answer: 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้งค่ะ', 
       source: 'error',
@@ -131,6 +133,7 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error('Chatbot GET error:', error);
+    Sentry.captureException(error);
     return NextResponse.json({
       quickQuestions: QUICK_QUESTIONS,
       categories: [],

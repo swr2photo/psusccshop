@@ -2,7 +2,9 @@
 // Cron job for data cleanup (PDPA compliance)
 
 import { NextRequest, NextResponse } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 import { cleanupOldData, logSecurityEvent } from '@/lib/supabase';
+import { withCronMonitor } from '@/lib/sentry-cron';
 import { cleanupExpiredRateLimits } from '@/lib/rate-limit-supabase';
 import { autoRotateExpiringKeys, cleanupOldKeys } from '@/lib/api-key-rotation';
 import { cleanupOldChatImages } from '@/lib/support-chat';
@@ -42,6 +44,9 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  return withCronMonitor(
+    { monitorSlug: 'cleanup', schedule: '0 */6 * * *', maxRuntime: 15 },
+    async () => {
   const startTime = Date.now();
   const results: Record<string, any> = {
     status: 'success',
@@ -172,6 +177,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(results);
   } catch (error) {
     console.error('[Cron Cleanup] Fatal error:', error);
+    Sentry.captureException(error);
     
     // Log error to security audit
     await logSecurityEvent({
@@ -190,4 +196,5 @@ export async function GET(req: NextRequest) {
       { status: 500 }
     );
   }
+  });
 }

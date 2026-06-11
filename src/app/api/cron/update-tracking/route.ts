@@ -2,7 +2,9 @@
 // Cron job to auto-update order status based on tracking information — Drizzle ORM
 
 import { NextRequest, NextResponse } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 import { db } from '@/lib/db';
+import { withCronMonitor } from '@/lib/sentry-cron';
 import { orders } from '@/db/schema';
 import { eq, and, desc, isNotNull } from 'drizzle-orm';
 import { trackShipment, TrackingStatus, ShippingProvider } from '@/lib/shipping';
@@ -34,6 +36,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  return withCronMonitor(
+    { monitorSlug: 'update-tracking', schedule: '0 */2 * * *', maxRuntime: 15 },
+    async () => {
   try {
     const fetchedOrders = await db.select({
       ref: orders.ref,
@@ -98,10 +103,13 @@ export async function GET(request: NextRequest) {
 
     console.log(`[Tracking Cron] Processed: ${results.processed}, Updated: ${results.updated}, Delivered: ${results.delivered}`);
     return NextResponse.json({ success: true, ...results });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Tracking Cron] Error:', error);
-    return NextResponse.json({ success: false, error: error.message || 'Unknown error' }, { status: 500 });
+    Sentry.captureException(error);
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
+  });
 }
 
 export async function POST(request: NextRequest) {

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import * as Sentry from "@sentry/nextjs";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Providers from "@/components/Providers";
@@ -14,7 +15,7 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 // SEO & Open Graph Metadata
-export const metadata: Metadata = {
+const siteMetadata = {
   metadataBase: new URL(SITE_URL),
   applicationName: "SCC Shop",
   title: {
@@ -80,7 +81,16 @@ export const metadata: Metadata = {
     address: true,
   },
   category: "shopping",
-};
+} satisfies Metadata;
+
+export function generateMetadata(): Metadata {
+  return {
+    ...siteMetadata,
+    other: {
+      ...Sentry.getTraceData(),
+    },
+  };
+}
 
 // Viewport configuration (separated in Next.js 14+)
 export const viewport: Viewport = {

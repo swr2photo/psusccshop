@@ -49,3 +49,6 @@ src/generated/
 /npm-cache/
 /supabase/
 
+
+# Sentry Config File
+.env.sentry-build-plugin

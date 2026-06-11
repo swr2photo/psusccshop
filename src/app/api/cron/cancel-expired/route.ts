@@ -2,7 +2,9 @@
 // Cron job to auto-cancel orders that haven't been paid within 24 hours
 
 import { NextRequest, NextResponse } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 import { putJson, getExpiredUnpaidOrders } from '@/lib/filebase';
+import { withCronMonitor } from '@/lib/sentry-cron';
 import { sendOrderCancelledEmail } from '@/lib/email';
 import { triggerSheetSync } from '@/lib/sheet-sync';
 
@@ -44,6 +46,9 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  return withCronMonitor(
+    { monitorSlug: 'cancel-expired', schedule: '*/30 * * * *', maxRuntime: 10 },
+    async () => {
   try {
     console.log('[Cron] Starting auto-cancel expired orders...');
     
@@ -119,13 +124,16 @@ export async function GET(req: NextRequest) {
     
     return NextResponse.json(result);
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Cron] Fatal error:', error);
+    Sentry.captureException(error);
+    const message = error instanceof Error ? error.message : 'Cron job failed';
     return NextResponse.json(
-      { status: 'error', message: error.message || 'Cron job failed' },
+      { status: 'error', message },
       { status: 500 }
     );
   }
+  });
 }
 
 // POST method สำหรับ manual trigger จาก admin
