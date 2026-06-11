@@ -4418,14 +4418,34 @@ export default function AdminPage(): JSX.Element {
     });
   };
 
-  // Toggle order expansion (show cart items)
+  const hydrateAdminOrder = useCallback(async (ref: string): Promise<AdminOrder | null> => {
+    try {
+      const res = await fetch(`/api/admin/orders?ref=${encodeURIComponent(ref)}`);
+      const data = await res.json();
+      if (data.status === 'success' && data.data) {
+        const full = normalizeOrder(data.data);
+        setOrders((prev) => prev.map((o) => (o.ref === ref ? full : o)));
+        return full;
+      }
+    } catch {
+      console.warn('[Admin] Failed to load order detail', ref);
+    }
+    return null;
+  }, []);
+
+  // Toggle order expansion (lazy-load cart when list used index-only scan)
   const toggleOrderExpand = (ref: string) => {
-    setExpandedOrders(prev => {
+    setExpandedOrders((prev) => {
       const next = new Set(prev);
-      if (next.has(ref)) {
-        next.delete(ref);
-      } else {
+      const expanding = !next.has(ref);
+      if (expanding) {
         next.add(ref);
+        const order = orders.find((o) => o.ref === ref);
+        if ((order as AdminOrder & { _listOnly?: boolean })?._listOnly) {
+          void hydrateAdminOrder(ref);
+        }
+      } else {
+        next.delete(ref);
       }
       return next;
     });
@@ -4754,16 +4774,21 @@ export default function AdminPage(): JSX.Element {
     setOrderEditor(prev => ({ ...prev, cart: newCart }));
   };
 
-  const openOrderEditor = (order: AdminOrder) => {
+  const openOrderEditor = async (order: AdminOrder) => {
+    let detail = order;
+    if ((order as AdminOrder & { _listOnly?: boolean })._listOnly) {
+      const full = await hydrateAdminOrder(order.ref);
+      if (full) detail = full;
+    }
     setOrderEditor({
       open: true,
-      ref: order.ref,
-      name: order.name,
-      email: order.email,
-      amount: order.amount,
-      status: order.status,
-      date: order.date ? new Date(order.date).toISOString().slice(0, 16) : '',
-      cart: order.cart || [],
+      ref: detail.ref,
+      name: detail.name,
+      email: detail.email,
+      amount: detail.amount,
+      status: detail.status,
+      date: detail.date ? new Date(detail.date).toISOString().slice(0, 16) : '',
+      cart: detail.cart || [],
     });
   };
 
@@ -7827,7 +7852,9 @@ export default function AdminPage(): JSX.Element {
                   </Box>
 
                   {/* Cart Items Preview - Compact */}
-                  {((order.cart && order.cart.length > 0) || (order.items && order.items.length > 0)) && (
+                  {((order as AdminOrder & { _listOnly?: boolean })._listOnly
+                    || (order.cart && order.cart.length > 0)
+                    || (order.items && order.items.length > 0)) && (
                     <Box sx={{ mt: 1.5 }}>
                       <Box 
                         onClick={() => toggleOrderExpand(order.ref)}
@@ -7847,7 +7874,9 @@ export default function AdminPage(): JSX.Element {
                       >
                         <ShoppingBag size={16} color="#818cf8" />
                         <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#a5b4fc', flex: 1 }}>
-                          {(order.cart || order.items || []).length} รายการ
+                          {(order as AdminOrder & { _listOnly?: boolean })._listOnly
+                            ? (expandedOrders.has(order.ref) ? 'กำลังโหลดรายการ...' : 'แตะเพื่อโหลดรายการ')
+                            : `${(order.cart || order.items || []).length} รายการ`}
                         </Typography>
                         {expandedOrders.has(order.ref) ? (
                           <ExpandLess size={18} color="#818cf8" />

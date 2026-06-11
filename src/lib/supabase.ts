@@ -480,6 +480,81 @@ import crypto from 'crypto';
 const normalizeEmail = (email?: string | null) => (email || '').trim().toLowerCase();
 const emailHash = (email: string) => crypto.createHash('sha256').update(normalizeEmail(email)).digest('hex');
 
+/** Columns aligned with idx_orders_created_admin_covering (index-only scan). */
+const ORDER_ADMIN_LIST_COLUMNS = {
+  createdAt: orders.createdAt,
+  ref: orders.ref,
+  status: orders.status,
+  customerName: orders.customerName,
+  customerEmail: orders.customerEmail,
+  customerPhone: orders.customerPhone,
+  totalAmount: orders.totalAmount,
+  shippingOption: orders.shippingOption,
+  trackingNumber: orders.trackingNumber,
+  shopId: orders.shopId,
+  paymentVerified: orders.paymentVerified,
+  date: orders.date,
+} as const;
+
+/** Columns aligned with idx_orders_status_created_covering. */
+const ORDER_STATUS_LIST_COLUMNS = {
+  createdAt: orders.createdAt,
+  status: orders.status,
+  ref: orders.ref,
+  customerName: orders.customerName,
+  customerEmail: orders.customerEmail,
+  totalAmount: orders.totalAmount,
+  shippingOption: orders.shippingOption,
+  trackingNumber: orders.trackingNumber,
+  shopId: orders.shopId,
+} as const;
+
+const EMAIL_LOG_LIST_COLUMNS = {
+  id: emailLogs.id,
+  createdAt: emailLogs.createdAt,
+  toEmail: emailLogs.toEmail,
+  fromEmail: emailLogs.fromEmail,
+  subject: emailLogs.subject,
+  emailType: emailLogs.emailType,
+  status: emailLogs.status,
+  orderRef: emailLogs.orderRef,
+  sentAt: emailLogs.sentAt,
+  error: emailLogs.error,
+} as const;
+
+const USER_LOG_LIST_COLUMNS = {
+  id: userLogs.id,
+  createdAt: userLogs.createdAt,
+  email: userLogs.email,
+  name: userLogs.name,
+  action: userLogs.action,
+  details: userLogs.details,
+  ip: userLogs.ip,
+  userAgent: userLogs.userAgent,
+} as const;
+
+const USER_LOG_ACTION_LIST_COLUMNS = {
+  id: userLogs.id,
+  createdAt: userLogs.createdAt,
+  email: userLogs.email,
+  name: userLogs.name,
+  action: userLogs.action,
+  details: userLogs.details,
+} as const;
+
+function transformDBOrderListRow(dbOrder: any): any {
+  const legacy = transformDBOrderToLegacy({
+    ...dbOrder,
+    cart: [],
+    slipData: undefined,
+    customerAddress: '',
+    customerInstagram: null,
+    notes: null,
+  });
+  legacy._listOnly = true;
+  return legacy;
+}
+
 function transformDBOrderToLegacy(dbOrder: any): any {
   return {
     ref: dbOrder.ref,
@@ -586,7 +661,7 @@ function transformDBEmailLogToLegacy(dbLog: any): any {
     to: dbLog.toEmail,
     from: dbLog.fromEmail,
     subject: dbLog.subject,
-    body: dbLog.body,
+    body: dbLog.body ?? '',
     type: dbLog.emailType,
     status: dbLog.status,
     sentAt: dbLog.sentAt,
@@ -752,22 +827,53 @@ function slimSlipForAdminList(slipData: any): any | undefined {
   };
 }
 
-/** Admin order list — trims heavy cart/slip payloads before sending to client. */
+/**
+ * Admin order list — index-only scan when no text search.
+ * Heavy fields (cart, slip) omitted; use getOrderByRef for detail/edit.
+ */
 export async function getAllOrdersForAdminList(
   options: { limit?: number; offset?: number; status?: string[]; search?: string } = {},
 ): Promise<{ orders: any[]; total: number }> {
-  const { orders: rawOrders, total } = await getAllOrders(options);
+  const { limit = 100, offset = 0, status, search } = options;
+  const term = search?.trim();
+
+  if (term) {
+    const { orders: rawOrders, total } = await getAllOrders(options);
+    return {
+      total,
+      orders: rawOrders.map((order) => {
+        const slim = {
+          ...order,
+          cart: slimCartForAdminList(order.cart),
+          slip: slimSlipForAdminList(order.slip || order.slipData),
+        };
+        delete slim.slipData;
+        return slim;
+      }),
+    };
+  }
+
+  const conditions = [];
+  if (status && status.length > 0) conditions.push(inArray(orders.status, status));
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const listColumns = status?.length ? ORDER_STATUS_LIST_COLUMNS : ORDER_ADMIN_LIST_COLUMNS;
+
+  let selectQuery = db.select(listColumns).from(orders);
+  let countQuery = db.select({ value: count() }).from(orders);
+  if (whereClause) {
+    selectQuery = selectQuery.where(whereClause) as typeof selectQuery;
+    countQuery = countQuery.where(whereClause) as typeof countQuery;
+  }
+
+  const [data, totalResult] = await Promise.all([
+    selectQuery.orderBy(desc(orders.createdAt)).offset(offset).limit(limit),
+    countQuery,
+  ]);
+
   return {
-    total,
-    orders: rawOrders.map((order) => {
-      const slim = {
-        ...order,
-        cart: slimCartForAdminList(order.cart),
-        slip: slimSlipForAdminList(order.slip || order.slipData),
-      };
-      delete slim.slipData;
-      return slim;
-    }),
+    orders: (data || []).map(transformDBOrderListRow),
+    total: totalResult[0]?.value || 0,
   };
 }
 
@@ -808,7 +914,11 @@ export async function getUserLogsPaginated(options: {
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-  let selectQuery = db.select().from(userLogs);
+  const listColumns = action
+    ? USER_LOG_ACTION_LIST_COLUMNS
+    : USER_LOG_LIST_COLUMNS;
+
+  let selectQuery = db.select(listColumns).from(userLogs);
   let countQuery = db.select({ value: count() }).from(userLogs);
   if (whereClause) {
     selectQuery = selectQuery.where(whereClause) as typeof selectQuery;
@@ -894,10 +1004,10 @@ export async function getEmailLogStats(): Promise<{
   };
 }
 
-/** Email logs list via single SQL query. */
+/** Email logs list — index-only scan (body excluded). */
 export async function getEmailLogsFromDb(limit = 100): Promise<any[]> {
   const rows = await db
-    .select()
+    .select(EMAIL_LOG_LIST_COLUMNS)
     .from(emailLogs)
     .orderBy(desc(emailLogs.createdAt))
     .limit(limit);
