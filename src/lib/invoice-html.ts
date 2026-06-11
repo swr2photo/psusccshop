@@ -1,5 +1,7 @@
 import { absoluteUrl } from '@/lib/site';
 
+const TH_TIMEZONE = 'Asia/Bangkok';
+
 export type InvoiceLang = 'th' | 'en';
 
 export interface InvoiceBuildOptions {
@@ -21,26 +23,25 @@ function formatMoney(amount: number, lang: InvoiceLang): string {
   })}`;
 }
 
-function formatDate(iso: string, lang: InvoiceLang): string {
-  try {
-    return new Date(iso).toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  } catch {
-    return iso;
-  }
+function invoiceLocale(lang: InvoiceLang): string {
+  return lang === 'th' ? 'th-TH' : 'en-US';
 }
 
-function formatDateTime(iso: Date, lang: InvoiceLang): string {
-  return iso.toLocaleString(lang === 'th' ? 'th-TH' : 'en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+function formatDateTime(iso: Date | string, lang: InvoiceLang): string {
+  try {
+    const date = typeof iso === 'string' ? new Date(iso) : iso;
+    if (Number.isNaN(date.getTime())) return String(iso);
+    return date.toLocaleString(invoiceLocale(lang), {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: TH_TIMEZONE,
+    });
+  } catch {
+    return String(iso);
+  }
 }
 
 interface InvoiceLabelSet {
@@ -200,6 +201,31 @@ function readOrderField(order: Record<string, unknown>, ...keys: string[]): stri
   return '';
 }
 
+/** Show shipping address only for delivery orders (not pickup / in-store). */
+function orderRequiresShippingAddress(order: Record<string, unknown>): boolean {
+  const shippingOpt = readOrderField(
+    order,
+    'shippingOption',
+    'shipping_option',
+    'shippingOptionId',
+    'shipping_option_id'
+  ).toLowerCase();
+  const shippingProvider = readOrderField(order, 'shippingProvider', 'shipping_provider').toLowerCase();
+  const shippingFee = Number(order.shippingFee ?? order.shipping_fee ?? 0) || 0;
+
+  const isPickup =
+    shippingOpt === 'pickup' ||
+    shippingProvider === 'pickup' ||
+    shippingOpt.includes('รับเอง') ||
+    shippingOpt.includes('รับหน้าร้าน') ||
+    shippingOpt.includes('pick up') ||
+    shippingOpt.includes('รับ');
+
+  if (isPickup) return false;
+  if (shippingOpt && !isPickup) return true;
+  return shippingFee > 0;
+}
+
 function paymentMethodLabel(order: Record<string, unknown>, lang: InvoiceLang): string {
   const L = resolveLabels(lang);
   const method = readOrderField(order, 'paymentMethod', 'payment_method').toLowerCase();
@@ -288,12 +314,9 @@ export function buildInvoiceHtml(
   const customerName = readOrderField(order, 'customerName', 'customer_name', 'name') || '-';
   const customerEmail = readOrderField(order, 'customerEmail', 'customer_email', 'email') || '-';
   const customerPhone = readOrderField(order, 'customerPhone', 'customer_phone', 'phone') || '-';
-  const customerAddress = readOrderField(
-    order,
-    'customerAddress',
-    'customer_address',
-    'address'
-  );
+  const customerAddress = orderRequiresShippingAddress(order)
+    ? readOrderField(order, 'customerAddress', 'customer_address', 'address')
+    : '';
 
   const cartRows = cart
     .map((item) => {
@@ -330,7 +353,7 @@ export function buildInvoiceHtml(
     </div>`
     : '';
 
-  const logoUrl = absoluteUrl('/logo.png');
+  const logoUrl = absoluteUrl('/logo3-01-01-01-01.png');
 
   return `<!DOCTYPE html>
 <html lang="${lang}">
@@ -534,7 +557,7 @@ export function buildInvoiceHtml(
         </div>
         <div>
           <div class="info-label">${escapeHtml(L.date)}</div>
-          <div class="info-value">${escapeHtml(formatDate(orderDate, lang))}</div>
+          <div class="info-value">${escapeHtml(formatDateTime(orderDate, lang))}</div>
         </div>
         <div>
           <div class="info-label">${escapeHtml(L.email)}</div>
@@ -556,7 +579,7 @@ export function buildInvoiceHtml(
           paidAt
             ? `<div>
           <div class="info-label">${escapeHtml(L.paidAt)}</div>
-          <div class="info-value">${escapeHtml(formatDate(paidAt, lang))}</div>
+          <div class="info-value">${escapeHtml(formatDateTime(paidAt, lang))}</div>
         </div>`
             : ''
         }
