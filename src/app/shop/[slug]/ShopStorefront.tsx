@@ -56,7 +56,7 @@ import {
   getProductName, getProductDescription,
   getCategoryLabel, getCategoryIcon,
   sortProductsNewestFirst,
-  DEFAULT_SHIRT_NAME, type ShirtNameConfig,
+  DEFAULT_SHIRT_NAME, getProductShirtNameConfig, type ShirtNameConfig,
   DEFAULT_NAME_VALIDATION,
 } from '@/lib/config';
 import { submitOrder as submitOrderApi, getHistory, cancelOrder as cancelOrderApi, saveProfile as saveProfileApi, getProfile } from '@/lib/api-client';
@@ -457,7 +457,10 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
     pickup: (shop as any).pickup,
   }), [shopOpenFields, products, announcements, announcementHistory, events, socialMediaNews]);
 
-  const shirtCfg = shopConfig.shirtNameConfig ?? DEFAULT_SHIRT_NAME;
+  const shirtCfg = useMemo(
+    () => getProductShirtNameConfig(selectedProduct, shopConfig.shirtNameConfig),
+    [selectedProduct, shopConfig.shirtNameConfig],
+  );
   const drawerCart = useMemo(() => zustandCartToDrawerCart(shopCart), [shopCart]);
 
   const liveStream = (shop as any).liveStream;

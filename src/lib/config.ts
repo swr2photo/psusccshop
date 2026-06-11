@@ -244,6 +244,8 @@ export interface Product {
   };
   /** URL-friendly slug สำหรับ product link */
   slug?: string;
+  /** ตั้งค่าชื่อบนเสื้อเฉพาะสินค้านี้ (เมื่อเปิด hasCustomName) */
+  shirtNameConfig?: ShirtNameConfig;
   /** ลำดับการแสดงผล */
   sortOrder?: number;
   /** วันที่สร้าง */
@@ -418,6 +420,18 @@ export const DEFAULT_SHIRT_NAME: ShirtNameConfig = {
   allowSpecialChars: false,
   allowedSpecialChars: '.-',
 };
+
+/** Resolve shirt name rules: product → legacy shop config → defaults */
+export function getProductShirtNameConfig(
+  product?: Pick<Product, 'shirtNameConfig'> | null,
+  legacyShopConfig?: ShirtNameConfig,
+): ShirtNameConfig {
+  return {
+    ...DEFAULT_SHIRT_NAME,
+    ...legacyShopConfig,
+    ...product?.shirtNameConfig,
+  };
+}
 
 export interface ShopConfig {
   isOpen: boolean;

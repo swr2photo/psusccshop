@@ -157,6 +157,7 @@ import {
   getProductSortTime,
   sortProductsNewestFirst,
   DEFAULT_SHIRT_NAME,
+  getProductShirtNameConfig,
   type ShirtNameConfig,
 } from '@/lib/config';
 import { productMatchesSearch, rankProductSearch } from '@/lib/product-search';
@@ -1763,7 +1764,10 @@ export default function HomePage() {
       return null;
     }
 
-    const shirtCfg = { ...DEFAULT_SHIRT_NAME, ...activeProductCatalog.shirtNameConfig };
+    const shirtCfg = getProductShirtNameConfig(
+      selectedProduct,
+      activeProductCatalog.shirtNameConfig ?? config?.shirtNameConfig,
+    );
     const normalizedCustomName = normalizeShirtName(productOptions.customName, shirtCfg);
 
     if (selectedProduct.options?.hasCustomName && !normalizedCustomName) {
@@ -3238,7 +3242,7 @@ export default function HomePage() {
 
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {selectedProduct.options?.hasCustomName && (() => {
-                  const sc = { ...DEFAULT_SHIRT_NAME, ...config?.shirtNameConfig };
+                  const sc = getProductShirtNameConfig(selectedProduct, config?.shirtNameConfig);
                   const langs: string[] = [];
                   if (sc.allowThai) langs.push(t.profile.langThai);
                   if (sc.allowEnglish) langs.push(t.profile.langEnglish);

@@ -155,7 +155,8 @@ import {
   Flame as Fire,
 } from 'lucide-react';
 
-import { isAdmin, isSuperAdmin, setDynamicAdminEmails, SUPER_ADMIN_EMAIL, Product, ShopConfig, SIZES, AdminPermissions, DEFAULT_ADMIN_PERMISSIONS, DEFAULT_NAME_VALIDATION, type NameValidationConfig, DEFAULT_SHIRT_NAME, type ShirtNameConfig } from '@/lib/config';
+import { isAdmin, isSuperAdmin, setDynamicAdminEmails, SUPER_ADMIN_EMAIL, Product, ShopConfig, SIZES, AdminPermissions, DEFAULT_ADMIN_PERMISSIONS, DEFAULT_NAME_VALIDATION, type NameValidationConfig, DEFAULT_SHIRT_NAME, getProductShirtNameConfig } from '@/lib/config';
+import ShirtNameConfigFields from '@/components/admin/ShirtNameConfigFields';
 import {
   ADMIN_THEME,
   STATUS_THEME,
@@ -176,7 +177,7 @@ import TrackingManagement from '@/components/admin/TrackingManagement';
 import RefundManagement from '@/components/admin/RefundManagement';
 import LiveStreamSettings from '@/components/admin/LiveStreamSettings';
 import ShopManagement from '@/components/admin/ShopManagement';
-import { mapShopPermissionsToAdminPanel } from '@/lib/admin-context';
+import { mapShopPermissionsToAdminPanel } from '@/lib/admin-permissions';
 
 // ============== TYPES ==============
 interface AdminDataResponse {
@@ -1000,145 +1001,6 @@ const SettingsView = React.memo(function SettingsView({
                       nv.allowSpecialChars && (nv.allowThai ? `สมชาย ใจ${nv.allowedSpecialChars[0] || '.'}ดี` : `John O${nv.allowedSpecialChars[0] || "'"}Brien`),
                     ].filter(Boolean).join(' / ')}
                     {` (${nv.minLength}-${nv.maxLength} ตัว)`}
-                  </Typography>
-                </Box>
-              </Box>
-            );
-          })()}
-        </SettingSection>
-      )}
-
-      {/* Shirt Custom Name Settings */}
-      {canManageShop && (
-        <SettingSection icon={<ShoppingBag size={20} />} title="ชื่อบนเสื้อ (Custom Name)">
-          {(() => {
-            const sn = { ...DEFAULT_SHIRT_NAME, ...localConfig.shirtNameConfig };
-            const updateSN = (patch: Partial<ShirtNameConfig>) => {
-              onConfigChange({ ...localConfig, shirtNameConfig: { ...sn, ...patch } });
-            };
-            return (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {/* Length settings */}
-                <Box sx={{ display: 'flex', gap: 1.5 }}>
-                  <TextField
-                    type="number"
-                    label="ความยาวขั้นต่ำ"
-                    value={sn.minLength}
-                    onChange={e => updateSN({ minLength: Math.max(1, Number(e.target.value) || 1) })}
-                    inputProps={{ min: 1, max: 50 }}
-                    size="small"
-                    sx={{
-                      flex: 1,
-                      ...inputSx,
-                      '& .MuiOutlinedInput-root': { ...inputSx['& .MuiOutlinedInput-root'], borderRadius: '10px' },
-                    }}
-                  />
-                  <TextField
-                    type="number"
-                    label="ความยาวสูงสุด"
-                    value={sn.maxLength}
-                    onChange={e => updateSN({ maxLength: Math.max(sn.minLength, Number(e.target.value) || 7) })}
-                    inputProps={{ min: sn.minLength, max: 50 }}
-                    size="small"
-                    sx={{
-                      flex: 1,
-                      ...inputSx,
-                      '& .MuiOutlinedInput-root': { ...inputSx['& .MuiOutlinedInput-root'], borderRadius: '10px' },
-                    }}
-                  />
-                </Box>
-
-                {/* Language toggles */}
-                <Box sx={{
-                  p: 2,
-                  borderRadius: '12px',
-                  bgcolor: 'rgba(99,102,241,0.08)',
-                  border: '1px solid rgba(99,102,241,0.2)',
-                }}>
-                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#818cf8', mb: 1.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Groups size={14} /> ภาษาที่อนุญาต
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                    {[
-                      { key: 'allowThai' as const, label: 'ภาษาไทย', color: '#0071e3' },
-                      { key: 'allowEnglish' as const, label: 'English', color: '#10b981' },
-                    ].map(lang => (
-                      <Box
-                        key={lang.key}
-                        onClick={() => {
-                          // Don't allow disabling all languages
-                          if (sn[lang.key] && !['allowThai', 'allowEnglish'].some(k => k !== lang.key && sn[k as keyof ShirtNameConfig] === true)) return;
-                          updateSN({ [lang.key]: !sn[lang.key] });
-                        }}
-                        sx={{
-                          px: 2,
-                          py: 1,
-                          borderRadius: '10px',
-                          cursor: 'pointer',
-                          fontSize: '0.85rem',
-                          fontWeight: 600,
-                          bgcolor: sn[lang.key] ? `${lang.color}15` : 'rgba(255,255,255,0.05)',
-                          color: sn[lang.key] ? lang.color : '#64748b',
-                          border: `1.5px solid ${sn[lang.key] ? lang.color : 'transparent'}`,
-                          transition: 'all 0.2s ease',
-                          '&:hover': {
-                            bgcolor: sn[lang.key] ? `${lang.color}25` : 'rgba(255,255,255,0.1)',
-                          },
-                        }}
-                      >
-                        {lang.label}
-                      </Box>
-                    ))}
-                  </Box>
-                </Box>
-
-                {/* Auto uppercase toggle */}
-                <SettingToggleRow
-                  label="แปลงเป็นตัวพิมพ์ใหญ่อัตโนมัติ"
-                  description={sn.autoUppercase ? 'john → JOHN' : 'ปิดใช้งาน'}
-                  checked={sn.autoUppercase}
-                  onChange={checked => updateSN({ autoUppercase: checked })}
-                />
-
-                {/* Special characters */}
-                <SettingToggleRow
-                  label="อนุญาตอักษรพิเศษ"
-                  description={sn.allowSpecialChars ? `ตัวอักษรที่อนุญาต: ${sn.allowedSpecialChars}` : 'ปิดใช้งาน'}
-                  checked={sn.allowSpecialChars}
-                  onChange={checked => updateSN({ allowSpecialChars: checked })}
-                />
-                {sn.allowSpecialChars && (
-                  <TextField
-                    label="อักษรพิเศษที่อนุญาต"
-                    value={sn.allowedSpecialChars}
-                    onChange={e => updateSN({ allowedSpecialChars: e.target.value })}
-                    placeholder=".-"
-                    helperText="กรอกตัวอักษรพิเศษที่ต้องการอนุญาต เช่น . - _ +"
-                    size="small"
-                    sx={{
-                      ...inputSx,
-                      '& .MuiOutlinedInput-root': { ...inputSx['& .MuiOutlinedInput-root'], borderRadius: '10px' },
-                    }}
-                  />
-                )}
-
-                {/* Preview */}
-                <Box sx={{
-                  p: 1.5,
-                  borderRadius: '10px',
-                  bgcolor: 'rgba(16,185,129,0.08)',
-                  border: '1px solid rgba(16,185,129,0.2)',
-                }}>
-                  <Typography sx={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 600, mb: 0.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Shirt size={14} /> ตัวอย่างที่ใช้ได้:
-                  </Typography>
-                  <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    {[
-                      sn.allowEnglish && (sn.autoUppercase ? 'JOHN' : 'John'),
-                      sn.allowThai && 'สมชาย',
-                      sn.allowSpecialChars && (sn.allowEnglish ? `O${sn.allowedSpecialChars[0] || '.'}BRIEN` : `สม${sn.allowedSpecialChars[0] || '.'}ชาย`),
-                    ].filter(Boolean).join(' / ')}
-                    {` (${sn.minLength}-${sn.maxLength} ตัว)`}
                   </Typography>
                 </Box>
               </Box>
@@ -8562,7 +8424,8 @@ export default function AdminPage(): JSX.Element {
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                       {/* Custom Name */}
                       {(() => {
-                        const sc = { ...DEFAULT_SHIRT_NAME, ...config?.shirtNameConfig };
+                        const cartProduct = config?.products?.find((p) => p.id === item.productId);
+                        const sc = getProductShirtNameConfig(cartProduct, config?.shirtNameConfig);
                         const langs: string[] = [];
                         if (sc.allowThai) langs.push('ไทย');
                         if (sc.allowEnglish) langs.push('อังกฤษ');
@@ -12404,6 +12267,20 @@ const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving, showT
                 size="small"
                 sx={{ ...inputSx, width: 180 }}
                 helperText="ราคาที่จะบวกเพิ่มเมื่อเลือกแขนยาว"
+              />
+            </Box>
+          )}
+
+          {product.options?.hasCustomName && (
+            <Box sx={{ mt: 2, pt: 2, borderTop: `1px solid ${ADMIN_THEME.border}` }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1.5, color: ADMIN_THEME.text, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Shirt size={18} />
+                ตั้งค่าชื่อบนเสื้อ (เฉพาะสินค้านี้)
+              </Typography>
+              <ShirtNameConfigFields
+                compact
+                value={getProductShirtNameConfig(product)}
+                onChange={(shirtNameConfig) => onChange({ ...product, shirtNameConfig })}
               />
             </Box>
           )}

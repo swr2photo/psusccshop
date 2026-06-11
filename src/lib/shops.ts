@@ -5,7 +5,15 @@ import { db } from './db';
 import { shops, shopAdmins, orders } from '../db/schema';
 import { eq, and, desc, inArray, count, or, like } from 'drizzle-orm';
 import { Product, ShopConfig } from './config';
+import {
+  type ShopAdminPermissions,
+  DEFAULT_SHOP_ADMIN_PERMISSIONS,
+  ALL_SHOP_ADMIN_PERMISSIONS,
+} from './admin-permissions';
 import { getCached, invalidateCacheKey, CACHE_TTL } from './server-cache';
+
+export type { ShopAdminPermissions } from './admin-permissions';
+export { DEFAULT_SHOP_ADMIN_PERMISSIONS, ALL_SHOP_ADMIN_PERMISSIONS } from './admin-permissions';
 
 // ==================== TYPES ====================
 
@@ -68,51 +76,6 @@ export interface ShopAdmin {
   createdAt: string;
   updatedAt: string;
 }
-
-export interface ShopAdminPermissions {
-  canManageProducts?: boolean;
-  canManageOrders?: boolean;
-  canManagePickup?: boolean;
-  canManageTracking?: boolean;
-  canManageRefunds?: boolean;
-  canManageAnnouncement?: boolean;
-  canManageEvents?: boolean;
-  canManageSupport?: boolean;
-  canManageShop?: boolean;
-  canManagePayment?: boolean;
-  canManageShipping?: boolean;
-  canAddAdmins?: boolean;
-}
-
-export const DEFAULT_SHOP_ADMIN_PERMISSIONS: ShopAdminPermissions = {
-  canManageProducts: true,
-  canManageOrders: true,
-  canManagePickup: false,
-  canManageTracking: true,
-  canManageRefunds: true,
-  canManageAnnouncement: false,
-  canManageEvents: false,
-  canManageSupport: true,
-  canManageShop: false,
-  canManagePayment: false,
-  canManageShipping: false,
-  canAddAdmins: false,
-};
-
-export const ALL_SHOP_ADMIN_PERMISSIONS: ShopAdminPermissions = {
-  canManageProducts: true,
-  canManageOrders: true,
-  canManagePickup: true,
-  canManageTracking: true,
-  canManageRefunds: true,
-  canManageAnnouncement: true,
-  canManageEvents: true,
-  canManageSupport: true,
-  canManageShop: true,
-  canManagePayment: true,
-  canManageShipping: true,
-  canAddAdmins: true,
-};
 
 /** Public-facing shop payload for storefronts (no sensitive admin data) */
 export function toPublicShopData(shop: Shop) {
