@@ -8,8 +8,8 @@ const buildHash = Math.floor(Date.now() / 1000).toString(36);
 const buildVersion = `v${pkg.version}+${buildHash}`;
 
 const nextConfig: NextConfig = {
-  // Enable standalone output for Docker
-  output: 'standalone',
+  // Standalone only for Docker/Railway — Cloudflare Workers uses @opennextjs/cloudflare
+  ...(process.env.DOCKER_BUILD === '1' ? { output: 'standalone' as const } : {}),
   // Expose build info to client
   env: {
     NEXT_PUBLIC_BUILD_TIME: buildTime,

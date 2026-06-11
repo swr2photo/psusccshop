@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getRedisClient } from '@/lib/redis';
 
+// Edge middleware (middleware.ts) — required for @opennextjs/cloudflare; proxy.ts is Node-only in Next 16.
+
 // --- CORS config ---
 const allowedOrigins = [
   'https://sccshop.psusci.club',
@@ -10,69 +12,39 @@ const allowedOrigins = [
   'https://www.sccshop.psuscc.club',
 ];
 
-// Check if origin is allowed
 function isAllowedOrigin(origin: string | null): boolean {
-  // No origin header = same-origin request (allowed)
   if (!origin) return true;
-
-  // Exact match for production domains
   if (allowedOrigins.includes(origin)) return true;
-
-  // Allow subdomains of psusci.club / psuscc.club
   if (origin.endsWith('.psusci.club') || origin.endsWith('.psuscc.club')) return true;
-
-  // Allow localhost for development
   if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) return true;
-
-  // Allow GitHub Codespaces public URLs (HMR/CSR in dev)
   if (origin.endsWith('.app.github.dev')) return true;
-
   return false;
 }
 
-/**
- * Security headers to add to all responses
- */
 const securityHeaders = {
-  // Prevent clickjacking
   'X-Frame-Options': 'DENY',
-  
-  // Prevent MIME type sniffing
   'X-Content-Type-Options': 'nosniff',
-  
-  // Enable XSS filter
   'X-XSS-Protection': '1; mode=block',
-  
-  // Referrer policy
   'Referrer-Policy': 'strict-origin-when-cross-origin',
-  
-  // Permissions policy - Allow camera for QR scanning
   'Permissions-Policy': 'camera=(self), microphone=(), geolocation=()',
-  
-  // HSTS (HTTP Strict Transport Security)
   'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
 };
 
-/**
- * Simple in-memory rate limiting for middleware
- * Note: This resets on server restart. For production, use Redis.
- */
 const ipRequestCounts = new Map<string, { count: number; resetTime: number }>();
 
 function checkMiddlewareRateLimit(ip: string, limit: number, windowSeconds: number): boolean {
   const now = Date.now();
   const windowMs = windowSeconds * 1000;
-  
+
   let entry = ipRequestCounts.get(ip);
-  
+
   if (!entry || now > entry.resetTime) {
     entry = { count: 0, resetTime: now + windowMs };
   }
-  
+
   entry.count += 1;
   ipRequestCounts.set(ip, entry);
-  
-  // Cleanup old entries periodically
+
   if (ipRequestCounts.size > 10000) {
     const threshold = now - windowMs;
     for (const [key, val] of ipRequestCounts.entries()) {
@@ -81,66 +53,49 @@ function checkMiddlewareRateLimit(ip: string, limit: number, windowSeconds: numb
       }
     }
   }
-  
+
   return entry.count <= limit;
 }
 
-/**
- * Get client IP from request
- */
 function getIP(request: NextRequest): string {
-  // Cloudflare IP
   const cfIP = request.headers.get('cf-connecting-ip');
   if (cfIP) return cfIP;
-  
-  // X-Forwarded-For
+
   const xForwardedFor = request.headers.get('x-forwarded-for');
   if (xForwardedFor) return xForwardedFor.split(',')[0].trim();
-  
-  // X-Real-IP
+
   const xRealIP = request.headers.get('x-real-ip');
   if (xRealIP) return xRealIP;
-  
-  // Fallback
+
   return 'unknown';
 }
 
-/**
- * Check if user agent looks like a bot
- */
 function isSuspiciousUserAgent(userAgent: string | null): boolean {
   if (!userAgent) return true;
-  
+
   const ua = userAgent.toLowerCase();
-  
-  // Allow common browsers
+
   if (ua.includes('mozilla') || ua.includes('chrome') || ua.includes('safari') || ua.includes('firefox') || ua.includes('edge')) {
     return false;
   }
-  
-  // Block obvious bots (unless it's a legitimate crawler)
+
   const suspiciousPatterns = [
     'bot', 'crawler', 'spider', 'scraper', 'curl', 'wget', 'python-requests',
     'httpclient', 'libwww', 'lwp-', 'java/', 'perl/', 'ruby/', 'scanner',
   ];
-  
-  // Allow known good bots
+
   const allowedBots = ['googlebot', 'bingbot', 'slurp', 'duckduckbot', 'facebookexternalhit'];
   for (const allowed of allowedBots) {
     if (ua.includes(allowed)) return false;
   }
-  
+
   for (const pattern of suspiciousPatterns) {
     if (ua.includes(pattern)) return true;
   }
-  
+
   return false;
 }
 
-/**
- * Routes that require stricter rate limiting (POST/PUT/DELETE only)
- * GET requests have higher limits for better UX
- */
 const STRICT_RATE_LIMIT_ROUTES = [
   '/api/payment',
   '/api/upload',
@@ -148,16 +103,10 @@ const STRICT_RATE_LIMIT_ROUTES = [
   '/api/gas',
 ];
 
-/**
- * Routes with moderate rate limiting (all methods)
- */
 const MODERATE_RATE_LIMIT_ROUTES = [
   '/api/admin',
 ];
 
-/**
- * Routes that should block suspicious bots
- */
 const BOT_PROTECTED_ROUTES = [
   '/api/orders',
   '/api/payment',
@@ -166,26 +115,17 @@ const BOT_PROTECTED_ROUTES = [
   '/api/profile',
 ];
 
-/**
- * API routes that are called externally (webhooks, OAuth, cron, images)
- * These are excluded from the internal-request header check.
- */
 const EXTERNAL_API_ROUTES = [
-  '/api/auth/',           // NextAuth OAuth callbacks
-  '/api/payment/webhook/', // Stripe/Omise webhook callbacks
-  '/api/cron/',           // Cron jobs (have their own CRON_SECRET)
-  '/api/image/',          // Image proxy (called from <img> tags)
+  '/api/auth/',
+  '/api/payment/webhook/',
+  '/api/cron/',
+  '/api/image/',
 ];
 
-/** Opened in new tab for print/PDF — must allow browser navigation */
 const NAVIGABLE_API_ROUTES = [
   '/api/invoice',
 ];
 
-/**
- * GET responses from these routes set their own Cache-Control.
- * Do not force no-store in middleware (would override CDN caching).
- */
 const CACHEABLE_API_PREFIXES = [
   '/api/config',
   '/api/live',
@@ -197,14 +137,13 @@ const CACHEABLE_API_PREFIXES = [
   '/api/image/',
 ];
 
-export default async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const origin = request.headers.get('origin');
   const pathname = request.nextUrl.pathname;
   const method = request.method;
   const ip = getIP(request);
   const userAgent = request.headers.get('user-agent');
 
-  // --- Shop Open/Closed Check for Orders ---
   if (pathname.startsWith('/api/orders') && method === 'POST') {
     try {
       const redis = getRedisClient();
@@ -212,22 +151,22 @@ export default async function proxy(request: NextRequest) {
         const isOrderOpen = await redis.get<boolean>('is_order_open');
         if (isOrderOpen === false) {
           return NextResponse.json(
-            { 
-              success: false, 
-              status: 'error', 
-              message: 'ขออภัย ขณะนี้ระบบปิดรับคำสั่งซื้อแล้ว' 
+            {
+              success: false,
+              status: 'error',
+              message: 'ขออภัย ขณะนี้ระบบปิดรับคำสั่งซื้อแล้ว',
             },
-            { 
-              status: 403, 
-              headers: { 
+            {
+              status: 403,
+              headers: {
                 'Content-Type': 'application/json; charset=utf-8',
                 ...securityHeaders,
-              } 
+              },
             }
           );
         }
       } else if (process.env.NODE_ENV === 'production') {
-        console.error('[Proxy] Redis unavailable — blocking order POST (fail-closed)');
+        console.error('[Middleware] Redis unavailable — blocking order POST (fail-closed)');
         return NextResponse.json(
           {
             success: false,
@@ -243,11 +182,11 @@ export default async function proxy(request: NextRequest) {
           }
         );
       } else {
-        console.warn('[Proxy] Redis client not configured, bypassing check (dev only)');
+        console.warn('[Middleware] Redis client not configured, bypassing check (dev only)');
       }
     } catch (error) {
       if (process.env.NODE_ENV === 'production') {
-        console.error('[Proxy] Redis lookup failed — blocking order POST (fail-closed):', error);
+        console.error('[Middleware] Redis lookup failed — blocking order POST (fail-closed):', error);
         return NextResponse.json(
           {
             success: false,
@@ -263,11 +202,10 @@ export default async function proxy(request: NextRequest) {
           }
         );
       }
-      console.error('[Proxy] Redis lookup failed, bypassing check (dev only):', error);
+      console.error('[Middleware] Redis lookup failed, bypassing check (dev only):', error);
     }
   }
 
-  // --- CORS Check (skip auth — NextAuth sets CSRF/state cookies on POST sign-in) ---
   if (!pathname.startsWith('/api/auth/') && !isAllowedOrigin(origin)) {
     return NextResponse.json(
       { status: 'error', message: 'CORS policy: This origin is not allowed' },
@@ -276,32 +214,22 @@ export default async function proxy(request: NextRequest) {
   }
 
   const response = NextResponse.next();
-  
-  // Add security headers to all responses
+
   for (const [key, value] of Object.entries(securityHeaders)) {
     response.headers.set(key, value);
   }
-  
-  // Skip rate limiting for static files
+
   if (
     pathname.startsWith('/_next/') ||
     pathname.startsWith('/static/') ||
-    pathname.includes('.') // files with extensions
+    pathname.includes('.')
   ) {
     return response;
   }
 
-  // --- Block Direct Browser Navigation to API Routes ---
-  // Modern browsers send Sec-Fetch-Mode header:
-  //   "navigate" = user typed URL / clicked link / bookmark
-  //   "cors" / "same-origin" / "no-cors" = JavaScript fetch/XHR
-  // Server-side calls (Next.js internal) don't send Sec-Fetch-Mode at all.
-  // This blocks people from viewing API responses by typing URLs in browser.
   if (pathname.startsWith('/api/')) {
     const secFetchMode = request.headers.get('sec-fetch-mode');
     const secFetchDest = request.headers.get('sec-fetch-dest');
-    // Block only direct browser navigation (typing URL, clicking link)
-    // Allow: fetch/XHR (mode=cors/same-origin/no-cors), server calls (no header)
     if (secFetchMode === 'navigate' || secFetchDest === 'document') {
       const isExternalRoute = EXTERNAL_API_ROUTES.some(route => pathname.startsWith(route));
       const isNavigableRoute = NAVIGABLE_API_ROUTES.some(route => pathname.startsWith(route));
@@ -319,8 +247,7 @@ export default async function proxy(request: NextRequest) {
       }
     }
   }
-  
-  // Block suspicious bots on protected routes
+
   const isBotProtected = BOT_PROTECTED_ROUTES.some(route => pathname.startsWith(route));
   if (isBotProtected && isSuspiciousUserAgent(userAgent)) {
     console.warn(`[Security] Blocked suspicious bot: ${ip} - ${userAgent?.slice(0, 100)}`);
@@ -335,20 +262,14 @@ export default async function proxy(request: NextRequest) {
       }
     );
   }
-  
-  // Apply rate limiting based on route and method
+
   const isStrictRoute = STRICT_RATE_LIMIT_ROUTES.some(route => pathname.startsWith(route));
   const isModerateRoute = MODERATE_RATE_LIMIT_ROUTES.some(route => pathname.startsWith(route));
   const isWriteMethod = ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method);
-  
-  // Rate limits: 
-  // - Strict routes (payment, upload): 30/min
-  // - Moderate routes (admin): 60/min
-  // - Write methods on API: 60/min
-  // - Read methods: 200/min
+
   let rateLimit = 200;
   let rateLimitKey = 'normal';
-  
+
   if (isStrictRoute) {
     rateLimit = 30;
     rateLimitKey = 'strict';
@@ -359,9 +280,9 @@ export default async function proxy(request: NextRequest) {
     rateLimit = 60;
     rateLimitKey = 'write';
   }
-  
+
   const windowSeconds = 60;
-  
+
   if (!checkMiddlewareRateLimit(`${ip}:${rateLimitKey}`, rateLimit, windowSeconds)) {
     console.warn(`[Security] Rate limit exceeded: ${ip} on ${pathname} (${rateLimitKey})`);
     return new NextResponse(
@@ -376,43 +297,29 @@ export default async function proxy(request: NextRequest) {
       }
     );
   }
-  
-  // Add request ID for tracing
+
   const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
   response.headers.set('X-Request-ID', requestId);
-  
-  // Add additional security headers
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('X-Frame-Options', 'DENY');
   response.headers.set('X-XSS-Protection', '1; mode=block');
-  
-  // Default no-store for API; cacheable routes set Cache-Control in route handlers
+
   const isCacheableApi = CACHEABLE_API_PREFIXES.some(prefix => pathname.startsWith(prefix));
   if (pathname.startsWith('/api/') && !isCacheableApi) {
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     response.headers.set('Pragma', 'no-cache');
     response.headers.set('Expires', '0');
   }
-  
-  // Log suspicious activity
+
   if (isSuspiciousUserAgent(userAgent)) {
     console.warn(`[Security] Suspicious request: ${ip} - ${userAgent?.slice(0, 100)} - ${pathname}`);
   }
-  
+
   return response;
 }
 
-/**
- * Configure which routes the middleware applies to
- */
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
     '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 };

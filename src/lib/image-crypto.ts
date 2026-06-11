@@ -10,17 +10,19 @@ import crypto from 'crypto';
  * Secret key for AES-256 encryption (must be 32 bytes)
  * ใช้ HMAC-SHA256 เพื่อ derive key ที่มีความยาวถูกต้อง
  */
-const MASTER_SECRET = process.env.IMAGE_CRYPTO_SECRET;
-if (!MASTER_SECRET && typeof window === 'undefined' && process.env.NODE_ENV === 'production') {
-  throw new Error('[SECURITY] IMAGE_CRYPTO_SECRET is required in production');
+function getMasterSecret(): string {
+  const secret = process.env.IMAGE_CRYPTO_SECRET;
+  if (!secret && typeof window === 'undefined' && process.env.NODE_ENV === 'production') {
+    throw new Error('[SECURITY] IMAGE_CRYPTO_SECRET is required in production');
+  }
+  return secret || '';
 }
-const EFFECTIVE_SECRET = MASTER_SECRET || '';
 
 /**
  * Derive a 32-byte key from master secret
  */
 function deriveKey(): Buffer {
-  return crypto.createHash('sha256').update(EFFECTIVE_SECRET).digest();
+  return crypto.createHash('sha256').update(getMasterSecret()).digest();
 }
 
 /**
@@ -272,7 +274,7 @@ export function smartDecryptUrl(token: string, maxAgeHours: number = 0): string 
  */
 export function generateSignature(data: string): string {
   return crypto
-    .createHmac('sha256', EFFECTIVE_SECRET)
+    .createHmac('sha256', getMasterSecret())
     .update(data)
     .digest('hex')
     .substring(0, 16);

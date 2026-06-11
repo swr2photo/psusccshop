@@ -392,25 +392,25 @@ export async function verifyPasskeyAuthentication(
 
 // ==================== PASSKEY LOGIN TOKEN ====================
 
-const SECRET_KEY = (() => {
+function getPasskeySecretKey(): Uint8Array {
   const secret = process.env.NEXTAUTH_SECRET;
   if (!secret) {
     throw new Error('NEXTAUTH_SECRET is required for passkey login tokens');
   }
   return new TextEncoder().encode(secret);
-})();
+}
 
 export async function createPasskeyLoginToken(email: string): Promise<string> {
   return new SignJWT({ email, purpose: 'passkey-login' })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('2m')
-    .sign(SECRET_KEY);
+    .sign(getPasskeySecretKey());
 }
 
 export async function verifyPasskeyLoginToken(token: string): Promise<string | null> {
   try {
-    const { payload } = await jwtVerify(token, SECRET_KEY);
+    const { payload } = await jwtVerify(token, getPasskeySecretKey());
     if (payload.purpose !== 'passkey-login') return null;
     return (payload.email as string) || null;
   } catch {
