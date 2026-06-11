@@ -61,6 +61,24 @@ export const ADMIN_CACHE_KEYS = {
   DATA: '/api/admin/data',
 } as const;
 
+/** Build orders-list URL scoped to a sub-shop when needed. */
+export function buildAdminOrdersListKey(shopId?: string | null): string {
+  const base = ADMIN_CACHE_KEYS.ORDERS_LIST;
+  if (shopId && shopId !== 'all') {
+    return `${base}&shopId=${encodeURIComponent(shopId)}`;
+  }
+  return base;
+}
+
+/** Build bootstrap URL with optional shop scope for order stats. */
+export function buildAdminBootstrapKey(shopId?: string | null): string {
+  const base = ADMIN_CACHE_KEYS.BOOTSTRAP;
+  if (shopId && shopId !== 'all') {
+    return `${base}?shopId=${encodeURIComponent(shopId)}`;
+  }
+  return base;
+}
+
 export const CACHE_KEYS = {
   ADMIN_DATA: ADMIN_CACHE_KEYS.DATA,
   ADMIN_BOOTSTRAP: ADMIN_CACHE_KEYS.BOOTSTRAP,

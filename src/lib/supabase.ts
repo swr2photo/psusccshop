@@ -492,6 +492,7 @@ const ORDER_ADMIN_LIST_COLUMNS = {
   shippingOption: orders.shippingOption,
   trackingNumber: orders.trackingNumber,
   shopId: orders.shopId,
+  shopSlug: orders.shopSlug,
   paymentVerified: orders.paymentVerified,
   date: orders.date,
 } as const;
@@ -507,6 +508,7 @@ const ORDER_STATUS_LIST_COLUMNS = {
   shippingOption: orders.shippingOption,
   trackingNumber: orders.trackingNumber,
   shopId: orders.shopId,
+  shopSlug: orders.shopSlug,
 } as const;
 
 const EMAIL_LOG_LIST_COLUMNS = {
@@ -880,11 +882,18 @@ export async function getAllOrdersForAdminList(
 }
 
 /** Fast status counts for admin dashboard (no order rows). */
-export async function getOrderStatusCounts(): Promise<{ byStatus: Record<string, number>; total: number }> {
-  const rows = await db
+export async function getOrderStatusCounts(
+  shopIds?: string[],
+): Promise<{ byStatus: Record<string, number>; total: number }> {
+  let query = db
     .select({ status: orders.status, value: count() })
-    .from(orders)
-    .groupBy(orders.status);
+    .from(orders);
+
+  if (shopIds && shopIds.length > 0) {
+    query = query.where(inArray(orders.shopId, shopIds)) as typeof query;
+  }
+
+  const rows = await query.groupBy(orders.status);
 
   const byStatus: Record<string, number> = {};
   let total = 0;

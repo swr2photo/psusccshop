@@ -4286,6 +4286,8 @@ export default function AdminPage(): JSX.Element {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedShopId]);
 
+  const shopContextReady = myShops.length === 0 || selectedShopId !== '';
+
   // 📥 SWR Hook for Admin Data (replaces manual fetchData)
   const { 
     isLoading: swrLoading, 
@@ -4297,6 +4299,8 @@ export default function AdminPage(): JSX.Element {
     applyRealtimeOrderChange,
   } = useAdminDataSWR({
     enabled: status === 'authenticated',
+    shopId: isShopMode && selectedShopId !== 'all' ? selectedShopId : undefined,
+    ordersReady: shopContextReady,
     onSectionReceived: handleAdminSectionReceived,
     onError: (error) => {
       // Mark role check complete so auth useEffect can proceed
@@ -5993,8 +5997,12 @@ export default function AdminPage(): JSX.Element {
   // Shop-scoped orders (used for dashboard stats, badge counts, pickup, etc.)
   const shopOrders = useMemo(() => {
     if (!selectedShopId || selectedShopId === 'all') return orders;
-    return orders.filter(o => o.shopId === selectedShopId);
-  }, [orders, selectedShopId]);
+    const shop = myShops.find((s) => s.id === selectedShopId);
+    return orders.filter((o) =>
+      o.shopId === selectedShopId
+      || (shop?.slug && (o.shopSlug === shop.slug || o.raw?.shopSlug === shop.slug)),
+    );
+  }, [orders, selectedShopId, myShops]);
 
   // Memoize pickup data outside PickupView to avoid conditional hook calls
   // Use shopOrders so pickup list is shop-scoped when a shop is selected
@@ -7357,7 +7365,7 @@ export default function AdminPage(): JSX.Element {
                   )}
                 </Typography>
                 <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  {filteredOrders.length}/{orders.length} รายการ
+                  {filteredOrders.length}/{shopOrders.length} รายการ
                 </Typography>
               </Box>
             </Box>
@@ -7467,7 +7475,7 @@ export default function AdminPage(): JSX.Element {
           }}>
             {['ALL', ...ORDER_STATUSES].map((status) => {
               const isActive = orderFilterStatus === status;
-              const count = status === 'ALL' ? orders.length : orders.filter(o => o.status === status).length;
+              const count = status === 'ALL' ? shopOrders.length : shopOrders.filter(o => o.status === status).length;
               const theme = STATUS_THEME[status] || { bg: 'rgba(255,255,255,0.05)', text: 'var(--text-muted)', border: ADMIN_THEME.border };
               // Short labels for mobile
               const shortLabels: Record<string, string> = {

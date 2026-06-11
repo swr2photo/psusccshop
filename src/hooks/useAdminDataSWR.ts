@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import useSWR from 'swr';
-import { ADMIN_CACHE_KEYS } from './useAdminData';
+import { ADMIN_CACHE_KEYS, buildAdminBootstrapKey, buildAdminOrdersListKey } from './useAdminData';
 
 const adminFetcher = async (url: string) => {
   const res = await fetch(url, { headers: { Accept: 'application/json' } });
@@ -40,6 +40,10 @@ export interface AdminSectionPayload {
 
 interface UseAdminDataSWROptions {
   enabled: boolean;
+  /** When set (sub-shop mode), orders + stats are scoped to this shop ID. */
+  shopId?: string | null;
+  /** Wait until shop selector is initialized before fetching orders (avoids global flash). */
+  ordersReady?: boolean;
   onSectionReceived: (payload: AdminSectionPayload) => void;
   onError?: (error: any, section?: AdminDataSection) => void;
   onLoadingChange?: (loading: boolean) => void;
@@ -61,11 +65,17 @@ function readLocalCache(): { config?: any; orders?: any[]; logs?: any[] } | null
 export function useAdminDataSWR(options: UseAdminDataSWROptions) {
   const {
     enabled,
+    shopId,
+    ordersReady = true,
     onSectionReceived,
     onError,
     onLoadingChange,
     realtimeConnected = false,
   } = options;
+
+  const bootstrapKey = buildAdminBootstrapKey(shopId);
+  const ordersListKey = buildAdminOrdersListKey(shopId);
+  const isShopScoped = Boolean(shopId && shopId !== 'all');
 
   const bootstrapDone = useRef(false);
   const onSectionRef = useRef(onSectionReceived);
@@ -94,7 +104,7 @@ export function useAdminDataSWR(options: UseAdminDataSWROptions) {
     isValidating: bootstrapValidating,
     mutate: mutateBootstrap,
   } = useSWR(
-    enabled ? ADMIN_CACHE_KEYS.BOOTSTRAP : null,
+    enabled ? bootstrapKey : null,
     adminFetcher,
     { ...swrOptions, refreshInterval: 0 },
   );
@@ -130,12 +140,14 @@ export function useAdminDataSWR(options: UseAdminDataSWROptions) {
     isValidating: ordersValidating,
     mutate: mutateOrders,
   } = useSWR(
-    enabled && bootstrapReady ? ADMIN_CACHE_KEYS.ORDERS_LIST : null,
+    enabled && bootstrapReady && ordersReady ? ordersListKey : null,
     adminFetcher,
     {
       ...swrOptions,
+      keepPreviousData: !isShopScoped,
       refreshInterval: realtimeConnected ? 120_000 : 15_000,
       fallbackData: (() => {
+        if (isShopScoped) return undefined;
         const cached = readLocalCache();
         if (!cached?.orders?.length) return undefined;
         return {

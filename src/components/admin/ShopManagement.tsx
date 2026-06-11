@@ -164,6 +164,8 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
       if (data.status === 'success') {
         setShopAdmins(data.admins || []);
         setAdminsShopId(shopId);
+      } else {
+        showToast('error', data.message || 'โหลดรายชื่อแอดมินไม่สำเร็จ');
       }
     } catch {
       showToast('error', 'โหลดรายชื่อแอดมินไม่สำเร็จ');
@@ -200,8 +202,9 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
         }),
       });
       const data = await res.json();
-      if (data.status === 'success' && data.url) {
-        setEditingShop(prev => prev ? { ...prev, [type === 'logo' ? 'logoUrl' : 'bannerUrl']: data.url } : null);
+      const imageUrl = data.data?.url || data.url;
+      if (data.status === 'success' && imageUrl) {
+        setEditingShop(prev => prev ? { ...prev, [type === 'logo' ? 'logoUrl' : 'bannerUrl']: imageUrl } : null);
         showToast('success', `อัปโหลด${type === 'logo' ? 'โลโก้' : 'แบนเนอร์'}สำเร็จ`);
       } else {
         showToast('error', data.message || 'อัปโหลดไม่สำเร็จ');

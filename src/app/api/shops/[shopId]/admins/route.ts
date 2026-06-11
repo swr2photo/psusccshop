@@ -35,13 +35,13 @@ export async function POST(req: NextRequest, { params }: Params) {
     const adminRole = role || 'admin';
 
     const admin = await addShopAdmin(shopId, email, adminRole, permissions, authResult.email);
-    if (!admin) {
-      return NextResponse.json({ status: 'error', message: 'เพิ่มแอดมินไม่สำเร็จ' }, { status: 500 });
-    }
-
     return NextResponse.json({ status: 'success', admin }, { status: 201 });
   } catch (error: any) {
-    return NextResponse.json({ status: 'error', message: error?.message || 'เกิดข้อผิดพลาด' }, { status: 500 });
+    console.error('[shops/admins] POST error:', error?.message);
+    const message = error?.message?.includes('shop_admins')
+      ? 'ตาราง shop_admins ยังไม่ได้สร้างในฐานข้อมูล กรุณารัน migration scripts/supabase-multi-shop-schema.sql'
+      : (error?.message || 'เพิ่มแอดมินไม่สำเร็จ');
+    return NextResponse.json({ status: 'error', message }, { status: 500 });
   }
 }
 

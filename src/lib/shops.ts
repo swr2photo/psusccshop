@@ -428,34 +428,41 @@ export async function addShopAdmin(
   role: 'owner' | 'admin' = 'admin',
   permissions?: ShopAdminPermissions,
   addedBy?: string,
-): Promise<ShopAdmin | null> {
-  try {
-    const normalizedEmail = email.toLowerCase().trim();
-    
-    const data = await db.insert(shopAdmins)
-      .values({
-        shopId,
-        email: normalizedEmail,
+): Promise<ShopAdmin> {
+  const normalizedEmail = email.toLowerCase().trim();
+  const perms = permissions || DEFAULT_SHOP_ADMIN_PERMISSIONS;
+
+  const existing = await db.select()
+    .from(shopAdmins)
+    .where(and(eq(shopAdmins.shopId, shopId), eq(shopAdmins.email, normalizedEmail)))
+    .limit(1);
+
+  if (existing[0]) {
+    const data = await db.update(shopAdmins)
+      .set({
         role,
-        permissions: (permissions || DEFAULT_SHOP_ADMIN_PERMISSIONS) as any,
+        permissions: perms as any,
         addedBy: addedBy || null,
+        updatedAt: new Date(),
       })
-      .onConflictDoUpdate({
-        target: [shopAdmins.shopId, shopAdmins.email],
-        set: {
-          role,
-          permissions: (permissions || DEFAULT_SHOP_ADMIN_PERMISSIONS) as any,
-          addedBy: addedBy || null,
-          updatedAt: new Date(),
-        },
-      })
+      .where(eq(shopAdmins.id, existing[0].id))
       .returning();
-      
+    if (!data[0]) throw new Error('อัปเดตแอดมินไม่สำเร็จ');
     return dbToShopAdmin(data[0]);
-  } catch (error: any) {
-    console.error('[shops] addShopAdmin error:', error.message);
-    return null;
   }
+
+  const data = await db.insert(shopAdmins)
+    .values({
+      shopId,
+      email: normalizedEmail,
+      role,
+      permissions: perms as any,
+      addedBy: addedBy || null,
+    })
+    .returning();
+
+  if (!data[0]) throw new Error('เพิ่มแอดมินไม่สำเร็จ');
+  return dbToShopAdmin(data[0]);
 }
 
 export async function updateShopAdmin(
