@@ -165,44 +165,12 @@ export async function middleware(request: NextRequest) {
             }
           );
         }
-      } else if (process.env.NODE_ENV === 'production') {
-        console.error('[Middleware] Redis unavailable — blocking order POST (fail-closed)');
-        return NextResponse.json(
-          {
-            success: false,
-            status: 'error',
-            message: 'ระบบไม่พร้อมรับคำสั่งซื้อชั่วคราว กรุณาลองใหม่ภายหลัง',
-          },
-          {
-            status: 503,
-            headers: {
-              'Content-Type': 'application/json; charset=utf-8',
-              ...securityHeaders,
-            },
-          }
-        );
       } else {
-        console.warn('[Middleware] Redis client not configured, bypassing check (dev only)');
+        // Redis is an optional fast-path cache; /api/orders validates isOpen from DB
+        console.warn('[Middleware] Redis unavailable, deferring shop-open check to /api/orders');
       }
     } catch (error) {
-      if (process.env.NODE_ENV === 'production') {
-        console.error('[Middleware] Redis lookup failed — blocking order POST (fail-closed):', error);
-        return NextResponse.json(
-          {
-            success: false,
-            status: 'error',
-            message: 'ระบบไม่พร้อมรับคำสั่งซื้อชั่วคราว กรุณาลองใหม่ภายหลัง',
-          },
-          {
-            status: 503,
-            headers: {
-              'Content-Type': 'application/json; charset=utf-8',
-              ...securityHeaders,
-            },
-          }
-        );
-      }
-      console.error('[Middleware] Redis lookup failed, bypassing check (dev only):', error);
+      console.warn('[Middleware] Redis lookup failed, deferring shop-open check to /api/orders:', error);
     }
   }
 
