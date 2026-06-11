@@ -135,7 +135,7 @@ const LABELS = {
       bank_transfer: 'Bank Transfer',
       slip: 'Slip Upload',
       default: 'Online',
-    },
+    } as Record<string, string>,
     statuses: {
       PAID: 'Paid',
       WAITING_PAYMENT: 'Awaiting Payment',
@@ -144,7 +144,7 @@ const LABELS = {
       RECEIVED: 'Received',
       COMPLETED: 'Completed',
       CANCELLED: 'Cancelled',
-    },
+    } as Record<string, string>,
   },
 } as const;
 
