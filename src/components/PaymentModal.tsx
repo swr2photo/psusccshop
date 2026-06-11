@@ -307,10 +307,9 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
   // Stripe PromptPay paid — webhook marks the order PAID server-side
   const handleStripeSuccess = () => {
     addToast('success', t.payment.paymentSuccessToast, t.payment.paymentDetected);
-    setTimeout(() => {
-      setOrderStatus('PAID');
-      onSuccess();
-    }, 2000);
+    setOrderStatus('PAID');
+    // Brief pause so the success state is visible before closing the modal
+    setTimeout(() => onSuccess(), 450);
   };
 
   const processFile = (file: File) => {

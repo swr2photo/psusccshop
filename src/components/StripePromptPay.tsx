@@ -24,7 +24,7 @@ interface StripePromptPayProps {
 
 type Phase = 'creating' | 'qr' | 'succeeded' | 'expired' | 'error';
 
-const POLL_INTERVAL_MS = 4000;
+const POLL_INTERVAL_MS = 1500;
 
 // Dedupe concurrent intent creation (React StrictMode double-mounts in dev
 // would otherwise create two PaymentIntents per modal open)
@@ -60,6 +60,7 @@ export default function StripePromptPay({ orderRef, onSuccess, size = 232 }: Str
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
 
   const stripeRef = useRef<StripeJS | null>(null);
+  const publishableKeyRef = useRef<string | null>(null);
   const clientSecretRef = useRef<string | null>(null);
   const intentIdRef = useRef<string | null>(null);
   const successNotified = useRef(false);
@@ -97,6 +98,7 @@ export default function StripePromptPay({ orderRef, onSuccess, size = 232 }: Str
       }
 
       const { clientSecret, publishableKey, amount: amt, email, qrCode: serverQr, intentStatus, paymentIntentId } = json.data;
+      publishableKeyRef.current = publishableKey || null;
       clientSecretRef.current = clientSecret;
       intentIdRef.current = paymentIntentId || null;
       setAmount(Number(amt) || 0);
@@ -164,22 +166,60 @@ export default function StripePromptPay({ orderRef, onSuccess, size = 232 }: Str
   useEffect(() => { start(); }, [start]);
 
   // ---- 3) Poll payment status while the QR is displayed ----
-  // Polls our own server, which verifies with Stripe using the secret key and
-  // marks the order paid — works even without webhook delivery (localhost).
+  // Fast path: Stripe.js retrievePaymentIntent (~200ms). Then sync order via our API.
   useEffect(() => {
     if (phase !== 'qr') return;
+    let cancelled = false;
     let busy = false;
-    const interval = setInterval(async () => {
-      const intentId = intentIdRef.current;
-      if (!intentId || busy) return;
+
+    const syncPaidOnServer = async (intentId: string) => {
+      const res = await fetch(
+        `/api/payment/stripe/promptpay?ref=${encodeURIComponent(orderRef)}&intent=${encodeURIComponent(intentId)}`
+      );
+      const json = await res.json();
+      if (json.status !== 'success') {
+        throw new Error(json.message || 'server sync failed');
+      }
+      return json.data?.intentStatus as string | undefined;
+    };
+
+    const pollOnce = async () => {
+      if (cancelled || busy || successNotified.current) return;
       busy = true;
       try {
-        const res = await fetch(
-          `/api/payment/stripe/promptpay?ref=${encodeURIComponent(orderRef)}&intent=${encodeURIComponent(intentId)}`
-        );
-        const json = await res.json();
-        if (!mountedRef.current || json.status !== 'success') return;
-        const status = json.data?.intentStatus;
+        const clientSecret = clientSecretRef.current;
+        const publishableKey = publishableKeyRef.current;
+        const intentId = intentIdRef.current;
+
+        // Client-side check first — avoids Vercel round-trip on every tick
+        if (clientSecret && publishableKey) {
+          try {
+            const stripe =
+              stripeRef.current ?? (await getStripe(publishableKey, lang === 'th' ? 'th' : 'en'));
+            stripeRef.current = stripe;
+            const { paymentIntent } = await stripe.retrievePaymentIntent(clientSecret);
+            if (!mountedRef.current || cancelled) return;
+
+            if (paymentIntent?.status === 'succeeded') {
+              if (intentId) {
+                await syncPaidOnServer(intentId);
+              }
+              markSucceeded();
+              return;
+            }
+            if (paymentIntent?.status === 'canceled') {
+              setPhase('expired');
+              return;
+            }
+          } catch {
+            // Fall through to server poll
+          }
+        }
+
+        if (!intentId) return;
+
+        const status = await syncPaidOnServer(intentId);
+        if (!mountedRef.current || cancelled) return;
         if (status === 'succeeded') {
           markSucceeded();
         } else if (status === 'canceled') {
@@ -190,9 +230,15 @@ export default function StripePromptPay({ orderRef, onSuccess, size = 232 }: Str
       } finally {
         busy = false;
       }
-    }, POLL_INTERVAL_MS);
-    return () => clearInterval(interval);
-  }, [phase, orderRef, markSucceeded]);
+    };
+
+    void pollOnce();
+    const interval = setInterval(() => void pollOnce(), POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [phase, orderRef, markSucceeded, lang]);
 
   // ---- Countdown to QR expiry ----
   useEffect(() => {
