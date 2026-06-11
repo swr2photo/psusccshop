@@ -7,6 +7,9 @@ const buildTime = new Date().toISOString();
 const buildHash = Math.floor(Date.now() / 1000).toString(36);
 const buildVersion = `v${pkg.version}+${buildHash}`;
 
+// Cloudflare Workers Builds injects WORKERS_CI=1 (limited RAM vs Vercel)
+const isWorkersBuild = process.env.WORKERS_CI === '1';
+
 const nextConfig: NextConfig = {
   // Standalone only for Docker/Railway — Cloudflare Workers uses @opennextjs/cloudflare
   ...(process.env.DOCKER_BUILD === '1' ? { output: 'standalone' as const } : {}),
@@ -61,6 +64,8 @@ const nextConfig: NextConfig = {
       'zustand',
       'qrcode.react',
     ],
+    // Lower peak memory during OpenNext/Cloudflare CI builds
+    ...(isWorkersBuild ? { cpus: 2, memoryBasedWorkersCount: false } : {}),
   },
   // Enable HTTPS in production (for custom server, not Vercel)
   ...(process.env.NODE_ENV === 'production' && process.env.HTTPS_KEY && process.env.HTTPS_CERT
@@ -311,8 +316,9 @@ export default withSentryConfig(nextConfig, {
   // For all available options, see:
   // https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/
 
-  // Upload a larger set of source maps for prettier stack traces (increases build time)
-  widenClientFileUpload: true,
+  // Skip heavy source-map upload on Cloudflare Workers Builds (saves RAM)
+  widenClientFileUpload: !isWorkersBuild,
+  ...(isWorkersBuild ? { sourcemaps: { disable: true } } : {}),
 
   // Route browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers.
   // This can increase your server load as well as your hosting bill.
@@ -325,7 +331,7 @@ export default withSentryConfig(nextConfig, {
     // See the following for more information:
     // https://docs.sentry.io/product/crons/
     // https://vercel.com/docs/cron-jobs
-    automaticVercelMonitors: true,
+    automaticVercelMonitors: !isWorkersBuild,
 
     // Tree-shaking options for reducing bundle size
     treeshake: {

@@ -8,8 +8,8 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
-    "build:cloudflare": "opennextjs-cloudflare build",
-    "deploy:cloudflare": "opennextjs-cloudflare build && wrangler deploy",
+    "build:cloudflare": "NODE_OPTIONS=--max-old-space-size=6144 opennextjs-cloudflare build",
+    "deploy:cloudflare": "NODE_OPTIONS=--max-old-space-size=6144 opennextjs-cloudflare build && wrangler deploy",
     "start": "next start",
     "lint": "eslint",
     "migrate:images": "npx tsx scripts/migrate-image-urls.ts",
