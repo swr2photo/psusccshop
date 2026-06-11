@@ -29,8 +29,15 @@ export async function GET(req: NextRequest) {
       vendorSheetUrl: '',
     };
     
-    const mergedCfg = mergeConfigAdminEmails(cfg as ShopConfig);
     const session = await resolveAdminSession(authResult.email);
+    if (session.userRole === 'shopAdmin') {
+      return NextResponse.json(
+        { status: 'error', message: 'แอดมินร้านย่อยใช้ API แยกตามร้านที่ได้รับมอบหมาย' },
+        { status: 403 },
+      );
+    }
+
+    const mergedCfg = mergeConfigAdminEmails(cfg as ShopConfig);
 
     // Get pagination params
     const url = new URL(req.url);
@@ -38,9 +45,10 @@ export async function GET(req: NextRequest) {
     const offset = parseInt(url.searchParams.get('offset') || '0');
     const status = url.searchParams.get('status')?.split(',').filter(Boolean);
     const search = url.searchParams.get('search') || undefined;
+    const shopIdParam = url.searchParams.get('shopId')?.trim() || undefined;
+    const shopIds = shopIdParam ? [shopIdParam] : undefined;
     
-    // Get orders using optimized Supabase query with pagination
-    const { orders, total } = await getAllOrdersForAdminList({ limit, offset, status, search });
+    const { orders, total } = await getAllOrdersForAdminList({ limit, offset, status, search, shopIds });
     
     const sanitizedConfig = sanitizeConfigForAdmin(mergedCfg as ShopConfig);
     const sanitizedOrders = sanitizeOrdersForAdmin(orders);

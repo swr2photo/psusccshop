@@ -2,40 +2,33 @@
 // Background sheet sync utility - auto-syncs orders to Google Sheets
 
 import { getSheets } from '@/lib/google';
-import { getJson, putJson, getAllOrders } from '@/lib/filebase';
+import { getJson, getAllOrders } from '@/lib/filebase';
+import type { Product } from '@/lib/config';
+import {
+  FACTORY_EXPORT_TITLE,
+  buildFactoryExport,
+  groupOrdersByProduct,
+  resolveFactoryOrderStatuses,
+  shouldUsePerProductFactorySheets,
+  type SheetSettings,
+} from '@/lib/sheet-factory-export';
 
 const ORDERS_SHEET_TITLE = 'Orders';
 const VENDOR_SHEET_TITLE = 'Orders Vendor';
-const FACTORY_EXPORT_TITLE = 'Factory Export';
 
-// Config key for storing sheet settings
 const CONFIG_KEY = 'config/shop-settings.json';
 
-// Debounce sync requests - avoid syncing too frequently
 let syncTimeout: NodeJS.Timeout | null = null;
 let lastSyncTime = 0;
-const MIN_SYNC_INTERVAL = 5000; // Minimum 5 seconds between syncs
+const MIN_SYNC_INTERVAL = 5000;
 
-/**
- * Trigger a background sync to Google Sheets
- * This is debounced to prevent excessive API calls
- */
 export async function triggerSheetSync(baseUrl?: string): Promise<void> {
   const now = Date.now();
-  
-  // Skip if synced very recently
   if (now - lastSyncTime < MIN_SYNC_INTERVAL) {
     console.log('[sheet-sync] Skipping - synced recently');
     return;
   }
-
-  // Clear any pending sync
-  if (syncTimeout) {
-    clearTimeout(syncTimeout);
-  }
-
-  // Debounce: wait 2 seconds before actually syncing
-  // This batches rapid changes together
+  if (syncTimeout) clearTimeout(syncTimeout);
   syncTimeout = setTimeout(async () => {
     try {
       await performSync(baseUrl);
@@ -46,9 +39,6 @@ export async function triggerSheetSync(baseUrl?: string): Promise<void> {
   }, 2000);
 }
 
-/**
- * Immediately sync without debounce (use sparingly)
- */
 export async function syncNow(baseUrl?: string): Promise<{ success: boolean; message: string }> {
   try {
     await performSync(baseUrl);
@@ -84,7 +74,7 @@ const buildRows = (orders: any[], baseUrl: string) => {
     const slipUploadedAt = slip?.uploadedAt ? new Date(slip.uploadedAt).toLocaleString('th-TH') : '';
     const slipVerified = slip?.slipData?.transRef ? 'ผ่าน' : (hasSlip ? 'รอตรวจสอบ' : '');
     const slipLink = hasSlip ? `${baseUrl}/api/slip/${o?.ref}` : '';
-    
+
     return [
       o?.ref || '',
       o?.date || o?.createdAt || o?.created_at || '',
@@ -102,137 +92,6 @@ const buildRows = (orders: any[], baseUrl: string) => {
       slipLink,
     ];
   });
-};
-
-// Flatten items for factory export + size summary - Beautiful format for production
-// IMPORTANT: This should only receive PAID orders
-const buildFactoryExport = (orders: any[]) => {
-  // Define size order for sorting
-  const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL', '7XL', '8XL', '9XL', '10XL'];
-  const getSizeIndex = (size: string) => {
-    const idx = sizeOrder.findIndex(s => size?.toUpperCase()?.includes(s));
-    return idx === -1 ? 999 : idx;
-  };
-
-  // Collect all items with full details
-  const allItems: any[] = [];
-  const sizeCount: Record<string, number> = {};
-  const sizeLongSleeveCount: Record<string, number> = {};
-  const sizeShortSleeveCount: Record<string, number> = {};
-  
-  orders.forEach((o) => {
-    const items = o?.items || o?.cart || o?.raw?.items || [];
-    items.forEach((item: any) => {
-      const size = item.size || 'ไม่ระบุ';
-      const qty = Number(item.quantity ?? 1) || 1;
-      const isLongSleeve = item.options?.isLongSleeve || item.isLongSleeve || false;
-      
-      // Count totals
-      sizeCount[size] = (sizeCount[size] || 0) + qty;
-      if (isLongSleeve) {
-        sizeLongSleeveCount[size] = (sizeLongSleeveCount[size] || 0) + qty;
-      } else {
-        sizeShortSleeveCount[size] = (sizeShortSleeveCount[size] || 0) + qty;
-      }
-
-      allItems.push({
-        orderRef: o?.ref || '',
-        orderDate: o?.date || o?.createdAt || '',
-        customerName: o?.customerName || o?.name || '',
-        customerPhone: o?.customerPhone || o?.phone || '',
-        productName: item.productName || item.name || item.productId || '',
-        size,
-        qty,
-        isLongSleeve,
-        customName: item.options?.customName || item.customName || '',
-        customNumber: item.options?.customNumber || item.customNumber || '',
-        unitPrice: item.unitPrice || 0,
-        subtotal: (item.unitPrice || 0) * qty,
-      });
-    });
-  });
-
-  // Sort items by size then by customer name
-  allItems.sort((a, b) => {
-    const sizeCompare = getSizeIndex(a.size) - getSizeIndex(b.size);
-    if (sizeCompare !== 0) return sizeCompare;
-    return (a.customerName || '').localeCompare(b.customerName || '');
-  });
-
-  // Build header row - production friendly
-  const header = [
-    'ลำดับ',
-    'ไซซ์',
-    'แขน',
-    'ชื่อสกรีน',
-    'เบอร์สกรีน',
-    'ชื่อลูกค้า',
-    'เบอร์โทร',
-    'สินค้า',
-    'Ref',
-    'วันที่สั่ง',
-  ];
-
-  // Build data rows
-  const rows = allItems.map((item, index) => [
-    index + 1,
-    item.size,
-    item.isLongSleeve ? 'แขนยาว' : 'แขนสั้น',
-    item.customName || '-',
-    item.customNumber || '-',
-    item.customerName,
-    item.customerPhone,
-    item.productName,
-    item.orderRef,
-    item.orderDate ? new Date(item.orderDate).toLocaleDateString('th-TH') : '',
-  ]);
-
-  // Build size summary with totals - sorted properly
-  const sortedSizes = Object.keys(sizeCount).sort((a, b) => getSizeIndex(a) - getSizeIndex(b));
-  
-  const summaryHeader = ['สรุปตามไซซ์', '', '', ''];
-  const summarySubHeader = ['ไซซ์', 'แขนสั้น', 'แขนยาว', 'รวม'];
-  const summaryRows = sortedSizes.map(size => [
-    size,
-    sizeShortSleeveCount[size] || 0,
-    sizeLongSleeveCount[size] || 0,
-    sizeCount[size] || 0,
-  ]);
-
-  // Calculate grand totals
-  const totalShortSleeve = Object.values(sizeShortSleeveCount).reduce((a, b) => a + b, 0);
-  const totalLongSleeve = Object.values(sizeLongSleeveCount).reduce((a, b) => a + b, 0);
-  const grandTotal = totalShortSleeve + totalLongSleeve;
-
-  const totalRow = ['รวมทั้งหมด', totalShortSleeve, totalLongSleeve, grandTotal];
-
-  // Build stats row
-  const statsRow = [
-    `จำนวนคำสั่งซื้อที่ชำระแล้ว: ${orders.length} รายการ`,
-    `จำนวนชิ้นทั้งหมด: ${grandTotal} ชิ้น`,
-    `อัปเดตล่าสุด: ${new Date().toLocaleString('th-TH')}`,
-    '',
-  ];
-
-  // Combine all sections with spacing
-  const values = [
-    // Stats section
-    ['รายงานการผลิต - Factory Export'],
-    statsRow,
-    [],
-    // Main data
-    header,
-    ...rows,
-    [],
-    [],
-    // Summary section
-    summaryHeader,
-    summarySubHeader,
-    ...summaryRows,
-    totalRow,
-  ];
-
-  return values;
 };
 
 const buildVendorRows = (orders: any[]) => {
@@ -253,7 +112,7 @@ const buildVendorRows = (orders: any[]) => {
   });
 };
 
-const ensureSheet = async (sheets: any, spreadsheetId: string, title: string) => {
+export const ensureSheet = async (sheets: any, spreadsheetId: string, title: string) => {
   try {
     const meta = await sheets.spreadsheets.get({ spreadsheetId });
     const hasSheet = meta.data?.sheets?.some((s: any) => s.properties?.title === title);
@@ -274,17 +133,79 @@ const ensureSheet = async (sheets: any, spreadsheetId: string, title: string) =>
   }
 };
 
+export async function syncFactoryExportSheets(
+  sheets: any,
+  spreadsheetId: string,
+  orders: any[],
+  products: Product[] = [],
+  sheetSettings?: SheetSettings,
+): Promise<{ mode: 'per_product' | 'combined'; tabs: string[] }> {
+  const statuses = resolveFactoryOrderStatuses(sheetSettings);
+  const factoryOrders = orders.filter((o) => statuses.includes(String(o?.status || '').toUpperCase()));
+  const perProduct = shouldUsePerProductFactorySheets(sheetSettings);
+
+  if (perProduct) {
+    const groups = groupOrdersByProduct(factoryOrders, products);
+    const tabs: string[] = [];
+
+    for (const group of groups) {
+      await ensureSheet(sheets, spreadsheetId, group.sheetTitle);
+      const values = buildFactoryExport(group.orders, group.productLabel);
+      await sheets.spreadsheets.values.clear({
+        spreadsheetId,
+        range: `'${group.sheetTitle.replace(/'/g, "''")}'!A:Z`,
+      });
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `'${group.sheetTitle.replace(/'/g, "''")}'!A1:M${values.length}`,
+        valueInputOption: 'RAW',
+        requestBody: { values },
+      });
+      tabs.push(group.sheetTitle);
+    }
+
+    // Clear legacy combined tab if present
+    try {
+      await sheets.spreadsheets.values.clear({
+        spreadsheetId,
+        range: `${FACTORY_EXPORT_TITLE}!A:Z`,
+      });
+    } catch {
+      /* tab may not exist */
+    }
+
+    console.log(`[sheet-sync] Per-product factory export — ${groups.length} product tabs`);
+    return { mode: 'per_product', tabs };
+  }
+
+  await ensureSheet(sheets, spreadsheetId, FACTORY_EXPORT_TITLE);
+  const factoryValues = buildFactoryExport(factoryOrders);
+  await sheets.spreadsheets.values.clear({
+    spreadsheetId,
+    range: `${FACTORY_EXPORT_TITLE}!A:Z`,
+  });
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: `${FACTORY_EXPORT_TITLE}!A1:M${factoryValues.length}`,
+    valueInputOption: 'RAW',
+    requestBody: { values: factoryValues },
+  });
+
+  console.log(`[sheet-sync] Combined factory export — ${factoryOrders.length} orders`);
+  return { mode: 'combined', tabs: [FACTORY_EXPORT_TITLE] };
+}
+
 async function performSync(baseUrl?: string): Promise<void> {
-  // Check if Google credentials are available
   if (!process.env.GOOGLE_CLIENT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY) {
     console.log('[sheet-sync] Skipping - Google credentials not configured');
     return;
   }
 
-  // Get config to find sheet IDs
   const config = await getJson<any>(CONFIG_KEY);
   const sheetId = config?.sheetId || process.env.GOOGLE_SHEET_ID;
   const vendorSheetId = config?.vendorSheetId || process.env.VENDOR_SHEET_ID;
+  const sheetSettings: SheetSettings | undefined = config?.sheetSettings;
+  const products: Product[] = config?.products || [];
 
   if (!sheetId) {
     console.log('[sheet-sync] Skipping - No sheet ID configured');
@@ -296,15 +217,11 @@ async function performSync(baseUrl?: string): Promise<void> {
   const sheets = await getSheets();
   const url = baseUrl || process.env.NEXT_PUBLIC_BASE_URL || 'https://sccshop.psusci.club';
 
-  // Ensure sheets exist
   await ensureSheet(sheets, sheetId, ORDERS_SHEET_TITLE);
-  await ensureSheet(sheets, sheetId, FACTORY_EXPORT_TITLE);
 
-  // Get all orders
   const { orders } = await getAllOrders({ limit: 10000 });
   const orderList = orders.map((data: any) => ({ ...data, _key: `orders/${data.ref}.json` }));
 
-  // Sync main orders sheet
   const header = ['Ref', 'Date', 'Name', 'Email', 'Phone', 'Amount', 'Status', 'Address', 'Items (summary)', 'Notes', 'Slip', 'Slip Date', 'Slip Verified', 'Slip Link'];
   const values = [header, ...buildRows(orderList, url)];
 
@@ -315,26 +232,8 @@ async function performSync(baseUrl?: string): Promise<void> {
     requestBody: { values },
   });
 
-  // Factory export tab - ONLY PAID orders (important for production tracking)
-  const paidOrders = orderList.filter((o) => o?.status === 'PAID');
-  const factoryValues = buildFactoryExport(paidOrders);
-  
-  // Clear the factory sheet first to avoid stale data when orders get cancelled
-  await sheets.spreadsheets.values.clear({
-    spreadsheetId: sheetId,
-    range: `${FACTORY_EXPORT_TITLE}!A:Z`,
-  });
-  
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: sheetId,
-    range: `${FACTORY_EXPORT_TITLE}!A1:J${factoryValues.length}`,
-    valueInputOption: 'RAW',
-    requestBody: { values: factoryValues },
-  });
+  await syncFactoryExportSheets(sheets, sheetId, orderList, products, sheetSettings);
 
-  console.log(`[sheet-sync] Factory export - ${paidOrders.length} PAID orders synced`);
-
-  // Sync vendor sheet if configured
   if (vendorSheetId) {
     try {
       await ensureSheet(sheets, vendorSheetId, VENDOR_SHEET_TITLE);

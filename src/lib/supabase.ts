@@ -763,12 +763,13 @@ export async function getOrdersByEmail(
  * Get all orders (admin) with pagination
  */
 export async function getAllOrders(
-  options: { limit?: number; offset?: number; status?: string[]; search?: string } = {}
+  options: { limit?: number; offset?: number; status?: string[]; search?: string; shopIds?: string[] } = {}
 ): Promise<{ orders: any[]; total: number }> {
-  const { limit = 100, offset = 0, status, search } = options;
+  const { limit = 100, offset = 0, status, search, shopIds } = options;
   
   const conditions = [];
   if (status && status.length > 0) conditions.push(inArray(orders.status, status));
+  if (shopIds && shopIds.length > 0) conditions.push(inArray(orders.shopId, shopIds));
   if (search) {
     conditions.push(or(
       like(orders.ref, `%${search}%`),
@@ -832,9 +833,9 @@ function slimSlipForAdminList(slipData: any): any | undefined {
  * Heavy fields (cart, slip) omitted; use getOrderByRef for detail/edit.
  */
 export async function getAllOrdersForAdminList(
-  options: { limit?: number; offset?: number; status?: string[]; search?: string } = {},
+  options: { limit?: number; offset?: number; status?: string[]; search?: string; shopIds?: string[] } = {},
 ): Promise<{ orders: any[]; total: number }> {
-  const { limit = 100, offset = 0, status, search } = options;
+  const { limit = 100, offset = 0, status, search, shopIds } = options;
   const term = search?.trim();
 
   if (term) {
@@ -855,6 +856,7 @@ export async function getAllOrdersForAdminList(
 
   const conditions = [];
   if (status && status.length > 0) conditions.push(inArray(orders.status, status));
+  if (shopIds && shopIds.length > 0) conditions.push(inArray(orders.shopId, shopIds));
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
   const listColumns = status?.length ? ORDER_STATUS_LIST_COLUMNS : ORDER_ADMIN_LIST_COLUMNS;

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getJson, putJson } from '@/lib/filebase';
 import { getOrderByRef, updateOrderByRef } from '@/lib/order-lookup';
 import { requireAdminWithPermission } from '@/lib/auth';
+import { assertShopAccess, resolveAdminSession } from '@/lib/admin-context';
 import { triggerSheetSync } from '@/lib/sheet-sync';
 import { sendOrderStatusEmail } from '@/lib/email';
 import { sendPushNotification } from '@/lib/push-notification';
@@ -85,6 +86,15 @@ export async function POST(req: NextRequest) {
     if (!ref || !status) return NextResponse.json({ status: 'error', message: 'missing ref/status' }, { status: 400 });
     const order = await getOrderByRef(ref);
     if (!order) return NextResponse.json({ status: 'error', message: 'order not found' }, { status: 404 });
+
+    const session = await resolveAdminSession(authResult.email);
+    if (session.userRole === 'shopAdmin') {
+      const orderShopId = order.shopId || order.shop_id;
+      if (!orderShopId || !assertShopAccess(session, orderShopId)) {
+        return NextResponse.json({ status: 'error', message: 'ไม่มีสิทธิ์จัดการออเดอร์ของร้านนี้' }, { status: 403 });
+      }
+    }
+
     {
       const previousStatus = order.status;
       order.status = status;

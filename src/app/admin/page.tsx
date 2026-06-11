@@ -176,6 +176,7 @@ import TrackingManagement from '@/components/admin/TrackingManagement';
 import RefundManagement from '@/components/admin/RefundManagement';
 import LiveStreamSettings from '@/components/admin/LiveStreamSettings';
 import ShopManagement from '@/components/admin/ShopManagement';
+import { mapShopPermissionsToAdminPanel } from '@/lib/admin-context';
 
 // ============== TYPES ==============
 interface AdminDataResponse {
@@ -1151,7 +1152,7 @@ const SettingsView = React.memo(function SettingsView({
         <SettingSection icon={<Bolt size={20} />} title="Google Sheet">
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <TextField
-              label="Sheet ID"
+              label="Sheet ID (ออเดอร์ + สรุปการผลิต)"
               placeholder="วาง Sheet ID หรือ URL ก็ได้"
               value={localConfig.sheetId || ''}
               onChange={(e) => {
@@ -1166,7 +1167,7 @@ const SettingsView = React.memo(function SettingsView({
                   borderRadius: '10px',
                 },
               }}
-              helperText="ใส่ Sheet ID หรือ URL ของ Google Sheet"
+              helperText="ชีตหลัก — แท็บ Orders รวมทุกออเดอร์ และแท็บสรุปตามสินค้า"
             />
 
             <TextField
@@ -1185,8 +1186,88 @@ const SettingsView = React.memo(function SettingsView({
                   borderRadius: '10px',
                 },
               }}
-              helperText="ชีตสำหรับส่งให้โรงงาน (ตัดอีเมล/ลิงก์สลิปออก)"
+              helperText="ชีตแยกสำหรับส่งให้โรงงาน (ตัดอีเมล/ลิงก์สลิปออก) — ไม่บังคับ"
             />
+
+            <Box sx={{
+              p: 2,
+              borderRadius: '12px',
+              bgcolor: 'var(--surface-2)',
+              border: `1px solid ${ADMIN_THEME.border}`,
+            }}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={localConfig.sheetSettings?.factoryPerProduct !== false}
+                    onChange={(e) => onConfigChange({
+                      ...localConfig,
+                      sheetSettings: {
+                        ...localConfig.sheetSettings,
+                        factoryPerProduct: e.target.checked,
+                      },
+                    })}
+                    sx={{
+                      '& .MuiSwitch-switchBase.Mui-checked': { color: '#10b981' },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: '#10b981' },
+                    }}
+                  />
+                }
+                label={
+                  <Box>
+                    <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                      แยกชีตสรุปตามสินค้า
+                    </Typography>
+                    <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      แต่ละสินค้าจะมีแท็บชื่อ &quot;สรุป [ชื่อสินค้า]&quot; พร้อมรายการและสรุปไซซ์แยกกัน
+                    </Typography>
+                  </Box>
+                }
+                sx={{ alignItems: 'flex-start', ml: 0, mr: 0 }}
+              />
+
+              <TextField
+                label="สถานะออเดอร์ที่นำเข้าชีตสรุป"
+                placeholder="PAID"
+                value={(localConfig.sheetSettings?.factoryOrderStatuses || ['PAID']).join(', ')}
+                onChange={(e) => {
+                  const statuses = e.target.value
+                    .split(',')
+                    .map((s) => s.trim().toUpperCase())
+                    .filter(Boolean);
+                  onConfigChange({
+                    ...localConfig,
+                    sheetSettings: {
+                      ...localConfig.sheetSettings,
+                      factoryOrderStatuses: statuses.length ? statuses : ['PAID'],
+                    },
+                  });
+                }}
+                fullWidth
+                size="small"
+                sx={{ mt: 1.5, ...inputSx }}
+                helperText="คั่นด้วยจุลภาค เช่น PAID หรือ PAID, READY"
+              />
+
+              {localConfig.sheetSettings?.factoryPerProduct !== false && (localConfig.products?.length ?? 0) > 0 && (
+                <Box sx={{ mt: 1.5 }}>
+                  <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', mb: 0.75 }}>
+                    แท็บสรุปที่จะสร้างเมื่อมีออเดอร์:
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                    {(localConfig.products || [])
+                      .filter((p) => p.isActive !== false)
+                      .map((p) => (
+                        <Chip
+                          key={p.id}
+                          label={`สรุป ${p.name}`}
+                          size="small"
+                          sx={{ fontSize: '0.7rem', bgcolor: 'rgba(99,102,241,0.12)', color: '#6366f1' }}
+                        />
+                      ))}
+                  </Box>
+                </Box>
+              )}
+            </Box>
             
             {localConfig.sheetUrl && (
               <Box sx={{
@@ -4072,30 +4153,24 @@ export default function AdminPage(): JSX.Element {
   const userEmail = session?.user?.email?.toLowerCase() ?? '';
   // Trust server-validated role OR fall back to client-side check
   const isSuperAdminUser = serverUserRole === 'superadmin' || isSuperAdmin(session?.user?.email ?? null);
+  const selectedShopPerms = useMemo(() => {
+    if (serverUserRole !== 'shopAdmin' || !selectedShopId || selectedShopId === 'all') return null;
+    return myShops.find((s) => s.id === selectedShopId)?.permissions ?? null;
+  }, [serverUserRole, selectedShopId, myShops]);
+
   const adminPerms = useMemo(() => {
     // If user has custom permissions in config, use those
     if (config.adminPermissions?.[userEmail]) {
       return { ...DEFAULT_ADMIN_PERMISSIONS, ...config.adminPermissions[userEmail] };
     }
-    // Shop admin: use permissions from shop_admins table (mapped to admin permission keys)
-    if (serverUserRole === 'shopAdmin' && shopAdminPermissions) {
-      return {
-        canManageShop: false,
-        canManageSheet: false,
-        canManageAnnouncement: false,
-        canManageOrders: shopAdminPermissions.canManageOrders ?? true,
-        canManageProducts: shopAdminPermissions.canManageProducts ?? true,
-        canManagePickup: shopAdminPermissions.canManagePickup ?? false,
-        canManageEvents: shopAdminPermissions.canManageEvents ?? false,
-        canManagePromoCodes: shopAdminPermissions.canManagePromoCodes ?? false,
-        canManageRefunds: shopAdminPermissions.canManageRefunds ?? false,
-        canManageTracking: shopAdminPermissions.canManageTracking ?? false,
-        canManageShipping: shopAdminPermissions.canManageShipping ?? false,
-        canManagePayment: shopAdminPermissions.canManagePayment ?? false,
-        canManageSupport: shopAdminPermissions.canManageSupport ?? false,
-        canManageLiveStream: false,
-        canSendEmail: false,
-      } as AdminPermissions;
+    // Shop admin: permissions for the currently selected sub-shop only
+    if (serverUserRole === 'shopAdmin') {
+      if (selectedShopPerms) {
+        return { ...DEFAULT_ADMIN_PERMISSIONS, ...mapShopPermissionsToAdminPanel(selectedShopPerms) } as AdminPermissions;
+      }
+      if (shopAdminPermissions) {
+        return { ...DEFAULT_ADMIN_PERMISSIONS, ...mapShopPermissionsToAdminPanel(shopAdminPermissions) } as AdminPermissions;
+      }
     }
     // Server-validated admins (from ADMIN_EMAILS env var) get all permissions
     // by default until the super admin explicitly customizes them
@@ -4107,7 +4182,7 @@ export default function AdminPage(): JSX.Element {
       return allPerms;
     }
     return { ...DEFAULT_ADMIN_PERMISSIONS };
-  }, [config.adminPermissions, userEmail, serverUserRole, shopAdminPermissions]);
+  }, [config.adminPermissions, userEmail, serverUserRole, shopAdminPermissions, selectedShopPerms]);
 
   // Permission flags - super admin has all permissions
   const canManageShop = isSuperAdminUser || adminPerms.canManageShop;
@@ -4262,14 +4337,23 @@ export default function AdminPage(): JSX.Element {
             permissions: s.permissions || {},
           }));
           setMyShops(shops);
-          // SuperAdmin sees all by default, regular admin auto-selects first shop
           if (data.role === 'superadmin') {
             setSelectedShopId('all');
-          } else if (shops.length === 1) {
-            setSelectedShopId(shops[0].id);
-          } else if (shops.length > 1) {
+          } else if (data.role === 'shopAdmin') {
+            if (shops.length > 0) {
+              setSelectedShopId(shops[0].id);
+            }
+          } else if (shops.length > 0) {
             setSelectedShopId(shops[0].id);
           }
+        } else if (data.status === 'error' && data.message?.includes('มอบหมาย')) {
+          alertDialog({
+            title: 'ไม่มีสิทธิ์เข้าถึง',
+            message: data.message || 'บัญชีของคุณยังไม่ได้รับมอบหมายร้านค้าย่อย',
+            variant: 'error',
+            confirmText: 'กลับหน้าหลัก',
+            onClose: () => router.push('/'),
+          });
         }
       } catch {
         console.warn('[Admin] Failed to fetch shops');

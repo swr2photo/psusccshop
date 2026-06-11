@@ -1,6 +1,6 @@
 // /api/shops — List shops & Create shop
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin, isSuperAdminEmail } from '@/lib/auth';
+import { requireAdmin, isSuperAdminEmail, isGlobalAdminEmailAsync } from '@/lib/auth';
 import { listAllShops, listActiveShops, createShop, getShopsForAdmin } from '@/lib/shops';
 
 export const runtime = 'nodejs';
@@ -29,10 +29,22 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ status: 'success', shops, role: 'superadmin' });
   }
 
-  // Regular admin sees only their assigned shops
+  const isGlobal = await isGlobalAdminEmailAsync(authResult.email);
   const shopRoles = await getShopsForAdmin(authResult.email);
   const shops = shopRoles.map(sr => ({ ...sr.shop, role: sr.role, permissions: sr.permissions }));
-  return NextResponse.json({ status: 'success', shops, role: 'admin' });
+
+  if (isGlobal) {
+    return NextResponse.json({ status: 'success', shops, role: 'admin' });
+  }
+
+  if (shops.length === 0) {
+    return NextResponse.json(
+      { status: 'error', message: 'ไม่มีร้านค้าที่ได้รับมอบหมาย' },
+      { status: 403 },
+    );
+  }
+
+  return NextResponse.json({ status: 'success', shops, role: 'shopAdmin' });
 }
 
 /** POST /api/shops — Create a new shop (SuperAdmin only) */

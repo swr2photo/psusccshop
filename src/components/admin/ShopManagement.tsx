@@ -14,9 +14,8 @@ import {
 } from 'lucide-react';
 import {
   ADMIN_THEME,
-  DIALOG_THEME,
-  dialogPaperSx,
-  dialogInputSx,
+  adminDialogPaperSx,
+  adminInputSx,
 } from '@/lib/adminTheme';
 
 // ==================== TYPES ====================
@@ -363,7 +362,7 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
     }
   };
 
-  const inputSx = dialogInputSx;
+  const inputSx = adminInputSx;
 
   const SettingToggle = ({
     title,
@@ -383,12 +382,12 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
       gap: 2,
       p: 1.5,
       borderRadius: '10px',
-      bgcolor: 'rgba(255,255,255,0.04)',
-      border: `1px solid ${DIALOG_THEME.border}`,
+      bgcolor: ADMIN_THEME.glassSoft,
+      border: `1px solid ${ADMIN_THEME.border}`,
     }}>
       <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: DIALOG_THEME.text }}>{title}</Typography>
-        <Typography sx={{ fontSize: '0.75rem', color: DIALOG_THEME.muted, mt: 0.25 }}>{description}</Typography>
+        <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: ADMIN_THEME.text }}>{title}</Typography>
+        <Typography sx={{ fontSize: '0.75rem', color: ADMIN_THEME.muted, mt: 0.25 }}>{description}</Typography>
       </Box>
       <Switch
         checked={checked}
@@ -663,12 +662,12 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
         onClose={() => setCreateOpen(false)}
         maxWidth="sm"
         fullWidth
-        PaperProps={{ sx: dialogPaperSx }}
+        PaperProps={{ sx: adminDialogPaperSx }}
       >
-        <DialogTitle sx={{ fontWeight: 700, color: DIALOG_THEME.title, display: 'flex', alignItems: 'center', gap: 1 }}>
+        <DialogTitle sx={{ fontWeight: 700, color: ADMIN_THEME.text, display: 'flex', alignItems: 'center', gap: 1 }}>
           <Store size={20} /> สร้างร้านค้าใหม่
         </DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '12px !important', color: DIALOG_THEME.text }}>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '12px !important', color: ADMIN_THEME.text }}>
           <TextField
             label="ชื่อร้านค้า *"
             value={newShop.name}
@@ -717,14 +716,14 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
             rows={2}
             sx={inputSx}
           />
-          <Box sx={{ p: 1.5, borderRadius: '10px', bgcolor: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.25)' }}>
-            <Typography sx={{ fontSize: '0.78rem', color: DIALOG_THEME.muted, lineHeight: 1.5 }}>
+          <Box sx={{ p: 1.5, borderRadius: '10px', bgcolor: 'rgba(99,102,241,0.08)', border: `1px solid ${ADMIN_THEME.border}` }}>
+            <Typography sx={{ fontSize: '0.78rem', color: ADMIN_THEME.muted, lineHeight: 1.5 }}>
               การชำระเงินใช้บัญชี PromptPay ของร้านหลัก (SCC Shop) ร่วมกัน — ไม่ต้องตั้งค่าแยกต่อร้านย่อย
             </Typography>
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setCreateOpen(false)} sx={{ color: DIALOG_THEME.muted, textTransform: 'none' }}>
+          <Button onClick={() => setCreateOpen(false)} sx={{ color: ADMIN_THEME.muted, textTransform: 'none' }}>
             ยกเลิก
           </Button>
           <Button
@@ -745,61 +744,127 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
         onClose={() => setEditingShop(null)}
         maxWidth="sm"
         fullWidth
-        PaperProps={{ sx: dialogPaperSx }}
+        PaperProps={{ sx: adminDialogPaperSx }}
       >
         {editingShop && (
           <>
-            <DialogTitle sx={{ fontWeight: 700, color: DIALOG_THEME.title, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <DialogTitle sx={{ fontWeight: 700, color: ADMIN_THEME.text, display: 'flex', alignItems: 'center', gap: 1 }}>
               <Edit size={20} /> แก้ไขร้าน: {editingShop.name}
             </DialogTitle>
-            <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '12px !important', color: DIALOG_THEME.text }}>
+            <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '12px !important', color: ADMIN_THEME.text }}>
               {/* Banner & Logo Upload */}
-              <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: DIALOG_THEME.section, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: ADMIN_THEME.primary, display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Image size={16} /> รูปภาพร้านค้า
               </Typography>
-              {/* Banner Preview & Upload */}
-              <Box sx={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', border: `1px solid ${ADMIN_THEME.border}` }}>
-                <Box sx={{
-                  height: 120,
-                  background: editingShop.bannerUrl
-                    ? `url(${editingShop.bannerUrl}) center/cover`
-                    : 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <Button
-                    component="label"
-                    variant="contained"
-                    size="small"
+
+              <Box>
+                <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: ADMIN_THEME.textSecondary, mb: 0.75 }}>
+                  รูปปกร้าน (แบนเนอร์)
+                </Typography>
+                <Box
+                  component="label"
+                  sx={{
+                    display: 'block',
+                    position: 'relative',
+                    height: 160,
+                    borderRadius: '12px',
+                    overflow: 'hidden',
+                    border: `2px dashed ${editingShop.bannerUrl ? ADMIN_THEME.primary : ADMIN_THEME.border}`,
+                    bgcolor: ADMIN_THEME.glassSoft,
+                    cursor: uploadingImage === 'banner' ? 'wait' : 'pointer',
+                    backgroundImage: editingShop.bannerUrl ? `url(${editingShop.bannerUrl})` : 'none',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    transition: 'border-color 0.2s ease',
+                    '&:hover': { borderColor: ADMIN_THEME.primary },
+                  }}
+                >
+                  <input
+                    type="file"
+                    hidden
+                    accept="image/jpeg,image/png,image/webp,image/gif"
                     disabled={uploadingImage === 'banner'}
-                    startIcon={uploadingImage === 'banner' ? <CircularProgress size={14} /> : <Upload size={14} />}
-                    sx={{ bgcolor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(8px)', textTransform: 'none', borderRadius: '8px', fontSize: '0.75rem' }}
-                  >
-                    {editingShop.bannerUrl ? 'เปลี่ยนแบนเนอร์' : 'อัปโหลดแบนเนอร์'}
-                    <input type="file" hidden accept="image/*" onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0], 'banner')} />
-                  </Button>
-                </Box>
-                {/* Logo overlay */}
-                <Box sx={{ position: 'absolute', bottom: -20, left: 16 }}>
-                  <Box sx={{ position: 'relative', display: 'inline-block' }}>
-                    <Avatar
-                      src={editingShop.logoUrl}
-                      sx={{ width: 56, height: 56, border: '3px solid #1a1a2e', bgcolor: '#2a2a3e', fontSize: '1.2rem', fontWeight: 700 }}
-                    >
-                      {editingShop.name[0]}
-                    </Avatar>
-                    <IconButton
-                      component="label"
-                      size="small"
-                      disabled={uploadingImage === 'logo'}
-                      sx={{ position: 'absolute', bottom: -4, right: -4, bgcolor: '#8b5cf6', color: 'white', width: 22, height: 22, '&:hover': { bgcolor: '#7c3aed' } }}
-                    >
-                      {uploadingImage === 'logo' ? <CircularProgress size={10} sx={{ color: 'white' }} /> : <Upload size={10} />}
-                      <input type="file" hidden accept="image/*" onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0], 'logo')} />
-                    </IconButton>
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleImageUpload(file, 'banner');
+                      e.target.value = '';
+                    }}
+                  />
+                  <Box sx={{
+                    position: 'absolute',
+                    inset: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 1,
+                    bgcolor: editingShop.bannerUrl ? 'rgba(0,0,0,0.35)' : 'transparent',
+                    color: editingShop.bannerUrl ? '#fff' : ADMIN_THEME.textSecondary,
+                  }}>
+                    {uploadingImage === 'banner' ? (
+                      <CircularProgress size={28} sx={{ color: editingShop.bannerUrl ? '#fff' : ADMIN_THEME.primary }} />
+                    ) : (
+                      <>
+                        <Upload size={28} strokeWidth={1.75} />
+                        <Typography sx={{ fontSize: '0.85rem', fontWeight: 600 }}>
+                          {editingShop.bannerUrl ? 'คลิกเพื่อเปลี่ยนรูปปก' : 'คลิกเพื่อแนบรูปปกร้าน'}
+                        </Typography>
+                        <Typography sx={{ fontSize: '0.72rem', opacity: 0.85 }}>
+                          JPG, PNG, WebP — สูงสุด 5MB
+                        </Typography>
+                      </>
+                    )}
                   </Box>
                 </Box>
               </Box>
-              <Box sx={{ height: 16 }} />
+
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 1.5, borderRadius: '12px', bgcolor: ADMIN_THEME.glassSoft, border: `1px solid ${ADMIN_THEME.border}` }}>
+                <Avatar
+                  src={editingShop.logoUrl}
+                  sx={{
+                    width: 64,
+                    height: 64,
+                    border: `2px solid ${ADMIN_THEME.border}`,
+                    bgcolor: ADMIN_THEME.surface2,
+                    fontSize: '1.25rem',
+                    fontWeight: 700,
+                    color: ADMIN_THEME.primary,
+                  }}
+                >
+                  {editingShop.name[0]}
+                </Avatar>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: ADMIN_THEME.text, mb: 0.5 }}>
+                    โลโก้ร้าน
+                  </Typography>
+                  <Button
+                    component="label"
+                    variant="outlined"
+                    size="small"
+                    disabled={uploadingImage === 'logo'}
+                    startIcon={uploadingImage === 'logo' ? <CircularProgress size={14} /> : <Upload size={14} />}
+                    sx={{
+                      textTransform: 'none',
+                      borderRadius: '8px',
+                      borderColor: ADMIN_THEME.border,
+                      color: ADMIN_THEME.text,
+                      '&:hover': { borderColor: ADMIN_THEME.primary, bgcolor: 'rgba(99,102,241,0.06)' },
+                    }}
+                  >
+                    {editingShop.logoUrl ? 'เปลี่ยนโลโก้' : 'แนบรูปโลโก้'}
+                    <input
+                      type="file"
+                      hidden
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleImageUpload(file, 'logo');
+                        e.target.value = '';
+                      }}
+                    />
+                  </Button>
+                </Box>
+              </Box>
 
               <TextField
                 label="ชื่อร้านค้า"
@@ -841,7 +906,7 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
                 sx={inputSx}
               />
 
-              <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: DIALOG_THEME.section, mt: 0.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: ADMIN_THEME.primary, mt: 0.5, display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Settings size={16} /> สถานะร้าน
               </Typography>
               <SettingToggle
@@ -869,7 +934,7 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
                 />
               )}
 
-              <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: DIALOG_THEME.section, mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: ADMIN_THEME.primary, mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Users size={16} /> ข้อมูลติดต่อ
               </Typography>
               <TextField
@@ -886,7 +951,7 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
                 fullWidth
                 sx={inputSx}
               />
-              <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: DIALOG_THEME.section, mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: ADMIN_THEME.primary, mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Store size={16} /> การแสดงผล
               </Typography>
               <TextField
@@ -898,14 +963,14 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
                 helperText="ใช้เรียงร้านย่อยบนหน้าร้านหลัก"
                 sx={inputSx}
               />
-              <Box sx={{ p: 1.5, borderRadius: '10px', bgcolor: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.25)' }}>
-                <Typography sx={{ fontSize: '0.78rem', color: DIALOG_THEME.muted, lineHeight: 1.5 }}>
+              <Box sx={{ p: 1.5, borderRadius: '10px', bgcolor: 'rgba(99,102,241,0.08)', border: `1px solid ${ADMIN_THEME.border}` }}>
+                <Typography sx={{ fontSize: '0.78rem', color: ADMIN_THEME.muted, lineHeight: 1.5 }}>
                   การชำระเงินใช้บัญชี PromptPay ของร้านหลัก (SCC Shop) ร่วมกัน — ไม่ต้องตั้งค่าแยกต่อร้านย่อย
                 </Typography>
               </Box>
             </DialogContent>
             <DialogActions sx={{ px: 3, pb: 2 }}>
-              <Button onClick={() => setEditingShop(null)} sx={{ color: DIALOG_THEME.muted, textTransform: 'none' }}>
+              <Button onClick={() => setEditingShop(null)} sx={{ color: ADMIN_THEME.muted, textTransform: 'none' }}>
                 ยกเลิก
               </Button>
               <Button

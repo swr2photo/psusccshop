@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth';
-import { mergeConfigAdminEmails } from '@/lib/admin-context';
+import { mergeConfigAdminEmails, resolveAdminSession } from '@/lib/admin-context';
 import { getShopConfig } from '@/lib/filebase';
 import { ShopConfig } from '@/lib/config';
 import { sanitizeConfigForAdmin } from '@/lib/sanitize';
@@ -12,6 +12,14 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   const authResult = await requireAdmin();
   if (authResult instanceof NextResponse) return authResult;
+
+  const session = await resolveAdminSession(authResult.email);
+  if (session.userRole === 'shopAdmin') {
+    return NextResponse.json(
+      { status: 'error', message: 'แอดมินร้านย่อยใช้การตั้งค่าผ่านร้านที่ได้รับมอบหมายเท่านั้น' },
+      { status: 403 },
+    );
+  }
 
   try {
     const cfg = (await getShopConfig()) || {

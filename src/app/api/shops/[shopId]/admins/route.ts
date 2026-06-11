@@ -1,44 +1,28 @@
 // /api/shops/[shopId]/admins — Manage shop admins
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin, isSuperAdminEmail } from '@/lib/auth';
-import { listShopAdmins, addShopAdmin, updateShopAdmin, removeShopAdmin, getShopAdminRole } from '@/lib/shops';
+import { requireSuperAdmin } from '@/lib/auth';
+import { listShopAdmins, addShopAdmin, updateShopAdmin, removeShopAdmin } from '@/lib/shops';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 type Params = { params: Promise<{ shopId: string }> };
 
-/** GET /api/shops/[shopId]/admins — List shop admins */
+/** GET /api/shops/[shopId]/admins — List shop admins (Super Admin only) */
 export async function GET(req: NextRequest, { params }: Params) {
   const { shopId } = await params;
-  const authResult = await requireAdmin();
+  const authResult = await requireSuperAdmin();
   if (authResult instanceof NextResponse) return authResult;
-
-  const isSuperAdmin = isSuperAdminEmail(authResult.email);
-  if (!isSuperAdmin) {
-    const role = await getShopAdminRole(shopId, authResult.email);
-    if (!role) {
-      return NextResponse.json({ status: 'error', message: 'ไม่มีสิทธิ์' }, { status: 403 });
-    }
-  }
 
   const admins = await listShopAdmins(shopId);
   return NextResponse.json({ status: 'success', admins });
 }
 
-/** POST /api/shops/[shopId]/admins — Add admin to shop */
+/** POST /api/shops/[shopId]/admins — Add admin to shop (Super Admin only) */
 export async function POST(req: NextRequest, { params }: Params) {
   const { shopId } = await params;
-  const authResult = await requireAdmin();
+  const authResult = await requireSuperAdmin();
   if (authResult instanceof NextResponse) return authResult;
-
-  const isSuperAdmin = isSuperAdminEmail(authResult.email);
-  if (!isSuperAdmin) {
-    const role = await getShopAdminRole(shopId, authResult.email);
-    if (!role || (!role.permissions.canAddAdmins && role.role !== 'owner')) {
-      return NextResponse.json({ status: 'error', message: 'ไม่มีสิทธิ์เพิ่มแอดมิน' }, { status: 403 });
-    }
-  }
 
   try {
     const body = await req.json();
@@ -48,8 +32,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       return NextResponse.json({ status: 'error', message: 'กรุณาระบุอีเมล' }, { status: 400 });
     }
 
-    // Only SuperAdmin can set role to 'owner'
-    const adminRole = (!isSuperAdmin && role === 'owner') ? 'admin' : (role || 'admin');
+    const adminRole = role || 'admin';
 
     const admin = await addShopAdmin(shopId, email, adminRole, permissions, authResult.email);
     if (!admin) {
@@ -62,19 +45,11 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 }
 
-/** PUT /api/shops/[shopId]/admins — Update admin permissions */
+/** PUT /api/shops/[shopId]/admins — Update admin permissions (Super Admin only) */
 export async function PUT(req: NextRequest, { params }: Params) {
   const { shopId } = await params;
-  const authResult = await requireAdmin();
+  const authResult = await requireSuperAdmin();
   if (authResult instanceof NextResponse) return authResult;
-
-  const isSuperAdmin = isSuperAdminEmail(authResult.email);
-  if (!isSuperAdmin) {
-    const role = await getShopAdminRole(shopId, authResult.email);
-    if (!role || (!role.permissions.canAddAdmins && role.role !== 'owner')) {
-      return NextResponse.json({ status: 'error', message: 'ไม่มีสิทธิ์แก้ไขสิทธิ์แอดมิน' }, { status: 403 });
-    }
-  }
 
   try {
     const body = await req.json();
@@ -95,19 +70,11 @@ export async function PUT(req: NextRequest, { params }: Params) {
   }
 }
 
-/** DELETE /api/shops/[shopId]/admins — Remove admin from shop */
+/** DELETE /api/shops/[shopId]/admins — Remove admin from shop (Super Admin only) */
 export async function DELETE(req: NextRequest, { params }: Params) {
   const { shopId } = await params;
-  const authResult = await requireAdmin();
+  const authResult = await requireSuperAdmin();
   if (authResult instanceof NextResponse) return authResult;
-
-  const isSuperAdmin = isSuperAdminEmail(authResult.email);
-  if (!isSuperAdmin) {
-    const role = await getShopAdminRole(shopId, authResult.email);
-    if (!role || (!role.permissions.canAddAdmins && role.role !== 'owner')) {
-      return NextResponse.json({ status: 'error', message: 'ไม่มีสิทธิ์ลบแอดมิน' }, { status: 403 });
-    }
-  }
 
   const url = new URL(req.url);
   const email = url.searchParams.get('email');

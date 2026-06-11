@@ -891,73 +891,70 @@ export default function CheckoutDialog({
             <Typography sx={{ color: 'var(--foreground)', fontSize: '0.9rem' }}>
               <Box component="span" sx={{ color: 'var(--text-muted)', mr: 1 }}>IG:</Box>{orderData.instagram || '—'}
             </Typography>
-            {/* Address — pick from saved list when user has multiple */}
-            {showAddressPicker ? (
-              <Box sx={{ mt: 0.5 }}>
-                <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem', mb: 0.25 }}>
-                  {t.checkout.selectAddress}
-                  {requiresAddress && <Box component="span" sx={{ color: '#ff453a', ml: 0.3 }}>*</Box>}
-                </Typography>
-                {!requiresAddress && (
-                  <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.72rem', mb: 0.75 }}>
-                    {t.checkout.addressPickupHint}
+            {/* Address — only for delivery (hidden for self-pickup) */}
+            {requiresAddress && (
+              showAddressPicker ? (
+                <Box sx={{ mt: 0.5 }}>
+                  <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem', mb: 0.75 }}>
+                    {t.checkout.selectAddress}
+                    <Box component="span" sx={{ color: '#ff453a', ml: 0.3 }}>*</Box>
                   </Typography>
-                )}
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                  {checkoutAddresses.map((addr) => {
-                    const isSelected = selectedAddressId === addr.id;
-                    return (
-                      <Box
-                        key={addr.id}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => handleSelectAddress(addr)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            handleSelectAddress(addr);
-                          }
-                        }}
-                        sx={{
-                          p: 1.1,
-                          borderRadius: '10px',
-                          cursor: 'pointer',
-                          bgcolor: isSelected ? 'rgba(0,113,227,0.08)' : 'var(--surface)',
-                          border: isSelected ? '2px solid rgba(0,113,227,0.45)' : '1px solid var(--glass-border)',
-                          transition: 'all 0.2s ease',
-                          '&:hover': { borderColor: 'rgba(0,113,227,0.35)' },
-                        }}
-                      >
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mb: 0.3 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
-                            <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: isSelected ? 'var(--primary)' : 'var(--text-muted)' }}>
-                              {addr.label}
-                            </Typography>
-                            {addr.isDefault && (
-                              <Typography sx={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--success)', bgcolor: 'rgba(16,185,129,0.1)', px: 0.5, borderRadius: '4px' }}>
-                                {t.common.default}
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                    {checkoutAddresses.map((addr) => {
+                      const isSelected = selectedAddressId === addr.id;
+                      return (
+                        <Box
+                          key={addr.id}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => handleSelectAddress(addr)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              handleSelectAddress(addr);
+                            }
+                          }}
+                          sx={{
+                            p: 1.1,
+                            borderRadius: '10px',
+                            cursor: 'pointer',
+                            bgcolor: isSelected ? 'rgba(0,113,227,0.08)' : 'var(--surface)',
+                            border: isSelected ? '2px solid rgba(0,113,227,0.45)' : '1px solid var(--glass-border)',
+                            transition: 'all 0.2s ease',
+                            '&:hover': { borderColor: 'rgba(0,113,227,0.35)' },
+                          }}
+                        >
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mb: 0.3 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
+                              <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: isSelected ? 'var(--primary)' : 'var(--text-muted)' }}>
+                                {addr.label}
                               </Typography>
-                            )}
+                              {addr.isDefault && (
+                                <Typography sx={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--success)', bgcolor: 'rgba(16,185,129,0.1)', px: 0.5, borderRadius: '4px' }}>
+                                  {t.common.default}
+                                </Typography>
+                              )}
+                            </Box>
+                            {isSelected && <Check size={14} color="#0071e3" />}
                           </Box>
-                          {isSelected && <Check size={14} color="#0071e3" />}
+                          <Typography sx={{ fontSize: '0.8rem', color: 'var(--foreground)', lineHeight: 1.4 }}>
+                            {addr.address}
+                          </Typography>
                         </Box>
-                        <Typography sx={{ fontSize: '0.8rem', color: 'var(--foreground)', lineHeight: 1.4 }}>
-                          {addr.address}
-                        </Typography>
-                      </Box>
-                    );
-                  })}
+                      );
+                    })}
+                  </Box>
                 </Box>
-              </Box>
-            ) : (
-              <Typography sx={{ color: 'var(--foreground)', fontSize: '0.9rem', display: 'flex', alignItems: 'flex-start' }}>
-                <Box component="span" sx={{ color: 'var(--text-muted)', mr: 1, flexShrink: 0 }}>
-                  {`${t.common.address}:`}{requiresAddress && <Box component="span" sx={{ color: '#ff453a', ml: 0.3 }}>*</Box>}
-                </Box>
-                <Box component="span" sx={{ color: orderData.address ? 'var(--foreground)' : 'var(--text-muted)' }}>
-                  {orderData.address || (requiresAddress ? t.checkout.addressEmpty : '—')}
-                </Box>
-              </Typography>
+              ) : (
+                <Typography sx={{ color: 'var(--foreground)', fontSize: '0.9rem', display: 'flex', alignItems: 'flex-start' }}>
+                  <Box component="span" sx={{ color: 'var(--text-muted)', mr: 1, flexShrink: 0 }}>
+                    {`${t.common.address}:`}<Box component="span" sx={{ color: '#ff453a', ml: 0.3 }}>*</Box>
+                  </Box>
+                  <Box component="span" sx={{ color: orderData.address ? 'var(--foreground)' : 'var(--text-muted)' }}>
+                    {orderData.address || t.checkout.addressEmpty}
+                  </Box>
+                </Typography>
+              )
             )}
           </Box>
           {/* Profile incomplete warning */}

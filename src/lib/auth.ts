@@ -6,7 +6,7 @@ import { authOptions } from '@/lib/auth-options';
 import { NextResponse } from 'next/server';
 import { getJson } from '@/lib/filebase';
 import { getAdminPermissionsFromDB } from '@/lib/supabase';
-import { isShopAdminEmail } from '@/lib/shops';
+import { getShopAdminPermissions, isShopAdminEmail } from '@/lib/shops';
 import type { AdminPermissions } from '@/lib/config';
 
 // Re-export authOptions for convenience
@@ -118,6 +118,17 @@ export const isAdminEmail = (email: string | null | undefined): boolean => {
   if (!email) return false;
   const normalized = email.trim().toLowerCase();
   return ADMIN_EMAILS.includes(normalized);
+};
+
+/**
+ * Global admin only (env ADMIN_EMAILS + dynamic config list) — excludes shop_admins-only users.
+ */
+export const isGlobalAdminEmailAsync = async (email: string | null | undefined): Promise<boolean> => {
+  if (!email) return false;
+  const normalized = email.trim().toLowerCase();
+  if (ADMIN_EMAILS.includes(normalized)) return true;
+  const dynamicAdmins = await getDynamicAdminEmails();
+  return dynamicAdmins.includes(normalized);
 };
 
 /**
@@ -247,6 +258,35 @@ export const requireAdminWithPermission = async (
     return { isAdmin: true, email };
   }
 
+  const isGlobal = await isGlobalAdminEmailAsync(email);
+  if (!isGlobal) {
+    const shopOnly = await isShopAdminEmail(email);
+    if (shopOnly) {
+      const shopPerms = await getShopAdminPermissions(email);
+      const shopPermissionMap: Partial<Record<keyof AdminPermissions, keyof typeof shopPerms>> = {
+        canManageOrders: 'canManageOrders',
+        canManageProducts: 'canManageProducts',
+        canManagePickup: 'canManagePickup',
+        canManageTracking: 'canManageTracking',
+        canManageRefunds: 'canManageRefunds',
+        canManageAnnouncement: 'canManageAnnouncement',
+        canManageEvents: 'canManageEvents',
+        canManageSupport: 'canManageSupport',
+        canManageShop: 'canManageShop',
+        canManagePayment: 'canManagePayment',
+        canManageShipping: 'canManageShipping',
+      };
+      const shopKey = shopPermissionMap[permission];
+      if (!shopKey || !shopPerms[shopKey]) {
+        return NextResponse.json(
+          { status: 'error', message: `ไม่มีสิทธิ์ดำเนินการนี้ (ต้องการสิทธิ์: ${permission})` },
+          { status: 403 },
+        );
+      }
+      return { isAdmin: true, email };
+    }
+  }
+
   // Check if admin at all
   const adminCheck = await isAdminEmailAsync(email);
   if (!adminCheck) {
@@ -256,7 +296,7 @@ export const requireAdminWithPermission = async (
     );
   }
 
-  // Check specific permission
+  // Check specific permission (global admin)
   const perms = await getAdminPermissions(email);
   if (!perms[permission]) {
     return NextResponse.json(

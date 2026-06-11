@@ -100,6 +100,8 @@ export function useAdminDataSWR(options: UseAdminDataSWROptions) {
   );
 
   const bootstrapReady = bootstrapData?.status === 'success';
+  const bootstrapRole = bootstrapData?.data?.userRole as string | undefined;
+  const isShopOnlyAdmin = bootstrapRole === 'shopAdmin';
 
   const {
     data: configData,
@@ -108,7 +110,7 @@ export function useAdminDataSWR(options: UseAdminDataSWROptions) {
     isValidating: configValidating,
     mutate: mutateConfig,
   } = useSWR(
-    enabled && bootstrapReady ? ADMIN_CACHE_KEYS.CONFIG : null,
+    enabled && bootstrapReady && !isShopOnlyAdmin ? ADMIN_CACHE_KEYS.CONFIG : null,
     adminFetcher,
     {
       ...swrOptions,

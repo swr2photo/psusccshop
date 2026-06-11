@@ -443,6 +443,13 @@ export interface ShopConfig {
   sheetUrl?: string;
   vendorSheetId?: string;
   vendorSheetUrl?: string;
+  /** ตั้งค่าการซิงก์ชีตสรุปการผลิต */
+  sheetSettings?: {
+    /** แยกชีตสรุปตามสินค้า (ค่าเริ่มต้น: เปิด) */
+    factoryPerProduct?: boolean;
+    /** สถานะออเดอร์ที่นำเข้าชีตสรุป เช่น PAID */
+    factoryOrderStatuses?: string[];
+  };
   /** Legacy single announcement (deprecated, kept for backward compatibility) */
   announcement?: {
     enabled: boolean;
