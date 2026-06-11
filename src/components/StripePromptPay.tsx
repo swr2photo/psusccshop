@@ -24,7 +24,7 @@ interface StripePromptPayProps {
 
 type Phase = 'creating' | 'qr' | 'succeeded' | 'expired' | 'error';
 
-const POLL_INTERVAL_MS = 1500;
+const SERVER_POLL_MS = 2000;
 
 // Dedupe concurrent intent creation (React StrictMode double-mounts in dev
 // would otherwise create two PaymentIntents per modal open)
@@ -110,6 +110,11 @@ export default function StripePromptPay({ orderRef, onSuccess, size = 232 }: Str
         if (!mountedRef.current) return;
         setQrCode(serverQr);
         setPhase('qr');
+        if (publishableKey) {
+          void getStripe(publishableKey, lang === 'th' ? 'th' : 'en').then((s) => {
+            stripeRef.current = s;
+          });
+        }
         return;
       }
 
@@ -166,77 +171,77 @@ export default function StripePromptPay({ orderRef, onSuccess, size = 232 }: Str
   useEffect(() => { start(); }, [start]);
 
   // ---- 3) Poll payment status while the QR is displayed ----
-  // Fast path: Stripe.js retrievePaymentIntent (~200ms). Then sync order via our API.
+  // Server poll is authoritative (marks order PAID). Client Stripe.js runs in parallel
+  // only to trigger an early server sync — never blocks the server poll loop.
   useEffect(() => {
     if (phase !== 'qr') return;
     let cancelled = false;
-    let busy = false;
 
-    const syncPaidOnServer = async (intentId: string) => {
+    const applyIntentStatus = (status: string | undefined) => {
+      if (!mountedRef.current || cancelled || !status) return;
+      if (status === 'succeeded') {
+        markSucceeded();
+      } else if (status === 'canceled') {
+        setPhase('expired');
+      }
+    };
+
+    const pollServer = async (): Promise<string | undefined> => {
+      if (cancelled || successNotified.current) return;
+      const intentId = intentIdRef.current;
+      if (!intentId) return;
+
       const res = await fetch(
-        `/api/payment/stripe/promptpay?ref=${encodeURIComponent(orderRef)}&intent=${encodeURIComponent(intentId)}`
+        `/api/payment/stripe/promptpay?ref=${encodeURIComponent(orderRef)}&intent=${encodeURIComponent(intentId)}`,
+        { credentials: 'same-origin' }
       );
       const json = await res.json();
       if (json.status !== 'success') {
-        throw new Error(json.message || 'server sync failed');
+        throw new Error(json.message || 'poll failed');
       }
-      return json.data?.intentStatus as string | undefined;
+      const status = json.data?.intentStatus as string | undefined;
+      applyIntentStatus(status);
+      return status;
     };
 
-    const pollOnce = async () => {
-      if (cancelled || busy || successNotified.current) return;
-      busy = true;
+    const pollClient = async () => {
+      if (cancelled || successNotified.current) return;
+      const clientSecret = clientSecretRef.current;
+      const publishableKey = publishableKeyRef.current;
+      if (!clientSecret || !publishableKey) return;
+
       try {
-        const clientSecret = clientSecretRef.current;
-        const publishableKey = publishableKeyRef.current;
-        const intentId = intentIdRef.current;
+        const stripe =
+          stripeRef.current ?? (await getStripe(publishableKey, lang === 'th' ? 'th' : 'en'));
+        stripeRef.current = stripe;
+        const { paymentIntent } = await stripe.retrievePaymentIntent(clientSecret);
+        if (cancelled || successNotified.current) return;
 
-        // Client-side check first — avoids Vercel round-trip on every tick
-        if (clientSecret && publishableKey) {
+        if (paymentIntent?.status === 'succeeded') {
+          // Stripe confirmed — sync DB via server, then update UI
           try {
-            const stripe =
-              stripeRef.current ?? (await getStripe(publishableKey, lang === 'th' ? 'th' : 'en'));
-            stripeRef.current = stripe;
-            const { paymentIntent } = await stripe.retrievePaymentIntent(clientSecret);
-            if (!mountedRef.current || cancelled) return;
-
-            if (paymentIntent?.status === 'succeeded') {
-              if (intentId) {
-                await syncPaidOnServer(intentId);
-              }
-              markSucceeded();
-              return;
-            }
-            if (paymentIntent?.status === 'canceled') {
-              setPhase('expired');
-              return;
-            }
+            await pollServer();
           } catch {
-            // Fall through to server poll
+            // Server sync failed; server interval will retry
           }
-        }
-
-        if (!intentId) return;
-
-        const status = await syncPaidOnServer(intentId);
-        if (!mountedRef.current || cancelled) return;
-        if (status === 'succeeded') {
-          markSucceeded();
-        } else if (status === 'canceled') {
+        } else if (paymentIntent?.status === 'canceled') {
           setPhase('expired');
         }
       } catch {
-        // Transient network errors — keep polling
-      } finally {
-        busy = false;
+        // Ad blockers / CSP — server poll handles verification
       }
     };
 
-    void pollOnce();
-    const interval = setInterval(() => void pollOnce(), POLL_INTERVAL_MS);
+    void pollServer();
+    void pollClient();
+
+    const serverTimer = setInterval(() => void pollServer(), SERVER_POLL_MS);
+    const clientTimer = setInterval(() => void pollClient(), SERVER_POLL_MS);
+
     return () => {
       cancelled = true;
-      clearInterval(interval);
+      clearInterval(serverTimer);
+      clearInterval(clientTimer);
     };
   }, [phase, orderRef, markSucceeded, lang]);
 

@@ -309,7 +309,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
     addToast('success', t.payment.paymentSuccessToast, t.payment.paymentDetected);
     setOrderStatus('PAID');
     // Brief pause so the success state is visible before closing the modal
-    setTimeout(() => onSuccess(), 450);
+    setTimeout(() => onSuccess(), 800);
   };
 
   const processFile = (file: File) => {
