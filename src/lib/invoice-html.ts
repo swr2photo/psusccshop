@@ -43,7 +43,45 @@ function formatDateTime(iso: Date, lang: InvoiceLang): string {
   });
 }
 
-const LABELS = {
+interface InvoiceLabelSet {
+  title: string;
+  orderRef: string;
+  date: string;
+  paidAt: string;
+  customer: string;
+  email: string;
+  phone: string;
+  address: string;
+  item: string;
+  size: string;
+  qty: string;
+  unitPrice: string;
+  lineTotal: string;
+  subtotal: string;
+  shipping: string;
+  discount: string;
+  grandTotal: string;
+  paymentMethod: string;
+  status: string;
+  pattern: string;
+  jerseyName: string;
+  jerseyNumber: string;
+  sleeve: string;
+  longSleeve: string;
+  shortSleeve: string;
+  generatedAt: string;
+  shopName: string;
+  shopTagline: string;
+  thankYou: string;
+  print: string;
+  stripeReceipt: string;
+  stripeNote: string;
+  paid: string;
+  methods: Record<string, string>;
+  statuses: Record<string, string>;
+}
+
+const LABELS: Record<InvoiceLang, InvoiceLabelSet> = {
   th: {
     title: 'ใบเสร็จรับเงิน / Receipt',
     orderRef: 'เลขที่คำสั่งซื้อ',
@@ -84,7 +122,7 @@ const LABELS = {
       bank_transfer: 'โอนธนาคาร',
       slip: 'อัปโหลดสลิป',
       default: 'ออนไลน์',
-    } as Record<string, string>,
+    },
     statuses: {
       PAID: 'ชำระแล้ว',
       WAITING_PAYMENT: 'รอชำระ',
@@ -93,7 +131,7 @@ const LABELS = {
       RECEIVED: 'ได้รับแล้ว',
       COMPLETED: 'สำเร็จ',
       CANCELLED: 'ยกเลิก',
-    } as Record<string, string>,
+    },
   },
   en: {
     title: 'Receipt / Tax Invoice',
@@ -135,7 +173,7 @@ const LABELS = {
       bank_transfer: 'Bank Transfer',
       slip: 'Slip Upload',
       default: 'Online',
-    } as Record<string, string>,
+    },
     statuses: {
       PAID: 'Paid',
       WAITING_PAYMENT: 'Awaiting Payment',
@@ -144,9 +182,9 @@ const LABELS = {
       RECEIVED: 'Received',
       COMPLETED: 'Completed',
       CANCELLED: 'Cancelled',
-    } as Record<string, string>,
+    },
   },
-} as const;
+};
 
 function resolveLabels(lang: InvoiceLang) {
   return LABELS[lang];
