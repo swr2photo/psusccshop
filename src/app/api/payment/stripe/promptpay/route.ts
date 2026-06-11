@@ -15,6 +15,7 @@ import { orders, paymentTransactions } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { requireAuth, isResourceOwner, isAdminEmailAsync } from '@/lib/auth';
 import { createStripePaymentIntent } from '@/lib/payment';
+import { fetchStripeReceiptUrl, mergeStripeReceiptSlipData } from '@/lib/stripe-receipt';
 import { sanitizeUtf8Input } from '@/lib/sanitize';
 
 export const runtime = 'nodejs';
@@ -185,6 +186,8 @@ export async function GET(req: NextRequest) {
 
     // Mark paid (idempotent) — same effect as the webhook, but pull-based
     if (intent.status === 'succeeded' && txRows[0].status !== 'paid') {
+      const receiptUrl = await fetchStripeReceiptUrl(intentId);
+
       await db
         .update(paymentTransactions)
         .set({
@@ -198,6 +201,8 @@ export async function GET(req: NextRequest) {
         })
         .where(eq(paymentTransactions.id, txRows[0].id));
 
+      const slipData = mergeStripeReceiptSlipData(order.slipData, receiptUrl);
+
       await db
         .update(orders)
         .set({
@@ -208,6 +213,7 @@ export async function GET(req: NextRequest) {
           paymentVerified: true,
           paymentVerifiedAt: new Date().toISOString(),
           updatedAt: new Date(),
+          ...(slipData ? { slipData } : {}),
         })
         .where(eq(orders.id, order.id));
 

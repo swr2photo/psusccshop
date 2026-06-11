@@ -2,6 +2,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, isResourceOwner, isAdminEmailAsync } from '@/lib/auth';
 import { API_CACHE } from '@/lib/api-helpers';
+import { fetchStripeReceiptUrl, readStoredStripeReceiptUrl } from '@/lib/stripe-receipt';
+import { eq, desc } from 'drizzle-orm';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -25,7 +27,6 @@ export async function GET(request: NextRequest) {
     try {
       const { db } = await import('@/lib/db');
       const { orders } = await import('@/db/schema');
-      const { eq } = await import('drizzle-orm');
       const data = await db
         .select()
         .from(orders)
@@ -44,6 +45,37 @@ export async function GET(request: NextRequest) {
     const userEmail = authResult.email;
     if (!(await isAdminEmailAsync(userEmail)) && !isResourceOwner(orderEmail, userEmail)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const isStripePaid =
+      (order.paymentGateway === 'stripe' || order.payment_gateway === 'stripe') &&
+      (order.paymentVerified === true || order.payment_verified === true);
+
+    if (isStripePaid) {
+      let receiptUrl = readStoredStripeReceiptUrl(order.slipData ?? order.slip_data);
+
+      if (!receiptUrl && order.id) {
+        try {
+          const { db } = await import('@/lib/db');
+          const { paymentTransactions } = await import('@/db/schema');
+          const txRows = await db
+            .select({ gatewayChargeId: paymentTransactions.gatewayChargeId })
+            .from(paymentTransactions)
+            .where(eq(paymentTransactions.orderId, order.id))
+            .orderBy(desc(paymentTransactions.createdAt))
+            .limit(1);
+          const intentId = txRows[0]?.gatewayChargeId;
+          if (intentId) {
+            receiptUrl = await fetchStripeReceiptUrl(intentId);
+          }
+        } catch (err) {
+          console.error('[Invoice] Stripe receipt lookup failed:', err);
+        }
+      }
+
+      if (receiptUrl) {
+        return NextResponse.redirect(receiptUrl, 302);
+      }
     }
 
     const labels = lang === 'en' ? {

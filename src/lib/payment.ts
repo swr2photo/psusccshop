@@ -622,6 +622,7 @@ export async function createStripePaymentIntent(
       body.append('payment_method_data[type]', params.paymentMethodData.type);
       if (params.paymentMethodData.billingEmail) {
         body.append('payment_method_data[billing_details][email]', params.paymentMethodData.billingEmail);
+        body.append('receipt_email', params.paymentMethodData.billingEmail);
       }
     }
     

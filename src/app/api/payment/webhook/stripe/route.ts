@@ -6,6 +6,7 @@ import { db } from '@/lib/db';
 import { orders, paymentTransactions } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { verifyStripeWebhook } from '@/lib/payment';
+import { fetchStripeReceiptUrl, mergeStripeReceiptSlipData } from '@/lib/stripe-receipt';
 import { webhookSecretMissingResponse } from '@/lib/api-helpers';
 
 export const runtime = 'nodejs';
@@ -84,6 +85,15 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
     cardBrand = card.brand;
   }
 
+  const receiptUrl = await fetchStripeReceiptUrl(intentId);
+
+  const orderRows = await db
+    .select({ id: orders.id, slipData: orders.slipData })
+    .from(orders)
+    .where(eq(orders.ref, orderId))
+    .limit(1);
+  const slipData = mergeStripeReceiptSlipData(orderRows[0]?.slipData, receiptUrl);
+
   // Update transaction
   await db
     .update(paymentTransactions)
@@ -116,6 +126,7 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
       paymentVerified: true,
       paymentVerifiedAt: new Date().toISOString(),
       updatedAt: new Date(),
+      ...(slipData ? { slipData } : {}),
     })
     .where(eq(orders.ref, orderId));
 
