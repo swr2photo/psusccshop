@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth';
 import { updateShopOpenStatus } from '@/lib/filebase';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * POST /api/admin/toggle-shop
  * 

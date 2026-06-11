@@ -11,24 +11,58 @@ import { getCached, invalidateCacheKey, CACHE_TTL } from './server-cache';
 
 // ==================== CONFIGURATION ====================
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL2 || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY2 || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY2 || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
-// Public client (for client-side, uses anon key with RLS)
-// ใช้เฉพาะสำหรับ read public config เท่านั้น
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-  },
-  realtime: {
-    params: { eventsPerSecond: 2 },
-  },
-  global: {
-    fetch(url, options = {}) {
-      return fetch(url, { ...options, cache: 'no-store' as any });
+function resolveSupabasePublicConfig() {
+  return {
+    url:
+      process.env.NEXT_PUBLIC_SUPABASE_URL2 ||
+      process.env.NEXT_PUBLIC_SUPABASE_URL ||
+      '',
+    anonKey:
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY2 ||
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY2 ||
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+      '',
+  };
+}
+
+let _supabasePublic: SupabaseClient | null = null;
+
+function getSupabasePublic(): SupabaseClient {
+  if (_supabasePublic) return _supabasePublic;
+  let { url, anonKey } = resolveSupabasePublicConfig();
+  if (!url || !anonKey) {
+    if (process.env.WORKERS_CI === '1') {
+      url = url || 'https://build-placeholder.supabase.co';
+      anonKey = anonKey || 'build-placeholder-anon-key';
+    } else {
+      throw new Error('Supabase public client is not configured (missing URL or anon key)');
+    }
+  }
+  _supabasePublic = createClient(url, anonKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
     },
+    realtime: {
+      params: { eventsPerSecond: 2 },
+    },
+    global: {
+      fetch(url, options = {}) {
+        return fetch(url, { ...options, cache: 'no-store' as any });
+      },
+    },
+  });
+  return _supabasePublic;
+}
+
+// Lazy proxy — avoids createClient() at import time (CI builds without env vars)
+export const supabase: SupabaseClient = new Proxy({} as SupabaseClient, {
+  get(_target, prop) {
+    const client = getSupabasePublic();
+    const value = Reflect.get(client, prop, client);
+    return typeof value === 'function' ? value.bind(client) : value;
   },
 });
 
