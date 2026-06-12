@@ -1,5 +1,6 @@
 // src/app/api/inventory/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import { withBackendProxy } from '@/lib/backend-proxy';
 import { db } from '@/lib/db';
 import { inventory } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
@@ -26,7 +27,7 @@ async function fetchInventoryRows(productId: string | null): Promise<InventoryDb
 }
 
 // GET /api/inventory?productId=xxx — public: coarse availability; admin: full counts
-export async function GET(request: NextRequest) {
+async function GETHandler(request: NextRequest) {
   try {
     const productId = request.nextUrl.searchParams.get('productId');
     const session = await getServerSession(authOptions);
@@ -60,6 +61,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+export const GET = withBackendProxy(GETHandler);
 
 // POST /api/inventory - Update stock (admin only)
 export async function POST(request: NextRequest) {

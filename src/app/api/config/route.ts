@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { withBackendProxy } from '@/lib/backend-proxy';
 import { getJson, putJson, syncShopOpenStatusToRedis } from '@/lib/filebase';
 import { ShopConfig } from '@/lib/config';
 import { requireAdmin, requireAuth, isSuperAdminEmail } from '@/lib/auth';
@@ -72,7 +73,7 @@ const DEFAULT_CONFIG: ShopConfig = {
   bankAccount: { bankName: '', accountName: '', accountNumber: '' },
 };
 
-export async function GET() {
+async function GETHandler() {
   const payload = await getCached(PUBLIC_CONFIG_CACHE_KEY, CACHE_TTL.config, async () => {
     let cfg = DEFAULT_CONFIG;
     try {
@@ -102,7 +103,7 @@ export async function GET() {
   );
 }
 
-export async function POST(req: NextRequest) {
+async function POSTHandler(req: NextRequest) {
   // ตรวจสอบสิทธิ์ Admin - เฉพาะ admin เท่านั้นที่แก้ config ได้
   const authResult = await requireAdmin();
   if (authResult instanceof NextResponse) {
@@ -207,3 +208,6 @@ export async function POST(req: NextRequest) {
     }, { status: 500 });
   }
 }
+
+export const GET = withBackendProxy(GETHandler);
+export const POST = withBackendProxy(POSTHandler);

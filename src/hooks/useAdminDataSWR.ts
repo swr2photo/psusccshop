@@ -12,9 +12,10 @@
 import { useCallback, useEffect, useRef } from 'react';
 import useSWR from 'swr';
 import { ADMIN_CACHE_KEYS, buildAdminBootstrapKey, buildAdminOrdersListKey } from './useAdminData';
+import { apiFetch } from '@/lib/api-client';
 
 const adminFetcher = async (url: string) => {
-  const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  const res = await apiFetch(url, { headers: { Accept: 'application/json' } });
   if (!res.ok) {
     const error = new Error('Admin data fetch failed');
     (error as any).status = res.status;

@@ -1,0 +1,83 @@
+name: API Server (Bun)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/**'
+      - 'src/app/api/**'
+      - 'src/lib/**'
+      - 'src/db/**'
+      - '.github/workflows/api-server.yml'
+  pull_request:
+    paths:
+      - 'server/**'
+      - 'src/app/api/**'
+      - 'src/lib/**'
+      - 'src/db/**'
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: server
+
+jobs:
+  verify:
+    name: Typecheck & smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        working-directory: .
+        run: bun install
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Smoke test (health endpoint)
+        env:
+          API_PORT: 3099
+          # Minimal env so route modules can load in CI
+          NEXTAUTH_SECRET: ci-smoke-test-secret-min-32-chars-long
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+        run: |
+          bun run src/index.ts &
+          SERVER_PID=$!
+          sleep 3
+          curl -sf http://localhost:3099/api/health
+          kill $SERVER_PID
+
+  docker:
+    name: Build Docker image
+    runs-on: ubuntu-latest
+    needs: verify
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: server/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/api:latest
+            ghcr.io/${{ github.repository }}/api:${{ github.sha }}

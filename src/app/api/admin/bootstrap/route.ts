@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { withBackendProxy } from '@/lib/backend-proxy';
 import { requireAdmin } from '@/lib/auth';
 import { assertShopAccess, resolveAdminSession } from '@/lib/admin-context';
 import { getOrderStatusCounts } from '@/lib/filebase';
@@ -7,7 +8,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /** Lightweight admin bootstrap — auth, role, order counts only. */
-export async function GET(req: NextRequest) {
+async function GETHandler(req: NextRequest) {
   const authResult = await requireAdmin();
   if (authResult instanceof NextResponse) return authResult;
 
@@ -54,3 +55,5 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
+export const GET = withBackendProxy(GETHandler);

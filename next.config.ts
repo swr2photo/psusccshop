@@ -10,6 +10,16 @@ const buildVersion = `v${pkg.version}+${buildHash}`;
 // Cloudflare Workers Builds injects WORKERS_CI=1 (limited RAM vs Vercel)
 const isWorkersBuild = process.env.WORKERS_CI === '1';
 
+function apiConnectSrc(): string {
+  const raw = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (!raw) return '';
+  try {
+    return ` ${new URL(raw).origin}`;
+  } catch {
+    return '';
+  }
+}
+
 const nextConfig: NextConfig = {
   // Standalone only for Docker/Railway — Cloudflare Workers uses @opennextjs/cloudflare
   ...(process.env.DOCKER_BUILD === '1' ? { output: 'standalone' as const } : {}),
@@ -94,7 +104,7 @@ const nextConfig: NextConfig = {
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;",
             "img-src 'self' data: blob: https://*.filebase.io https://*.filebase.com https://*.googleusercontent.com https://ui-avatars.com https://*.supabase.co https://profile.line-scdn.net https://platform-lookaside.fbsbx.com https://*.fbcdn.net https://graph.microsoft.com https://i.ytimg.com https://*.ggpht.com https://*.stripe.com;",
             "font-src 'self' https://fonts.gstatic.com;",
-            "connect-src 'self' https://*.filebase.com https://*.filebase.io https://api.resend.com https://challenges.cloudflare.com https://*.supabase.co wss://*.supabase.co https://*.googlevideo.com https://*.youtube.com https://*.facebook.com https://api.stripe.com https://js.stripe.com https://r.stripe.com https://q.stripe.com https://m.stripe.com https://m.stripe.network https://errors.stripe.com https://merchant-ui-api.stripe.com https://*.ingest.sentry.io https://*.sentry.io;",
+            `connect-src 'self'${apiConnectSrc()} https://*.filebase.com https://*.filebase.io https://api.resend.com https://challenges.cloudflare.com https://*.supabase.co wss://*.supabase.co https://*.googlevideo.com https://*.youtube.com https://*.facebook.com https://api.stripe.com https://js.stripe.com https://r.stripe.com https://q.stripe.com https://m.stripe.com https://m.stripe.network https://errors.stripe.com https://merchant-ui-api.stripe.com https://*.ingest.sentry.io https://*.sentry.io;`,
             "media-src 'self' blob: https://*.cdn.jsdelivr.net https://*.cloudflarestream.com;",
             "worker-src 'self' blob:;",
             "child-src 'self' blob:;",

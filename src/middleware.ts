@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getRedisClient } from '@/lib/redis';
+import { proxyToBackend, shouldProxyToBackend } from '@/lib/backend-proxy';
 
 // Edge middleware (middleware.ts) — required for @opennextjs/cloudflare; proxy.ts is Node-only in Next 16.
 
@@ -281,6 +282,15 @@ export async function middleware(request: NextRequest) {
 
   if (isSuspiciousUserAgent(userAgent)) {
     console.warn(`[Security] Suspicious request: ${ip} - ${userAgent?.slice(0, 100)} - ${pathname}`);
+  }
+
+  // Proxy non-auth API to Elysia backend when configured
+  if (
+    shouldProxyToBackend() &&
+    pathname.startsWith('/api/') &&
+    !pathname.startsWith('/api/auth')
+  ) {
+    return proxyToBackend(request);
   }
 
   return response;

@@ -1,5 +1,6 @@
 // API route for product reviews
 import { NextRequest, NextResponse } from 'next/server';
+import { withBackendProxy } from '@/lib/backend-proxy';
 import { db } from '@/lib/db';
 import { reviews } from '@/db/schema';
 import { eq, and, desc } from 'drizzle-orm';
@@ -30,7 +31,7 @@ function hashEmail(email: string): string {
 }
 
 // GET /api/reviews?productId=xxx
-export async function GET(request: NextRequest) {
+async function GETHandler(request: NextRequest) {
   try {
     const productId = request.nextUrl.searchParams.get('productId');
     const cacheKey = productId ? `reviews:product:${productId}` : 'reviews:all';
@@ -74,6 +75,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+export const GET = withBackendProxy(GETHandler);
 
 // POST /api/reviews - Create or update a review
 export async function POST(request: NextRequest) {

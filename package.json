@@ -2,11 +2,18 @@
   "name": "psuscc-shop",
   "version": "2.1.0",
   "private": true,
+  "workspaces": [
+    "server"
+  ],
   "engines": {
     "node": ">=22.0.0"
   },
   "scripts": {
     "dev": "next dev --turbopack",
+    "dev:api": "bun run --cwd server dev",
+    "start:api": "bun run --cwd server start",
+    "generate:api-registry": "node server/scripts/generate-registry.mjs",
+    "dev:all": "npx concurrently -k \"npm run dev\" \"npm run dev:api\"",
     "build": "next build",
     "build:cloudflare": "NODE_OPTIONS=--max-old-space-size=6144 opennextjs-cloudflare build",
     "deploy:cloudflare": "NODE_OPTIONS=--max-old-space-size=6144 opennextjs-cloudflare build && wrangler deploy",
@@ -69,6 +76,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/web-push": "^3.6.4",
+    "concurrently": "^9.2.1",
     "dotenv": "^17.2.4",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",

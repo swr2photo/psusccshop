@@ -12,6 +12,7 @@
 
 import { SWRConfig } from 'swr';
 import { ReactNode } from 'react';
+import { apiFetch } from '@/lib/api-client';
 
 // ============== TYPES ==============
 
@@ -27,7 +28,7 @@ interface SWRProviderProps {
  * SWR handles revalidation in-memory; the browser HTTP cache is our L2 cache.
  */
 export const fetcher = async (url: string) => {
-  const res = await fetch(url, {
+  const res = await apiFetch(url, {
     headers: {
       'Accept': 'application/json',
     },
@@ -48,7 +49,7 @@ export const fetcher = async (url: string) => {
  * POST fetcher for mutations
  */
 export const postFetcher = async (url: string, { arg }: { arg: any }) => {
-  const res = await fetch(url, {
+  const res = await apiFetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(arg),
