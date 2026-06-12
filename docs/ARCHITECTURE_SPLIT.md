@@ -91,3 +91,45 @@ Push ไป `main` (เมื่อแก้ `server/` หรือ `src/app/api
 ```bash
 docker pull ghcr.io/<owner>/<repo>/api:latest
 ```
+
+## Repo แยก (`psusccshop-api`)
+
+Monorepo ยัง deploy ได้จาก `server/` + Docker ใน repo หลัก  
+ถ้าต้องการ **repo คนละตัว** ให้ export โฟลเดอร์ standalone:
+
+**ครั้งแรก (export + สร้าง repo):**
+
+```bash
+npm run export:api-repo
+cd ../psusccshop-api
+bun install
+git init && git add . && git commit -m "Initial psusccshop-api export"
+git remote add origin https://github.com/swr2photo/psusccshop-api.git
+git push -u origin main
+```
+
+**ทุกครั้งที่แก้ API ใน monorepo แล้ว sync:**
+
+```bash
+# 1) ใน psusccshop — export ทับ ../psusccshop-api
+npm run sync:api-repo
+
+# 2) ใน psusccshop-api — commit + push
+cd ../psusccshop-api
+bun install
+git add .
+git commit -m "Sync API from monorepo"
+git push
+```
+
+โครงสร้าง repo แยก:
+
+```
+psusccshop-api/
+├── src/index.ts       # Elysia entry
+├── src/bridge/        # next-bridge, router
+├── src/routes/        # health + proxy + registry
+├── src/app/api/       # Next route handlers (69 routes)
+├── src/lib/ + src/db/ # shared logic
+└── Dockerfile         # Bun alpine
+```

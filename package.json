@@ -13,6 +13,8 @@
     "dev:api": "bun run --cwd server dev",
     "start:api": "bun run --cwd server start",
     "generate:api-registry": "node server/scripts/generate-registry.mjs",
+    "export:api-repo": "node scripts/export-api-repo.mjs",
+    "sync:api-repo": "node scripts/export-api-repo.mjs",
     "dev:all": "npx concurrently -k \"npm run dev\" \"npm run dev:api\"",
     "build": "next build",
     "build:cloudflare": "NODE_OPTIONS=--max-old-space-size=6144 opennextjs-cloudflare build",
