@@ -6,6 +6,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { withReplicas } from 'drizzle-orm/pg-core';
 import { Pool } from 'pg';
 import * as schema from '../db/schema';
+import { isCloudflareWorkersRuntime } from '@/lib/runtime-env';
 
 function resolvePrimaryConnectionString(): string {
   const cf = (globalThis as { __CF_ENV__?: { HYPERDRIVE?: { connectionString: string } } }).__CF_ENV__;
@@ -22,21 +23,26 @@ function resolvePrimaryConnectionString(): string {
 function createDrizzleInstance() {
   const primaryConnectionString = resolvePrimaryConnectionString();
   const replicaConnectionString = process.env.DATABASE_READ_URL;
+  const onWorkers = isCloudflareWorkersRuntime();
+
+  // Workers isolates: single short-lived connection via Hyperdrive (avoid pool crashes)
+  const poolMax = onWorkers ? 1 : parseInt(process.env.DB_POOL_MAX || '5');
+  const poolMin = onWorkers ? 0 : 1;
 
   // 1. สร้าง Pool เชื่อมต่อฐานข้อมูลหลัก (Write operations)
   const primaryPool = new Pool({
     connectionString: primaryConnectionString,
-    max: parseInt(process.env.DB_POOL_MAX || '5'),
-    min: 1,
-    idleTimeoutMillis: 30_000,
-    connectionTimeoutMillis: 5_000,
-    keepAlive: true,
+    max: poolMax,
+    min: poolMin,
+    idleTimeoutMillis: onWorkers ? 10_000 : 30_000,
+    connectionTimeoutMillis: onWorkers ? 10_000 : 5_000,
+    keepAlive: !onWorkers,
   });
   
   const primaryDb = drizzle(primaryPool, { schema });
 
-  // 2. ถ้ามี DATABASE_READ_URL และไม่ตรงกับ Primary ให้เปิดใช้งาน Read Replica (Read operations)
-  if (replicaConnectionString && replicaConnectionString !== primaryConnectionString) {
+  // 2. Read replica — skip on Workers (Hyperdrive binding is primary-only)
+  if (!onWorkers && replicaConnectionString && replicaConnectionString !== primaryConnectionString) {
     const replicaPool = new Pool({
       connectionString: replicaConnectionString,
       max: parseInt(process.env.DB_POOL_MAX || '5'),

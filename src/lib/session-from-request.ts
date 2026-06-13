@@ -19,6 +19,11 @@ export function nextAuthTokenOptions(request: Request, cookieName?: string) {
 }
 
 async function readTokenFromRequest(request: Request) {
+  if (!process.env.NEXTAUTH_SECRET) {
+    console.error('[session] NEXTAUTH_SECRET is not configured');
+    return null;
+  }
+
   for (const cookieName of getSessionCookieNamesForRead()) {
     const token = await getToken(nextAuthTokenOptions(request, cookieName));
     if (token) return token;

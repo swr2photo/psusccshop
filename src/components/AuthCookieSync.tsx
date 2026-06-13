@@ -5,9 +5,9 @@ import { useCallback, useEffect, useRef } from 'react';
 import { getSharedCookieDomain } from '@/lib/cookie-domain';
 import { signOutUser } from '@/lib/sign-out-client';
 
-/** Legacy direct-browser API mode — sync host-only cookie to COOKIE_DOMAIN. */
+/** Sync host-only cookie to COOKIE_DOMAIN when split deploy uses shared domain. */
 function needsCrossSubdomainCookieSync(): boolean {
-  return typeof window !== 'undefined' && Boolean(process.env.NEXT_PUBLIC_API_URL?.trim());
+  return typeof window !== 'undefined' && Boolean(getSharedCookieDomain());
 }
 
 /** Upgrade host-only NextAuth cookie to COOKIE_DOMAIN after login (split API). */

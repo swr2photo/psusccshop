@@ -85,44 +85,49 @@ function deny(
 export function apiSecurityPlugin() {
   return new Elysia({ name: 'api-security' })
     .onBeforeHandle(async ({ request, set }) => {
-      const url = new URL(request.url);
-      const pathname = url.pathname;
-      const method = request.method.toUpperCase();
+      try {
+        const url = new URL(request.url);
+        const pathname = url.pathname;
+        const method = request.method.toUpperCase();
 
-      for (const [k, v] of Object.entries(SECURITY_HEADERS)) {
-        set.headers[k] = v;
-      }
-
-      const ip = getClientIP(request);
-      if (await isIPBlocked(ip)) {
-        return deny(set, request, 403, 'Access denied');
-      }
-
-      const secFetchMode = request.headers.get('sec-fetch-mode');
-      const secFetchDest = request.headers.get('sec-fetch-dest');
-      if (secFetchMode === 'navigate' || secFetchDest === 'document') {
-        const ok =
-          NO_ORIGIN_PREFIXES.some((p) => pathname.startsWith(p)) ||
-          NAVIGABLE_PREFIXES.some((p) => pathname.startsWith(p));
-        if (!ok && pathname.startsWith('/api/')) {
-          return deny(set, request, 403, 'Direct API access is not allowed');
+        for (const [k, v] of Object.entries(SECURITY_HEADERS)) {
+          set.headers[k] = v;
         }
-      }
 
-      const userAgent = request.headers.get('user-agent');
-      if (BOT_PROTECTED_PREFIXES.some((p) => pathname.startsWith(p)) && isSuspiciousUserAgent(userAgent)) {
-        console.warn(`[Security] Blocked suspicious client: ${ip} ${pathname}`);
-        return deny(set, request, 403, 'Access denied');
-      }
+        const ip = getClientIP(request);
+        if (await isIPBlocked(ip)) {
+          return deny(set, request, 403, 'Access denied');
+        }
 
-      const cfg = rateLimitConfig(pathname, method);
-      const result = await checkRateLimitSupabase(`${ip}:${cfg.prefix}`, cfg);
-      if (!result.allowed) {
-        return deny(set, request, 429, 'Too many requests. Please try again later.', getRateLimitHeaders(result));
-      }
+        const secFetchMode = request.headers.get('sec-fetch-mode');
+        const secFetchDest = request.headers.get('sec-fetch-dest');
+        if (secFetchMode === 'navigate' || secFetchDest === 'document') {
+          const ok =
+            NO_ORIGIN_PREFIXES.some((p) => pathname.startsWith(p)) ||
+            NAVIGABLE_PREFIXES.some((p) => pathname.startsWith(p));
+          if (!ok && pathname.startsWith('/api/')) {
+            return deny(set, request, 403, 'Direct API access is not allowed');
+          }
+        }
 
-      set.headers['X-RateLimit-Remaining'] = String(result.remaining);
-      set.headers['X-RateLimit-Reset'] = String(Math.floor(result.resetTime / 1000));
+        const userAgent = request.headers.get('user-agent');
+        if (BOT_PROTECTED_PREFIXES.some((p) => pathname.startsWith(p)) && isSuspiciousUserAgent(userAgent)) {
+          console.warn(`[Security] Blocked suspicious client: ${ip} ${pathname}`);
+          return deny(set, request, 403, 'Access denied');
+        }
+
+        const cfg = rateLimitConfig(pathname, method);
+        const result = await checkRateLimitSupabase(`${ip}:${cfg.prefix}`, cfg);
+        if (!result.allowed) {
+          return deny(set, request, 429, 'Too many requests. Please try again later.', getRateLimitHeaders(result));
+        }
+
+        set.headers['X-RateLimit-Remaining'] = String(result.remaining);
+        set.headers['X-RateLimit-Reset'] = String(Math.floor(result.resetTime / 1000));
+      } catch (error) {
+        console.error('[api-security] hook failed:', error);
+        return deny(set, request, 503, 'Service temporarily unavailable');
+      }
     });
 }
 
