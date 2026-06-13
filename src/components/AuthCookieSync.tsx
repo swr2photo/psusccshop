@@ -1,34 +1,44 @@
 'use client';
 
 import { useSession } from 'next-auth/react';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { getPublicApiBaseUrl } from '@/lib/api-client';
 import { signOutUser } from '@/lib/sign-out-client';
 
 /** Upgrade host-only NextAuth cookie to COOKIE_DOMAIN after login (split API). */
 export function AuthCookieSync() {
   const { status } = useSession();
-  const synced = useRef(false);
+  const syncing = useRef(false);
+
+  const syncCookie = useCallback(async () => {
+    if (!getPublicApiBaseUrl() || syncing.current) return;
+    syncing.current = true;
+    try {
+      const res = await fetch('/api/auth/sync-cookie', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (res.status === 401) {
+        await signOutUser();
+      }
+    } catch {
+      /* retry on next focus */
+    } finally {
+      syncing.current = false;
+    }
+  }, []);
 
   useEffect(() => {
-    if (status !== 'authenticated') {
-      synced.current = false;
-      return;
-    }
-    if (!getPublicApiBaseUrl() || synced.current) return;
+    if (status !== 'authenticated') return;
+    void syncCookie();
+  }, [status, syncCookie]);
 
-    synced.current = true;
-    fetch('/api/auth/sync-cookie', { method: 'POST', credentials: 'include' })
-      .then(async (res) => {
-        if (res.status === 401) {
-          synced.current = false;
-          await signOutUser();
-        }
-      })
-      .catch(() => {
-        synced.current = false;
-      });
-  }, [status]);
+  useEffect(() => {
+    if (status !== 'authenticated' || !getPublicApiBaseUrl()) return;
+    const onFocus = () => void syncCookie();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [status, syncCookie]);
 
   return null;
 }

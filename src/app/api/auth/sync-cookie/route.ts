@@ -9,10 +9,11 @@ import {
   getNextAuthSessionCookieName,
   getSessionCookieNamesForRead,
 } from '@/lib/nextauth-cookie-names';
+import { getSharedCookieDomain } from '@/lib/cookie-domain';
 
 const useSecureCookies = process.env.NODE_ENV === 'production';
 const sessionCookieName = getNextAuthSessionCookieName();
-const sharedCookieDomain = process.env.COOKIE_DOMAIN?.trim() || undefined;
+const sharedCookieDomain = getSharedCookieDomain();
 
 export async function POST(req: NextRequest) {
   const secret = process.env.NEXTAUTH_SECRET;

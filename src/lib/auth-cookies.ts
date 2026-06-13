@@ -7,8 +7,10 @@ import {
   getNextAuthCsrfCookieName,
 } from '@/lib/nextauth-cookie-names';
 
+import { getSharedCookieDomain } from '@/lib/cookie-domain';
+
 const useSecureCookies = process.env.NODE_ENV === 'production';
-const sharedCookieDomain = process.env.COOKIE_DOMAIN?.trim() || undefined;
+const sharedCookieDomain = getSharedCookieDomain();
 
 function buildClearCookie(name: string, options: { httpOnly?: boolean; domain?: string } = {}): string {
   const parts = [

@@ -35,8 +35,20 @@ export async function invokeNextRoute(
   request: Request,
   params: Record<string, string> = {},
 ): Promise<Response> {
-  const mod = await loadRouteModule(moduleId);
   const method = request.method.toUpperCase() as keyof NextRouteModule;
+
+  let mod: NextRouteModule;
+  try {
+    mod = await loadRouteModule(moduleId);
+  } catch (error) {
+    console.error(`[next-bridge] failed to load ${moduleId}:`, error);
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    return withBrowserCors(
+      Response.json({ status: 'error', message }, { status: 500 }),
+      request,
+    );
+  }
+
   const handler = mod[method];
 
   if (!handler) {

@@ -108,8 +108,10 @@ const providerNameMap: Record<string, string> = {
 
 // ==================== AUTH OPTIONS ====================
 
+import { getSharedCookieDomain } from '@/lib/cookie-domain';
+
 const useSecureCookies = process.env.NODE_ENV === 'production';
-const sharedCookieDomain = process.env.COOKIE_DOMAIN?.trim() || undefined;
+const sharedCookieDomain = getSharedCookieDomain();
 
 const sharedCookieOptions = {
   httpOnly: true,
