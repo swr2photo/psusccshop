@@ -67,7 +67,7 @@ const removeIndexEntry = async (email: string, ref: string) => {
 
 export async function GET(req: NextRequest) {
   // ต้องเข้าสู่ระบบก่อนถึงจะดู orders ได้
-  const authResult = await requireAuth();
+  const authResult = await requireAuth(req);
   if (authResult instanceof NextResponse) {
     return authResult;
   }
@@ -332,7 +332,7 @@ export async function POST(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   // ต้องเข้าสู่ระบบก่อน
-  const authResult = await requireAuth();
+  const authResult = await requireAuth(req);
   if (authResult instanceof NextResponse) {
     return authResult;
   }
@@ -428,7 +428,7 @@ export async function PUT(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   // ต้องเข้าสู่ระบบก่อน
-  const authResult = await requireAuth();
+  const authResult = await requireAuth(req);
   if (authResult instanceof NextResponse) {
     return authResult;
   }

@@ -28,6 +28,52 @@ export function shouldProxyToBackend(): boolean {
   return Boolean(getBackendProxyUrl());
 }
 
+/**
+ * Session-bound routes stay on Vercel (NextAuth getServerSession).
+ * Workers only validate JWT when NEXTAUTH_SECRET is synced — avoid 401 on profile/cart/orders.
+ */
+export function shouldKeepApiOnVercel(pathname: string): boolean {
+  if (!pathname.startsWith('/api/')) return false;
+  if (pathname.startsWith('/api/auth')) return true;
+
+  if (pathname.startsWith('/api/support-chat/settings/public')) return false;
+  if (pathname.startsWith('/api/payment/webhook')) return false;
+  if (pathname.startsWith('/api/cron')) return false;
+
+  const sessionPrefixes = [
+    '/api/profile',
+    '/api/cart',
+    '/api/orders',
+    '/api/admin',
+    '/api/upload',
+    '/api/push-subscription',
+    '/api/support-chat',
+    '/api/shipping/track',
+    '/api/stock-alert',
+    '/api/refund',
+    '/api/privacy',
+    '/api/invoice',
+    '/api/gas',
+    '/api/pickup',
+    '/api/payment-info',
+    '/api/payment/create-charge',
+    '/api/payment/verify',
+    '/api/payment/stripe',
+    '/api/payment/config',
+    '/api/shops',
+  ];
+
+  return sessionPrefixes.some((prefix) => pathname.startsWith(prefix));
+}
+
+export function shouldProxyApiRoute(pathname: string): boolean {
+  if (!shouldProxyToBackend()) return false;
+  if (!pathname.startsWith('/api/')) return false;
+  if (pathname.startsWith('/api/auth')) return false;
+  if (shouldKeepApiOnVercel(pathname)) return false;
+  return true;
+}
+
 function buildProxyRequestHeaders(request: NextRequest): Headers {
   const headers = new Headers(request.headers);
   headers.delete('host');
@@ -104,7 +150,8 @@ type RouteHandler = (req: NextRequest, ...args: unknown[]) => Promise<NextRespon
 /** Wrap a route handler — forwards to Elysia when backend proxy URL is configured. */
 export function withBackendProxy(handler: RouteHandler): RouteHandler {
   return async (req: NextRequest, ...args: unknown[]) => {
-    if (shouldProxyToBackend()) return proxyToBackend(req);
+    const pathname = new URL(req.url).pathname;
+    if (shouldProxyApiRoute(pathname)) return proxyToBackend(req);
     return handler(req, ...args);
   };
 }
