@@ -210,4 +210,4 @@ async function POSTHandler(req: NextRequest) {
 }
 
 export const GET = withBackendProxy(GETHandler);
-export const POST = withBackendProxy(POSTHandler);
+export const POST = POSTHandler;

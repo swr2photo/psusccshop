@@ -291,7 +291,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Proxy stateless/public API to Workers; keep session routes on Vercel (NextAuth)
-  if (shouldProxyApiRoute(pathname)) {
+  if (shouldProxyApiRoute(pathname, method)) {
     return proxyToBackend(request);
   }
 

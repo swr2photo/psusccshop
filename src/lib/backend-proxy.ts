@@ -66,11 +66,23 @@ export function shouldKeepApiOnVercel(pathname: string): boolean {
   return sessionPrefixes.some((prefix) => pathname.startsWith(prefix));
 }
 
-export function shouldProxyApiRoute(pathname: string): boolean {
+/** Stateless writes that are safe to run on Workers (no NextAuth session). */
+const PROXY_WRITE_PREFIXES = [
+  '/api/payment/webhook',
+  '/api/cron',
+];
+
+export function shouldProxyApiRoute(pathname: string, method = 'GET'): boolean {
   if (!shouldProxyToBackend()) return false;
   if (!pathname.startsWith('/api/')) return false;
   if (pathname.startsWith('/api/auth')) return false;
   if (shouldKeepApiOnVercel(pathname)) return false;
+
+  const verb = method.toUpperCase();
+  if (verb !== 'GET' && verb !== 'HEAD') {
+    return PROXY_WRITE_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+  }
+
   return true;
 }
 
@@ -151,7 +163,7 @@ type RouteHandler = (req: NextRequest, ...args: unknown[]) => Promise<NextRespon
 export function withBackendProxy(handler: RouteHandler): RouteHandler {
   return async (req: NextRequest, ...args: unknown[]) => {
     const pathname = new URL(req.url).pathname;
-    if (shouldProxyApiRoute(pathname)) return proxyToBackend(req);
+    if (shouldProxyApiRoute(pathname, req.method)) return proxyToBackend(req);
     return handler(req, ...args);
   };
 }
