@@ -49,7 +49,7 @@ export async function fetchConfigValue<T = unknown>(key: string): Promise<T | nu
 
 export async function getConfigValueCached<T = unknown>(
   key: string,
-  ttlMs = CACHE_TTL.config,
+  ttlMs: number = CACHE_TTL.config,
 ): Promise<T | null> {
   return getCached(configCacheKey(key), ttlMs, () => fetchConfigValue<T>(key));
 }
