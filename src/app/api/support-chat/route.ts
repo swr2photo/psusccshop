@@ -2,8 +2,7 @@
 // Customer: Create new chat or get active chat
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { getSession } from '@/lib/auth';
 import { 
   createChatSession, 
   getCustomerActiveChat,
@@ -17,7 +16,7 @@ export const dynamic = 'force-dynamic';
 // GET: Get customer's active chat or chat history
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getSession();
     
     if (!session?.user?.email) {
       return NextResponse.json('Unauthorized', { status: 401 });
@@ -48,7 +47,7 @@ export async function GET(request: NextRequest) {
 // POST: Create a new chat session
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getSession();
     
     if (!session?.user?.email) {
       return NextResponse.json('Unauthorized', { status: 401 });

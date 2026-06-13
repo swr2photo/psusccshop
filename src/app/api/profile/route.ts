@@ -36,29 +36,31 @@ async function saveUserLogServer(log: {
 }
 
 export async function GET(req: NextRequest) {
-  // ตรวจสอบว่าเข้าสู่ระบบแล้ว
-  const authResult = await requireAuth();
-  if (authResult instanceof NextResponse) {
-    return authResult;
-  }
-
-  const email = req.nextUrl.searchParams.get('email');
-  if (!email) return NextResponse.json({ status: 'error', message: 'missing email' }, { status: 400 });
-
-  // ตรวจสอบว่าเป็นเจ้าของหรือเป็น admin
-  const currentEmail = authResult.email;
-  if (!isResourceOwner(email, currentEmail) && !(await isAdminEmailAsync(currentEmail))) {
-    return NextResponse.json({ status: 'error', message: 'ไม่มีสิทธิ์เข้าถึงข้อมูลนี้' }, { status: 403 });
-  }
-
-  const data = await getJson(profileKey(email));
-  // Load extra fields (profileImage, theme) from key_value_store
-  let extras: Record<string, any> = {};
   try {
-    extras = (await getJson(profileExtrasKey(email))) || {};
-  } catch { /* ignore - extras may not exist */ }
-  const merged = { ...(data || {}), ...extras };
-  return NextResponse.json({ status: 'success', data: { profile: merged } });
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) {
+      return authResult;
+    }
+
+    const email = req.nextUrl.searchParams.get('email');
+    if (!email) return NextResponse.json({ status: 'error', message: 'missing email' }, { status: 400 });
+
+    const currentEmail = authResult.email;
+    if (!isResourceOwner(email, currentEmail) && !(await isAdminEmailAsync(currentEmail))) {
+      return NextResponse.json({ status: 'error', message: 'ไม่มีสิทธิ์เข้าถึงข้อมูลนี้' }, { status: 403 });
+    }
+
+    const data = await getJson(profileKey(email));
+    let extras: Record<string, any> = {};
+    try {
+      extras = (await getJson(profileExtrasKey(email))) || {};
+    } catch { /* ignore - extras may not exist */ }
+    const merged = { ...(data || {}), ...extras };
+    return NextResponse.json({ status: 'success', data: { profile: merged } });
+  } catch (error) {
+    console.error('[Profile API] GET error:', error);
+    return NextResponse.json({ status: 'error', message: 'Internal server error' }, { status: 500 });
+  }
 }
 
 export async function POST(req: NextRequest) {
