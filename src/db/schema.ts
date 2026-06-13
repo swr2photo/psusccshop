@@ -382,3 +382,64 @@ export const todos = pgTable('todos', {
   id: uuid('id').defaultRandom().primaryKey(),
   name: text('name').notNull(),
 });
+
+// ==================== PHASE 2 ADDITIONS ====================
+
+export const notifications = pgTable('notifications', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  recipientEmail: text('recipient_email').notNull(),
+  type: text('type').notNull(),
+  channel: text('channel').notNull(),
+  title: text('title').notNull(),
+  body: text('body').notNull(),
+  metadata: jsonb('metadata'),
+  isRead: boolean('is_read').default(false).notNull(),
+  sentAt: timestamp('sent_at', { withTimezone: true }),
+  readAt: timestamp('read_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const inventoryLogs = pgTable('inventory_logs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  productId: text('product_id').notNull(),
+  size: text('size'),
+  previousQuantity: integer('previous_quantity').notNull(),
+  newQuantity: integer('new_quantity').notNull(),
+  changeType: text('change_type').notNull(),
+  orderRef: text('order_ref'),
+  changedBy: text('changed_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const webhookEndpoints = pgTable('webhook_endpoints', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  url: text('url').notNull(),
+  events: text('events').array().notNull(),
+  secret: text('secret').notNull(),
+  isActive: boolean('is_active').default(true).notNull(),
+  shopId: uuid('shop_id'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const webhookDeliveries = pgTable('webhook_deliveries', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  endpointId: uuid('endpoint_id').references(() => webhookEndpoints.id, { onDelete: 'cascade' }),
+  event: text('event').notNull(),
+  payload: jsonb('payload').notNull(),
+  statusCode: integer('status_code'),
+  response: text('response'),
+  attempts: integer('attempts').default(0).notNull(),
+  deliveredAt: timestamp('delivered_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const auditTrail = pgTable('audit_trail', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  entityType: text('entity_type').notNull(),
+  entityId: text('entity_id').notNull(),
+  action: text('action').notNull(),
+  changes: jsonb('changes'),
+  performedBy: text('performed_by').notNull(),
+  ipAddress: text('ip_address'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});

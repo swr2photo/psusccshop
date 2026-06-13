@@ -87,7 +87,7 @@ const buildVendorRows = (orders: any[]) => {
 };
 
 export async function POST(req: NextRequest) {
-  const authResult = await requireAdminWithPermission('canManageSheet');
+  const authResult = await requireAdminWithPermission('canManageSheet', req);
   if (authResult instanceof NextResponse) return authResult;
 
   try {

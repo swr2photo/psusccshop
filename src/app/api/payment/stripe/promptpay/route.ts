@@ -27,7 +27,7 @@ const isStripePromptPayConfigured = (): boolean =>
   Boolean(process.env.STRIPE_SECRET_KEY && process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
 
 export async function POST(req: NextRequest) {
-  const authResult = await requireAuth();
+  const authResult = await requireAuth(req);
   if (authResult instanceof NextResponse) {
     return authResult;
   }
@@ -140,7 +140,7 @@ export async function POST(req: NextRequest) {
 // ==================== STATUS POLLING ====================
 
 export async function GET(req: NextRequest) {
-  const authResult = await requireAuth();
+  const authResult = await requireAuth(req);
   if (authResult instanceof NextResponse) {
     return authResult;
   }

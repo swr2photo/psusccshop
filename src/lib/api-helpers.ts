@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  checkCombinedRateLimit,
+  checkCombinedRateLimitAsync,
   getRateLimitHeaders,
   type RateLimitConfig,
 } from '@/lib/rate-limit';
@@ -16,11 +16,11 @@ export const API_CACHE = {
 /**
  * Return 429 response when rate limit exceeded, otherwise null.
  */
-export function rateLimitOrNull(
+export async function rateLimitOrNull(
   request: NextRequest,
   config: RateLimitConfig
-): NextResponse | null {
-  const result = checkCombinedRateLimit(request, config);
+): Promise<NextResponse | null> {
+  const result = await checkCombinedRateLimitAsync(request, config);
   if (!result.allowed) {
     return NextResponse.json(
       { status: 'error', message: 'Too many requests. Please try again later.' },

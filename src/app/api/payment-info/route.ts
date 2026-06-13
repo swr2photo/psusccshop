@@ -16,7 +16,7 @@ const maskAccountNumber = (accountNumber: string): string => {
 
 export async function GET(req: NextRequest) {
   // ต้องเข้าสู่ระบบก่อนถึงจะดูข้อมูลการชำระเงินได้
-  const authResult = await requireAuth();
+  const authResult = await requireAuth(req);
   if (authResult instanceof NextResponse) {
     return authResult;
   }

@@ -6,14 +6,16 @@ import { requireAuth, requireAdmin, isAdminEmailAsync, isResourceOwner, normaliz
 import { triggerSheetSync } from '@/lib/sheet-sync';
 import { sanitizeOrderForUser, sanitizeOrdersForUser, sanitizeObjectUtf8, sanitizeUtf8Input } from '@/lib/sanitize';
 import { verifyTurnstileToken, getClientIP } from '@/lib/cloudflare';
-import { checkCombinedRateLimit, RATE_LIMITS, getRateLimitHeaders } from '@/lib/rate-limit';
+import { checkCombinedRateLimitAsync, RATE_LIMITS, getRateLimitHeaders } from '@/lib/rate-limit';
 import { sendOrderConfirmationEmail } from '@/lib/email';
 import { db } from '@/lib/db';
 import { shops } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { recordOrderCreated } from '@/lib/sentry-metrics';
 import { buildValidatedCart, clampShippingFee } from '@/lib/order-pricing';
 import { computePromoDiscount } from '@/lib/promo';
+import { dispatchNotification } from '@/lib/notifications';
+import { isValidTransition, dispatchWebhook, OrderStatus } from '@/lib/order-state-machine';
 
 // Helper to save user log server-side
 async function saveUserLogServer(log: {
@@ -111,7 +113,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const start = Date.now();
   // Rate limiting สำหรับ order submission
-  const rateLimitResult = checkCombinedRateLimit(req, RATE_LIMITS.order);
+  const rateLimitResult = await checkCombinedRateLimitAsync(req, RATE_LIMITS.order);
   if (!rateLimitResult.allowed) {
     return NextResponse.json(
       { status: 'error', message: 'คุณส่งคำสั่งซื้อเร็วเกินไป กรุณารอสักครู่' },
@@ -280,12 +282,45 @@ export async function POST(req: NextRequest) {
       ...(sanitizedBody.shopId ? { shopId: sanitizedBody.shopId } : {}),
       ...(sanitizedBody.shopSlug ? { shopSlug: sanitizedBody.shopSlug } : {}),
     };
-    
     const key = orderKey(ref, now);
+    
+    // Deduct stock before saving
+    for (const item of cartItems) {
+      const size = item.size || 'FREE';
+      const qty = Number(item.quantity || item.qty || 1);
+      const prodId = item.productId || item.id;
+      if (prodId) {
+        try {
+          const deductRes: any = await db.execute(sql`SELECT deduct_stock(${prodId}, ${size}, ${qty}) as success`);
+          const rows = deductRes.rows || deductRes;
+          if (!rows[0]?.success) {
+            console.warn(`[Orders API] Stock deduction failed for ${prodId} size ${size}`);
+            // If strictly enforcing: throw new Error(`สินค้า ${item.productName || prodId} สต็อกไม่เพียงพอ`);
+          } else {
+            // Log the inventory change
+            await db.execute(sql`
+              INSERT INTO inventory_logs (product_id, size, previous_quantity, new_quantity, change_type, order_ref, changed_by)
+              VALUES (${prodId}, ${size}, 0, 0, 'ORDER_DEDUCT', ${ref}, ${customerEmail})
+            `);
+          }
+        } catch (e) {
+          console.error('[Orders API] Error deducting stock:', e);
+        }
+      }
+    }
+
     await putJson(key, order);
     if (order.customerEmail) {
       await upsertIndexEntry(order.customerEmail, order);
     }
+    
+    // Dispatch LINE Notification for new order
+    dispatchNotification({
+      shopId: sanitizedBody.shopId,
+      type: 'NEW_ORDER',
+      title: '📦 New Order Received!',
+      message: `Ref: ${ref}\nName: ${order.customerName}\nAmount: ฿${totalAmount.toLocaleString()}`,
+    }).catch(e => console.error('[Orders API] Notification error:', e));
     
     // Send order confirmation email
     if (order.customerEmail) {
@@ -405,9 +440,30 @@ export async function PUT(req: NextRequest) {
     }
 
     const next = { ...existing, ...sanitizedUpdates };
+
+    // State machine check if status changed
+    if (sanitizedUpdates.status && sanitizedUpdates.status !== existing.status) {
+      if (!isValidTransition(existing.status as OrderStatus, sanitizedUpdates.status as OrderStatus, isAdmin)) {
+        return NextResponse.json(
+          { status: 'error', message: `Invalid status transition from ${existing.status} to ${sanitizedUpdates.status}` },
+          { status: 400, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
+        );
+      }
+    }
+
     await updateOrderByRef(ref, next);
     if (next.customerEmail) {
       await upsertIndexEntry(next.customerEmail, next);
+    }
+
+    // Webhook dispatch if status changed
+    if (sanitizedUpdates.status && sanitizedUpdates.status !== existing.status) {
+      dispatchWebhook('order.status_updated', {
+        ref: next.ref,
+        status: next.status,
+        customerName: next.customerName,
+        totalAmount: next.totalAmount,
+      }, next.shopId).catch(() => {});
     }
     // Auto sync to Google Sheets
     triggerSheetSync().catch(() => {});

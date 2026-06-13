@@ -38,7 +38,7 @@ interface CreateChargeRequest {
 }
 
 export async function POST(request: NextRequest) {
-  const rateLimited = rateLimitOrNull(request, RATE_LIMITS.payment);
+  const rateLimited = await rateLimitOrNull(request, RATE_LIMITS.payment);
   if (rateLimited) return rateLimited;
 
   try {

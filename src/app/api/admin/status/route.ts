@@ -72,7 +72,7 @@ const updateIndexEntry = async (email: string, order: any) => {
 
 export async function POST(req: NextRequest) {
   // ตรวจสอบสิทธิ์ Admin + permission canManageOrders
-  const authResult = await requireAdminWithPermission('canManageOrders');
+  const authResult = await requireAdminWithPermission('canManageOrders', req);
   if (authResult instanceof NextResponse) {
     return authResult;
   }

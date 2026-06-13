@@ -11,7 +11,7 @@ type Params = { params: Promise<{ shopId: string }> };
 /** GET /api/shops/[shopId]/orders — List orders for this shop */
 export async function GET(req: NextRequest, { params }: Params) {
   const { shopId } = await params;
-  const authResult = await requireAdmin();
+  const authResult = await requireAdmin(req);
   if (authResult instanceof NextResponse) return authResult;
 
   const isSuperAdmin = isSuperAdminEmail(authResult.email);

@@ -44,7 +44,7 @@ interface TrackRequest {
 }
 
 export async function POST(request: NextRequest) {
-  const rateLimited = rateLimitOrNull(request, { maxRequests: 30, windowSeconds: 60, prefix: 'ship-track' });
+  const rateLimited = await rateLimitOrNull(request, { maxRequests: 30, windowSeconds: 60, prefix: 'ship-track' });
   if (rateLimited) return rateLimited;
 
   const session = await requireSession();
@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  const rateLimited = rateLimitOrNull(request, { maxRequests: 30, windowSeconds: 60, prefix: 'ship-track' });
+  const rateLimited = await rateLimitOrNull(request, { maxRequests: 30, windowSeconds: 60, prefix: 'ship-track' });
   if (rateLimited) return rateLimited;
 
   const session = await requireSession();

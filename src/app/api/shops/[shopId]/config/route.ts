@@ -14,7 +14,7 @@ interface RouteParams {
 /** GET /api/shops/[shopId]/config — Get shop config */
 export async function GET(req: NextRequest, { params }: RouteParams) {
   const { shopId } = await params;
-  const authResult = await requireAdmin();
+  const authResult = await requireAdmin(req);
   if (authResult instanceof NextResponse) return authResult;
 
   const isSuperAdmin = isSuperAdminEmail(authResult.email);
@@ -74,7 +74,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 /** PUT /api/shops/[shopId]/config — Update shop config */
 export async function PUT(req: NextRequest, { params }: RouteParams) {
   const { shopId } = await params;
-  const authResult = await requireAdmin();
+  const authResult = await requireAdmin(req);
   if (authResult instanceof NextResponse) return authResult;
 
   const isSuperAdmin = isSuperAdminEmail(authResult.email);

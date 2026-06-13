@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as Sentry from '@sentry/nextjs';
 import { processChat, buildDetailedShopContext, getShopData, ChatMessage, getCurrentModelName } from '@/lib/ai-chatbot';
 import { QUICK_QUESTIONS, SHIRT_FAQ } from '@/lib/shirt-faq';
-import { checkCombinedRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
+import { checkCombinedRateLimitAsync, RATE_LIMITS } from '@/lib/rate-limit';
 import { API_CACHE } from '@/lib/api-helpers';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -20,7 +20,7 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(req: NextRequest) {
   // Rate limiting
-  const rateLimitResult = checkCombinedRateLimit(req, { 
+  const rateLimitResult = await checkCombinedRateLimitAsync(req, { 
     maxRequests: 30, // More generous for chat
     windowSeconds: 60, 
     prefix: 'chatbot' 
@@ -160,7 +160,7 @@ export async function POST(req: NextRequest) {
  * Returns: Quick questions, FAQ categories, shop status, and shop info
  */
 export async function GET(req: NextRequest) {
-  const rateLimitResult = checkCombinedRateLimit(req, {
+  const rateLimitResult = await checkCombinedRateLimitAsync(req, {
     maxRequests: 60,
     windowSeconds: 60,
     prefix: 'chatbot-get',

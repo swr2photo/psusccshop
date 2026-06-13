@@ -74,10 +74,10 @@ async function handleGasRequest(
   action: string,
   body?: unknown
 ) {
-  const rateLimited = rateLimitOrNull(request, { maxRequests: 20, windowSeconds: 60, prefix: 'gas' });
+  const rateLimited = await rateLimitOrNull(request, { maxRequests: 20, windowSeconds: 60, prefix: 'gas' });
   if (rateLimited) return rateLimited;
 
-  const authResult = await requireAuth();
+  const authResult = await requireAuth(request);
   if (authResult instanceof NextResponse) return authResult;
 
   const allowed = await assertActionAllowed(action, authResult.email);

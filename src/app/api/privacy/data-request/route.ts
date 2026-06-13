@@ -43,7 +43,7 @@ const orderIndexKey = (email: string) => `orders/index/${emailHash(email)}.json`
  * GET: Get user's data or data request status
  */
 export async function GET(req: NextRequest) {
-  const authResult = await requireAuth();
+  const authResult = await requireAuth(req);
   if (authResult instanceof NextResponse) {
     return authResult;
   }
@@ -139,7 +139,7 @@ export async function GET(req: NextRequest) {
  * POST: Submit data request or process data deletion
  */
 export async function POST(req: NextRequest) {
-  const authResult = await requireAuth();
+  const authResult = await requireAuth(req);
   if (authResult instanceof NextResponse) {
     return authResult;
   }

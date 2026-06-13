@@ -91,7 +91,7 @@ export async function GET(req: NextRequest) {
   const shopId = req.nextUrl.searchParams.get('shopId');
 
   if (isAdminQuery) {
-    const adminAuth = await requireAdminWithPermission('canManageRefunds');
+    const adminAuth = await requireAdminWithPermission('canManageRefunds', req);
     if (adminAuth instanceof NextResponse) return adminAuth;
 
     try {
@@ -171,7 +171,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Regular user
-  const authResult = await requireAuth();
+  const authResult = await requireAuth(req);
   if (authResult instanceof NextResponse) return authResult;
 
   const ref = req.nextUrl.searchParams.get('ref');
@@ -207,7 +207,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const authResult = await requireAuth();
+  const authResult = await requireAuth(req);
   if (authResult instanceof NextResponse) return authResult;
 
   try {
@@ -266,7 +266,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  const authResult = await requireAdminWithPermission('canManageRefunds');
+  const authResult = await requireAdminWithPermission('canManageRefunds', req);
   if (authResult instanceof NextResponse) return authResult;
 
   try {

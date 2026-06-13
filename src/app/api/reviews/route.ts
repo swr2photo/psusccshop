@@ -80,10 +80,10 @@ export const GET = withBackendProxy(GETHandler);
 
 // POST /api/reviews - Create or update a review
 export async function POST(request: NextRequest) {
-  const rateLimited = rateLimitOrNull(request, { maxRequests: 10, windowSeconds: 60, prefix: 'reviews' });
+  const rateLimited = await rateLimitOrNull(request, { maxRequests: 10, windowSeconds: 60, prefix: 'reviews' });
   if (rateLimited) return rateLimited;
 
-  const authResult = await requireAuth();
+  const authResult = await requireAuth(request);
   if (authResult instanceof NextResponse) return authResult;
 
   try {
@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
 
 // DELETE /api/reviews - Delete a review
 export async function DELETE(request: NextRequest) {
-  const authResult = await requireAuth();
+  const authResult = await requireAuth(request);
   if (authResult instanceof NextResponse) return authResult;
 
   try {

@@ -11,7 +11,7 @@ type Params = { params: Promise<{ shopId: string }> };
 /** GET /api/shops/[shopId] — Get shop details */
 export async function GET(req: NextRequest, { params }: Params) {
   const { shopId } = await params;
-  const authResult = await requireAdmin();
+  const authResult = await requireAdmin(req);
   if (authResult instanceof NextResponse) return authResult;
 
   const isSuperAdmin = isSuperAdminEmail(authResult.email);
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 /** PUT /api/shops/[shopId] — Update shop */
 export async function PUT(req: NextRequest, { params }: Params) {
   const { shopId } = await params;
-  const authResult = await requireAdmin();
+  const authResult = await requireAdmin(req);
   if (authResult instanceof NextResponse) return authResult;
 
   const isSuperAdmin = isSuperAdminEmail(authResult.email);
@@ -63,7 +63,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 /** DELETE /api/shops/[shopId] — Delete shop (SuperAdmin only) */
 export async function DELETE(req: NextRequest, { params }: Params) {
   const { shopId } = await params;
-  const authResult = await requireAdmin();
+  const authResult = await requireAdmin(req);
   if (authResult instanceof NextResponse) return authResult;
 
   if (!isSuperAdminEmail(authResult.email)) {

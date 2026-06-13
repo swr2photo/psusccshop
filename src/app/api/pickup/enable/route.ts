@@ -35,7 +35,7 @@ const updateIndexEntry = async (email: string, order: any) => {
  * Body: { productId: string, pickup: { enabled, location, startDate, endDate, notes }, autoUpdateOrders?: boolean }
  */
 export async function POST(req: NextRequest) {
-  const authResult = await requireAdminWithPermission('canManagePickup');
+  const authResult = await requireAdminWithPermission('canManagePickup', req);
   if (authResult instanceof NextResponse) {
     return authResult;
   }

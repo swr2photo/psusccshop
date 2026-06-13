@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
-import { checkCombinedRateLimit, RATE_LIMITS, getRateLimitHeaders } from '@/lib/rate-limit';
+import { checkCombinedRateLimitAsync, RATE_LIMITS, getRateLimitHeaders } from '@/lib/rate-limit';
 import { putJson, uploadImageToStorage, isSupabaseStorageUrl } from '@/lib/supabase';
 import { validateImageBuffer, isAllowedPassThroughImageUrl } from '@/lib/upload-validation';
 
@@ -62,7 +62,7 @@ const generateFileName = (contentType: string) => {
 
 export async function POST(req: NextRequest) {
   // Rate limiting สำหรับ upload
-  const rateLimitResult = checkCombinedRateLimit(req, RATE_LIMITS.upload);
+  const rateLimitResult = await checkCombinedRateLimitAsync(req, RATE_LIMITS.upload);
   if (!rateLimitResult.allowed) {
     return NextResponse.json(
       { status: 'error', message: 'คุณอัปโหลดไฟล์เร็วเกินไป กรุณารอสักครู่' },
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
   }
 
   // ต้องเข้าสู่ระบบก่อนถึงจะ upload ได้
-  const authResult = await requireAuth();
+  const authResult = await requireAuth(req);
   if (authResult instanceof NextResponse) {
     return authResult;
   }
@@ -160,7 +160,7 @@ export async function POST(req: NextRequest) {
 
 // Handle multiple images upload
 export async function PUT(req: NextRequest) {
-  const rateLimitResult = checkCombinedRateLimit(req, RATE_LIMITS.upload);
+  const rateLimitResult = await checkCombinedRateLimitAsync(req, RATE_LIMITS.upload);
   if (!rateLimitResult.allowed) {
     return NextResponse.json(
       { status: 'error', message: 'คุณอัปโหลดไฟล์เร็วเกินไป กรุณารอสักครู่' },
@@ -175,7 +175,7 @@ export async function PUT(req: NextRequest) {
   }
 
   // ต้องเข้าสู่ระบบก่อนถึงจะ upload ได้
-  const authResult = await requireAuth();
+  const authResult = await requireAuth(req);
   if (authResult instanceof NextResponse) {
     return authResult;
   }

@@ -29,7 +29,7 @@ interface SlipOKLogEntry {
 // GET: ดู orders ที่ไม่มี slip data
 export async function GET(request: NextRequest) {
   try {
-    const admin = await requireSuperAdmin();
+    const admin = await requireSuperAdmin(request);
     if (!admin) return NextResponse.json('Unauthorized', { status: 401 });
 
     const fetchedOrders = await db.select({
@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
 // POST: Import slip URLs จาก SlipOK log
 export async function POST(request: NextRequest) {
   try {
-    const admin = await requireSuperAdmin();
+    const admin = await requireSuperAdmin(request);
     if (!admin) return NextResponse.json('Unauthorized', { status: 401 });
 
     const body = await request.json();
@@ -185,7 +185,7 @@ export async function POST(request: NextRequest) {
 // PUT: Manual update
 export async function PUT(request: NextRequest) {
   try {
-    const admin = await requireSuperAdmin();
+    const admin = await requireSuperAdmin(request);
     if (!admin) return NextResponse.json('Unauthorized', { status: 401 });
 
     const body = await request.json();

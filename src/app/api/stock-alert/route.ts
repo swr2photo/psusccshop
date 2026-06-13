@@ -16,10 +16,10 @@ function hashEmail(email: string): string {
 
 // POST /api/stock-alert - Register for back-in-stock alert
 export async function POST(request: NextRequest) {
-  const rateLimited = rateLimitOrNull(request, { maxRequests: 10, windowSeconds: 60, prefix: 'stock-alert' });
+  const rateLimited = await rateLimitOrNull(request, { maxRequests: 10, windowSeconds: 60, prefix: 'stock-alert' });
   if (rateLimited) return rateLimited;
 
-  const authResult = await requireAuth();
+  const authResult = await requireAuth(request);
   if (authResult instanceof NextResponse) return authResult;
 
   try {
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
 
 // DELETE /api/stock-alert - Unsubscribe from alert
 export async function DELETE(request: NextRequest) {
-  const authResult = await requireAuth();
+  const authResult = await requireAuth(request);
   if (authResult instanceof NextResponse) return authResult;
 
   try {
@@ -110,7 +110,7 @@ export async function DELETE(request: NextRequest) {
 
 // GET /api/stock-alert - Get user's active alerts
 export async function GET(request: NextRequest) {
-  const authResult = await requireAuth();
+  const authResult = await requireAuth(request);
   if (authResult instanceof NextResponse) return authResult;
 
   try {

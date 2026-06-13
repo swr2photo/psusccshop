@@ -80,7 +80,7 @@ const updateIndexEntry = async (email: string, order: any) => {
 
 // GET - ดึงข้อมูล pickup status ของ order
 export async function GET(req: NextRequest) {
-  const authResult = await requireAuth();
+  const authResult = await requireAuth(req);
   if (authResult instanceof NextResponse) {
     return authResult;
   }
@@ -240,7 +240,7 @@ export async function GET(req: NextRequest) {
 
 // POST - อัปเดต pickup status (admin only)
 export async function POST(req: NextRequest) {
-  const authResult = await requireAdminWithPermission('canManagePickup');
+  const authResult = await requireAdminWithPermission('canManagePickup', req);
   if (authResult instanceof NextResponse) {
     return authResult;
   }

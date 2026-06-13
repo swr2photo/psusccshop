@@ -8130,8 +8130,8 @@ export default function AdminPage(): JSX.Element {
               <NoPermissionView permission="จัดการสินค้า" />
             )
           )}
-          {activeTab === 2 && (canManageOrders ? OrdersView() : <NoPermissionView permission="จัดการออเดอร์" />)}
-          {activeTab === 3 && (canManagePickup ? PickupView() : <NoPermissionView permission="จัดการรับสินค้า" />)}
+          {activeTab === 2 && (canManageOrders ? <OrdersView /> : <NoPermissionView permission="จัดการออเดอร์" />)}
+          {activeTab === 3 && (canManagePickup ? <PickupView /> : <NoPermissionView permission="จัดการรับสินค้า" />)}
           {activeTab === 4 && (canManageSupport ? <SupportChatPanel selectedShopId={isShopMode ? selectedShopId : undefined} /> : <NoPermissionView permission="แชทสนับสนุน" />)}
           {activeTab === 5 && (
             canManageAnnouncement ? (

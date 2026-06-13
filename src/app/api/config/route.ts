@@ -105,7 +105,7 @@ async function GETHandler() {
 
 async function POSTHandler(req: NextRequest) {
   // ตรวจสอบสิทธิ์ Admin - เฉพาะ admin เท่านั้นที่แก้ config ได้
-  const authResult = await requireAdmin();
+  const authResult = await requireAdmin(req);
   if (authResult instanceof NextResponse) {
     return authResult;
   }

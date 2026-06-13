@@ -365,6 +365,59 @@ async function migrateDataRequests() {
   console.log(`✅ Data requests migration complete: ${migrated} migrated`);
 }
 
+async function migrateInventory() {
+  console.log('\n📦 Migrating inventory...');
+  
+  const configKeys = await listS3Keys('config/');
+  let migrated = 0;
+  
+  for (const key of configKeys) {
+    if (key !== 'config/shop-settings.json') continue; // Only process shop settings for main shop
+    
+    try {
+      const config = await getS3Json<any>(key);
+      if (!config || !config.products) continue;
+      
+      for (const prod of config.products) {
+        // If product has variants
+        if (prod.variants && prod.variants.length > 0) {
+          for (const variant of prod.variants) {
+            if (variant.stock !== undefined && variant.stock !== null) {
+              const { error } = await supabase.from('inventory').upsert({
+                product_id: prod.id,
+                size: 'FREE',
+                variant_id: variant.id,
+                quantity: variant.stock,
+                updated_at: new Date().toISOString()
+              });
+              if (!error) migrated++;
+            }
+          }
+        } 
+        // If product has overall stock
+        else if (prod.stock !== undefined && prod.stock !== null) {
+          // It might have sizes (sizePricing keys) or just FREE
+          const sizes = prod.sizePricing ? Object.keys(prod.sizePricing) : ['FREE'];
+          // Distribute stock equally or just assign to FREE if no specific size stock is tracked in JSON
+          // The old system didn't track stock per size! It was tracked per product or variant.
+          // So we'll just track it against 'FREE' size, or the first size.
+          const { error } = await supabase.from('inventory').upsert({
+            product_id: prod.id,
+            size: 'FREE',
+            quantity: prod.stock,
+            updated_at: new Date().toISOString()
+          });
+          if (!error) migrated++;
+        }
+      }
+    } catch (error: any) {
+      console.error(`  ❌ Error processing inventory from ${key}:`, error.message);
+    }
+  }
+  
+  console.log(`✅ Inventory migration complete: ${migrated} records created`);
+}
+
 // ==================== MAIN ====================
 
 async function main() {
@@ -395,6 +448,7 @@ async function main() {
     await migrateEmailLogs();
     await migrateUserLogs();
     await migrateDataRequests();
+    await migrateInventory();
     
     console.log('\n✨ Migration complete!');
     console.log('\n📝 Next steps:');

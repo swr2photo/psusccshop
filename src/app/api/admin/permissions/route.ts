@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic';
  * ดึงสิทธิ์แอดมินทั้งหมด (super admin only) หรือสิทธิ์ตัวเอง (admin)
  */
 export async function GET(req: NextRequest) {
-  const adminResult = await requireAdmin();
+  const adminResult = await requireAdmin(req);
   if (adminResult instanceof NextResponse) return adminResult;
 
   const { searchParams } = new URL(req.url);
@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
   try {
     // If specific email requested, only super admin can view others' perms
     if (email && email.toLowerCase() !== adminResult.email.toLowerCase()) {
-      const superCheck = await requireSuperAdmin();
+      const superCheck = await requireSuperAdmin(req);
       if (superCheck instanceof NextResponse) return superCheck;
     }
 
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Get all - super admin only
-    const superCheck = await requireSuperAdmin();
+    const superCheck = await requireSuperAdmin(req);
     if (superCheck instanceof NextResponse) {
       // Not super admin - return only own perms
       const perms = await getAdminPermissionsFromDB(adminResult.email);
@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
  *   or: { email: string, permissions: AdminPermissions }
  */
 export async function POST(req: NextRequest) {
-  const superCheck = await requireSuperAdmin();
+  const superCheck = await requireSuperAdmin(req);
   if (superCheck instanceof NextResponse) return superCheck;
 
   try {
@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
  * Body: { email: string }
  */
 export async function DELETE(req: NextRequest) {
-  const superCheck = await requireSuperAdmin();
+  const superCheck = await requireSuperAdmin(req);
   if (superCheck instanceof NextResponse) return superCheck;
 
   try {

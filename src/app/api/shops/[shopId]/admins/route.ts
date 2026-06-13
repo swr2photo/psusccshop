@@ -11,7 +11,7 @@ type Params = { params: Promise<{ shopId: string }> };
 /** GET /api/shops/[shopId]/admins — List shop admins (Super Admin only) */
 export async function GET(req: NextRequest, { params }: Params) {
   const { shopId } = await params;
-  const authResult = await requireSuperAdmin();
+  const authResult = await requireSuperAdmin(req);
   if (authResult instanceof NextResponse) return authResult;
 
   const admins = await listShopAdmins(shopId);
@@ -21,7 +21,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 /** POST /api/shops/[shopId]/admins — Add admin to shop (Super Admin only) */
 export async function POST(req: NextRequest, { params }: Params) {
   const { shopId } = await params;
-  const authResult = await requireSuperAdmin();
+  const authResult = await requireSuperAdmin(req);
   if (authResult instanceof NextResponse) return authResult;
 
   try {
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 /** PUT /api/shops/[shopId]/admins — Update admin permissions (Super Admin only) */
 export async function PUT(req: NextRequest, { params }: Params) {
   const { shopId } = await params;
-  const authResult = await requireSuperAdmin();
+  const authResult = await requireSuperAdmin(req);
   if (authResult instanceof NextResponse) return authResult;
 
   try {
@@ -73,7 +73,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 /** DELETE /api/shops/[shopId]/admins — Remove admin from shop (Super Admin only) */
 export async function DELETE(req: NextRequest, { params }: Params) {
   const { shopId } = await params;
-  const authResult = await requireSuperAdmin();
+  const authResult = await requireSuperAdmin(req);
   if (authResult instanceof NextResponse) return authResult;
 
   const url = new URL(req.url);

@@ -12,10 +12,10 @@ export const dynamic = 'force-dynamic';
  * Body: { code: string, subtotal: number }
  */
 export async function POST(req: NextRequest) {
-  const rateLimited = rateLimitOrNull(req, { maxRequests: 20, windowSeconds: 60, prefix: 'promo' });
+  const rateLimited = await rateLimitOrNull(req, { maxRequests: 20, windowSeconds: 60, prefix: 'promo' });
   if (rateLimited) return rateLimited;
 
-  const authResult = await requireAuth();
+  const authResult = await requireAuth(req);
   if (authResult instanceof NextResponse) return authResult;
 
   try {

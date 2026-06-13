@@ -66,7 +66,7 @@ export const GET = withBackendProxy(GETHandler);
 
 // POST /api/inventory - Update stock (admin only)
 export async function POST(request: NextRequest) {
-  const authResult = await requireAdmin();
+  const authResult = await requireAdmin(request);
   if (authResult instanceof NextResponse) return authResult;
 
   try {

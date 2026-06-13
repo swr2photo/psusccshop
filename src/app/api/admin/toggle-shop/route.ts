@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(req: NextRequest) {
   // Verify administrator permissions
-  const authResult = await requireAdmin();
+  const authResult = await requireAdmin(req);
   if (authResult instanceof NextResponse) {
     return authResult;
   }

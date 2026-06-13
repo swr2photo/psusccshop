@@ -37,7 +37,7 @@ async function resolveStripeReceiptUrl(order: Record<string, unknown>): Promise<
 
 // GET /api/invoice?ref=xxx&lang=th
 export async function GET(request: NextRequest) {
-  const authResult = await requireAuth();
+  const authResult = await requireAuth(request);
   if (authResult instanceof NextResponse) return authResult;
 
   try {

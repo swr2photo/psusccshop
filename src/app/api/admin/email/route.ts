@@ -27,7 +27,7 @@ import {
 // GET: Retrieve email logs
 export async function GET(request: NextRequest) {
   try {
-    const admin = await requireAdminWithPermission('canSendEmail');
+    const admin = await requireAdminWithPermission('canSendEmail', request);
     if (!admin || admin instanceof NextResponse) {
       return admin instanceof NextResponse ? admin : NextResponse.json('Unauthorized', { status: 401 });
     }
@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
 // POST: Send email
 export async function POST(request: NextRequest) {
   try {
-    const admin = await requireAdminWithPermission('canSendEmail');
+    const admin = await requireAdminWithPermission('canSendEmail', request);
     if (!admin || admin instanceof NextResponse) {
       return admin instanceof NextResponse ? admin : NextResponse.json('Unauthorized', { status: 401 });
     }

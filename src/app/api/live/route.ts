@@ -55,7 +55,7 @@ export async function GET() {
 // POST — Admin only: Update live stream settings
 export async function POST(request: Request) {
   try {
-    const auth = await requireAdmin();
+    const auth = await requireAdmin(request);
     if (auth instanceof NextResponse) return auth;
 
     const body = await request.json();

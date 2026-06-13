@@ -24,7 +24,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 /** PUT /api/shops/[shopId]/products — Update shop products (admin) */
 export async function PUT(req: NextRequest, { params }: Params) {
   const { shopId } = await params;
-  const authResult = await requireAdmin();
+  const authResult = await requireAdmin(req);
   if (authResult instanceof NextResponse) return authResult;
 
   const isSuperAdmin = isSuperAdminEmail(authResult.email);

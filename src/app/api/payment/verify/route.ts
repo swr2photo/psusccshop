@@ -8,6 +8,7 @@ import { sendPaymentReceivedEmail } from '@/lib/email';
 import { sendPushNotification } from '@/lib/push-notification';
 import { rateLimitOrNull } from '@/lib/api-helpers';
 import { RATE_LIMITS } from '@/lib/rate-limit';
+import { dispatchNotification } from '@/lib/notifications';
 import crypto from 'crypto';
 
 // Helper to save user log server-side
@@ -237,11 +238,11 @@ const checkSlipWithSlipOK = async (
 const CONFIG_KEY = 'config/shop-settings.json';
 
 export async function POST(req: NextRequest) {
-  const rateLimited = rateLimitOrNull(req, RATE_LIMITS.payment);
+  const rateLimited = await rateLimitOrNull(req, RATE_LIMITS.payment);
   if (rateLimited) return rateLimited;
 
   // ต้องเข้าสู่ระบบก่อน
-  const authResult = await requireAuth();
+  const authResult = await requireAuth(req);
   if (authResult instanceof NextResponse) {
     return authResult;
   }
@@ -420,6 +421,15 @@ export async function POST(req: NextRequest) {
         tag: `payment-${ref}`,
       }).catch(() => {});
     }
+
+    // Dispatch LINE Notification for verified payment
+    dispatchNotification({
+      shopId: updated.shopId,
+      type: 'PAYMENT_RECEIVED',
+      title: '💰 Payment Verified!',
+      message: `Ref: ${ref}\nName: ${senderName}\nAmount: ฿${slipCheck.slipData?.amount || expectedAmount}`,
+      url: `/admin#orders?ref=${ref}`,
+    }).catch(e => console.error('[payment-verify] Notification error:', e));
 
     // ส่งข้อมูลกลับ
     return NextResponse.json({
