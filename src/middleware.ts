@@ -139,8 +139,14 @@ const CACHEABLE_API_PREFIXES = [
 ];
 
 export async function middleware(request: NextRequest) {
-  const origin = request.headers.get('origin');
   const pathname = request.nextUrl.pathname;
+
+  // Bypass middleware for Sentry telemetry tunnel
+  if (pathname === '/monitoring') {
+    return NextResponse.next();
+  }
+
+  const origin = request.headers.get('origin');
   const method = request.method;
   const ip = getIP(request);
   const userAgent = request.headers.get('user-agent');

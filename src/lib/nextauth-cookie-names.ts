@@ -1,56 +1,75 @@
-/** Shared NextAuth session cookie naming (frontend + Workers API). */
-const useSecureCookies = process.env.NODE_ENV === 'production';
-const cookiePrefix = useSecureCookies ? '__Secure-' : '';
+function getEnvValue(key: string): string | undefined {
+  // Try globalThis.__CF_ENV__ first (Cloudflare Workers env bindings)
+  const cfEnv = (globalThis as any).__CF_ENV__;
+  if (cfEnv && typeof cfEnv === 'object' && key in cfEnv) {
+    return String(cfEnv[key]);
+  }
+  // Fallback to process.env
+  return process.env[key];
+}
 
-/** Bump to force global re-login (cookie name change). Production default: 2. */
-export const AUTH_SESSION_VERSION = (
-  process.env.AUTH_SESSION_VERSION ||
-  (useSecureCookies ? '2' : '1')
-).trim();
+function resolveUseSecureCookies(): boolean {
+  return getEnvValue('NODE_ENV') === 'production';
+}
+
+function resolveCookiePrefix(): string {
+  return resolveUseSecureCookies() ? '__Secure-' : '';
+}
+
+function resolveAuthSessionVersion(): string {
+  const explicit = getEnvValue('AUTH_SESSION_VERSION');
+  if (explicit) return explicit.trim();
+  return resolveUseSecureCookies() ? '2' : '1';
+}
 
 function versionSuffix(version: string): string {
   return version && version !== '1' ? `.v${version}` : '';
 }
 
-export function getNextAuthSessionCookieName(version = AUTH_SESSION_VERSION): string {
-  return `${cookiePrefix}next-auth.session-token${versionSuffix(version)}`;
+export function getNextAuthSessionCookieName(version?: string): string {
+  const resolvedVersion = version || resolveAuthSessionVersion();
+  const prefix = resolveCookiePrefix();
+  return `${prefix}next-auth.session-token${versionSuffix(resolvedVersion)}`;
 }
 
-export function getNextAuthCallbackCookieName(version = AUTH_SESSION_VERSION): string {
-  return `${cookiePrefix}next-auth.callback-url${versionSuffix(version)}`;
+export function getNextAuthCallbackCookieName(version?: string): string {
+  const resolvedVersion = version || resolveAuthSessionVersion();
+  const prefix = resolveCookiePrefix();
+  return `${prefix}next-auth.callback-url${versionSuffix(resolvedVersion)}`;
 }
 
-/** All session cookie names to clear on signOut (current + legacy). */
 export function getAllSessionCookieNames(): string[] {
+  const prefix = resolveCookiePrefix();
   const names = new Set<string>([
     getNextAuthSessionCookieName('2'),
     getNextAuthSessionCookieName('1'),
-    `${cookiePrefix}next-auth.session-token`,
+    `${prefix}next-auth.session-token`,
     'next-auth.session-token',
   ]);
   return [...names];
 }
 
 export function getAllCallbackCookieNames(): string[] {
+  const prefix = resolveCookiePrefix();
   const names = new Set<string>([
     getNextAuthCallbackCookieName('2'),
     getNextAuthCallbackCookieName('1'),
-    `${cookiePrefix}next-auth.callback-url`,
+    `${prefix}next-auth.callback-url`,
     'next-auth.callback-url',
   ]);
   return [...names];
 }
 
-/** Cookie names to try when reading an existing session (newest first). */
 export function getSessionCookieNamesForRead(): string[] {
+  const prefix = resolveCookiePrefix();
   return [
     getNextAuthSessionCookieName('2'),
     getNextAuthSessionCookieName('1'),
-    `${cookiePrefix}next-auth.session-token`,
+    `${prefix}next-auth.session-token`,
     'next-auth.session-token',
   ];
 }
 
 export function getNextAuthCsrfCookieName(): string {
-  return useSecureCookies ? '__Host-next-auth.csrf-token' : 'next-auth.csrf-token';
+  return resolveUseSecureCookies() ? '__Host-next-auth.csrf-token' : 'next-auth.csrf-token';
 }

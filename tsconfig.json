@@ -31,5 +31,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", ".next", "scratch", "server", "dist", "build"]
+  "exclude": ["node_modules", ".next", ".open-next", "scratch", "server", "dist", "build"]
 }
