@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Admin mode: requires auth
-  const authResult = await requireAdmin();
+  const authResult = await requireAdmin(req);
   if (authResult instanceof NextResponse) return authResult;
 
   const isSuperAdmin = isSuperAdminEmail(authResult.email);
@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
 
 /** POST /api/shops — Create a new shop (SuperAdmin only) */
 export async function POST(req: NextRequest) {
-  const authResult = await requireAdmin();
+  const authResult = await requireAdmin(req);
   if (authResult instanceof NextResponse) return authResult;
 
   if (!isSuperAdminEmail(authResult.email)) {

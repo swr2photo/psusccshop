@@ -3,7 +3,7 @@
 
 import { getServerSession, Session } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
-import { getSessionFromRequest } from '@/lib/session-from-request';
+import { getSessionFromRequest, getSessionFromAppRouter } from '@/lib/session-from-request';
 import { getCurrentRequest } from '@/lib/request-context';
 import { NextResponse } from 'next/server';
 import { getJson } from '@/lib/filebase';
@@ -166,15 +166,23 @@ export const isAdminEmailAsync = async (email: string | null | undefined): Promi
 };
 
 /**
+ * Resolve session from explicit request (Workers) or App Router cookies.
+ */
+async function resolveSession(req?: Request): Promise<Session | null> {
+  if (req) return getSessionFromRequest(req);
+  const request = getCurrentRequest();
+  if (request) return getSessionFromRequest(request);
+  const fromAppRouter = await getSessionFromAppRouter();
+  if (fromAppRouter) return fromAppRouter;
+  return getServerSession(authOptions);
+}
+
+/**
  * Get current session on server side
  */
-export const getSession = async (): Promise<Session | null> => {
+export const getSession = async (req?: Request): Promise<Session | null> => {
   try {
-    const request = getCurrentRequest();
-    if (request) {
-      return getSessionFromRequest(request);
-    }
-    return await getServerSession(authOptions);
+    return await resolveSession(req);
   } catch (error) {
     console.error('[auth] getSession failed:', error);
     return null;
@@ -196,14 +204,6 @@ export const isCurrentUserAdmin = async (): Promise<boolean> => {
   const email = await getCurrentUserEmail();
   return await isAdminEmailAsync(email);
 };
-
-/**
- * Resolve session from explicit request (Workers) or request context / getServerSession.
- */
-async function resolveSession(req?: Request): Promise<Session | null> {
-  if (req) return getSessionFromRequest(req);
-  return getSession();
-}
 
 /**
  * Require admin authentication - returns error response if not admin

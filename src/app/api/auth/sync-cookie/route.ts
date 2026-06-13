@@ -8,6 +8,7 @@ import {
   getNextAuthSessionCookieName,
   getSessionCookieNamesForRead,
 } from '@/lib/nextauth-cookie-names';
+import { buildGetTokenReq } from '@/lib/session-from-request';
 import { getSharedCookieDomain } from '@/lib/cookie-domain';
 
 const useSecureCookies = process.env.NODE_ENV === 'production';
@@ -21,9 +22,10 @@ export async function POST(req: NextRequest) {
   }
 
   let token = null;
+  const getTokenReq = buildGetTokenReq(req);
   for (const cookieName of getSessionCookieNamesForRead()) {
     token = await getToken({
-      req: req,
+      req: getTokenReq,
       secret,
       secureCookie: useSecureCookies,
       cookieName,
