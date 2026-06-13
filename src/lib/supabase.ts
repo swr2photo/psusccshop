@@ -8,6 +8,7 @@ import { db } from './db';
 import { orders, config, carts, profiles, emailLogs, userLogs, dataRequests, keyValueStore, adminPermissions, securityAuditLog } from '../db/schema';
 import { eq, lt, lte, gt, gte, and, desc, inArray, like, or, count } from 'drizzle-orm';
 import { getCached, invalidateCacheKey, CACHE_TTL } from './server-cache';
+import { getConfigValueCached, invalidateConfigCache } from './config-db';
 
 // ==================== CONFIGURATION ====================
 
@@ -205,11 +206,7 @@ export async function getJson<T = any>(key: string): Promise<T | null> {
     
     if (key.startsWith('config/')) {
       const configKey = key.replace('config/', '').replace('.json', '');
-      const cacheKey = `json:config:${configKey}`;
-      return getCached(cacheKey, CACHE_TTL.config, async () => {
-        const data = await db.select().from(config).where(eq(config.key, configKey)).limit(1);
-        return (data[0]?.value as T) || null;
-      });
+      return getConfigValueCached<T>(configKey, CACHE_TTL.config);
     }
     
     if (key.startsWith('carts/')) {
@@ -283,7 +280,7 @@ export async function putJson(key: string, data: any): Promise<void> {
           target: config.key,
           set: { value: data, updatedAt: new Date() },
         });
-      invalidateCacheKey(`json:config:${configKey}`);
+      invalidateConfigCache(configKey);
       // Bump the lightweight realtime signal row so clients refetch the
       // sanitized config immediately (the full row is too large / unsafe
       // to broadcast via postgres_changes).

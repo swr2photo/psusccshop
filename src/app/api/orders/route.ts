@@ -9,7 +9,7 @@ import { verifyTurnstileToken, getClientIP } from '@/lib/cloudflare';
 import { checkCombinedRateLimit, RATE_LIMITS, getRateLimitHeaders } from '@/lib/rate-limit';
 import { sendOrderConfirmationEmail } from '@/lib/email';
 import { db } from '@/lib/db';
-import { shops, config as dbConfigTable } from '@/db/schema';
+import { shops } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { recordOrderCreated } from '@/lib/sentry-metrics';
 import { buildValidatedCart, clampShippingFee } from '@/lib/order-pricing';
@@ -171,14 +171,9 @@ export async function POST(req: NextRequest) {
       }
     } else {
       // Main shop validation
-      const configResult = await db.select()
-        .from(dbConfigTable)
-        .where(eq(dbConfigTable.key, 'shop-settings'))
-        .limit(1);
-        
-      if (configResult.length > 0) {
-        const cfg = configResult[0].value as any;
-        products = cfg.products || [];
+      const cfg = await getJson<{ products?: unknown[]; isOpen?: boolean }>('config/shop-settings.json');
+      if (cfg) {
+        products = (cfg.products as any[]) || [];
         isShopOpen = cfg.isOpen !== false;
       }
     }
