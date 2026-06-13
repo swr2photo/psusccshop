@@ -3157,8 +3157,8 @@ export default function AdminPage(): JSX.Element {
       const isNetworkError = error?.message?.includes('Failed to fetch') || 
                             error?.message?.includes('NETWORK_ERROR');
       if (status === 401) {
-        console.warn('[Admin SWR] Session expired (401) — signing out automatically');
-        void signOutUser();
+        // Workers 401 ≠ session expired; do not auto sign-out from admin data fetches.
+        console.warn('[Admin SWR] Unauthorized:', status);
       } else if (isNetworkError) {
         console.warn('[Admin SWR] Network error - using cached data');
       } else {

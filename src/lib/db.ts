@@ -2,14 +2,18 @@
 // Drizzle ORM — node-postgres (Vercel/Bun) or postgres.js (Cloudflare Workers + Hyperdrive)
 
 import { drizzle as drizzleNodePg } from 'drizzle-orm/node-postgres';
-import { drizzle as drizzlePostgresJs } from 'drizzle-orm/postgres-js';
 import { withReplicas } from 'drizzle-orm/pg-core';
 import { Pool } from 'pg';
 import postgres from 'postgres';
 import * as schema from '../db/schema';
 import { isCloudflareWorkersRuntime } from '@/lib/runtime-env';
+import {
+  getWorkersDb,
+  resetWorkersDbConnection,
+  type DbInstance,
+} from '@/lib/db-workers-scope';
 
-type DbInstance = ReturnType<typeof drizzleNodePg<typeof schema>>;
+export type { DbInstance };
 
 function resolvePrimaryConnectionString(): string {
   const cf = (globalThis as { __CF_ENV__?: { HYPERDRIVE?: { connectionString: string } } }).__CF_ENV__;
@@ -21,19 +25,6 @@ function resolvePrimaryConnectionString(): string {
     throw new Error('DATABASE_URL is not set in environment variables');
   }
   return primaryConnectionString;
-}
-
-function createWorkersDrizzleInstance(): DbInstance {
-  const connectionString = resolvePrimaryConnectionString();
-  const client = postgres(connectionString, {
-    max: 1,
-    fetch_types: false,
-    prepare: false,
-    idle_timeout: 20,
-    connect_timeout: 10,
-  });
-  globalForDb.postgresClient = client;
-  return drizzlePostgresJs(client, { schema }) as unknown as DbInstance;
 }
 
 function createNodeDrizzleInstance(): DbInstance {
@@ -70,58 +61,53 @@ function createNodeDrizzleInstance(): DbInstance {
   return primaryDb as unknown as DbInstance;
 }
 
-function createDrizzleInstance(): DbInstance {
-  if (isCloudflareWorkersRuntime()) {
-    return createWorkersDrizzleInstance();
-  }
-  return createNodeDrizzleInstance();
-}
-
 const globalForDb = globalThis as unknown as {
   dbInstance: DbInstance | undefined;
   postgresClient: ReturnType<typeof postgres> | undefined;
 };
 
+function resolveDbInstance(): DbInstance {
+  if (isCloudflareWorkersRuntime()) {
+    return getWorkersDb();
+  }
+  if (!globalForDb.dbInstance) {
+    globalForDb.dbInstance = createNodeDrizzleInstance();
+  }
+  return globalForDb.dbInstance;
+}
+
 // Lazy initialization wrapper using a Proxy to avoid connections/crashes at build time
 export const db = new Proxy({} as DbInstance, {
   get(_target, prop, _receiver) {
-    if (!globalForDb.dbInstance) {
-      globalForDb.dbInstance = createDrizzleInstance();
-    }
-    const value = Reflect.get(globalForDb.dbInstance as object, prop);
+    const instance = resolveDbInstance();
+    const value = Reflect.get(instance as object, prop);
     if (typeof value === 'function') {
-      return value.bind(globalForDb.dbInstance);
+      return value.bind(instance);
     }
     return value;
   },
   set(_target, prop, value, _receiver) {
-    if (!globalForDb.dbInstance) {
-      globalForDb.dbInstance = createDrizzleInstance();
-    }
-    return Reflect.set(globalForDb.dbInstance as object, prop, value);
+    const instance = resolveDbInstance();
+    return Reflect.set(instance as object, prop, value);
   },
   has(_target, prop) {
-    if (!globalForDb.dbInstance) {
-      globalForDb.dbInstance = createDrizzleInstance();
-    }
-    return Reflect.has(globalForDb.dbInstance as object, prop);
+    return Reflect.has(resolveDbInstance() as object, prop);
   },
   ownKeys(_target) {
-    if (!globalForDb.dbInstance) {
-      globalForDb.dbInstance = createDrizzleInstance();
-    }
-    return Reflect.ownKeys(globalForDb.dbInstance as object);
+    return Reflect.ownKeys(resolveDbInstance() as object);
   },
   getOwnPropertyDescriptor(_target, prop) {
-    if (!globalForDb.dbInstance) {
-      globalForDb.dbInstance = createDrizzleInstance();
-    }
-    return Reflect.getOwnPropertyDescriptor(globalForDb.dbInstance as object, prop);
+    return Reflect.getOwnPropertyDescriptor(resolveDbInstance() as object, prop);
   },
 });
 
-/** Drop pooled client after transient Hyperdrive errors (Workers only). */
+/** Drop pooled client after transient Hyperdrive errors (Workers: per-request scope only). */
 export async function resetDbConnection(): Promise<void> {
+  if (isCloudflareWorkersRuntime()) {
+    await resetWorkersDbConnection();
+    return;
+  }
+
   const client = globalForDb.postgresClient;
   globalForDb.dbInstance = undefined;
   globalForDb.postgresClient = undefined;

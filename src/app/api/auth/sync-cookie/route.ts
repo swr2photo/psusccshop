@@ -4,7 +4,6 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { encode, getToken } from 'next-auth/jwt';
-import { getStaleHostOnlyAuthCookieClearHeaders } from '@/lib/auth-cookies';
 import {
   getNextAuthSessionCookieName,
   getSessionCookieNamesForRead,
@@ -52,9 +51,6 @@ export async function POST(req: NextRequest) {
     maxAge: 30 * 24 * 60 * 60,
   });
 
-  for (const header of getStaleHostOnlyAuthCookieClearHeaders()) {
-    response.headers.append('Set-Cookie', header);
-  }
-
+  // Do not clear host-only cookies here — can race with login and wipe the only valid session.
   return response;
 }

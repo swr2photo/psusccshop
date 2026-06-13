@@ -2700,7 +2700,7 @@ export default function HomePage() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
-  if (!mounted || loading) {
+  if (!mounted || loading || status === 'loading') {
     return <LoadingScreen />;
   }
 

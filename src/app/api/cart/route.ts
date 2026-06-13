@@ -30,7 +30,7 @@ async function saveUserLogServer(log: {
 
 export async function GET(req: NextRequest) {
   // ตรวจสอบว่าเข้าสู่ระบบแล้ว
-  const authResult = await requireAuth();
+  const authResult = await requireAuth(req);
   if (authResult instanceof NextResponse) {
     return authResult;
   }
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   // ตรวจสอบว่าเข้าสู่ระบบแล้ว
-  const authResult = await requireAuth();
+  const authResult = await requireAuth(req);
   if (authResult instanceof NextResponse) {
     return authResult;
   }

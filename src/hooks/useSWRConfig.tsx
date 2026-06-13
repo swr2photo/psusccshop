@@ -111,18 +111,14 @@ export function SWRProvider({ children }: SWRProviderProps) {
         // Performance: keep previous data visible during revalidation
         keepPreviousData: true,
         
-        // Global error handler (minimal logging in production)
+        // Do not sign out on API 401 — split Workers deploy often returns 401 while
+        // NextAuth session on Vercel is still valid (missing/wrong NEXTAUTH_SECRET on Workers).
         onError: (error, key) => {
-          if ((error as any)?.status === 401) {
-            console.warn('[SWR] Session expired (401) — signing out...', key);
-            import('@/lib/sign-out-client').then(({ signOutUser }) => {
-              void signOutUser();
-            });
-            return;
-          }
           if (process.env.NODE_ENV === 'development') {
             if ((error as any)?.status === 403) {
               console.warn('[SWR] Access denied:', key);
+            } else if ((error as any)?.status === 401) {
+              console.warn('[SWR] Unauthorized (session may still be valid):', key);
             } else if ((error as any)?.status !== 404) {
               console.error('[SWR] Error fetching:', key, error);
             }
