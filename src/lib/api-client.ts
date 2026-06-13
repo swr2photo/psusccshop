@@ -1,8 +1,10 @@
 /**
  * Client-side API helpers for Next.js routes (Vercel) or split Elysia backend.
  *
- * - NEXT_PUBLIC_API_URL unset → same-origin /api/* (Next.js on Vercel)
- * - NEXT_PUBLIC_API_URL set   → direct calls to external API (e.g. Bun/Elysia)
+ * Browser always uses same-origin /api/* — Vercel middleware proxies to Workers
+ * via API_INTERNAL_URL (cookies stay on sccshop.psuscc.club, no CORS).
+ *
+ * Server-side may use API_INTERNAL_URL or NEXT_PUBLIC_API_URL for direct backend calls.
  */
 
 const API_PREFIX = '/api';
@@ -13,16 +15,24 @@ function normalizePath(path: string): string {
   return withSlash.startsWith(API_PREFIX) ? withSlash : `${API_PREFIX}${withSlash}`;
 }
 
-/** Base URL for browser API calls (empty string = same origin). */
+/** Base URL for API calls. Browser: always same-origin. Server: backend URL if configured. */
 export function getPublicApiBaseUrl(): string {
-  if (typeof window === 'undefined') {
-    return (
-      process.env.API_INTERNAL_URL ||
-      process.env.NEXT_PUBLIC_API_URL ||
-      ''
-    ).replace(/\/$/, '');
+  if (typeof window !== 'undefined') {
+    return '';
   }
-  return (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+  return (
+    process.env.API_INTERNAL_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    ''
+  ).replace(/\/$/, '');
+}
+
+/** True when API runs on a separate backend (proxy or direct server-side). */
+export function isSplitApiBackend(): boolean {
+  return Boolean(
+    process.env.API_INTERNAL_URL?.trim() ||
+      process.env.NEXT_PUBLIC_API_URL?.trim(),
+  );
 }
 
 /** Resolve a path to a full API URL. Auth routes always stay same-origin. */

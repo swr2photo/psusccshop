@@ -24,8 +24,19 @@ export async function GET(request: NextRequest) {
     }
 
     const shippingCfg = data.value as unknown as ShippingConfig;
-    const session = await getSession();
-    const isAdminUser = session?.user?.email ? await isAdminEmailAsync(session.user.email) : false;
+
+    let isAdminUser = false;
+    const hasSessionCookie = Boolean(
+      request.cookies.get('__Secure-next-auth.session-token.v2')?.value ||
+        request.cookies.get('__Secure-next-auth.session-token')?.value ||
+        request.cookies.get('next-auth.session-token')?.value,
+    );
+    if (hasSessionCookie) {
+      const session = await getSession();
+      isAdminUser = session?.user?.email
+        ? await isAdminEmailAsync(session.user.email)
+        : false;
+    }
 
     if (!isAdminUser) {
       const publicConfig: ShippingConfig = {

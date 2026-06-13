@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 /**
  * Set Vercel production env for split deploy (frontend → api.psuscc.club).
+ * Browser uses same-origin /api/*; middleware proxies via API_INTERNAL_URL.
+ *
  * Requires: npx vercel login && npx vercel link (in monorepo root)
  *
  * Usage: node scripts/set-vercel-split-env.mjs
@@ -12,11 +14,13 @@ import { fileURLToPath } from 'node:url';
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 const VARS = {
-  NEXT_PUBLIC_API_URL: 'https://api.psuscc.club',
+  API_INTERNAL_URL: 'https://api.psuscc.club',
   COOKIE_DOMAIN: '.psuscc.club',
   NEXTAUTH_URL: 'https://sccshop.psuscc.club',
   AUTH_SESSION_VERSION: '2',
 };
+
+const REMOVE = ['NEXT_PUBLIC_API_URL'];
 
 const TARGETS = [
   { name: 'production' },
@@ -65,14 +69,14 @@ if (!whoami()) {
   console.log('  node scripts/set-vercel-split-env.mjs');
   console.log('\nOr set manually in Vercel Dashboard → Project → Settings → Environment Variables:');
   for (const [k, v] of Object.entries(VARS)) console.log(`  ${k}=${v}`);
-  console.log('  (Remove API_INTERNAL_URL if present)');
+  for (const k of REMOVE) console.log(`  (Remove ${k} if present)`);
   process.exit(1);
 }
 
 let ok = true;
 for (const target of TARGETS) {
   console.log(`\n[${target.name}]`);
-  removeEnv('API_INTERNAL_URL', target.name);
+  for (const key of REMOVE) removeEnv(key, target.name);
   for (const [key, value] of Object.entries(VARS)) {
     if (!addEnv(key, value, target.name, target.gitBranch)) ok = false;
   }
