@@ -4,7 +4,15 @@
   "main": "src/worker.ts",
   "compatibility_date": "2026-06-13",
   "compatibility_flags": ["nodejs_compat"],
-  "observability": { "enabled": true },
+  "observability": {
+    "logs": {
+      "enabled": true,
+      "invocation_logs": true
+    },
+    "traces": {
+      "enabled": false
+    }
+  },
   "vars": {
     "NODE_ENV": "production"
   },
