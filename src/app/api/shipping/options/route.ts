@@ -2,8 +2,10 @@
 // Shipping options configuration API — Drizzle ORM
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession, isAdminEmailAsync } from '@/lib/auth';
+import { isAdminEmailAsync } from '@/lib/auth';
+import { getSessionFromRequest } from '@/lib/session-from-request';
 import { db } from '@/lib/db';
+import { withDbTimeout } from '@/lib/db-timeout';
 import { config } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { ShippingConfig, DEFAULT_SHIPPING_CONFIG } from '@/lib/shipping';
@@ -16,7 +18,11 @@ const CONFIG_KEY = 'shipping_config';
 // GET - Retrieve shipping options
 export async function GET(request: NextRequest) {
   try {
-    const rows = await db.select().from(config).where(eq(config.key, CONFIG_KEY)).limit(1);
+    const rows = await withDbTimeout(
+      db.select().from(config).where(eq(config.key, CONFIG_KEY)).limit(1),
+      8_000,
+      'shipping options query',
+    );
     const data = rows[0];
 
     if (!data) {
@@ -26,16 +32,9 @@ export async function GET(request: NextRequest) {
     const shippingCfg = data.value as unknown as ShippingConfig;
 
     let isAdminUser = false;
-    const hasSessionCookie = Boolean(
-      request.cookies.get('__Secure-next-auth.session-token.v2')?.value ||
-        request.cookies.get('__Secure-next-auth.session-token')?.value ||
-        request.cookies.get('next-auth.session-token')?.value,
-    );
-    if (hasSessionCookie) {
-      const session = await getSession();
-      isAdminUser = session?.user?.email
-        ? await isAdminEmailAsync(session.user.email)
-        : false;
+    const session = await getSessionFromRequest(request);
+    if (session?.user?.email) {
+      isAdminUser = await isAdminEmailAsync(session.user.email);
     }
 
     if (!isAdminUser) {
@@ -65,7 +64,7 @@ export async function GET(request: NextRequest) {
 // POST - Update shipping options (admin only)
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession();
+    const session = await getSessionFromRequest(request);
     if (!session?.user?.email || !(await isAdminEmailAsync(session.user.email))) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
