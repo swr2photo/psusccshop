@@ -32,6 +32,7 @@ function createWorkersDrizzleInstance(): DbInstance {
     idle_timeout: 20,
     connect_timeout: 10,
   });
+  globalForDb.postgresClient = client;
   return drizzlePostgresJs(client, { schema }) as unknown as DbInstance;
 }
 
@@ -78,6 +79,7 @@ function createDrizzleInstance(): DbInstance {
 
 const globalForDb = globalThis as unknown as {
   dbInstance: DbInstance | undefined;
+  postgresClient: ReturnType<typeof postgres> | undefined;
 };
 
 // Lazy initialization wrapper using a Proxy to avoid connections/crashes at build time
@@ -117,3 +119,16 @@ export const db = new Proxy({} as DbInstance, {
     return Reflect.getOwnPropertyDescriptor(globalForDb.dbInstance as object, prop);
   },
 });
+
+/** Drop pooled client after transient Hyperdrive errors (Workers only). */
+export async function resetDbConnection(): Promise<void> {
+  const client = globalForDb.postgresClient;
+  globalForDb.dbInstance = undefined;
+  globalForDb.postgresClient = undefined;
+  if (!client) return;
+  try {
+    await client.end({ timeout: 2 });
+  } catch {
+    /* ignore */
+  }
+}
