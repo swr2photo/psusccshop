@@ -18,10 +18,39 @@ import type {
   RegistrationResponseJSON,
   AuthenticationResponseJSON,
 } from '@simplewebauthn/types';
-import { db } from './db';
+import { db, resetDbConnection } from './db';
 import { passkeyChallenges, passkeyCredentials } from '../db/schema';
 import { eq, lt, gt, and, desc } from 'drizzle-orm';
 import { SignJWT, jwtVerify } from 'jose';
+import { withDbTimeout } from './db-timeout';
+import { formatDbError } from './config-db';
+import { isCloudflareWorkersRuntime } from './runtime-env';
+
+async function withPasskeyDb<T>(label: string, fn: () => Promise<T>): Promise<T> {
+  const maxAttempts = isCloudflareWorkersRuntime() ? 3 : 2;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await withDbTimeout(fn(), 8_000, label);
+    } catch (error) {
+      console.error(`[passkey-db] ${label} attempt ${attempt}/${maxAttempts}:`, formatDbError(error));
+      if (attempt < maxAttempts) {
+        await resetDbConnection();
+        await new Promise((r) => setTimeout(r, 150 * attempt));
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw new Error(`${label} failed`);
+}
+
+export function isPasskeySchemaMissingError(error: unknown): boolean {
+  const msg = formatDbError(error).toLowerCase();
+  return (
+    msg.includes('passkey_credentials') &&
+    (msg.includes('does not exist') || msg.includes('relation') || msg.includes('failed query'))
+  );
+}
 
 // ==================== RP CONFIG ====================
 
@@ -108,14 +137,16 @@ async function storeChallenge(
   type: 'registration' | 'authentication',
   userEmail?: string,
 ): Promise<string> {
-  const data = await db.insert(passkeyChallenges)
-    .values({
-      challenge,
-      type,
-      userEmail: userEmail || null,
-      expiresAt: new Date(Date.now() + 5 * 60 * 1000),
-    })
-    .returning();
+  const data = await withPasskeyDb('storeChallenge', () =>
+    db.insert(passkeyChallenges)
+      .values({
+        challenge,
+        type,
+        userEmail: userEmail || null,
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+      })
+      .returning(),
+  );
   return data[0].id;
 }
 
@@ -123,19 +154,23 @@ async function getAndDeleteChallenge(
   challengeId: string,
   type: 'registration' | 'authentication',
 ): Promise<string> {
-  const rows = await db.select()
-    .from(passkeyChallenges)
-    .where(and(
-      eq(passkeyChallenges.id, challengeId),
-      eq(passkeyChallenges.type, type),
-      gt(passkeyChallenges.expiresAt, new Date())
-    ))
-    .limit(1);
+  const rows = await withPasskeyDb('getChallenge', () =>
+    db.select()
+      .from(passkeyChallenges)
+      .where(and(
+        eq(passkeyChallenges.id, challengeId),
+        eq(passkeyChallenges.type, type),
+        gt(passkeyChallenges.expiresAt, new Date()),
+      ))
+      .limit(1),
+  );
   const data = rows[0];
-  
+
   if (!data) throw new Error('Challenge expired or not found');
-  
-  await db.delete(passkeyChallenges).where(eq(passkeyChallenges.id, challengeId)).catch(() => {});
+
+  await withPasskeyDb('deleteChallenge', () =>
+    db.delete(passkeyChallenges).where(eq(passkeyChallenges.id, challengeId)),
+  ).catch(() => {});
   return data.challenge;
 }
 
@@ -163,53 +198,65 @@ function toStoredCred(row: any): StoredCredential {
 }
 
 export async function getCredentialsByEmail(email: string): Promise<StoredCredential[]> {
-  const data = await db.select()
-    .from(passkeyCredentials)
-    .where(eq(passkeyCredentials.userEmail, email))
-    .orderBy(desc(passkeyCredentials.createdAt));
+  const data = await withPasskeyDb('getCredentialsByEmail', () =>
+    db.select()
+      .from(passkeyCredentials)
+      .where(eq(passkeyCredentials.userEmail, email))
+      .orderBy(desc(passkeyCredentials.createdAt)),
+  );
   return data.map(toStoredCred);
 }
 
 export async function getCredentialById(credentialId: string): Promise<StoredCredential | null> {
-  const data = await db.select()
-    .from(passkeyCredentials)
-    .where(eq(passkeyCredentials.credentialId, credentialId))
-    .limit(1);
+  const data = await withPasskeyDb('getCredentialById', () =>
+    db.select()
+      .from(passkeyCredentials)
+      .where(eq(passkeyCredentials.credentialId, credentialId))
+      .limit(1),
+  );
   return data[0] ? toStoredCred(data[0]) : null;
 }
 
 async function getAllCredentials(): Promise<StoredCredential[]> {
-  const data = await db.select().from(passkeyCredentials);
+  const data = await withPasskeyDb('getAllCredentials', () =>
+    db.select().from(passkeyCredentials),
+  );
   return data.map(toStoredCred);
 }
 
 async function saveCredential(cred: Omit<StoredCredential, 'created_at' | 'last_used_at'>): Promise<void> {
-  await db.insert(passkeyCredentials)
-    .values({
-      credentialId: cred.credential_id,
-      userEmail: cred.user_email,
-      publicKey: cred.public_key,
-      counter: cred.counter,
-      deviceType: cred.device_type,
-      backedUp: cred.backed_up,
-      transports: (cred.transports || []) as any,
-      friendlyName: cred.friendly_name,
-    });
+  await withPasskeyDb('saveCredential', () =>
+    db.insert(passkeyCredentials)
+      .values({
+        credentialId: cred.credential_id,
+        userEmail: cred.user_email,
+        publicKey: cred.public_key,
+        counter: cred.counter,
+        deviceType: cred.device_type,
+        backedUp: cred.backed_up,
+        transports: (cred.transports || []) as any,
+        friendlyName: cred.friendly_name,
+      }),
+  );
 }
 
 async function updateCredentialCounter(credentialId: string, newCounter: number): Promise<void> {
-  await db.update(passkeyCredentials)
-    .set({ counter: newCounter, lastUsedAt: new Date() })
-    .where(eq(passkeyCredentials.credentialId, credentialId));
+  await withPasskeyDb('updateCredentialCounter', () =>
+    db.update(passkeyCredentials)
+      .set({ counter: newCounter, lastUsedAt: new Date() })
+      .where(eq(passkeyCredentials.credentialId, credentialId)),
+  );
 }
 
 export async function deleteCredential(credentialId: string, userEmail: string): Promise<boolean> {
   try {
-    await db.delete(passkeyCredentials)
-      .where(and(
-        eq(passkeyCredentials.credentialId, credentialId),
-        eq(passkeyCredentials.userEmail, userEmail)
-      ));
+    await withPasskeyDb('deleteCredential', () =>
+      db.delete(passkeyCredentials)
+        .where(and(
+          eq(passkeyCredentials.credentialId, credentialId),
+          eq(passkeyCredentials.userEmail, userEmail),
+        )),
+    );
     return true;
   } catch {
     return false;
@@ -222,19 +269,23 @@ export async function renameCredential(
   name: string,
 ): Promise<boolean> {
   try {
-    const rows = await db.select()
-      .from(passkeyCredentials)
-      .where(and(
-        eq(passkeyCredentials.credentialId, credentialId),
-        eq(passkeyCredentials.userEmail, userEmail)
-      ))
-      .limit(1);
+    const rows = await withPasskeyDb('renameCredentialLookup', () =>
+      db.select()
+        .from(passkeyCredentials)
+        .where(and(
+          eq(passkeyCredentials.credentialId, credentialId),
+          eq(passkeyCredentials.userEmail, userEmail),
+        ))
+        .limit(1),
+    );
     const existing = rows[0];
     if (!existing) return false;
-    
-    await db.update(passkeyCredentials)
-      .set({ friendlyName: name })
-      .where(eq(passkeyCredentials.credentialId, credentialId));
+
+    await withPasskeyDb('renameCredential', () =>
+      db.update(passkeyCredentials)
+        .set({ friendlyName: name })
+        .where(eq(passkeyCredentials.credentialId, credentialId)),
+    );
     return true;
   } catch {
     return false;

@@ -12,10 +12,24 @@ import {
   getCredentialsByEmail,
   deleteCredential,
   renameCredential,
+  isPasskeySchemaMissingError,
 } from '@/lib/passkey';
+import { formatDbError } from '@/lib/config-db';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+const SCHEMA_MIGRATION_HINT =
+  'Passkey tables not migrated — run scripts/supabase-passkey-schema.sql on your database';
+
+function passkeyDbErrorResponse(error: unknown, fallback: string) {
+  console.error(`[Passkey] ${fallback}:`, formatDbError(error));
+  if (isPasskeySchemaMissingError(error)) {
+    return NextResponse.json({ error: SCHEMA_MIGRATION_HINT }, { status: 503 });
+  }
+  const message = error instanceof Error ? error.message : fallback;
+  return NextResponse.json({ error: message }, { status: 500 });
+}
 
 // ==================== GET: List passkeys ====================
 export async function GET(req: NextRequest) {
@@ -24,18 +38,25 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const credentials = await getCredentialsByEmail(session.user.email);
+  try {
+    const credentials = await getCredentialsByEmail(session.user.email);
 
-  return NextResponse.json({
-    passkeys: credentials.map((c) => ({
-      id: c.credential_id,
-      name: c.friendly_name,
-      deviceType: c.device_type,
-      backedUp: c.backed_up,
-      createdAt: c.created_at,
-      lastUsedAt: c.last_used_at,
-    })),
-  });
+    return NextResponse.json({
+      passkeys: credentials.map((c) => ({
+        id: c.credential_id,
+        name: c.friendly_name,
+        deviceType: c.device_type,
+        backedUp: c.backed_up,
+        createdAt: c.created_at,
+        lastUsedAt: c.last_used_at,
+      })),
+    });
+  } catch (error) {
+    if (isPasskeySchemaMissingError(error)) {
+      return NextResponse.json({ passkeys: [], warning: SCHEMA_MIGRATION_HINT });
+    }
+    return passkeyDbErrorResponse(error, 'GET list error');
+  }
 }
 
 // ==================== POST: Register passkey ====================
@@ -48,7 +69,6 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { action } = body;
 
-  // Step 1: Generate registration options
   if (action === 'register-options') {
     try {
       const { options, challengeId } = await generatePasskeyRegistrationOptions(
@@ -58,13 +78,13 @@ export async function POST(req: NextRequest) {
       );
       return NextResponse.json({ options, challengeId });
     } catch (err: unknown) {
-      console.error('[Passkey] Registration options error:', err);
-      const message = err instanceof Error ? err.message : String(err);
-      return NextResponse.json({ error: message }, { status: 500 });
+      if (isPasskeySchemaMissingError(err)) {
+        return NextResponse.json({ error: SCHEMA_MIGRATION_HINT }, { status: 503 });
+      }
+      return passkeyDbErrorResponse(err, 'Registration options error');
     }
   }
 
-  // Step 2: Verify registration response
   if (action === 'register-verify') {
     const { challengeId, attestation, friendlyName } = body;
     if (!challengeId || !attestation) {
@@ -82,17 +102,17 @@ export async function POST(req: NextRequest) {
 
       if (verification.verified) {
         return NextResponse.json({ verified: true });
-      } else {
-        return NextResponse.json({ verified: false, error: 'Verification failed' }, { status: 400 });
       }
+      return NextResponse.json({ verified: false, error: 'Verification failed' }, { status: 400 });
     } catch (err: unknown) {
-      console.error('[Passkey] Registration verify error:', err);
+      if (isPasskeySchemaMissingError(err)) {
+        return NextResponse.json({ error: SCHEMA_MIGRATION_HINT }, { status: 503 });
+      }
       const message = err instanceof Error ? err.message : String(err);
       return NextResponse.json({ error: message }, { status: 400 });
     }
   }
 
-  // Rename a passkey
   if (action === 'rename') {
     const { credentialId, name } = body;
     if (!credentialId || !name) {
