@@ -15,6 +15,7 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
 import React, { Component, ErrorInfo, useMemo, useEffect, useState, lazy, Suspense } from 'react';
 import { useHydrated } from '@/hooks/useHydrated';
 import { SessionProvider } from "next-auth/react";
+import { AuthCookieSync } from './AuthCookieSync';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { NotificationProvider } from './NotificationContext';
@@ -480,6 +481,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ErrorBoundary>
       <SessionProvider>
+        <AuthCookieSync />
         <TanStackQueryProvider>
           <SWRProvider>
             <LiveStreamProvider>

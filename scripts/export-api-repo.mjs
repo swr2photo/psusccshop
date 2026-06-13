@@ -106,6 +106,10 @@ await cp(
   path.join(ROOT, 'server/src/lib/cors-origins.ts'),
   path.join(OUT, 'src/lib/cors-origins.ts'),
 );
+await cp(
+  path.join(ROOT, 'server/src/lib/apply-cors.ts'),
+  path.join(OUT, 'src/lib/apply-cors.ts'),
+);
 
 let appTs = await readFile(path.join(OUT, 'src/app.ts'), 'utf8');
 appTs = appTs.replace("from './lib/api-security.js'", "from './bridge/api-security.js'");
@@ -220,6 +224,12 @@ CMD ["bun", "src/index.ts"]
 
 // Cloudflare Workers (primary deploy target)
 await cp(path.join(ROOT, 'server/wrangler.jsonc'), path.join(OUT, 'wrangler.jsonc'));
+
+// Preserve dev template if present in target repo
+const devVarsExample = path.join(OUT, '.dev.vars.example');
+if (!existsSync(devVarsExample) && existsSync(path.join(ROOT, 'server/.dev.vars.example'))) {
+  await cp(path.join(ROOT, 'server/.dev.vars.example'), devVarsExample);
+}
 
 // GitHub Actions
 await mkdir(path.join(OUT, '.github/workflows'), { recursive: true });

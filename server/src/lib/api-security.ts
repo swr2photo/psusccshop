@@ -6,6 +6,7 @@ import {
   getRateLimitHeaders,
   isIPBlocked,
 } from '@/lib/rate-limit-supabase';
+import { applyBrowserCorsHeaders } from './apply-cors.js';
 
 const SECURITY_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
@@ -65,9 +66,18 @@ function rateLimitConfig(pathname: string, method: string): { maxRequests: numbe
   return { maxRequests: max, windowSeconds: windowSeconds > 0 ? windowSeconds : 60, prefix: 'normal' };
 }
 
-function deny(set: { status?: number | string; headers?: Record<string, string> }, status: number, message: string, extraHeaders?: Record<string, string>) {
+function deny(
+  set: { status?: number | string; headers?: Record<string, unknown> },
+  request: Request,
+  status: number,
+  message: string,
+  extraHeaders?: Record<string, string>,
+) {
   set.status = status;
-  set.headers = { ...SECURITY_HEADERS, ...extraHeaders, 'Content-Type': 'application/json; charset=utf-8' };
+  set.headers = applyBrowserCorsHeaders(
+    { ...SECURITY_HEADERS, ...extraHeaders, 'Content-Type': 'application/json; charset=utf-8' },
+    request,
+  ) as Record<string, string>;
   return { status: 'error', message };
 }
 
@@ -85,7 +95,7 @@ export function apiSecurityPlugin() {
 
       const ip = getClientIP(request);
       if (await isIPBlocked(ip)) {
-        return deny(set, 403, 'Access denied');
+        return deny(set, request, 403, 'Access denied');
       }
 
       const secFetchMode = request.headers.get('sec-fetch-mode');
@@ -95,20 +105,20 @@ export function apiSecurityPlugin() {
           NO_ORIGIN_PREFIXES.some((p) => pathname.startsWith(p)) ||
           NAVIGABLE_PREFIXES.some((p) => pathname.startsWith(p));
         if (!ok && pathname.startsWith('/api/')) {
-          return deny(set, 403, 'Direct API access is not allowed');
+          return deny(set, request, 403, 'Direct API access is not allowed');
         }
       }
 
       const userAgent = request.headers.get('user-agent');
       if (BOT_PROTECTED_PREFIXES.some((p) => pathname.startsWith(p)) && isSuspiciousUserAgent(userAgent)) {
         console.warn(`[Security] Blocked suspicious client: ${ip} ${pathname}`);
-        return deny(set, 403, 'Access denied');
+        return deny(set, request, 403, 'Access denied');
       }
 
       const cfg = rateLimitConfig(pathname, method);
       const result = await checkRateLimitSupabase(`${ip}:${cfg.prefix}`, cfg);
       if (!result.allowed) {
-        return deny(set, 429, 'Too many requests. Please try again later.', getRateLimitHeaders(result));
+        return deny(set, request, 429, 'Too many requests. Please try again later.', getRateLimitHeaders(result));
       }
 
       set.headers['X-RateLimit-Remaining'] = String(result.remaining);

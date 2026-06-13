@@ -2,6 +2,7 @@ import type { ElysiaAdapter } from 'elysia';
 import { Elysia } from 'elysia';
 import { cors } from '@elysiajs/cors';
 import { isBrowserOriginAllowed } from './lib/cors-origins.js';
+import { applyBrowserCorsHeaders } from './lib/apply-cors.js';
 import { apiSecurityPlugin, isServerToServerPath, safeApiErrorMessage } from './lib/api-security.js';
 import { healthRoutes } from './routes/health.js';
 import { nextProxyRoutes } from './routes/next-proxy.js';
@@ -18,7 +19,6 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
     prefix: '/api',
     ...(options.adapter ? { adapter: options.adapter } : {}),
   })
-    .use(apiSecurityPlugin())
     .use(
       cors({
         origin:
@@ -37,13 +37,17 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
         allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'X-Requested-With'],
       }),
     )
-    .onError(({ error, set }) => {
+    .use(apiSecurityPlugin())
+    .onError(({ error, set, request }) => {
       console.error('[API] Unhandled error:', error);
       set.status = 500;
-      set.headers = {
-        ...set.headers,
-        'Content-Type': 'application/json; charset=utf-8',
-      };
+      set.headers = applyBrowserCorsHeaders(
+        {
+          ...set.headers,
+          'Content-Type': 'application/json; charset=utf-8',
+        },
+        request,
+      );
       return {
         status: 'error',
         message: safeApiErrorMessage(error),

@@ -2,8 +2,7 @@
 // Shipping options configuration API — Drizzle ORM
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions, isAdminEmailAsync } from '@/lib/auth';
+import { getSession, isAdminEmailAsync } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { config } from '@/db/schema';
 import { eq } from 'drizzle-orm';
@@ -25,7 +24,7 @@ export async function GET(request: NextRequest) {
     }
 
     const shippingCfg = data.value as unknown as ShippingConfig;
-    const session = await getServerSession(authOptions);
+    const session = await getSession();
     const isAdminUser = session?.user?.email ? await isAdminEmailAsync(session.user.email) : false;
 
     if (!isAdminUser) {
@@ -55,7 +54,7 @@ export async function GET(request: NextRequest) {
 // POST - Update shipping options (admin only)
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getSession();
     if (!session?.user?.email || !(await isAdminEmailAsync(session.user.email))) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
