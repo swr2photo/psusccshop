@@ -169,9 +169,15 @@ export const isAdminEmailAsync = async (email: string | null | undefined): Promi
  * Resolve session from explicit request (Workers) or App Router cookies.
  */
 async function resolveSession(req?: Request): Promise<Session | null> {
-  if (req) return getSessionFromRequest(req);
+  if (req) {
+    const session = await getSessionFromRequest(req);
+    if (session) return session;
+  }
   const request = getCurrentRequest();
-  if (request) return getSessionFromRequest(request);
+  if (request) {
+    const session = await getSessionFromRequest(request);
+    if (session) return session;
+  }
   const fromAppRouter = await getSessionFromAppRouter();
   if (fromAppRouter) return fromAppRouter;
   return getServerSession(authOptions);
