@@ -2,6 +2,7 @@
 // Reuses existing src/app/api route modules without duplication.
 
 import { NextRequest } from 'next/server';
+import { runWithRequest } from '@/lib/request-context';
 import { ROUTE_MODULES } from '../routes/route-modules.js';
 
 type NextRouteHandler = (
@@ -46,7 +47,7 @@ export async function invokeNextRoute(
   const ctx = { params: Promise.resolve(params) };
 
   try {
-    return await handler(nextReq, ctx);
+    return await runWithRequest(request, () => handler(nextReq, ctx));
   } catch (error) {
     console.error(`[next-bridge] ${moduleId} ${method} failed:`, error);
     const message = error instanceof Error ? error.message : 'Internal server error';

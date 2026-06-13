@@ -3,7 +3,8 @@
 import { apiFetch } from '@/lib/api-client';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { JSX } from 'react';
-import { useSession, signIn, signOut } from 'next-auth/react';
+import { useSession, signIn } from 'next-auth/react';
+import { signOutUser } from '@/lib/sign-out-client';
 import dynamic from 'next/dynamic';
 const PasskeyLoginButton = dynamic(() => import('@/components/PasskeyLoginButton'), { ssr: false });
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -10382,7 +10383,7 @@ export default function AdminPage(): JSX.Element {
             ยกเลิก
           </Button>
           <Button
-            onClick={() => signOut()}
+            onClick={() => signOutUser()}
             variant="contained"
             color="error"
             sx={{ borderRadius: 2 }}

@@ -3,6 +3,8 @@
 
 import { getServerSession, Session } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
+import { getSessionFromRequest } from '@/lib/session-from-request';
+import { getCurrentRequest } from '@/lib/request-context';
 import { NextResponse } from 'next/server';
 import { getJson } from '@/lib/filebase';
 import { getAdminPermissionsFromDB } from '@/lib/supabase';
@@ -167,6 +169,10 @@ export const isAdminEmailAsync = async (email: string | null | undefined): Promi
  * Get current session on server side
  */
 export const getSession = async (): Promise<Session | null> => {
+  const request = getCurrentRequest();
+  if (request) {
+    return getSessionFromRequest(request);
+  }
   return await getServerSession(authOptions);
 };
 

@@ -3,19 +3,13 @@
  * Uses NextAuth JWT from cookies (same session as the Next.js frontend).
  */
 
-import { getToken } from 'next-auth/jwt';
 import { isAdminEmailAsync, isSuperAdminEmail } from '@/lib/auth';
+import { getEmailFromRequest } from '@/lib/session-from-request';
 
 export type AuthFailure = { ok: false; status: number; message: string };
 export type AuthSuccess = { ok: true; email: string };
 
-export async function getEmailFromRequest(request: Request): Promise<string | null> {
-  const token = await getToken({
-    req: request as Parameters<typeof getToken>[0]['req'],
-    secret: process.env.NEXTAUTH_SECRET,
-  });
-  return (token?.email as string | undefined) ?? null;
-}
+export { getEmailFromRequest, getSessionFromRequest } from '@/lib/session-from-request';
 
 export async function requireAuthFromRequest(
   request: Request,

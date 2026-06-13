@@ -2,7 +2,8 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { useSession, signOut, signIn } from 'next-auth/react';
+import { useSession, signIn } from 'next-auth/react';
+import { signOutUser } from '@/lib/sign-out-client';
 import {
   Avatar,
   Box,
@@ -243,7 +244,7 @@ export default function SidebarMenu(props: SidebarMenuProps) {
           {t.common.cancel}
         </Button>
         <Button
-          onClick={() => signOut()}
+          onClick={() => signOutUser()}
           variant="contained"
           color="error"
           sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 600 }}

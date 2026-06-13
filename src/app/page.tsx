@@ -12,7 +12,8 @@ import ShirtChatBot from '@/components/ShirtChatBot';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useSession, signIn, signOut } from 'next-auth/react';
+import { useSession, signIn } from 'next-auth/react';
+import { signOutUser } from '@/lib/sign-out-client';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   Alert,
@@ -7630,7 +7631,7 @@ export default function HomePage() {
             {t.common.cancel}
           </Button>
           <Button
-            onClick={() => signOut()}
+            onClick={() => signOutUser()}
             variant="contained"
             color="error"
             sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 600 }}
