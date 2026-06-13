@@ -204,6 +204,46 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             })()`,
           }}
         />
+        {/* Intercept chunk / script loading errors to auto-reload */}
+        <script
+          id="chunk-error-handler"
+          dangerouslySetInnerHTML={{
+            __html: `(function(){
+              window.addEventListener('error', function(e) {
+                if (e.target && e.target.nodeName === 'SCRIPT' && e.target.src && e.target.src.indexOf('/_next/') !== -1) {
+                  var key = 'chunk_reload_attempted';
+                  try {
+                    var hasReloaded = sessionStorage.getItem(key);
+                    if (!hasReloaded) {
+                      sessionStorage.setItem(key, 'true');
+                      setTimeout(function() {
+                        try { sessionStorage.removeItem(key); } catch(err) {}
+                      }, 10000);
+                      window.location.reload();
+                    }
+                  } catch(err) {}
+                }
+              }, true);
+              
+              window.addEventListener('unhandledrejection', function(e) {
+                var msg = e.reason && e.reason.message || '';
+                if (msg && (msg.indexOf('ChunkLoadError') !== -1 || /loading chunk/i.test(msg) || /failed to fetch/i.test(msg))) {
+                  var key = 'chunk_reload_attempted';
+                  try {
+                    var hasReloaded = sessionStorage.getItem(key);
+                    if (!hasReloaded) {
+                      sessionStorage.setItem(key, 'true');
+                      setTimeout(function() {
+                        try { sessionStorage.removeItem(key); } catch(err) {}
+                      }, 10000);
+                      window.location.reload();
+                    }
+                  } catch(err) {}
+                }
+              });
+            })()`,
+          }}
+        />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased relative min-h-screen overflow-x-hidden`} suppressHydrationWarning={true}>
         {/* Skip to main content link for accessibility */}

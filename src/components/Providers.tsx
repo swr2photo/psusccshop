@@ -49,6 +49,31 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, ErrorBounda
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('[ErrorBoundary] Client error caught:', error, errorInfo);
+    
+    // Auto-reload on chunk loading error
+    const errorMessage = error.message || '';
+    const isChunkError = 
+      error.name === 'ChunkLoadError' ||
+      /loading chunk/i.test(errorMessage) ||
+      /failed to fetch/i.test(errorMessage) ||
+      /refused to execute script/i.test(errorMessage);
+
+    if (isChunkError && typeof window !== 'undefined') {
+      try {
+        const hasReloaded = sessionStorage.getItem('chunk_reload_attempted');
+        if (!hasReloaded) {
+          sessionStorage.setItem('chunk_reload_attempted', 'true');
+          setTimeout(() => {
+            try {
+              sessionStorage.removeItem('chunk_reload_attempted');
+            } catch (e) {}
+          }, 10000);
+          window.location.reload();
+        }
+      } catch (e) {
+        console.error('[ErrorBoundary] Failed to reload page:', e);
+      }
+    }
   }
 
   render() {
