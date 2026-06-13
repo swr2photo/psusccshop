@@ -113,6 +113,13 @@ export function SWRProvider({ children }: SWRProviderProps) {
         
         // Global error handler (minimal logging in production)
         onError: (error, key) => {
+          if ((error as any)?.status === 401) {
+            console.warn('[SWR] Session expired (401) — signing out...', key);
+            import('@/lib/sign-out-client').then(({ signOutUser }) => {
+              void signOutUser();
+            });
+            return;
+          }
           if (process.env.NODE_ENV === 'development') {
             if ((error as any)?.status === 403) {
               console.warn('[SWR] Access denied:', key);

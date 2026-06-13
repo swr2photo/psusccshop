@@ -3157,7 +3157,8 @@ export default function AdminPage(): JSX.Element {
       const isNetworkError = error?.message?.includes('Failed to fetch') || 
                             error?.message?.includes('NETWORK_ERROR');
       if (status === 401) {
-        console.warn('[Admin SWR] Session expired (401) — sign out and sign in again');
+        console.warn('[Admin SWR] Session expired (401) — signing out automatically');
+        void signOutUser();
       } else if (isNetworkError) {
         console.warn('[Admin SWR] Network error - using cached data');
       } else {
