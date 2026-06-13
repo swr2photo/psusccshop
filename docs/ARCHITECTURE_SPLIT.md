@@ -97,6 +97,25 @@ Local Workers dev: `cd psusccshop-api && bun run dev:worker` (port 8787)
 
 Session cookie ใช้ร่วม subdomain ได้เมื่อ `COOKIE_DOMAIN=.psuscc.club`
 
+## Security (split deploy)
+
+Workers API (`server/src/app.ts`) ใช้ `api-security` plugin:
+
+- CORS allowlist จาก `API_CORS_ORIGINS` + frontend URLs (ไม่ wildcard subdomain ใน production)
+- Rate limit ผ่าน Postgres (`rate-limit-supabase`) — ไม่พึ่ง in-memory อย่างเดียว
+- บล็อก direct browser navigation ไป `/api/*`
+- บล็อก suspicious UA บน orders/payment/cart
+- Error message generic ใน production
+
+**Workers env เพิ่ม (optional):**
+```env
+API_CORS_ORIGINS=https://sccshop.psuscc.club,https://www.sccshop.psuscc.club
+```
+
+**Cloudflare Dashboard:** เปิด WAF + Rate Limiting บน `api.psuscc.club` เป็น layer เพิ่ม
+
+**Secrets:** รัน `npm run secrets:workers` — ไม่ sync OAuth client secrets ไป Workers (auth อยู่ Vercel)
+
 ### Docker API (Bun)
 
 ```bash

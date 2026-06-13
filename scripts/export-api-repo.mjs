@@ -99,9 +99,17 @@ await cp(path.join(ROOT, 'server/src/index.ts'), path.join(OUT, 'src/index.ts'))
 await cp(path.join(ROOT, 'server/src/app.ts'), path.join(OUT, 'src/app.ts'));
 await cp(path.join(ROOT, 'server/src/worker.ts'), path.join(OUT, 'src/worker.ts'));
 await cp(
+  path.join(ROOT, 'server/src/polyfill-node-globals.ts'),
+  path.join(OUT, 'src/polyfill-node-globals.ts'),
+);
+await cp(
   path.join(ROOT, 'server/src/lib/cors-origins.ts'),
   path.join(OUT, 'src/lib/cors-origins.ts'),
 );
+
+let appTs = await readFile(path.join(OUT, 'src/app.ts'), 'utf8');
+appTs = appTs.replace("from './lib/api-security.js'", "from './bridge/api-security.js'");
+await writeFile(path.join(OUT, 'src/app.ts'), appTs);
 
 await patchBridgeImports(path.join(OUT, 'src/routes'));
 
@@ -211,23 +219,7 @@ CMD ["bun", "src/index.ts"]
 );
 
 // Cloudflare Workers (primary deploy target)
-await writeFile(
-  path.join(OUT, 'wrangler.jsonc'),
-  `{
-  "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "psusccshop-api",
-  "main": "src/worker.ts",
-  "compatibility_date": "2026-06-13",
-  "compatibility_flags": ["nodejs_compat"],
-  "observability": { "enabled": true },
-  "vars": {
-    "NODE_ENV": "production"
-  }
-  // Hyperdrive binding — set id after creating config in Cloudflare Dashboard
-  // "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "<YOUR_HYPERDRIVE_ID>" }]
-}
-`,
-);
+await cp(path.join(ROOT, 'server/wrangler.jsonc'), path.join(OUT, 'wrangler.jsonc'));
 
 // GitHub Actions
 await mkdir(path.join(OUT, '.github/workflows'), { recursive: true });

@@ -45,9 +45,16 @@ const saveUserLogServer = async (params: {
   }
 };
 
-// Generate unique filename
-const generateFileName = (originalName: string) => {
-  const ext = originalName.split('.').pop()?.toLowerCase() || 'png';
+// Generate unique filename from detected content type (ignore client extension)
+const extFromContentType = (contentType: string) => {
+  if (contentType.includes('jpeg') || contentType.includes('jpg')) return 'jpg';
+  if (contentType.includes('gif')) return 'gif';
+  if (contentType.includes('webp')) return 'webp';
+  return 'png';
+};
+
+const generateFileName = (contentType: string) => {
+  const ext = extFromContentType(contentType);
   const timestamp = Date.now();
   const random = Math.random().toString(36).substring(2, 8);
   return `img_${timestamp}_${random}.${ext}`;
@@ -85,8 +92,8 @@ export async function POST(req: NextRequest) {
 
     // Validate mime type - only allow images
     const allowedMimes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
-    const contentType = mime || 'image/png';
-    if (!allowedMimes.includes(contentType)) {
+    const contentTypeHint = mime || 'image/png';
+    if (!allowedMimes.includes(contentTypeHint)) {
       return NextResponse.json({ status: 'error', message: 'Invalid file type. Only images allowed.' }, { status: 400 });
     }
 
@@ -106,19 +113,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: 'error', message: 'File too large (max 5MB)' }, { status: 413 });
     }
 
-    // Validate file magic bytes for image types
-    const magicBytes = buffer.slice(0, 8);
-    const isPng = magicBytes[0] === 0x89 && magicBytes[1] === 0x50 && magicBytes[2] === 0x4E && magicBytes[3] === 0x47;
-    const isJpeg = magicBytes[0] === 0xFF && magicBytes[1] === 0xD8;
-    const isGif = magicBytes[0] === 0x47 && magicBytes[1] === 0x49 && magicBytes[2] === 0x46;
-    const isWebp = magicBytes[0] === 0x52 && magicBytes[1] === 0x49 && magicBytes[2] === 0x46 && magicBytes[3] === 0x46;
-    
-    if (!isPng && !isJpeg && !isGif && !isWebp) {
-      return NextResponse.json({ status: 'error', message: 'Invalid image file' }, { status: 400 });
+    const validated = validateImageBuffer(buffer, mime);
+    if (!validated.ok) {
+      return NextResponse.json({ status: 'error', message: validated.message }, { status: 400 });
     }
+    const contentType = validated.contentType;
 
     // Generate filename and upload to Supabase Storage
-    const fileName = generateFileName(filename || 'image.png');
+    const fileName = generateFileName(contentType);
     
     // Upload to Supabase Storage (returns permanent public URL)
     const { url, path } = await uploadImageToStorage(buffer, fileName, contentType);
@@ -151,7 +153,7 @@ export async function POST(req: NextRequest) {
     console.error('[upload] error', error);
     return NextResponse.json({
       status: 'error',
-      message: error?.message || 'Upload failed',
+      message: process.env.NODE_ENV === 'production' ? 'Upload failed' : (error?.message || 'Upload failed'),
     }, { status: 500 });
   }
 }

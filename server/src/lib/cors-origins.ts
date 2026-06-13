@@ -12,11 +12,31 @@ export function getApiCorsOrigins(): string[] {
     'https://www.sccshop.psuscc.club',
     'https://sccshop.psusci.club',
     'https://www.sccshop.psusci.club',
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
   ].filter(Boolean) as string[];
 
+  if (process.env.NODE_ENV !== 'production') {
+    defaults.push('http://localhost:3000', 'http://127.0.0.1:3000');
+  }
+
   return [...new Set([...fromEnv, ...defaults])];
+}
+
+/** Whether a browser Origin may call credentialed API routes in production. */
+export function isBrowserOriginAllowed(origin: string | null): boolean {
+  if (!origin) {
+    return false;
+  }
+
+  const allowed = getApiCorsOrigins();
+  if (allowed.includes(origin)) return true;
+
+  // Dev-only: Codespaces / preview hosts when not in production
+  if (process.env.NODE_ENV !== 'production') {
+    if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) return true;
+    if (origin.endsWith('.app.github.dev')) return true;
+  }
+
+  return false;
 }
 
 export function resolveApiPort(): number {

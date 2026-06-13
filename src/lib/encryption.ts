@@ -13,7 +13,10 @@ import crypto from 'crypto';
 
 // ==================== CONFIGURATION ====================
 
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || process.env.NEXTAUTH_SECRET || '';
+const ENCRYPTION_KEY =
+  process.env.ENCRYPTION_KEY ||
+  process.env.IMAGE_CRYPTO_SECRET ||
+  (process.env.NODE_ENV === 'production' ? '' : process.env.NEXTAUTH_SECRET || '');
 const KEY_DERIVATION_ITERATIONS = 100000;
 const SALT_LENGTH = 32;
 const IV_LENGTH = 16;
@@ -22,7 +25,7 @@ const KEY_LENGTH = 32; // 256 bits
 
 // Validate encryption key on startup
 if (!ENCRYPTION_KEY && typeof window === 'undefined') {
-  console.error('[Encryption] ENCRYPTION_KEY not set! Encryption operations will fail. Set ENCRYPTION_KEY in production!');
+  console.error('[Encryption] ENCRYPTION_KEY or IMAGE_CRYPTO_SECRET must be set in production');
 }
 
 // ==================== TYPES ====================

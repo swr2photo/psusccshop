@@ -1,7 +1,8 @@
 import type { ElysiaAdapter } from 'elysia';
 import { Elysia } from 'elysia';
 import { cors } from '@elysiajs/cors';
-import { getApiCorsOrigins } from './lib/cors-origins.js';
+import { isBrowserOriginAllowed } from './lib/cors-origins.js';
+import { apiSecurityPlugin, isServerToServerPath, safeApiErrorMessage } from './lib/api-security.js';
 import { healthRoutes } from './routes/health.js';
 import { nextProxyRoutes } from './routes/next-proxy.js';
 
@@ -11,29 +12,25 @@ type CreateApiAppOptions = {
 
 /** Shared Elysia app — used by Bun (index.ts) and Cloudflare Workers (worker.ts). */
 export function createApiApp(options: CreateApiAppOptions = {}) {
-  const allowedOrigins = getApiCorsOrigins();
+  const isProd = process.env.NODE_ENV === 'production';
 
   return new Elysia({
     prefix: '/api',
     ...(options.adapter ? { adapter: options.adapter } : {}),
   })
+    .use(apiSecurityPlugin())
     .use(
       cors({
         origin:
-          process.env.NODE_ENV !== 'production'
+          !isProd
             ? true
             : (request) => {
                 const origin = request.headers.get('origin');
-                if (!origin) return true;
-                if (allowedOrigins.includes(origin)) return true;
-                if (origin.endsWith('.psuscc.club') || origin.endsWith('.psusci.club')) return true;
-                if (
-                  origin.startsWith('http://localhost:') ||
-                  origin.startsWith('http://127.0.0.1:')
-                ) {
-                  return true;
+                const pathname = new URL(request.url).pathname;
+                if (!origin) {
+                  return isServerToServerPath(pathname);
                 }
-                return false;
+                return isBrowserOriginAllowed(origin);
               },
         credentials: true,
         methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -43,9 +40,13 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
     .onError(({ error, set }) => {
       console.error('[API] Unhandled error:', error);
       set.status = 500;
+      set.headers = {
+        ...set.headers,
+        'Content-Type': 'application/json; charset=utf-8',
+      };
       return {
         status: 'error',
-        message: error instanceof Error ? error.message : 'Internal server error',
+        message: safeApiErrorMessage(error),
       };
     })
     .use(healthRoutes)

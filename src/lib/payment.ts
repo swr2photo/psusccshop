@@ -669,15 +669,16 @@ export async function createStripePaymentIntent(
  */
 export function verifyStripeWebhook(
   payload: string,
-  signature: string
+  signature: string,
+  toleranceSeconds = 300,
 ): boolean {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-  
+
   if (!webhookSecret) {
     console.error('[Payment] Stripe webhook secret not configured');
     return false;
   }
-  
+
   try {
     const crypto = require('crypto');
     const signatureParts = signature.split(',').reduce((acc, part) => {
@@ -685,20 +686,31 @@ export function verifyStripeWebhook(
       acc[key] = value;
       return acc;
     }, {} as Record<string, string>);
-    
+
     const timestamp = signatureParts['t'];
     const sig = signatureParts['v1'];
-    
+
+    if (!timestamp || !sig) return false;
+
+    const eventTime = Number(timestamp);
+    if (!Number.isFinite(eventTime)) return false;
+    const age = Math.abs(Math.floor(Date.now() / 1000) - eventTime);
+    if (age > toleranceSeconds) {
+      console.error('[Payment] Stripe webhook timestamp outside tolerance window');
+      return false;
+    }
+
     const signedPayload = `${timestamp}.${payload}`;
     const expectedSignature = crypto
       .createHmac('sha256', webhookSecret)
       .update(signedPayload)
       .digest('hex');
-    
-    return crypto.timingSafeEqual(
-      Buffer.from(sig),
-      Buffer.from(expectedSignature)
-    );
+
+    const sigBuf = Buffer.from(sig, 'hex');
+    const expectedBuf = Buffer.from(expectedSignature, 'hex');
+    if (sigBuf.length !== expectedBuf.length) return false;
+
+    return crypto.timingSafeEqual(sigBuf, expectedBuf);
   } catch (error) {
     console.error('[Payment] Stripe webhook verification error:', error);
     return false;

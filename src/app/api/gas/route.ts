@@ -57,10 +57,15 @@ function buildGasUrl(action: string): URL | null {
   if (!GAS_URL) return null;
   const gasUrl = new URL(GAS_URL);
   gasUrl.searchParams.set('action', action);
-  if (GAS_AUTH_TOKEN) {
-    gasUrl.searchParams.set('authorization', GAS_AUTH_TOKEN);
-  }
   return gasUrl;
+}
+
+function gasFetchHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (GAS_AUTH_TOKEN) {
+    headers.Authorization = `Bearer ${GAS_AUTH_TOKEN}`;
+  }
+  return headers;
 }
 
 async function handleGasRequest(
@@ -90,10 +95,23 @@ async function handleGasRequest(
   const timeoutId = setTimeout(() => controller.abort(), 28000);
 
   try {
+    // Never put auth token in URL — use POST body + Authorization header for GAS
+    const usePost = method === 'POST' || Boolean(GAS_AUTH_TOKEN);
+    const postBody = usePost
+      ? {
+          ...(body && typeof body === 'object' ? body : {}),
+          action,
+          ...(GAS_AUTH_TOKEN ? { authorization: GAS_AUTH_TOKEN } : {}),
+        }
+      : undefined;
+
     const response = await fetch(gasUrl.toString(), {
-      method,
-      headers: method === 'POST' ? { 'Content-Type': 'application/json' } : { Accept: 'application/json' },
-      body: method === 'POST' && body !== undefined ? JSON.stringify(body) : undefined,
+      method: usePost ? 'POST' : 'GET',
+      headers: {
+        ...gasFetchHeaders(),
+        ...(usePost ? { 'Content-Type': 'application/json' } : {}),
+      },
+      body: usePost ? JSON.stringify(postBody) : undefined,
       signal: controller.signal,
     });
 
@@ -128,7 +146,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('[GAS-API] GET Error:', error?.message || error);
     return NextResponse.json(
-      { status: 'error', message: error?.message || 'Internal server error' },
+      { status: 'error', message: process.env.NODE_ENV === 'production' ? 'Internal server error' : (error?.message || 'Internal server error') },
       { status: 500 }
     );
   }
@@ -149,7 +167,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('[GAS-API] POST Error:', error?.message || error);
     return NextResponse.json(
-      { status: 'error', message: error?.message || 'Internal server error' },
+      { status: 'error', message: process.env.NODE_ENV === 'production' ? 'Internal server error' : (error?.message || 'Internal server error') },
       { status: 500 }
     );
   }
