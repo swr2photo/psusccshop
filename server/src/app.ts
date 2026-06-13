@@ -2,7 +2,7 @@ import type { ElysiaAdapter } from 'elysia';
 import { Elysia } from 'elysia';
 import { cors } from '@elysiajs/cors';
 import { isBrowserOriginAllowed } from './lib/cors-origins.js';
-import { applyBrowserCorsHeaders } from './lib/apply-cors.js';
+import { applyBrowserCorsHeaders, withBrowserCors } from './lib/apply-cors.js';
 import { apiSecurityPlugin, isServerToServerPath, safeApiErrorMessage } from './lib/api-security.js';
 import { healthRoutes } from './routes/health.js';
 import { nextProxyRoutes } from './routes/next-proxy.js';
@@ -38,6 +38,11 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
       }),
     )
     .use(apiSecurityPlugin())
+    .onAfterHandle(({ response, request }) => {
+      if (response instanceof Response) {
+        return withBrowserCors(response, request);
+      }
+    })
     .onError(({ error, set, request }) => {
       console.error('[API] Unhandled error:', error);
       set.status = 500;

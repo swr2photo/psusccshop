@@ -169,11 +169,16 @@ export const isAdminEmailAsync = async (email: string | null | undefined): Promi
  * Get current session on server side
  */
 export const getSession = async (): Promise<Session | null> => {
-  const request = getCurrentRequest();
-  if (request) {
-    return getSessionFromRequest(request);
+  try {
+    const request = getCurrentRequest();
+    if (request) {
+      return getSessionFromRequest(request);
+    }
+    return await getServerSession(authOptions);
+  } catch (error) {
+    console.error('[auth] getSession failed:', error);
+    return null;
   }
-  return await getServerSession(authOptions);
 };
 
 /**

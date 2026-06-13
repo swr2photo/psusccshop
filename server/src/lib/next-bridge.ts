@@ -3,6 +3,7 @@
 
 import { NextRequest } from 'next/server';
 import { runWithRequest } from '@/lib/request-context';
+import { withBrowserCors } from './apply-cors.js';
 import { ROUTE_MODULES } from '../routes/route-modules.js';
 
 type NextRouteHandler = (
@@ -39,7 +40,10 @@ export async function invokeNextRoute(
   const handler = mod[method];
 
   if (!handler) {
-    return Response.json({ status: 'error', message: 'Method Not Allowed' }, { status: 405 });
+    return withBrowserCors(
+      Response.json({ status: 'error', message: 'Method Not Allowed' }, { status: 405 }),
+      request,
+    );
   }
 
   // Clone incoming Request — avoids Next.js RequestInit signal type mismatch
@@ -47,10 +51,14 @@ export async function invokeNextRoute(
   const ctx = { params: Promise.resolve(params) };
 
   try {
-    return await runWithRequest(request, () => handler(nextReq, ctx));
+    const response = await runWithRequest(request, () => handler(nextReq, ctx));
+    return withBrowserCors(response instanceof Response ? response : Response.json(response), request);
   } catch (error) {
     console.error(`[next-bridge] ${moduleId} ${method} failed:`, error);
     const message = error instanceof Error ? error.message : 'Internal server error';
-    return Response.json({ status: 'error', message }, { status: 500 });
+    return withBrowserCors(
+      Response.json({ status: 'error', message }, { status: 500 }),
+      request,
+    );
   }
 }
