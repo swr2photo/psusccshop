@@ -131,6 +131,14 @@ async function fetchJson<T = any>(path: string, opts?: FetchOptions): Promise<AP
     const res = await apiFetch(path, init);
     const contentType = res.headers.get('content-type') || '';
     if (!res.ok) {
+      if (res.status === 401) {
+        console.warn('[API] Session expired (401) — signing out automatically');
+        if (typeof window !== 'undefined') {
+          import('@/lib/sign-out-client').then(({ signOutUser }) => {
+            void signOutUser();
+          });
+        }
+      }
       const text = await res.text();
       return {
         status: 'error',
