@@ -20,6 +20,7 @@ export async function getSessionFromRequest(request: Request): Promise<Session |
   if (!token) return null;
 
   const userFromToken = token.user as Session['user'] | undefined;
+  const expSeconds = typeof token.exp === 'number' ? token.exp : undefined;
   return {
     user: userFromToken ?? {
       id: token.sub,
@@ -27,8 +28,8 @@ export async function getSessionFromRequest(request: Request): Promise<Session |
       email: (token.email as string | null | undefined) ?? null,
       image: (token.picture as string | null | undefined) ?? null,
     },
-    expires: token.exp
-      ? new Date(token.exp * 1000).toISOString()
+    expires: expSeconds
+      ? new Date(expSeconds * 1000).toISOString()
       : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     accessToken: token.accessToken as string | undefined,
     error: token.error as string | undefined,
