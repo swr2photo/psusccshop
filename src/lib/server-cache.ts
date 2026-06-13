@@ -13,6 +13,7 @@
 
 
 import { getRedisClient } from '@/lib/redis';
+import { isCloudflareWorkersRuntime } from '@/lib/runtime-env';
 
 
 
@@ -78,6 +79,8 @@ function redisKey(key: string) {
 
 async function redisGet<T>(key: string): Promise<T | null> {
 
+  if (isCloudflareWorkersRuntime()) return null;
+
   const redis = getRedisClient();
 
   if (!redis) return null;
@@ -97,6 +100,8 @@ async function redisGet<T>(key: string): Promise<T | null> {
 
 
 async function redisSet<T>(key: string, value: T, ttlMs: number): Promise<void> {
+
+  if (isCloudflareWorkersRuntime()) return;
 
   const redis = getRedisClient();
 
@@ -118,6 +123,8 @@ async function redisSet<T>(key: string, value: T, ttlMs: number): Promise<void> 
 
 async function redisDeleteKey(key: string): Promise<void> {
 
+  if (isCloudflareWorkersRuntime()) return;
+
   const redis = getRedisClient();
 
   if (!redis) return;
@@ -133,6 +140,8 @@ async function redisDeleteKey(key: string): Promise<void> {
 
 
 async function redisDeletePrefix(prefix: string): Promise<void> {
+
+  if (isCloudflareWorkersRuntime()) return;
 
   const redis = getRedisClient();
 

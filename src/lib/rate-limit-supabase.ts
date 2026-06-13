@@ -4,6 +4,7 @@
 import { db } from './db';
 import { rateLimits, blockedIps } from '../db/schema';
 import { eq, lt, gt, and, desc } from 'drizzle-orm';
+import { isCloudflareWorkersRuntime } from '@/lib/runtime-env';
 
 // ==================== TYPES ====================
 
@@ -56,6 +57,11 @@ export async function checkRateLimitSupabase(
   identifier: string,
   config: RateLimitConfig
 ): Promise<RateLimitResult> {
+  // Workers: avoid DB on every request — Hyperdrive can hang in rate-limit hooks
+  if (isCloudflareWorkersRuntime()) {
+    return checkRateLimitLocal(identifier, config);
+  }
+
   const key = config.prefix ? `${config.prefix}:${identifier}` : identifier;
   const now = Date.now();
   const windowMs = config.windowSeconds * 1000;
@@ -185,6 +191,9 @@ export async function blockIP(ip: string, reason: string, durationHours: number 
 }
 
 export async function isIPBlocked(ip: string): Promise<boolean> {
+  if (isCloudflareWorkersRuntime()) {
+    return false;
+  }
   try {
     const rows = await db.select()
       .from(blockedIps)
