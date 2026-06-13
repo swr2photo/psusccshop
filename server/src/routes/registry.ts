@@ -10,6 +10,18 @@ export const API_ROUTES: RouteEntry[] = [
     "module": "@/app/api/support-chat/[sessionId]/message/[messageId]/route"
   },
   {
+    "pattern": "/admin/analytics/summary",
+    "module": "@/app/api/admin/analytics/summary/route"
+  },
+  {
+    "pattern": "/admin/inventory/logs",
+    "module": "@/app/api/admin/inventory/logs/route"
+  },
+  {
+    "pattern": "/admin/system/cache-clear",
+    "module": "@/app/api/admin/system/cache-clear/route"
+  },
+  {
     "pattern": "/payment/stripe/promptpay",
     "module": "@/app/api/payment/stripe/promptpay/route"
   },
@@ -130,6 +142,14 @@ export const API_ROUTES: RouteEntry[] = [
     "module": "@/app/api/admin/user-logs/route"
   },
   {
+    "pattern": "/admin/webhooks",
+    "module": "@/app/api/admin/webhooks/route"
+  },
+  {
+    "pattern": "/auth/sync-cookie",
+    "module": "@/app/api/auth/sync-cookie/route"
+  },
+  {
     "pattern": "/cron/cancel-expired",
     "module": "@/app/api/cron/cancel-expired/route"
   },
@@ -216,6 +236,10 @@ export const API_ROUTES: RouteEntry[] = [
   {
     "pattern": "/gas",
     "module": "@/app/api/gas/route"
+  },
+  {
+    "pattern": "/health",
+    "module": "@/app/api/health/route"
   },
   {
     "pattern": "/inventory",
