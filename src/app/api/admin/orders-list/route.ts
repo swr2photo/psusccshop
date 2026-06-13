@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { withBackendProxy } from '@/lib/backend-proxy';
 import { requireAdmin } from '@/lib/auth';
 import { assertShopAccess, resolveAdminSession } from '@/lib/admin-context';
 import { getAllOrdersForAdminList } from '@/lib/filebase';
 import { sanitizeOrdersForAdmin } from '@/lib/sanitize';
+import { formatDbError } from '@/lib/db-query';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /** Paginated admin order list (slim payload). */
-async function GETHandler(req: NextRequest) {
+export async function GET(req: NextRequest) {
   const authResult = await requireAdmin(req);
   if (authResult instanceof NextResponse) return authResult;
 
@@ -57,12 +57,15 @@ async function GETHandler(req: NextRequest) {
       },
       { headers: { 'Content-Type': 'application/json; charset=utf-8' } },
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
+    console.error('[orders-list] failed:', formatDbError(error));
     return NextResponse.json(
-      { status: 'error', message: error?.message || 'orders load failed' },
-      { status: 500 },
+      {
+        status: 'success',
+        data: { orders: [], total: 0, hasMore: false, dbError: true },
+      },
+      { headers: { 'Content-Type': 'application/json; charset=utf-8' } },
     );
   }
 }
 
-export const GET = withBackendProxy(GETHandler);

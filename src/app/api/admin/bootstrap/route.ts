@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth';
 import { assertShopAccess, resolveAdminSession } from '@/lib/admin-context';
 import { getOrderStatusCounts } from '@/lib/filebase';
+import { formatDbError } from '@/lib/db-query';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -35,7 +36,12 @@ export async function GET(req: NextRequest) {
       shopIds = [shopIdParam];
     }
 
-    const orderStats = await getOrderStatusCounts(shopIds);
+    let orderStats = { byStatus: {} as Record<string, number>, total: 0 };
+    try {
+      orderStats = await getOrderStatusCounts(shopIds);
+    } catch (error) {
+      console.error('[bootstrap] orderStats failed:', formatDbError(error));
+    }
 
     return NextResponse.json(
       {

@@ -4,6 +4,18 @@ import { mergeConfigAdminEmails, resolveAdminSession } from '@/lib/admin-context
 import { getShopConfig } from '@/lib/filebase';
 import { ShopConfig } from '@/lib/config';
 import { sanitizeConfigForAdmin } from '@/lib/sanitize';
+import { formatDbError } from '@/lib/db-query';
+
+const DEFAULT_ADMIN_CONFIG = {
+  isOpen: true,
+  closeDate: '',
+  announcement: { enabled: false, message: '', color: 'blue' },
+  products: [],
+  sheetId: '',
+  sheetUrl: '',
+  vendorSheetId: '',
+  vendorSheetUrl: '',
+};
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -22,16 +34,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const cfg = (await getShopConfig()) || {
-      isOpen: true,
-      closeDate: '',
-      announcement: { enabled: false, message: '', color: 'blue' },
-      products: [],
-      sheetId: '',
-      sheetUrl: '',
-      vendorSheetId: '',
-      vendorSheetUrl: '',
-    };
+    const cfg = (await getShopConfig()) || DEFAULT_ADMIN_CONFIG;
 
     const merged = mergeConfigAdminEmails(cfg as ShopConfig);
     const sanitizedConfig = sanitizeConfigForAdmin(merged as ShopConfig);
@@ -40,10 +43,13 @@ export async function GET(req: NextRequest) {
       { status: 'success', data: { config: sanitizedConfig } },
       { headers: { 'Content-Type': 'application/json; charset=utf-8' } },
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
+    console.error('[admin/config] failed:', formatDbError(error));
+    const merged = mergeConfigAdminEmails(DEFAULT_ADMIN_CONFIG as ShopConfig);
+    const sanitizedConfig = sanitizeConfigForAdmin(merged as ShopConfig);
     return NextResponse.json(
-      { status: 'error', message: error?.message || 'config load failed' },
-      { status: 500 },
+      { status: 'success', data: { config: sanitizedConfig, dbError: true } },
+      { headers: { 'Content-Type': 'application/json; charset=utf-8' } },
     );
   }
 }

@@ -9,6 +9,7 @@ import { orders, config, carts, profiles, emailLogs, userLogs, dataRequests, key
 import { eq, lt, lte, gt, gte, and, desc, inArray, like, or, count } from 'drizzle-orm';
 import { getCached, invalidateCacheKey, CACHE_TTL } from './server-cache';
 import { getConfigValueCached, invalidateConfigCache } from './config-db';
+import { withDbRetry } from './db-query';
 
 // ==================== CONFIGURATION ====================
 
@@ -211,13 +212,17 @@ export async function getJson<T = any>(key: string): Promise<T | null> {
     
     if (key.startsWith('carts/')) {
       const emailHashValue = key.replace('carts/', '').replace('.json', '');
-      const data = await db.select().from(carts).where(eq(carts.emailHash, emailHashValue)).limit(1);
+      const data = await withDbRetry(`getJson:${key}`, () =>
+        db.select().from(carts).where(eq(carts.emailHash, emailHashValue)).limit(1),
+      );
       return (data[0]?.cartData as T) || null;
     }
     
     if (key.startsWith('users/')) {
       const emailHashValue = key.replace('users/', '').replace('.json', '');
-      const data = await db.select().from(profiles).where(eq(profiles.emailHash, emailHashValue)).limit(1);
+      const data = await withDbRetry(`getJson:${key}`, () =>
+        db.select().from(profiles).where(eq(profiles.emailHash, emailHashValue)).limit(1),
+      );
       return data[0] ? (transformDBProfileToLegacy(data[0]) as T) : null;
     }
     
@@ -737,18 +742,20 @@ export async function getOrdersByEmail(
   if (shopSlug) conditions.push(eq(orders.shopSlug, shopSlug));
   
   const whereClause = and(...conditions);
-  
-  const [data, totalResult] = await Promise.all([
-    db.select()
-      .from(orders)
-      .where(whereClause)
-      .orderBy(desc(orders.createdAt))
-      .offset(offset)
-      .limit(limit),
-    db.select({ value: count() })
-      .from(orders)
-      .where(whereClause),
-  ]);
+
+  const [data, totalResult] = await withDbRetry(`getOrdersByEmail:${hash}`, () =>
+    Promise.all([
+      db.select()
+        .from(orders)
+        .where(whereClause)
+        .orderBy(desc(orders.createdAt))
+        .offset(offset)
+        .limit(limit),
+      db.select({ value: count() })
+        .from(orders)
+        .where(whereClause),
+    ]),
+  );
   
   return {
     orders: (data || []).map(transformDBOrderToLegacy),
@@ -866,10 +873,12 @@ export async function getAllOrdersForAdminList(
     countQuery = countQuery.where(whereClause) as typeof countQuery;
   }
 
-  const [data, totalResult] = await Promise.all([
-    selectQuery.orderBy(desc(orders.createdAt)).offset(offset).limit(limit),
-    countQuery,
-  ]);
+  const [data, totalResult] = await withDbRetry('getAllOrdersForAdminList', () =>
+    Promise.all([
+      selectQuery.orderBy(desc(orders.createdAt)).offset(offset).limit(limit),
+      countQuery,
+    ]),
+  );
 
   return {
     orders: (data || []).map(transformDBOrderListRow),
@@ -881,15 +890,17 @@ export async function getAllOrdersForAdminList(
 export async function getOrderStatusCounts(
   shopIds?: string[],
 ): Promise<{ byStatus: Record<string, number>; total: number }> {
-  let query = db
-    .select({ status: orders.status, value: count() })
-    .from(orders);
+  const rows = await withDbRetry('getOrderStatusCounts', async () => {
+    let query = db
+      .select({ status: orders.status, value: count() })
+      .from(orders);
 
-  if (shopIds && shopIds.length > 0) {
-    query = query.where(inArray(orders.shopId, shopIds)) as typeof query;
-  }
+    if (shopIds && shopIds.length > 0) {
+      query = query.where(inArray(orders.shopId, shopIds)) as typeof query;
+    }
 
-  const rows = await query.groupBy(orders.status);
+    return query.groupBy(orders.status);
+  });
 
   const byStatus: Record<string, number> = {};
   let total = 0;

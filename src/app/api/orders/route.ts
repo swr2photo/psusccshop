@@ -100,9 +100,10 @@ export async function GET(req: NextRequest) {
       { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Content-Type': 'application/json; charset=utf-8' } }
     );
   } catch (error: any) {
+    console.error('[Orders API] GET failed:', error?.message || error);
     return NextResponse.json(
-      { status: 'error', message: error?.message || 'load failed' },
-      { status: 500, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
+      { status: 'success', data: { history: [], hasMore: false, total: 0 } },
+      { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Content-Type': 'application/json; charset=utf-8' } },
     );
   }
 }

@@ -44,8 +44,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ status: 'error', message: 'ไม่มีสิทธิ์เข้าถึงข้อมูลนี้' }, { status: 403 });
   }
 
-  const data = await getJson(cartKey(email));
-  return NextResponse.json({ status: 'success', data: { cart: data || [] } });
+  try {
+    const data = await getJson(cartKey(email));
+    return NextResponse.json({ status: 'success', data: { cart: data || [] } });
+  } catch (error) {
+    console.error('[Cart API] GET failed:', error);
+    return NextResponse.json({ status: 'success', data: { cart: [] } });
+  }
 }
 
 export async function POST(req: NextRequest) {

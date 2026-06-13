@@ -27,30 +27,84 @@ function resolvePrimaryConnectionString(): string {
   return primaryConnectionString;
 }
 
-function createNodeDrizzleInstance(): DbInstance {
-  const primaryConnectionString = resolvePrimaryConnectionString();
-  const replicaConnectionString = process.env.DATABASE_READ_URL;
+const globalForDb = globalThis as unknown as {
+  dbInstance: DbInstance | undefined;
+  postgresClient: ReturnType<typeof postgres> | undefined;
+  primaryPool: Pool | undefined;
+  replicaPool: Pool | undefined;
+};
 
-  const primaryPool = new Pool({
-    connectionString: primaryConnectionString,
-    max: parseInt(process.env.DB_POOL_MAX || '5'),
-    min: 1,
-    idleTimeoutMillis: 30_000,
-    connectionTimeoutMillis: 5_000,
+function normalizeConnectionString(connectionString: string): string {
+  let normalized = connectionString.trim();
+
+  // ?sslmode=require breaks node-pg on Vercel — use pool ssl option instead
+  try {
+    const parsed = new URL(normalized);
+    parsed.searchParams.delete('sslmode');
+    normalized = parsed.toString();
+  } catch {
+    normalized = normalized
+      .replace(/([?&])sslmode=[^&]*(&|$)/gi, (_, sep, tail) => (tail === '&' ? sep : ''))
+      .replace(/\?$/, '');
+  }
+
+  return normalized;
+}
+
+function poolConfig(connectionString: string) {
+  const normalized = normalizeConnectionString(connectionString);
+  const useSsl =
+    normalized.includes('supabase.co') ||
+    process.env.DB_SSL === '1' ||
+    process.env.NODE_ENV === 'production';
+
+  if (
+    process.env.VERCEL === '1' &&
+    normalized.includes('db.') &&
+    normalized.includes('.supabase.co')
+  ) {
+    console.warn(
+      '[db] Direct Supabase host on Vercel may fail — use Session pooler URI in DATABASE_URL',
+    );
+  }
+
+  return {
+    connectionString: normalized,
+    max: parseInt(process.env.DB_POOL_MAX || '5', 10),
+    min: 0,
+    idleTimeoutMillis: 10_000,
+    connectionTimeoutMillis: 10_000,
     keepAlive: true,
-  });
+    ...(useSsl ? { ssl: { rejectUnauthorized: false } } : {}),
+  };
+}
+
+function createNodeDrizzleInstance(): DbInstance {
+  const primaryConnectionString = normalizeConnectionString(resolvePrimaryConnectionString());
+  const replicaConnectionString = process.env.DATABASE_READ_URL
+    ? normalizeConnectionString(process.env.DATABASE_READ_URL)
+    : undefined;
+
+  try {
+    const host = new URL(primaryConnectionString).hostname;
+    console.log(`[db] Connecting primary host=${host}`);
+  } catch {
+    console.log('[db] Connecting primary (host parse skipped)');
+  }
+
+  const primaryPool = new Pool(poolConfig(primaryConnectionString));
+  globalForDb.primaryPool = primaryPool;
 
   const primaryDb = drizzleNodePg(primaryPool, { schema });
 
-  if (replicaConnectionString && replicaConnectionString !== primaryConnectionString) {
-    const replicaPool = new Pool({
-      connectionString: replicaConnectionString,
-      max: parseInt(process.env.DB_POOL_MAX || '5'),
-      min: 1,
-      idleTimeoutMillis: 30_000,
-      connectionTimeoutMillis: 5_000,
-      keepAlive: true,
-    });
+  const useReplica =
+    process.env.USE_DB_READ_REPLICA === '1' &&
+    replicaConnectionString &&
+    replicaConnectionString !== primaryConnectionString;
+
+  if (useReplica) {
+    const replicaPool = new Pool(poolConfig(replicaConnectionString));
+    globalForDb.replicaPool = replicaPool;
 
     const replicaDb = drizzleNodePg(replicaPool, { schema });
     console.log('⚖️ เปิดใช้งาน Drizzle Read Replicas (Load Balancing) เรียบร้อยแล้ว');
@@ -60,11 +114,6 @@ function createNodeDrizzleInstance(): DbInstance {
   console.log('🔌 เชื่อมต่อฐานข้อมูลหลัก (Primary DB เท่านั้น)');
   return primaryDb as unknown as DbInstance;
 }
-
-const globalForDb = globalThis as unknown as {
-  dbInstance: DbInstance | undefined;
-  postgresClient: ReturnType<typeof postgres> | undefined;
-};
 
 function resolveDbInstance(): DbInstance {
   if (isCloudflareWorkersRuntime()) {
@@ -101,20 +150,25 @@ export const db = new Proxy({} as DbInstance, {
   },
 });
 
-/** Drop pooled client after transient Hyperdrive errors (Workers: per-request scope only). */
+/** Drop pooled client after transient DB errors. */
 export async function resetDbConnection(): Promise<void> {
   if (isCloudflareWorkersRuntime()) {
     await resetWorkersDbConnection();
     return;
   }
 
+  const pools = [globalForDb.primaryPool, globalForDb.replicaPool].filter(
+    (pool): pool is Pool => pool !== undefined,
+  );
   const client = globalForDb.postgresClient;
+
   globalForDb.dbInstance = undefined;
+  globalForDb.primaryPool = undefined;
+  globalForDb.replicaPool = undefined;
   globalForDb.postgresClient = undefined;
-  if (!client) return;
-  try {
-    await client.end({ timeout: 2 });
-  } catch {
-    /* ignore */
-  }
+
+  await Promise.all([
+    ...pools.map((pool) => pool.end().catch(() => undefined)),
+    client ? client.end({ timeout: 2 }).catch(() => undefined) : Promise.resolve(),
+  ]);
 }
