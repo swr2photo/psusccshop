@@ -13,6 +13,11 @@ import { putJson, getJson } from "@/lib/filebase";
 import { verifyPasskeyLoginToken } from "@/lib/passkey";
 import { createHash } from 'crypto';
 import { oauthProvider } from "./oauth-provider";
+import {
+  getNextAuthCallbackCookieName,
+  getNextAuthCsrfCookieName,
+  getNextAuthSessionCookieName,
+} from '@/lib/nextauth-cookie-names';
 
 const GoogleProvider = oauthProvider(google);
 const AzureADProvider = oauthProvider(azureAd);
@@ -104,7 +109,6 @@ const providerNameMap: Record<string, string> = {
 // ==================== AUTH OPTIONS ====================
 
 const useSecureCookies = process.env.NODE_ENV === 'production';
-const cookiePrefix = useSecureCookies ? '__Secure-' : '';
 const sharedCookieDomain = process.env.COOKIE_DOMAIN?.trim() || undefined;
 
 const sharedCookieOptions = {
@@ -184,15 +188,15 @@ export const authOptions: NextAuthOptions = {
     ? {
         cookies: {
           sessionToken: {
-            name: `${cookiePrefix}next-auth.session-token`,
+            name: getNextAuthSessionCookieName(),
             options: sharedCookieOptions,
           },
           callbackUrl: {
-            name: `${cookiePrefix}next-auth.callback-url`,
+            name: getNextAuthCallbackCookieName(),
             options: { ...sharedCookieOptions, httpOnly: false },
           },
           csrfToken: {
-            name: `${useSecureCookies ? '__Host-' : ''}next-auth.csrf-token`,
+            name: getNextAuthCsrfCookieName(),
             options: {
               httpOnly: true,
               sameSite: 'lax' as const,

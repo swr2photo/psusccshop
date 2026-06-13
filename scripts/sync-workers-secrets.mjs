@@ -23,6 +23,7 @@ const SKIP = new Set([
 const API_KEYS = [
   'NEXTAUTH_SECRET',
   'NEXTAUTH_URL',
+  'AUTH_SESSION_VERSION',
   'NEXT_PUBLIC_BASE_URL',
   'COOKIE_DOMAIN',
   'API_CORS_ORIGINS',
@@ -123,6 +124,7 @@ env.NEXTAUTH_URL = env.NEXTAUTH_URL?.includes('localhost')
   : env.NEXTAUTH_URL || 'https://sccshop.psuscc.club';
 env.NEXT_PUBLIC_BASE_URL = env.NEXT_PUBLIC_BASE_URL || 'https://sccshop.psuscc.club';
 env.COOKIE_DOMAIN = env.COOKIE_DOMAIN || '.psuscc.club';
+env.AUTH_SESSION_VERSION = env.AUTH_SESSION_VERSION || '2';
 
 const lines = [];
 for (const key of API_KEYS) {

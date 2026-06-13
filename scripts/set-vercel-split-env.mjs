@@ -15,6 +15,7 @@ const VARS = {
   NEXT_PUBLIC_API_URL: 'https://api.psuscc.club',
   COOKIE_DOMAIN: '.psuscc.club',
   NEXTAUTH_URL: 'https://sccshop.psuscc.club',
+  AUTH_SESSION_VERSION: '2',
 };
 
 const TARGETS = [

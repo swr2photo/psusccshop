@@ -3,20 +3,31 @@
  */
 import { getToken } from 'next-auth/jwt';
 import type { Session } from 'next-auth';
+import {
+  getNextAuthSessionCookieName,
+  getSessionCookieNamesForRead,
+} from '@/lib/nextauth-cookie-names';
 
-export function nextAuthTokenOptions(request: Request) {
+export function nextAuthTokenOptions(request: Request, cookieName?: string) {
   const useSecureCookies = process.env.NODE_ENV === 'production';
-  const cookiePrefix = useSecureCookies ? '__Secure-' : '';
   return {
     req: request as Parameters<typeof getToken>[0]['req'],
     secret: process.env.NEXTAUTH_SECRET,
     secureCookie: useSecureCookies,
-    cookieName: `${cookiePrefix}next-auth.session-token`,
+    cookieName: cookieName || getNextAuthSessionCookieName(),
   };
 }
 
+async function readTokenFromRequest(request: Request) {
+  for (const cookieName of getSessionCookieNamesForRead()) {
+    const token = await getToken(nextAuthTokenOptions(request, cookieName));
+    if (token) return token;
+  }
+  return null;
+}
+
 export async function getSessionFromRequest(request: Request): Promise<Session | null> {
-  const token = await getToken(nextAuthTokenOptions(request));
+  const token = await readTokenFromRequest(request);
   if (!token) return null;
 
   const userFromToken = token.user as Session['user'] | undefined;

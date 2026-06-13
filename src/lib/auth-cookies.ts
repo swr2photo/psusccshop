@@ -1,11 +1,13 @@
 /**
  * Clear NextAuth cookies that may survive signOut when COOKIE_DOMAIN is set.
- * Browsers can hold both host-only and Domain=.psuscc.club cookies with the same name;
- * NextAuth only clears the configured variant.
  */
+import {
+  getAllCallbackCookieNames,
+  getAllSessionCookieNames,
+  getNextAuthCsrfCookieName,
+} from '@/lib/nextauth-cookie-names';
 
 const useSecureCookies = process.env.NODE_ENV === 'production';
-const cookiePrefix = useSecureCookies ? '__Secure-' : '';
 const sharedCookieDomain = process.env.COOKIE_DOMAIN?.trim() || undefined;
 
 function buildClearCookie(name: string, options: { httpOnly?: boolean; domain?: string } = {}): string {
@@ -22,25 +24,15 @@ function buildClearCookie(name: string, options: { httpOnly?: boolean; domain?: 
   return parts.join('; ');
 }
 
-/** Cookie names that may exist after login / failed logout. */
 function authCookieNames(): Array<{ name: string; httpOnly: boolean }> {
   const names: Array<{ name: string; httpOnly: boolean }> = [
-    { name: `${cookiePrefix}next-auth.session-token`, httpOnly: true },
-    { name: `${cookiePrefix}next-auth.callback-url`, httpOnly: false },
-    { name: useSecureCookies ? '__Host-next-auth.csrf-token' : 'next-auth.csrf-token', httpOnly: true },
+    ...getAllSessionCookieNames().map((name) => ({ name, httpOnly: true })),
+    ...getAllCallbackCookieNames().map((name) => ({ name, httpOnly: false })),
+    { name: getNextAuthCsrfCookieName(), httpOnly: true },
   ];
-
-  if (useSecureCookies) {
-    names.push(
-      { name: 'next-auth.session-token', httpOnly: true },
-      { name: 'next-auth.callback-url', httpOnly: false },
-    );
-  }
-
   return names;
 }
 
-/** Host-only clears — safe after OAuth callback (won't remove Domain= cookie). */
 export function getStaleHostOnlyAuthCookieClearHeaders(): string[] {
   const headers: string[] = [];
   for (const { name, httpOnly } of authCookieNames()) {
@@ -50,7 +42,6 @@ export function getStaleHostOnlyAuthCookieClearHeaders(): string[] {
   return headers;
 }
 
-/** Clear every auth cookie variant (host-only + shared domain + legacy names). */
 export function getFullAuthCookieClearHeaders(): string[] {
   const headers = getStaleHostOnlyAuthCookieClearHeaders();
   if (!sharedCookieDomain) return headers;

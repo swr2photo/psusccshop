@@ -5,10 +5,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { encode, getToken } from 'next-auth/jwt';
 import { getStaleHostOnlyAuthCookieClearHeaders } from '@/lib/auth-cookies';
+import {
+  getNextAuthSessionCookieName,
+  getSessionCookieNamesForRead,
+} from '@/lib/nextauth-cookie-names';
 
 const useSecureCookies = process.env.NODE_ENV === 'production';
-const cookiePrefix = useSecureCookies ? '__Secure-' : '';
-const sessionCookieName = `${cookiePrefix}next-auth.session-token`;
+const sessionCookieName = getNextAuthSessionCookieName();
 const sharedCookieDomain = process.env.COOKIE_DOMAIN?.trim() || undefined;
 
 export async function POST(req: NextRequest) {
@@ -17,12 +20,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ status: 'error', message: 'misconfigured' }, { status: 500 });
   }
 
-  const token = await getToken({
-    req,
-    secret,
-    secureCookie: useSecureCookies,
-    cookieName: sessionCookieName,
-  });
+  let token = null;
+  for (const cookieName of getSessionCookieNamesForRead()) {
+    token = await getToken({
+      req: req,
+      secret,
+      secureCookie: useSecureCookies,
+      cookieName,
+    });
+    if (token) break;
+  }
 
   if (!token) {
     return NextResponse.json({ status: 'error', message: 'no session' }, { status: 401 });
