@@ -1,5 +1,6 @@
 'use client';
 
+import { apiFetch } from '@/lib/api-client';
 /**
  * TanStack Query Hooks for Admin Data
  * 
@@ -157,7 +158,7 @@ export function useDeleteOrderMutation() {
   
   return useMutation({
     mutationFn: (ref: string) =>
-      fetch(`/api/orders?ref=${encodeURIComponent(ref)}`, { method: 'DELETE' })
+      apiFetch(`/api/orders?ref=${encodeURIComponent(ref)}`, { method: 'DELETE' })
         .then(res => res.json()),
     onMutate: async (ref) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.admin.data() });

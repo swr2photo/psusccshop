@@ -1,7 +1,9 @@
+'use client';
+
+import { apiFetch } from '@/lib/api-client';
 // src/hooks/usePushNotification.ts
 // Client-side hook for managing Web Push notifications
 
-'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSession } from 'next-auth/react';
@@ -148,7 +150,7 @@ export function usePushNotification(): UsePushNotificationReturn {
       });
 
       // Send subscription to server
-      const response = await fetch('/api/push-subscription', {
+      const response = await apiFetch('/api/push-subscription', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -181,7 +183,7 @@ export function usePushNotification(): UsePushNotificationReturn {
       const sub = await registration.pushManager.getSubscription();
       if (sub) {
         // Remove from server
-        await fetch('/api/push-subscription', {
+        await apiFetch('/api/push-subscription', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

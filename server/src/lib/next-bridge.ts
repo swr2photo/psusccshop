@@ -2,6 +2,7 @@
 // Reuses existing src/app/api route modules without duplication.
 
 import { NextRequest } from 'next/server';
+import { ROUTE_MODULES } from '../routes/route-modules.js';
 
 type NextRouteHandler = (
   req: NextRequest,
@@ -15,6 +16,13 @@ const moduleCache = new Map<string, NextRouteModule>();
 async function loadRouteModule(moduleId: string): Promise<NextRouteModule> {
   const cached = moduleCache.get(moduleId);
   if (cached) return cached;
+
+  const staticMod = ROUTE_MODULES[moduleId];
+  if (staticMod) {
+    moduleCache.set(moduleId, staticMod);
+    return staticMod;
+  }
+
   const mod = (await import(moduleId)) as NextRouteModule;
   moduleCache.set(moduleId, mod);
   return mod;

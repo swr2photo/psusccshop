@@ -1,5 +1,6 @@
 'use client';
 
+import { apiFetch } from '@/lib/api-client';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { X, ShieldCheck, User, Phone, Instagram, AlertTriangle, MapPin, Check, Sparkles, UserCircle, CheckCircle2, AlertCircle, Search, Camera, ZoomIn, ZoomOut, RotateCw, Move, Plus, Trash2, Star, Edit } from 'lucide-react';
 import {
@@ -625,7 +626,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
       const croppedBase64 = offscreen.toDataURL('image/png', 0.92);
 
       // Upload image
-      const res = await fetch('/api/upload', {
+      const res = await apiFetch('/api/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -642,7 +643,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
 
         // Save profile image immediately to server (without closing modal)
         try {
-          await fetch('/api/profile', {
+          await apiFetch('/api/profile', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

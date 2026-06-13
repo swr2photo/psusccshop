@@ -2,16 +2,24 @@
 // NextAuth configuration - extracted from route file for Next.js 16 compatibility
 
 import { NextAuthOptions, Session } from "next-auth";
-import GoogleProvider from "next-auth/providers/google";
-import AzureADProvider from "next-auth/providers/azure-ad";
-import FacebookProvider from "next-auth/providers/facebook";
-import AppleProvider from "next-auth/providers/apple";
-import LineProvider from "next-auth/providers/line";
-import CredentialsProvider from "next-auth/providers/credentials";
+import google from "next-auth/providers/google";
+import azureAd from "next-auth/providers/azure-ad";
+import facebook from "next-auth/providers/facebook";
+import apple from "next-auth/providers/apple";
+import line from "next-auth/providers/line";
+import credentials from "next-auth/providers/credentials";
 import { JWT } from "next-auth/jwt";
 import { putJson, getJson } from "@/lib/filebase";
 import { verifyPasskeyLoginToken } from "@/lib/passkey";
 import { createHash } from 'crypto';
+import { oauthProvider } from "./oauth-provider";
+
+const GoogleProvider = oauthProvider(google);
+const AzureADProvider = oauthProvider(azureAd);
+const FacebookProvider = oauthProvider(facebook);
+const AppleProvider = oauthProvider(apple);
+const LineProvider = oauthProvider(line);
+const CredentialsProvider = oauthProvider(credentials);
 
 // ==================== TYPE EXTENSIONS ====================
 declare module "next-auth" {
@@ -95,6 +103,18 @@ const providerNameMap: Record<string, string> = {
 
 // ==================== AUTH OPTIONS ====================
 
+const useSecureCookies = process.env.NODE_ENV === 'production';
+const cookiePrefix = useSecureCookies ? '__Secure-' : '';
+const sharedCookieDomain = process.env.COOKIE_DOMAIN?.trim() || undefined;
+
+const sharedCookieOptions = {
+  httpOnly: true,
+  sameSite: 'lax' as const,
+  path: '/',
+  secure: useSecureCookies,
+  ...(sharedCookieDomain ? { domain: sharedCookieDomain } : {}),
+};
+
 export const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
@@ -137,7 +157,7 @@ export const authOptions: NextAuthOptions = {
       id: 'passkey',
       name: 'Passkey',
       credentials: { token: { label: 'Passkey Token', type: 'text' } },
-      async authorize(credentials) {
+      async authorize(credentials: Record<'token', string> | undefined) {
         if (!credentials?.token) return null;
         try {
           const email = await verifyPasskeyLoginToken(credentials.token);
@@ -160,6 +180,29 @@ export const authOptions: NextAuthOptions = {
   ],
   pages: { signIn: '/', error: '/auth/error' },
   session: { strategy: "jwt", maxAge: 30 * 24 * 60 * 60 },
+  ...(sharedCookieDomain
+    ? {
+        cookies: {
+          sessionToken: {
+            name: `${cookiePrefix}next-auth.session-token`,
+            options: sharedCookieOptions,
+          },
+          callbackUrl: {
+            name: `${cookiePrefix}next-auth.callback-url`,
+            options: { ...sharedCookieOptions, httpOnly: false },
+          },
+          csrfToken: {
+            name: `${useSecureCookies ? '__Host-' : ''}next-auth.csrf-token`,
+            options: {
+              httpOnly: true,
+              sameSite: 'lax' as const,
+              path: '/',
+              secure: useSecureCookies,
+            },
+          },
+        },
+      }
+    : {}),
   callbacks: {
     async jwt({ token, account, user }) {
       if (account && user) {

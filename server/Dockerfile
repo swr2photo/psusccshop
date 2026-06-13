@@ -16,9 +16,9 @@ COPY src/app/api ./src/app/api
 
 WORKDIR /app/server
 
-ENV API_PORT=3001
 ENV NODE_ENV=production
 
 EXPOSE 3001
 
+# Railway/Render inject PORT; entrypoint uses PORT || API_PORT
 CMD ["bun", "run", "src/index.ts"]

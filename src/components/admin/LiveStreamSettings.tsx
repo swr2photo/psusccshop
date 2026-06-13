@@ -1,5 +1,6 @@
 'use client';
 
+import { apiFetch } from '@/lib/api-client';
 import React, { useState, useEffect } from 'react';
 import { invalidateLiveStreamCache } from '@/hooks/useLiveStream';
 import {
@@ -112,7 +113,7 @@ export default function LiveStreamSettings({ config, saveConfig, showToast, user
 
     setSaving(true);
     try {
-      const res = await fetch('/api/live', {
+      const res = await apiFetch('/api/live', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ liveStream: live }),
@@ -148,7 +149,7 @@ export default function LiveStreamSettings({ config, saveConfig, showToast, user
     // Auto-save when toggling live
     setSaving(true);
     try {
-      const res = await fetch('/api/live', {
+      const res = await apiFetch('/api/live', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ liveStream: newState }),

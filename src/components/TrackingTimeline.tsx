@@ -1,5 +1,6 @@
 'use client';
 
+import { apiFetch } from '@/lib/api-client';
 import React from 'react';
 import {
   Box,
@@ -75,7 +76,7 @@ export default function TrackingTimeline({
     setError(null);
 
     try {
-      const res = await fetch('/api/shipping/track', {
+      const res = await apiFetch('/api/shipping/track', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

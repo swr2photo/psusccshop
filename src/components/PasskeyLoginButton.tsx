@@ -1,8 +1,10 @@
+'use client';
+
+import { apiFetch } from '@/lib/api-client';
 // src/components/PasskeyLoginButton.tsx
 // "Sign in with Passkey" button for the login screen
 // Uses WebAuthn discoverable credentials (resident keys)
 
-'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { Button, CircularProgress } from '@mui/material';
@@ -37,7 +39,7 @@ export default function PasskeyLoginButton({
     setLoading(true);
     try {
       // Step 1: Get authentication options from server
-      const optRes = await fetch('/api/auth/passkey/login', {
+      const optRes = await apiFetch('/api/auth/passkey/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'login-options' }),
@@ -52,7 +54,7 @@ export default function PasskeyLoginButton({
       const assertion = await startAuthentication({ optionsJSON: options });
 
       // Step 3: Verify with server
-      const verifyRes = await fetch('/api/auth/passkey/login', {
+      const verifyRes = await apiFetch('/api/auth/passkey/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'login-verify', challengeId, assertion }),

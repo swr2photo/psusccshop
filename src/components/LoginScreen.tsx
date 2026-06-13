@@ -1,5 +1,6 @@
 'use client';
 
+import { apiFetch } from '@/lib/api-client';
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -21,7 +22,7 @@ export default function LoginScreen() {
 
   // Fetch available OAuth providers
   useEffect(() => {
-    fetch('/api/auth/available-providers')
+    apiFetch('/api/auth/available-providers')
       .then(res => res.json())
       .then(data => {
         if (data.providers) setAvailableProviders(data.providers);

@@ -1,5 +1,7 @@
-// src/components/admin/UserLogsView.tsx
 'use client';
+
+import { apiFetch } from '@/lib/api-client';
+// src/components/admin/UserLogsView.tsx
 
 import { useState, useEffect, useCallback, Fragment } from 'react';
 import type { ReactElement } from 'react';
@@ -113,7 +115,7 @@ export default function UserLogsView({ showToast }: Props) {
       if (filterAction) params.set('action', filterAction);
       params.set('limit', '200');
 
-      const res = await fetch(`/api/admin/user-logs?${params.toString()}`);
+      const res = await apiFetch(`/api/admin/user-logs?${params.toString()}`);
       const data = await res.json();
 
       setLogs(data.logs || []);

@@ -1,5 +1,6 @@
 'use client';
 
+import { apiFetch } from '@/lib/api-client';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { JSX } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
@@ -4200,7 +4201,7 @@ export default function AdminPage(): JSX.Element {
     myShopsLoadedRef.current = true;
     (async () => {
       try {
-        const res = await fetch('/api/shops');
+        const res = await apiFetch('/api/shops');
         const data = await res.json();
         if (data.status === 'success') {
           const shops: MyShopInfo[] = (data.shops || []).map((s: any) => ({
@@ -4259,7 +4260,7 @@ export default function AdminPage(): JSX.Element {
     setShopConfigLoading(true);
     (async () => {
       try {
-        const res = await fetch(`/api/shops/${selectedShopId}/config`);
+        const res = await apiFetch(`/api/shops/${selectedShopId}/config`);
         const data = await res.json();
         if (!cancelled && data.status === 'success' && data.config) {
           const shopConfig: ShopConfig = {
@@ -4382,7 +4383,7 @@ export default function AdminPage(): JSX.Element {
 
   const hydrateAdminOrder = useCallback(async (ref: string): Promise<AdminOrder | null> => {
     try {
-      const res = await fetch(`/api/admin/orders?ref=${encodeURIComponent(ref)}`);
+      const res = await apiFetch(`/api/admin/orders?ref=${encodeURIComponent(ref)}`);
       const data = await res.json();
       if (data.status === 'success' && data.data) {
         const full = normalizeOrder(data.data);
@@ -4469,7 +4470,7 @@ export default function AdminPage(): JSX.Element {
       const batch = imagesToUpload.slice(i, i + BATCH_SIZE);
       const uploadPromises = batch.map(async (item) => {
         try {
-          const res = await fetch('/api/upload', {
+          const res = await apiFetch('/api/upload', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -4593,7 +4594,7 @@ export default function AdminPage(): JSX.Element {
       // Save to server — shop-specific or global
       if (isShopMode && selectedShopId) {
         // Save to shop-specific config API
-        const res = await fetch(`/api/shops/${selectedShopId}/config`, {
+        const res = await apiFetch(`/api/shops/${selectedShopId}/config`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(configWithUrls),
@@ -4829,7 +4830,7 @@ export default function AdminPage(): JSX.Element {
   };
   // Fetch available OAuth providers
   useEffect(() => {
-    fetch('/api/auth/available-providers')
+    apiFetch('/api/auth/available-providers')
       .then(res => res.json())
       .then(data => { if (data.providers) setAvailableProviders(data.providers); })
       .catch(() => {});
@@ -5800,7 +5801,7 @@ export default function AdminPage(): JSX.Element {
                 console.log('Extracted orderRef:', orderRef);
                 
                 // Search for the order
-                fetch(`/api/pickup?search=${encodeURIComponent(orderRef)}`)
+                apiFetch(`/api/pickup?search=${encodeURIComponent(orderRef)}`)
                   .then(res => res.json())
                   .then(data => {
                     if (data.status === 'success' && data.data && data.data.length > 0) {
@@ -5896,7 +5897,7 @@ export default function AdminPage(): JSX.Element {
     setPickupSearching(true);
     try {
       const shopParam = isShopMode && selectedShopId ? `&shopId=${encodeURIComponent(selectedShopId)}` : '';
-      const res = await fetch(`/api/pickup?search=${encodeURIComponent(term.trim())}${shopParam}`);
+      const res = await apiFetch(`/api/pickup?search=${encodeURIComponent(term.trim())}${shopParam}`);
       const data = await res.json();
       if (data.status === 'success') {
         setPickupSearchResults(data.data || []);
@@ -5916,7 +5917,7 @@ export default function AdminPage(): JSX.Element {
     
     setPickupProcessing(true);
     try {
-      const res = await fetch('/api/pickup', {
+      const res = await apiFetch('/api/pickup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -5975,7 +5976,7 @@ export default function AdminPage(): JSX.Element {
     
     // Search for the order and open confirmation popup
     try {
-      const res = await fetch(`/api/pickup?search=${encodeURIComponent(ref)}`);
+      const res = await apiFetch(`/api/pickup?search=${encodeURIComponent(ref)}`);
       const data = await res.json();
       if (data.status === 'success' && data.data?.length > 0) {
         // Find exact match
@@ -8761,7 +8762,7 @@ export default function AdminPage(): JSX.Element {
         });
       }
 
-      const response = await fetch('/api/upload', {
+      const response = await apiFetch('/api/upload', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -10925,7 +10926,7 @@ function ProductsView({ config, searchTerm, setSearchTerm, saveFullConfig, showT
             setPickupSaving(true);
             try {
               // Call API to enable pickup and auto-update orders
-              const res = await fetch('/api/pickup/enable', {
+              const res = await apiFetch('/api/pickup/enable', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

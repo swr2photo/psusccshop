@@ -1,5 +1,6 @@
 'use client';
 
+import { apiFetch } from '@/lib/api-client';
 import React from 'react';
 import {
   Avatar,
@@ -197,7 +198,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
 
   // Fetch user session on mount
   React.useEffect(() => {
-    fetch('/api/auth/session')
+    apiFetch('/api/auth/session')
       .then(res => res.json())
       .then(data => {
         if (data?.user) {
@@ -251,7 +252,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
       setShowPulse(false);
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 8000);
-      fetch('/api/chatbot', { signal: controller.signal })
+      apiFetch('/api/chatbot', { signal: controller.signal })
         .then(res => res.json())
         .then(data => {
           setAiEnabled(data.aiEnabled || false);
@@ -336,7 +337,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
         
         const editController = new AbortController();
         const editTimeout = setTimeout(() => editController.abort(), 30000);
-        const res = await fetch('/api/chatbot', {
+        const res = await apiFetch('/api/chatbot', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
@@ -399,7 +400,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
       
       const sendController = new AbortController();
       const sendTimeout = setTimeout(() => sendController.abort(), 30000);
-      const res = await fetch('/api/chatbot', {
+      const res = await apiFetch('/api/chatbot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -536,7 +537,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
         ? `(ตอบกลับ: "${replyToMessage.text}") ${msgText}`
         : msgText;
       
-      const res = await fetch('/api/chatbot', {
+      const res = await apiFetch('/api/chatbot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 

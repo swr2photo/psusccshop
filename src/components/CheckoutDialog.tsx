@@ -1,5 +1,6 @@
 'use client';
 
+import { apiFetch } from '@/lib/api-client';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Dialog,
@@ -275,8 +276,8 @@ export default function CheckoutDialog({
     setLoadingConfig(true);
     try {
       const [shippingRes, paymentRes] = await Promise.all([
-        fetch('/api/shipping/options').then(r => r.json()),
-        fetch('/api/payment/config').then(r => r.json()),
+        apiFetch('/api/shipping/options').then(r => r.json()),
+        apiFetch('/api/payment/config').then(r => r.json()),
       ]);
 
       if (shippingRes.success && shippingRes.data) {
@@ -358,7 +359,7 @@ export default function CheckoutDialog({
     setPromoError('');
     setPromoResult(null);
     try {
-      const res = await fetch('/api/promo', {
+      const res = await apiFetch('/api/promo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: promoCode.trim(), subtotal, ...(shopId ? { shopId } : {}) }),

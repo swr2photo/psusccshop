@@ -1,5 +1,7 @@
-// src/components/admin/EmailManagement.tsx
 'use client';
+
+import { apiFetch } from '@/lib/api-client';
+// src/components/admin/EmailManagement.tsx
 
 import { useState, useEffect, useCallback, Fragment } from 'react';
 import type { ReactElement } from 'react';
@@ -136,7 +138,7 @@ export default function EmailManagement({ showToast }: Props) {
   const fetchLogs = useCallback(async () => {
     setLoading(true);
     try {
-      const logsRes = await fetch('/api/admin/email?action=logs&limit=200').then((r) => r.json());
+      const logsRes = await apiFetch('/api/admin/email?action=logs&limit=200').then((r) => r.json());
       setLogs(logsRes.logs || []);
     } catch (error: any) {
       console.error('Failed to fetch email logs:', error);
@@ -149,7 +151,7 @@ export default function EmailManagement({ showToast }: Props) {
   const fetchStats = useCallback(async () => {
     if (stats) return;
     try {
-      const statsRes = await fetch('/api/admin/email?action=stats').then((r) => r.json());
+      const statsRes = await apiFetch('/api/admin/email?action=stats').then((r) => r.json());
       setStats(statsRes.stats || null);
     } catch (error: any) {
       console.error('Failed to fetch email stats:', error);
@@ -159,7 +161,7 @@ export default function EmailManagement({ showToast }: Props) {
   const fetchCustomers = useCallback(async () => {
     if (customers.length > 0) return;
     try {
-      const customersRes = await fetch('/api/admin/email?action=customers').then((r) => r.json());
+      const customersRes = await apiFetch('/api/admin/email?action=customers').then((r) => r.json());
       setCustomers(customersRes.customers || []);
     } catch (error: any) {
       console.error('Failed to fetch email customers:', error);
@@ -169,14 +171,14 @@ export default function EmailManagement({ showToast }: Props) {
   const fetchData = useCallback(async () => {
     await fetchLogs();
     if (activeTab === 1) {
-      await fetch('/api/admin/email?action=customers')
+      await apiFetch('/api/admin/email?action=customers')
         .then((r) => r.json())
         .then((res) => setCustomers(res.customers || []))
         .catch(() => {});
     }
     if (activeTab === 2) {
       setStats(null);
-      await fetch('/api/admin/email?action=stats')
+      await apiFetch('/api/admin/email?action=stats')
         .then((r) => r.json())
         .then((res) => setStats(res.stats || null))
         .catch(() => {});
@@ -220,7 +222,7 @@ export default function EmailManagement({ showToast }: Props) {
 
     setSending(true);
     try {
-      const res = await fetch('/api/admin/email', {
+      const res = await apiFetch('/api/admin/email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(

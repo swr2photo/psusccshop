@@ -1,10 +1,12 @@
+'use client';
+
+import { apiFetch } from '@/lib/api-client';
 // src/components/NotificationPrompt.tsx
 // Global notification permission prompt — shows once per session for logged-in users
 // Registers service worker for push notifications independently of the chat widget
 // Supports iOS 16.4+ PWA, iOS 26+ (all home-screen sites are web apps), Android + Desktop
 // Handles denied permission with guidance to re-enable via device settings
 
-'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
@@ -189,7 +191,7 @@ export default function NotificationPrompt() {
                   userVisibleOnly: true,
                   applicationServerKey: urlBase64ToUint8Array(vapidKey) as BufferSource,
                 });
-                await fetch('/api/push-subscription', {
+                await apiFetch('/api/push-subscription', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ subscription: sub.toJSON(), action: 'subscribe' }),
@@ -282,7 +284,7 @@ export default function NotificationPrompt() {
         applicationServerKey: urlBase64ToUint8Array(vapidKey) as BufferSource,
       });
 
-      await fetch('/api/push-subscription', {
+      await apiFetch('/api/push-subscription', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

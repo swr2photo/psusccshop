@@ -298,7 +298,7 @@ export function useOptimisticOrderUpdate() {
     }
 
     try {
-      const res = await fetch('/api/admin/status', {
+      const res = await apiFetch('/api/admin/status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ref, ...updates, adminEmail }),
@@ -340,7 +340,7 @@ export function useOptimisticBatchUpdate() {
     try {
       const results = await Promise.all(
         refs.map((ref) =>
-          fetch('/api/admin/status', {
+          apiFetch('/api/admin/status', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ref, status, adminEmail }),

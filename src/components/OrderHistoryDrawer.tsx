@@ -1,5 +1,6 @@
 'use client';
 
+import { apiFetch } from '@/lib/api-client';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Box,
@@ -221,7 +222,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
     if (!refundReason || !refundBankName || !refundBankAccount || !refundAccountName) return;
     setRefundSubmitting(true);
     try {
-      const res = await fetch('/api/refund', {
+      const res = await apiFetch('/api/refund', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -1,4 +1,4 @@
-// Generates server/src/routes/registry.ts from src/app/api route files
+// Generates server/src/routes/registry.ts + route-modules.ts from src/app/api route files
 // Run: node server/scripts/generate-registry.mjs
 import { readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const apiRoot = path.resolve(__dirname, '../../src/app/api');
-const outFile = path.resolve(__dirname, '../src/routes/registry.ts');
+const routesDir = path.resolve(__dirname, '../src/routes');
 
 const AUTH_PREFIXES = [
   'auth/[...nextauth]',
@@ -65,7 +65,7 @@ const routes = all
   }))
   .sort((a, b) => b.specificity - a.specificity);
 
-const content = `/** AUTO-GENERATED — run: node server/scripts/generate-registry.mjs */
+const registryContent = `/** AUTO-GENERATED — run: node server/scripts/generate-registry.mjs */
 export type RouteEntry = {
   pattern: string;
   module: string;
@@ -78,5 +78,32 @@ export const API_ROUTES: RouteEntry[] = ${JSON.stringify(
 )};
 `;
 
-await writeFile(outFile, content, 'utf8');
-console.log(`Wrote ${routes.length} routes to ${outFile}`);
+const importLines = routes.map(
+  (r, i) => `import * as __route_${i} from '${r.module}';`,
+);
+const mapEntries = routes.map(
+  (r, i) => `  '${r.module}': __route_${i} as RouteModule,`,
+);
+
+const modulesContent = `/** AUTO-GENERATED — static imports for Cloudflare Workers bundling */
+import type { NextRequest } from 'next/server';
+
+type RouteHandler = (
+  req: NextRequest,
+  ctx: { params: Promise<Record<string, string>> },
+) => Promise<Response> | Response;
+
+type RouteModule = Partial<
+  Record<'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS', RouteHandler>
+>;
+
+${importLines.join('\n')}
+
+export const ROUTE_MODULES: Record<string, RouteModule> = {
+${mapEntries.join('\n')}
+};
+`;
+
+await writeFile(path.join(routesDir, 'registry.ts'), registryContent, 'utf8');
+await writeFile(path.join(routesDir, 'route-modules.ts'), modulesContent, 'utf8');
+console.log(`Wrote ${routes.length} routes to ${routesDir}/registry.ts + route-modules.ts`);

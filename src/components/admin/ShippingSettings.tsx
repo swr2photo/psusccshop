@@ -1,5 +1,6 @@
 'use client';
 
+import { apiFetch } from '@/lib/api-client';
 import { useState, useEffect } from 'react';
 import {
   Box,
@@ -71,7 +72,7 @@ export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
   const loadConfig = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/shipping/options');
+      const res = await apiFetch('/api/shipping/options');
       const data = await res.json();
       if (data.success) {
         setConfig(data.data);
@@ -90,7 +91,7 @@ export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
       setSaving(true);
       setError(null);
       
-      const res = await fetch('/api/shipping/options', {
+      const res = await apiFetch('/api/shipping/options', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ config }),

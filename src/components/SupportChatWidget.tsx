@@ -1,7 +1,9 @@
+'use client';
+
+import { apiFetch } from '@/lib/api-client';
 // src/components/SupportChatWidget.tsx
 // Customer Support Chat Widget - Floating chat button with chatbot option
 
-'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
@@ -190,7 +192,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
 
   // Fetch admin display name from chat settings
   useEffect(() => {
-    fetch('/api/support-chat/settings/public')
+    apiFetch('/api/support-chat/settings/public')
       .then(res => res.json())
       .then(data => {
         if (data.admin_display_name) setAdminDisplayName(data.admin_display_name);
@@ -245,12 +247,12 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
     if (!session?.user?.email) return;
     
     try {
-      const res = await fetch('/api/support-chat');
+      const res = await apiFetch('/api/support-chat');
       const data = await res.json();
       
       if (data.chat) {
         // Fetch full chat with messages (markRead only on first open, not polling)
-        const chatRes = await fetch(`/api/support-chat/${data.chat.id}${markRead ? '?markRead=true' : ''}`);
+        const chatRes = await apiFetch(`/api/support-chat/${data.chat.id}${markRead ? '?markRead=true' : ''}`);
         const chatData = await chatRes.json();
         
         if (chatData.chat) {
@@ -284,7 +286,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
     if (!session?.user?.email) return;
     
     try {
-      const res = await fetch('/api/support-chat?action=history');
+      const res = await apiFetch('/api/support-chat?action=history');
       const data = await res.json();
       if (data.chats) {
         setChatHistory(data.chats.filter((c: ChatSession) => c.status === 'closed'));
@@ -297,7 +299,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
   // View a specific chat from history
   const viewChatHistory = useCallback(async (chatId: string) => {
     try {
-      const res = await fetch(`/api/support-chat/${chatId}`);
+      const res = await apiFetch(`/api/support-chat/${chatId}`);
       const data = await res.json();
       if (data.chat) {
         setChat(data.chat);
@@ -321,14 +323,14 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
       rtSendTyping(true, session?.user?.name || undefined);
     } else {
       // Fallback: API call
-      fetch(`/api/support-chat/${chat.id}/typing`, {
+      apiFetch(`/api/support-chat/${chat.id}/typing`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isTyping: true }),
       }).catch(() => {});
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = setTimeout(() => {
-        fetch(`/api/support-chat/${chat.id}/typing`, {
+        apiFetch(`/api/support-chat/${chat.id}/typing`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ isTyping: false }),
@@ -345,7 +347,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
 
     const pollTyping = () => {
       if (document.visibilityState === 'hidden') return;
-      fetch(`/api/support-chat/${chat.id}/typing`)
+      apiFetch(`/api/support-chat/${chat.id}/typing`)
         .then((res) => res.json())
         .then((data) => setFallbackTyping(data.isTyping || false))
         .catch(() => setFallbackTyping(false));
@@ -361,7 +363,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
   useEffect(() => {
     if (open && chat?.id && !showHistory && !showNewChat && !showRating && chat.status === 'active') {
       // Mark read via API (one-time, not polling)
-      fetch(`/api/support-chat/${chat.id}/read`, { method: 'POST' }).catch(() => {});
+      apiFetch(`/api/support-chat/${chat.id}/read`, { method: 'POST' }).catch(() => {});
       // Broadcast read receipt via Realtime
       broadcastRead();
     }
@@ -433,7 +435,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
 
     const onVisible = () => {
       if (document.visibilityState !== 'visible') return;
-      fetch(`/api/support-chat/${chat.id}`)
+      apiFetch(`/api/support-chat/${chat.id}`)
         .then((res) => res.json())
         .then((data) => {
           if (!data.chat?.messages) return;
@@ -471,7 +473,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
     const messageText = message.trim();
     setSending(true);
     try {
-      const res = await fetch('/api/support-chat', {
+      const res = await apiFetch('/api/support-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -492,7 +494,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
       // Existing active chat — initial message was not added by POST, send it now
       const isExistingChat = typeof data.message === 'string' && data.message.includes('กำลังดำเนินอยู่แล้ว');
       if (isExistingChat) {
-        const msgRes = await fetch(`/api/support-chat/${data.chat.id}/message`, {
+        const msgRes = await apiFetch(`/api/support-chat/${data.chat.id}/message`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: messageText }),
@@ -504,7 +506,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
         }
       }
 
-      const chatRes = await fetch(`/api/support-chat/${data.chat.id}`);
+      const chatRes = await apiFetch(`/api/support-chat/${data.chat.id}`);
       const chatData = await chatRes.json();
       
       if (chatData.chat) {
@@ -564,7 +566,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
       const ext = mime.split('/')[1] || 'jpg';
       
       // Upload image first
-      const uploadRes = await fetch('/api/upload', {
+      const uploadRes = await apiFetch('/api/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -593,7 +595,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
         const tempId = `temp_img_${Date.now()}`;
         addOptimisticMessage(tempId, msgContent, session?.user?.name || undefined, session?.user?.image || undefined);
         
-        const res = await fetch(`/api/support-chat/${chat.id}/message`, {
+        const res = await apiFetch(`/api/support-chat/${chat.id}/message`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: msgContent }),
@@ -653,7 +655,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
       // Stop typing indicator
       rtSendTyping(false);
       
-      const res = await fetch(`/api/support-chat/${chat.id}/message`, {
+      const res = await apiFetch(`/api/support-chat/${chat.id}/message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: finalMessage }),
@@ -694,7 +696,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
     
     setUnsending(true);
     try {
-      const res = await fetch(`/api/support-chat/${chat.id}/message/${messageId}`, {
+      const res = await apiFetch(`/api/support-chat/${chat.id}/message/${messageId}`, {
         method: 'DELETE',
       });
       
@@ -757,7 +759,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
     
     setSending(true);
     try {
-      const res = await fetch(`/api/support-chat/${chat.id}/rate`, {
+      const res = await apiFetch(`/api/support-chat/${chat.id}/rate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rating, comment: ratingComment.trim() }),
@@ -895,7 +897,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
     if (!session?.user?.email) return;
     setLoadingOrders(true);
     try {
-      const res = await fetch('/api/orders');
+      const res = await apiFetch('/api/orders');
       const data = await res.json();
       if (data.status === 'success' && data.data) {
         // API returns { data: { history: [...], hasMore, total } }
@@ -921,14 +923,14 @@ ${getStatusLabel(order.status)}
     
     setSending(true);
     try {
-      const res = await fetch(`/api/support-chat/${chat.id}/message`, {
+      const res = await apiFetch(`/api/support-chat/${chat.id}/message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: orderMsg }),
       });
       
       if (res.ok) {
-        const chatRes = await fetch(`/api/support-chat/${chat.id}`);
+        const chatRes = await apiFetch(`/api/support-chat/${chat.id}`);
         const chatData = await chatRes.json();
         if (chatData.chat) {
           setChat(chatData.chat);

@@ -1,5 +1,6 @@
 'use client';
 
+import { apiFetch } from '@/lib/api-client';
 import { useState, useEffect } from 'react';
 import {
   Box,
@@ -80,7 +81,7 @@ export default function PaymentSettings({ onSave }: PaymentSettingsProps) {
   const loadConfig = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/payment/config');
+      const res = await apiFetch('/api/payment/config');
       const data = await res.json();
       if (data.success) {
         setConfig(data.data);
@@ -99,7 +100,7 @@ export default function PaymentSettings({ onSave }: PaymentSettingsProps) {
       setSaving(true);
       setError(null);
       
-      const res = await fetch('/api/payment/config', {
+      const res = await apiFetch('/api/payment/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ config }),

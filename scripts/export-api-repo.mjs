@@ -96,6 +96,12 @@ await copyDir(path.join(ROOT, 'src/app/api'), path.join(OUT, 'src/app/api'));
 await copyDir(path.join(ROOT, 'server/src/routes'), path.join(OUT, 'src/routes'));
 await copyDir(path.join(ROOT, 'server/src/lib'), path.join(OUT, 'src/bridge'));
 await cp(path.join(ROOT, 'server/src/index.ts'), path.join(OUT, 'src/index.ts'));
+await cp(path.join(ROOT, 'server/src/app.ts'), path.join(OUT, 'src/app.ts'));
+await cp(path.join(ROOT, 'server/src/worker.ts'), path.join(OUT, 'src/worker.ts'));
+await cp(
+  path.join(ROOT, 'server/src/lib/cors-origins.ts'),
+  path.join(OUT, 'src/lib/cors-origins.ts'),
+);
 
 await patchBridgeImports(path.join(OUT, 'src/routes'));
 
@@ -108,10 +114,10 @@ await writeFile(routerPath, router);
 // Scripts
 await mkdir(path.join(OUT, 'scripts'), { recursive: true });
 let registryScript = await readFile(path.join(ROOT, 'server/scripts/generate-registry.mjs'), 'utf8');
-registryScript = registryScript
-  .replace('../../src/app/api', '../src/app/api')
-  .replace('../src/routes/registry.ts', '../src/routes/registry.ts')
-  .replace('node server/scripts/generate-registry.mjs', 'node scripts/generate-registry.mjs');
+registryScript = registryScript.replace(
+  "path.resolve(__dirname, '../../src/app/api')",
+  "path.resolve(__dirname, '../src/app/api')",
+);
 await writeFile(path.join(OUT, 'scripts/generate-registry.mjs'), registryScript);
 
 // package.json
@@ -132,6 +138,7 @@ const devDependencies = {
   typescript: rootPkg.devDependencies.typescript,
   dotenv: rootPkg.devDependencies.dotenv,
   'drizzle-kit': rootPkg.devDependencies['drizzle-kit'],
+  wrangler: rootPkg.devDependencies.wrangler || '^4.99.0',
 };
 
 const apiPkg = {
@@ -142,7 +149,9 @@ const apiPkg = {
   engines: { bun: '>=1.2.0' },
   scripts: {
     dev: 'bun --watch --env-file=.env src/index.ts',
+    'dev:worker': 'wrangler dev',
     start: 'bun src/index.ts',
+    deploy: 'wrangler deploy',
     typecheck: 'tsc --noEmit',
     'generate:registry': 'node scripts/generate-registry.mjs',
   },
@@ -193,11 +202,30 @@ COPY tsconfig.json ./
 COPY src ./src
 COPY scripts ./scripts
 
-ENV API_PORT=3001
 ENV NODE_ENV=production
 EXPOSE 3001
 
+# Railway/Render inject PORT; API uses PORT || API_PORT
 CMD ["bun", "src/index.ts"]
+`,
+);
+
+// Cloudflare Workers (primary deploy target)
+await writeFile(
+  path.join(OUT, 'wrangler.jsonc'),
+  `{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "psusccshop-api",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-06-13",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "vars": {
+    "NODE_ENV": "production"
+  }
+  // Hyperdrive binding — set id after creating config in Cloudflare Dashboard
+  // "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "<YOUR_HYPERDRIVE_ID>" }]
+}
 `,
 );
 
@@ -222,8 +250,9 @@ jobs:
         with:
           bun-version: latest
       - run: bun install
+      - run: bun run generate:registry
       - run: bun run typecheck
-      - name: Smoke test
+      - name: Smoke test (Bun)
         env:
           API_PORT: 3099
           NEXTAUTH_SECRET: ci-smoke-test-secret-min-32-chars-long
@@ -235,27 +264,22 @@ jobs:
           sleep 3
           curl -sf http://localhost:3099/api/health
 
-  docker:
+  deploy:
     needs: verify
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/login-action@v3
+      - uses: oven-sh/setup-bun@v2
         with:
-          registry: ghcr.io
-          username: \${{ github.actor }}
-          password: \${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
+          bun-version: latest
+      - run: bun install
+      - run: bun run generate:registry
+      - uses: cloudflare/wrangler-action@v3
         with:
-          context: .
-          push: true
-          tags: |
-            ghcr.io/\${{ github.repository }}:latest
-            ghcr.io/\${{ github.repository }}:\${{ github.sha }}
+          apiToken: \${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: \${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
 `,
 );
 
@@ -264,6 +288,8 @@ await writeFile(
   path.join(OUT, '.gitignore'),
   `node_modules/
 npm-cache/
+.wrangler/
+.dev.vars
 .env
 .env.local
 .env.*.local
@@ -278,40 +304,82 @@ await writeFile(
 
 Elysia + Bun API server for SCC Shop (exported from [psusccshop](https://github.com/swr2photo/psusccshop)).
 
-## Run
+## Run (local — Bun)
 
 \`\`\`bash
 bun install
-cp .env.example .env   # fill in secrets
-bun run dev
+cp .env.example .env
+bun run dev          # http://localhost:3001/api/health
 \`\`\`
 
-Health: \`GET /api/health\`
+## Run (local — Cloudflare Workers)
+
+\`\`\`bash
+bun run dev:worker   # http://localhost:8787/api/health
+\`\`\`
 
 ## Sync from monorepo
 
 \`\`\`bash
 cd ../psusccshop
-node scripts/export-api-repo.mjs
+npm run sync:api-repo
 \`\`\`
 
-## Deploy
+## Deploy — Cloudflare Workers (แนะนำ)
 
-- Docker: \`docker build -t psusccshop-api .\`
-- GitHub Actions builds & pushes to GHCR on push to \`main\`
+### ครั้งแรก
+
+1. [Cloudflare Dashboard](https://dash.cloudflare.com) → **Workers & Pages** → **Create**
+2. เลือก **Connect to Git** → repo \`swr2photo/psusccshop-api\`
+3. Build settings:
+   - **Build command:** \`bun install && bun run generate:registry\`
+   - **Deploy command:** \`bunx wrangler deploy\`
+   - หรือใช้ GitHub Actions (ตั้ง \`CLOUDFLARE_API_TOKEN\`, \`CLOUDFLARE_ACCOUNT_ID\`)
+4. **Hyperdrive** (จำเป็นสำหรับ PostgreSQL บน Workers):
+   - Dashboard → Hyperdrive → Create → ใส่ \`DATABASE_URL\`
+   - แก้ \`wrangler.jsonc\` เพิ่ม binding \`HYPERDRIVE\`
+5. **Secrets** (Workers → Settings → Variables):
+   \`NEXTAUTH_SECRET\`, Supabase keys, Filebase keys ฯลฯ (คัดลอกจาก Vercel)
+   - CLI: \`wrangler secret put NEXTAUTH_SECRET\`
+6. **Custom domain:** \`api.psuscc.club\` → Workers → Domains
+
+### Frontend (Vercel)
+
+\`\`\`env
+NEXT_PUBLIC_API_URL=https://api.psuscc.club
+COOKIE_DOMAIN=.psuscc.club
+\`\`\`
+
+ลบ \`API_INTERNAL_URL\` ถ้ามี → redeploy frontend
+
+### Docker (ทางเลือก — local/self-host)
+
+\`\`\`bash
+docker build -t psusccshop-api .
+docker run -p 3001:3001 --env-file .env psusccshop-api
+\`\`\`
 `,
 );
 
 // .env.example
 await writeFile(
   path.join(OUT, '.env.example'),
-  `API_PORT=3001
+  `# Local Bun dev
+API_PORT=3001
+
+# Must match Vercel frontend
 NEXTAUTH_SECRET=
+NEXT_PUBLIC_BASE_URL=https://sccshop.psuscc.club
+
+# CORS — comma-separated extra origins
+# API_CORS_ORIGINS=https://sccshop.psuscc.club
+
+# PostgreSQL (Bun/Docker — direct connection)
+# On Cloudflare Workers use Hyperdrive binding instead (see wrangler.jsonc)
 DATABASE_URL=
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
-NEXT_PUBLIC_BASE_URL=https://sccshop.psusci.club
 `,
 );
 

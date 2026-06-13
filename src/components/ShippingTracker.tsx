@@ -1,5 +1,6 @@
 'use client';
 
+import { apiFetch } from '@/lib/api-client';
 import { useState } from 'react';
 import {
   Box,
@@ -82,7 +83,7 @@ export default function ShippingTracker({
     setError(null);
     
     try {
-      const res = await fetch('/api/shipping/track', {
+      const res = await apiFetch('/api/shipping/track', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

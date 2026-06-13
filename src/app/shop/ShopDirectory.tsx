@@ -1,6 +1,8 @@
+'use client';
+
+import { apiFetch } from '@/lib/api-client';
 // src/app/shop/ShopDirectory.tsx
 // Client component: lists all active shops as cards
-'use client';
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -36,7 +38,7 @@ export default function ShopDirectory() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch('/api/shops?public=1');
+        const res = await apiFetch('/api/shops?public=1');
         const data = await res.json();
         if (data.status === 'success') {
           setShops(data.shops || []);

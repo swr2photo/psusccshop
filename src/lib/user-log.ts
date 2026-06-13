@@ -1,3 +1,4 @@
+import { apiFetch } from '@/lib/api-client';
 // src/lib/user-log.ts
 // Helper for logging user actions to /api/admin/user-logs
 
@@ -15,7 +16,7 @@ export async function logUserAction({
   metadata?: Record<string, any>;
 }) {
   try {
-    await fetch('/api/admin/user-logs', {
+    await apiFetch('/api/admin/user-logs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, name, action, details, metadata })

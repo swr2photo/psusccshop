@@ -1,6 +1,8 @@
+'use client';
+
+import { apiFetch } from '@/lib/api-client';
 // src/components/admin/ShopManagement.tsx
 // Multi-shop management panel for Admin page
-'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -135,7 +137,7 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
   const fetchShops = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/shops');
+      const res = await apiFetch('/api/shops');
       const data = await res.json();
       if (data.status === 'success') {
         setShops(data.shops || []);
@@ -151,7 +153,7 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
 
   const fetchShopDetail = async (shopId: string): Promise<ShopDetail | null> => {
     try {
-      const res = await fetch(`/api/shops/${shopId}`);
+      const res = await apiFetch(`/api/shops/${shopId}`);
       const data = await res.json();
       return data.status === 'success' ? data.shop : null;
     } catch { return null; }
@@ -159,7 +161,7 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
 
   const fetchShopAdmins = async (shopId: string) => {
     try {
-      const res = await fetch(`/api/shops/${shopId}/admins`);
+      const res = await apiFetch(`/api/shops/${shopId}/admins`);
       const data = await res.json();
       if (data.status === 'success') {
         setShopAdmins(data.admins || []);
@@ -192,7 +194,7 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
         reader.readAsDataURL(file);
       });
       const base64Data = base64.split(',')[1];
-      const res = await fetch('/api/upload', {
+      const res = await apiFetch('/api/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -224,7 +226,7 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
     }
     setSaving(true);
     try {
-      const res = await fetch('/api/shops', {
+      const res = await apiFetch('/api/shops', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -261,7 +263,7 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
     if (!editingShop) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/shops/${editingShop.id}`, {
+      const res = await apiFetch(`/api/shops/${editingShop.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -298,7 +300,7 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
   const handleDeleteShop = async (shopId: string, shopName: string) => {
     if (!confirm(`ต้องการลบร้าน "${shopName}" จริงหรือ? การดำเนินการนี้ย้อนกลับไม่ได้`)) return;
     try {
-      const res = await fetch(`/api/shops/${shopId}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/shops/${shopId}`, { method: 'DELETE' });
       const data = await res.json();
       if (data.status === 'success') {
         showToast('success', `ลบร้าน "${shopName}" แล้ว`);
@@ -314,7 +316,7 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
   const handleAddAdmin = async (shopId: string) => {
     if (!newAdminEmail.trim()) return;
     try {
-      const res = await fetch(`/api/shops/${shopId}/admins`, {
+      const res = await apiFetch(`/api/shops/${shopId}/admins`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: newAdminEmail.trim() }),
@@ -335,7 +337,7 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
   const handleRemoveAdmin = async (shopId: string, email: string) => {
     if (!confirm(`ลบ ${email} ออกจากร้านนี้?`)) return;
     try {
-      const res = await fetch(`/api/shops/${shopId}/admins?email=${encodeURIComponent(email)}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/shops/${shopId}/admins?email=${encodeURIComponent(email)}`, { method: 'DELETE' });
       const data = await res.json();
       if (data.status === 'success') {
         showToast('success', `ลบ ${email} แล้ว`);
@@ -351,7 +353,7 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
   const handleTogglePermission = async (shopId: string, email: string, currentPerms: Record<string, boolean>, key: string) => {
     const newPerms = { ...currentPerms, [key]: !currentPerms[key] };
     try {
-      const res = await fetch(`/api/shops/${shopId}/admins`, {
+      const res = await apiFetch(`/api/shops/${shopId}/admins`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, permissions: newPerms }),

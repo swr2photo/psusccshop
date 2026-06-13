@@ -1,8 +1,10 @@
+'use client';
+
+import { apiFetch } from '@/lib/api-client';
 // src/components/PasskeyManager.tsx
 // UI for registering, viewing, renaming, and deleting passkeys
 // Rendered inside ProfileModal or as standalone section
 
-'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import {
@@ -47,7 +49,7 @@ export default function PasskeyManager({ userEmail }: PasskeyManagerProps) {
   // Load existing passkeys
   const loadPasskeys = useCallback(async () => {
     try {
-      const res = await fetch('/api/auth/passkey');
+      const res = await apiFetch('/api/auth/passkey');
       if (res.ok) {
         const data = await res.json();
         setPasskeys(data.passkeys || []);
@@ -69,7 +71,7 @@ export default function PasskeyManager({ userEmail }: PasskeyManagerProps) {
     setMessage(null);
     try {
       // Step 1: Get registration options from server
-      const optRes = await fetch('/api/auth/passkey', {
+      const optRes = await apiFetch('/api/auth/passkey', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'register-options' }),
@@ -81,7 +83,7 @@ export default function PasskeyManager({ userEmail }: PasskeyManagerProps) {
       const attestation = await startRegistration({ optionsJSON: options });
 
       // Step 3: Verify with server
-      const verifyRes = await fetch('/api/auth/passkey', {
+      const verifyRes = await apiFetch('/api/auth/passkey', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -125,7 +127,7 @@ export default function PasskeyManager({ userEmail }: PasskeyManagerProps) {
   const handleDelete = useCallback(async (id: string) => {
     setDeletingId(id);
     try {
-      const res = await fetch(`/api/auth/passkey?id=${encodeURIComponent(id)}`, {
+      const res = await apiFetch(`/api/auth/passkey?id=${encodeURIComponent(id)}`, {
         method: 'DELETE',
       });
       if (res.ok) {
@@ -149,7 +151,7 @@ export default function PasskeyManager({ userEmail }: PasskeyManagerProps) {
   const handleRename = useCallback(async (id: string) => {
     if (!editName.trim()) return;
     try {
-      const res = await fetch('/api/auth/passkey', {
+      const res = await apiFetch('/api/auth/passkey', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'rename', credentialId: id, name: editName.trim() }),

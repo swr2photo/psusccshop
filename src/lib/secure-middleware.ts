@@ -135,11 +135,12 @@ async function parseRequestBody(
       const body: Record<string, any> = {};
       
       for (const [key, value] of formData.entries()) {
-        if (value instanceof File) {
-          if (value.size > maxSize) {
+        if (typeof value !== 'string') {
+          const file = value as File;
+          if (file.size > maxSize) {
             return { body: null, error: 'File too large' };
           }
-          body[key] = { name: value.name, size: value.size, type: value.type };
+          body[key] = { name: file.name, size: file.size, type: file.type };
         } else {
           body[key] = value;
         }

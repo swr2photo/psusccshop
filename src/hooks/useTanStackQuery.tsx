@@ -12,6 +12,7 @@
  * - Devtools support
  */
 
+import { apiFetch } from '@/lib/api-client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { ReactNode, useState } from 'react';
@@ -114,7 +115,7 @@ export const queryKeys = {
 // ============== FETCHER FUNCTIONS ==============
 
 export async function fetchJSON<T>(url: string): Promise<T> {
-  const res = await fetch(url);
+  const res = await (url.startsWith('/api') ? apiFetch(url) : fetch(url));
   
   if (!res.ok) {
     const error = await res.json().catch(() => ({ message: 'Network error' }));
@@ -125,11 +126,17 @@ export async function fetchJSON<T>(url: string): Promise<T> {
 }
 
 export async function postJSON<T>(url: string, data: any): Promise<T> {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
+  const res = await (url.startsWith('/api')
+    ? apiFetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+    : fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      }));
   
   if (!res.ok) {
     const error = await res.json().catch(() => ({ message: 'Network error' }));

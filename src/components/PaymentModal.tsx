@@ -1,5 +1,6 @@
 'use client';
 
+import { apiFetch } from '@/lib/api-client';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { JSX } from 'react';
 import { X, Upload, Check, Loader2, AlertCircle, CheckCircle2, Image, Clock3, Download, CreditCard, QrCode, Copy, Smartphone, Sparkles, AlertTriangle, Info, ShoppingBag, Tag, Hash, Shirt, Clock, Palette } from 'lucide-react';
@@ -272,7 +273,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
   const fetchPaymentInfo = async () => {
     setLoading(true);
     try {
-      const res: Response = await fetch(`/api/payment-info?ref=${encodeURIComponent(orderRef)}`);
+      const res: Response = await apiFetch(`/api/payment-info?ref=${encodeURIComponent(orderRef)}`);
       const data: any = await res.json();
 
       if (data.status === 'success') {
@@ -340,7 +341,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
     reader.onload = async () => {
       const base64 = reader.result?.toString().split(',')[1];
       try {
-        const res: Response = await fetch('/api/payment/verify', {
+        const res: Response = await apiFetch('/api/payment/verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

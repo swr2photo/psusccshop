@@ -1,7 +1,9 @@
+'use client';
+
+import { apiFetch } from '@/lib/api-client';
 // src/components/admin/SupportChatPanel.tsx
 // Admin Panel for Support Chat Management - Mobile Responsive with Typing & Read Receipts
 
-'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
@@ -224,7 +226,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
       // Fetch and open the specific chat
       fetchChatDetails(chatIdParam, true).then(() => {
         // After fetching, also seed realtime
-        fetch('/api/support-chat/' + chatIdParam + '?markRead=true')
+        apiFetch('/api/support-chat/' + chatIdParam + '?markRead=true')
           .then(res => res.json())
           .then(data => { if (data.chat) setRealtimeMessages(data.chat.messages || []); })
           .catch(() => {});
@@ -238,7 +240,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     try {
       const filter = ['all', 'pending', 'my', 'closed'][tabValue];
       const shopParam = selectedShopId ? `&shopId=${encodeURIComponent(selectedShopId)}` : '';
-      const res = await fetch('/api/admin/support-chat?filter=' + filter + shopParam);
+      const res = await apiFetch('/api/admin/support-chat?filter=' + filter + shopParam);
       const data = await res.json();
       if (data.chats) setChats(data.chats);
       if (data.stats) setStats(data.stats);
@@ -250,7 +252,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
   const fetchChatDetails = useCallback(async (chatId: string, markRead = false) => {
     try {
       const url = '/api/support-chat/' + chatId + (markRead ? '?markRead=true' : '');
-      const res = await fetch(url);
+      const res = await apiFetch(url);
       const data = await res.json();
       if (data.chat) setSelectedChat(data.chat);
     } catch (error) {
@@ -298,7 +300,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
   // Mark messages as read when viewing a chat  
   useEffect(() => {
     if (selectedChat?.id) {
-      fetch('/api/support-chat/' + selectedChat.id + '/read', { method: 'POST' }).catch(() => {});
+      apiFetch('/api/support-chat/' + selectedChat.id + '/read', { method: 'POST' }).catch(() => {});
       broadcastRead();
     }
   }, [selectedChat?.id, selectedChat?.messages?.length, broadcastRead]);
@@ -353,7 +355,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
             return { ...prev, ...result.chat, messages: merged };
           });
           if (didUpdate) {
-            fetch('/api/support-chat/' + chatId + '/read', { method: 'POST' }).catch(() => {});
+            apiFetch('/api/support-chat/' + chatId + '/read', { method: 'POST' }).catch(() => {});
           }
           return;
         }
@@ -372,7 +374,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
           return { ...result.chat, messages: incoming };
         });
         if (didUpdate) {
-          fetch('/api/support-chat/' + chatId + '/read', { method: 'POST' }).catch(() => {});
+          apiFetch('/api/support-chat/' + chatId + '/read', { method: 'POST' }).catch(() => {});
         }
       } catch {}
     };
@@ -391,7 +393,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
 
     const onVisible = () => {
       if (document.visibilityState !== 'visible') return;
-      fetch('/api/support-chat/' + selectedChat.id)
+      apiFetch('/api/support-chat/' + selectedChat.id)
         .then((res) => res.json())
         .then((data) => {
           if (!data.chat?.messages) return;
@@ -413,7 +415,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
 
     const pollTyping = () => {
       if (document.visibilityState === 'hidden') return;
-      fetch('/api/support-chat/' + selectedChat.id + '/typing')
+      apiFetch('/api/support-chat/' + selectedChat.id + '/typing')
         .then((res) => res.json())
         .then((data) => setFallbackTyping(data.isTyping || false))
         .catch(() => setFallbackTyping(false));
@@ -480,7 +482,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
       }, 3000);
     } else if (selectedChat) {
       // Fallback: API call
-      fetch('/api/support-chat/' + selectedChat.id + '/typing', {
+      apiFetch('/api/support-chat/' + selectedChat.id + '/typing', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isTyping: true }),
@@ -488,7 +490,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = setTimeout(() => {
         if (selectedChat) {
-          fetch('/api/support-chat/' + selectedChat.id + '/typing', {
+          apiFetch('/api/support-chat/' + selectedChat.id + '/typing', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ isTyping: false }),
@@ -501,7 +503,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
   // Removed redundant /read call - now handled by fetchChatDetails with markRead=true
 
   useEffect(() => {
-    fetch('/api/support-chat/settings')
+    apiFetch('/api/support-chat/settings')
       .then(res => res.json())
       .then(data => { if (data.settings) setChatSettings(data.settings); })
       .catch(() => {});
@@ -512,7 +514,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     isUserScrollingRef.current = false;
     prevMessageCountRef.current = 0;
     // Fetch with markRead=true when user explicitly selects a chat
-    const res = await fetch('/api/support-chat/' + chatId + '?markRead=true');
+    const res = await apiFetch('/api/support-chat/' + chatId + '?markRead=true');
     const data = await res.json();
     if (data.chat) {
       setSelectedChat(data.chat);
@@ -533,7 +535,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
 
   const handleSaveSettings = async () => {
     try {
-      await fetch('/api/support-chat/settings', {
+      await apiFetch('/api/support-chat/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(chatSettings),
@@ -548,11 +550,11 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
 
   const handleAcceptChat = async (chatId: string) => {
     try {
-      const res = await fetch('/api/support-chat/' + chatId + '/accept', { method: 'POST' });
+      const res = await apiFetch('/api/support-chat/' + chatId + '/accept', { method: 'POST' });
       const data = await res.json();
       if (data.chat) {
         await fetchChats();
-        const detailRes = await fetch('/api/support-chat/' + chatId);
+        const detailRes = await apiFetch('/api/support-chat/' + chatId);
         const detailData = await detailRes.json();
         if (detailData.chat) {
           setSelectedChat(detailData.chat);
@@ -567,7 +569,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
   const handleCloseChat = async () => {
     if (!selectedChat) return;
     try {
-      const res = await fetch('/api/support-chat/' + selectedChat.id + '/close', { method: 'POST' });
+      const res = await apiFetch('/api/support-chat/' + selectedChat.id + '/close', { method: 'POST' });
       const data = await res.json();
       if (data.chat) {
         await fetchChats();
@@ -594,7 +596,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     
     setSending(true);
     try {
-      const res = await fetch('/api/support-chat/' + selectedChat.id + '/message', {
+      const res = await apiFetch('/api/support-chat/' + selectedChat.id + '/message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: msgText }),
@@ -637,7 +639,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
       const mimeMatch = previewImage.match(/data:([^;]+);/);
       const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
       const ext = mime.split('/')[1] || 'jpg';
-      const uploadRes = await fetch('/api/upload', {
+      const uploadRes = await apiFetch('/api/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ base64: previewImage, filename: 'admin_chat_' + Date.now() + '.' + ext, mime }),
@@ -654,7 +656,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
       if (uploadData.status === 'success' && uploadData.data?.url) {
         const imageUrl = uploadData.data.url;
         const finalMsg = message.trim() ? message.trim() + '\n[รูปภาพ: ' + imageUrl + ']' : '[รูปภาพ: ' + imageUrl + ']';
-        const res = await fetch('/api/support-chat/' + selectedChat.id + '/message', {
+        const res = await apiFetch('/api/support-chat/' + selectedChat.id + '/message', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: finalMsg }),
@@ -730,7 +732,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     setSearchingOrder(true);
     setFoundOrder(null);
     try {
-      const res = await fetch(`/api/admin/orders?ref=${encodeURIComponent(orderSearchRef.trim())}`);
+      const res = await apiFetch(`/api/admin/orders?ref=${encodeURIComponent(orderSearchRef.trim())}`);
       const data = await res.json();
       if (data.status === 'success' && data.data) {
         setFoundOrder(data.data);
@@ -750,7 +752,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     if (!email) return;
     setLoadingCustomerOrders(true);
     try {
-      const res = await fetch(`/api/admin/orders?email=${encodeURIComponent(email)}&limit=10`);
+      const res = await apiFetch(`/api/admin/orders?email=${encodeURIComponent(email)}&limit=10`);
       const data = await res.json();
       if (data.status === 'success' && Array.isArray(data.data)) {
         setCustomerOrders(data.data);
@@ -780,7 +782,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     scrollToBottom(true);
     
     try {
-      const res = await fetch('/api/support-chat/' + selectedChat.id + '/message', {
+      const res = await apiFetch('/api/support-chat/' + selectedChat.id + '/message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: orderMsg }),

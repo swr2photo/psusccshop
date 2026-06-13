@@ -2,6 +2,7 @@
 // Client-side storefront for individual shops — matches main store design
 'use client';
 
+import { apiFetch } from '@/lib/api-client';
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Box, Typography, Button, Chip, Avatar, IconButton, Badge,
@@ -521,7 +522,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
 
   // Shipping options preview (same as main store cart drawer)
   useEffect(() => {
-    fetch('/api/shipping/options', { cache: 'no-store' })
+    apiFetch('/api/shipping/options', { cache: 'no-store' })
       .then((r) => r.json())
       .then((data) => {
         if (data?.config) setShippingConfig(data.config);

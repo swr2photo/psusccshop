@@ -1,5 +1,6 @@
 'use client';
 
+import { apiFetch } from '@/lib/api-client';
 /**
  * Admin Data Hooks with SWR
  * 
@@ -171,7 +172,7 @@ export function useUpdateOrderStatus() {
   const { trigger, isMutating, error } = useSWRMutation(
     '/api/admin/status',
     async (url, { arg }: { arg: { ref: string; status: string; adminEmail: string; trackingNumber?: string } }) => {
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(arg),
@@ -367,7 +368,7 @@ export function useCart(email: string | undefined | null) {
     await globalMutate(
       CACHE_KEYS.CART(email),
       async () => {
-        const res = await fetch('/api/cart', {
+        const res = await apiFetch('/api/cart', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, cart }),
@@ -443,7 +444,7 @@ export function useDeleteOrder() {
       CACHE_KEYS.ADMIN_DATA,
       async (currentData: AdminDataResponse | undefined) => {
         // Make API call
-        const res = await fetch(`/api/orders?ref=${encodeURIComponent(ref)}${hard ? '&hard=true' : ''}`, {
+        const res = await apiFetch(`/api/orders?ref=${encodeURIComponent(ref)}${hard ? '&hard=true' : ''}`, {
           method: 'DELETE',
         });
         
@@ -502,7 +503,7 @@ export function useUpdateOrder() {
     await globalMutate(
       CACHE_KEYS.ADMIN_DATA,
       async (currentData: AdminDataResponse | undefined) => {
-        const res = await fetch('/api/orders', {
+        const res = await apiFetch('/api/orders', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ref, data, adminEmail }),
@@ -563,7 +564,7 @@ export function useBatchUpdateStatus() {
         // Make all API calls in parallel
         await Promise.all(
           refs.map(ref =>
-            fetch('/api/admin/status', {
+            apiFetch('/api/admin/status', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ ref, status, adminEmail }),
@@ -613,7 +614,7 @@ export function useSyncSheet() {
   const { trigger, isMutating, error } = useSWRMutation(
     '/api/admin/sheet',
     async (url, { arg }: { arg: { mode: string; sheetId?: string; vendorSheetId?: string } }) => {
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(arg),

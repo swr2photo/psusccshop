@@ -1,5 +1,6 @@
 'use client';
 
+import { apiFetch } from '@/lib/api-client';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
@@ -76,7 +77,7 @@ export default function RefundManagement({ showToast, selectedShopId }: Props) {
     try {
       setLoading(true);
       const shopParam = selectedShopId ? `&shopId=${encodeURIComponent(selectedShopId)}` : '';
-      const res = await fetch(`/api/refund?admin=true${shopParam}`);
+      const res = await apiFetch(`/api/refund?admin=true${shopParam}`);
       const data = await res.json();
       if (data.orders) {
         setRefundOrders(data.orders);
@@ -96,7 +97,7 @@ export default function RefundManagement({ showToast, selectedShopId }: Props) {
     setActionLoading(true);
     try {
       const actionMap: Record<string, string> = { APPROVED: 'approve', REJECTED: 'reject', COMPLETED: 'complete' };
-      const res = await fetch('/api/refund', {
+      const res = await apiFetch('/api/refund', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

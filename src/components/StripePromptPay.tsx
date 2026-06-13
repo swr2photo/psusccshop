@@ -1,5 +1,6 @@
 'use client';
 
+import { apiFetch } from '@/lib/api-client';
 // Custom PromptPay payment via Stripe.js (https://docs.stripe.com/js)
 //
 // Flow:
@@ -38,7 +39,7 @@ async function createPromptPayIntent(orderRef: string): Promise<any> {
   if (existing) return existing;
   const promise = (async () => {
     try {
-      const res = await fetch('/api/payment/stripe/promptpay', {
+      const res = await apiFetch('/api/payment/stripe/promptpay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ref: orderRef }),
@@ -200,7 +201,7 @@ export default function StripePromptPay({
       const intentId = intentIdRef.current;
       if (!intentId) return;
 
-      const res = await fetch(
+      const res = await apiFetch(
         `/api/payment/stripe/promptpay?ref=${encodeURIComponent(orderRef)}&intent=${encodeURIComponent(intentId)}`,
         { credentials: 'same-origin' }
       );

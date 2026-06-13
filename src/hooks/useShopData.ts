@@ -15,6 +15,7 @@ import useSWR from 'swr';
 import useSWRMutation from 'swr/mutation';
 import { useCallback, useMemo, useEffect } from 'react';
 import { fetcher, postFetcher } from './useSWRConfig';
+import { apiFetch } from '@/lib/api-client';
 
 // ============== CACHE KEYS ==============
 
@@ -138,7 +139,7 @@ export function useUserProfile(email: string | undefined | null) {
   const { trigger: saveTrigger, isMutating: isSaving } = useSWRMutation(
     email ? '/api/profile' : null,
     async (url, { arg }: { arg: any }) => {
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, ...arg }),
@@ -188,7 +189,7 @@ export function useUserCart(email: string | undefined | null) {
   const { trigger: saveTrigger, isMutating: isSaving } = useSWRMutation(
     email ? '/api/cart' : null,
     async (url, { arg }: { arg: any[] }) => {
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, cart: arg }),
@@ -306,7 +307,7 @@ export function useSubmitOrder() {
   const { trigger, isMutating, error } = useSWRMutation(
     '/api/orders',
     async (url, { arg }: { arg: any }) => {
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(arg),

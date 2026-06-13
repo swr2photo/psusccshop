@@ -1,5 +1,6 @@
 'use client';
 
+import { apiFetch } from '@/lib/api-client';
 import React from 'react';
 import { useLiveStreamContext } from '@/context/LiveStreamProvider';
 import OptimizedImage, { preloadImages, OptimizedBackground } from '@/components/OptimizedImage';
@@ -966,7 +967,7 @@ export default function HomePage() {
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
-    fetch('/api/auth/available-providers')
+    apiFetch('/api/auth/available-providers')
       .then(res => res.json())
       .then(data => {
         if (data.providers) setAvailableProviders(data.providers);
@@ -1071,7 +1072,7 @@ export default function HomePage() {
       
       // Fetch shipping config for cart display
       try {
-        const shippingRes = await fetch('/api/shipping/options');
+        const shippingRes = await apiFetch('/api/shipping/options');
         if (shippingRes.ok) {
           const shippingData = await shippingRes.json();
           setShippingConfig(shippingData);
@@ -1984,7 +1985,7 @@ export default function HomePage() {
       const imgUrl = product.coverImage || product.images?.[0];
       if (!imgUrl) return null;
       try {
-        const res = await fetch(imgUrl, { cache: 'force-cache' });
+        const res = await apiFetch(imgUrl, { cache: 'force-cache' });
         if (!res.ok) return null;
         const blob = await res.blob();
         const ext = blob.type.split('/')[1] || 'jpg';
@@ -8084,7 +8085,7 @@ export default function HomePage() {
                 };
 
                 try {
-                  const res = await fetch('/api/reviews', {
+                  const res = await apiFetch('/api/reviews', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(reviewData),
@@ -8094,7 +8095,7 @@ export default function HomePage() {
                     const data = await res.json();
                     if (data.success) {
                       // Fetch updated reviews
-                      const freshRes = await fetch(`/api/reviews?productId=${encodeURIComponent(selectedProduct?.id || '')}`);
+                      const freshRes = await apiFetch(`/api/reviews?productId=${encodeURIComponent(selectedProduct?.id || '')}`);
                       if (freshRes.ok) {
                         const freshData = await freshRes.json();
                         if (freshData.reviews) {

@@ -13,6 +13,7 @@ import useSWR from 'swr';
 import useSWRMutation from 'swr/mutation';
 import { useCallback, useMemo } from 'react';
 import { fetcher } from './useSWRConfig';
+import { apiFetch } from '@/lib/api-client';
 import { ADMIN_CACHE_KEYS, invalidateAdminData } from './useAdminData';
 
 // ============== TYPES ==============
@@ -138,7 +139,7 @@ export function useUpdateTracking() {
       trackingNumber?: string | null; 
       shippingProvider?: string | null;
     } }) => {
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(arg),
@@ -189,7 +190,7 @@ export function useTrackShipment() {
   const { trigger, isMutating, error, reset } = useSWRMutation(
     '/api/shipping/track',
     async (url, { arg }: { arg: { trackingNumber: string; provider?: string } }) => {
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(arg),

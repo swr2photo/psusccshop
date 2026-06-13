@@ -7,13 +7,21 @@ import { withReplicas } from 'drizzle-orm/pg-core';
 import { Pool } from 'pg';
 import * as schema from '../db/schema';
 
-function createDrizzleInstance() {
+function resolvePrimaryConnectionString(): string {
+  const cf = (globalThis as { __CF_ENV__?: { HYPERDRIVE?: { connectionString: string } } }).__CF_ENV__;
+  if (cf?.HYPERDRIVE?.connectionString) {
+    return cf.HYPERDRIVE.connectionString;
+  }
   const primaryConnectionString = process.env.DATABASE_URL;
-  const replicaConnectionString = process.env.DATABASE_READ_URL;
-
   if (!primaryConnectionString) {
     throw new Error('DATABASE_URL is not set in environment variables');
   }
+  return primaryConnectionString;
+}
+
+function createDrizzleInstance() {
+  const primaryConnectionString = resolvePrimaryConnectionString();
+  const replicaConnectionString = process.env.DATABASE_READ_URL;
 
   // 1. สร้าง Pool เชื่อมต่อฐานข้อมูลหลัก (Write operations)
   const primaryPool = new Pool({

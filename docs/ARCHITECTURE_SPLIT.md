@@ -67,12 +67,35 @@ DATABASE_URL=...
 
 ### B) แยกโดเมน (production)
 
-| Service | URL |
-|---------|-----|
-| Frontend | `https://sccshop.psusci.club` |
-| API | `https://api.psuscc.club` |
+| Service | URL | Platform |
+|---------|-----|----------|
+| Frontend | `https://sccshop.psuscc.club` | Vercel |
+| API | `https://api.psuscc.club` | **Cloudflare Workers** (Bun local dev) |
 
-`NEXT_PUBLIC_API_URL` บน Vercel + CORS บน Elysia
+**Frontend (Vercel env):**
+```env
+NEXT_PUBLIC_API_URL=https://api.psuscc.club
+COOKIE_DOMAIN=.psuscc.club
+NEXTAUTH_URL=https://sccshop.psuscc.club
+# อย่าตั้ง API_INTERNAL_URL
+```
+
+**API (Cloudflare Workers):** คัดลอก secrets จาก Vercel + ตั้ง Hyperdrive สำหรับ PostgreSQL:
+```env
+NEXT_PUBLIC_BASE_URL=https://sccshop.psuscc.club
+NEXTAUTH_SECRET=<same as frontend>
+```
+
+**Deploy API บน Cloudflare Workers:**
+1. dash.cloudflare.com → Workers → Connect Git → `psusccshop-api`
+2. สร้าง **Hyperdrive** → bind ใน `wrangler.jsonc` (`HYPERDRIVE`)
+3. ตั้ง secrets ผ่าน Dashboard หรือ `wrangler secret put`
+4. Custom domain `api.psuscc.club`
+5. อัปเดต `NEXT_PUBLIC_API_URL` บน Vercel → redeploy frontend
+
+Local Workers dev: `cd psusccshop-api && bun run dev:worker` (port 8787)
+
+Session cookie ใช้ร่วม subdomain ได้เมื่อ `COOKIE_DOMAIN=.psuscc.club`
 
 ### Docker API (Bun)
 

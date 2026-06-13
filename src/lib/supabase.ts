@@ -49,9 +49,8 @@ function getSupabasePublic(): SupabaseClient {
       params: { eventsPerSecond: 2 },
     },
     global: {
-      fetch(url, options = {}) {
-        return fetch(url, { ...options, cache: 'no-store' as any });
-      },
+      fetch: ((url: RequestInfo | URL, options: RequestInit = {}) =>
+        fetch(url, { ...options, cache: 'no-store' })) as typeof fetch,
     },
   });
   return _supabasePublic;
@@ -86,9 +85,8 @@ export function getSupabaseAdmin(): SupabaseClient | null {
       schema: 'public',
     },
     global: {
-      fetch(url, options = {}) {
-        return fetch(url, { ...options, cache: 'no-store' as any });
-      },
+      fetch: ((url: RequestInfo | URL, options: RequestInit = {}) =>
+        fetch(url, { ...options, cache: 'no-store' })) as typeof fetch,
     },
   });
   return _supabaseAdmin;
