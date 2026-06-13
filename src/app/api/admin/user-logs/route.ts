@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireSuperAdmin } from '@/lib/auth';
+import { getSessionFromRequest } from '@/lib/session-from-request';
 import { putJson, getUserLogsPaginated } from '@/lib/filebase';
 
 export interface UserLog {
@@ -56,7 +57,7 @@ export async function saveUserLog(log: Omit<UserLog, 'id' | 'timestamp'>): Promi
 // GET: Retrieve user logs (single SQL query + pagination)
 export async function GET(request: NextRequest) {
   try {
-    const admin = await requireSuperAdmin();
+    const admin = await requireSuperAdmin(request);
     if (!admin || admin instanceof NextResponse) {
       return admin instanceof NextResponse ? admin : NextResponse.json('Unauthorized', { status: 401 });
     }
@@ -95,9 +96,7 @@ export async function GET(request: NextRequest) {
 // POST: Log user action (requires authentication)
 export async function POST(request: NextRequest) {
   try {
-    const { getServerSession } = await import('next-auth');
-    const { authOptions } = await import('@/lib/auth');
-    const session = await getServerSession(authOptions);
+    const session = await getSessionFromRequest(request);
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

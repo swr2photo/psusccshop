@@ -25,7 +25,11 @@ const KEY_LENGTH = 32; // 256 bits
 
 // Validate encryption key on startup
 if (!ENCRYPTION_KEY && typeof window === 'undefined') {
-  console.error('[Encryption] ENCRYPTION_KEY or IMAGE_CRYPTO_SECRET must be set in production');
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('[Encryption] FATAL: ENCRYPTION_KEY or IMAGE_CRYPTO_SECRET must be set in production. Refusing to start with empty encryption key.');
+  } else {
+    console.warn('[Encryption] ENCRYPTION_KEY is not set — using NEXTAUTH_SECRET fallback (dev only)');
+  }
 }
 
 // ==================== TYPES ====================

@@ -399,8 +399,13 @@ export async function PUT(req: NextRequest) {
         const qty = Number(item?.quantity ?? 1);
         return sum + (price * qty);
       }, 0);
-      sanitizedUpdates.totalAmount = cartTotal;
-      sanitizedUpdates.amount = cartTotal;
+      // Preserve existing shippingFee and promoDiscount from the order
+      const shippingFee = Number(existing.shippingFee ?? 0);
+      const promoDiscount = Number(existing.promoDiscount ?? existing.discount ?? 0);
+      const recalculated = Math.max(0, cartTotal + shippingFee - promoDiscount);
+      sanitizedUpdates.subtotal = cartTotal;
+      sanitizedUpdates.totalAmount = recalculated;
+      sanitizedUpdates.amount = recalculated;
     }
 
     const next = { ...existing, ...sanitizedUpdates };

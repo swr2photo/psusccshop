@@ -264,7 +264,7 @@ export async function syncOrdersSheet(
   return fetchJson('/api/admin/sheet', { method: 'POST', body: { mode, sheetId, vendorSheetId } });
 }
 
-export async function getAdminData(adminEmail: string): Promise<APIResponse> {
+export async function getAdminData(): Promise<APIResponse> {
   return fetchJson('/api/admin/data');
 }
 
@@ -289,7 +289,16 @@ export async function sendCustomEmail(
   body: string,
   adminEmail: string
 ): Promise<APIResponse> {
-  return { status: 'success', message: 'Email stubbed (Filebase mode)' } as APIResponse;
+  return fetchJson('/api/auto-email', {
+    method: 'POST',
+    body: {
+      type: 'custom',
+      to,
+      subject,
+      message: body,
+      adminEmail,
+    },
+  });
 }
 
 // ============== UTILITY FUNCTIONS ==============

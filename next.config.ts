@@ -114,7 +114,6 @@ const nextConfig: NextConfig = {
             "base-uri 'self';",
             "form-action 'self';",
             "upgrade-insecure-requests;",
-            "block-all-mixed-content;",
           ].join(' '),
         },
         // Prevent Clickjacking
@@ -135,7 +134,7 @@ const nextConfig: NextConfig = {
         // Referrer Policy - No referrer to external
         {
           key: 'Referrer-Policy',
-          value: 'no-referrer',
+          value: 'strict-origin-when-cross-origin',
         },
         // Permissions Policy - Restrict all
         {

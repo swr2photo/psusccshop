@@ -2,8 +2,9 @@
 // Sends transactional emails based on order status changes
 
 import { NextRequest, NextResponse } from 'next/server';
-import { sendEmail, getOrderRecipientEmail } from '@/lib/email';
+import { sendEmail, getOrderRecipientEmail, generateCustomEmail } from '@/lib/email';
 import { requireInternalSecret } from '@/lib/api-helpers';
+import { requireAdmin } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -126,18 +127,28 @@ ${trackingNumber ? `📦 เลขพัสดุ: ${trackingNumber}` : ''}
 
 // POST /api/auto-email - Send automated email based on event type (internal only)
 export async function POST(request: NextRequest) {
-  const authError = requireInternalSecret(request);
-  if (authError) return authError;
+  let authError = requireInternalSecret(request);
+  if (authError) {
+    // Fallback to checking admin session
+    const adminAuth = await requireAdmin(request);
+    if (adminAuth instanceof NextResponse) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+  }
 
   try {
     const body = await request.json();
     const { type, order, trackingNumber, lang = 'th' } = body;
 
-    if (!type || !order) {
-      return NextResponse.json({ error: 'Missing type or order' }, { status: 400 });
+    if (!type) {
+      return NextResponse.json({ error: 'Missing type' }, { status: 400 });
     }
 
-    let template: EmailTemplate;
+    if (type !== 'custom' && !order) {
+      return NextResponse.json({ error: 'Missing order' }, { status: 400 });
+    }
+
+    let template: { subject: string; body?: string; html?: string; text?: string };
     switch (type) {
       case 'order_confirmation':
         template = getOrderConfirmationTemplate(order, lang);
@@ -148,25 +159,36 @@ export async function POST(request: NextRequest) {
       case 'shipping_notification':
         template = getShippingNotificationTemplate(order, trackingNumber || '', lang);
         break;
+      case 'custom':
+        const { to: customTo, subject: customSubject, message: customMessage } = body;
+        if (!customTo || !customSubject || !customMessage) {
+          return NextResponse.json({ error: 'Missing custom email fields' }, { status: 400 });
+        }
+        template = generateCustomEmail({
+          customerName: body.customerName || 'ลูกค้า',
+          subject: customSubject,
+          message: customMessage,
+        });
+        break;
       default:
         return NextResponse.json({ error: 'Unknown email type' }, { status: 400 });
     }
 
-    const email = getOrderRecipientEmail(order);
+    const email = type === 'custom' ? body.to : getOrderRecipientEmail(order);
     if (!email) {
       return NextResponse.json({ error: 'No email address' }, { status: 400 });
     }
 
-    const htmlBody = template.body.replace(/\n/g, '<br>');
+    const htmlBody = (template.html || template.body || '').replace(/\n/g, '<br>');
     const result = await sendEmail({
       to: email,
       subject: template.subject,
-      html: `<div style="font-family:sans-serif;line-height:1.6">${htmlBody}</div>`,
-      text: template.body,
+      html: template.html || `<div style="font-family:sans-serif;line-height:1.6">${htmlBody}</div>`,
+      text: template.text || template.body || '',
       type: type === 'order_confirmation' ? 'order_confirmation'
         : type === 'payment_received' ? 'payment_received'
         : 'custom',
-      orderRef: order.ref,
+      orderRef: order?.ref,
     });
 
     if (!result.success) {

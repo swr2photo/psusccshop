@@ -94,9 +94,9 @@ export function generateMetadata(): Metadata {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
+  maximumScale: 5,
   minimumScale: 1,
-  userScalable: false,
+  userScalable: true,
   interactiveWidget: "resizes-content",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#f8fafc" },
@@ -128,6 +128,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="SCC Shop" />
         <meta name="application-name" content="SCC Shop" />
+        <meta name="app-version" content={process.env.NEXT_PUBLIC_APP_VERSION || '0.0.0'} />
         {GOOGLE_SITE_VERIFICATION ? (
           <meta name="google-site-verification" content={GOOGLE_SITE_VERIFICATION} />
         ) : null}
@@ -171,23 +172,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             }),
           }}
         />
-        {/* Workaround for React 19 script warnings */}
-        <script
-          id="console-filter"
-          dangerouslySetInnerHTML={{
-            __html: `(function(){
-              if (window.console && window.console.error) {
-                var orig = window.console.error;
-                window.console.error = function() {
-                  if (arguments[0] && typeof arguments[0] === 'string' && arguments[0].indexOf('Encountered a script tag') !== -1) {
-                    return;
-                  }
-                  orig.apply(window.console, arguments);
-                };
-              }
-            })()`,
-          }}
-        />
+
         {/* Inline theme script — runs before React hydration to prevent FOUC */}
         <script
           id="theme-initializer"
@@ -212,7 +197,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   });
                 } else {
                   caches.keys().then(function(names){
-                    names.forEach(function(n){if(n.indexOf('scc-shop-v2.3.0')===-1){caches.delete(n)}})
+                    var ver='scc-shop-v'+(document.querySelector('meta[name="app-version"]')||{}).content||'';names.forEach(function(n){if(ver&&n.indexOf(ver)===-1){caches.delete(n)}})
                   });
                 }
               }

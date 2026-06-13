@@ -2,8 +2,8 @@
 // Admin: Get all chat sessions — Drizzle ORM
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions, isAdminEmailAsync } from '@/lib/auth';
+import { getSessionFromRequest } from '@/lib/session-from-request';
+import { isAdminEmailAsync } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { orders } from '@/db/schema';
 import { and, eq, ne } from 'drizzle-orm';
@@ -37,7 +37,7 @@ async function getShopCustomerEmails(shopId: string): Promise<Set<string>> {
 // GET: Get chats for admin
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getSessionFromRequest(request);
     
     if (!session?.user?.email) {
       return NextResponse.json('Unauthorized', { status: 401 });

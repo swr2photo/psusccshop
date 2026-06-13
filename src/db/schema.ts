@@ -374,6 +374,10 @@ export const paymentTransactions = pgTable('payment_transactions', {
 });
 
 // ==================== TODOS (TEST/DEMO) ====================
+/**
+ * @deprecated This table is for testing/demo only and should NOT be used in production code.
+ * Scheduled for removal in the next schema migration.
+ */
 export const todos = pgTable('todos', {
   id: uuid('id').defaultRandom().primaryKey(),
   name: text('name').notNull(),

@@ -5,8 +5,7 @@
 // DELETE - Remove a passkey
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth-options';
+import { getSessionFromRequest } from '@/lib/session-from-request';
 import {
   generatePasskeyRegistrationOptions,
   verifyPasskeyRegistration,
@@ -19,8 +18,8 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 // ==================== GET: List passkeys ====================
-export async function GET() {
-  const session = await getServerSession(authOptions);
+export async function GET(req: NextRequest) {
+  const session = await getSessionFromRequest(req);
   if (!session?.user?.email) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -41,7 +40,7 @@ export async function GET() {
 
 // ==================== POST: Register passkey ====================
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = await getSessionFromRequest(req);
   if (!session?.user?.email) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -108,7 +107,7 @@ export async function POST(req: NextRequest) {
 
 // ==================== DELETE: Remove passkey ====================
 export async function DELETE(req: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = await getSessionFromRequest(req);
   if (!session?.user?.email) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth';
 import { mergeConfigAdminEmails, resolveAdminSession } from '@/lib/admin-context';
 import { getShopConfig } from '@/lib/filebase';
@@ -9,8 +9,8 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /** Shop config only — for admin settings/products tabs. */
-export async function GET() {
-  const authResult = await requireAdmin();
+export async function GET(req: NextRequest) {
+  const authResult = await requireAdmin(req);
   if (authResult instanceof NextResponse) return authResult;
 
   const session = await resolveAdminSession(authResult.email);

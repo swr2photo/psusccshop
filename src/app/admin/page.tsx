@@ -4319,9 +4319,12 @@ export default function AdminPage(): JSX.Element {
     onError: (error) => {
       // Mark role check complete so auth useEffect can proceed
       setServerRoleChecked(true);
+      const status = (error as Error & { status?: number })?.status;
       const isNetworkError = error?.message?.includes('Failed to fetch') || 
                             error?.message?.includes('NETWORK_ERROR');
-      if (isNetworkError) {
+      if (status === 401) {
+        console.warn('[Admin SWR] Session expired (401) — sign out and sign in again');
+      } else if (isNetworkError) {
         console.warn('[Admin SWR] Network error - using cached data');
       } else {
         console.error('[Admin SWR] Error:', error);

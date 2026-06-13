@@ -15,10 +15,21 @@ import { ADMIN_CACHE_KEYS, buildAdminBootstrapKey, buildAdminOrdersListKey } fro
 import { apiFetch } from '@/lib/api-client';
 
 const adminFetcher = async (url: string) => {
-  const res = await apiFetch(url, { headers: { Accept: 'application/json' } });
+  const res = await apiFetch(url, {
+    headers: { Accept: 'application/json' },
+    credentials: 'include',
+  });
   if (!res.ok) {
-    const error = new Error('Admin data fetch failed');
-    (error as any).status = res.status;
+    let message = 'Admin data fetch failed';
+    try {
+      const body = await res.json();
+      if (body?.message) message = body.message;
+      else if (body?.error) message = typeof body.error === 'string' ? body.error : message;
+    } catch {
+      /* non-JSON body */
+    }
+    const error = new Error(message);
+    (error as Error & { status?: number }).status = res.status;
     throw error;
   }
   return res.json();

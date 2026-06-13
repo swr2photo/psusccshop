@@ -1,9 +1,11 @@
 // src/lib/rate-limit.ts
 // Rate limiting utilities for API protection
 
+import { getRedisClient } from '@/lib/redis';
+
 /**
- * Simple in-memory rate limiter
- * Note: In production with multiple instances, use Redis or similar
+ * Simple in-memory rate limiter (fallback when Redis is unavailable)
+ * In production with multiple instances, Redis is preferred for cross-instance consistency.
  */
 
 interface RateLimitEntry {
@@ -77,7 +79,7 @@ export const RATE_LIMITS = {
 } as const;
 
 /**
- * Check rate limit for a given identifier
+ * Check rate limit using in-memory store (fallback)
  * @param identifier - Unique identifier (usually IP + endpoint)
  * @param config - Rate limit configuration
  * @returns Rate limit result
@@ -115,6 +117,49 @@ export function checkRateLimit(
     resetTime: entry.resetTime,
     retryAfter: allowed ? undefined : Math.ceil((entry.resetTime - now) / 1000),
   };
+}
+
+/**
+ * Check rate limit using Redis (works across serverless instances).
+ * Returns null if Redis is unavailable — caller should fall back to in-memory.
+ */
+async function checkRedisRateLimit(
+  identifier: string,
+  config: RateLimitConfig
+): Promise<RateLimitResult | null> {
+  try {
+    const redis = getRedisClient();
+    if (!redis) return null;
+
+    const key = `rl:${config.prefix || 'gen'}:${identifier}`;
+    const windowSeconds = config.windowSeconds;
+
+    // Atomic increment + set TTL on first access
+    const count = await redis.incr(key);
+
+    // Set expiry only on the first request in the window (count === 1)
+    if (count === 1) {
+      await redis.expire(key, windowSeconds);
+    }
+
+    // Get remaining TTL to compute resetTime
+    const ttl = await redis.ttl(key);
+    const resetTime = Date.now() + (ttl > 0 ? ttl * 1000 : windowSeconds * 1000);
+
+    const remaining = Math.max(0, config.maxRequests - count);
+    const allowed = count <= config.maxRequests;
+
+    return {
+      allowed,
+      remaining,
+      resetTime,
+      retryAfter: allowed ? undefined : Math.max(1, ttl > 0 ? ttl : windowSeconds),
+    };
+  } catch (error) {
+    // Redis failure — log and fall back to in-memory
+    console.warn('[RateLimit] Redis check failed, falling back to in-memory:', error);
+    return null;
+  }
 }
 
 /**
@@ -163,8 +208,8 @@ export function getRateLimitIdentifier(request: Request, suffix?: string): strin
 }
 
 /**
- * Combined rate limit check with multiple tiers
- * Checks both global and endpoint-specific limits
+ * Combined rate limit check with multiple tiers (synchronous, in-memory only).
+ * Checks both global and endpoint-specific limits.
  */
 export function checkCombinedRateLimit(
   request: Request,
@@ -181,4 +226,28 @@ export function checkCombinedRateLimit(
   // Check endpoint-specific rate limit
   const endpointId = getRateLimitIdentifier(request, endpointConfig.prefix);
   return checkRateLimit(endpointId, endpointConfig);
+}
+
+/**
+ * Combined rate limit check with Redis support (async version).
+ * Tries Redis first for cross-instance consistency,
+ * falls back to in-memory on Redis failure or absence.
+ */
+export async function checkCombinedRateLimitAsync(
+  request: Request,
+  endpointConfig: RateLimitConfig
+): Promise<RateLimitResult> {
+  const ip = getRateLimitIdentifier(request);
+
+  // Try Redis for the global rate limit
+  const globalRedis = await checkRedisRateLimit(ip, RATE_LIMITS.api);
+  const globalResult = globalRedis ?? checkRateLimit(ip, RATE_LIMITS.api);
+  if (!globalResult.allowed) {
+    return globalResult;
+  }
+
+  // Try Redis for endpoint-specific rate limit
+  const endpointId = getRateLimitIdentifier(request, endpointConfig.prefix);
+  const endpointRedis = await checkRedisRateLimit(endpointId, endpointConfig);
+  return endpointRedis ?? checkRateLimit(endpointId, endpointConfig);
 }

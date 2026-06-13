@@ -49,7 +49,7 @@ export default function PasskeyManager({ userEmail }: PasskeyManagerProps) {
   // Load existing passkeys
   const loadPasskeys = useCallback(async () => {
     try {
-      const res = await apiFetch('/api/auth/passkey');
+      const res = await apiFetch('/api/auth/passkey', { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
         setPasskeys(data.passkeys || []);
@@ -75,9 +75,23 @@ export default function PasskeyManager({ userEmail }: PasskeyManagerProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'register-options' }),
+        credentials: 'include',
       });
-      if (!optRes.ok) throw new Error('Failed to get registration options');
-      const { options, challengeId } = await optRes.json();
+      const optData = await optRes.json().catch(() => ({}));
+      if (!optRes.ok) {
+        if (optRes.status === 401) {
+          throw new Error(
+            lang === 'en'
+              ? 'Session expired — please sign out and sign in again'
+              : 'เซสชันหมดอายุ — กรุณาออกจากระบบแล้วเข้าสู่ระบบใหม่',
+          );
+        }
+        throw new Error(
+          (optData as { error?: string }).error ||
+            (lang === 'en' ? 'Failed to get registration options' : 'ไม่สามารถเริ่มลงทะเบียนพาสคีย์ได้'),
+        );
+      }
+      const { options, challengeId } = optData;
 
       // Step 2: Create credential with browser WebAuthn API
       const attestation = await startRegistration({ optionsJSON: options });

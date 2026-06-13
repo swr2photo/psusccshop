@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   // ตรวจสอบสิทธิ์ Admin (server-side: reads env vars at runtime)
-  const authResult = await requireAdmin();
+  const authResult = await requireAdmin(req);
   if (authResult instanceof NextResponse) {
     return authResult;
   }

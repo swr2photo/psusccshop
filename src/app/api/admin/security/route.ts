@@ -3,8 +3,8 @@
 // Provides security metrics, alerts, and threat analysis
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions, isAdminEmailAsync } from '@/lib/auth';
+import { getSessionFromRequest } from '@/lib/session-from-request';
+import { isAdminEmailAsync } from '@/lib/auth';
 import {
   getSecurityAuditLogs,
   getSecurityMetrics,
@@ -21,7 +21,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   try {
     // Check admin authentication
-    const session = await getServerSession(authOptions);
+    const session = await getSessionFromRequest(request);
     const userEmail = session?.user?.email;
     
     if (!userEmail) {
@@ -143,7 +143,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     // Check admin authentication
-    const session = await getServerSession(authOptions);
+    const session = await getSessionFromRequest(request);
     const userEmail = session?.user?.email;
     
     if (!userEmail) {

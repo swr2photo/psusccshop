@@ -198,10 +198,20 @@ export const isCurrentUserAdmin = async (): Promise<boolean> => {
 };
 
 /**
+ * Resolve session from explicit request (Workers) or request context / getServerSession.
+ */
+async function resolveSession(req?: Request): Promise<Session | null> {
+  if (req) return getSessionFromRequest(req);
+  return getSession();
+}
+
+/**
  * Require admin authentication - returns error response if not admin
  */
-export const requireAdmin = async (): Promise<{ isAdmin: true; email: string } | NextResponse> => {
-  const session = await getSession();
+export const requireAdmin = async (
+  req?: Request,
+): Promise<{ isAdmin: true; email: string } | NextResponse> => {
+  const session = await resolveSession(req);
   const email = session?.user?.email;
 
   if (!email) {
@@ -226,8 +236,10 @@ export const requireAdmin = async (): Promise<{ isAdmin: true; email: string } |
 /**
  * Require super admin authentication - returns error response if not super admin
  */
-export const requireSuperAdmin = async (): Promise<{ isAdmin: true; email: string } | NextResponse> => {
-  const session = await getSession();
+export const requireSuperAdmin = async (
+  req?: Request,
+): Promise<{ isAdmin: true; email: string } | NextResponse> => {
+  const session = await resolveSession(req);
   const email = session?.user?.email;
 
   if (!email) {
@@ -252,9 +264,10 @@ export const requireSuperAdmin = async (): Promise<{ isAdmin: true; email: strin
  * Super admin always passes all permission checks
  */
 export const requireAdminWithPermission = async (
-  permission: keyof AdminPermissions
+  permission: keyof AdminPermissions,
+  req?: Request,
 ): Promise<{ isAdmin: true; email: string } | NextResponse> => {
-  const session = await getSession();
+  const session = await resolveSession(req);
   const email = session?.user?.email;
 
   if (!email) {
@@ -322,8 +335,10 @@ export const requireAdminWithPermission = async (
 /**
  * Require authentication - returns error response if not logged in
  */
-export const requireAuth = async (): Promise<{ isAuthenticated: true; email: string } | NextResponse> => {
-  const session = await getSession();
+export const requireAuth = async (
+  req?: Request,
+): Promise<{ isAuthenticated: true; email: string } | NextResponse> => {
+  const session = await resolveSession(req);
   const email = session?.user?.email;
 
   if (!email) {

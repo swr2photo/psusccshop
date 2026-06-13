@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 
 /** Paginated admin order list (slim payload). */
 async function GETHandler(req: NextRequest) {
-  const authResult = await requireAdmin();
+  const authResult = await requireAdmin(req);
   if (authResult instanceof NextResponse) return authResult;
 
   try {

@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 
 /** Lightweight admin bootstrap — auth, role, order counts only. */
 async function GETHandler(req: NextRequest) {
-  const authResult = await requireAdmin();
+  const authResult = await requireAdmin(req);
   if (authResult instanceof NextResponse) return authResult;
 
   try {

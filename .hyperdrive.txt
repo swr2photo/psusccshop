@@ -1,0 +1,12 @@
+# Hyperdrive — ใช้บรรทัดเดียว (port 5432 ไม่ใช่ 6543)
+
+postgresql://postgres.dqecqtmebioqhrkusahz:vm5VDZf%2Ay%2BLe-qe@aws-1-ap-northeast-1.pooler.supabase.com:5432/postgres
+
+# ทางเลือก scheme postgres:// (ลองถ้าอันบน fail)
+postgres://postgres.dqecqtmebioqhrkusahz:vm5VDZf%2Ay%2BLe-qe@aws-1-ap-northeast-1.pooler.supabase.com:5432/postgres
+
+# ❌ คุณใส่ 6543 — บางครั้ง Hyperdrive reject; ใช้ 5432
+# ❌ ห้าม ?sslmode=require
+
+# ถ้า Dashboard ยัง fail → Reset password ใหม่ให้เป็น a-z A-Z 0-9 อย่างเดียว (ไม่มี * + #)
+# แล้ว Connect → Session pooler → URI → วางใหม่
