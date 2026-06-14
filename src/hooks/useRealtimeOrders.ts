@@ -297,7 +297,7 @@ export function useRealtimeOrders(options: UseRealtimeOrdersOptions = {}) {
   // Subscribe to config changes
   const subscribeToConfig = useCallback(() => {
     const client = getSupabaseClient();
-    if (!client || !enabled || !onConfigChangeRef.current) return null;
+    if (!client || !onConfigChangeRef.current) return null;
 
     try {
       const channelName = `config-changes-${Math.random().toString(36).substring(2, 9)}`;
@@ -329,7 +329,7 @@ export function useRealtimeOrders(options: UseRealtimeOrdersOptions = {}) {
       console.error('[Realtime] Config subscribe error:', err);
       return null;
     }
-  }, [enabled]);
+  }, []);
 
   // Schedule reconnection
   const scheduleReconnect = useCallback(() => {
@@ -522,15 +522,20 @@ export function useRealtimeOrders(options: UseRealtimeOrdersOptions = {}) {
     
     if (!enabled) {
       updateState({ connectionState: 'disconnected', isConnected: false });
-      return;
+      // Only return early if neither order nor config subscription is needed
+      if (!onConfigChangeRef.current) {
+        return;
+      }
     }
 
     updateState({ connectionState: 'connecting' });
 
     // Subscribe to channels
-    const orderChannel = subscribeToOrders();
-    if (orderChannel) {
-      channelRef.current = orderChannel;
+    if (enabled) {
+      const orderChannel = subscribeToOrders();
+      if (orderChannel) {
+        channelRef.current = orderChannel;
+      }
     }
 
     const configChannel = subscribeToConfig();

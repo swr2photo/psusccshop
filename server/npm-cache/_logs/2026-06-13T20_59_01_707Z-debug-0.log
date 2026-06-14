@@ -1,0 +1,13 @@
+0 verbose cli C:\nvm4w\nodejs\node.exe C:\Users\This PC\AppData\Roaming\npm\node_modules\npm\bin\npm-cli.js
+1 info using npm@11.15.0
+2 info using node@v22.22.2
+3 silly config load:file:C:\Users\This PC\AppData\Roaming\npm\node_modules\npm\npmrc
+4 info config found workspace root at D:\shop\psusccshop
+5 silly config load:file:D:\shop\psusccshop\.npmrc
+6 silly config load:file:C:\Users\This PC\.npmrc
+7 silly config load:file:C:\Users\This PC\AppData\Roaming\npm\etc\npmrc
+8 verbose title npm exec wrangler tail --format=json
+9 verbose argv "exec" "--" "wrangler" "tail" "--format=json"
+10 verbose logfile logs-max:10 dir:D:\shop\psusccshop\server\npm-cache\_logs\2026-06-13T20_59_01_707Z-
+11 verbose logfile D:\shop\psusccshop\server\npm-cache\_logs\2026-06-13T20_59_01_707Z-debug-0.log
+12 silly logfile done cleaning log files

@@ -99,6 +99,7 @@ async function handleChargeComplete(charge: any) {
       paymentMethod: 'credit_card',
       paymentVerified: true,
       paymentVerifiedAt: new Date().toISOString(),
+      receiptIssuedAt: new Date().toISOString(),
       updatedAt: new Date(),
     })
     .where(eq(orders.ref, orderId));

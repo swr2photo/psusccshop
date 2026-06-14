@@ -212,6 +212,7 @@ export async function GET(req: NextRequest) {
           paymentGateway: 'stripe',
           paymentVerified: true,
           paymentVerifiedAt: new Date().toISOString(),
+          receiptIssuedAt: new Date().toISOString(),
           updatedAt: new Date(),
           ...(slipData ? { slipData } : {}),
         })

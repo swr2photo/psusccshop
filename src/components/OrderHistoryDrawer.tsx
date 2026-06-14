@@ -512,7 +512,10 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
               const statusColor = getStatusColor(statusKey);
               const canCancel = CANCELABLE_STATUSES.includes(statusKey);
               const canPay = isShopOpen && PAYABLE_STATUSES.includes(statusKey);
-              const canRequestRefund = REFUNDABLE_STATUSES.includes(statusKey) && !order.refundStatus;
+              const paymentVerifiedDate = order.paymentVerifiedAt ? new Date(order.paymentVerifiedAt) : null;
+              const isWithin5Days = paymentVerifiedDate ? (new Date().getTime() - paymentVerifiedDate.getTime()) <= 5 * 24 * 60 * 60 * 1000 : false;
+              const canRequestRefund = REFUNDABLE_STATUSES.includes(statusKey) && isWithin5Days && !order.refundStatus;
+              const hasRequestedRefund = !!order.refundStatus;
               const canViewReceipt = isOrderPaidForReceipt(order);
               const category = getStatusCategory(statusKey);
               const isExpanded = expandedOrders.has(order.ref);
@@ -1142,17 +1145,18 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                               {cancellingRef === order.ref ? t.orderHistory.cancelling : t.orderHistory.cancelOrder}
                             </Button>
                           )}
-                          {canRequestRefund && (
+                          {(canRequestRefund || hasRequestedRefund) && (
                             <Button
                               size="small"
-                              onClick={() => openRefundDialog(order.ref, order.total || 0)}
+                              onClick={() => canRequestRefund ? openRefundDialog(order.ref, order.total || 0) : null}
+                              disabled={hasRequestedRefund}
                               sx={{
                                 px: 1.5,
                                 py: 0.6,
                                 borderRadius: '8px',
-                                bgcolor: 'rgba(124,58,237,0.08)',
-                                border: '1px solid rgba(124,58,237,0.2)',
-                                color: '#8b5cf6',
+                                bgcolor: hasRequestedRefund ? 'rgba(100,116,139,0.08)' : 'rgba(124,58,237,0.08)',
+                                border: hasRequestedRefund ? '1px solid rgba(100,116,139,0.2)' : '1px solid rgba(124,58,237,0.2)',
+                                color: hasRequestedRefund ? 'var(--text-muted)' : '#8b5cf6',
                                 fontSize: '0.75rem',
                                 fontWeight: 600,
                                 textTransform: 'none',
@@ -1160,11 +1164,19 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: 0.5,
-                                '&:hover': { bgcolor: 'rgba(124,58,237,0.15)' },
+                                '&:hover': { bgcolor: hasRequestedRefund ? 'rgba(100,116,139,0.08)' : 'rgba(124,58,237,0.15)' },
+                                '&:disabled': {
+                                  color: 'var(--text-muted)',
+                                  borderColor: 'rgba(100,116,139,0.2)',
+                                }
                               }}
                             >
                               <RotateCcw size={12} />
-                              {t.orderHistory.requestRefund}
+                              {hasRequestedRefund ? `ขอคืนเงิน: ${
+                                order.refundStatus === 'PENDING' ? 'รอตรวจสอบ' :
+                                order.refundStatus === 'APPROVED' ? 'อนุมัติแล้ว' :
+                                order.refundStatus === 'REJECTED' ? 'ถูกปฏิเสธ' : order.refundStatus
+                              }` : t.orderHistory.requestRefund}
                             </Button>
                           )}
                           {/* Invoice — only after payment confirmed */}

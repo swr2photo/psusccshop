@@ -471,6 +471,7 @@ export type OrderHistory = {
   refundAmount?: number;
   refundRequestedAt?: string;
   refundAdminNote?: string;
+  paymentVerifiedAt?: string | null;
   // Pickup confirmation info
   pickup?: {
     pickedUp?: boolean;

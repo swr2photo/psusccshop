@@ -1,0 +1,34 @@
+0 verbose cli C:\nvm4w\nodejs\node.exe C:\Users\This PC\AppData\Roaming\npm\node_modules\npm\bin\npm-cli.js
+1 info using npm@11.15.0
+2 info using node@v22.22.2
+3 silly config load:file:C:\Users\This PC\AppData\Roaming\npm\node_modules\npm\npmrc
+4 info config found workspace root at D:\shop\psusccshop
+5 silly config load:file:D:\shop\psusccshop\.npmrc
+6 silly config load:file:C:\Users\This PC\.npmrc
+7 silly config load:file:C:\Users\This PC\AppData\Roaming\npm\etc\npmrc
+8 verbose title npm run build
+9 verbose argv "run" "build"
+10 verbose logfile logs-max:10 dir:D:\shop\psusccshop\server\npm-cache\_logs\2026-06-13T21_03_30_103Z-
+11 verbose logfile D:\shop\psusccshop\server\npm-cache\_logs\2026-06-13T21_03_30_103Z-debug-0.log
+12 silly logfile done cleaning log files
+13 verbose stack Error: Missing script: "build"
+13 verbose stack
+13 verbose stack To see a list of scripts, run:
+13 verbose stack   npm run --workspace=@psusccshop/api@1.0.0
+13 verbose stack     at #run (C:\Users\This PC\AppData\Roaming\npm\node_modules\npm\lib\commands\run.js:115:13)
+13 verbose stack     at RunScript.execWorkspaces (C:\Users\This PC\AppData\Roaming\npm\node_modules\npm\lib\commands\run.js:67:24)
+13 verbose stack     at async Npm.exec (C:\Users\This PC\AppData\Roaming\npm\node_modules\npm\lib\npm.js:193:9)
+13 verbose stack     at async module.exports (C:\Users\This PC\AppData\Roaming\npm\node_modules\npm\lib\cli\entry.js:67:5)
+14 error Lifecycle script `build` failed with error:
+15 error workspace @psusccshop/api@1.0.0
+16 error location D:\shop\psusccshop\server
+17 error Missing script: "build"
+17 error
+17 error To see a list of scripts, run:
+17 error   npm run --workspace=@psusccshop/api@1.0.0
+18 verbose cwd D:\shop\psusccshop\server
+19 verbose os Windows_NT 10.0.26300
+20 verbose node v22.22.2
+21 verbose npm  v11.15.0
+22 verbose exit 1
+23 verbose code 1

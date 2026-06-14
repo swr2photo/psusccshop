@@ -297,10 +297,9 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
     }
   }, [productDialogOpen]);
 
-  if (!selectedProduct) return null;
-
   const productImages = (() => {
     const imgs: string[] = [];
+    if (!selectedProduct) return imgs;
     if (selectedProduct.coverImage) {
       imgs.push(selectedProduct.coverImage);
     }
@@ -355,12 +354,13 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
 
   // Determine if pattern must be selected first
   const needsPatternFirst = !!(
-    selectedProduct.patterns &&
+    selectedProduct?.patterns &&
     selectedProduct.patterns.filter((p: any) => p.isActive !== false).length > 0 &&
     !productOptions.pattern
   );
 
   const displaySizes = useMemo(() => {
+    if (!selectedProduct) return [t.common.freeSize];
     const sizeKeys = Object.keys(selectedProduct.sizePricing || {});
     if (sizeKeys.length === 0) return [t.common.freeSize];
     return sizeKeys.sort((a, b) => {
@@ -372,6 +372,8 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
       return a.localeCompare(b);
     });
   }, [selectedProduct, t.common.freeSize]);
+
+  if (!selectedProduct) return null;
 
   const productContent = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: 'var(--background)', color: 'var(--foreground)' }}>

@@ -439,6 +439,11 @@ export async function PUT(req: NextRequest) {
       sanitizedUpdates.amount = recalculated;
     }
 
+    // Record receipt issued at when payment is verified
+    if (sanitizedUpdates.paymentVerified === true && existing.paymentVerified !== true) {
+      sanitizedUpdates.receiptIssuedAt = new Date().toISOString();
+    }
+
     const next = { ...existing, ...sanitizedUpdates };
 
     // State machine check if status changed

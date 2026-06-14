@@ -10,6 +10,7 @@ const PasskeyLoginButton = dynamic(() => import('@/components/PasskeyLoginButton
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useConfirmDialog, useAlertDialog } from '@/hooks/useConfirmDialog';
 import { useRealtimeAdminOrders } from '@/hooks/useRealtimeOrders';
+import { supabase } from '@/lib/supabase-client';
 import { useAdminDataSWR } from '@/hooks/useAdminDataSWR';
 import { SettingsView } from '@/components/admin/SettingsView';
 import { DashboardView } from '@/components/admin/DashboardView';
@@ -3029,6 +3030,39 @@ export default function AdminPage(): JSX.Element {
       });
     }
   }, []);
+
+  // ========== Realtime Subscription for Shops ==========
+  useEffect(() => {
+    if (!serverRoleChecked || serverUserRole !== 'superadmin') return;
+
+    const channelName = `admin-shops-sync-${Math.random().toString(36).substring(2, 9)}`;
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'shops' },
+        () => {
+          console.log('[Admin Realtime] Shops table changed, refetching...');
+          apiFetch('/api/shops').then(res => res.json()).then(data => {
+            if (data.status === 'success') {
+              const shops: MyShopInfo[] = (data.shops || []).map((s: any) => ({
+                id: s.id,
+                slug: s.slug,
+                name: s.name,
+                role: s.role || 'admin',
+                permissions: s.permissions || {},
+              }));
+              setMyShops(shops);
+            }
+          }).catch(err => console.warn('[Admin Realtime] Failed to refetch shops', err));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [serverRoleChecked, serverUserRole]);
 
   // ========== Fetch My Shops (after auth) ==========
   useEffect(() => {

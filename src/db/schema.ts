@@ -30,6 +30,7 @@ export const orders = pgTable('orders', {
   notes: text('notes'),
   slipData: jsonb('slip_data'),
   paymentVerifiedAt: text('payment_verified_at'),
+  receiptIssuedAt: text('receipt_issued_at'),
   paymentMethod: text('payment_method'),
   paymentStatus: text('payment_status').default('pending').notNull(),
   paymentVerified: boolean('payment_verified').default(false).notNull(),

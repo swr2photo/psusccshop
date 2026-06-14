@@ -125,6 +125,7 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
       paymentGateway: 'stripe',
       paymentVerified: true,
       paymentVerifiedAt: new Date().toISOString(),
+      receiptIssuedAt: new Date().toISOString(),
       updatedAt: new Date(),
       ...(slipData ? { slipData } : {}),
     })
