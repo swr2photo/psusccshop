@@ -2904,6 +2904,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
         isShopOpen={isShopOpen}
         realtimeConnected={realtimeConnected}
         config={shopConfig}
+        onRefundRequested={() => loadOrderHistory()}
       />
 
       {/* ==================== SUPPORT CHAT ==================== */}

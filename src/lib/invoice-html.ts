@@ -296,6 +296,10 @@ export function buildInvoiceHtml(
   const orderDate =
     readOrderField(order, 'createdAt', 'created_at', 'date') || new Date().toISOString();
   const paidAt = readOrderField(order, 'paymentVerifiedAt', 'payment_verified_at', 'verifiedAt');
+  const receiptIssuedDate =
+    readOrderField(order, 'receiptIssuedAt', 'receipt_issued_at') ||
+    paidAt ||
+    orderDate;
   const status = readOrderField(order, 'status') || 'WAITING_PAYMENT';
   const isPaid = status.toUpperCase() === 'PAID' || order.paymentVerified === true;
 
@@ -618,7 +622,7 @@ export function buildInvoiceHtml(
     </div>
     <div class="footer">
       <p><strong>${escapeHtml(L.thankYou)}</strong></p>
-      <p style="margin-top:6px;">${escapeHtml(L.generatedAt)}: ${escapeHtml(formatDateTime(new Date(), lang))}</p>
+      <p style="margin-top:6px;">${escapeHtml(L.generatedAt)}: ${escapeHtml(formatDateTime(receiptIssuedDate, lang))}</p>
       <p style="margin-top:4px;">${escapeHtml(absoluteUrl('/'))}</p>
     </div>
   </div>

@@ -4775,6 +4775,7 @@ export default function HomePage() {
           setLightboxIndex(0);
           setLightboxImage(image);
         }}
+        onRefundRequested={() => loadOrderHistory()}
       />
 
       {/* ===== Wishlist Drawer ===== */}

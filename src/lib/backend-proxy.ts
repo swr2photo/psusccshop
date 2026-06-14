@@ -61,6 +61,7 @@ export function shouldKeepApiOnVercel(pathname: string): boolean {
     '/api/payment/stripe',
     '/api/payment/config',
     '/api/shops',
+    '/api/reviews',
   ];
 
   return sessionPrefixes.some((prefix) => pathname.startsWith(prefix));

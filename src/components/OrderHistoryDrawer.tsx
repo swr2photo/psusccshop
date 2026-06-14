@@ -78,6 +78,7 @@ interface OrderHistoryDrawerProps {
   realtimeConnected: boolean;
   config: ShopConfig | null;
   onImageClick?: (image: string) => void;
+  onRefundRequested?: (ref: string) => void;
 }
 
 const historyFilters: HistoryFilter[] = [
@@ -158,6 +159,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
     realtimeConnected,
     config,
     onImageClick,
+    onRefundRequested,
   } = props;
 
   const { success: toastSuccess, error: toastError } = useNotification();
@@ -196,6 +198,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
   const [refundAccountName, setRefundAccountName] = React.useState('');
   const [refundAmount, setRefundAmount] = React.useState('');
   const [refundSubmitting, setRefundSubmitting] = React.useState(false);
+  const [requestedRefundRefs, setRequestedRefundRefs] = React.useState<Set<string>>(new Set());
   const refundReasons = React.useMemo(() => [
     t.orderHistory.reason_damaged,
     t.orderHistory.reason_wrong,
@@ -239,6 +242,14 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
       if (res.ok && data.success) {
         setRefundDialogOpen(false);
         toastSuccess(t.orderHistory.refundSuccess);
+        setRequestedRefundRefs(prev => {
+          const next = new Set(prev);
+          next.add(refundOrderRef);
+          return next;
+        });
+        if (onRefundRequested) {
+          onRefundRequested(refundOrderRef);
+        }
       } else {
         toastError(data.error || t.orderHistory.refundError);
       }
@@ -515,8 +526,9 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
               const orderDateStr = order.receiptIssuedAt || order.paymentVerifiedAt || order.date;
               const referenceDate = orderDateStr ? new Date(orderDateStr) : null;
               const isWithin5Days = referenceDate ? (new Date().getTime() - referenceDate.getTime()) <= 5 * 24 * 60 * 60 * 1000 : false;
-              const canRequestRefund = REFUNDABLE_STATUSES.includes(statusKey) && isWithin5Days && !order.refundStatus;
-              const hasRequestedRefund = !!order.refundStatus;
+              const tempRefundStatus = order.refundStatus || (requestedRefundRefs.has(order.ref) ? 'REQUESTED' : null);
+              const canRequestRefund = REFUNDABLE_STATUSES.includes(statusKey) && isWithin5Days && !tempRefundStatus;
+              const hasRequestedRefund = !!tempRefundStatus;
               const canViewReceipt = isOrderPaidForReceipt(order);
               const category = getStatusCategory(statusKey);
               const isExpanded = expandedOrders.has(order.ref);
@@ -734,7 +746,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                     <Box sx={{ borderTop: '1px solid var(--glass-border)' }}>
 
                       {/* Refund Status Badge */}
-                      {order.refundStatus && (
+                      {tempRefundStatus && (
                         <Box sx={{ px: { xs: 1.5, sm: 2 }, pt: 1.5 }}>
                           <Box sx={{
                             display: 'flex',
@@ -743,29 +755,29 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                             px: 1.5,
                             py: 0.7,
                             borderRadius: '10px',
-                            bgcolor: order.refundStatus === 'REJECTED' ? 'rgba(239,68,68,0.08)' :
-                                     order.refundStatus === 'COMPLETED' ? 'rgba(16,185,129,0.08)' :
+                            bgcolor: tempRefundStatus === 'REJECTED' ? 'rgba(239,68,68,0.08)' :
+                                     tempRefundStatus === 'COMPLETED' ? 'rgba(16,185,129,0.08)' :
                                      'rgba(124,58,237,0.08)',
                             border: `1px solid ${
-                              order.refundStatus === 'REJECTED' ? 'rgba(239,68,68,0.2)' :
-                              order.refundStatus === 'COMPLETED' ? 'rgba(16,185,129,0.2)' :
+                              tempRefundStatus === 'REJECTED' ? 'rgba(239,68,68,0.2)' :
+                              tempRefundStatus === 'COMPLETED' ? 'rgba(16,185,129,0.2)' :
                               'rgba(124,58,237,0.2)'
                             }`,
                           }}>
                             <RotateCcw size={13} style={{
-                              color: order.refundStatus === 'REJECTED' ? 'var(--error)' :
-                                     order.refundStatus === 'COMPLETED' ? 'var(--success)' : '#bf5af2',
+                              color: tempRefundStatus === 'REJECTED' ? 'var(--error)' :
+                                     tempRefundStatus === 'COMPLETED' ? 'var(--success)' : '#bf5af2',
                             }} />
                             <Typography sx={{
                               fontSize: '0.73rem',
                               fontWeight: 600,
-                              color: order.refundStatus === 'REJECTED' ? 'var(--error)' :
-                                     order.refundStatus === 'COMPLETED' ? 'var(--success)' : '#bf5af2',
+                              color: tempRefundStatus === 'REJECTED' ? 'var(--error)' :
+                                     tempRefundStatus === 'COMPLETED' ? 'var(--success)' : '#bf5af2',
                             }}>
-                              {order.refundStatus === 'REQUESTED' ? t.orderHistory.refundPending :
-                               order.refundStatus === 'APPROVED' ? t.orderHistory.refundApproved :
-                               order.refundStatus === 'COMPLETED' ? t.orderHistory.refundCompleted :
-                               order.refundStatus === 'REJECTED' ? t.orderHistory.refundRejected :
+                              {tempRefundStatus === 'REQUESTED' ? t.orderHistory.refundPending :
+                               tempRefundStatus === 'APPROVED' ? t.orderHistory.refundApproved :
+                               tempRefundStatus === 'COMPLETED' ? t.orderHistory.refundCompleted :
+                               tempRefundStatus === 'REJECTED' ? t.orderHistory.refundRejected :
                                t.orderHistory.refundRequest}
                             </Typography>
                             {order.refundAmount && (
@@ -1174,9 +1186,9 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                             >
                               <RotateCcw size={12} />
                               {hasRequestedRefund ? `ขอคืนเงิน: ${
-                                order.refundStatus === 'PENDING' ? 'รอตรวจสอบ' :
-                                order.refundStatus === 'APPROVED' ? 'อนุมัติแล้ว' :
-                                order.refundStatus === 'REJECTED' ? 'ถูกปฏิเสธ' : order.refundStatus
+                                (tempRefundStatus === 'REQUESTED' || tempRefundStatus === 'PENDING') ? 'รอตรวจสอบ' :
+                                tempRefundStatus === 'APPROVED' ? 'อนุมัติแล้ว' :
+                                tempRefundStatus === 'REJECTED' ? 'ถูกปฏิเสธ' : tempRefundStatus
                               }` : t.orderHistory.requestRefund}
                             </Button>
                           )}
