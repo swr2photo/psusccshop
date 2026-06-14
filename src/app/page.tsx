@@ -778,7 +778,7 @@ export default function HomePage() {
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [lightboxImages, setLightboxImages] = useState<string[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState(0);
-  const { reviews: selectedProductReviewsList } = useProductReviews(selectedProduct?.id);
+  const { reviews: selectedProductReviewsList } = useProductReviews(selectedProduct?.id, orderData.email);
   const [productDialogOpen, setProductDialogOpen] = useState(false);
   const [bottomPanelCollapsed, setBottomPanelCollapsed] = useState(true);
   const [productOptions, setProductOptions] = useState<ProductOptions>({
@@ -4455,7 +4455,7 @@ export default function HomePage() {
               if (data.success) {
                 // Fetch updated reviews
                 if (selectedProduct?.id) {
-                  const freshRes = await apiFetch(`/api/reviews?productId=${encodeURIComponent(selectedProduct.id)}`);
+                  const freshRes = await apiFetch(`/api/reviews?productId=${encodeURIComponent(selectedProduct.id)}${orderData.email ? `&viewerEmail=${encodeURIComponent(orderData.email)}` : ''}`);
                   if (freshRes.ok) {
                     const freshData = await freshRes.json();
                     if (freshData.reviews) {
@@ -6239,7 +6239,7 @@ export default function HomePage() {
                     const data = await res.json();
                     if (editingReviewId || data.success) {
                       // Fetch updated reviews
-                      const freshRes = await apiFetch(`/api/reviews?productId=${encodeURIComponent(selectedProduct?.id || '')}`);
+                      const freshRes = await apiFetch(`/api/reviews?productId=${encodeURIComponent(selectedProduct?.id || '')}${orderData.email ? `&viewerEmail=${encodeURIComponent(orderData.email)}` : ''}`);
                       if (freshRes.ok) {
                         const freshData = await freshRes.json();
                         if (freshData.reviews) {

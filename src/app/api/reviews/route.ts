@@ -84,7 +84,12 @@ async function GETHandler(request: NextRequest) {
     });
 
     const session = await getServerSession(authOptions);
-    const userEmailHash = session?.user?.email ? hashEmail(session.user.email) : null;
+    const viewerEmail = searchParams.get('viewerEmail');
+    
+    let userEmailHash = session?.user?.email ? hashEmail(session.user.email) : null;
+    if (!userEmailHash && viewerEmail) {
+      userEmailHash = hashEmail(viewerEmail);
+    }
 
     const responseReviews = reviewData.map((r: any) => {
       const { emailHash, ...rest } = r;

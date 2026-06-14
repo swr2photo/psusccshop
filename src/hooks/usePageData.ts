@@ -21,7 +21,7 @@ export const PAGE_CACHE_KEYS = {
   CART: (email: string) => `/api/cart?email=${encodeURIComponent(email)}`,
   ORDERS: (email: string) => `/api/orders?email=${encodeURIComponent(email)}`,
   SHIPPING: '/api/shipping/options',
-  REVIEWS: (productId: string) => `/api/reviews?productId=${encodeURIComponent(productId)}`,
+  REVIEWS: (productId: string, viewerEmail?: string) => `/api/reviews?productId=${encodeURIComponent(productId)}${viewerEmail ? `&viewerEmail=${encodeURIComponent(viewerEmail)}` : ''}`,
 };
 
 // ============== LOCAL STORAGE CACHE ==============
@@ -161,9 +161,9 @@ export function useShopCatalog() {
 
 const EMPTY_REVIEWS: never[] = [];
 
-export function useProductReviews(productId: string | undefined | null) {
+export function useProductReviews(productId: string | undefined | null, viewerEmail?: string) {
   const { data, error, isLoading, mutate } = useSWR(
-    productId ? PAGE_CACHE_KEYS.REVIEWS(productId) : null,
+    productId ? PAGE_CACHE_KEYS.REVIEWS(productId, viewerEmail) : null,
     fetcher,
     {
       revalidateOnFocus: false,

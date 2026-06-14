@@ -512,8 +512,9 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
               const statusColor = getStatusColor(statusKey);
               const canCancel = CANCELABLE_STATUSES.includes(statusKey);
               const canPay = isShopOpen && PAYABLE_STATUSES.includes(statusKey);
-              const paymentVerifiedDate = order.paymentVerifiedAt ? new Date(order.paymentVerifiedAt) : null;
-              const isWithin5Days = paymentVerifiedDate ? (new Date().getTime() - paymentVerifiedDate.getTime()) <= 5 * 24 * 60 * 60 * 1000 : false;
+              const orderDateStr = order.receiptIssuedAt || order.paymentVerifiedAt || order.date;
+              const referenceDate = orderDateStr ? new Date(orderDateStr) : null;
+              const isWithin5Days = referenceDate ? (new Date().getTime() - referenceDate.getTime()) <= 5 * 24 * 60 * 60 * 1000 : false;
               const canRequestRefund = REFUNDABLE_STATUSES.includes(statusKey) && isWithin5Days && !order.refundStatus;
               const hasRequestedRefund = !!order.refundStatus;
               const canViewReceipt = isOrderPaidForReceipt(order);
