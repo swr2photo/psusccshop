@@ -778,6 +778,15 @@ export default function HomePage() {
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [lightboxImages, setLightboxImages] = useState<string[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [orderData, setOrderData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    instagram: '',
+    profileImage: '',
+  });
+
   const { reviews: selectedProductReviewsList } = useProductReviews(selectedProduct?.id, orderData.email);
   const [productDialogOpen, setProductDialogOpen] = useState(false);
   const [bottomPanelCollapsed, setBottomPanelCollapsed] = useState(true);
@@ -800,14 +809,6 @@ export default function HomePage() {
   const productHoldTimer = useRef<Interval | null>(null);
   const cartHoldTimers = useRef<Record<string, Interval | null>>({});
 
-  const [orderData, setOrderData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    address: '',
-    instagram: '',
-    profileImage: '',
-  });
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
   const [orderHistory, setOrderHistory] = useState<OrderHistory[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
