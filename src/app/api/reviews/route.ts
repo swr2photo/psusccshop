@@ -84,7 +84,7 @@ async function GETHandler(request: NextRequest) {
     });
 
     const session = await getServerSession(authOptions);
-    const viewerEmail = searchParams.get('viewerEmail');
+    const viewerEmail = request.nextUrl.searchParams.get('viewerEmail');
     
     let userEmailHash = session?.user?.email ? hashEmail(session.user.email) : null;
     if (!userEmailHash && viewerEmail) {
