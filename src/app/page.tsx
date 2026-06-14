@@ -1665,6 +1665,30 @@ export default function HomePage() {
           mutate(PAGE_CACHE_KEYS.CATALOG);
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'products',
+        },
+        (payload) => {
+          console.log('[Realtime] Public products change payload:', payload);
+          mutate(PAGE_CACHE_KEYS.CATALOG);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'categories',
+        },
+        (payload) => {
+          console.log('[Realtime] Public categories change payload:', payload);
+          mutate(PAGE_CACHE_KEYS.CATALOG);
+        }
+      )
       .subscribe((status) => {
         console.log('[Realtime] Public config subscription status:', status);
         setConfigRealtimeOk(status === 'SUBSCRIBED');
