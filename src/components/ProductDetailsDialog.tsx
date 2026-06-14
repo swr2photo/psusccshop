@@ -39,6 +39,7 @@ import {
   Palette,
   Ruler,
   Image as ImageOutlinedIcon,
+  Trash2,
 } from 'lucide-react';
 
 import {
@@ -214,6 +215,10 @@ interface ProductDetailsDialogProps {
   setReviewRating: (rating: number) => void;
   setReviewComment: (comment: string) => void;
   setReviewDialogOpen: (open: boolean) => void;
+  editingReviewId?: string | null;
+  setEditingReviewId?: (id: string | null) => void;
+  onEditReview?: (review: any) => void;
+  onDeleteReview?: (id: string) => void;
   config: ShopConfig;
 }
 
@@ -247,6 +252,10 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
   setReviewRating,
   setReviewComment,
   setReviewDialogOpen,
+  editingReviewId,
+  setEditingReviewId,
+  onEditReview,
+  onDeleteReview,
   config,
 }: ProductDetailsDialogProps) {
   
@@ -1118,6 +1127,16 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
                                 <Star key={s} size={12} color="#ff9f0a" fill={s <= review.rating ? '#ff9f0a' : 'none'} />
                               ))}
                             </Box>
+                            {review.isOwner && (
+                              <Box sx={{ display: 'flex', gap: 0.5, ml: 1 }}>
+                                <IconButton size="small" onClick={() => onEditReview?.(review)} sx={{ p: 0.5 }}>
+                                  <Edit size={14} color="var(--text-muted)" />
+                                </IconButton>
+                                <IconButton size="small" onClick={() => onDeleteReview?.(review.id)} sx={{ p: 0.5 }}>
+                                  <Trash2 size={14} color="#ff453a" />
+                                </IconButton>
+                              </Box>
+                            )}
                           </Box>
                           {review.comment && (
                             <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.5, ml: 4.5 }}>{review.comment}</Typography>
@@ -2070,6 +2089,16 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
                                 <Star key={s} size={10} color="#ff9f0a" fill={s <= review.rating ? '#ff9f0a' : 'none'} />
                               ))}
                             </Box>
+                            {review.isOwner && (
+                              <Box sx={{ display: 'flex', gap: 0.5, ml: 0.5 }}>
+                                <IconButton size="small" onClick={() => onEditReview?.(review)} sx={{ p: 0.5 }}>
+                                  <Edit size={12} color="var(--text-muted)" />
+                                </IconButton>
+                                <IconButton size="small" onClick={() => onDeleteReview?.(review.id)} sx={{ p: 0.5 }}>
+                                  <Trash2 size={12} color="#ff453a" />
+                                </IconButton>
+                              </Box>
+                            )}
                           </Box>
                           {review.comment && (
                             <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.5, ml: 4.2 }}>{review.comment}</Typography>

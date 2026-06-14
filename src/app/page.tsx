@@ -181,7 +181,8 @@ import { useThemeStore, ThemeMode } from '@/store/themeStore';
 import { useWishlistStore } from '@/store/wishlistStore';
 import { useRecentlyViewedStore } from '@/store/recentlyViewedStore';
 import { useTranslation } from '@/hooks/useTranslation';
-import { useShopCatalog, useProductReviews } from '@/hooks/usePageData';
+import { useShopCatalog, useProductReviews, PAGE_CACHE_KEYS } from '@/hooks/usePageData';
+import { mutate } from 'swr';
 
 const STATUS_LABELS: Record<string, string> = {
   PENDING: 'รอดำเนินการ',
@@ -765,6 +766,7 @@ export default function HomePage() {
   const [reviewComment, setReviewComment] = useState('');
   const [productReviews, setProductReviews] = useState<Record<string, Array<{ id: string; userName: string; userImage?: string; rating: number; comment: string; date: string; verified: boolean; helpful: number }>>>({});
   const [editingCartItem, setEditingCartItem] = useState<CartItem | null>(null);
+  const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
   const [bulkOrderOpen, setBulkOrderOpen] = useState(false);
   const [bulkStep, setBulkStep] = useState(0); // 0=sizes, 1=names, 2=preview
   const [bulkSizes, setBulkSizes] = useState<Record<string, number>>({}); // size -> qty
@@ -990,9 +992,14 @@ export default function HomePage() {
         rafId = null;
         const currentY = window.scrollY;
         const delta = Math.abs(currentY - lastScrollYRef.current);
+        if (delta < 5) return;
         lastScrollYRef.current = currentY;
-        if (delta < 2) return;
-        setNavHidden(true);
+        
+        setNavHidden(prev => {
+          if (!prev) return true;
+          return prev;
+        });
+        
         if (scrollIdleTimer.current) clearTimeout(scrollIdleTimer.current);
         scrollIdleTimer.current = setTimeout(() => setNavHidden(false), 220);
       });
@@ -1643,6 +1650,19 @@ export default function HomePage() {
           console.log('[Realtime] Public config change payload:', payload);
           const newData = payload.new as Record<string, any> | null;
           handleConfigChange(newData?.value || {});
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'shops',
+        },
+        (payload) => {
+          console.log('[Realtime] Public shops change payload:', payload);
+          // Refetch the public sub-shop catalog via SWR
+          mutate(PAGE_CACHE_KEYS.CATALOG);
         }
       )
       .subscribe((status) => {
@@ -4414,6 +4434,50 @@ export default function HomePage() {
         setReviewRating={setReviewRating}
         setReviewComment={setReviewComment}
         setReviewDialogOpen={setReviewDialogOpen}
+        editingReviewId={editingReviewId}
+        setEditingReviewId={setEditingReviewId}
+        onEditReview={(review: any) => {
+          setEditingReviewId(review.id);
+          setReviewRating(review.rating);
+          setReviewComment(review.comment);
+          setReviewDialogOpen(true);
+        }}
+        onDeleteReview={async (reviewId: string) => {
+          const ok = window.confirm(t.reviews?.deleteConfirmMsg || 'Are you sure you want to delete this review?');
+          if (!ok) return;
+
+          try {
+            const res = await apiFetch(`/api/reviews?id=${reviewId}`, {
+              method: 'DELETE',
+            });
+            if (res.ok) {
+              const data = await res.json();
+              if (data.success) {
+                // Fetch updated reviews
+                if (selectedProduct?.id) {
+                  const freshRes = await apiFetch(`/api/reviews?productId=${encodeURIComponent(selectedProduct.id)}`);
+                  if (freshRes.ok) {
+                    const freshData = await freshRes.json();
+                    if (freshData.reviews) {
+                      setProductReviews((prev) => ({
+                        ...prev,
+                        [selectedProduct.id]: freshData.reviews,
+                      }));
+                    }
+                  }
+                }
+                showToast('success', (t.reviews as any)?.deleteSuccess || 'Review deleted successfully');
+              } else {
+                showToast('error', data.error || 'Failed to delete review');
+              }
+            } else {
+              showToast('error', 'Failed to delete review');
+            }
+          } catch (err) {
+            console.error('Delete review error:', err);
+            showToast('error', 'Failed to delete review');
+          }
+        }}
         config={config!}
       />
 
@@ -6067,7 +6131,10 @@ export default function HomePage() {
       {/* ===== Review Dialog ===== */}
       <Dialog
         open={reviewDialogOpen}
-        onClose={() => setReviewDialogOpen(false)}
+        onClose={() => {
+          setReviewDialogOpen(false);
+          setEditingReviewId(null);
+        }}
         maxWidth="xs"
         fullWidth
         PaperProps={{
@@ -6131,7 +6198,10 @@ export default function HomePage() {
           {/* Actions */}
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Button
-              onClick={() => setReviewDialogOpen(false)}
+              onClick={() => {
+                setReviewDialogOpen(false);
+                setEditingReviewId(null);
+              }}
               sx={{ flex: 1, borderRadius: '12px', color: 'var(--text-muted)', border: '1px solid var(--glass-border)' }}
             >
               {t.common.cancel}
@@ -6147,25 +6217,27 @@ export default function HomePage() {
                   return;
                 }
 
-                const reviewData = {
-                  productId: selectedProduct?.id,
-                  email: session.user.email,
-                  userName: session.user.name || 'Anonymous',
-                  userImage: session.user.image || '',
-                  rating: reviewRating,
-                  comment: reviewComment,
-                };
+                const reviewData = editingReviewId
+                  ? { id: editingReviewId, rating: reviewRating, comment: reviewComment }
+                  : {
+                      productId: selectedProduct?.id,
+                      email: session.user.email,
+                      userName: session.user.name || 'Anonymous',
+                      userImage: session.user.image || '',
+                      rating: reviewRating,
+                      comment: reviewComment,
+                    };
 
                 try {
                   const res = await apiFetch('/api/reviews', {
-                    method: 'POST',
+                    method: editingReviewId ? 'PUT' : 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(reviewData),
                   });
                   
                   if (res.ok) {
                     const data = await res.json();
-                    if (data.success) {
+                    if (editingReviewId || data.success) {
                       // Fetch updated reviews
                       const freshRes = await apiFetch(`/api/reviews?productId=${encodeURIComponent(selectedProduct?.id || '')}`);
                       if (freshRes.ok) {
@@ -6177,7 +6249,7 @@ export default function HomePage() {
                           }));
                         }
                       }
-                      showToast('success', t.reviews.thankYou);
+                      showToast('success', editingReviewId ? 'อัปเดตรีวิวสำเร็จ' : t.reviews.thankYou);
                     } else {
                       showToast('error', data.error || 'Failed to submit review');
                     }
@@ -6190,6 +6262,7 @@ export default function HomePage() {
                 }
                 
                 setReviewDialogOpen(false);
+                setEditingReviewId(null);
               }}
               disabled={reviewRating === 0}
               sx={{
@@ -6201,7 +6274,7 @@ export default function HomePage() {
                 '&:disabled': { background: 'rgba(100,116,139,0.15)', color: 'var(--text-muted)' },
               }}
             >
-              {t.reviews.submit}
+              {editingReviewId ? 'อัปเดตรีวิว' : t.reviews.submit}
             </Button>
           </Box>
         </Box>
