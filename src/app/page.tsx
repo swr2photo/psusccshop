@@ -4443,7 +4443,7 @@ export default function HomePage() {
           setReviewDialogOpen(true);
         }}
         onDeleteReview={async (reviewId: string) => {
-          const ok = window.confirm(t.reviews?.deleteConfirmMsg || 'Are you sure you want to delete this review?');
+          const ok = window.confirm(t.reviews?.deleteConfirm || 'Are you sure you want to delete this review?');
           if (!ok) return;
 
           try {

@@ -271,7 +271,7 @@ export default function CartDrawer(props: CartDrawerProps) {
                       borderRadius: '16px',
                       bgcolor: 'var(--surface-2)',
                       border: '1px solid var(--glass-border)',
-                      transition: 'all 0.2s ease',
+                      transition: 'background-color 0.2s ease, transform 0.2s ease',
                       '&:hover': { bgcolor: 'var(--surface-2)' },
                     }}
                   >

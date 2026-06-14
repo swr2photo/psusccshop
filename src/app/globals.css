@@ -1499,3 +1499,21 @@ textarea::placeholder {
   flex-shrink: 0;
   padding-bottom: max(12px, env(safe-area-inset-bottom));
 }
+
+/* 
+ * iOS Performance Optimizations 
+ * iOS WebKit struggles heavily with multiple overlapping backdrop-filters. 
+ * We downgrade the blur effect to max 4px, or remove it entirely on heavy elements,
+ * compensating with a slightly more opaque background.
+ */
+@supports (-webkit-touch-callout: none) {
+  /* Reduce blur on all elements using it */
+  * {
+    --ios-max-blur: blur(4px) !important;
+  }
+  
+  [style*="backdrop-filter"] {
+    -webkit-backdrop-filter: blur(4px) !important;
+    backdrop-filter: blur(4px) !important;
+  }
+}
