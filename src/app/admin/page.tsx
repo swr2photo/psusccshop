@@ -3416,6 +3416,14 @@ export default function AdminPage(): JSX.Element {
       return;
     }
     
+    // Capture previous config for rollback in case of error
+    const previousConfig = config;
+    
+    // 1. Optimistic Update: Save to local state/cache immediately for instant UI feedback
+    setConfig(newConfig);
+    setLastSavedTime(new Date());
+    saveAdminCache({ config: newConfig, orders, logs });
+    
     setSaving(true);
     
     try {
@@ -3425,7 +3433,7 @@ export default function AdminPage(): JSX.Element {
       
       // Add announcement to history if it has content and is enabled
       const currentAnnouncement = configWithUrls.announcement;
-      const previousAnnouncement = config?.announcement;
+      const previousAnnouncement = previousConfig?.announcement;
       
       // Check if announcement content changed (message or image)
       const announcementChanged = currentAnnouncement?.enabled && 
@@ -3459,9 +3467,8 @@ export default function AdminPage(): JSX.Element {
         configWithUrls = { ...configWithUrls, announcementHistory };
       }
       
-      // Save to local state/cache immediately for instant UI feedback
+      // Update local state/cache with final configuration containing uploaded image URLs
       setConfig(configWithUrls);
-      setLastSavedTime(new Date());
       saveAdminCache({ config: configWithUrls, orders, logs });
 
       // Save to server — shop-specific or global
@@ -3488,10 +3495,13 @@ export default function AdminPage(): JSX.Element {
     } catch (error: any) {
       console.error('❌ Save error:', error);
       showToast('error', error?.message || 'บันทึกไม่สำเร็จ');
+      // Rollback to previous config on error
+      setConfig(previousConfig);
+      saveAdminCache({ config: previousConfig, orders, logs });
     } finally {
       setSaving(false);
     }
-  }, [orders, logs, showToast, session?.user?.email, addLog, config?.announcement, isShopMode, selectedShopId, myShops]);
+  }, [orders, logs, showToast, session?.user?.email, addLog, config, isShopMode, selectedShopId, myShops]);
 
   // Update Order Status
   const updateOrderStatus = async (ref: string, newStatus: string) => {

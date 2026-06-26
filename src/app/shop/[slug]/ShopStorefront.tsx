@@ -2,7 +2,7 @@
 // Client-side storefront for individual shops — matches main store design
 'use client';
 
-import { apiFetch } from '@/lib/api-client';
+import { apiFetch, getCart, saveCart as saveCartApi } from '@/lib/api-client';
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Box, Typography, Button, Chip, Avatar, IconButton, Badge,
@@ -537,6 +537,44 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user?.email]);
+
+  // Load cart from database on mount or session change
+  useEffect(() => {
+    const email = session?.user?.email;
+    if (!email) return;
+    
+    let active = true;
+    const loadCart = async () => {
+      try {
+        const res = await getCart(email);
+        const serverCart = (res.data as any)?.cart || (res as any)?.cart;
+        if (res.status === 'success' && Array.isArray(serverCart) && active) {
+          useCartStore.getState().setCart(serverCart);
+        }
+      } catch (error) {
+        console.error('[Cart Sync] Failed to load cart from database:', error);
+      }
+    };
+    
+    loadCart();
+    return () => { active = false; };
+  }, [session?.user?.email]);
+
+  // Sync local Zustand cart with database cart for logged-in users when it changes
+  useEffect(() => {
+    const email = session?.user?.email;
+    if (!email) return;
+    
+    const saveTimer = setTimeout(async () => {
+      try {
+        await saveCartApi(email, cart);
+      } catch (error) {
+        console.error('[Cart Sync] Failed to save cart to database:', error);
+      }
+    }, 500);
+
+    return () => clearTimeout(saveTimer);
+  }, [cart, session?.user?.email]);
 
   // Load follow state from localStorage
   useEffect(() => {

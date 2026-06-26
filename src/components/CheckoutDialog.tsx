@@ -43,6 +43,7 @@ import { ShippingConfig, ShippingOption } from '@/lib/shipping';
 import { PaymentConfig, PaymentOption } from '@/lib/payment';
 import TurnstileWidget from './TurnstileWidget';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useNotification } from '@/components/NotificationContext';
 
 // ==================== TYPES ====================
 
@@ -165,6 +166,7 @@ export default function CheckoutDialog({
   const [promoError, setPromoError] = useState('');
 
   const { t, lang } = useTranslation();
+  const { warning: toastWarning } = useNotification();
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
 
   const checkoutAddresses = useMemo(() => {
@@ -404,6 +406,17 @@ export default function CheckoutDialog({
   const addressMissing = useMemo(() => {
     return requiresAddress && !orderData.address?.trim();
   }, [requiresAddress, orderData.address]);
+
+  const handleShippingChange = (value: string) => {
+    setSelectedShipping(value);
+    
+    const selectedOption = shippingConfig?.options?.find(o => o.id === value);
+    const requiresAddr = selectedOption && selectedOption.provider !== 'pickup';
+    
+    if (requiresAddr && !orderData.address?.trim()) {
+      toastWarning(t.checkout.addressRequired || 'กรุณากรอกที่อยู่สำหรับจัดส่งสินค้า');
+    }
+  };
 
   const handleSubmit = () => {
     onSubmitOrder({
@@ -656,7 +669,7 @@ export default function CheckoutDialog({
             <Collapse in={showShippingOptions}>
               <RadioGroup
                 value={selectedShipping}
-                onChange={(e) => setSelectedShipping(e.target.value)}
+                onChange={(e) => handleShippingChange(e.target.value)}
               >
                 {enabledShippingOptions.map((option) => {
                   const isSelected = selectedShipping === option.id;

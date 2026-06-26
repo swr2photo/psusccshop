@@ -2065,11 +2065,11 @@ export default function HomePage() {
   };
 
   const updateCartQuantity = (id: string, quantity: number) => {
-    const clamped = clampQty(quantity);
-    if (clamped <= 0) {
+    if (quantity <= 0) {
       removeFromCart(id);
       return;
     }
+    const clamped = clampQty(quantity);
     const newCart = cart.map((item) => (item.id === id ? { ...item, quantity: clamped } : item));
     saveCart(newCart);
   };

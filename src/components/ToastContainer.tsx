@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo } from 'react';
 import { X, CheckCircle2, AlertCircle, AlertTriangle, Info, Sparkles } from 'lucide-react';
-import { Box, Typography, IconButton, Slide } from '@mui/material';
+import { Box, Typography, IconButton, Slide, useTheme, useMediaQuery } from '@mui/material';
 import { useNotification, Toast } from './NotificationContext';
 
 // ============== TOAST STYLES ==============
@@ -37,10 +37,12 @@ const TOAST_STYLES = {
 // ============== SINGLE TOAST COMPONENT ==============
 
 function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) => void }) {
+  const theme = useTheme();
+  const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
   const style = TOAST_STYLES[toast.type];
 
   return (
-    <Slide direction="left" in={true} mountOnEnter unmountOnExit>
+    <Slide direction={isDesktop ? "left" : "down"} in={true} mountOnEnter unmountOnExit>
       <Box
         sx={{
           background: style.bg,
@@ -57,8 +59,10 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
           minWidth: { xs: 280, sm: 320 },
           maxWidth: { xs: 'calc(100vw - 32px)', sm: 420 },
           pointerEvents: 'auto',
-          animation: 'toastSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
-          '@keyframes toastSlideIn': {
+          animation: isDesktop 
+            ? 'toastSlideInLeft 0.35s cubic-bezier(0.16, 1, 0.3, 1)' 
+            : 'toastSlideInDown 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
+          '@keyframes toastSlideInLeft': {
             '0%': {
               opacity: 0,
               transform: 'translateX(24px) scale(0.95)',
@@ -66,6 +70,16 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
             '100%': {
               opacity: 1,
               transform: 'translateX(0) scale(1)',
+            },
+          },
+          '@keyframes toastSlideInDown': {
+            '0%': {
+              opacity: 0,
+              transform: 'translateY(-24px) scale(0.95)',
+            },
+            '100%': {
+              opacity: 1,
+              transform: 'translateY(0) scale(1)',
             },
           },
           '&:hover': {
@@ -177,15 +191,17 @@ export default function ToastContainer() {
     <Box
       sx={{
         position: 'fixed',
-        top: { xs: 16, sm: 24 },
-        right: { xs: 16, sm: 24 },
-        zIndex: 99999,
+        top: { xs: 16, md: 24 },
+        left: { xs: '50%', md: 'auto' },
+        right: { xs: 'auto', md: 24 },
+        transform: { xs: 'translateX(-50%)', md: 'none' },
+        zIndex: 9999999,
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'flex-end',
+        alignItems: { xs: 'center', md: 'flex-end' },
         gap: 1.5,
         pointerEvents: 'none',
-        width: { xs: 'calc(100% - 32px)', sm: 'auto' },
+        width: { xs: 'calc(100% - 32px)', md: 'auto' },
         maxWidth: 420,
       }}
     >

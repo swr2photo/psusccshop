@@ -193,9 +193,13 @@ const ALLOWED_DOMAINS = [
   // Supabase storage
   'supabase.co',
   'supabase.com',
+  'supabase.net',
   // Common CDNs
   'cloudflare.com',
   'cdn.jsdelivr.net',
+  // Local development / emulation
+  'localhost',
+  '127.0.0.1',
 ];
 
 function isAllowedUrl(url: string): boolean {
@@ -347,23 +351,14 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid content type' }, { status: 400 });
     }
 
-    // Stream to client immediately; cache in background (faster first paint on MISS)
-    const body = response.body;
-    if (!body) {
-      return NextResponse.json({ error: 'Empty image response' }, { status: 502 });
-    }
+    // Fetch image data as ArrayBuffer to avoid fragile Node/Web stream compatibility issues
+    const arrayBuffer = await response.arrayBuffer();
+    const imageBuffer = Buffer.from(arrayBuffer);
 
-    const [clientStream, cacheStream] = body.tee();
-    (async () => {
-      try {
-        const imageBuffer = Buffer.from(await new Response(cacheStream).arrayBuffer());
-        await saveToCache(cacheKey, imageBuffer, contentType);
-      } catch {
-        // cache write is best-effort
-      }
-    })();
+    // Save to cache in the background (fire-and-forget, non-blocking)
+    saveToCache(cacheKey, imageBuffer, contentType).catch(() => {});
 
-    return new NextResponse(clientStream, {
+    return new NextResponse(new Uint8Array(imageBuffer), {
       status: 200,
       headers: {
         'Content-Type': contentType,
