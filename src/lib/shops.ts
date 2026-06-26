@@ -557,6 +557,29 @@ export async function getShopAdminPermissions(email: string): Promise<ShopAdminP
   }
 }
 
+/** Lean column selection for shop order list — excludes heavy fields. */
+const SHOP_ORDER_LIST_COLUMNS = {
+  id: orders.id,
+  ref: orders.ref,
+  date: orders.date,
+  status: orders.status,
+  customerName: orders.customerName,
+  customerEmail: orders.customerEmail,
+  emailHash: orders.emailHash,
+  customerPhone: orders.customerPhone,
+  cart: orders.cart,
+  totalAmount: orders.totalAmount,
+  paymentMethod: orders.paymentMethod,
+  shippingOption: orders.shippingOption,
+  trackingNumber: orders.trackingNumber,
+  shippingProvider: orders.shippingProvider,
+  trackingStatus: orders.trackingStatus,
+  shopId: orders.shopId,
+  shopSlug: orders.shopSlug,
+  createdAt: orders.createdAt,
+  updatedAt: orders.updatedAt,
+} as const;
+
 export async function getShopOrders(shopId: string, options?: {
   limit?: number;
   offset?: number;
@@ -580,7 +603,7 @@ export async function getShopOrders(shopId: string, options?: {
     const whereClause = and(...conditions);
     
     const [data, totalResult] = await Promise.all([
-      db.select()
+      db.select(SHOP_ORDER_LIST_COLUMNS)
         .from(orders)
         .where(whereClause!)
         .orderBy(desc(orders.createdAt))
@@ -598,3 +621,4 @@ export async function getShopOrders(shopId: string, options?: {
     return { orders: [], total: 0 };
   }
 }
+

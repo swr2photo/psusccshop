@@ -194,7 +194,7 @@ export async function getJson<T = any>(key: string): Promise<T | null> {
         .from(orders)
         .where(eq(orders.emailHash, emailHashValue))
         .orderBy(desc(orders.createdAt))
-        .limit(500);
+        .limit(100);
       return (data?.map(transformDBOrderToLegacy) || []) as T;
     }
     
@@ -398,7 +398,8 @@ export async function listKeys(prefix: string): Promise<string[]> {
     if (prefix.startsWith('orders/') && !prefix.includes('index')) {
       const data = await db.select({ ref: orders.ref, createdAt: orders.createdAt })
         .from(orders)
-        .orderBy(desc(orders.createdAt));
+        .orderBy(desc(orders.createdAt))
+        .limit(10000);
       return (data || []).map((order: any) => {
         const date = new Date(order.createdAt);
         const yyyy = date.getFullYear();
@@ -410,21 +411,24 @@ export async function listKeys(prefix: string): Promise<string[]> {
     if (prefix.startsWith('email-logs/')) {
       const data = await db.select({ id: emailLogs.id })
         .from(emailLogs)
-        .orderBy(desc(emailLogs.createdAt));
+        .orderBy(desc(emailLogs.createdAt))
+        .limit(10000);
       return (data || []).map((log: any) => `email-logs/${log.id}.json`);
     }
     
     if (prefix.startsWith('user-logs/')) {
       const data = await db.select({ id: userLogs.id })
         .from(userLogs)
-        .orderBy(desc(userLogs.createdAt));
+        .orderBy(desc(userLogs.createdAt))
+        .limit(10000);
       return (data || []).map((log: any) => `user-logs/${log.id}.json`);
     }
     
     if (prefix.startsWith('data-requests/')) {
       const data = await db.select({ id: dataRequests.id })
         .from(dataRequests)
-        .orderBy(desc(dataRequests.createdAt));
+        .orderBy(desc(dataRequests.createdAt))
+        .limit(10000);
       return (data || []).map((req: any) => `data-requests/${req.id}.json`);
     }
     
@@ -1264,7 +1268,9 @@ export async function uploadImageToStorage(
   const uniqueName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
   const path = `${yearMonth}/${uniqueName}`;
   
-  const { data, error } = await supabase.storage
+  // Use admin client for secure server-side storage operations
+  const adminClient = getSupabaseAdmin() || supabase;
+  const { data, error } = await adminClient.storage
     .from(STORAGE_BUCKET)
     .upload(path, buffer, {
       contentType,
@@ -1277,7 +1283,7 @@ export async function uploadImageToStorage(
     throw new Error(`Failed to upload image: ${error.message}`);
   }
   
-  const { data: urlData } = supabase.storage
+  const { data: urlData } = adminClient.storage
     .from(STORAGE_BUCKET)
     .getPublicUrl(path);
   
@@ -1291,7 +1297,8 @@ export async function uploadImageToStorage(
  * Delete image from Supabase Storage
  */
 export async function deleteImageFromStorage(path: string): Promise<boolean> {
-  const { error } = await supabase.storage
+  const adminClient = getSupabaseAdmin() || supabase;
+  const { error } = await adminClient.storage
     .from(STORAGE_BUCKET)
     .remove([path]);
   

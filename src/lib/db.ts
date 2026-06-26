@@ -68,9 +68,14 @@ function poolConfig(connectionString: string) {
     );
   }
 
+  // Limit connection pool max in serverless runtime environments to prevent exhaustion
+  const isServerless = process.env.VERCEL === '1' || process.env.LAMBDA === '1';
+  const defaultMax = isServerless ? 1 : 5;
+  const maxConnections = parseInt(process.env.DB_POOL_MAX || String(defaultMax), 10);
+
   return {
     connectionString: normalized,
-    max: parseInt(process.env.DB_POOL_MAX || '5', 10),
+    max: maxConnections,
     min: 0,
     idleTimeoutMillis: 10_000,
     connectionTimeoutMillis: 10_000,
