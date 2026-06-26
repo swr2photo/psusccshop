@@ -5463,9 +5463,9 @@ export default function HomePage() {
           sx={{
             position: 'fixed',
             top: { xs: 16, sm: 16, md: 24 },
-            left: { xs: '50%', md: 'auto' },
-            right: { xs: 'auto', md: 24 },
-            transform: { xs: 'translateX(-50%)', md: 'none' },
+            left: '50%',
+            right: 'auto',
+            transform: 'translateX(-50%)',
             zIndex: 9999999,
             display: 'flex',
             flexDirection: 'column',
@@ -5499,7 +5499,7 @@ export default function HomePage() {
               },
             };
             return (
-              <Slide key={t.id} in direction={isDesktop ? "left" : "down"} timeout={350}>
+              <Slide key={t.id} in direction="down" timeout={350}>
                 <Box
                   sx={{
                     background: colors[t.type].bg,
@@ -5514,13 +5514,7 @@ export default function HomePage() {
                     boxShadow: colors[t.type].shadow,
                     cursor: 'pointer',
                     pointerEvents: 'auto',
-                    animation: isDesktop 
-                      ? 'toastEnterRight 0.35s cubic-bezier(0.16, 1, 0.3, 1)'
-                      : 'toastEnterTop 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
-                    '@keyframes toastEnterRight': {
-                      '0%': { opacity: 0, transform: 'translateX(24px) scale(0.96)' },
-                      '100%': { opacity: 1, transform: 'translateX(0) scale(1)' },
-                    },
+                    animation: 'toastEnterTop 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
                     '@keyframes toastEnterTop': {
                       '0%': { opacity: 0, transform: 'translateY(-24px) scale(0.96)' },
                       '100%': { opacity: 1, transform: 'translateY(0) scale(1)' },

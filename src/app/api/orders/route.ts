@@ -110,6 +110,37 @@ export async function GET(req: NextRequest) {
   }
 }
 
+const isValidDate = (dateString?: string): boolean => {
+  if (!dateString || dateString.trim() === '') return false;
+  const date = new Date(dateString);
+  return !isNaN(date.getTime());
+};
+
+// Helper to parse date string in Thailand timezone (GMT+7)
+const parseThailandDate = (dateString: string, isEnd: boolean): Date => {
+  const hasTime = dateString.includes('T') || /\d{2}:\d{2}/.test(dateString);
+  
+  if (!hasTime) {
+    const parts = dateString.split(/[-/]/);
+    if (parts.length === 3) {
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1; // 0-indexed
+      const day = parseInt(parts[2], 10);
+      
+      if (isEnd) {
+        // End of day in GMT+7: 23:59:59.999 -> UTC: 16:59:59.999
+        return new Date(Date.UTC(year, month, day, 16, 59, 59, 999));
+      } else {
+        // Start of day in GMT+7: 00:00:00.000 -> UTC: previous day 17:00:00.000
+        const d = new Date(Date.UTC(year, month, day, 0, 0, 0));
+        d.setUTCHours(d.getUTCHours() - 7);
+        return d;
+      }
+    }
+  }
+  return new Date(dateString);
+};
+
 export async function POST(req: NextRequest) {
   const start = Date.now();
   // Rate limiting สำหรับ order submission
@@ -149,6 +180,8 @@ export async function POST(req: NextRequest) {
     // Validate shop status and product status in database before order creation
     let products: any[] = [];
     let isShopOpen = true;
+    let shopCloseDate = '';
+    let shopOpenDate = '';
 
     if (sanitizedBody.shopId || sanitizedBody.shopSlug) {
       // Multi-shop validation
@@ -166,6 +199,8 @@ export async function POST(req: NextRequest) {
         products = (s.products as any[]) || [];
         const settings = (s.settings as any) || {};
         isShopOpen = settings.isOpen !== false;
+        shopCloseDate = settings.closeDate ?? '';
+        shopOpenDate = settings.openDate ?? '';
       } else {
         return NextResponse.json(
           { status: 'error', message: 'ไม่พบข้อมูลร้านค้า' },
@@ -174,17 +209,34 @@ export async function POST(req: NextRequest) {
       }
     } else {
       // Main shop validation
-      const cfg = await getJson<{ products?: unknown[]; isOpen?: boolean }>('config/shop-settings.json');
+      const cfg = await getJson<{ products?: unknown[]; isOpen?: boolean; closeDate?: string; openDate?: string }>('config/shop-settings.json');
       if (cfg) {
         products = (cfg.products as any[]) || [];
         isShopOpen = cfg.isOpen !== false;
+        shopCloseDate = cfg.closeDate ?? '';
+        shopOpenDate = cfg.openDate ?? '';
       }
     }
 
-    // 1. Validate if shop is open
+    // 1. Validate if shop is open (matching frontend getShopStatus logic)
+    const nowTime = new Date();
+    let shopStatus = 'OPEN';
     if (!isShopOpen) {
+      shopStatus = 'TEMPORARILY_CLOSED';
+    } else if (isValidDate(shopOpenDate)) {
+      const open = parseThailandDate(shopOpenDate, false);
+      if (nowTime < open) shopStatus = 'WAITING_TO_OPEN';
+    } else if (isValidDate(shopCloseDate)) {
+      const close = parseThailandDate(shopCloseDate, true);
+      if (nowTime > close) shopStatus = 'ORDER_ENDED';
+    }
+
+    if (shopStatus !== 'OPEN') {
+      const message = shopStatus === 'ORDER_ENDED' 
+        ? 'ร้านค้าปิดรับออเดอร์แล้ว ไม่สามารถสั่งซื้อได้' 
+        : 'ร้านค้าปิดให้บริการชั่วคราว ไม่สามารถสั่งซื้อได้';
       return NextResponse.json(
-        { status: 'error', message: 'ร้านค้าปิดให้บริการชั่วคราว ไม่สามารถสั่งซื้อได้' },
+        { status: 'error', message },
         { status: 400, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
       );
     }
@@ -201,18 +253,9 @@ export async function POST(req: NextRequest) {
       }
       
       // Check product status (active, start/end dates)
-      const nowTime = new Date();
       const isActive = prod.isActive !== false;
-      
-      // Helper to check if a date string is valid
-      const isValidDate = (dateString?: string): boolean => {
-        if (!dateString || dateString.trim() === '') return false;
-        const date = new Date(dateString);
-        return !isNaN(date.getTime());
-      };
-      
-      const start = isValidDate(prod.startDate) ? new Date(prod.startDate) : null;
-      const end = isValidDate(prod.endDate) ? new Date(prod.endDate) : null;
+      const start = isValidDate(prod.startDate) ? parseThailandDate(prod.startDate, false) : null;
+      const end = isValidDate(prod.endDate) ? parseThailandDate(prod.endDate, true) : null;
       
       const isClosed = !isActive || (start && nowTime < start) || (end && nowTime > end);
       if (isClosed) {

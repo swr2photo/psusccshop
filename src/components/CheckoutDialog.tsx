@@ -16,6 +16,7 @@ import {
   FormControlLabel,
   Collapse,
   CircularProgress,
+  LinearProgress,
   Skeleton,
   TextField,
   InputAdornment,
@@ -185,7 +186,10 @@ export default function CheckoutDialog({
   const [promoError, setPromoError] = useState('');
 
   const { t, lang } = useTranslation();
-  const { warning: toastWarning } = useNotification();
+  const { toasts, warning: toastWarning } = useNotification();
+  const latestError = useMemo(() => {
+    return [...toasts].reverse().find(t => t.type === 'error');
+  }, [toasts]);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
 
   const checkoutAddresses = useMemo(() => {
@@ -498,6 +502,33 @@ export default function CheckoutDialog({
           <Typography sx={{ fontSize: '0.75rem', opacity: 0.85 }}>{cart.length} {t.common.items}</Typography>
         </Box>
       </DialogTitle>
+
+      {processing && (
+        <LinearProgress sx={{ height: 3, bgcolor: 'rgba(0,113,227,0.1)', '& .MuiLinearProgress-bar': { bgcolor: '#0071e3' } }} />
+      )}
+
+      {latestError && (
+        <Box
+          sx={{
+            mx: 3,
+            mt: 2,
+            mb: -1,
+            p: 1.5,
+            borderRadius: '12px',
+            bgcolor: 'rgba(239, 68, 68, 0.1)',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+            color: '#ff453a',
+          }}
+        >
+          <AlertCircle size={20} style={{ flexShrink: 0 }} />
+          <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, flex: 1 }}>
+            {latestError.message || latestError.title}
+          </Typography>
+        </Box>
+      )}
 
       <DialogContent sx={{ 
         display: 'flex', 

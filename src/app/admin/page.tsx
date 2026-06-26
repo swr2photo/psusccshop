@@ -8502,9 +8502,9 @@ export default function AdminPage(): JSX.Element {
           sx={{
             position: 'fixed',
             top: { xs: 16, sm: 16, md: 24 },
-            left: { xs: '50%', md: 'auto' },
-            right: { xs: 'auto', md: 24 },
-            transform: { xs: 'translateX(-50%)', md: 'none' },
+            left: '50%',
+            right: 'auto',
+            transform: 'translateX(-50%)',
             zIndex: 9999999,
             display: 'flex',
             flexDirection: 'column',
@@ -8542,17 +8542,11 @@ export default function AdminPage(): JSX.Element {
                   backdropFilter: 'blur(10px)',
                   cursor: 'pointer',
                   pointerEvents: 'auto',
-                  animation: isDesktop 
-                    ? 'adminToastInLeft 0.4s cubic-bezier(0.2, 0.6, 0.35, 1)'
-                    : 'adminToastInDown 0.4s cubic-bezier(0.2, 0.6, 0.35, 1)',
+                  animation: 'adminToastInDown 0.4s cubic-bezier(0.2, 0.6, 0.35, 1)',
                   transition: 'all 0.25s cubic-bezier(0.2, 0.6, 0.35, 1)',
                   '&:hover': {
-                    transform: isDesktop ? 'translateX(-4px) scale(1.01)' : 'translateY(4px) scale(1.01)',
+                    transform: 'translateY(4px) scale(1.01)',
                     boxShadow: '0 12px 45px rgba(0,0,0,0.35)',
-                  },
-                  '@keyframes adminToastInLeft': {
-                    '0%': { opacity: 0, transform: 'translateX(100%) scale(0.95)' },
-                    '100%': { opacity: 1, transform: 'translateX(0) scale(1)' },
                   },
                   '@keyframes adminToastInDown': {
                     '0%': { opacity: 0, transform: 'translateY(-24px) scale(0.95)' },

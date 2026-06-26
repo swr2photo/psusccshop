@@ -38,11 +38,10 @@ const TOAST_STYLES = {
 
 function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) => void }) {
   const theme = useTheme();
-  const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
   const style = TOAST_STYLES[toast.type];
 
   return (
-    <Slide direction={isDesktop ? "left" : "down"} in={true} mountOnEnter unmountOnExit>
+    <Slide direction="down" in={true} mountOnEnter unmountOnExit>
       <Box
         sx={{
           background: style.bg,
@@ -59,19 +58,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
           minWidth: { xs: 280, sm: 320 },
           maxWidth: { xs: 'calc(100vw - 32px)', sm: 420 },
           pointerEvents: 'auto',
-          animation: isDesktop 
-            ? 'toastSlideInLeft 0.35s cubic-bezier(0.16, 1, 0.3, 1)' 
-            : 'toastSlideInDown 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
-          '@keyframes toastSlideInLeft': {
-            '0%': {
-              opacity: 0,
-              transform: 'translateX(24px) scale(0.95)',
-            },
-            '100%': {
-              opacity: 1,
-              transform: 'translateX(0) scale(1)',
-            },
-          },
+          animation: 'toastSlideInDown 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
           '@keyframes toastSlideInDown': {
             '0%': {
               opacity: 0,
@@ -192,16 +179,15 @@ export default function ToastContainer() {
       sx={{
         position: 'fixed',
         top: { xs: 16, md: 24 },
-        left: { xs: '50%', md: 'auto' },
-        right: { xs: 'auto', md: 24 },
-        transform: { xs: 'translateX(-50%)', md: 'none' },
+        left: '50%',
+        transform: 'translateX(-50%)',
         zIndex: 9999999,
         display: 'flex',
         flexDirection: 'column',
-        alignItems: { xs: 'center', md: 'flex-end' },
+        alignItems: 'center',
         gap: 1.5,
         pointerEvents: 'none',
-        width: { xs: 'calc(100% - 32px)', md: 'auto' },
+        width: { xs: 'calc(100% - 32px)', sm: 'auto' },
         maxWidth: 420,
       }}
     >
