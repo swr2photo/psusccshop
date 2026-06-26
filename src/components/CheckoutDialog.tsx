@@ -150,6 +150,25 @@ export default function CheckoutDialog({
   const [paymentConfig, setPaymentConfig] = useState<PaymentConfig | null>(null);
   const [loadingConfig, setLoadingConfig] = useState(true);
 
+  // Turnstile Widget Resetting mechanism
+  const [turnstileKey, setTurnstileKey] = useState(0);
+  const prevTokenRef = useRef(turnstileToken);
+
+  useEffect(() => {
+    // If turnstileToken was non-empty and now is empty (e.g. cleared on failure)
+    if (prevTokenRef.current && !turnstileToken && open) {
+      setTurnstileKey(prev => prev + 1);
+    }
+    prevTokenRef.current = turnstileToken;
+  }, [turnstileToken, open]);
+
+  // Also reset when the dialog opens
+  useEffect(() => {
+    if (open) {
+      setTurnstileKey(prev => prev + 1);
+    }
+  }, [open]);
+
   // Selection states
   const [selectedShipping, setSelectedShipping] = useState<string>('');
   const [selectedPayment, setSelectedPayment] = useState<string>('');
@@ -1151,6 +1170,7 @@ export default function CheckoutDialog({
         {/* Turnstile */}
         <Box sx={{ display: 'flex', justifyContent: 'center', pt: 1 }}>
           <TurnstileWidget
+            key={turnstileKey}
             onSuccess={(token) => setTurnstileToken(token)}
             onExpire={() => setTurnstileToken('')}
             onError={() => setTurnstileToken('')}

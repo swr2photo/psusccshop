@@ -1080,9 +1080,11 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
           queryKey: [...queryKeys.shop.all, 'public', shop.id],
         });
       } else {
+        setTurnstileToken('');
         showToast('error', (res as any).message || (lang === 'en' ? 'Order failed' : 'สั่งซื้อไม่สำเร็จ'));
       }
     } catch (err: any) {
+      setTurnstileToken('');
       showToast('error', err.message || (lang === 'en' ? 'Error' : 'เกิดข้อผิดพลาด'));
     } finally {
       setCheckoutProcessing(false);

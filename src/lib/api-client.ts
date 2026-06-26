@@ -132,9 +132,29 @@ async function fetchJson<T = any>(path: string, opts?: FetchOptions): Promise<AP
     const contentType = res.headers.get('content-type') || '';
     if (!res.ok) {
       const text = await res.text();
+      let extractedMessage = '';
+      try {
+        const parsed = JSON.parse(text);
+        extractedMessage = parsed.message || parsed.error?.message || parsed.error || '';
+      } catch (e) {
+        // Not JSON
+      }
+
+      if (!extractedMessage) {
+        extractedMessage = `HTTP ${res.status}: ${text.slice(0, 200)}`;
+      } else {
+        // Translate known client-side errors directly if returned by backend
+        const lower = extractedMessage.toLowerCase();
+        if (lower.includes('timeout-or-duplicate') || lower.includes('turnstile')) {
+          extractedMessage = 'การยืนยันตัวตน (บอท) หมดอายุหรือผิดพลาด กรุณาลองใหม่อีกครั้ง';
+        } else if (lower.includes('rate limit') || lower.includes('too many requests') || lower.includes('เร็วเกินไป')) {
+          extractedMessage = 'คุณส่งคำขอถี่เกินไป กรุณารอสักครู่แล้วลองใหม่อีกครั้ง';
+        }
+      }
+
       return {
         status: 'error',
-        message: `HTTP ${res.status}: ${text.slice(0, 200)}`,
+        message: extractedMessage,
         error: { code: 'HTTP_ERROR', status: res.status }
       } as APIResponse<T>;
     }

@@ -1,6 +1,7 @@
 'use client';
 
 import { apiFetch } from '@/lib/api-client';
+import { formatFriendlyError } from '@/utils/error';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { JSX } from 'react';
 import { useSession, signIn } from 'next-auth/react';
@@ -2759,6 +2760,7 @@ export default function AdminPage(): JSX.Element {
   const [searchTerm, setSearchTerm] = useState('');
   const toastTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const [realtimeIsConnected, setRealtimeIsConnected] = useState(false);
+  const isDesktop = useMediaQuery('(min-width: 900px)');
 
   // Available OAuth providers
   const [availableProviders, setAvailableProviders] = useState<string[]>(['google']);
@@ -2813,7 +2815,6 @@ export default function AdminPage(): JSX.Element {
   // Slip viewer state
   const [slipViewerOpen, setSlipViewerOpen] = useState(false);
   const [slipViewerData, setSlipViewerData] = useState<{ ref: string; slip?: AdminOrder['slip'] } | null>(null);
-  const isDesktop = useMediaQuery('(min-width:900px)');
   const hasInitialData = serverRoleChecked || orders.length > 0 || (config.products || []).length > 0 || logs.length > 0 || !!lastSavedTime;
   const fetchInFlightRef = useRef(false);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
@@ -2916,11 +2917,12 @@ export default function AdminPage(): JSX.Element {
   const isDataLoading = loading && !hasInitialData;
 
   const showToast = useCallback((type: 'success' | 'error' | 'info' | 'warning', message: string) => {
-    const id = `${type}-${message}`;
+    const friendlyMessage = formatFriendlyError(message);
+    const id = `${type}-${friendlyMessage}`;
     
     setToasts((prev) => {
       if (prev.some((t) => t.id === id)) return prev;
-      return [...prev, { id, type, message }].slice(-3);
+      return [...prev, { id, type, message: friendlyMessage }].slice(-3);
     });
     
     if (toastTimeoutsRef.current.has(id)) {
@@ -8499,13 +8501,17 @@ export default function AdminPage(): JSX.Element {
         <Box
           sx={{
             position: 'fixed',
-            top: 20,
-            right: 20,
-            zIndex: 99999,
+            top: { xs: 16, sm: 16, md: 24 },
+            left: { xs: '50%', md: 'auto' },
+            right: { xs: 'auto', md: 24 },
+            transform: { xs: 'translateX(-50%)', md: 'none' },
+            zIndex: 9999999,
             display: 'flex',
             flexDirection: 'column',
-            gap: 1,
-            maxWidth: 380,
+            gap: 1.5,
+            width: { xs: 'calc(100% - 32px)', sm: 'auto' },
+            maxWidth: 420,
+            pointerEvents: 'none',
           }}
         >
           {toasts.map((t) => {
@@ -8535,15 +8541,22 @@ export default function AdminPage(): JSX.Element {
                   boxShadow: '0 10px 40px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.1) inset',
                   backdropFilter: 'blur(10px)',
                   cursor: 'pointer',
-                  animation: 'adminToastIn 0.4s cubic-bezier(0.2, 0.6, 0.35, 1)',
+                  pointerEvents: 'auto',
+                  animation: isDesktop 
+                    ? 'adminToastInLeft 0.4s cubic-bezier(0.2, 0.6, 0.35, 1)'
+                    : 'adminToastInDown 0.4s cubic-bezier(0.2, 0.6, 0.35, 1)',
                   transition: 'all 0.25s cubic-bezier(0.2, 0.6, 0.35, 1)',
                   '&:hover': {
-                    transform: 'translateX(-4px) scale(1.01)',
+                    transform: isDesktop ? 'translateX(-4px) scale(1.01)' : 'translateY(4px) scale(1.01)',
                     boxShadow: '0 12px 45px rgba(0,0,0,0.35)',
                   },
-                  '@keyframes adminToastIn': {
+                  '@keyframes adminToastInLeft': {
                     '0%': { opacity: 0, transform: 'translateX(100%) scale(0.95)' },
                     '100%': { opacity: 1, transform: 'translateX(0) scale(1)' },
+                  },
+                  '@keyframes adminToastInDown': {
+                    '0%': { opacity: 0, transform: 'translateY(-24px) scale(0.95)' },
+                    '100%': { opacity: 1, transform: 'translateY(0) scale(1)' },
                   },
                 }}
                 onClick={() => setToasts((prev) => prev.filter((toast) => toast.id !== t.id))}

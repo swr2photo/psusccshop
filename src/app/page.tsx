@@ -118,6 +118,8 @@ import Footer from '@/components/Footer';
 import TurnstileWidget from '@/components/TurnstileWidget';
 import { ShopStatusBanner, getProductStatus, getShopStatus, SHOP_STATUS_CONFIG, type ShopStatusType } from '@/components/ShopStatusCard';
 import type { SavedAddress } from '@/components/ProfileModal';
+import { useTheme } from '@mui/material';
+import { formatFriendlyError } from '@/utils/error';
 
 // ==================== DYNAMIC IMPORTS (Code Splitting) ====================
 // Heavy components loaded on-demand to reduce initial bundle size
@@ -519,6 +521,8 @@ function getProductLink(product: Product): string {
 export default function HomePage() {
   const { data: session, status } = useSession();
   const isMobile = useMediaQuery('(max-width:600px)');
+  const theme = useTheme();
+  const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
 
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -1703,12 +1707,13 @@ export default function HomePage() {
 
 
   function showToast(type: ToastSeverity, message: string) {
-    const id = `${type}-${message}`;
+    const friendlyMessage = formatFriendlyError(message);
+    const id = `${type}-${friendlyMessage}`;
     
     // ป้องกันการซ้ำซ้อน - ถ้ามี toast เดียวกันอยู่แล้วให้ข้าม
     setToasts((prev) => {
       if (prev.some((t) => t.id === id)) return prev;
-      return [...prev, { id, type, message }].slice(-3); // เก็บแค่ 3 อันล่าสุด
+      return [...prev, { id, type, message: friendlyMessage }].slice(-3); // เก็บแค่ 3 อันล่าสุด
     });
     
     // ลบ toast อัตโนมัติหลัง 3 วินาที
@@ -1721,7 +1726,7 @@ export default function HomePage() {
     }, 3000));
     
     if (productDialogOpen) {
-      setInlineNotice({ id, type, message });
+      setInlineNotice({ id, type, message: friendlyMessage });
       setTimeout(() => setInlineNotice(null), 2000);
     }
   };
@@ -2346,9 +2351,11 @@ export default function HomePage() {
 
         if (res.ref) openPaymentFlow(res.ref);
       } else {
+        setTurnstileToken('');
         throw new Error(res.message || t.common.error);
       }
     } catch (error: any) {
+      setTurnstileToken('');
       showToast('error', error.message || t.checkout.orderError);
     } finally {
       setProcessing(false);
@@ -5455,12 +5462,13 @@ export default function HomePage() {
         <Box
           sx={{
             position: 'fixed',
-            bottom: { xs: 90, sm: 32 },
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 99999,
+            top: { xs: 16, sm: 16, md: 24 },
+            left: { xs: '50%', md: 'auto' },
+            right: { xs: 'auto', md: 24 },
+            transform: { xs: 'translateX(-50%)', md: 'none' },
+            zIndex: 9999999,
             display: 'flex',
-            flexDirection: 'column-reverse',
+            flexDirection: 'column',
             gap: 1.5,
             width: { xs: 'calc(100% - 32px)', sm: 'auto' },
             maxWidth: 420,
@@ -5491,7 +5499,7 @@ export default function HomePage() {
               },
             };
             return (
-              <Slide key={t.id} in direction="up" timeout={350}>
+              <Slide key={t.id} in direction={isDesktop ? "left" : "down"} timeout={350}>
                 <Box
                   sx={{
                     background: colors[t.type].bg,
@@ -5506,9 +5514,15 @@ export default function HomePage() {
                     boxShadow: colors[t.type].shadow,
                     cursor: 'pointer',
                     pointerEvents: 'auto',
-                    animation: 'toastEnterBottom 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
-                    '@keyframes toastEnterBottom': {
-                      '0%': { opacity: 0, transform: 'translateY(12px) scale(0.96)' },
+                    animation: isDesktop 
+                      ? 'toastEnterRight 0.35s cubic-bezier(0.16, 1, 0.3, 1)'
+                      : 'toastEnterTop 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
+                    '@keyframes toastEnterRight': {
+                      '0%': { opacity: 0, transform: 'translateX(24px) scale(0.96)' },
+                      '100%': { opacity: 1, transform: 'translateX(0) scale(1)' },
+                    },
+                    '@keyframes toastEnterTop': {
+                      '0%': { opacity: 0, transform: 'translateY(-24px) scale(0.96)' },
                       '100%': { opacity: 1, transform: 'translateY(0) scale(1)' },
                     },
                     transition: 'all 0.2s ease',

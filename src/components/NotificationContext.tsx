@@ -13,55 +13,14 @@ import {
   recordLastVisit,
 } from '@/lib/cookies';
 
+import { formatFriendlyError as formatError } from '@/utils/error';
+
 // Helper to map complex or system error messages into user-friendly Thai messages
 function formatFriendlyError(title: string, message?: string): { title: string; message?: string } {
-  let friendlyTitle = title;
-  let friendlyMessage = message;
-
-  const translate = (text: string): string => {
-    const lower = text.toLowerCase();
-    if (lower.includes('failed to fetch') || lower.includes('network error') || lower.includes('fetch failed')) {
-      return 'การเชื่อมต่อเครือข่ายล้มเหลว กรุณาตรวจสอบอินเทอร์เน็ตของคุณ';
-    }
-    if (lower.includes('internal server error') || lower.includes('500') || lower.includes('server error')) {
-      return 'เกิดข้อผิดพลาดทางเทคนิคที่เซิร์ฟเวอร์ กรุณาลองใหม่อีกครั้งในภายหลัง';
-    }
-    if (lower.includes('unauthorized') || lower.includes('jwt expired') || lower.includes('token expired') || lower.includes('401')) {
-      return 'เซสชันหมดอายุหรือไม่มีสิทธิ์ใช้งาน กรุณาเข้าสู่ระบบใหม่อีกครั้ง';
-    }
-    if (lower.includes('forbidden') || lower.includes('403')) {
-      return 'คุณไม่มีสิทธิ์เข้าถึงหรือดำเนินการในส่วนนี้';
-    }
-    if (lower.includes('not found') || lower.includes('404')) {
-      return 'ไม่พบข้อมูลที่ต้องการ กรุณาตรวจสอบอีกครั้ง';
-    }
-    if (lower.includes('duplicate key') || lower.includes('already exists') || lower.includes('unique constraint')) {
-      return 'ข้อมูลนี้มีอยู่แล้วในระบบ ไม่สามารถสร้างซ้ำได้';
-    }
-    if (lower.includes('row-level security') || lower.includes('rls') || lower.includes('policy')) {
-      return 'ข้อผิดพลาดในการตรวจสอบสิทธิ์การเข้าถึงข้อมูล';
-    }
-    if (lower.includes('json') || lower.includes('parse')) {
-      return 'การประมวลผลข้อมูลผิดพลาด กรุณาลองใหม่อีกครั้ง';
-    }
-    if (lower.includes('timeout')) {
-      return 'การเชื่อมต่อใช้เวลานานเกินไป กรุณาลองใหม่อีกครั้ง';
-    }
-    if (lower.includes('bad request') || lower.includes('400')) {
-      return 'คำขอไม่ถูกต้อง กรุณาตรวจสอบข้อมูลที่กรอก';
-    }
-    if (lower.includes('uuid') || lower.includes('invalid input syntax')) {
-      return 'ข้อมูลไม่ถูกต้องหรือรูปแบบไม่ตรงตามที่กำหนด';
-    }
-    return text;
+  return {
+    title: formatError(title),
+    message: message ? formatError(message) : undefined,
   };
-
-  friendlyTitle = translate(title);
-  if (message) {
-    friendlyMessage = translate(message);
-  }
-
-  return { title: friendlyTitle, message: friendlyMessage };
 }
 
 // ============== TOAST TYPES ==============
