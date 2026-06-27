@@ -113,18 +113,22 @@ export async function POST(req: NextRequest) {
                 })
                 .where(eq(paymentTransactions.id, existingTx.id));
 
+              const slipData = mergeStripeReceiptSlipData(order.slipData, receiptUrl);
+
               await db
                 .update(orders)
                 .set({
                   status: 'PAID',
+                  paymentStatus: 'paid',
+                  paymentMethod: 'promptpay',
+                  paymentGateway: 'stripe',
                   paymentVerified: true,
                   paymentVerifiedAt: new Date().toISOString(),
+                  receiptIssuedAt: new Date().toISOString(),
                   updatedAt: new Date(),
-                  slipUrl: receiptUrl || null,
+                  ...(slipData ? { slipData } : {}),
                 })
                 .where(eq(orders.id, order.id));
-              
-              await mergeStripeReceiptSlipData(order.id, receiptUrl || undefined);
             }
 
             return NextResponse.json({
