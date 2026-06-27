@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
                 .set({
                   status: 'PAID',
                   paymentVerified: true,
-                  paymentVerifiedAt: new Date(),
+                  paymentVerifiedAt: new Date().toISOString(),
                   updatedAt: new Date(),
                   slipUrl: receiptUrl || null,
                 })
