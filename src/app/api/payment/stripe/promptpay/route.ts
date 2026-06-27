@@ -12,7 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { orders, paymentTransactions } from '@/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, desc, isNotNull } from 'drizzle-orm';
 import { requireAuth, isResourceOwner, isAdminEmailAsync } from '@/lib/auth';
 import { createStripePaymentIntent } from '@/lib/payment';
 import { fetchStripeReceiptUrl, mergeStripeReceiptSlipData } from '@/lib/stripe-receipt';
@@ -66,6 +66,82 @@ export async function POST(req: NextRequest) {
         { status: 'error', message: 'คำสั่งซื้อนี้ชำระเงินแล้ว' },
         { status: 409 }
       );
+    }
+
+    // Check if there is an existing pending PromptPay transaction for this order created within the last 24 hours
+    const existingTxRows = await db
+      .select()
+      .from(paymentTransactions)
+      .where(and(
+        eq(paymentTransactions.orderId, order.id),
+        eq(paymentTransactions.method, 'promptpay'),
+        eq(paymentTransactions.status, 'pending'),
+        isNotNull(paymentTransactions.gatewayChargeId),
+      ))
+      .orderBy(desc(paymentTransactions.createdAt))
+      .limit(1);
+    const existingTx = existingTxRows[0];
+
+    if (existingTx && existingTx.gatewayChargeId) {
+      const ageMs = Date.now() - new Date(existingTx.createdAt).getTime();
+      const oneDayMs = 24 * 60 * 60 * 1000;
+      if (ageMs < oneDayMs) {
+        // Retrieve the PaymentIntent from Stripe using the secret key to ensure it hasn't been canceled
+        const intentId = existingTx.gatewayChargeId;
+        const res = await fetch(`https://api.stripe.com/v1/payment_intents/${intentId}`, {
+          headers: { Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}` },
+        });
+        if (res.ok) {
+          const intent = await res.json();
+          if (intent.status !== 'canceled') {
+            console.log('[Stripe PromptPay] Reusing existing active PaymentIntent:', intent.id);
+            
+            // If the status has succeeded in Stripe, update the transaction and order immediately
+            if (intent.status === 'succeeded' && existingTx.status !== 'paid') {
+              const receiptUrl = await fetchStripeReceiptUrl(intentId);
+
+              await db
+                .update(paymentTransactions)
+                .set({
+                  status: 'paid',
+                  gatewayTransactionId: intent.latest_charge || null,
+                  verified: true,
+                  verificationMethod: 'gateway',
+                  verifiedAt: new Date(),
+                  updatedAt: new Date(),
+                  rawResponse: intent,
+                })
+                .where(eq(paymentTransactions.id, existingTx.id));
+
+              await db
+                .update(orders)
+                .set({
+                  status: 'PAID',
+                  paymentVerified: true,
+                  paymentVerifiedAt: new Date(),
+                  updatedAt: new Date(),
+                  slipUrl: receiptUrl || null,
+                })
+                .where(eq(orders.id, order.id));
+              
+              await mergeStripeReceiptSlipData(order.id, receiptUrl || undefined);
+            }
+
+            return NextResponse.json({
+              status: 'success',
+              data: {
+                clientSecret: intent.client_secret,
+                paymentIntentId: intent.id,
+                amount: intent.amount / 100, // get amount from intent
+                email: order.customerEmail,
+                publishableKey: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
+                qrCode: intent.next_action?.promptpay_display_qr_code || null,
+                intentStatus: intent.status,
+              },
+            });
+          }
+        }
+      }
     }
 
     // Amount is always computed server-side from the order record
