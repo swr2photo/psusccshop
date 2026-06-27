@@ -579,9 +579,9 @@ export function ModernSkeleton(props: SkeletonProps) {
       borderRadius,
       position: 'relative',
       overflow: 'hidden',
-      bgcolor: 'rgba(255,255,255,0.06)',
+      bgcolor: 'var(--skeleton-bg)',
       ...(animation === 'shimmer' && {
-        background: 'linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.04) 100%)',
+        background: 'var(--skeleton-shimmer)',
         backgroundSize: '200% 100%',
         animation: `${animationKeyframes} 1.5s ease-in-out infinite`,
       }),
@@ -593,7 +593,7 @@ export function ModernSkeleton(props: SkeletonProps) {
         <Box sx={{
           position: 'absolute',
           inset: 0,
-          background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent)',
+          background: 'linear-gradient(90deg, transparent, var(--skeleton-highlight), transparent)',
           animation: `${animationKeyframes} 1.5s ease-in-out infinite`,
         }} />
       )}

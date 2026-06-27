@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, CheckCircle2, AlertCircle, AlertTriangle, Info, Sparkles } from 'lucide-react';
 import { Box, Typography, IconButton, Slide, useTheme, useMediaQuery } from '@mui/material';
 import { useNotification, Toast } from './NotificationContext';
@@ -171,17 +172,20 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
 
 export default function ToastContainer() {
   const { toasts, removeToast } = useNotification();
+  const [mounted, setMounted] = useState(false);
 
-  if (toasts.length === 0) return null;
+  useEffect(() => { setMounted(true); }, []);
 
-  return (
+  if (!mounted || toasts.length === 0) return null;
+
+  return createPortal(
     <Box
       sx={{
         position: 'fixed',
         top: { xs: 16, md: 24 },
         left: '50%',
         transform: 'translateX(-50%)',
-        zIndex: 9999999,
+        zIndex: 2147483647,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -194,7 +198,8 @@ export default function ToastContainer() {
       {toasts.map((toast) => (
         <ToastItem key={toast.id} toast={toast} onRemove={removeToast} />
       ))}
-    </Box>
+    </Box>,
+    document.body
   );
 }
 

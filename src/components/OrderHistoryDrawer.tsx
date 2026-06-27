@@ -93,7 +93,7 @@ const historyFilters: HistoryFilter[] = [
 // Number of orders rendered per chunk (progressive rendering)
 const ORDERS_PER_CHUNK = 10;
 
-const skeletonSx = { bgcolor: 'var(--glass-bg)' } as const;
+const skeletonSx = { bgcolor: 'var(--skeleton-bg)' } as const;
 
 /** Skeleton placeholder matching the collapsed order card layout */
 function OrderCardSkeleton() {

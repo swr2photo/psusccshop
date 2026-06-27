@@ -740,6 +740,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
       anchor={isMobile ? 'bottom' : 'right'}
       open={true}
       onClose={onClose}
+      sx={{ zIndex: 1400 }}
       PaperProps={{
         sx: {
           height: isMobile ? { xs: '90vh', sm: '85vh' } : '100vh',

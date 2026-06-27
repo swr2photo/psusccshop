@@ -2,6 +2,7 @@
 
 import { apiFetch } from '@/lib/api-client';
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { useLiveStreamContext } from '@/context/LiveStreamProvider';
 import OptimizedImage, { preloadImages, OptimizedBackground } from '@/components/OptimizedImage';
 import { useGalleryImagePreload, isGalleryImageInRange } from '@/hooks/useGalleryImagePreload';
@@ -5457,8 +5458,8 @@ export default function HomePage() {
         </Box>
       )}
 
-      {/* Enhanced Modern Toast Container */}
-      {toasts.length > 0 && (
+      {/* Enhanced Modern Toast Container - rendered via portal to always be on top */}
+      {toasts.length > 0 && createPortal(
         <Box
           sx={{
             position: 'fixed',
@@ -5466,7 +5467,7 @@ export default function HomePage() {
             left: '50%',
             right: 'auto',
             transform: 'translateX(-50%)',
-            zIndex: 9999999,
+            zIndex: 2147483647,
             display: 'flex',
             flexDirection: 'column',
             gap: 1.5,
@@ -5572,7 +5573,8 @@ export default function HomePage() {
               </Slide>
             );
           })}
-        </Box>
+        </Box>,
+        document.body
       )}
 
       <Backdrop

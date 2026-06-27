@@ -163,10 +163,15 @@ export default function CheckoutDialog({
     prevTokenRef.current = turnstileToken;
   }, [turnstileToken, open]);
 
-  // Also reset when the dialog opens
+  // Also reset and scroll content to top when the dialog opens
   useEffect(() => {
     if (open) {
       setTurnstileKey(prev => prev + 1);
+      setTimeout(() => {
+        if (dialogScrollRef.current) {
+          dialogScrollRef.current.scrollTop = 0;
+        }
+      }, 50);
     }
   }, [open]);
 
@@ -251,7 +256,7 @@ export default function CheckoutDialog({
   const [dialogDragOffset, setDialogDragOffset] = useState(0);
   const [isDialogDragging, setIsDialogDragging] = useState(false);
   const dialogSwipeStartY = useRef(0);
-  const dialogScrollRef = useRef<HTMLElement | null>(null);
+  const dialogScrollRef = useRef<HTMLDivElement | null>(null);
 
   const handleDialogSwipeStart = useCallback((e: React.TouchEvent) => {
     if (!isMobile) return;
@@ -530,14 +535,17 @@ export default function CheckoutDialog({
         </Box>
       )}
 
-      <DialogContent sx={{ 
-        display: 'flex', 
-        flexDirection: 'column', 
-        gap: 2, 
-        pt: 3, 
-        bgcolor: 'var(--background)',
-        pb: 2,
-      }}>
+      <DialogContent 
+        ref={dialogScrollRef}
+        sx={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: 2, 
+          pt: 3, 
+          bgcolor: 'var(--background)',
+          pb: 2,
+        }}
+      >
         {/* Order Summary */}
         <Box sx={{ 
           p: 2, 
@@ -682,7 +690,7 @@ export default function CheckoutDialog({
 
         {/* Shipping Options */}
         {loadingConfig ? (
-          <Skeleton variant="rounded" height={120} sx={{ bgcolor: 'var(--glass-bg)' }} />
+          <Skeleton variant="rounded" height={120} sx={{ bgcolor: 'var(--skeleton-bg)' }} />
         ) : enabledShippingOptions.length > 0 && shippingConfig?.showOptions && (
           <Box sx={{ 
             p: 2, 
@@ -813,7 +821,7 @@ export default function CheckoutDialog({
 
         {/* Payment Options */}
         {loadingConfig ? (
-          <Skeleton variant="rounded" height={120} sx={{ bgcolor: 'var(--glass-bg)' }} />
+          <Skeleton variant="rounded" height={120} sx={{ bgcolor: 'var(--skeleton-bg)' }} />
         ) : enabledPaymentOptions.length > 0 && (
           <Box sx={{ 
             p: 2, 

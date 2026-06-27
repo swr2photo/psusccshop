@@ -43,15 +43,28 @@ export const isSuperAdminEmail = (email: string | null | undefined): boolean => 
   return email.trim().toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
 };
 
-// ==================== PERFORMANCE CACHE ====================
-// Cache dynamic admin emails from Filebase (expensive S3 call) — TTL 5 minutes
+// Cache dynamic admin emails from Filebase (expensive S3 call) — TTL 30 seconds
 let _dynamicAdminEmailsCache: string[] | null = null;
 let _dynamicAdminEmailsCacheExpiry = 0;
-const DYNAMIC_ADMIN_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const DYNAMIC_ADMIN_CACHE_TTL = 30 * 1000; // 30 seconds
 
 // Cache per-email admin check results — TTL 30 seconds
 const _adminCheckCache = new Map<string, { result: boolean; expires: number }>();
 const ADMIN_CHECK_CACHE_TTL = 30 * 1000; // 30 seconds
+
+export const clearDynamicAdminEmailsCache = () => {
+  _dynamicAdminEmailsCache = null;
+  _dynamicAdminEmailsCacheExpiry = 0;
+};
+
+export const clearAdminCheckCache = (email?: string) => {
+  if (email) {
+    _adminCheckCache.delete(email.trim().toLowerCase());
+  } else {
+    _adminCheckCache.clear();
+  }
+};
+
 
 /**
  * Get dynamic admin emails from config stored in Filebase

@@ -1571,10 +1571,10 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)', lg: 'repeat(4, 1fr)' }, gap: 2 }}>
             {Array.from({ length: 8 }).map((_, i) => (
               <Box key={i} sx={{ borderRadius: '20px', overflow: 'hidden', bgcolor: 'var(--surface)' }}>
-                <Skeleton variant="rectangular" sx={{ aspectRatio: '1/1', bgcolor: 'var(--surface-2)' }} />
+                <Skeleton variant="rectangular" sx={{ aspectRatio: '1/1', bgcolor: 'var(--skeleton-bg)' }} />
                 <Box sx={{ p: 2 }}>
-                  <Skeleton sx={{ bgcolor: 'var(--surface-2)' }} />
-                  <Skeleton width="60%" sx={{ bgcolor: 'var(--surface-2)' }} />
+                  <Skeleton sx={{ bgcolor: 'var(--skeleton-bg)' }} />
+                  <Skeleton width="60%" sx={{ bgcolor: 'var(--skeleton-bg)' }} />
                 </Box>
               </Box>
             ))}

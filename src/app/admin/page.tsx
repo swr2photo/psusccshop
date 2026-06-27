@@ -3,6 +3,7 @@
 import { apiFetch } from '@/lib/api-client';
 import { formatFriendlyError } from '@/utils/error';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import type { JSX } from 'react';
 import { useSession, signIn } from 'next-auth/react';
 import { signOutUser } from '@/lib/sign-out-client';
@@ -8496,8 +8497,8 @@ export default function AdminPage(): JSX.Element {
         </DialogActions>
       </Dialog>
 
-      {/* Modern Toast Container */}
-      {toasts.length > 0 && (
+      {/* Modern Toast Container - rendered via portal to always be on top */}
+      {toasts.length > 0 && createPortal(
         <Box
           sx={{
             position: 'fixed',
@@ -8505,7 +8506,7 @@ export default function AdminPage(): JSX.Element {
             left: '50%',
             right: 'auto',
             transform: 'translateX(-50%)',
-            zIndex: 9999999,
+            zIndex: 2147483647,
             display: 'flex',
             flexDirection: 'column',
             gap: 1.5,
@@ -8583,7 +8584,8 @@ export default function AdminPage(): JSX.Element {
               </Box>
             );
           })}
-        </Box>
+        </Box>,
+        document.body
       )}
 
       {/* Order Editor Dialog - rendered at root level */}

@@ -93,7 +93,7 @@ export default function ShopDirectory() {
         {loading ? (
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' }, gap: 2 }}>
             {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} variant="rectangular" sx={{ height: 180, borderRadius: '16px', bgcolor: 'rgba(255,255,255,0.05)' }} />
+              <Skeleton key={i} variant="rectangular" sx={{ height: 180, borderRadius: '16px', bgcolor: 'var(--skeleton-bg)' }} />
             ))}
           </Box>
         ) : shops.length === 0 ? (

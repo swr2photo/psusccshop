@@ -242,6 +242,14 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
   const [swipeDragOffset, setSwipeDragOffset] = useState(0);
   const [isSwipeDragging, setIsSwipeDragging] = useState(false);
   const swipeStartY = useRef(0);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Scroll content to top when loading or orderRef changes
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0;
+    }
+  }, [orderRef, loading]);
 
   const handleSwipeStart = useCallback((e: React.TouchEvent) => {
     swipeStartY.current = e.touches[0].clientY;
@@ -666,12 +674,15 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
       </Box>
 
       {/* Content */}
-      <Box sx={{ flex: 1, overflow: 'auto', WebkitOverflowScrolling: 'touch', px: { xs: 2, sm: 3 }, py: 2.5 }}>
+      <Box 
+        ref={scrollContainerRef}
+        sx={{ flex: 1, overflow: 'auto', WebkitOverflowScrolling: 'touch', px: { xs: 2, sm: 3 }, py: 2.5 }}
+      >
         {loading ? (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, maxWidth: 500, mx: 'auto' }}>
-            <Skeleton variant="rectangular" height={120} sx={{ bgcolor: 'var(--surface-2)', borderRadius: '20px' }} />
-            <Skeleton variant="rectangular" height={300} sx={{ bgcolor: 'var(--surface-2)', borderRadius: '20px' }} />
-            <Skeleton variant="rectangular" height={180} sx={{ bgcolor: 'var(--surface-2)', borderRadius: '20px' }} />
+            <Skeleton variant="rectangular" height={120} sx={{ bgcolor: 'var(--skeleton-bg)', borderRadius: '20px' }} />
+            <Skeleton variant="rectangular" height={300} sx={{ bgcolor: 'var(--skeleton-bg)', borderRadius: '20px' }} />
+            <Skeleton variant="rectangular" height={180} sx={{ bgcolor: 'var(--skeleton-bg)', borderRadius: '20px' }} />
           </Box>
         ) : isPaid ? (
           /* ============== ALREADY PAID UI ============== */
