@@ -34,6 +34,7 @@ import Link from 'next/link';
 import { useCartStore } from '@/store/cartStore';
 import { useWishlistStore } from '@/store/wishlistStore';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useCurrentTime } from '@/hooks/useCurrentTime';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { usePublicShopQuery, queryKeys } from '@/hooks';
 import { useQueryClient } from '@tanstack/react-query';
@@ -199,6 +200,7 @@ const normalizeDigits99 = (value: string) => {
 export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefrontProps) {
   const { data: session } = useSession();
   const { t, lang } = useTranslation();
+  const now = useCurrentTime(5000);
   const { confirm: showConfirm, ConfirmDialog } = useConfirmDialog();
   const { success: toastSuccess, error: toastError, warning: toastWarning, info: toastInfo } = useNotification();
   const isMobile = useMediaQuery('(max-width:600px)', { noSsr: true });
@@ -216,8 +218,8 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
   const products: Product[] = (shop as any)?.products || [];
   const shopOpenFields = useMemo(() => resolveShopOpenFields(shop), [shop]);
   const shopStatusType = useMemo(
-    () => getShopStatus(shopOpenFields.isOpen, shopOpenFields.closeDate, shopOpenFields.openDate),
-    [shopOpenFields],
+    () => getShopStatus(shopOpenFields.isOpen, shopOpenFields.closeDate, shopOpenFields.openDate, now),
+    [shopOpenFields, now],
   );
   const isShopOpen = shopStatusType === 'OPEN';
   const announcements: any[] = (shop as any)?.announcements || [];
@@ -638,13 +640,13 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       (updatedProduct.stock !== null && updatedProduct.stock !== undefined && updatedProduct.stock <= 0) ||
       (updatedProduct.variants && updatedProduct.variants.length > 0 && updatedProduct.variants.every(v => v.stock !== null && v.stock !== undefined && v.stock <= 0))
     );
-    if (!updatedProduct || getProductStatus(updatedProduct) !== 'OPEN' || isOutOfStock) {
+    if (!updatedProduct || getProductStatus(updatedProduct, now) !== 'OPEN' || isOutOfStock) {
       showToast('warning', lang === 'en' ? 'This product is no longer available' : 'สินค้านี้ไม่พร้อมจำหน่ายแล้ว');
       setSelectedProduct(null);
     } else {
       setSelectedProduct(updatedProduct);
     }
-  }, [products, selectedProduct, lang, showToast]);
+  }, [products, selectedProduct, lang, showToast, now]);
 
   // Auto-close product dialog/cart when shop becomes closed
   useEffect(() => {
@@ -996,7 +998,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
         (p.stock !== null && p.stock !== undefined && p.stock <= 0) ||
         (p.variants && p.variants.length > 0 && p.variants.every(v => v.stock !== null && v.stock !== undefined && v.stock <= 0))
       );
-      return getProductStatus(p) !== 'OPEN' || isOutOfStock;
+      return getProductStatus(p, now) !== 'OPEN' || isOutOfStock;
     });
 
     if (unavailableItem) {
@@ -1089,7 +1091,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
     } finally {
       setCheckoutProcessing(false);
     }
-  }, [session, shopCart, orderName, orderPhone, orderAddress, orderInstagram, shop.id, shop.slug, shopSlug, lang, showToast, turnstileToken, queryClient, openPaymentFlow, loadOrderHistory, products, isShopOpen]);
+  }, [session, shopCart, orderName, orderPhone, orderAddress, orderInstagram, shop.id, shop.slug, shopSlug, lang, showToast, turnstileToken, queryClient, openPaymentFlow, loadOrderHistory, products, isShopOpen, now]);
 
   // Categories from products
   const categories = useMemo(() => {
@@ -1648,7 +1650,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                   pb: { xs: 1, sm: 0 },
                 }}>
                   {items.map((product, productIdx) => {
-                    const productStatus = getProductStatus(product);
+                    const productStatus = getProductStatus(product, now);
                     const isProductAvailable = productStatus === 'OPEN' && isShopOpen;
                     const isProductClosed = productStatus !== 'OPEN';
                     const eventDiscount = getEventDiscount(product.id, events);

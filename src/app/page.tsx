@@ -184,6 +184,7 @@ import { useThemeStore, ThemeMode } from '@/store/themeStore';
 import { useWishlistStore } from '@/store/wishlistStore';
 import { useRecentlyViewedStore } from '@/store/recentlyViewedStore';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useCurrentTime } from '@/hooks/useCurrentTime';
 import { useShopCatalog, useProductReviews, PAGE_CACHE_KEYS } from '@/hooks/usePageData';
 import { mutate } from 'swr';
 
@@ -520,6 +521,7 @@ function getProductLink(product: Product): string {
 }
 
 export default function HomePage() {
+  const now = useCurrentTime(5000);
   const { data: session, status } = useSession();
   const isMobile = useMediaQuery('(max-width:600px)');
   const theme = useTheme();
@@ -1472,12 +1474,12 @@ export default function HomePage() {
       (updatedProduct.stock !== null && updatedProduct.stock !== undefined && updatedProduct.stock <= 0) ||
       (updatedProduct.variants && updatedProduct.variants.length > 0 && updatedProduct.variants.every(v => v.stock !== null && v.stock !== undefined && v.stock <= 0))
     );
-    if (!updatedProduct || getProductStatus(updatedProduct) !== 'OPEN' || isOutOfStock) {
+    if (!updatedProduct || getProductStatus(updatedProduct, now) !== 'OPEN' || isOutOfStock) {
       showToast('warning', lang === 'en' ? 'This product is no longer available' : 'สินค้านี้ไม่พร้อมจำหน่ายแล้ว');
       setSelectedProduct(null);
       setProductDialogOpen(false);
     }
-  }, [selectedProduct, selectedProductContext.shopSlug, subShopCatalog, config?.products, lang, showToast]);
+  }, [selectedProduct, selectedProductContext.shopSlug, subShopCatalog, config?.products, lang, showToast, now]);
 
   //  Realtime config updates via Supabase + fallback polling for visibility changes
   // The realtime payload is a lightweight signal ({ updatedAt, isOpen }) —
@@ -2260,7 +2262,7 @@ export default function HomePage() {
         (p.stock !== null && p.stock !== undefined && p.stock <= 0) ||
         (p.variants && p.variants.length > 0 && p.variants.every(v => v.stock !== null && v.stock !== undefined && v.stock <= 0))
       );
-      return getProductStatus(p) !== 'OPEN' || isOutOfStock;
+      return getProductStatus(p, now) !== 'OPEN' || isOutOfStock;
     });
 
     if (unavailableItem) {
@@ -2666,7 +2668,7 @@ export default function HomePage() {
         });
         // Filter by availability
         const byAvailability = showOnlyAvailable 
-          ? byPrice.filter((p) => getProductStatus(p) === 'OPEN')
+          ? byPrice.filter((p) => getProductStatus(p, now) === 'OPEN')
           : byPrice;
         // Filter by wishlist if wishlist drawer is open
         return [key, byAvailability] as const;
@@ -2701,7 +2703,7 @@ export default function HomePage() {
     }
     
     return Object.fromEntries(entries);
-  }, [categoryFilter, allGroupedProducts, priceRange, productSearch, sortBy, showOnlyAvailable, lang]);
+  }, [categoryFilter, allGroupedProducts, priceRange, productSearch, sortBy, showOnlyAvailable, lang, now]);
 
   const displayGroupedProducts = useMemo(() => {
     const term = productSearch.trim();
@@ -3790,7 +3792,7 @@ export default function HomePage() {
                       color: 'var(--primary)',
                       flexShrink: 0,
                     }}>
-                      {items.filter(p => getProductStatus(p) === 'OPEN').length}/{items.length}
+                      {items.filter(p => getProductStatus(p, now) === 'OPEN').length}/{items.length}
                     </Box>
                   </Box>
                   {/* Gradient Divider */}
@@ -3821,7 +3823,7 @@ export default function HomePage() {
                     pb: { xs: 1, sm: 0 },
                   }}>
                     {items.map((product, productIdx) => {
-                      const productStatus = getProductStatus(product);
+                      const productStatus = getProductStatus(product, now);
                       const isProductAvailable = productStatus === 'OPEN' && catalogContext.isOpen;
                       const isProductClosed = productStatus !== 'OPEN'; // Product is closed/coming soon/ended
                       const eventDiscount = getEventDiscount(product.id, catalogContext.events);
@@ -4833,7 +4835,7 @@ export default function HomePage() {
                 const product = Object.values(allGroupedProducts).flat().find((p) => p.id === productId);
                 if (!product) return null;
                 const eventDiscount = getEventDiscount(product.id, config?.events as ShopEvent[] | undefined);
-                const productStatus = getProductStatus(product);
+                const productStatus = getProductStatus(product, now);
                 const statusLabelsMap: Record<ShopStatusType, string> = {
                   OPEN: t.shopStatus.open,
                   COMING_SOON: t.shopStatus.comingSoon,
@@ -4948,7 +4950,7 @@ export default function HomePage() {
               {recentlyViewedStore.items.map((productId) => {
                 const product = Object.values(allGroupedProducts).flat().find((p) => p.id === productId);
                 if (!product) return null;
-                const productStatus = getProductStatus(product);
+                const productStatus = getProductStatus(product, now);
                 const statusLabelsMap: Record<ShopStatusType, string> = {
                   OPEN: t.shopStatus.open,
                   COMING_SOON: t.shopStatus.comingSoon,

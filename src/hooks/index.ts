@@ -115,3 +115,6 @@ export {
   useShopPageData,
   PAGE_CACHE_KEYS,
 } from './usePageData';
+
+export { useCurrentTime } from './useCurrentTime';
+

@@ -13,6 +13,7 @@ import {
   LucideIcon,
 } from 'lucide-react';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useCurrentTime } from '@/hooks/useCurrentTime';
 
 // ==================== SHOP STATUS TYPES ====================
 export type ShopStatusType = 'OPEN' | 'COMING_SOON' | 'ORDER_ENDED' | 'TEMPORARILY_CLOSED' | 'WAITING_TO_OPEN';
@@ -104,8 +105,8 @@ const getOpenDateTime = (dateString: string): Date => {
 };
 
 // Helper to determine shop status
-export const getShopStatus = (isOpen: boolean, closeDate?: string, openDate?: string): ShopStatusType => {
-  const now = new Date();
+export const getShopStatus = (isOpen: boolean, closeDate?: string, openDate?: string, nowOverride?: Date): ShopStatusType => {
+  const now = nowOverride || new Date();
   
   // Check if shop is explicitly closed
   if (!isOpen) return 'TEMPORARILY_CLOSED';
@@ -126,8 +127,8 @@ export const getShopStatus = (isOpen: boolean, closeDate?: string, openDate?: st
 };
 
 // Helper to determine product status
-export const getProductStatus = (product: { isActive?: boolean; startDate?: string; endDate?: string }): ShopStatusType => {
-  const now = new Date();
+export const getProductStatus = (product: { isActive?: boolean; startDate?: string; endDate?: string }, nowOverride?: Date): ShopStatusType => {
+  const now = nowOverride || new Date();
   const start = isValidDate(product.startDate) ? getOpenDateTime(product.startDate!) : null;
   const end = isValidDate(product.endDate) ? getCloseDateTime(product.endDate!) : null;
   
@@ -138,11 +139,11 @@ export const getProductStatus = (product: { isActive?: boolean; startDate?: stri
 };
 
 // Format countdown time
-export const formatCountdown = (targetDate: Date, t?: { common: { days: string; hours: string; minutes: string } }): string => {
+export const formatCountdown = (targetDate: Date, t?: { common: { days: string; hours: string; minutes: string } }, nowOverride?: Date): string => {
   // Handle invalid date
   if (!targetDate || isNaN(targetDate.getTime())) return '';
   
-  const now = new Date();
+  const now = nowOverride || new Date();
   const diff = targetDate.getTime() - now.getTime();
   
   // Don't show "time expired" - return empty string instead
@@ -179,20 +180,8 @@ export default function ShopStatusCard({
 }: ShopStatusCardProps) {
   const { t } = useTranslation();
   const config = SHOP_STATUS_CONFIG[status];
-  const [countdown, setCountdown] = useState<string>('');
-  
-  useEffect(() => {
-    if (!countdownDate) return;
-    const targetDate = new Date(countdownDate);
-    
-    const updateCountdown = () => {
-      setCountdown(formatCountdown(targetDate, t));
-    };
-    
-    updateCountdown();
-    const interval = setInterval(updateCountdown, 60000); // Update every minute
-    return () => clearInterval(interval);
-  }, [countdownDate, t]);
+  const now = useCurrentTime(5000);
+  const countdown = countdownDate ? formatCountdown(new Date(countdownDate), t, now) : '';
 
   // Get translated label and description based on status
   const statusLabels: Record<ShopStatusType, string> = {
@@ -362,7 +351,8 @@ interface ProductStatusBadgeProps {
 
 export function ProductStatusBadge({ product }: ProductStatusBadgeProps) {
   const { t, lang } = useTranslation();
-  const status = getProductStatus(product);
+  const now = useCurrentTime(5000);
+  const status = getProductStatus(product, now);
   const config = SHOP_STATUS_CONFIG[status];
   
   const statusLabels: Record<ShopStatusType, string> = {
@@ -436,7 +426,8 @@ interface ShopStatusBannerProps {
 }
 
 export function ShopStatusBanner({ isOpen, closeDate, openDate, customMessage }: ShopStatusBannerProps) {
-  const status = getShopStatus(isOpen, closeDate, openDate);
+  const now = useCurrentTime(5000);
+  const status = getShopStatus(isOpen, closeDate, openDate, now);
   
   // Don't show banner if shop is open normally
   if (status === 'OPEN') return null;
@@ -466,7 +457,8 @@ interface StatusChipProps {
 export function StatusChip({ status, countdownDate }: StatusChipProps) {
   const { t } = useTranslation();
   const config = SHOP_STATUS_CONFIG[status];
-  const [countdown, setCountdown] = useState<string>('');
+  const now = useCurrentTime(5000);
+  const countdown = countdownDate ? formatCountdown(new Date(countdownDate), t, now) : '';
   
   const statusLabels: Record<ShopStatusType, string> = {
     OPEN: t.shopStatus.open,
@@ -476,19 +468,6 @@ export function StatusChip({ status, countdownDate }: StatusChipProps) {
     WAITING_TO_OPEN: t.shopStatus.waitingToOpen,
   };
   const label = statusLabels[status];
-  
-  useEffect(() => {
-    if (!countdownDate) return;
-    const targetDate = new Date(countdownDate);
-    
-    const updateCountdown = () => {
-      setCountdown(formatCountdown(targetDate, t));
-    };
-    
-    updateCountdown();
-    const interval = setInterval(updateCountdown, 60000);
-    return () => clearInterval(interval);
-  }, [countdownDate, t]);
 
   return (
     <Box
