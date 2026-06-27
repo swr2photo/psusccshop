@@ -323,11 +323,41 @@ export const CONFIG_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 // ==================== UTILITY FUNCTIONS ====================
 export const clampQty = (value: number) => Math.min(99, Math.max(1, value));
 
-export const isProductCurrentlyOpen = (product: { isActive?: boolean; startDate?: string; endDate?: string }): boolean => {
+export const isValidDate = (dateString?: string): boolean => {
+  if (!dateString) return false;
+  const date = new Date(dateString);
+  return !isNaN(date.getTime());
+};
+
+export const parseThailandDateTime = (dateString: string, isEnd: boolean): Date => {
+  if (!dateString) return new Date();
+  const trimmed = dateString.trim();
+  if (trimmed.endsWith('Z') || /[+-]\d{2}:?\d{2}$/.test(trimmed)) {
+    return new Date(trimmed);
+  }
+  let normalized = trimmed.replace(' ', 'T');
+  const hasTime = normalized.includes('T');
+  if (!hasTime) {
+    if (isEnd) {
+      normalized += 'T23:59:59.999+07:00';
+    } else {
+      normalized += 'T00:00:00.000+07:00';
+    }
+  } else {
+    normalized += '+07:00';
+  }
+  const date = new Date(normalized);
+  if (isNaN(date.getTime())) {
+    return new Date(dateString);
+  }
+  return date;
+};
+
+export const isProductCurrentlyOpen = (product: { isActive?: boolean; startDate?: string; endDate?: string }, nowOverride?: Date): boolean => {
   if (!product.isActive) return false;
-  const now = new Date();
-  const start = product.startDate ? new Date(product.startDate) : null;
-  const end = product.endDate ? new Date(product.endDate) : null;
+  const now = nowOverride || new Date();
+  const start = product.startDate && isValidDate(product.startDate) ? parseThailandDateTime(product.startDate, false) : null;
+  const end = product.endDate && isValidDate(product.endDate) ? parseThailandDateTime(product.endDate, true) : null;
   if (start && now < start) return false;
   if (end && now > end) return false;
   return true;

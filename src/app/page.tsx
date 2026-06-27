@@ -187,6 +187,7 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { useCurrentTime } from '@/hooks/useCurrentTime';
 import { useShopCatalog, useProductReviews, PAGE_CACHE_KEYS } from '@/hooks/usePageData';
 import { mutate } from 'swr';
+import { parseThailandDateTime, isValidDate } from '@/lib/shop-constants';
 
 const STATUS_LABELS: Record<string, string> = {
   PENDING: 'รอดำเนินการ',
@@ -445,11 +446,11 @@ const clampQty = (value: number) => Math.min(99, Math.max(1, value));
 const normalizeStatus = (status: string) => (status || '').trim().toUpperCase();
 
 // Check if product is currently open based on startDate/endDate
-const isProductCurrentlyOpen = (product: { isActive?: boolean; startDate?: string; endDate?: string }): boolean => {
+const isProductCurrentlyOpen = (product: { isActive?: boolean; startDate?: string; endDate?: string }, nowOverride?: Date): boolean => {
   if (!product.isActive) return false;
-  const now = new Date();
-  const start = product.startDate ? new Date(product.startDate) : null;
-  const end = product.endDate ? new Date(product.endDate) : null;
+  const now = nowOverride || new Date();
+  const start = product.startDate && isValidDate(product.startDate) ? parseThailandDateTime(product.startDate, false) : null;
+  const end = product.endDate && isValidDate(product.endDate) ? parseThailandDateTime(product.endDate, true) : null;
   // Not yet started
   if (start && now < start) return false;
   // Already ended
@@ -1149,12 +1150,12 @@ export default function HomePage() {
       p.slug === decoded ||
       generateSlug(p.name, p.id) === decoded
     );
-    if (found && isProductCurrentlyOpen(found)) {
+    if (found && isProductCurrentlyOpen(found, now)) {
       handleSelectProduct(found);
       // Clean URL without reload
       window.history.replaceState({}, '', window.location.pathname);
     }
-  }, [config?.products, loading]);
+  }, [config?.products, loading, now]);
 
   useEffect(() => {
     if (!session?.user?.email) return;
@@ -2614,7 +2615,7 @@ export default function HomePage() {
   const groupedProducts = useMemo(() => {
     const realProducts = catalogContext.products || [];
     const items = sortProductsNewestFirst(isDev && activeShopMenu === 'main' ? [...devTestProducts, ...realProducts] : realProducts);
-    const activeItems = items.filter((p) => isProductCurrentlyOpen(p));
+    const activeItems = items.filter((p) => isProductCurrentlyOpen(p, now));
     const map: Record<string, Product[]> = {};
     activeItems.forEach((p) => {
       const category = (p as any).category || getCategoryFromType(p.type);
@@ -2622,7 +2623,7 @@ export default function HomePage() {
       map[category].push(p);
     });
     return map;
-  }, [catalogContext.products, isDev, devTestProducts, activeShopMenu]);
+  }, [catalogContext.products, isDev, devTestProducts, activeShopMenu, now]);
 
   const totalProductCount = useMemo(() => Object.values(allGroupedProducts).reduce((acc, items) => acc + items.length, 0), [allGroupedProducts]);
   const activeProductCount = useMemo(() => Object.values(groupedProducts).reduce((acc, items) => acc + items.length, 0), [groupedProducts]);
@@ -3175,7 +3176,7 @@ export default function HomePage() {
                             <Box
                               key={product.id}
                               onClick={() => {
-                                if (isProductCurrentlyOpen(product)) {
+                                if (isProductCurrentlyOpen(product, now)) {
                                   handleSelectProduct(product);
                                   setShowSearchBar(false);
                                   setProductSearch('');
@@ -3185,8 +3186,8 @@ export default function HomePage() {
                                 display: 'flex', alignItems: 'center', gap: 1.5,
                                 px: 1.5, py: 1,
                                 borderRadius: '12px',
-                                cursor: isProductCurrentlyOpen(product) ? 'pointer' : 'default',
-                                opacity: isProductCurrentlyOpen(product) ? 1 : 0.5,
+                                cursor: isProductCurrentlyOpen(product, now) ? 'pointer' : 'default',
+                                opacity: isProductCurrentlyOpen(product, now) ? 1 : 0.5,
                                 transition: 'all 0.15s ease',
                                 '&:hover': { bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)' },
                               }}

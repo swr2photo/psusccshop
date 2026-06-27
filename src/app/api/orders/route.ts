@@ -118,27 +118,27 @@ const isValidDate = (dateString?: string): boolean => {
 
 // Helper to parse date string in Thailand timezone (GMT+7)
 const parseThailandDate = (dateString: string, isEnd: boolean): Date => {
-  const hasTime = dateString.includes('T') || /\d{2}:\d{2}/.test(dateString);
-  
-  if (!hasTime) {
-    const parts = dateString.split(/[-/]/);
-    if (parts.length === 3) {
-      const year = parseInt(parts[0], 10);
-      const month = parseInt(parts[1], 10) - 1; // 0-indexed
-      const day = parseInt(parts[2], 10);
-      
-      if (isEnd) {
-        // End of day in GMT+7: 23:59:59.999 -> UTC: 16:59:59.999
-        return new Date(Date.UTC(year, month, day, 16, 59, 59, 999));
-      } else {
-        // Start of day in GMT+7: 00:00:00.000 -> UTC: previous day 17:00:00.000
-        const d = new Date(Date.UTC(year, month, day, 0, 0, 0));
-        d.setUTCHours(d.getUTCHours() - 7);
-        return d;
-      }
-    }
+  if (!dateString) return new Date();
+  const trimmed = dateString.trim();
+  if (trimmed.endsWith('Z') || /[+-]\d{2}:?\d{2}$/.test(trimmed)) {
+    return new Date(trimmed);
   }
-  return new Date(dateString);
+  let normalized = trimmed.replace(' ', 'T');
+  const hasTime = normalized.includes('T');
+  if (!hasTime) {
+    if (isEnd) {
+      normalized += 'T23:59:59.999+07:00';
+    } else {
+      normalized += 'T00:00:00.000+07:00';
+    }
+  } else {
+    normalized += '+07:00';
+  }
+  const date = new Date(normalized);
+  if (isNaN(date.getTime())) {
+    return new Date(dateString);
+  }
+  return date;
 };
 
 export async function POST(req: NextRequest) {

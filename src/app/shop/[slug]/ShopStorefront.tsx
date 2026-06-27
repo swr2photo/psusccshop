@@ -68,6 +68,7 @@ import {
   getStatusCategory, normalizeStatus,
   productRequiresSize, getDisplaySizes, SIZE_MEASUREMENTS, resolveProductUnitPrice,
   resolveShopOpenFields, applyRealtimeShopRow,
+  parseThailandDateTime,
 } from '@/lib/shop-constants';
 
 // ==================== TYPES ====================
@@ -1783,8 +1784,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                               </Box>
                             )}
 
-                            {/* Countdown timer badge */}
-                            {!isProductClosed && product.endDate && new Date(product.endDate) > new Date() && (
+                            {!isProductClosed && product.endDate && parseThailandDateTime(product.endDate, true) > now && (
                               <Box sx={{
                                 position: 'absolute', top: 8, left: 8,
                                 display: 'flex', flexDirection: 'column', gap: 0.5,
@@ -1797,8 +1797,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                                 }}>
                                   <Clock size={10} />
                                   {(() => {
-                                    const end = new Date(product.endDate!);
-                                    const now = new Date();
+                                    const end = parseThailandDateTime(product.endDate!, true);
                                     const diff = end.getTime() - now.getTime();
                                     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
                                     const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
