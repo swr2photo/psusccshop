@@ -11,7 +11,7 @@ import {
   Box, Typography, Button, IconButton, TextField, CircularProgress,
   Chip, Dialog, DialogContent, DialogActions,
 } from '@mui/material';
-import { Fingerprint, Plus, Trash2, Edit, Check, X, Shield, Smartphone, Monitor, Key } from 'lucide-react';
+import { Fingerprint, Plus, Trash2, Edit, Check, X, Shield, Key } from 'lucide-react';
 import { startRegistration, browserSupportsWebAuthn } from '@simplewebauthn/browser';
 import { useTranslation } from '@/hooks/useTranslation';
 
@@ -28,8 +28,9 @@ interface PasskeyManagerProps {
   userEmail: string;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export default function PasskeyManager({ userEmail }: PasskeyManagerProps) {
-  const { lang, t } = useTranslation();
+  const { lang } = useTranslation();
   const [passkeys, setPasskeys] = useState<PasskeyInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
@@ -120,8 +121,9 @@ export default function PasskeyManager({ userEmail }: PasskeyManagerProps) {
       } else {
         throw new Error(verifyData.error || 'Verification failed');
       }
-    } catch (err: any) {
-      if (err.name === 'NotAllowedError') {
+    } catch (err) {
+      const error = err as Error;
+      if (error.name === 'NotAllowedError') {
         setMessage({
           type: 'error',
           text: lang === 'en' ? 'Registration cancelled' : 'ยกเลิกการลงทะเบียน',
@@ -129,7 +131,7 @@ export default function PasskeyManager({ userEmail }: PasskeyManagerProps) {
       } else {
         setMessage({
           type: 'error',
-          text: err.message || (lang === 'en' ? 'Registration failed' : 'ลงทะเบียนไม่สำเร็จ'),
+          text: error.message || (lang === 'en' ? 'Registration failed' : 'ลงทะเบียนไม่สำเร็จ'),
         });
       }
     } finally {
@@ -441,6 +443,7 @@ export default function PasskeyManager({ userEmail }: PasskeyManagerProps) {
         }}
         maxWidth="xs"
         fullWidth
+        sx={{ zIndex: 1500 }}
         PaperProps={{
           sx: {
             borderRadius: '20px',

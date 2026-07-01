@@ -1,7 +1,7 @@
 'use client';
 
 import { apiFetch } from '@/lib/api-client';
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, type HTMLAttributes } from 'react';
 import { X, ShieldCheck, User, Phone, Instagram, AlertTriangle, MapPin, Check, Sparkles, UserCircle, CheckCircle2, AlertCircle, Search, Camera, ZoomIn, ZoomOut, RotateCw, Move, Plus, Trash2, Star, Edit } from 'lucide-react';
 import {
   Drawer, Box, Typography, Button, IconButton, TextField, InputAdornment,
@@ -22,10 +22,19 @@ export interface SavedAddress {
   isDefault: boolean;
 }
 
+export interface ProfileSaveData {
+  name: string;
+  phone: string;
+  address: string;
+  instagram: string;
+  profileImage?: string;
+  savedAddresses?: SavedAddress[];
+}
+
 interface ProfileModalProps {
   initialData: { name: string; phone: string; address: string; instagram: string; profileImage?: string; savedAddresses?: SavedAddress[] };
   onClose: () => void;
-  onSave: (data: any) => void;
+  onSave: (data: ProfileSaveData) => void;
   userImage?: string;
   userEmail?: string;
   nameValidation?: NameValidationConfig;
@@ -130,7 +139,6 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
   // Crop preview state
   const [cropPreview, setCropPreview] = useState<string | null>(null);
   const [cropFileName, setCropFileName] = useState('');
-  const [cropMime, setCropMime] = useState('image/png');
   const [cropScale, setCropScale] = useState(1);
   const [cropOffset, setCropOffset] = useState({ x: 0, y: 0 });
   const [cropRotation, setCropRotation] = useState(0);
@@ -440,7 +448,6 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
     reader.onload = () => {
       setCropPreview(reader.result as string);
       setCropFileName(file.name);
-      setCropMime(file.type);
       setCropScale(1);
       setCropOffset({ x: 0, y: 0 });
       setCropRotation(0);
@@ -665,7 +672,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
       } else {
         showNotification('error', json.message || t.profile.uploadFailed);
       }
-    } catch (err) {
+    } catch {
       showNotification('error', t.profile.uploadFailedRetry);
     } finally {
       setUploadingImage(false);
@@ -719,7 +726,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
     '& .MuiAutocomplete-clearIndicator': { color: 'var(--text-muted)' },
   };
 
-  const dropdownPaper = (props: any) => (
+  const dropdownPaper = (props: HTMLAttributes<HTMLDivElement>) => (
     <Paper {...props} sx={{
       bgcolor: 'var(--surface)',
       color: 'var(--foreground)',
@@ -1300,6 +1307,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                     loading={addressLoading}
                     noOptionsText={t.profile.noProvince}
                     loadingText={t.common.loading}
+                    slotProps={{ popper: { sx: { zIndex: 1500 } } }}
                     renderInput={(params) => (
                       <TextField
                         {...params}
@@ -1326,6 +1334,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                     onChange={(_, val) => handleDistrictChange(val)}
                     disabled={!addressFields.province}
                     noOptionsText={t.profile.selectProvince}
+                    slotProps={{ popper: { sx: { zIndex: 1500 } } }}
                     renderInput={(params) => (
                       <TextField {...params} placeholder={t.profile.district} sx={autocompleteSx} />
                     )}
@@ -1342,6 +1351,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                   onChange={(_, val) => handleSubDistrictChange(val)}
                   disabled={!addressFields.district}
                   noOptionsText={t.profile.selectDistrict}
+                  slotProps={{ popper: { sx: { zIndex: 1500 } } }}
                   renderInput={(params) => (
                     <TextField {...params} placeholder={t.profile.subDistrict} sx={autocompleteSx} />
                   )}
@@ -1574,6 +1584,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
         onClose={() => { setCropPreview(null); cropImageRef.current = null; }}
         maxWidth="xs"
         fullWidth
+        sx={{ zIndex: 1500 }}
         PaperProps={{
           sx: {
             bgcolor: 'var(--surface)',
