@@ -57,6 +57,7 @@ import {
   DEFAULT_PAYMENT_CONFIG,
 } from '@/lib/payment';
 import { ADMIN_THEME, adminCardSx, adminDialogPaperSx, adminInputSxCompact as inputSx } from '@/lib/adminTheme';
+import StripeSettings from '@/components/admin/StripeSettings';
 
 interface PaymentSettingsProps {
   onSave?: () => void;
@@ -72,6 +73,7 @@ export default function PaymentSettings({ onSave }: PaymentSettingsProps) {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [gatewayDialogOpen, setGatewayDialogOpen] = useState(false);
   const [editingGateway, setEditingGateway] = useState<PaymentGateway | null>(null);
+  const [showStripeSettings, setShowStripeSettings] = useState(false);
 
   // Load config on mount
   useEffect(() => {
@@ -192,6 +194,19 @@ export default function PaymentSettings({ onSave }: PaymentSettingsProps) {
     );
   }
 
+  // Show Stripe-specific settings panel
+  if (showStripeSettings) {
+    return (
+      <StripeSettings
+        config={getGatewayConfig('stripe')}
+        onUpdate={(updates) => updateGateway('stripe', updates)}
+        onBack={() => setShowStripeSettings(false)}
+        onSave={saveConfig}
+        saving={saving}
+      />
+    );
+  }
+
   return (
     <Box>
       {/* Header */}
@@ -297,8 +312,12 @@ export default function PaymentSettings({ onSave }: PaymentSettingsProps) {
                     <Button
                       size="small"
                       onClick={() => {
-                        setEditingGateway(gateway);
-                        setGatewayDialogOpen(true);
+                        if (gateway === 'stripe') {
+                          setShowStripeSettings(true);
+                        } else {
+                          setEditingGateway(gateway);
+                          setGatewayDialogOpen(true);
+                        }
                       }}
                       sx={{ color: ADMIN_THEME.primary }}
                     >
@@ -401,7 +420,7 @@ export default function PaymentSettings({ onSave }: PaymentSettingsProps) {
         enabledGateways={config.gateways.filter(g => g.enabled).map(g => g.gateway)}
       />
 
-      {/* Gateway Config Dialog */}
+      {/* Gateway Config Dialog (for non-Stripe gateways) */}
       {editingGateway && (
         <GatewayConfigDialog
           open={gatewayDialogOpen}
@@ -732,7 +751,7 @@ function AddPaymentOptionDialog({
   );
 }
 
-// Gateway Config Dialog
+// Gateway Config Dialog (for non-Stripe gateways)
 function GatewayConfigDialog({
   open,
   onClose,

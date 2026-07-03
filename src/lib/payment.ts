@@ -71,6 +71,29 @@ export interface PaymentGatewayConfig {
   testMode: boolean;
   /** Supported payment methods */
   supportedMethods: PaymentMethod[];
+  /** Stripe-specific configuration */
+  stripeConfig?: StripeSpecificConfig;
+}
+
+export interface StripeSpecificConfig {
+  /** Enable PromptPay QR payments */
+  enablePromptPay: boolean;
+  /** Enable Credit/Debit Card payments */
+  enableCreditCard: boolean;
+  /** Minimum amount for PromptPay (THB) */
+  promptPayMinAmount: number;
+  /** Maximum amount for PromptPay (THB) — 0 = no limit */
+  promptPayMaxAmount: number;
+  /** Custom statement descriptor (max 22 chars) */
+  statementDescriptor?: string;
+  /** Enable automatic refund processing via Stripe */
+  enableAutoRefund: boolean;
+  /** Send receipt email via Stripe */
+  receiptEmailEnabled: boolean;
+  /** Custom currency (default: thb) */
+  currency?: string;
+  /** PromptPay QR expiration in minutes (default: 15) */
+  promptPayExpirationMinutes?: number;
 }
 
 export interface PaymentTransaction {

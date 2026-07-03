@@ -185,6 +185,7 @@ import RefundManagement from '@/components/admin/RefundManagement';
 import LiveStreamSettings from '@/components/admin/LiveStreamSettings';
 import ShopManagement from '@/components/admin/ShopManagement';
 import { mapShopPermissionsToAdminPanel } from '@/lib/admin-permissions';
+import LanguageToggle from '@/components/LanguageToggle';
 
 // ============== TYPES ==============
 interface AdminDataResponse {
@@ -7738,6 +7739,9 @@ export default function AdminPage(): JSX.Element {
                 </>
               )}
             </Box>
+
+            {/* Language Toggle */}
+            <LanguageToggle size="small" />
 
             {/* User Menu */}
             <Box sx={{ 
