@@ -134,9 +134,17 @@ const CACHEABLE_API_PREFIXES = [
   '/api/reviews',
   '/api/inventory',
   '/api/chatbot',
+  '/api/shipping/options',
   '/api/support-chat/settings/public',
+  '/api/auth/available-providers',
   '/api/image/',
 ];
+
+function isCacheableApiPath(pathname: string): boolean {
+  if (CACHEABLE_API_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return true;
+  // Public shop payloads only — not /admins, /config, etc.
+  return /^\/api\/shops\/[^/]+\/(public|products)$/.test(pathname);
+}
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
@@ -279,7 +287,7 @@ export async function middleware(request: NextRequest) {
   response.headers.set('X-Frame-Options', 'DENY');
   response.headers.set('X-XSS-Protection', '1; mode=block');
 
-  const isCacheableApi = CACHEABLE_API_PREFIXES.some(prefix => pathname.startsWith(prefix));
+  const isCacheableApi = isCacheableApiPath(pathname);
   if (pathname.startsWith('/api/') && !isCacheableApi) {
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     response.headers.set('Pragma', 'no-cache');

@@ -3,6 +3,7 @@
   "framework": "nextjs",
   "buildCommand": "npm run build",
   "installCommand": "npm install",
+  "regions": ["hnd1"],
   "crons": [
     {
       "path": "/api/cron",
@@ -21,7 +22,14 @@
       ]
     },
     {
-      "source": "/api/(.*)",
+      "source": "/api/(auth|admin|cart|orders|profile|payment|payment-info|upload|refund|invoice|privacy|pickup|gas|stock-alert|push-subscription|cron)/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate" },
+        { "key": "Pragma", "value": "no-cache" }
+      ]
+    },
+    {
+      "source": "/api/(auth|admin|cart|orders|profile|payment|payment-info|upload|refund|invoice|privacy|pickup|gas|stock-alert|push-subscription|cron)",
       "headers": [
         { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate" },
         { "key": "Pragma", "value": "no-cache" }

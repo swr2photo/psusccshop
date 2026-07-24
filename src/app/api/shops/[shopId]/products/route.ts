@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, isSuperAdminEmail } from '@/lib/auth';
 import { getShopById, updateShop, getShopAdminRole } from '@/lib/shops';
+import { API_CACHE } from '@/lib/api-helpers';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -18,7 +19,10 @@ export async function GET(req: NextRequest, { params }: Params) {
 
   // Return only active products for public
   const products = (shop.products || []).filter((p: any) => p.isActive !== false);
-  return NextResponse.json({ status: 'success', products, shopName: shop.name });
+  return NextResponse.json(
+    { status: 'success', products, shopName: shop.name },
+    { headers: { 'Cache-Control': API_CACHE.medium } },
+  );
 }
 
 /** PUT /api/shops/[shopId]/products — Update shop products (admin) */

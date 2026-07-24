@@ -29,42 +29,49 @@ export function shouldProxyToBackend(): boolean {
 }
 
 /**
- * Session-bound routes stay on Vercel (NextAuth getServerSession).
- * Workers only validate JWT when NEXTAUTH_SECRET is synced — avoid 401 on profile/cart/orders.
+ * Keep on Vercel (no Workers hop):
+ * - Session/auth routes (NextAuth)
+ * - Hot public storefront reads (CDN-cacheable near Asia + Supabase ap-northeast-1)
+ *
+ * Still proxied to Workers: payment webhooks, cron, and other unmatched GETs.
  */
+const KEEP_ON_VERCEL_PREFIXES = [
+  '/api/auth',
+  '/api/profile',
+  '/api/cart',
+  '/api/orders',
+  '/api/admin',
+  '/api/upload',
+  '/api/push-subscription',
+  '/api/support-chat',
+  '/api/shipping',
+  '/api/stock-alert',
+  '/api/refund',
+  '/api/privacy',
+  '/api/invoice',
+  '/api/gas',
+  '/api/pickup',
+  '/api/payment-info',
+  '/api/payment/create-charge',
+  '/api/payment/verify',
+  '/api/payment/stripe',
+  '/api/payment/config',
+  '/api/shops',
+  '/api/reviews',
+  // Public storefront — avoid Vercel→Workers hop
+  '/api/config',
+  '/api/live',
+  '/api/inventory',
+  '/api/chatbot',
+  '/api/image',
+];
+
 export function shouldKeepApiOnVercel(pathname: string): boolean {
   if (!pathname.startsWith('/api/')) return false;
-  if (pathname.startsWith('/api/auth')) return true;
-
-  if (pathname.startsWith('/api/support-chat/settings/public')) return false;
   if (pathname.startsWith('/api/payment/webhook')) return false;
   if (pathname.startsWith('/api/cron')) return false;
 
-  const sessionPrefixes = [
-    '/api/profile',
-    '/api/cart',
-    '/api/orders',
-    '/api/admin',
-    '/api/upload',
-    '/api/push-subscription',
-    '/api/support-chat',
-    '/api/shipping/track',
-    '/api/stock-alert',
-    '/api/refund',
-    '/api/privacy',
-    '/api/invoice',
-    '/api/gas',
-    '/api/pickup',
-    '/api/payment-info',
-    '/api/payment/create-charge',
-    '/api/payment/verify',
-    '/api/payment/stripe',
-    '/api/payment/config',
-    '/api/shops',
-    '/api/reviews',
-  ];
-
-  return sessionPrefixes.some((prefix) => pathname.startsWith(prefix));
+  return KEEP_ON_VERCEL_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
 /** Stateless writes that are safe to run on Workers (no NextAuth session). */

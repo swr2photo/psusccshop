@@ -269,6 +269,60 @@ const nextConfig: NextConfig = {
         },
       ],
     },
+    {
+      source: '/api/shops/catalog',
+      headers: [
+        {
+          key: 'Cache-Control',
+          value: 'public, s-maxage=120, stale-while-revalidate=300',
+        },
+      ],
+    },
+    {
+      source: '/api/shops/:shopId/public',
+      headers: [
+        {
+          key: 'Cache-Control',
+          value: 'public, s-maxage=120, stale-while-revalidate=300',
+        },
+      ],
+    },
+    {
+      source: '/api/shops/:shopId/products',
+      headers: [
+        {
+          key: 'Cache-Control',
+          value: 'public, s-maxage=120, stale-while-revalidate=300',
+        },
+      ],
+    },
+    {
+      source: '/api/live',
+      headers: [
+        {
+          key: 'Cache-Control',
+          value: 'public, s-maxage=15, stale-while-revalidate=60',
+        },
+      ],
+    },
+    {
+      source: '/api/chatbot',
+      headers: [
+        {
+          key: 'Cache-Control',
+          value: 'public, s-maxage=30, stale-while-revalidate=60',
+        },
+      ],
+    },
+    {
+      source: '/api/support-chat/settings/public',
+      headers: [
+        {
+          key: 'Cache-Control',
+          value: 'public, s-maxage=120, stale-while-revalidate=300',
+        },
+      ],
+    },
   ],
   // Redirects - block common attack vectors
   redirects: async () => [
