@@ -109,6 +109,10 @@ await cp(
   path.join(ROOT, 'server/src/lib/apply-cors.ts'),
   path.join(OUT, 'src/lib/apply-cors.ts'),
 );
+await cp(
+  path.join(ROOT, 'server/src/lib/edge-cache.ts'),
+  path.join(OUT, 'src/lib/edge-cache.ts'),
+);
 
 let appTs = await readFile(path.join(OUT, 'src/app.ts'), 'utf8');
 appTs = appTs.replace("from './lib/api-security.js'", "from './bridge/api-security.js'");

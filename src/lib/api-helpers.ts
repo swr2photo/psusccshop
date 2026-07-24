@@ -7,10 +7,17 @@ import {
 
 /** Shared Cache-Control values for public GET endpoints */
 export const API_CACHE = {
-  short: 'public, s-maxage=30, stale-while-revalidate=60',
-  medium: 'public, s-maxage=120, stale-while-revalidate=300',
-  config: 'public, s-maxage=10, stale-while-revalidate=30',
+  short: 'public, max-age=0, s-maxage=30, stale-while-revalidate=60',
+  medium: 'public, max-age=0, s-maxage=120, stale-while-revalidate=300',
+  config: 'public, max-age=0, s-maxage=10, stale-while-revalidate=30',
   private: 'private, no-store, max-age=0',
+} as const;
+
+/** Extra headers so Cloudflare CDN / Cache API can store public API responses */
+export const API_CDN_HEADERS = {
+  short: { 'CDN-Cache-Control': 'public, max-age=30' },
+  medium: { 'CDN-Cache-Control': 'public, max-age=120' },
+  config: { 'CDN-Cache-Control': 'public, max-age=10' },
 } as const;
 
 /**

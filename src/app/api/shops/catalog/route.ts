@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withBackendProxy } from '@/lib/backend-proxy';
 import { listActivePublicShopCatalog } from '@/lib/shops';
-import { API_CACHE } from '@/lib/api-helpers';
+import { API_CACHE, API_CDN_HEADERS } from '@/lib/api-helpers';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -14,6 +14,7 @@ async function GETHandler(_req: NextRequest) {
     {
       headers: {
         'Cache-Control': API_CACHE.medium,
+        ...API_CDN_HEADERS.medium,
       },
     }
   );
