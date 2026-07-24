@@ -73,7 +73,7 @@ async function patchBridgeImports(dir) {
 }
 
 async function cleanExportDir(out) {
-  const preserve = new Set(['.git']);
+  const preserve = new Set(['.git', 'node_modules', '.wrangler']);
   if (!existsSync(out)) {
     await mkdir(out, { recursive: true });
     return;
