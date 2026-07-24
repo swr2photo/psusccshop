@@ -14,7 +14,11 @@ import { db } from '@/lib/db';
 import { orders, paymentTransactions } from '@/db/schema';
 import { eq, and, desc, isNotNull } from 'drizzle-orm';
 import { requireAuth, isResourceOwner, isAdminEmailAsync } from '@/lib/auth';
-import { createStripePaymentIntent } from '@/lib/payment';
+import {
+  createStripePaymentIntent,
+  getStripePromptPayEnabled,
+  isStripeEnvConfigured,
+} from '@/lib/payment';
 import { fetchStripeReceiptUrl, mergeStripeReceiptSlipData } from '@/lib/stripe-receipt';
 import { sanitizeUtf8Input } from '@/lib/sanitize';
 
@@ -22,9 +26,6 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const PAID_STATUSES = ['PAID', 'READY', 'SHIPPED', 'RECEIVED', 'COMPLETED'];
-
-const isStripePromptPayConfigured = (): boolean =>
-  Boolean(process.env.STRIPE_SECRET_KEY && process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
 
 export async function POST(req: NextRequest) {
   const authResult = await requireAuth(req);
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
   const userEmail = authResult.email;
 
   try {
-    if (!isStripePromptPayConfigured()) {
+    if (!isStripeEnvConfigured()) {
       return NextResponse.json(
         { status: 'error', message: 'Stripe PromptPay is not configured' },
         { status: 503 }
@@ -155,6 +156,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { status: 'error', message: 'ยอดชำระต่ำกว่าขั้นต่ำของ PromptPay (10 บาท)' },
         { status: 400 }
+      );
+    }
+
+    // Respect admin toggle + amount limits from Stripe settings
+    if (!(await getStripePromptPayEnabled(amountTHB))) {
+      return NextResponse.json(
+        { status: 'error', message: 'ระบบชำระเงิน PromptPay ผ่าน Stripe ปิดใช้งานอยู่ชั่วคราว' },
+        { status: 503 }
       );
     }
 

@@ -739,3 +739,70 @@ export function verifyStripeWebhook(
     return false;
   }
 }
+
+// ==================== STRIPE PROMPTPAY AVAILABILITY ====================
+
+const PAYMENT_CONFIG_KEY = 'payment_config';
+
+const DEFAULT_STRIPE_PROMPTPAY: Pick<
+  StripeSpecificConfig,
+  'enablePromptPay' | 'promptPayMinAmount' | 'promptPayMaxAmount' | 'promptPayExpirationMinutes'
+> = {
+  enablePromptPay: true,
+  promptPayMinAmount: 10,
+  promptPayMaxAmount: 0,
+  promptPayExpirationMinutes: 15,
+};
+
+export function isStripeEnvConfigured(): boolean {
+  return Boolean(process.env.STRIPE_SECRET_KEY && process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
+}
+
+/** Resolve Stripe-specific config from payment_config (defaults when unset). */
+export function resolveStripeSpecificConfig(
+  paymentConfig: PaymentConfig | null | undefined,
+): StripeSpecificConfig {
+  const stripeGw = paymentConfig?.gateways?.find((g) => g.gateway === 'stripe');
+  return {
+    enablePromptPay: DEFAULT_STRIPE_PROMPTPAY.enablePromptPay,
+    enableCreditCard: false,
+    promptPayMinAmount: DEFAULT_STRIPE_PROMPTPAY.promptPayMinAmount,
+    promptPayMaxAmount: DEFAULT_STRIPE_PROMPTPAY.promptPayMaxAmount,
+    enableAutoRefund: false,
+    receiptEmailEnabled: true,
+    currency: 'thb',
+    promptPayExpirationMinutes: DEFAULT_STRIPE_PROMPTPAY.promptPayExpirationMinutes,
+    ...(stripeGw?.stripeConfig || {}),
+  };
+}
+
+/**
+ * Whether Stripe PromptPay should be offered to customers.
+ * Respects admin toggle (stripeConfig.enablePromptPay) and optional amount limits.
+ * Defaults to enabled when Stripe env keys exist and no toggle has been saved yet.
+ */
+export function isStripePromptPayEnabled(
+  paymentConfig: PaymentConfig | null | undefined,
+  amountTHB?: number,
+): boolean {
+  if (!isStripeEnvConfigured()) return false;
+
+  const stripe = resolveStripeSpecificConfig(paymentConfig);
+  if (!stripe.enablePromptPay) return false;
+
+  if (typeof amountTHB === 'number' && Number.isFinite(amountTHB)) {
+    const min = stripe.promptPayMinAmount ?? 10;
+    const max = stripe.promptPayMaxAmount ?? 0;
+    if (amountTHB < min) return false;
+    if (max > 0 && amountTHB > max) return false;
+  }
+
+  return true;
+}
+
+/** Load payment_config and evaluate Stripe PromptPay availability. */
+export async function getStripePromptPayEnabled(amountTHB?: number): Promise<boolean> {
+  const { getConfigValueCached } = await import('@/lib/config-db');
+  const paymentConfig = await getConfigValueCached<PaymentConfig>(PAYMENT_CONFIG_KEY);
+  return isStripePromptPayEnabled(paymentConfig, amountTHB);
+}

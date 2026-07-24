@@ -8,6 +8,7 @@ import { db } from '@/lib/db';
 import { config } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { PaymentConfig, DEFAULT_PAYMENT_CONFIG } from '@/lib/payment';
+import { invalidateConfigCache } from '@/lib/config-db';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -68,6 +69,8 @@ export async function POST(request: NextRequest) {
         target: config.key,
         set: { value: newConfig, updatedAt: new Date() },
       });
+
+    invalidateConfigCache(CONFIG_KEY);
 
     return NextResponse.json({ success: true, message: 'Payment config updated successfully' });
   } catch (error) {

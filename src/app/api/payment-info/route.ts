@@ -5,6 +5,7 @@ import { requireAuth, isResourceOwner, isAdminEmailAsync } from '@/lib/auth';
 import { maskPhone, sanitizeUtf8Input } from '@/lib/sanitize';
 import { getShopById } from '@/lib/shops';
 import { resolveOrderByRef } from '@/lib/order-lookup';
+import { getStripePromptPayEnabled } from '@/lib/payment';
 
 const maskAccountNumber = (accountNumber: string): string => {
   if (!accountNumber) return '';
@@ -125,10 +126,8 @@ export async function GET(req: NextRequest) {
         // สถานะระบบชำระเงิน
         paymentEnabled,
         paymentDisabledMessage: paymentEnabled ? null : paymentDisabledMessage,
-        // Stripe PromptPay (auto-verified QR) — same flow for main + sub-shop orders
-        stripePromptPayEnabled: Boolean(
-          process.env.STRIPE_SECRET_KEY && process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-        ),
+        // Stripe PromptPay (auto-verified QR) — respects admin enablePromptPay toggle
+        stripePromptPayEnabled: await getStripePromptPayEnabled(finalAmount),
       },
     };
 
