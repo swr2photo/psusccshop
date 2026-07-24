@@ -2,8 +2,9 @@
  * Proxy Next.js API routes to the Elysia/Workers backend.
  * Set API_INTERNAL_URL (server-only) e.g. http://localhost:3001
  *
- * Option B (production): almost all /api/* runs on Workers.
- * Only NextAuth cookie mint/clear routes stay on Vercel.
+ * Option B: set API_PROXY_ALL=1 on Vercel AFTER Workers is redeployed with
+ * matching route handlers + NEXTAUTH_SECRET. Until then, keep hot/session
+ * routes on Vercel (Option A) to avoid 401s from stale Workers bundles.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -31,24 +32,78 @@ export function shouldProxyToBackend(): boolean {
   return Boolean(getBackendProxyUrl());
 }
 
-/**
- * True NextAuth session writers must stay on the shop origin (Vercel).
- * Everything else validates JWT via getSessionFromRequest on Workers.
- */
-const KEEP_ON_VERCEL_PREFIXES = [
+/** Full Option B cutover — only NextAuth writers stay on Vercel. */
+const KEEP_AUTH_ONLY = [
   '/api/auth',
 ];
 
-export function shouldKeepApiOnVercel(pathname: string): boolean {
-  if (!pathname.startsWith('/api/')) return false;
-  return KEEP_ON_VERCEL_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+/**
+ * Safe default (Option A): session + storefront stay on Vercel.
+ * Avoids Workers hop for hot paths and tolerates older Workers deploys.
+ */
+const KEEP_SAFE_DEFAULT = [
+  '/api/auth',
+  '/api/profile',
+  '/api/cart',
+  '/api/orders',
+  '/api/admin',
+  '/api/upload',
+  '/api/push-subscription',
+  '/api/support-chat',
+  '/api/shipping',
+  '/api/stock-alert',
+  '/api/refund',
+  '/api/privacy',
+  '/api/invoice',
+  '/api/gas',
+  '/api/pickup',
+  '/api/payment-info',
+  '/api/payment/create-charge',
+  '/api/payment/verify',
+  '/api/payment/stripe',
+  '/api/payment/config',
+  '/api/shops',
+  '/api/reviews',
+  '/api/config',
+  '/api/live',
+  '/api/inventory',
+  '/api/chatbot',
+  '/api/image',
+];
+
+function isProxyAllEnabled(): boolean {
+  return process.env.API_PROXY_ALL === '1' || process.env.API_PROXY_ALL === 'true';
 }
 
-export function shouldProxyApiRoute(pathname: string, _method = 'GET'): boolean {
+export function shouldKeepApiOnVercel(pathname: string): boolean {
+  if (!pathname.startsWith('/api/')) return false;
+
+  if (!isProxyAllEnabled()) {
+    if (pathname.startsWith('/api/payment/webhook')) return false;
+    if (pathname.startsWith('/api/cron')) return false;
+  }
+
+  const prefixes = isProxyAllEnabled() ? KEEP_AUTH_ONLY : KEEP_SAFE_DEFAULT;
+  return prefixes.some((prefix) => pathname.startsWith(prefix));
+}
+
+export function shouldProxyApiRoute(pathname: string, method = 'GET'): boolean {
   if (!shouldProxyToBackend()) return false;
   if (!pathname.startsWith('/api/')) return false;
   if (shouldKeepApiOnVercel(pathname)) return false;
-  // Proxy all methods (GET/POST/PUT/PATCH/DELETE) for non-auth APIs
+
+  if (isProxyAllEnabled()) {
+    return true;
+  }
+
+  // Option A: only proxy GET/HEAD (plus webhook/cron writes)
+  const verb = method.toUpperCase();
+  if (verb !== 'GET' && verb !== 'HEAD') {
+    return (
+      pathname.startsWith('/api/payment/webhook') ||
+      pathname.startsWith('/api/cron')
+    );
+  }
   return true;
 }
 

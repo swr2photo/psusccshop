@@ -24,6 +24,14 @@ psusccshop/
 
 Production ใช้ same-origin `/api/*` + middleware proxy ไป Workers (`API_INTERNAL_URL` หรือ fallback `https://api.psuscc.club`) — browser ไม่ต้องยิง cross-origin
 
+**เปิด Option B ทั้งก้อน:** หลัง `npm run deploy:api:cloudflare` สำเร็จ ตั้งบน Vercel:
+
+```env
+API_PROXY_ALL=1
+```
+
+ถ้ายังไม่ตั้ง = โหมดปลอดภัย (session/storefront อยู่ Vercel, proxy เฉพาะ webhook/cron + GET ที่ไม่ถูก keep)
+
 Elysia ไม่ได้เขียน logic ใหม่ — ใช้ **next-bridge** เรียก handler เดิมจาก `src/app/api/**/route.ts`
 
 ## รัน Local
