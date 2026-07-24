@@ -30,9 +30,8 @@ const FRONTEND_ONLY_DEPS = new Set([
   'lucide-react',
   'qrcode.react',
   'radix-ui',
-  'react',
+  // react / react-dom kept — Next.js bridge imports them at bundle time
   'react-day-picker',
-  'react-dom',
   'swr',
   'tailwind-merge',
   'three',
@@ -140,6 +139,10 @@ const dependencies = { ...rootPkg.dependencies, ...serverPkg.dependencies };
 for (const key of FRONTEND_ONLY_DEPS) delete dependencies[key];
 if (!dependencies.elysia) dependencies.elysia = serverPkg.dependencies.elysia;
 if (!dependencies['@elysiajs/cors']) dependencies['@elysiajs/cors'] = serverPkg.dependencies['@elysiajs/cors'];
+// Elysia peer — wrangler does not auto-resolve optional peers
+if (!dependencies['@sinclair/typebox']) dependencies['@sinclair/typebox'] = '^0.34.41';
+if (!dependencies.react) dependencies.react = rootPkg.dependencies.react || '19.2.4';
+if (!dependencies['react-dom']) dependencies['react-dom'] = rootPkg.dependencies['react-dom'] || '19.2.4';
 
 const devDependencies = {
   '@types/bun': '^1.2.0',
