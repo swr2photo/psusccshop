@@ -742,8 +742,6 @@ export function verifyStripeWebhook(
 
 // ==================== STRIPE PROMPTPAY AVAILABILITY ====================
 
-const PAYMENT_CONFIG_KEY = 'payment_config';
-
 const DEFAULT_STRIPE_PROMPTPAY: Pick<
   StripeSpecificConfig,
   'enablePromptPay' | 'promptPayMinAmount' | 'promptPayMaxAmount' | 'promptPayExpirationMinutes'
@@ -798,11 +796,4 @@ export function isStripePromptPayEnabled(
   }
 
   return true;
-}
-
-/** Load payment_config and evaluate Stripe PromptPay availability. */
-export async function getStripePromptPayEnabled(amountTHB?: number): Promise<boolean> {
-  const { getConfigValueCached } = await import('@/lib/config-db');
-  const paymentConfig = await getConfigValueCached<PaymentConfig>(PAYMENT_CONFIG_KEY);
-  return isStripePromptPayEnabled(paymentConfig, amountTHB);
 }

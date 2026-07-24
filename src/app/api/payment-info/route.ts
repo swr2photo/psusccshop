@@ -5,7 +5,7 @@ import { requireAuth, isResourceOwner, isAdminEmailAsync } from '@/lib/auth';
 import { maskPhone, sanitizeUtf8Input } from '@/lib/sanitize';
 import { getShopById } from '@/lib/shops';
 import { resolveOrderByRef } from '@/lib/order-lookup';
-import { getStripePromptPayEnabled } from '@/lib/payment';
+import { getStripePromptPayEnabled } from '@/lib/payment-server';
 
 const maskAccountNumber = (accountNumber: string): string => {
   if (!accountNumber) return '';
