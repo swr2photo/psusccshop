@@ -38,7 +38,14 @@ export async function POST(req: NextRequest) {
     const { message, conversationHistory, image, conversationId } = body;
 
     if (typeof conversationId === 'string' && conversationId.trim()) {
-      Sentry.setConversationId(conversationId.trim().slice(0, 128));
+      const id = conversationId.trim().slice(0, 128);
+      // setConversationId is Node-only; edge/Workers Sentry build does not export it
+      const setConversationId = (Sentry as { setConversationId?: (id: string) => void }).setConversationId;
+      if (typeof setConversationId === 'function') {
+        setConversationId(id);
+      } else {
+        Sentry.setTag('conversation_id', id);
+      }
     }
     
     // Get user session (optional — chatbot works for anonymous users too)
