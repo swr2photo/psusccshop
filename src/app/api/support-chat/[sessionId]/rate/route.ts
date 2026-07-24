@@ -2,8 +2,7 @@
 // Customer rates the chat after it's closed
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions, isResourceOwner } from '@/lib/auth';
+import { isResourceOwner, getSession } from '@/lib/auth';
 import { 
   getChatSession,
   rateChatSession 
@@ -20,7 +19,7 @@ interface Params {
 export async function POST(request: NextRequest, { params }: Params) {
   try {
     const { sessionId } = await params;
-    const session = await getServerSession(authOptions);
+    const session = await getSession(request);
     
     if (!session?.user?.email) {
       return NextResponse.json('Unauthorized', { status: 401 });

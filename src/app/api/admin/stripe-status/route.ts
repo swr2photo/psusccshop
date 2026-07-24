@@ -2,8 +2,7 @@
 // Admin API — Stripe connection status check
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions, isAdminEmailAsync } from '@/lib/auth';
+import { isAdminEmailAsync, getSession } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -11,7 +10,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   try {
     // Admin only
-    const session = await getServerSession(authOptions);
+    const session = await getSession(request);
     if (!session?.user?.email || !(await isAdminEmailAsync(session.user.email))) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }

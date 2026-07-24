@@ -2,8 +2,7 @@
 // Typing indicator API — Drizzle ORM
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions, isAdminEmailAsync } from '@/lib/auth';
+import { isAdminEmailAsync, getSession } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { supportChats } from '@/db/schema';
 import { eq } from 'drizzle-orm';
@@ -20,7 +19,7 @@ interface Params {
 export async function POST(request: NextRequest, { params }: Params) {
   try {
     const { sessionId } = await params;
-    const session = await getServerSession(authOptions);
+    const session = await getSession(request);
     
     if (!session?.user?.email) {
       return NextResponse.json('Unauthorized', { status: 401 });
@@ -61,7 +60,7 @@ export async function POST(request: NextRequest, { params }: Params) {
 export async function GET(request: NextRequest, { params }: Params) {
   try {
     const { sessionId } = await params;
-    const session = await getServerSession(authOptions);
+    const session = await getSession(request);
     
     if (!session?.user?.email) {
       return NextResponse.json('Unauthorized', { status: 401 });

@@ -4,8 +4,7 @@ import { withBackendProxy } from '@/lib/backend-proxy';
 import { db } from '@/lib/db';
 import { inventory } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
-import { requireAdmin, isAdminEmailAsync, authOptions } from '@/lib/auth';
-import { getServerSession } from 'next-auth';
+import { requireAdmin, isAdminEmailAsync, getSession } from '@/lib/auth';
 import { API_CACHE } from '@/lib/api-helpers';
 import { getCached, invalidateCachePrefix, CACHE_TTL } from '@/lib/server-cache';
 import { groupInventoryRows, toPublicInventory } from '@/lib/inventory-public';
@@ -30,7 +29,7 @@ async function fetchInventoryRows(productId: string | null): Promise<InventoryDb
 async function GETHandler(request: NextRequest) {
   try {
     const productId = request.nextUrl.searchParams.get('productId');
-    const session = await getServerSession(authOptions);
+    const session = await getSession(request);
     const adminView = session?.user?.email
       ? await isAdminEmailAsync(session.user.email)
       : false;

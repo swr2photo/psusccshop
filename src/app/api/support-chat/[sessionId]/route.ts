@@ -2,8 +2,7 @@
 // Get chat session details and messages (supports ETag + delta sync)
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions, isAdminEmailAsync, isResourceOwner } from '@/lib/auth';
+import { isAdminEmailAsync, isResourceOwner, getSession } from '@/lib/auth';
 import {
   getChatSession,
   getChatSessionWithMessages,
@@ -23,7 +22,7 @@ interface Params {
 export async function GET(request: NextRequest, { params }: Params) {
   try {
     const { sessionId } = await params;
-    const session = await getServerSession(authOptions);
+    const session = await getSession(request);
 
     if (!session?.user?.email) {
       return NextResponse.json('Unauthorized', { status: 401 });

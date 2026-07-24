@@ -2,8 +2,7 @@
 // Manage push notification subscriptions — Drizzle ORM
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { getSession } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { pushSubscriptions } from '@/db/schema';
 import { and, eq } from 'drizzle-orm';
@@ -14,7 +13,7 @@ export const dynamic = 'force-dynamic';
 // POST: Save or update push subscription
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getSession(request);
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

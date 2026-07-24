@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveOrderByRef } from '@/lib/order-lookup';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth-options';
-import { isAdminEmailAsync } from '@/lib/auth';
+import { isAdminEmailAsync, getSession } from '@/lib/auth';
 
 export async function GET(
   req: NextRequest,
@@ -10,7 +8,7 @@ export async function GET(
 ) {
   try {
     // Check admin authentication
-    const session = await getServerSession(authOptions);
+    const session = await getSession(req);
     const userEmail = session?.user?.email;
     
     if (!userEmail || !(await isAdminEmailAsync(userEmail))) {

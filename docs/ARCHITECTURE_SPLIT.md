@@ -12,15 +12,17 @@ psusccshop/
 
 | ส่วน | เทคโนโลยี | หน้าที่ |
 |------|-----------|---------|
-| Frontend | Next.js 16 | UI, OAuth/Passkey, middleware (rate limit, CORS) |
-| Backend | ElysiaJS + **Bun** | **69 API routes** ผ่าน Next bridge |
+| Frontend | Next.js 16 | UI, OAuth/Passkey, middleware proxy → Workers |
+| Backend | ElysiaJS + **Cloudflare Workers** | เกือบทุก `/api/*` ผ่าน Next bridge |
 
 ## Routes
 
 | อยู่ที่ | Routes |
 |--------|--------|
-| **Elysia** | ทุก `/api/*` ยกเว้น `/api/auth/*` (69 routes) |
-| **Next.js** | `/api/auth/[...nextauth]`, passkey, available-providers |
+| **Workers (api.psuscc.club)** | ทุก `/api/*` ยกเว้น `/api/auth/*` |
+| **Vercel (Next.js)** | `/api/auth/[...nextauth]`, passkey, sync-cookie, available-providers |
+
+Production ใช้ same-origin `/api/*` + middleware proxy ไป Workers (`API_INTERNAL_URL` หรือ fallback `https://api.psuscc.club`) — browser ไม่ต้องยิง cross-origin
 
 Elysia ไม่ได้เขียน logic ใหม่ — ใช้ **next-bridge** เรียก handler เดิมจาก `src/app/api/**/route.ts`
 

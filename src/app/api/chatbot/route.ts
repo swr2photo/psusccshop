@@ -6,8 +6,7 @@ import { processChat, buildDetailedShopContext, getShopData, ChatMessage, getCur
 import { QUICK_QUESTIONS, SHIRT_FAQ } from '@/lib/shirt-faq';
 import { checkCombinedRateLimitAsync, RATE_LIMITS } from '@/lib/rate-limit';
 import { API_CACHE } from '@/lib/api-helpers';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { getSession } from '@/lib/auth';
 import { recordChatbotRequest } from '@/lib/sentry-metrics';
 
 export const runtime = 'nodejs';
@@ -46,7 +45,7 @@ export async function POST(req: NextRequest) {
     let userEmail: string | undefined;
     let userName: string | undefined;
     try {
-      const session = await getServerSession(authOptions);
+      const session = await getSession(req);
       if (session?.user?.email) {
         userEmail = session.user.email;
         userName = session.user.name || undefined;

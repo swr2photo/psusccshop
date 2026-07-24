@@ -41,11 +41,11 @@ import * as __route_27 from '@/app/api/admin/security/route';
 import * as __route_28 from '@/app/api/admin/sheet/route';
 import * as __route_29 from '@/app/api/admin/slip-import/route';
 import * as __route_30 from '@/app/api/admin/status/route';
-import * as __route_31 from '@/app/api/admin/support-chat/route';
-import * as __route_32 from '@/app/api/admin/toggle-shop/route';
-import * as __route_33 from '@/app/api/admin/user-logs/route';
-import * as __route_34 from '@/app/api/admin/webhooks/route';
-import * as __route_35 from '@/app/api/auth/sync-cookie/route';
+import * as __route_31 from '@/app/api/admin/stripe-status/route';
+import * as __route_32 from '@/app/api/admin/support-chat/route';
+import * as __route_33 from '@/app/api/admin/toggle-shop/route';
+import * as __route_34 from '@/app/api/admin/user-logs/route';
+import * as __route_35 from '@/app/api/admin/webhooks/route';
 import * as __route_36 from '@/app/api/cron/cancel-expired/route';
 import * as __route_37 from '@/app/api/cron/cleanup/route';
 import * as __route_38 from '@/app/api/cron/update-tracking/route';
@@ -84,7 +84,8 @@ import * as __route_70 from '@/app/api/reviews/route';
 import * as __route_71 from '@/app/api/shops/route';
 import * as __route_72 from '@/app/api/stock-alert/route';
 import * as __route_73 from '@/app/api/support-chat/route';
-import * as __route_74 from '@/app/api/upload/route';
+import * as __route_74 from '@/app/api/time/route';
+import * as __route_75 from '@/app/api/upload/route';
 
 export const ROUTE_MODULES: Record<string, RouteModule> = {
   '@/app/api/support-chat/[sessionId]/message/[messageId]/route': __route_0 as RouteModule,
@@ -118,11 +119,11 @@ export const ROUTE_MODULES: Record<string, RouteModule> = {
   '@/app/api/admin/sheet/route': __route_28 as RouteModule,
   '@/app/api/admin/slip-import/route': __route_29 as RouteModule,
   '@/app/api/admin/status/route': __route_30 as RouteModule,
-  '@/app/api/admin/support-chat/route': __route_31 as RouteModule,
-  '@/app/api/admin/toggle-shop/route': __route_32 as RouteModule,
-  '@/app/api/admin/user-logs/route': __route_33 as RouteModule,
-  '@/app/api/admin/webhooks/route': __route_34 as RouteModule,
-  '@/app/api/auth/sync-cookie/route': __route_35 as RouteModule,
+  '@/app/api/admin/stripe-status/route': __route_31 as RouteModule,
+  '@/app/api/admin/support-chat/route': __route_32 as RouteModule,
+  '@/app/api/admin/toggle-shop/route': __route_33 as RouteModule,
+  '@/app/api/admin/user-logs/route': __route_34 as RouteModule,
+  '@/app/api/admin/webhooks/route': __route_35 as RouteModule,
   '@/app/api/cron/cancel-expired/route': __route_36 as RouteModule,
   '@/app/api/cron/cleanup/route': __route_37 as RouteModule,
   '@/app/api/cron/update-tracking/route': __route_38 as RouteModule,
@@ -161,5 +162,6 @@ export const ROUTE_MODULES: Record<string, RouteModule> = {
   '@/app/api/shops/route': __route_71 as RouteModule,
   '@/app/api/stock-alert/route': __route_72 as RouteModule,
   '@/app/api/support-chat/route': __route_73 as RouteModule,
-  '@/app/api/upload/route': __route_74 as RouteModule,
+  '@/app/api/time/route': __route_74 as RouteModule,
+  '@/app/api/upload/route': __route_75 as RouteModule,
 };

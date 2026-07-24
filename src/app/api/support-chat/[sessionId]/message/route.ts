@@ -2,8 +2,7 @@
 // Send a message in a chat session
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions, isAdminEmailAsync, ADMIN_EMAILS, isResourceOwner } from '@/lib/auth';
+import { isAdminEmailAsync, ADMIN_EMAILS, isResourceOwner, getSession } from '@/lib/auth';
 import { 
   getChatSession,
   addChatMessage 
@@ -23,7 +22,7 @@ interface Params {
 export async function POST(request: NextRequest, { params }: Params) {
   try {
     const { sessionId } = await params;
-    const session = await getServerSession(authOptions);
+    const session = await getSession(request);
     
     if (!session?.user?.email) {
       return NextResponse.json('Unauthorized', { status: 401 });

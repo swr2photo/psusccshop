@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic';
 // GET: Get customer's active chat or chat history
 export async function GET(request: NextRequest) {
   try {
-    const session = await getSession();
+    const session = await getSession(request);
     
     if (!session?.user?.email) {
       return NextResponse.json('Unauthorized', { status: 401 });
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
 // POST: Create a new chat session
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession();
+    const session = await getSession(request);
     
     if (!session?.user?.email) {
       return NextResponse.json('Unauthorized', { status: 401 });

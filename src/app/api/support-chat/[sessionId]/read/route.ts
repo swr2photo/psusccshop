@@ -2,8 +2,7 @@
 // Mark messages as read API
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions, isAdminEmailAsync, isResourceOwner } from '@/lib/auth';
+import { isAdminEmailAsync, isResourceOwner, getSession } from '@/lib/auth';
 import { markMessagesAsRead, getChatSession } from '@/lib/support-chat';
 
 export const runtime = 'nodejs';
@@ -17,7 +16,7 @@ interface Params {
 export async function POST(request: NextRequest, { params }: Params) {
   try {
     const { sessionId } = await params;
-    const session = await getServerSession(authOptions);
+    const session = await getSession(request);
     
     if (!session?.user?.email) {
       return NextResponse.json('Unauthorized', { status: 401 });

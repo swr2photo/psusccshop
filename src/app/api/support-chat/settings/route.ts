@@ -2,8 +2,7 @@
 // Chat settings API (Admin only) — Drizzle ORM
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions, isAdminEmailAsync } from '@/lib/auth';
+import { isAdminEmailAsync, getSession } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { config } from '@/db/schema';
 import { eq } from 'drizzle-orm';
@@ -34,7 +33,7 @@ const DEFAULT_SETTINGS = {
 // GET: Get chat settings
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getSession(request);
     if (!session?.user?.email || !(await isAdminEmailAsync(session.user.email))) {
       return NextResponse.json('Unauthorized', { status: 401 });
     }
@@ -62,7 +61,7 @@ export async function GET() {
 // POST: Update chat settings
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getSession(request);
     if (!session?.user?.email || !(await isAdminEmailAsync(session.user.email))) {
       return NextResponse.json('Unauthorized', { status: 401 });
     }

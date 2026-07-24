@@ -8,17 +8,15 @@ import {
   ShippingProvider,
   SHIPPING_PROVIDERS,
 } from '@/lib/shipping';
-import { isAdminEmailAsync } from '@/lib/auth';
+import { isAdminEmailAsync, getSession } from '@/lib/auth';
 import { userOwnsTrackingNumber } from '@/lib/order-lookup';
 import { rateLimitOrNull } from '@/lib/api-helpers';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-async function requireSession() {
-  const { getServerSession } = await import('next-auth');
-  const { authOptions } = await import('@/lib/auth');
-  const session = await getServerSession(authOptions);
+async function requireSession(request: NextRequest) {
+  const session = await getSession(request);
   if (!session?.user?.email) return null;
   return session;
 }
@@ -47,7 +45,7 @@ export async function POST(request: NextRequest) {
   const rateLimited = await rateLimitOrNull(request, { maxRequests: 30, windowSeconds: 60, prefix: 'ship-track' });
   if (rateLimited) return rateLimited;
 
-  const session = await requireSession();
+  const session = await requireSession(request);
   if (!session?.user?.email) {
     return NextResponse.json({ success: false, error: 'Unauthorized', errorCode: 'AUTH_REQUIRED' }, { status: 401 });
   }
@@ -128,7 +126,7 @@ export async function GET(request: NextRequest) {
   const rateLimited = await rateLimitOrNull(request, { maxRequests: 30, windowSeconds: 60, prefix: 'ship-track' });
   if (rateLimited) return rateLimited;
 
-  const session = await requireSession();
+  const session = await requireSession(request);
   if (!session?.user?.email) {
     return NextResponse.json({ success: false, error: 'Unauthorized', errorCode: 'AUTH_REQUIRED' }, { status: 401 });
   }

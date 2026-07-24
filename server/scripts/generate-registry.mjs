@@ -13,6 +13,7 @@ const AUTH_PREFIXES = [
   'auth/passkey/login',
   'auth/passkey',
   'auth/available-providers',
+  'auth/sync-cookie',
 ];
 
 async function walk(dir, base = '') {

@@ -2,8 +2,7 @@
 // Create payment charge API (for card payments via Omise/Stripe)
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { getSession } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { orders, paymentTransactions } from '@/db/schema';
 import { eq } from 'drizzle-orm';
@@ -43,7 +42,7 @@ export async function POST(request: NextRequest) {
 
   try {
     // User must be logged in
-    const session = await getServerSession(authOptions);
+    const session = await getSession(request);
     if (!session?.user?.email) {
       return NextResponse.json(
         { success: false, error: 'กรุณาเข้าสู่ระบบ' },

@@ -5,8 +5,7 @@ import { db } from '@/lib/db';
 import { reviews } from '@/db/schema';
 import { eq, and, desc } from 'drizzle-orm';
 import { createHash } from 'crypto';
-import { requireAuth, authOptions } from '@/lib/auth';
-import { getServerSession } from 'next-auth';
+import { requireAuth, getSession } from '@/lib/auth';
 import { rateLimitOrNull, API_CACHE } from '@/lib/api-helpers';
 import { getCached, invalidateCachePrefix, CACHE_TTL } from '@/lib/server-cache';
 
@@ -83,7 +82,7 @@ async function GETHandler(request: NextRequest) {
       }));
     });
 
-    const session = await getServerSession(authOptions);
+    const session = await getSession(request);
     const viewerEmail = request.nextUrl.searchParams.get('viewerEmail');
     
     let userEmailHash = session?.user?.email ? hashEmail(session.user.email) : null;
@@ -128,7 +127,7 @@ export async function POST(request: NextRequest) {
     }
 
     const email = authResult.email;
-    const session = await getServerSession(authOptions);
+    const session = await getSession(request);
     const userName = session?.user?.name || 'Anonymous';
     const userImage = session?.user?.image || null;
 

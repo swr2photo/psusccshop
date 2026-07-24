@@ -130,6 +130,10 @@ export const API_ROUTES: RouteEntry[] = [
     "module": "@/app/api/admin/status/route"
   },
   {
+    "pattern": "/admin/stripe-status",
+    "module": "@/app/api/admin/stripe-status/route"
+  },
+  {
     "pattern": "/admin/support-chat",
     "module": "@/app/api/admin/support-chat/route"
   },
@@ -144,10 +148,6 @@ export const API_ROUTES: RouteEntry[] = [
   {
     "pattern": "/admin/webhooks",
     "module": "@/app/api/admin/webhooks/route"
-  },
-  {
-    "pattern": "/auth/sync-cookie",
-    "module": "@/app/api/auth/sync-cookie/route"
   },
   {
     "pattern": "/cron/cancel-expired",
@@ -300,6 +300,10 @@ export const API_ROUTES: RouteEntry[] = [
   {
     "pattern": "/support-chat",
     "module": "@/app/api/support-chat/route"
+  },
+  {
+    "pattern": "/time",
+    "module": "@/app/api/time/route"
   },
   {
     "pattern": "/upload",
