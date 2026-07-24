@@ -31,7 +31,7 @@ const DEFAULT_SETTINGS = {
 };
 
 // GET: Get chat settings
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const session = await getSession(request);
     if (!session?.user?.email || !(await isAdminEmailAsync(session.user.email))) {
