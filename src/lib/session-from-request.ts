@@ -12,31 +12,36 @@ type GetTokenReq = NonNullable<Parameters<typeof getToken>[0]>['req'];
 
 /** Build req shape that next-auth getToken() reads reliably (NextRequest jar + Cookie header). */
 export function buildGetTokenReq(request: Request): GetTokenReq {
-  let cookieHeader = request.headers.get('cookie') ?? '';
+  const merged = new Map<string, string>();
 
-  const withCookies = request as Request & {
-    cookies?: { getAll?: () => Array<{ name: string; value: string }> };
-  };
-  if (!cookieHeader && typeof withCookies.cookies?.getAll === 'function') {
-    const all = withCookies.cookies.getAll();
-    if (all.length > 0) {
-      cookieHeader = all.map((c) => `${c.name}=${c.value}`).join('; ');
-    }
-  }
-
-  const cookies: Record<string, string> = {};
+  const cookieHeader = request.headers.get('cookie') ?? '';
   if (cookieHeader) {
     for (const part of cookieHeader.split(';')) {
       const trimmed = part.trim();
       if (!trimmed) continue;
       const eq = trimmed.indexOf('=');
       if (eq === -1) continue;
-      cookies[trimmed.slice(0, eq)] = trimmed.slice(eq + 1);
+      merged.set(trimmed.slice(0, eq), trimmed.slice(eq + 1));
     }
   }
 
+  // Always merge NextRequest cookie jar — chunked session tokens may only appear here
+  const withCookies = request as Request & {
+    cookies?: { getAll?: () => Array<{ name: string; value: string }> };
+  };
+  if (typeof withCookies.cookies?.getAll === 'function') {
+    for (const { name, value } of withCookies.cookies.getAll()) {
+      merged.set(name, value);
+    }
+  }
+
+  const cookies: Record<string, string> = Object.fromEntries(merged);
+  const rebuiltHeader = [...merged.entries()]
+    .map(([name, value]) => `${name}=${value}`)
+    .join('; ');
+
   return {
-    headers: cookieHeader ? { cookie: cookieHeader } : {},
+    headers: rebuiltHeader ? { cookie: rebuiltHeader } : {},
     cookies,
   } as GetTokenReq;
 }
@@ -56,13 +61,21 @@ async function readTokenFromRequest(request: Request) {
   }
 
   const getTokenReq = buildGetTokenReq(request);
+  // NextRequest itself is accepted by getToken; try it first for chunk assembly
+  const reqCandidates: GetTokenReq[] = [getTokenReq];
+  const maybeNext = request as Request & { cookies?: { getAll?: () => unknown } };
+  if (typeof maybeNext.cookies?.getAll === 'function') {
+    reqCandidates.unshift(request as unknown as GetTokenReq);
+  }
 
-  for (const cookieName of getSessionCookieNamesForRead()) {
-    const token = await getToken({
-      req: getTokenReq,
-      ...tokenOptions(cookieName),
-    });
-    if (token) return token;
+  for (const req of reqCandidates) {
+    for (const cookieName of getSessionCookieNamesForRead()) {
+      const token = await getToken({
+        req,
+        ...tokenOptions(cookieName),
+      });
+      if (token) return token;
+    }
   }
   return null;
 }

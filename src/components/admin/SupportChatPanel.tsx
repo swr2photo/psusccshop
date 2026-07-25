@@ -1,6 +1,6 @@
 'use client';
 
-import { apiFetch } from '@/lib/api-client';
+import { apiFetch, uploadImageApi } from '@/lib/api-client';
 // src/components/admin/SupportChatPanel.tsx
 // Admin Panel for Support Chat Management - Mobile Responsive with Typing & Read Receipts
 
@@ -664,10 +664,10 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
       const mimeMatch = previewImage.match(/data:([^;]+);/);
       const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
       const ext = mime.split('/')[1] || 'jpg';
-      const uploadRes = await apiFetch('/api/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ base64: previewImage, filename: 'admin_chat_' + Date.now() + '.' + ext, mime }),
+      const uploadRes = await uploadImageApi({
+        base64: previewImage,
+        filename: 'admin_chat_' + Date.now() + '.' + ext,
+        mime,
       });
       if (!uploadRes.ok) {
         throw new Error(`อัปโหลดล้มเหลว (HTTP ${uploadRes.status})`);

@@ -1,6 +1,6 @@
 'use client';
 
-import { apiFetch } from '@/lib/api-client';
+import { apiFetch, uploadImageApi } from '@/lib/api-client';
 // src/components/admin/ShopManagement.tsx
 // Multi-shop management panel for Admin page
 
@@ -194,14 +194,10 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
         reader.readAsDataURL(file);
       });
       const base64Data = base64.split(',')[1];
-      const res = await apiFetch('/api/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          base64: base64Data,
-          filename: `shop-${type}-${editingShop.id}-${Date.now()}.${file.name.split('.').pop()}`,
-          mime: file.type,
-        }),
+      const res = await uploadImageApi({
+        base64: base64Data,
+        filename: `shop-${type}-${editingShop.id}-${Date.now()}.${file.name.split('.').pop()}`,
+        mime: file.type,
       });
       const data = await res.json();
       const imageUrl = data.data?.url || data.url;

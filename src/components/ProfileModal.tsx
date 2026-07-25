@@ -1,6 +1,6 @@
 'use client';
 
-import { apiFetch } from '@/lib/api-client';
+import { apiFetch, uploadImageApi } from '@/lib/api-client';
 import { useState, useEffect, useMemo, useCallback, useRef, type HTMLAttributes } from 'react';
 import { X, ShieldCheck, User, Phone, Instagram, AlertTriangle, MapPin, Check, ArrowRight, UserCircle, CheckCircle2, AlertCircle, Search, Camera, ZoomIn, ZoomOut, RotateCw, Move, Plus, Trash2, Star, Pencil } from 'lucide-react';
 import {
@@ -658,14 +658,10 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
       const croppedBase64 = offscreen.toDataURL('image/png', 0.92);
 
       // Upload image
-      const res = await apiFetch('/api/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          base64: croppedBase64,
-          filename: cropFileName.replace(/\.[^.]+$/, '') + '_cropped.png',
-          mime: 'image/png',
-        }),
+      const res = await uploadImageApi({
+        base64: croppedBase64,
+        filename: cropFileName.replace(/\.[^.]+$/, '') + '_cropped.png',
+        mime: 'image/png',
       });
 
       const json = await res.json();

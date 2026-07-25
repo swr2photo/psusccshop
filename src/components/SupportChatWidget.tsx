@@ -1,6 +1,6 @@
 'use client';
 
-import { apiFetch } from '@/lib/api-client';
+import { apiFetch, uploadImageApi } from '@/lib/api-client';
 // src/components/SupportChatWidget.tsx
 // Customer Support Chat Widget - Floating chat button with chatbot option
 
@@ -598,15 +598,11 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
       const ext = mime.split('/')[1] || 'jpg';
       
       // Upload image first
-      const uploadRes = await apiFetch('/api/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        const uploadRes = await uploadImageApi({
           base64: previewImage,
           filename: `chat_${Date.now()}.${ext}`,
           mime: mime,
-        }),
-      });
+        });
 
       if (!uploadRes.ok) {
         throw new Error(`${t.supportChat.imageUploadFailed} (HTTP ${uploadRes.status})`);

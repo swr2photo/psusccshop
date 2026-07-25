@@ -1,6 +1,6 @@
 'use client';
 
-import { apiFetch } from '@/lib/api-client';
+import { apiFetch, uploadImageApi } from '@/lib/api-client';
 import { formatFriendlyError } from '@/utils/error';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -3359,14 +3359,10 @@ export default function AdminPage(): JSX.Element {
       const batch = imagesToUpload.slice(i, i + BATCH_SIZE);
       const uploadPromises = batch.map(async (item) => {
         try {
-          const res = await apiFetch('/api/upload', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              base64: item.base64,
-              filename: `product_${item.productIndex}_${Date.now()}.png`,
-              mime: 'image/png',
-            }),
+          const res = await uploadImageApi({
+            base64: item.base64,
+            filename: `product_${item.productIndex}_${Date.now()}.png`,
+            mime: 'image/png',
           });
           if (!res.ok) {
             const errText = await res.text().catch(() => '');
@@ -6992,16 +6988,10 @@ export default function AdminPage(): JSX.Element {
         });
       }
 
-      const response = await apiFetch('/api/upload', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          base64,
-          filename: file.name,
-          mime,
-        }),
+      const response = await uploadImageApi({
+        base64,
+        filename: file.name,
+        mime,
       });
 
       if (!response.ok) {

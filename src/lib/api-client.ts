@@ -63,6 +63,43 @@ export async function apiFetch(
   });
 }
 
+async function syncAuthCookieQuiet(): Promise<void> {
+  try {
+    await fetch('/api/auth/sync-cookie', {
+      method: 'POST',
+      credentials: 'include',
+      cache: 'no-store',
+    });
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Upload image JSON payload. Retries once after cookie sync on 401
+ * (stale host-only session tokens after Domain=.psuscc.club rollout).
+ */
+export async function uploadImageApi(body: {
+  base64: string;
+  filename?: string;
+  mime?: string;
+}): Promise<Response> {
+  const init: RequestInit = {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    credentials: 'same-origin',
+    cache: 'no-store',
+  };
+
+  let res = await apiFetch('/api/upload', init);
+  if (res.status === 401) {
+    await syncAuthCookieQuiet();
+    res = await apiFetch('/api/upload', init);
+  }
+  return res;
+}
+
 // ============== TYPES ==============
 
 export interface APIResponse<T = any> {

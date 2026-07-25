@@ -202,7 +202,10 @@ async function resolveSession(req?: Request): Promise<Session | null> {
     }
     // Workers/Elysia bridge: request scope exists but no JWT — do NOT call
     // getServerSession/headers() (throws "outside a request scope" → 500).
-    return null;
+    // On Vercel/Node, fall through so App Router cookies can still resolve.
+    if (isCloudflareWorkersRuntime()) {
+      return null;
+    }
   }
 
   if (isCloudflareWorkersRuntime()) {
