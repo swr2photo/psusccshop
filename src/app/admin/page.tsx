@@ -160,6 +160,7 @@ import {
   TrendingUp,
   BarChart3,
   Flame as Fire,
+  Loader2,
 } from 'lucide-react';
 
 import { isAdmin, isSuperAdmin, setDynamicAdminEmails, SUPER_ADMIN_EMAIL, Product, ShopConfig, SIZES, AdminPermissions, DEFAULT_ADMIN_PERMISSIONS, DEFAULT_NAME_VALIDATION, type NameValidationConfig, DEFAULT_SHIRT_NAME, getProductShirtNameConfig, validatePrice } from '@/lib/config';
@@ -185,8 +186,23 @@ import RefundManagement from '@/components/admin/RefundManagement';
 import LiveStreamSettings from '@/components/admin/LiveStreamSettings';
 import ShopManagement from '@/components/admin/ShopManagement';
 import { mapShopPermissionsToAdminPanel } from '@/lib/admin-permissions';
-import LanguageToggle from '@/components/LanguageToggle';
 import { useTranslation } from '@/hooks/useTranslation';
+import { AdminShell, type AdminNavGroup } from '@/components/admin/AdminShell';
+import {
+  Select as UiSelect,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Dialog as UiDialog,
+  DialogContent as UiDialogContent,
+  DialogHeader as UiDialogHeader,
+  DialogTitle as UiDialogTitle,
+  DialogFooter as UiDialogFooter,
+} from '@/components/ui/dialog';
+import { Button as UiButton } from '@/components/ui/button';
 
 // ============== TYPES ==============
 interface AdminDataResponse {
@@ -7273,129 +7289,57 @@ export default function AdminPage(): JSX.Element {
   // 🔐 Login Component - Show when not authenticated
   if (status === 'unauthenticated') {
     return (
-      <Box
-        sx={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+      <div
+        className="relative flex min-h-screen items-center justify-center p-4"
+        style={{
           background: `radial-gradient(ellipse at top, rgba(99,102,241,0.15) 0%, transparent 50%),
                        radial-gradient(ellipse at bottom right, rgba(139,92,246,0.1) 0%, transparent 50%),
                        var(--background)`,
-          p: 2,
         }}
       >
         {/* Animated Background Elements */}
-        <Box
-          sx={{
-            position: 'absolute',
-            top: '20%',
-            left: '10%',
-            width: 300,
-            height: 300,
-            borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(139,92,246,0.15) 0%, transparent 70%)',
-            filter: 'blur(40px)',
-            animation: 'pulse 4s ease-in-out infinite',
-            '@keyframes pulse': {
-              '0%, 100%': { transform: 'scale(1)', opacity: 0.5 },
-              '50%': { transform: 'scale(1.1)', opacity: 0.8 },
-            },
-          }}
+        <div
+          className="absolute left-[10%] top-[20%] size-[300px] animate-pulse rounded-full opacity-50 blur-[40px]"
+          style={{ background: 'radial-gradient(circle, rgba(139,92,246,0.15) 0%, transparent 70%)' }}
         />
-        <Box
-          sx={{
-            position: 'absolute',
-            bottom: '15%',
-            right: '15%',
-            width: 250,
-            height: 250,
-            borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%)',
-            filter: 'blur(40px)',
-            animation: 'pulse2 5s ease-in-out infinite',
-            '@keyframes pulse2': {
-              '0%, 100%': { transform: 'scale(1.1)', opacity: 0.6 },
-              '50%': { transform: 'scale(1)', opacity: 0.4 },
-            },
-          }}
+        <div
+          className="absolute bottom-[15%] right-[15%] size-[250px] animate-pulse rounded-full opacity-60 blur-[40px]"
+          style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%)' }}
         />
 
         {/* Login Card */}
-        <Box
-          sx={{
-            position: 'relative',
-            zIndex: 1,
-            width: '100%',
-            maxWidth: 440,
-          }}
-        >
-          <Box
-            sx={{
-              ...glassCardSx,
-              p: 0,
-              overflow: 'hidden',
+        <div className="relative z-[1] w-full max-w-[440px]">
+          <div
+            className="overflow-hidden rounded-[20px] backdrop-blur-xl"
+            style={{
+              background: ADMIN_THEME.glass,
+              border: `1px solid ${ADMIN_THEME.border}`,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+              color: ADMIN_THEME.text,
             }}
           >
             {/* Header Gradient */}
-            <Box
-              sx={{
-                background: 'linear-gradient(135deg, rgba(139,92,246,0.2) 0%, rgba(59,130,246,0.2) 100%)',
-                p: 4,
-                pb: 5,
-                textAlign: 'center',
-                position: 'relative',
-              }}
+            <div
+              className="relative px-8 pb-10 pt-8 text-center"
+              style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.2) 0%, rgba(59,130,246,0.2) 100%)' }}
             >
               {/* Logo */}
-              <Box
-                sx={{
-                  width: 80,
-                  height: 80,
-                  borderRadius: '24px',
-                  background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 50%, #3b82f6 100%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  mx: 'auto',
-                  mb: 2.5,
-                  boxShadow: '0 20px 40px rgba(139,92,246,0.3)',
-                }}
-              >
+              <div className="mx-auto mb-5 flex size-20 items-center justify-center rounded-3xl bg-gradient-to-br from-violet-500 via-indigo-500 to-blue-500 shadow-[0_20px_40px_rgba(139,92,246,0.3)]">
                 <Store size={40} color="#fff" />
-              </Box>
-              <Typography
-                sx={{
-                  fontSize: '1.6rem',
-                  fontWeight: 800,
-                  color: 'var(--foreground)',
-                  mb: 0.5,
-                }}
-              >
+              </div>
+              <h1 className="mb-1 text-[1.6rem] font-extrabold text-[var(--foreground)]">
                 PSUSCC Admin
-              </Typography>
-              <Typography
-                sx={{
-                  fontSize: '0.9rem',
-                  color: 'var(--text-muted)',
-                }}
-              >
+              </h1>
+              <p className="text-sm text-[var(--text-muted)]">
                 ระบบจัดการร้านค้า
-              </Typography>
-            </Box>
+              </p>
+            </div>
 
             {/* Login Form */}
-            <Box sx={{ p: 4, pt: 3 }}>
-              <Typography
-                sx={{
-                  fontSize: '0.85rem',
-                  color: 'var(--text-muted)',
-                  textAlign: 'center',
-                  mb: 3,
-                }}
-              >
+            <div className="p-8 pt-6">
+              <p className="mb-6 text-center text-[0.85rem] text-[var(--text-muted)]">
                 เข้าสู่ระบบด้วยบัญชีที่ได้รับอนุญาต
-              </Typography>
+              </p>
 
               {/* Google Sign In Button */}
               <Button
@@ -7482,16 +7426,16 @@ export default function AdminPage(): JSX.Element {
               </Button>}
 
               {/* Passkey Sign In */}
-              <Box sx={{ mt: 1.5 }}>
+              <div className="mt-3">
                 <PasskeyLoginButton fullWidth variant="outlined" />
-              </Box>
+              </div>
 
               {/* Divider */}
-              <Box sx={{ display: 'flex', alignItems: 'center', my: 3 }}>
-                <Box sx={{ flex: 1, height: 1, bgcolor: 'var(--glass-bg)' }} />
-                <Typography sx={{ px: 2, fontSize: '0.75rem', color: '#475569' }}>หรือ</Typography>
-                <Box sx={{ flex: 1, height: 1, bgcolor: 'var(--glass-bg)' }} />
-              </Box>
+              <div className="my-6 flex items-center">
+                <div className="h-px flex-1 bg-[var(--glass-bg)]" />
+                <span className="px-4 text-xs text-slate-600">หรือ</span>
+                <div className="h-px flex-1 bg-[var(--glass-bg)]" />
+              </div>
 
               {/* Back to Shop */}
               <Button
@@ -7504,694 +7448,221 @@ export default function AdminPage(): JSX.Element {
               >
                 กลับไปหน้าร้าน
               </Button>
-            </Box>
+            </div>
 
             {/* Footer */}
-            <Box
-              sx={{
-                px: 4,
-                py: 2,
-                borderTop: `1px solid ${ADMIN_THEME.border}`,
+            <div
+              className="border-t px-8 py-4"
+              style={{
+                borderColor: ADMIN_THEME.border,
                 background: 'var(--glass-bg)',
               }}
             >
-              <Typography
-                sx={{
-                  fontSize: '0.75rem',
-                  color: '#475569',
-                  textAlign: 'center',
-                }}
-              >
-                <Lock size={16} style={{ marginRight: 4 }} />
+              <p className="text-center text-xs text-slate-600">
+                <Lock size={16} className="mr-1 inline" />
                 เฉพาะผู้ดูแลระบบที่ได้รับอนุญาตเท่านั้น
-              </Typography>
-            </Box>
-          </Box>
+              </p>
+            </div>
+          </div>
 
           {/* Version Badge */}
-          <Typography
-            sx={{
-              textAlign: 'center',
-              mt: 3,
-              fontSize: '0.7rem',
-              color: '#475569',
-            }}
-          >
+          <p className="mt-6 text-center text-[0.7rem] text-slate-600">
             PSUSCC Shop Admin v{process.env.NEXT_PUBLIC_APP_VERSION || '2.1.0'}
-          </Typography>
-        </Box>
-      </Box>
+          </p>
+        </div>
+      </div>
     );
   }
 
   // Access Denied - logged in but not admin - alert shown in useEffect
   if (!isAuthorized) {
     return (
-      <Box
-        sx={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexDirection: 'column',
-          gap: 3,
-          background: `radial-gradient(ellipse at top, rgba(99,102,241,0.1) 0%, transparent 50%),
-                       var(--background)`,
+      <div
+        className="flex min-h-screen flex-col items-center justify-center gap-6"
+        style={{
+          background: `radial-gradient(ellipse at top, rgba(99,102,241,0.1) 0%, transparent 50%), var(--background)`,
         }}
       >
         <AlertDialog />
-        <CircularProgress size={48} sx={{ color: '#8b5cf6' }} />
-        <Typography sx={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-          กำลังตรวจสอบสิทธิ์...
-        </Typography>
-      </Box>
+        <Loader2 className="size-12 animate-spin text-violet-500" />
+        <p className="text-sm text-[var(--text-muted)]">กำลังตรวจสอบสิทธิ์...</p>
+      </div>
     );
   }
 
   // Only show loading for initial session check
   if (isSessionLoading) {
     return (
-      <Box
-        sx={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexDirection: 'column',
-          gap: 3,
-          background: `radial-gradient(ellipse at top, rgba(99,102,241,0.1) 0%, transparent 50%),
-                       var(--background)`,
+      <div
+        className="flex min-h-screen flex-col items-center justify-center gap-6"
+        style={{
+          background: `radial-gradient(ellipse at top, rgba(99,102,241,0.1) 0%, transparent 50%), var(--background)`,
         }}
       >
-        {/* Animated Logo */}
-        <Box
-          sx={{
-            width: 80,
-            height: 80,
-            borderRadius: '24px',
-            background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 50%, #3b82f6 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 20px 40px rgba(139,92,246,0.3)',
-            animation: 'pulse-logo 2s ease-in-out infinite',
-            '@keyframes pulse-logo': {
-              '0%, 100%': { transform: 'scale(1)', boxShadow: '0 20px 40px rgba(139,92,246,0.3)' },
-              '50%': { transform: 'scale(1.05)', boxShadow: '0 25px 50px rgba(139,92,246,0.4)' },
-            },
-          }}
-        >
+        <div className="flex size-20 animate-pulse items-center justify-center rounded-3xl bg-gradient-to-br from-violet-500 via-indigo-500 to-blue-500 shadow-[0_20px_40px_rgba(139,92,246,0.3)]">
           <Store size={40} color="#fff" />
-        </Box>
-        
-        {/* Loading Spinner */}
-        <Box sx={{ position: 'relative' }}>
-          <CircularProgress
-            size={48}
-            thickness={2}
-            sx={{
-              color: 'rgba(139,92,246,0.3)',
-              position: 'absolute',
-            }}
-          />
-          <CircularProgress
-            size={48}
-            thickness={2}
-            sx={{
-              color: '#8b5cf6',
-              animation: 'spin 1s linear infinite',
-              '@keyframes spin': {
-                '0%': { transform: 'rotate(0deg)' },
-                '100%': { transform: 'rotate(360deg)' },
-              },
-            }}
-          />
-        </Box>
-        
-        <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-          {t.admin.checkingAccess}
-        </Typography>
-      </Box>
+        </div>
+        <Loader2 className="size-12 animate-spin text-violet-500" />
+        <p className="text-sm text-[var(--text-muted)]">{t.admin.checkingAccess}</p>
+      </div>
     );
   }
 
+
+  const adminNavGroups: AdminNavGroup[] = [
+    {
+      category: t.admin.catMain,
+      items: [
+        { icon: <Dashboard size={18} />, label: t.admin.navDashboard, idx: 0, color: '#a5b4fc', show: true },
+        { icon: <ShoppingCart size={18} />, label: t.admin.navProducts, idx: 1, color: '#fbbf24', show: Boolean(canManageProducts) },
+        { icon: <Receipt size={18} />, label: t.admin.navOrders, idx: 2, color: '#34d399', badge: pendingCount, show: Boolean(canManageOrders) },
+      ],
+    },
+    {
+      category: t.admin.catManage,
+      items: [
+        { icon: <QrCodeScanner size={18} />, label: t.admin.navPickup, idx: 3, color: '#06b6d4', show: Boolean(canManagePickup) },
+        { icon: <LocalShipping size={18} />, label: t.admin.navTracking, idx: 12, color: '#fb923c', show: Boolean(canManageTracking) },
+        { icon: <Refresh size={18} />, label: t.admin.navRefunds, idx: 13, color: '#c084fc', show: Boolean(canManageRefunds) },
+      ],
+    },
+    {
+      category: t.admin.catComms,
+      items: [
+        { icon: <SupportAgent size={18} />, label: t.admin.navSupport, idx: 4, color: '#ec4899', show: Boolean(canManageSupport) },
+        { icon: <NotificationsActive size={18} />, label: t.admin.navAnnounce, idx: 5, color: '#f472b6', show: Boolean(canManageAnnouncement) },
+        { icon: <Send size={18} />, label: t.admin.navEmail, idx: 7, color: '#10b981', show: Boolean(canSendEmail) },
+        { icon: <Sparkles size={18} />, label: t.admin.navEvents, idx: 14, color: '#fbbf24', show: Boolean(canManageEvents) },
+        { icon: <Ticket size={18} />, label: t.admin.navPromo, idx: 15, color: '#34c759', show: Boolean(canManagePromoCodes) },
+        { icon: <Radio size={18} />, label: t.admin.navLive, idx: 16, color: '#ef4444', show: true },
+      ],
+    },
+    {
+      category: t.admin.catSettings,
+      items: [
+        { icon: <Settings size={18} />, label: t.admin.navShopSettings, idx: 6, color: '#60a5fa', show: Boolean(canManageShop || canManageSheet || isSuperAdminUser) },
+        { icon: <LocalShipping size={18} />, label: t.admin.navShipping, idx: 10, color: '#a78bfa', show: Boolean(canManageShipping) },
+        { icon: <AttachMoney size={18} />, label: t.admin.navPayment, idx: 11, color: '#22d3ee', show: Boolean(canManagePayment) },
+      ],
+    },
+    {
+      category: t.admin.catAudit,
+      items: [
+        { icon: <Groups size={18} />, label: t.admin.navUserLogs, idx: 8, color: '#f97316', show: Boolean(isSuperAdminUser) },
+        { icon: <Store size={18} />, label: t.admin.navShops, idx: 17, color: '#c084fc', show: Boolean(isSuperAdminUser) },
+        { icon: <History size={18} />, label: t.admin.navSystemLogs, idx: 9, color: '#64748b', show: Boolean(isSuperAdminUser) },
+      ],
+    },
+  ];
+
+  const shopSwitcher = myShops.length > 0 ? (
+    <UiSelect value={selectedShopId} onValueChange={setSelectedShopId}>
+      <SelectTrigger className="w-full bg-muted/40">
+        <SelectValue placeholder="ร้านค้า" />
+      </SelectTrigger>
+      <SelectContent>
+        {isSuperAdminUser && (
+          <SelectItem value="all">
+            <span className="inline-flex items-center gap-2"><Store size={16} />ทุกร้านค้า</span>
+          </SelectItem>
+        )}
+        {myShops.map((shop) => (
+          <SelectItem key={shop.id} value={shop.id}>
+            <span className="inline-flex items-center gap-2"><Store size={16} />{shop.name}</span>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </UiSelect>
+  ) : null;
+
+
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        minHeight: '100vh',
-        background: `radial-gradient(ellipse at top, rgba(99,102,241,0.08) 0%, transparent 50%),
-                     radial-gradient(ellipse at bottom right, rgba(6,182,212,0.06) 0%, transparent 50%),
-                     var(--background)`,
-        color: ADMIN_THEME.text,
-        position: 'relative',
-      }}
-    >
+    <>
       <ConfirmDialog />
       <AlertDialog />
-      {/* Data Loading Overlay - non-blocking */}
       {isDataLoading && (
-        <Box
-          sx={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            zIndex: 9999,
-            height: 3,
-            background: 'var(--glass-bg)',
-            overflow: 'hidden',
-          }}
-        >
-          <Box
-            sx={{
-              height: '100%',
-              width: '40%',
+        <div className="fixed inset-x-0 top-0 z-[9999] h-[3px] overflow-hidden bg-[var(--glass-bg)]">
+          <div
+            className="h-full w-[40%] animate-pulse"
+            style={{
               background: 'linear-gradient(90deg, transparent, #8b5cf6, #3b82f6, transparent)',
-              animation: 'loading-bar 1.5s ease-in-out infinite',
-              '@keyframes loading-bar': {
-                '0%': { transform: 'translateX(-100%)' },
-                '100%': { transform: 'translateX(350%)' },
-              },
             }}
           />
           {(sectionsLoading?.config || sectionsLoading?.orders) && (
-            <Typography
-              sx={{
-                position: 'fixed',
-                top: 6,
-                right: 12,
-                zIndex: 10000,
-                fontSize: '0.65rem',
-                color: 'var(--text-muted)',
-                bgcolor: 'rgba(0,0,0,0.45)',
-                px: 1,
-                py: 0.25,
-                borderRadius: 1,
-              }}
-            >
+            <p className="fixed top-1.5 right-3 z-[10000] rounded bg-black/45 px-2 py-0.5 text-[0.65rem] text-[var(--text-muted)]">
               {sectionsLoading.config && sectionsLoading.orders
                 ? t.admin.loadingConfigOrders
                 : sectionsLoading.config
                   ? t.admin.loadingConfig
                   : t.admin.loadingOrders}
-            </Typography>
+            </p>
           )}
-        </Box>
+        </div>
       )}
-
-      {/* Modern Header */}
-      <Box
-        sx={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 1200,
-          px: { xs: 2, md: 3 },
-          py: 1.5,
-          bgcolor: ADMIN_THEME.bgHeader,
-          backdropFilter: 'blur(20px)',
-          borderBottom: `1px solid ${ADMIN_THEME.border}`,
-        }}
+      <AdminShell
+        title={t.admin.title}
+        brand={t.admin.brand}
+        roleLabel={t.admin.role}
+        userName={session?.user?.name}
+        userImage={session?.user?.image}
+        saving={saving}
+        savingLabel={t.admin.saving}
+        readyLabel={t.admin.ready}
+        statusTime={
+          lastSavedTime
+            ? lastSavedTime.toLocaleTimeString(lang === 'en' ? 'en-US' : 'th-TH', {
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+            : null
+        }
+        navGroups={adminNavGroups}
+        activeTab={activeTab}
+        onNavigate={setActiveTab}
+        onLogout={() => setLogoutConfirmOpen(true)}
+        sidebarOpen={sidebarOpen}
+        onSidebarOpenChange={setSidebarOpen}
+        isDesktop={isDesktop}
+        shopSwitcher={shopSwitcher}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          {/* Left: Logo & Menu Toggle */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <IconButton
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              sx={{ 
-                display: { xs: 'flex', md: 'none' },
-                color: ADMIN_THEME.textSecondary,
-                bgcolor: 'var(--glass-bg)',
-                '&:hover': { bgcolor: 'var(--glass-bg)' },
-              }}
-            >
-              <Dashboard />
-            </IconButton>
-            
-            {/* Brand */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Box sx={{
-                width: 40,
-                height: 40,
-                borderRadius: '12px',
-                background: ADMIN_THEME.gradient,
-                display: 'grid',
-                placeItems: 'center',
-                boxShadow: '0 4px 14px rgba(99,102,241,0.3)',
-              }}>
-                <Bolt size={22} color="#fff" />
-              </Box>
-              <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
-                <Typography sx={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--foreground)', lineHeight: 1.2 }}>
-                  {t.admin.title}
-                </Typography>
-                <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                  {t.admin.brand}
-                </Typography>
-              </Box>
-            </Box>
-          </Box>
+        <div className="flex min-h-0 flex-col gap-6">
+          <div className="breadcrumb mb-1 flex items-center gap-1.5 px-0.5 text-xs text-muted-foreground">
+            <Dashboard size={12} />
+            <span>Admin</span>
+            <span className="breadcrumb-separator text-[0.65rem]">›</span>
+            <span className="breadcrumb-current text-foreground">
+              {(
+                {
+                  0: t.admin.navDashboard,
+                  1: t.admin.navProducts,
+                  2: t.admin.navOrders,
+                  3: t.admin.navPickup,
+                  4: t.admin.navSupport,
+                  5: t.admin.navAnnounce,
+                  6: t.admin.navShopSettings,
+                  7: t.admin.navEmail,
+                  8: t.admin.navUserLogs,
+                  9: t.admin.navSystemLogs,
+                  10: t.admin.navShipping,
+                  11: t.admin.navPayment,
+                  12: t.admin.navTracking,
+                  13: t.admin.navRefunds,
+                  14: t.admin.navEvents,
+                  15: t.admin.navPromo,
+                  16: t.admin.navLive,
+                  17: t.admin.navShops,
+                } as Record<number, string>
+              )[activeTab] || t.admin.navDashboard}
+            </span>
+          </div>
 
-          {/* Right: Status & User */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            {/* Sync Status */}
-            <Box sx={{ 
-              display: { xs: 'none', sm: 'flex' },
-              alignItems: 'center', 
-              gap: 1,
-              px: 1.5,
-              py: 0.6,
-              borderRadius: '10px',
-              bgcolor: saving ? 'rgba(245,158,11,0.15)' : 'rgba(16,185,129,0.15)',
-              border: `1px solid ${saving ? 'rgba(245,158,11,0.3)' : 'rgba(16,185,129,0.3)'}`,
-            }}>
-              {saving ? (
-                <>
-                  <CircularProgress size={12} thickness={6} sx={{ color: '#fbbf24' }} />
-                  <Typography sx={{ fontSize: '0.7rem', color: '#fbbf24', fontWeight: 600 }}>{t.admin.saving}</Typography>
-                </>
-              ) : (
-                <>
-                  <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#10b981' }} />
-                  <Typography sx={{ fontSize: '0.7rem', color: '#34d399', fontWeight: 600 }}>
-                    {lastSavedTime
-                      ? lastSavedTime.toLocaleTimeString(lang === 'en' ? 'en-US' : 'th-TH', { hour: '2-digit', minute: '2-digit' })
-                      : t.admin.ready}
-                  </Typography>
-                </>
-              )}
-            </Box>
-
-            {/* Language Toggle — keep above overlays */}
-            <Box sx={{ position: 'relative', zIndex: 10, pointerEvents: 'auto' }}>
-              <LanguageToggle size="small" />
-            </Box>
-
-            {/* User Menu */}
-            <Box sx={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: 1.5,
-              pl: 2,
-              borderLeft: `1px solid ${ADMIN_THEME.border}`,
-            }}>
-              <Avatar 
-                src={session?.user?.image || ''} 
-                sx={{ 
-                  width: 36, 
-                  height: 36,
-                  border: '2px solid rgba(99,102,241,0.3)',
-                }} 
-              />
-              <Box sx={{ display: { xs: 'none', md: 'block' } }}>
-                <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)', lineHeight: 1.2 }}>
-                  {session?.user?.name?.split(' ')[0] || 'Admin'}
-                </Typography>
-                <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-                  {t.admin.role}
-                </Typography>
-              </Box>
-              <IconButton 
-                onClick={() => setLogoutConfirmOpen(true)}
-                sx={{ 
-                  color: 'var(--text-muted)',
-                  '&:hover': { color: '#f87171', bgcolor: 'rgba(239,68,68,0.1)' },
-                }}
-              >
-                <Logout size={20} />
-              </IconButton>
-            </Box>
-          </Box>
-        </Box>
-      </Box>
-
-      {/* Sidebar & Content */}
-      <Box sx={{ display: 'flex', flex: 1 }}>
-        {/* Modern Sidebar */}
-        <Drawer
-          open={isDesktop ? true : sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-          sx={{
-            width: { xs: '100%', md: 260 },
-            flexShrink: 0,
-            '& .MuiDrawer-paper': {
-              width: { xs: '100%', md: 260 },
-              background: ADMIN_THEME.bgSidebar,
-              color: ADMIN_THEME.text,
-              borderRight: { xs: 'none', md: `1px solid ${ADMIN_THEME.border}` },
-              boxSizing: 'border-box',
-              position: { xs: 'fixed', md: 'relative' },
-              height: { xs: '100%', md: '100%' },
-              backdropFilter: 'blur(20px)',
-              pt: { xs: 2, md: 0 },
-              display: 'flex',
-              flexDirection: 'column',
-            }
-          }}
-          variant={isDesktop ? 'permanent' : 'temporary'}
-          ModalProps={{ 
-            keepMounted: true,
-            disableEnforceFocus: true,
-            disableRestoreFocus: true,
-          }}
-          anchor="left"
-        >
-          {/* Sidebar Content */}
-          <Box sx={{ 
-            p: 2, 
-            display: 'flex', 
-            flexDirection: 'column', 
-            gap: 1, 
-            flex: 1,
-            overflow: 'hidden',
-          }}>
-            {/* Mobile Header with Close Button */}
-            {!isDesktop && (
-              <Box sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'space-between',
-                mb: 2,
-                pb: 2,
-                borderBottom: `1px solid ${ADMIN_THEME.border}`,
-                flexShrink: 0,
-              }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                  <Box sx={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: '12px',
-                    background: ADMIN_THEME.gradient,
-                    display: 'grid',
-                    placeItems: 'center',
-                  }}>
-                    <Bolt size={22} color="#fff" />
-                  </Box>
-                  <Box>
-                    <Typography sx={{ fontSize: '1rem', fontWeight: 800, color: 'var(--foreground)' }}>
-                      Admin Panel
-                    </Typography>
-                    <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                      เลือกเมนู
-                    </Typography>
-                  </Box>
-                </Box>
-                <IconButton 
-                  onClick={() => setSidebarOpen(false)}
-                  sx={{ 
-                    color: 'var(--text-muted)',
-                    bgcolor: 'var(--glass-bg)',
-                    '&:hover': { bgcolor: 'var(--glass-bg)' },
-                  }}
-                >
-                  <Close />
-                </IconButton>
-              </Box>
-            )}
-            
-            {/* Shop Selector */}
-            {myShops.length > 0 && (
-              <Box sx={{ mb: 1.5, px: 0.5, flexShrink: 0 }}>
-                <FormControl fullWidth size="small">
-                  <InputLabel id="shop-selector-label" sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    ร้านค้า
-                  </InputLabel>
-                  <Select
-                    labelId="shop-selector-label"
-                    value={selectedShopId}
-                    label="ร้านค้า"
-                    onChange={(e) => setSelectedShopId(e.target.value)}
-                    sx={{
-                      fontSize: '0.85rem',
-                      borderRadius: '12px',
-                      bgcolor: 'var(--glass-bg)',
-                      color: 'var(--foreground)',
-                      '& .MuiOutlinedInput-notchedOutline': {
-                        borderColor: 'var(--glass-bg)',
-                      },
-                      '&:hover .MuiOutlinedInput-notchedOutline': {
-                        borderColor: ADMIN_THEME.primary,
-                      },
-                      '& .MuiSelect-icon': { color: 'var(--text-muted)' },
-                    }}
-                  >
-                    {isSuperAdminUser && (
-                      <MenuItem value="all">
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Store size={16} />
-                          ทุกร้านค้า
-                        </Box>
-                      </MenuItem>
-                    )}
-                    {myShops.map((shop) => (
-                      <MenuItem key={shop.id} value={shop.id}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Store size={16} />
-                          {shop.name}
-                        </Box>
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Box>
-            )}
-
-            {/* Navigation Items - Categorized & Scrollable */}
-            <Box sx={{
-              flex: 1,
-              overflow: 'auto',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 0.5,
-              pb: 2,
-              // Custom scrollbar
-              '&::-webkit-scrollbar': { width: 4 },
-              '&::-webkit-scrollbar-track': { bgcolor: 'transparent' },
-              '&::-webkit-scrollbar-thumb': { 
-                bgcolor: 'rgba(255,255,255,0.08)', 
-                borderRadius: 2,
-                '&:hover': { bgcolor: 'rgba(255,255,255,0.15)' },
-              },
-            }}>
-            {/* Categorized Navigation */}
-            {([
-              {
-                category: t.admin.catMain,
-                items: [
-                  { icon: <Dashboard size={18} />, label: t.admin.navDashboard, idx: 0, color: '#a5b4fc', show: true },
-                  { icon: <ShoppingCart size={18} />, label: t.admin.navProducts, idx: 1, color: '#fbbf24', show: canManageProducts },
-                  { icon: <Receipt size={18} />, label: t.admin.navOrders, idx: 2, color: '#34d399', badge: pendingCount, show: canManageOrders },
-                ],
-              },
-              {
-                category: t.admin.catManage,
-                items: [
-                  { icon: <QrCodeScanner size={18} />, label: t.admin.navPickup, idx: 3, color: '#06b6d4', show: canManagePickup },
-                  { icon: <LocalShipping size={18} />, label: t.admin.navTracking, idx: 12, color: '#fb923c', show: canManageTracking },
-                  { icon: <Refresh size={18} />, label: t.admin.navRefunds, idx: 13, color: '#c084fc', show: canManageRefunds },
-                ],
-              },
-              {
-                category: t.admin.catComms,
-                items: [
-                  { icon: <SupportAgent size={18} />, label: t.admin.navSupport, idx: 4, color: '#ec4899', show: canManageSupport },
-                  { icon: <NotificationsActive size={18} />, label: t.admin.navAnnounce, idx: 5, color: '#f472b6', show: canManageAnnouncement },
-                  { icon: <Send size={18} />, label: t.admin.navEmail, idx: 7, color: '#10b981', show: canSendEmail },
-                  { icon: <Sparkles size={18} />, label: t.admin.navEvents, idx: 14, color: '#fbbf24', show: canManageEvents },
-                  { icon: <Ticket size={18} />, label: t.admin.navPromo, idx: 15, color: '#34c759', show: canManagePromoCodes },
-                  { icon: <Radio size={18} />, label: t.admin.navLive, idx: 16, color: '#ef4444', show: true },
-                ],
-              },
-              {
-                category: t.admin.catSettings,
-                items: [
-                  { icon: <Settings size={18} />, label: t.admin.navShopSettings, idx: 6, color: '#60a5fa', show: canManageShop || canManageSheet || isSuperAdminUser },
-                  { icon: <LocalShipping size={18} />, label: t.admin.navShipping, idx: 10, color: '#a78bfa', show: canManageShipping },
-                  { icon: <AttachMoney size={18} />, label: t.admin.navPayment, idx: 11, color: '#22d3ee', show: canManagePayment },
-                ],
-              },
-              {
-                category: t.admin.catAudit,
-                items: [
-                  { icon: <Groups size={18} />, label: t.admin.navUserLogs, idx: 8, color: '#f97316', show: isSuperAdminUser },
-                  { icon: <Store size={18} />, label: t.admin.navShops, idx: 17, color: '#c084fc', show: isSuperAdminUser },
-                  { icon: <History size={18} />, label: t.admin.navSystemLogs, idx: 9, color: '#64748b', show: isSuperAdminUser },
-                ],
-              },
-            ] as { category: string; items: { icon: React.ReactNode; label: string; idx: number; color: string; badge?: number; show: boolean }[] }[])
-              .map((group) => {
-                const visibleItems = group.items.filter(item => item.show);
-                if (visibleItems.length === 0) return null;
-                return (
-                  <Box key={group.category} sx={{ mb: 0.5 }}>
-                    {/* Category Header */}
-                    <Typography sx={{
-                      fontSize: '0.65rem',
-                      fontWeight: 700,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.08em',
-                      color: 'var(--text-muted)',
-                      px: 1.5,
-                      py: 0.8,
-                      opacity: 0.7,
-                    }}>
-                      {group.category}
-                    </Typography>
-                    {/* Items */}
-                    {visibleItems.map((item) => {
-                      const isActive = activeTab === item.idx;
-                      return (
-                        <Box
-                          key={item.idx}
-                          className={isActive ? 'nav-pill-active' : ''}
-                          onClick={() => {
-                            setActiveTab(item.idx);
-                            setSidebarOpen(false);
-                          }}
-                          sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 1.5,
-                            px: 1.5,
-                            py: 1,
-                            borderRadius: '12px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-                            position: 'relative',
-                            '&:hover': { 
-                              bgcolor: isActive ? undefined : 'rgba(255,255,255,0.04)',
-                            },
-                            '[data-theme="light"] &:hover': {
-                              bgcolor: isActive ? undefined : 'rgba(0,0,0,0.03)',
-                            },
-                          }}
-                        >
-                          <Box sx={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: '8px',
-                            bgcolor: isActive ? `${item.color}22` : 'transparent',
-                            display: 'grid',
-                            placeItems: 'center',
-                            color: isActive ? item.color : '#64748b',
-                            transition: 'all 0.2s ease',
-                            flexShrink: 0,
-                          }}>
-                            {item.icon}
-                          </Box>
-                          <Typography sx={{ 
-                            flex: 1,
-                            fontSize: '0.85rem', 
-                            fontWeight: isActive ? 600 : 450, 
-                            color: isActive ? 'var(--foreground)' : 'var(--text-muted)',
-                            transition: 'color 0.2s ease',
-                          }}>
-                            {item.label}
-                          </Typography>
-                          {item.badge && item.badge > 0 && (
-                            <Box sx={{
-                              minWidth: 20,
-                              height: 20,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              px: 0.5,
-                              borderRadius: '6px',
-                              bgcolor: 'rgba(239,68,68,0.15)',
-                              border: '1px solid rgba(239,68,68,0.3)',
-                            }}>
-                              <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, color: '#f87171', lineHeight: 1 }}>
-                                {item.badge}
-                              </Typography>
-                            </Box>
-                          )}
-                        </Box>
-                      );
-                    })}
-                  </Box>
-                );
-              })}
-            </Box>
-          </Box>
-
-          {/* Sidebar Footer */}
-          <Box sx={{ p: 2, borderTop: `1px solid ${ADMIN_THEME.border}`, flexShrink: 0 }}>
-            <Box sx={{
-              p: 2,
-              borderRadius: '14px',
-              bgcolor: 'rgba(16,185,129,0.1)',
-              border: '1px solid rgba(16,185,129,0.2)',
-              mb: !isDesktop ? 2 : 0,
-            }}>
-              <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#34d399', mb: 0.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                ร้านค้า: 
-                <FiberManualRecord size={10} color={config.isOpen ? '#22c55e' : '#ef4444'} />
-                {config.isOpen ? 'เปิดขาย' : 'ปิดชั่วคราว'}
-              </Typography>
-              <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-                สินค้า {config.products?.length || 0} รายการ
-              </Typography>
-            </Box>
-            
-            {/* Mobile Close Button */}
-            {!isDesktop && (
-              <Button
-                fullWidth
-                onClick={() => setSidebarOpen(false)}
-                startIcon={<Close />}
-                sx={{
-                  py: 1.5,
-                  borderRadius: '12px',
-                  bgcolor: 'rgba(100,116,139,0.15)',
-                  border: '1px solid rgba(100,116,139,0.3)',
-                  color: 'var(--text-muted)',
-                  fontSize: '0.9rem',
-                  fontWeight: 600,
-                  textTransform: 'none',
-                  '&:hover': { bgcolor: 'rgba(100,116,139,0.25)' },
-                }}
-              >
-                ปิดเมนู
-              </Button>
-            )}
-          </Box>
-        </Drawer>
-
-        {/* Main Content */}
-        <Box sx={{ 
-          flex: 1, 
-          p: { xs: 2, md: 3 }, 
-          overflow: 'auto', 
-          display: 'flex', 
-          flexDirection: 'column', 
-          gap: 3,
-          minHeight: 0,
-        }}>
-          {/* Breadcrumb - Nielsen H1: Visibility of System Status */}
-          <Box className="breadcrumb" sx={{ mb: 1, px: 0.5 }}>
-            <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <Dashboard size={12} />
-              Admin
-            </Typography>
-            <Typography className="breadcrumb-separator" sx={{ fontSize: '0.65rem' }}>›</Typography>
-            <Typography className="breadcrumb-current" sx={{ fontSize: '0.75rem' }}>
-              {({
-                0: 'แดชบอร์ด', 1: 'จัดการสินค้า', 2: 'ออเดอร์', 3: 'รับสินค้า',
-                4: 'แชทสนับสนุน', 5: 'ประกาศ', 6: 'ตั้งค่าร้าน', 7: 'ส่งอีเมล',
-                8: 'ประวัติผู้ใช้', 9: 'ประวัติระบบ', 10: 'ตั้งค่าจัดส่ง', 11: 'ชำระเงิน',
-                12: 'ติดตามพัสดุ', 13: 'คืนเงิน', 14: 'อีเวนต์', 15: 'โค้ดส่วนลด',
-                16: 'ไลฟ์สด', 17: 'ร้านค้าย่อย',
-              } as Record<number, string>)[activeTab] || 'แดชบอร์ด'}
-            </Typography>
-          </Box>
-
-          {/* Shop config loading overlay */}
           {shopConfigLoading && (
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, p: 4, borderRadius: '16px', bgcolor: 'var(--glass-bg)', border: '1px solid var(--glass-bg)' }}>
-              <CircularProgress size={24} sx={{ color: '#c084fc' }} />
-              <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>กำลังโหลดข้อมูลร้านค้า...</Typography>
-            </Box>
+            <div className="flex items-center justify-center gap-3 rounded-2xl border border-border bg-card/60 p-8">
+              <Loader2 className="size-6 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">
+                {lang === 'en' ? 'Loading shop data...' : 'กำลังโหลดข้อมูลร้านค้า...'}
+              </p>
+            </div>
           )}
           {!shopConfigLoading && activeTab === 0 && (
             <DashboardView
@@ -8306,44 +7777,22 @@ export default function AdminPage(): JSX.Element {
           {activeTab === 12 && (canManageTracking ? <TrackingManagement showToast={showToast} selectedShopId={isShopMode ? selectedShopId : undefined} /> : <NoPermissionView permission="ติดตามพัสดุ" />)}
           {activeTab === 13 && (canManageRefunds ? <RefundManagement showToast={showToast} selectedShopId={isShopMode ? selectedShopId : undefined} /> : <NoPermissionView permission="จัดการคืนเงิน" />)}
           {activeTab === 17 && (isSuperAdminUser ? <ShopManagement showToast={showToast} isSuperAdmin={isSuperAdminUser} userEmail={session?.user?.email || ''} /> : <NoPermissionView permission="จัดการร้านค้าย่อย" />)}
-        </Box>
-      </Box>
+        </div>
+      </AdminShell>
 
       {/* Slip Viewer Dialog */}
-      <Dialog
-        open={slipViewerOpen}
-        onClose={() => setSlipViewerOpen(false)}
-        maxWidth="md"
-        PaperProps={{
-          sx: {
-            bgcolor: ADMIN_THEME.glass,
-            backdropFilter: 'blur(20px)',
-            border: `1px solid ${ADMIN_THEME.border}`,
-            borderRadius: '16px',
-          },
-        }}
-      >
-        <DialogTitle sx={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          borderBottom: `1px solid ${ADMIN_THEME.border}`,
-        }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <ImageIcon color="#10b981" />
-            <Typography sx={{ fontWeight: 700, color: 'var(--foreground)' }}>
+      <UiDialog open={slipViewerOpen} onOpenChange={setSlipViewerOpen}>
+        <UiDialogContent className="max-w-2xl border-[var(--glass-border)] bg-[var(--glass-bg)] backdrop-blur-xl sm:max-w-2xl">
+          <UiDialogHeader className="border-b border-[var(--glass-border)] pb-4">
+            <UiDialogTitle className="flex items-center gap-2 text-base font-bold">
+              <ImageIcon color="#10b981" />
               สลิปการโอนเงิน #{slipViewerData?.ref ?? '-'}
-            </Typography>
-          </Box>
-          <IconButton onClick={() => setSlipViewerOpen(false)} sx={{ color: 'var(--text-muted)' }}>
-            <Close />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent sx={{ p: 3 }}>
+            </UiDialogTitle>
+          </UiDialogHeader>
+          <div className="py-2">
           {(slipViewerData?.slip?.imageUrl || slipViewerData?.slip?.base64) ? (
-            <Box sx={{ textAlign: 'center' }}>
-              <Box
-                component="img"
+            <div className="text-center">
+              <img
                 src={slipViewerData.slip.imageUrl 
                   ? slipViewerData.slip.imageUrl
                   : slipViewerData.slip.base64?.startsWith('data:') 
@@ -8352,199 +7801,157 @@ export default function AdminPage(): JSX.Element {
                 alt="สลิปการโอนเงิน"
                 onError={(e) => {
                   console.error('[SlipViewer] Image load error:', slipViewerData.slip?.imageUrl);
-                  // Try to show a fallback message
                   (e.target as HTMLImageElement).style.display = 'none';
                 }}
-                sx={{
-                  maxWidth: '100%',
-                  maxHeight: '70vh',
-                  borderRadius: '12px',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-                }}
+                className="mx-auto max-h-[70vh] max-w-full rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.3)]"
               />
-              {/* Show imageUrl link if image fails to load */}
               {slipViewerData.slip.imageUrl && (
-                <Button 
-                  variant="outlined" 
-                  size="small"
-                  href={slipViewerData.slip.imageUrl}
-                  target="_blank"
-                  sx={{ mt: 2, color: '#6366f1', borderColor: '#6366f1' }}
-                >
-                  เปิดรูปภาพในแท็บใหม่
-                </Button>
+                <UiButton variant="outline" size="sm" className="mt-4" asChild>
+                  <a href={slipViewerData.slip.imageUrl} target="_blank" rel="noreferrer">
+                    เปิดรูปภาพในแท็บใหม่
+                  </a>
+                </UiButton>
               )}
               {slipViewerData.slip.uploadedAt && (
-                <Typography sx={{ mt: 2, color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                <p className="mt-4 text-sm text-[var(--text-muted)]">
                   อัพโหลดเมื่อ: {new Date(slipViewerData.slip.uploadedAt).toLocaleString('th-TH')}
-                </Typography>
+                </p>
               )}
               {slipViewerData.slip.slipData && (
-                <Box sx={{ mt: 2, p: 2, bgcolor: 'rgba(16,185,129,0.1)', borderRadius: '12px', textAlign: 'left' }}>
-                  <Typography sx={{ color: '#10b981', fontWeight: 600, mb: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}><ClipboardList size={16} /> ข้อมูลจากสลิป</Typography>
+                <div className="mt-4 rounded-xl bg-emerald-500/10 p-4 text-left">
+                  <p className="mb-2 flex items-center gap-1 font-semibold text-emerald-500"><ClipboardList size={16} /> ข้อมูลจากสลิป</p>
                   {slipViewerData.slip.slipData.amount && (
-                    <Typography sx={{ color: 'var(--foreground)', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: 0.5 }}><Banknote size={14} /> จำนวนเงิน: ฿{Number(slipViewerData.slip.slipData.amount).toLocaleString()}</Typography>
+                    <p className="flex items-center gap-1 text-sm text-[var(--foreground)]"><Banknote size={14} /> จำนวนเงิน: ฿{Number(slipViewerData.slip.slipData.amount).toLocaleString()}</p>
                   )}
-                  {/* ข้อมูลผู้โอน - แสดงทั้งชื่อเต็มและชื่อย่อ */}
                   {(slipViewerData.slip.slipData.senderName || slipViewerData.slip.slipData.senderFullName || slipViewerData.slip.slipData.senderDisplayName) && (
-                    <Box sx={{ mt: 1 }}>
-                      <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <div className="mt-2">
+                      <p className="flex items-center gap-1 text-sm text-[var(--text-muted)]">
                         <UserIcon size={13} /> ผู้โอน: {slipViewerData.slip.slipData.senderFullName || slipViewerData.slip.slipData.senderName || slipViewerData.slip.slipData.senderDisplayName}
-                      </Typography>
+                      </p>
                       {slipViewerData.slip.slipData.senderDisplayName && slipViewerData.slip.slipData.senderFullName && (
-                        <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.75rem', ml: 3 }}>
+                        <p className="ml-6 text-xs text-[var(--text-muted)]">
                           ({slipViewerData.slip.slipData.senderDisplayName})
-                        </Typography>
+                        </p>
                       )}
                       {slipViewerData.slip.slipData.senderBank && (
-                        <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.75rem', ml: 3, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <p className="ml-6 flex items-center gap-1 text-xs text-[var(--text-muted)]">
                           <Building2 size={12} /> {slipViewerData.slip.slipData.senderBank}
-                        </Typography>
+                        </p>
                       )}
-                    </Box>
+                    </div>
                   )}
                   {slipViewerData.slip.slipData.transRef && (
-                    <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem', mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}><Hash size={13} /> เลขอ้างอิง: {slipViewerData.slip.slipData.transRef}</Typography>
+                    <p className="mt-2 flex items-center gap-1 text-sm text-[var(--text-muted)]"><Hash size={13} /> เลขอ้างอิง: {slipViewerData.slip.slipData.transRef}</p>
                   )}
                   {slipViewerData.slip.slipData.transDate && slipViewerData.slip.slipData.transTime && (
-                    <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.75rem', ml: 3, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <p className="ml-6 flex items-center gap-1 text-xs text-[var(--text-muted)]">
                       <CalendarDays size={12} /> {slipViewerData.slip.slipData.transDate} {slipViewerData.slip.slipData.transTime}
-                    </Typography>
+                    </p>
                   )}
-                  {/* ข้อมูลผู้รับ (ร้านค้า) */}
                   {slipViewerData.slip.slipData.receiverName && (
-                    <Box sx={{ mt: 1, pt: 1, borderTop: '1px dashed rgba(255,255,255,0.1)' }}>
-                      <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <Archive size={12} /> ผู้รับ: {slipViewerData.slip.slipData.receiverName} 
+                    <div className="mt-2 border-t border-dashed border-white/10 pt-2">
+                      <p className="flex items-center gap-1 text-xs text-[var(--text-muted)]">
+                        <Archive size={12} /> ผู้รับ: {slipViewerData.slip.slipData.receiverName}
                         {slipViewerData.slip.slipData.receiverBank && ` (${slipViewerData.slip.slipData.receiverBank})`}
-                      </Typography>
-                    </Box>
+                      </p>
+                    </div>
                   )}
-                </Box>
+                </div>
               )}
-            </Box>
+            </div>
           ) : (
-            <Box sx={{ textAlign: 'center', py: 4 }}>
-              <Warning size={48} color="#f59e0b" style={{ marginBottom: 16 }} />
-              <Typography sx={{ color: 'var(--text-muted)' }}>
-                ไม่พบข้อมูลรูปภาพสลิป
-              </Typography>
+            <div className="py-8 text-center">
+              <Warning size={48} color="#f59e0b" className="mx-auto mb-4" />
+              <p className="text-[var(--text-muted)]">ไม่พบข้อมูลรูปภาพสลิป</p>
               {slipViewerData?.ref && (
-                <Button
-                  variant="outlined"
-                  size="small"
-                  href={`/api/slip/${slipViewerData.ref}`}
-                  target="_blank"
-                  sx={{ mt: 2, color: '#6366f1', borderColor: '#6366f1' }}
-                >
-                  เปิดหน้าดูสลิป
-                </Button>
+                <UiButton variant="outline" size="sm" className="mt-4" asChild>
+                  <a href={`/api/slip/${slipViewerData.ref}`} target="_blank" rel="noreferrer">
+                    เปิดหน้าดูสลิป
+                  </a>
+                </UiButton>
               )}
-            </Box>
+            </div>
           )}
-        </DialogContent>
-      </Dialog>
+          </div>
+        </UiDialogContent>
+      </UiDialog>
 
       {/* Batch Status Update Dialog */}
-      <Dialog
-        open={batchStatusDialogOpen}
-        onClose={() => setBatchStatusDialogOpen(false)}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{
-          sx: {
-            bgcolor: ADMIN_THEME.glass,
-            backdropFilter: 'blur(20px)',
-            border: `1px solid ${ADMIN_THEME.border}`,
-            borderRadius: '16px',
-          },
-        }}
-      >
-        <DialogTitle sx={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          borderBottom: `1px solid ${ADMIN_THEME.border}`,
-        }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Update color="#6366f1" />
-            <Typography sx={{ fontWeight: 700, color: 'var(--foreground)' }}>
+      <UiDialog open={batchStatusDialogOpen} onOpenChange={setBatchStatusDialogOpen}>
+        <UiDialogContent className="border-[var(--glass-border)] bg-[var(--glass-bg)] backdrop-blur-xl sm:max-w-md">
+          <UiDialogHeader className="border-b border-[var(--glass-border)] pb-4">
+            <UiDialogTitle className="flex items-center gap-2 text-base font-bold">
+              <Update color="#6366f1" />
               อัปเดตสถานะพร้อมกัน
-            </Typography>
-          </Box>
-          <IconButton onClick={() => setBatchStatusDialogOpen(false)} sx={{ color: 'var(--text-muted)' }}>
-            <Close />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent sx={{ p: 3 }}>
-          <Box sx={{ mb: 3 }}>
-            <Typography sx={{ color: 'var(--text-muted)', mb: 2 }}>
-              เลือก {selectedOrders.size} ออเดอร์เพื่ออัปเดตสถานะ
-            </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-              {Array.from(selectedOrders).map(ref => (
-                <Chip
-                  key={ref}
-                  label={`#${ref}`}
-                  size="small"
-                  sx={{
-                    bgcolor: 'rgba(99,102,241,0.15)',
-                    color: '#a5b4fc',
-                    fontFamily: 'monospace',
-                  }}
-                />
-              ))}
-            </Box>
-          </Box>
-          
-          <Typography sx={{ color: 'var(--foreground)', fontWeight: 600, mb: 1.5 }}>
-            สถานะใหม่
-          </Typography>
-          <Select
-            value={batchNewStatus}
-            onChange={(e) => setBatchNewStatus(e.target.value)}
-            fullWidth
-            sx={{
-              bgcolor: 'rgba(255,255,255,0.03)',
-              borderRadius: '10px',
-              '& .MuiOutlinedInput-notchedOutline': {
-                borderColor: ADMIN_THEME.border,
-              },
-              '&:hover .MuiOutlinedInput-notchedOutline': {
-                borderColor: 'var(--glass-border)',
-              },
-              '& .MuiSelect-select': {
-                color: 'var(--foreground)',
-              },
-            }}
-          >
-            {ORDER_STATUSES.map(status => (
-              <MenuItem key={status} value={status}>{status}</MenuItem>
-            ))}
-          </Select>
-        </DialogContent>
-        <DialogActions sx={{ p: 2, borderTop: `1px solid ${ADMIN_THEME.border}`, gap: 1 }}>
-          <Button
-            onClick={() => setBatchStatusDialogOpen(false)}
-            variant="outlined"
-            sx={{
-              borderColor: ADMIN_THEME.border,
-              color: 'var(--text-muted)',
-              '&:hover': { borderColor: '#6366f1' },
-            }}
-          >
-            ยกเลิก
-          </Button>
-          <Button
-            onClick={handleBatchUpdateStatus}
-            variant="contained"
-            disabled={batchUpdating || !batchNewStatus}
-            sx={gradientButtonSx}
-          >
-            {batchUpdating ? 'กำลังอัปเดต...' : `อัปเดต ${selectedOrders.size} รายการ`}
-          </Button>
-        </DialogActions>
-      </Dialog>
+            </UiDialogTitle>
+          </UiDialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <p className="mb-3 text-[var(--text-muted)]">
+                เลือก {selectedOrders.size} ออเดอร์เพื่ออัปเดตสถานะ
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {Array.from(selectedOrders).map(ref => (
+                  <Chip
+                    key={ref}
+                    label={`#${ref}`}
+                    size="small"
+                    sx={{
+                      bgcolor: 'rgba(99,102,241,0.15)',
+                      color: '#a5b4fc',
+                      fontFamily: 'monospace',
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="mb-2 font-semibold text-[var(--foreground)]">สถานะใหม่</p>
+              <Select
+                value={batchNewStatus}
+                onChange={(e) => setBatchNewStatus(e.target.value)}
+                fullWidth
+                sx={{
+                  bgcolor: 'rgba(255,255,255,0.03)',
+                  borderRadius: '10px',
+                  '& .MuiOutlinedInput-notchedOutline': {
+                    borderColor: ADMIN_THEME.border,
+                  },
+                  '&:hover .MuiOutlinedInput-notchedOutline': {
+                    borderColor: 'var(--glass-border)',
+                  },
+                  '& .MuiSelect-select': {
+                    color: 'var(--foreground)',
+                  },
+                }}
+              >
+                {ORDER_STATUSES.map(status => (
+                  <MenuItem key={status} value={status}>{status}</MenuItem>
+                ))}
+              </Select>
+            </div>
+          </div>
+          <UiDialogFooter className="border-t border-[var(--glass-border)] pt-4">
+            <UiButton variant="outline" onClick={() => setBatchStatusDialogOpen(false)}>
+              ยกเลิก
+            </UiButton>
+            <UiButton
+              onClick={handleBatchUpdateStatus}
+              disabled={batchUpdating || !batchNewStatus}
+              className="bg-gradient-to-r from-violet-500 to-indigo-500 text-white hover:from-violet-600 hover:to-indigo-600"
+            >
+              {batchUpdating ? (
+                <>
+                  <Loader2 className="animate-spin" />
+                  กำลังอัปเดต...
+                </>
+              ) : (
+                `อัปเดต ${selectedOrders.size} รายการ`
+              )}
+            </UiButton>
+          </UiDialogFooter>
+        </UiDialogContent>
+      </UiDialog>
 
       {/* Modern Toast Container - rendered via portal to always be on top */}
       {toasts.length > 0 && createPortal(
@@ -8644,43 +8051,28 @@ export default function AdminPage(): JSX.Element {
       {pickupConfirmDialog}
 
       {/* Logout Confirmation Dialog */}
-      <Dialog
-        open={logoutConfirmOpen}
-        onClose={() => setLogoutConfirmOpen(false)}
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            background: ADMIN_THEME.glass,
-            backdropFilter: 'blur(20px)',
-            border: `1px solid ${ADMIN_THEME.border}`,
-            minWidth: 320,
-          },
-        }}
-      >
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, pb: 1, color: ADMIN_THEME.text }}>
-          <Warning size={22} color="#f59e0b" />
-          ยืนยันการออกจากระบบ
-        </DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" sx={{ color: ADMIN_THEME.muted }}>
+      <UiDialog open={logoutConfirmOpen} onOpenChange={setLogoutConfirmOpen}>
+        <UiDialogContent className="min-w-[320px] border-[var(--glass-border)] bg-[var(--glass-bg)] backdrop-blur-xl sm:max-w-sm">
+          <UiDialogHeader>
+            <UiDialogTitle className="flex items-center gap-2">
+              <Warning size={22} color="#f59e0b" />
+              ยืนยันการออกจากระบบ
+            </UiDialogTitle>
+          </UiDialogHeader>
+          <p className="text-sm text-[var(--text-muted)]">
             คุณต้องการออกจากระบบใช่หรือไม่?
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setLogoutConfirmOpen(false)} sx={{ borderRadius: 2, color: ADMIN_THEME.text }}>
-            ยกเลิก
-          </Button>
-          <Button
-            onClick={() => signOutUser()}
-            variant="contained"
-            color="error"
-            sx={{ borderRadius: 2 }}
-          >
-            ออกจากระบบ
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+          </p>
+          <UiDialogFooter>
+            <UiButton variant="outline" onClick={() => setLogoutConfirmOpen(false)}>
+              ยกเลิก
+            </UiButton>
+            <UiButton variant="destructive" onClick={() => signOutUser()}>
+              ออกจากระบบ
+            </UiButton>
+          </UiDialogFooter>
+        </UiDialogContent>
+      </UiDialog>
+    </>
   );
 }
 

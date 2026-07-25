@@ -30,6 +30,7 @@ import { LiveStreamProvider } from '@/context/LiveStreamProvider';
 import { useThemeStore } from '@/store/themeStore';
 import { getTranslations } from '@/lib/i18n/translations';
 import { useLanguageStore } from '@/store/languageStore';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 // Error Boundary for catching client-side errors (especially on older browsers)
 interface ErrorBoundaryState {
@@ -526,6 +527,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
             <LiveStreamProvider>
             <ThemeProvider theme={activeTheme}>
               <CssBaseline />
+              <TooltipProvider delayDuration={300}>
               <NotificationProvider>
                   {children}
                 <Suspense fallback={null}>
@@ -535,6 +537,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
                   <LiveStreamPopup />
                 </Suspense>
               </NotificationProvider>
+              </TooltipProvider>
             </ThemeProvider>
             </LiveStreamProvider>
           </SWRProvider>

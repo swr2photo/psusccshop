@@ -6,61 +6,65 @@ import { apiFetch } from '@/lib/api-client';
 import { useState, useEffect, useCallback, Fragment } from 'react';
 import type { ReactElement } from 'react';
 import {
-  Box,
-  Typography,
-  Card,
-  CardContent,
-  Button,
-  TextField,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Chip,
-  IconButton,
-  CircularProgress,
-  Tabs,
-  Tab,
-  FormControlLabel,
-  Checkbox,
-  Alert,
-  InputAdornment,
-  Tooltip,
-  Badge,
-  Pagination,
-  Stack,
-  Avatar,
-  Collapse,
-} from '@mui/material';
-import {
   Mail as Email,
   Send,
   Search,
   RotateCcw as Refresh,
   CheckCircle2 as CheckCircle,
-  AlertCircle as Error,
+  AlertCircle as ErrorIcon,
   Clock as Pending,
   Megaphone as Campaign,
-  User as Person,
   ChevronDown as ExpandMore,
   ChevronUp as ExpandLess,
   Copy as ContentCopy,
-  Filter as FilterList,
   TrendingUp,
   Users as Groups,
   History,
-  Eye as Visibility,
   X as Close,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
-const AccessTime = Pending;
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
-import { ADMIN_THEME as THEME } from '@/lib/adminTheme';
+const AccessTime = Pending;
 
 interface EmailLog {
   id: string;
@@ -100,15 +104,15 @@ const typeLabels: Record<string, { label: string; color: string; icon: ReactElem
   order_ready: { label: 'พร้อมรับ', color: '#f59e0b', icon: <CheckCircle size={16} /> },
   order_shipped: { label: 'จัดส่งแล้ว', color: '#0ea5e9', icon: <Send size={16} /> },
   order_completed: { label: 'สำเร็จ', color: '#10b981', icon: <CheckCircle size={16} /> },
-  order_cancelled: { label: 'ยกเลิก', color: '#ef4444', icon: <Error size={16} /> },
+  order_cancelled: { label: 'ยกเลิก', color: '#ef4444', icon: <ErrorIcon size={16} /> },
   custom: { label: 'ส่งเอง', color: '#1e40af', icon: <Email size={16} /> },
   broadcast: { label: 'ประกาศ', color: '#f472b6', icon: <Campaign size={16} /> },
 };
 
 const statusColors: Record<string, string> = {
-  sent: '#10b981',
-  failed: '#ef4444',
-  pending: '#f59e0b',
+  sent: 'var(--success)',
+  failed: 'var(--error)',
+  pending: 'var(--warning)',
 };
 
 export default function EmailManagement({ showToast }: Props) {
@@ -120,7 +124,7 @@ export default function EmailManagement({ showToast }: Props) {
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
   const [expandedLog, setExpandedLog] = useState<string | null>(null);
-  
+
   // Compose dialog
   const [composeOpen, setComposeOpen] = useState(false);
   const [composeMode, setComposeMode] = useState<'single' | 'broadcast'>('single');
@@ -130,7 +134,7 @@ export default function EmailManagement({ showToast }: Props) {
   const [composeName, setComposeName] = useState('');
   const [selectedCustomers, setSelectedCustomers] = useState<Customer[]>([]);
   const [sending, setSending] = useState(false);
-  
+
   // Detail dialog
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedLog, setSelectedLog] = useState<EmailLog | null>(null);
@@ -313,691 +317,659 @@ export default function EmailManagement({ showToast }: Props) {
   };
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-      {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-        <Box>
-          <Typography variant="h5" sx={{ fontWeight: 800, color: THEME.text, mb: 0.5 }}>
-            ระบบจัดการอีเมล
-          </Typography>
-          <Typography sx={{ color: THEME.textSecondary, fontSize: '0.9rem' }}>
-            ส่งอีเมลแจ้งลูกค้าและดูประวัติการส่ง
-          </Typography>
-        </Box>
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button
-            variant="outlined"
-            startIcon={<Refresh />}
-            onClick={fetchData}
-            disabled={loading}
-            sx={{
-              borderColor: THEME.border,
-              color: THEME.textSecondary,
-              '&:hover': { borderColor: THEME.primary, color: THEME.primary },
-            }}
+    <TooltipProvider>
+      <div className="flex flex-col gap-6">
+        {/* Header */}
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 className="mb-1 text-xl font-extrabold text-[var(--foreground)]">
+              ระบบจัดการอีเมล
+            </h2>
+            <p className="text-[0.9rem] text-[var(--muted-foreground)]">
+              ส่งอีเมลแจ้งลูกค้าและดูประวัติการส่ง
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={fetchData}
+              disabled={loading}
+              className="border-[var(--border)] text-[var(--muted-foreground)] hover:border-[var(--primary)] hover:text-[var(--primary)]"
+            >
+              <Refresh />
+              รีเฟรช
+            </Button>
+            <Button
+              onClick={() => setComposeOpen(true)}
+              className="bg-[var(--primary)] text-[var(--primary-foreground)] hover:bg-[var(--primary)]/90"
+            >
+              <Send />
+              เขียนอีเมล
+            </Button>
+          </div>
+        </div>
+
+        {/* Stats Cards */}
+        {stats && (
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+            <StatCard
+              icon={<Email />}
+              label="ส่งทั้งหมด"
+              value={stats.total}
+              color="var(--primary)"
+            />
+            <StatCard
+              icon={<CheckCircle />}
+              label="สำเร็จ"
+              value={stats.sent}
+              color="var(--success)"
+            />
+            <StatCard
+              icon={<ErrorIcon />}
+              label="ล้มเหลว"
+              value={stats.failed}
+              color="var(--error)"
+            />
+            <StatCard
+              icon={<AccessTime />}
+              label="24 ชม. ล่าสุด"
+              value={stats.last24h}
+              color="var(--primary)"
+            />
+          </div>
+        )}
+
+        {/* Tabs */}
+        <Card className="gap-0 overflow-hidden rounded-2xl border-[var(--border)] bg-[var(--card)] py-0 shadow-none">
+          <Tabs
+            value={String(activeTab)}
+            onValueChange={(v) => setActiveTab(Number(v))}
           >
-            รีเฟรช
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<Send />}
-            onClick={() => setComposeOpen(true)}
-            sx={{
-              bgcolor: THEME.primary,
-              '&:hover': { bgcolor: '#1d4ed8' },
-            }}
-          >
-            เขียนอีเมล
-          </Button>
-        </Box>
-      </Box>
+            <TabsList
+              variant="line"
+              className="h-auto w-full justify-start rounded-none border-b border-[var(--border)] bg-transparent p-0"
+            >
+              <TabsTrigger
+                value="0"
+                className="rounded-none px-4 py-3 data-[state=active]:text-[var(--primary)]"
+              >
+                <History size={18} />
+                ประวัติส่ง
+              </TabsTrigger>
+              <TabsTrigger
+                value="1"
+                className="rounded-none px-4 py-3 data-[state=active]:text-[var(--primary)]"
+              >
+                <Groups size={18} />
+                {`ลูกค้า (${customers.length})`}
+              </TabsTrigger>
+              <TabsTrigger
+                value="2"
+                className="rounded-none px-4 py-3 data-[state=active]:text-[var(--primary)]"
+              >
+                <TrendingUp size={18} />
+                สถิติ
+              </TabsTrigger>
+            </TabsList>
 
-      {/* Stats Cards */}
-      {stats && (
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 2 }}>
-          <StatCard
-            icon={<Email />}
-            label="ส่งทั้งหมด"
-            value={stats.total}
-            color={THEME.primary}
-          />
-          <StatCard
-            icon={<CheckCircle />}
-            label="สำเร็จ"
-            value={stats.sent}
-            color={THEME.success}
-          />
-          <StatCard
-            icon={<Error />}
-            label="ล้มเหลว"
-            value={stats.failed}
-            color={THEME.error}
-          />
-          <StatCard
-            icon={<AccessTime />}
-            label="24 ชม. ล่าสุด"
-            value={stats.last24h}
-            color={THEME.info}
-          />
-        </Box>
-      )}
+            <CardContent className="pt-6">
+              {loading ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="size-8 animate-spin text-[var(--primary)]" />
+                </div>
+              ) : (
+                <>
+                  {/* Tab 0: Email Logs */}
+                  <TabsContent value="0" className="mt-0">
+                    <div className="mb-4 flex gap-4">
+                      <div className="relative max-w-[400px] flex-1">
+                        <Search className="absolute top-1/2 left-3 size-5 -translate-y-1/2 text-[var(--muted-foreground)]" />
+                        <Input
+                          placeholder="ค้นหาอีเมล, หัวข้อ, เลขออเดอร์..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="border-[var(--border)] bg-[var(--glass-bg)] pl-10 text-[var(--foreground)]"
+                        />
+                      </div>
+                    </div>
 
-      {/* Tabs */}
-      <Card sx={{ bgcolor: THEME.bgCard, border: `1px solid ${THEME.border}`, borderRadius: '16px' }}>
-        <Tabs
-          value={activeTab}
-          onChange={(_, v) => setActiveTab(v)}
-          sx={{
-            borderBottom: `1px solid ${THEME.border}`,
-            '& .MuiTab-root': {
-              color: THEME.textSecondary,
-              fontWeight: 600,
-              textTransform: 'none',
-              '&.Mui-selected': { color: THEME.primary },
-            },
-            '& .MuiTabs-indicator': { bgcolor: THEME.primary },
-          }}
-        >
-          <Tab icon={<History size={18} />} iconPosition="start" label="ประวัติส่ง" />
-          <Tab icon={<Groups size={18} />} iconPosition="start" label={`ลูกค้า (${customers.length})`} />
-          <Tab icon={<TrendingUp size={18} />} iconPosition="start" label="สถิติ" />
-        </Tabs>
-
-        <CardContent>
-          {loading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-              <CircularProgress sx={{ color: THEME.primary }} />
-            </Box>
-          ) : (
-            <>
-              {/* Tab 0: Email Logs */}
-              {activeTab === 0 && (
-                <Box>
-                  <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-                    <TextField
-                      placeholder="ค้นหาอีเมล, หัวข้อ, เลขออเดอร์..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      size="small"
-                      fullWidth
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <Search size={20} color={THEME.muted} />
-                          </InputAdornment>
-                        ),
-                      }}
-                      sx={{
-                        maxWidth: 400,
-                        '& .MuiOutlinedInput-root': {
-                          bgcolor: THEME.glassSoft,
-                          '& fieldset': { borderColor: THEME.border },
-                          '&:hover fieldset': { borderColor: THEME.primary },
-                        },
-                        '& .MuiInputBase-input': { color: THEME.text },
-                      }}
-                    />
-                  </Box>
-
-                  <TableContainer sx={{ maxHeight: 500 }}>
-                    <Table size="small" stickyHeader>
-                      <TableHead>
-                        <TableRow>
-                          <TableCell sx={{ bgcolor: THEME.glass, color: THEME.textSecondary, fontWeight: 700 }}>สถานะ</TableCell>
-                          <TableCell sx={{ bgcolor: THEME.glass, color: THEME.textSecondary, fontWeight: 700 }}>ประเภท</TableCell>
-                          <TableCell sx={{ bgcolor: THEME.glass, color: THEME.textSecondary, fontWeight: 700 }}>ผู้รับ</TableCell>
-                          <TableCell sx={{ bgcolor: THEME.glass, color: THEME.textSecondary, fontWeight: 700 }}>หัวข้อ</TableCell>
-                          <TableCell sx={{ bgcolor: THEME.glass, color: THEME.textSecondary, fontWeight: 700 }}>ออเดอร์</TableCell>
-                          <TableCell sx={{ bgcolor: THEME.glass, color: THEME.textSecondary, fontWeight: 700 }}>เวลา</TableCell>
-                          <TableCell sx={{ bgcolor: THEME.glass, color: THEME.textSecondary, fontWeight: 700, width: 60 }}></TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {paginatedLogs.map((log) => {
-                          const typeInfo = typeLabels[log.type] || { label: log.type, color: THEME.muted, icon: <Email size={16} /> };
-                          const isExpanded = expandedLog === log.id;
-                          
-                          return (
-                            <Fragment key={log.id}>
-                              <TableRow 
-                                hover
-                                sx={{ 
-                                  cursor: 'pointer',
-                                  '& td': { borderColor: THEME.border },
-                                  '&:hover': { bgcolor: THEME.glassSoft },
-                                }}
-                                onClick={() => setExpandedLog(isExpanded ? null : log.id)}
-                              >
-                                <TableCell>
-                                  <Chip
-                                    size="small"
-                                    label={log.status === 'sent' ? 'ส่งแล้ว' : log.status === 'failed' ? 'ล้มเหลว' : 'รอส่ง'}
-                                    sx={{
-                                      bgcolor: `${statusColors[log.status]}20`,
-                                      color: statusColors[log.status],
-                                      fontWeight: 600,
-                                      fontSize: '0.7rem',
-                                    }}
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <Chip
-                                    size="small"
-                                    icon={typeInfo.icon}
-                                    label={typeInfo.label}
-                                    sx={{
-                                      bgcolor: `${typeInfo.color}20`,
-                                      color: typeInfo.color,
-                                      fontWeight: 600,
-                                      fontSize: '0.7rem',
-                                      '& .MuiChip-icon': { color: typeInfo.color },
-                                    }}
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <Typography sx={{ color: THEME.text, fontSize: '0.85rem' }}>
-                                    {log.to}
-                                  </Typography>
-                                </TableCell>
-                                <TableCell>
-                                  <Typography sx={{ color: THEME.textSecondary, fontSize: '0.85rem', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {log.subject}
-                                  </Typography>
-                                </TableCell>
-                                <TableCell>
-                                  {log.orderRef ? (
-                                    <Chip
-                                      size="small"
-                                      label={log.orderRef}
-                                      sx={{
-                                        bgcolor: 'rgba(37,99,235,0.1)',
-                                        color: THEME.primary,
-                                        fontWeight: 600,
-                                        fontSize: '0.7rem',
-                                      }}
-                                    />
-                                  ) : (
-                                    <Typography sx={{ color: THEME.muted, fontSize: '0.8rem' }}>-</Typography>
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  <Typography sx={{ color: THEME.muted, fontSize: '0.8rem' }}>
-                                    {formatDate(log.sentAt)}
-                                  </Typography>
-                                </TableCell>
-                                <TableCell>
-                                  <IconButton size="small" sx={{ color: THEME.muted }}>
-                                    {isExpanded ? <ExpandLess /> : <ExpandMore />}
-                                  </IconButton>
-                                </TableCell>
-                              </TableRow>
-                              <TableRow>
-                                <TableCell colSpan={7} sx={{ p: 0, borderBottom: isExpanded ? undefined : 'none' }}>
-                                  <Collapse in={isExpanded}>
-                                    <Box sx={{ p: 2, bgcolor: THEME.glassSoft }}>
-                                      <Typography sx={{ color: THEME.textSecondary, fontSize: '0.85rem', mb: 1 }}>
-                                        <strong>ID:</strong> {log.id}
-                                      </Typography>
-                                      {log.error && (
-                                        <Alert severity="error" sx={{ mt: 1, bgcolor: 'rgba(239,68,68,0.1)' }}>
-                                          {log.error}
-                                        </Alert>
-                                      )}
-                                      {log.metadata && (
-                                        <Typography sx={{ color: THEME.muted, fontSize: '0.8rem', mt: 1 }}>
-                                          <strong>Metadata:</strong> {JSON.stringify(log.metadata)}
-                                        </Typography>
-                                      )}
-                                      <Button
-                                        size="small"
-                                        startIcon={<Send />}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setComposeTo(log.to);
-                                          setComposeMode('single');
-                                          setComposeOpen(true);
-                                        }}
-                                        sx={{ mt: 1, color: THEME.primary }}
-                                      >
-                                        ส่งอีเมลใหม่
-                                      </Button>
-                                    </Box>
-                                  </Collapse>
-                                </TableCell>
-                              </TableRow>
-                            </Fragment>
-                          );
-                        })}
-                        {paginatedLogs.length === 0 && (
-                          <TableRow>
-                            <TableCell colSpan={7} sx={{ textAlign: 'center', py: 4 }}>
-                              <Typography sx={{ color: THEME.muted }}>
-                                {searchTerm ? 'ไม่พบผลลัพธ์' : 'ยังไม่มีประวัติการส่งอีเมล'}
-                              </Typography>
-                            </TableCell>
+                    <ScrollArea className="h-[500px] rounded-md border border-[var(--border)]">
+                      <Table>
+                        <TableHeader className="sticky top-0 z-10 bg-[var(--card)]">
+                          <TableRow className="border-[var(--border)] hover:bg-transparent">
+                            <TableHead className="bg-[var(--glass-bg)] font-bold text-[var(--muted-foreground)]">สถานะ</TableHead>
+                            <TableHead className="bg-[var(--glass-bg)] font-bold text-[var(--muted-foreground)]">ประเภท</TableHead>
+                            <TableHead className="bg-[var(--glass-bg)] font-bold text-[var(--muted-foreground)]">ผู้รับ</TableHead>
+                            <TableHead className="bg-[var(--glass-bg)] font-bold text-[var(--muted-foreground)]">หัวข้อ</TableHead>
+                            <TableHead className="bg-[var(--glass-bg)] font-bold text-[var(--muted-foreground)]">ออเดอร์</TableHead>
+                            <TableHead className="bg-[var(--glass-bg)] font-bold text-[var(--muted-foreground)]">เวลา</TableHead>
+                            <TableHead className="w-[60px] bg-[var(--glass-bg)] font-bold text-[var(--muted-foreground)]" />
                           </TableRow>
-                        )}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
+                        </TableHeader>
+                        <TableBody>
+                          {paginatedLogs.map((log) => {
+                            const typeInfo = typeLabels[log.type] || {
+                              label: log.type,
+                              color: 'var(--muted-foreground)',
+                              icon: <Email size={16} />,
+                            };
+                            const isExpanded = expandedLog === log.id;
 
-                  {totalPages > 1 && (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-                      <Pagination
-                        count={totalPages}
-                        page={page}
-                        onChange={(_, p) => setPage(p)}
-                        sx={{
-                          '& .MuiPaginationItem-root': {
-                            color: THEME.textSecondary,
-                            '&.Mui-selected': { bgcolor: THEME.primary, color: '#fff' },
-                          },
-                        }}
-                      />
-                    </Box>
-                  )}
-                </Box>
-              )}
-
-              {/* Tab 1: Customers */}
-              {activeTab === 1 && (
-                <Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
-                    <TextField
-                      placeholder="ค้นหาลูกค้า..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      size="small"
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <Search size={24} color={THEME.muted} />
-                          </InputAdornment>
-                        ),
-                      }}
-                      sx={{
-                        maxWidth: 300,
-                        '& .MuiOutlinedInput-root': {
-                          bgcolor: THEME.glassSoft,
-                          '& fieldset': { borderColor: THEME.border },
-                        },
-                        '& .MuiInputBase-input': { color: THEME.text },
-                      }}
-                    />
-                    <Box sx={{ display: 'flex', gap: 1 }}>
-                      {selectedCustomers.length > 0 && (
-                        <>
-                          <Chip
-                            label={`เลือก ${selectedCustomers.length} คน`}
-                            onDelete={deselectAllCustomers}
-                            sx={{ bgcolor: THEME.primary, color: '#fff' }}
-                          />
-                          <Button
-                            variant="contained"
-                            startIcon={<Campaign />}
-                            onClick={() => {
-                              setComposeMode('broadcast');
-                              setComposeOpen(true);
-                            }}
-                            sx={{ bgcolor: THEME.success }}
-                          >
-                            ส่งอีเมลถึงที่เลือก
-                          </Button>
-                        </>
-                      )}
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        onClick={selectedCustomers.length === customers.length ? deselectAllCustomers : selectAllCustomers}
-                        sx={{ borderColor: THEME.border, color: THEME.textSecondary }}
-                      >
-                        {selectedCustomers.length === customers.length ? 'ยกเลิกทั้งหมด' : 'เลือกทั้งหมด'}
-                      </Button>
-                    </Box>
-                  </Box>
-
-                  <Box sx={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' }, 
-                    gap: 2,
-                    maxHeight: 500,
-                    overflow: 'auto',
-                  }}>
-                    {customers
-                      .filter(c => {
-                        const term = searchTerm.toLowerCase();
-                        return c.email.toLowerCase().includes(term) || c.name.toLowerCase().includes(term);
-                      })
-                      .map((customer) => {
-                        const isSelected = selectedCustomers.some(c => c.email === customer.email);
-                        return (
-                          <Card
-                            key={customer.email}
-                            onClick={() => toggleCustomerSelection(customer)}
-                            sx={{
-                              bgcolor: isSelected ? 'rgba(37,99,235,0.15)' : THEME.glassSoft,
-                              border: `1px solid ${isSelected ? THEME.primary : THEME.border}`,
-                              borderRadius: '12px',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s',
-                              '&:hover': { borderColor: THEME.primary },
-                            }}
-                          >
-                            <CardContent sx={{ p: 2 }}>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                <Checkbox
-                                  checked={isSelected}
-                                  sx={{
-                                    color: THEME.muted,
-                                    '&.Mui-checked': { color: THEME.primary },
-                                    p: 0,
-                                  }}
-                                />
-                                <Avatar sx={{ bgcolor: THEME.primary, width: 36, height: 36, fontSize: '0.9rem' }}>
-                                  {customer.name.charAt(0).toUpperCase()}
-                                </Avatar>
-                                <Box sx={{ flex: 1, minWidth: 0 }}>
-                                  <Typography sx={{ color: THEME.text, fontWeight: 600, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {customer.name}
-                                  </Typography>
-                                  <Typography sx={{ color: THEME.muted, fontSize: '0.75rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {customer.email}
-                                  </Typography>
-                                </Box>
-                                <Chip
-                                  size="small"
-                                  label={`${customer.orderCount} ออเดอร์`}
-                                  sx={{
-                                    bgcolor: 'rgba(16,185,129,0.1)',
-                                    color: THEME.success,
-                                    fontSize: '0.7rem',
-                                  }}
-                                />
-                              </Box>
-                              <Box sx={{ display: 'flex', gap: 1, mt: 1.5 }}>
-                                <Button
-                                  size="small"
-                                  startIcon={<Email />}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openComposeForCustomer(customer);
-                                  }}
-                                  sx={{ 
-                                    flex: 1, 
-                                    color: THEME.primary,
-                                    fontSize: '0.75rem',
-                                    '&:hover': { bgcolor: 'rgba(37,99,235,0.1)' },
-                                  }}
-                                >
-                                  ส่งอีเมล
-                                </Button>
-                                <Tooltip title="คัดลอกอีเมล">
-                                  <IconButton
-                                    size="small"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      navigator.clipboard.writeText(customer.email);
-                                      showToast('info', 'คัดลอกอีเมลแล้ว');
-                                    }}
-                                    sx={{ color: THEME.muted }}
-                                  >
-                                    <ContentCopy size={16} />
-                                  </IconButton>
-                                </Tooltip>
-                              </Box>
-                            </CardContent>
-                          </Card>
-                        );
-                      })}
-                  </Box>
-                </Box>
-              )}
-
-              {/* Tab 2: Statistics */}
-              {activeTab === 2 && stats && (
-                <Box>
-                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 3 }}>
-                    {/* By Type */}
-                    <Card sx={{ bgcolor: THEME.glassSoft, border: `1px solid ${THEME.border}`, borderRadius: '12px' }}>
-                      <CardContent>
-                        <Typography sx={{ color: THEME.text, fontWeight: 700, mb: 2 }}>
-                          จำแนกตามประเภท
-                        </Typography>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                          {Object.entries(stats.byType).map(([type, count]) => {
-                            const typeInfo = typeLabels[type] || { label: type, color: THEME.muted };
-                            const percentage = Math.round((count / stats.total) * 100);
                             return (
-                              <Box key={type}>
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                                  <Typography sx={{ color: THEME.textSecondary, fontSize: '0.85rem' }}>
-                                    {typeInfo.label}
-                                  </Typography>
-                                  <Typography sx={{ color: THEME.text, fontWeight: 600, fontSize: '0.85rem' }}>
-                                    {count} ({percentage}%)
-                                  </Typography>
-                                </Box>
-                                <Box sx={{ height: 6, bgcolor: THEME.glass, borderRadius: 3, overflow: 'hidden' }}>
-                                  <Box
-                                    sx={{
-                                      height: '100%',
-                                      width: `${percentage}%`,
-                                      bgcolor: typeInfo.color,
-                                      borderRadius: 3,
-                                      transition: 'width 0.5s ease',
-                                    }}
-                                  />
-                                </Box>
-                              </Box>
+                              <Fragment key={log.id}>
+                                <TableRow
+                                  className="cursor-pointer border-[var(--border)] hover:bg-[var(--glass-bg)]"
+                                  onClick={() => setExpandedLog(isExpanded ? null : log.id)}
+                                >
+                                  <TableCell>
+                                    <Badge
+                                      className="border-0 text-[0.7rem] font-semibold"
+                                      style={{
+                                        backgroundColor: `color-mix(in srgb, ${statusColors[log.status]} 20%, transparent)`,
+                                        color: statusColors[log.status],
+                                      }}
+                                    >
+                                      {log.status === 'sent' ? 'ส่งแล้ว' : log.status === 'failed' ? 'ล้มเหลว' : 'รอส่ง'}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge
+                                      className="gap-1 border-0 text-[0.7rem] font-semibold [&>svg]:text-current"
+                                      style={{
+                                        backgroundColor: `color-mix(in srgb, ${typeInfo.color} 20%, transparent)`,
+                                        color: typeInfo.color,
+                                      }}
+                                    >
+                                      {typeInfo.icon}
+                                      {typeInfo.label}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <span className="text-[0.85rem] text-[var(--foreground)]">
+                                      {log.to}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell>
+                                    <span className="block max-w-[200px] truncate text-[0.85rem] text-[var(--muted-foreground)]">
+                                      {log.subject}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell>
+                                    {log.orderRef ? (
+                                      <Badge
+                                        className="border-0 bg-[color-mix(in_srgb,var(--primary)_10%,transparent)] text-[0.7rem] font-semibold text-[var(--primary)]"
+                                      >
+                                        {log.orderRef}
+                                      </Badge>
+                                    ) : (
+                                      <span className="text-[0.8rem] text-[var(--muted-foreground)]">-</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    <span className="text-[0.8rem] text-[var(--muted-foreground)]">
+                                      {formatDate(log.sentAt)}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell>
+                                    <span className="text-[var(--muted-foreground)]">
+                                      {isExpanded ? <ExpandLess size={18} /> : <ExpandMore size={18} />}
+                                    </span>
+                                  </TableCell>
+                                </TableRow>
+                                {isExpanded && (
+                                  <TableRow className="border-[var(--border)] hover:bg-transparent">
+                                    <TableCell colSpan={7} className="p-0">
+                                      <div className="bg-[var(--glass-bg)] p-4">
+                                        <p className="mb-2 text-[0.85rem] text-[var(--muted-foreground)]">
+                                          <strong>ID:</strong> {log.id}
+                                        </p>
+                                        {log.error && (
+                                          <Alert variant="destructive" className="mt-2 bg-[color-mix(in_srgb,var(--error)_10%,transparent)]">
+                                            <AlertDescription>{log.error}</AlertDescription>
+                                          </Alert>
+                                        )}
+                                        {log.metadata && (
+                                          <p className="mt-2 text-[0.8rem] text-[var(--muted-foreground)]">
+                                            <strong>Metadata:</strong> {JSON.stringify(log.metadata)}
+                                          </p>
+                                        )}
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="mt-2 text-[var(--primary)] hover:bg-[color-mix(in_srgb,var(--primary)_10%,transparent)]"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setComposeTo(log.to);
+                                            setComposeMode('single');
+                                            setComposeOpen(true);
+                                          }}
+                                        >
+                                          <Send />
+                                          ส่งอีเมลใหม่
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                )}
+                              </Fragment>
                             );
                           })}
-                        </Box>
-                      </CardContent>
-                    </Card>
+                          {paginatedLogs.length === 0 && (
+                            <TableRow className="hover:bg-transparent">
+                              <TableCell colSpan={7} className="py-8 text-center">
+                                <span className="text-[var(--muted-foreground)]">
+                                  {searchTerm ? 'ไม่พบผลลัพธ์' : 'ยังไม่มีประวัติการส่งอีเมล'}
+                                </span>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </ScrollArea>
 
-                    {/* Overview */}
-                    <Card sx={{ bgcolor: THEME.glassSoft, border: `1px solid ${THEME.border}`, borderRadius: '12px' }}>
-                      <CardContent>
-                        <Typography sx={{ color: THEME.text, fontWeight: 700, mb: 2 }}>
-                          ภาพรวม
-                        </Typography>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Typography sx={{ color: THEME.textSecondary }}>อีเมลทั้งหมด</Typography>
-                            <Typography sx={{ color: THEME.text, fontWeight: 700, fontSize: '1.2rem' }}>{stats.total}</Typography>
-                          </Box>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Typography sx={{ color: THEME.textSecondary }}>ส่งสำเร็จ</Typography>
-                            <Typography sx={{ color: THEME.success, fontWeight: 700, fontSize: '1.2rem' }}>{stats.sent}</Typography>
-                          </Box>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Typography sx={{ color: THEME.textSecondary }}>ล้มเหลว</Typography>
-                            <Typography sx={{ color: THEME.error, fontWeight: 700, fontSize: '1.2rem' }}>{stats.failed}</Typography>
-                          </Box>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Typography sx={{ color: THEME.textSecondary }}>24 ชั่วโมงล่าสุด</Typography>
-                            <Typography sx={{ color: THEME.info, fontWeight: 700, fontSize: '1.2rem' }}>{stats.last24h}</Typography>
-                          </Box>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Typography sx={{ color: THEME.textSecondary }}>7 วันล่าสุด</Typography>
-                            <Typography sx={{ color: THEME.warning, fontWeight: 700, fontSize: '1.2rem' }}>{stats.last7days}</Typography>
-                          </Box>
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  </Box>
-                </Box>
+                    {totalPages > 1 && (
+                      <div className="mt-4 flex items-center justify-center gap-3">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={page <= 1}
+                          onClick={() => setPage((p) => p - 1)}
+                          className="border-[var(--border)] text-[var(--muted-foreground)]"
+                        >
+                          <ChevronLeft />
+                          ก่อนหน้า
+                        </Button>
+                        <span className="text-sm text-[var(--muted-foreground)]">
+                          {page} / {totalPages}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={page >= totalPages}
+                          onClick={() => setPage((p) => p + 1)}
+                          className="border-[var(--border)] text-[var(--muted-foreground)]"
+                        >
+                          ถัดไป
+                          <ChevronRight />
+                        </Button>
+                      </div>
+                    )}
+                  </TabsContent>
+
+                  {/* Tab 1: Customers */}
+                  <TabsContent value="1" className="mt-0">
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+                      <div className="relative max-w-[300px] flex-1">
+                        <Search className="absolute top-1/2 left-3 size-6 -translate-y-1/2 text-[var(--muted-foreground)]" />
+                        <Input
+                          placeholder="ค้นหาลูกค้า..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="border-[var(--border)] bg-[var(--glass-bg)] pl-10 text-[var(--foreground)]"
+                        />
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedCustomers.length > 0 && (
+                          <>
+                            <Badge className="gap-1 bg-[var(--primary)] text-[var(--primary-foreground)]">
+                              {`เลือก ${selectedCustomers.length} คน`}
+                              <button
+                                type="button"
+                                onClick={deselectAllCustomers}
+                                className="ml-1 rounded-sm hover:opacity-80"
+                              >
+                                <Close size={14} />
+                              </button>
+                            </Badge>
+                            <Button
+                              onClick={() => {
+                                setComposeMode('broadcast');
+                                setComposeOpen(true);
+                              }}
+                              className="bg-[var(--success)] text-white hover:bg-[var(--success)]/90"
+                            >
+                              <Campaign />
+                              ส่งอีเมลถึงที่เลือก
+                            </Button>
+                          </>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={selectedCustomers.length === customers.length ? deselectAllCustomers : selectAllCustomers}
+                          className="border-[var(--border)] text-[var(--muted-foreground)]"
+                        >
+                          {selectedCustomers.length === customers.length ? 'ยกเลิกทั้งหมด' : 'เลือกทั้งหมด'}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <ScrollArea className="h-[500px]">
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+                        {customers
+                          .filter(c => {
+                            const term = searchTerm.toLowerCase();
+                            return c.email.toLowerCase().includes(term) || c.name.toLowerCase().includes(term);
+                          })
+                          .map((customer) => {
+                            const isSelected = selectedCustomers.some(c => c.email === customer.email);
+                            return (
+                              <Card
+                                key={customer.email}
+                                onClick={() => toggleCustomerSelection(customer)}
+                                className={cn(
+                                  'cursor-pointer gap-0 rounded-xl border py-0 shadow-none transition-all hover:border-[var(--primary)]',
+                                  isSelected
+                                    ? 'border-[var(--primary)] bg-[color-mix(in_srgb,var(--primary)_15%,transparent)]'
+                                    : 'border-[var(--border)] bg-[var(--glass-bg)]'
+                                )}
+                              >
+                                <CardContent className="p-4">
+                                  <div className="flex items-center gap-3">
+                                    <Checkbox
+                                      checked={isSelected}
+                                      className="pointer-events-none"
+                                    />
+                                    <Avatar size="sm" className="size-9 bg-[var(--primary)]">
+                                      <AvatarFallback className="bg-[var(--primary)] text-[0.9rem] text-[var(--primary-foreground)]">
+                                        {customer.name.charAt(0).toUpperCase()}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div className="min-w-0 flex-1">
+                                      <p className="truncate text-[0.9rem] font-semibold text-[var(--foreground)]">
+                                        {customer.name}
+                                      </p>
+                                      <p className="truncate text-[0.75rem] text-[var(--muted-foreground)]">
+                                        {customer.email}
+                                      </p>
+                                    </div>
+                                    <Badge
+                                      className="border-0 bg-[color-mix(in_srgb,var(--success)_10%,transparent)] text-[0.7rem] text-[var(--success)]"
+                                    >
+                                      {`${customer.orderCount} ออเดอร์`}
+                                    </Badge>
+                                  </div>
+                                  <div className="mt-3 flex gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-8 flex-1 text-[0.75rem] text-[var(--primary)] hover:bg-[color-mix(in_srgb,var(--primary)_10%,transparent)]"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        openComposeForCustomer(customer);
+                                      }}
+                                    >
+                                      <Email />
+                                      ส่งอีเมล
+                                    </Button>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          size="icon-sm"
+                                          variant="ghost"
+                                          className="text-[var(--muted-foreground)]"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            navigator.clipboard.writeText(customer.email);
+                                            showToast('info', 'คัดลอกอีเมลแล้ว');
+                                          }}
+                                        >
+                                          <ContentCopy size={16} />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>คัดลอกอีเมล</TooltipContent>
+                                    </Tooltip>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            );
+                          })}
+                      </div>
+                    </ScrollArea>
+                  </TabsContent>
+
+                  {/* Tab 2: Statistics */}
+                  <TabsContent value="2" className="mt-0">
+                    {stats && (
+                      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                        {/* By Type */}
+                        <Card className="rounded-xl border-[var(--border)] bg-[var(--glass-bg)] py-0 shadow-none">
+                          <CardContent className="p-6">
+                            <h3 className="mb-4 font-bold text-[var(--foreground)]">
+                              จำแนกตามประเภท
+                            </h3>
+                            <div className="flex flex-col gap-3">
+                              {Object.entries(stats.byType).map(([type, count]) => {
+                                const typeInfo = typeLabels[type] || { label: type, color: 'var(--muted-foreground)' };
+                                const percentage = Math.round((count / stats.total) * 100);
+                                return (
+                                  <div key={type}>
+                                    <div className="mb-1 flex justify-between">
+                                      <span className="text-[0.85rem] text-[var(--muted-foreground)]">
+                                        {typeInfo.label}
+                                      </span>
+                                      <span className="text-[0.85rem] font-semibold text-[var(--foreground)]">
+                                        {count} ({percentage}%)
+                                      </span>
+                                    </div>
+                                    <div className="h-1.5 overflow-hidden rounded-full bg-[var(--glass-bg)]">
+                                      <div
+                                        className="h-full rounded-full transition-[width] duration-500 ease-out"
+                                        style={{
+                                          width: `${percentage}%`,
+                                          backgroundColor: typeInfo.color,
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </CardContent>
+                        </Card>
+
+                        {/* Overview */}
+                        <Card className="rounded-xl border-[var(--border)] bg-[var(--glass-bg)] py-0 shadow-none">
+                          <CardContent className="p-6">
+                            <h3 className="mb-4 font-bold text-[var(--foreground)]">
+                              ภาพรวม
+                            </h3>
+                            <div className="flex flex-col gap-4">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[var(--muted-foreground)]">อีเมลทั้งหมด</span>
+                                <span className="text-[1.2rem] font-bold text-[var(--foreground)]">{stats.total}</span>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-[var(--muted-foreground)]">ส่งสำเร็จ</span>
+                                <span className="text-[1.2rem] font-bold text-[var(--success)]">{stats.sent}</span>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-[var(--muted-foreground)]">ล้มเหลว</span>
+                                <span className="text-[1.2rem] font-bold text-[var(--error)]">{stats.failed}</span>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-[var(--muted-foreground)]">24 ชั่วโมงล่าสุด</span>
+                                <span className="text-[1.2rem] font-bold text-[var(--primary)]">{stats.last24h}</span>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-[var(--muted-foreground)]">7 วันล่าสุด</span>
+                                <span className="text-[1.2rem] font-bold text-[var(--warning)]">{stats.last7days}</span>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    )}
+                  </TabsContent>
+                </>
               )}
-            </>
-          )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Tabs>
+        </Card>
 
-      {/* Compose Dialog */}
-      <Dialog
-        open={composeOpen}
-        onClose={() => setComposeOpen(false)}
-        maxWidth="md"
-        fullWidth
-        PaperProps={{
-          sx: {
-            bgcolor: THEME.bgCard,
-            border: `1px solid ${THEME.border}`,
-            borderRadius: '16px',
-          },
-        }}
-      >
-        <DialogTitle sx={{ borderBottom: `1px solid ${THEME.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            {composeMode === 'broadcast' ? <Campaign size={24} color={THEME.success} /> : <Email size={24} color={THEME.primary} />}
-            <Typography sx={{ color: THEME.text, fontWeight: 700 }}>
-              {composeMode === 'broadcast' ? `ส่งถึงลูกค้า ${selectedCustomers.length} คน` : 'เขียนอีเมล'}
-            </Typography>
-          </Box>
-          <IconButton onClick={() => setComposeOpen(false)} sx={{ color: THEME.muted }}>
-            <Close />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent sx={{ mt: 2 }}>
-          <Stack spacing={2}>
-            {composeMode === 'single' && (
-              <>
-                <TextField
-                  label="ถึง (อีเมล)"
-                  value={composeTo}
-                  onChange={(e) => setComposeTo(e.target.value)}
-                  fullWidth
-                  required
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      '& fieldset': { borderColor: THEME.border },
-                    },
-                    '& .MuiInputBase-input': { color: THEME.text },
-                    '& .MuiInputLabel-root': { color: THEME.muted },
-                  }}
-                />
-                <TextField
-                  label="ชื่อผู้รับ"
-                  value={composeName}
-                  onChange={(e) => setComposeName(e.target.value)}
-                  fullWidth
-                  placeholder="ลูกค้า"
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      '& fieldset': { borderColor: THEME.border },
-                    },
-                    '& .MuiInputBase-input': { color: THEME.text },
-                    '& .MuiInputLabel-root': { color: THEME.muted },
-                  }}
-                />
-              </>
-            )}
+        {/* Compose Dialog */}
+        <Dialog open={composeOpen} onOpenChange={setComposeOpen}>
+          <DialogContent className="max-w-2xl border-[var(--border)] bg-[var(--card)] sm:max-w-2xl">
+            <DialogHeader className="flex-row items-center justify-between space-y-0 border-b border-[var(--border)] pb-4">
+              <DialogTitle className="flex items-center gap-2 font-bold text-[var(--foreground)]">
+                {composeMode === 'broadcast' ? (
+                  <Campaign size={24} className="text-[var(--success)]" />
+                ) : (
+                  <Email size={24} className="text-[var(--primary)]" />
+                )}
+                {composeMode === 'broadcast' ? `ส่งถึงลูกค้า ${selectedCustomers.length} คน` : 'เขียนอีเมล'}
+              </DialogTitle>
+            </DialogHeader>
 
-            {composeMode === 'broadcast' && (
-              <Box sx={{ bgcolor: THEME.glassSoft, p: 2, borderRadius: '12px', maxHeight: 150, overflow: 'auto' }}>
-                <Typography sx={{ color: THEME.textSecondary, fontSize: '0.85rem', mb: 1 }}>
-                  ผู้รับ ({selectedCustomers.length} คน):
-                </Typography>
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                  {selectedCustomers.map(c => (
-                    <Chip
-                      key={c.email}
-                      label={c.name || c.email}
-                      size="small"
-                      onDelete={() => toggleCustomerSelection(c)}
-                      sx={{ bgcolor: 'rgba(37,99,235,0.2)', color: THEME.primary }}
+            <div className="flex flex-col gap-4 py-2">
+              {composeMode === 'single' && (
+                <>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="compose-to" className="text-[var(--muted-foreground)]">
+                      ถึง (อีเมล) *
+                    </Label>
+                    <Input
+                      id="compose-to"
+                      value={composeTo}
+                      onChange={(e) => setComposeTo(e.target.value)}
+                      className="border-[var(--border)] text-[var(--foreground)]"
                     />
-                  ))}
-                </Box>
-              </Box>
-            )}
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="compose-name" className="text-[var(--muted-foreground)]">
+                      ชื่อผู้รับ
+                    </Label>
+                    <Input
+                      id="compose-name"
+                      value={composeName}
+                      onChange={(e) => setComposeName(e.target.value)}
+                      placeholder="ลูกค้า"
+                      className="border-[var(--border)] text-[var(--foreground)]"
+                    />
+                  </div>
+                </>
+              )}
 
-            <TextField
-              label="หัวข้อ"
-              value={composeSubject}
-              onChange={(e) => setComposeSubject(e.target.value)}
-              fullWidth
-              required
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  '& fieldset': { borderColor: THEME.border },
-                },
-                '& .MuiInputBase-input': { color: THEME.text },
-                '& .MuiInputLabel-root': { color: THEME.muted },
-              }}
-            />
+              {composeMode === 'broadcast' && (
+                <div className="max-h-[150px] overflow-auto rounded-xl bg-[var(--glass-bg)] p-4">
+                  <p className="mb-2 text-[0.85rem] text-[var(--muted-foreground)]">
+                    ผู้รับ ({selectedCustomers.length} คน):
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    {selectedCustomers.map(c => (
+                      <Badge
+                        key={c.email}
+                        className="gap-1 border-0 bg-[color-mix(in_srgb,var(--primary)_20%,transparent)] text-[var(--primary)]"
+                      >
+                        {c.name || c.email}
+                        <button
+                          type="button"
+                          onClick={() => toggleCustomerSelection(c)}
+                          className="rounded-sm hover:opacity-80"
+                        >
+                          <Close size={12} />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-            <TextField
-              label="ข้อความ"
-              value={composeMessage}
-              onChange={(e) => setComposeMessage(e.target.value)}
-              fullWidth
-              required
-              multiline
-              rows={6}
-              placeholder="พิมพ์ข้อความที่ต้องการส่ง..."
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  '& fieldset': { borderColor: THEME.border },
-                },
-                '& .MuiInputBase-input': { color: THEME.text },
-                '& .MuiInputLabel-root': { color: THEME.muted },
-              }}
-            />
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="compose-subject" className="text-[var(--muted-foreground)]">
+                  หัวข้อ *
+                </Label>
+                <Input
+                  id="compose-subject"
+                  value={composeSubject}
+                  onChange={(e) => setComposeSubject(e.target.value)}
+                  className="border-[var(--border)] text-[var(--foreground)]"
+                />
+              </div>
 
-            <Alert severity="info" sx={{ bgcolor: 'rgba(14,165,233,0.1)', color: THEME.info }}>
-              อีเมลจะถูกส่งในรูปแบบ HTML พร้อมดีไซน์สวยงาม โดยอัตโนมัติ
-            </Alert>
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={{ p: 2, borderTop: `1px solid ${THEME.border}` }}>
-          <Button onClick={() => setComposeOpen(false)} sx={{ color: THEME.textSecondary }}>
-            ยกเลิก
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={sending ? <CircularProgress size={18} sx={{ color: '#fff' }} /> : <Send />}
-            onClick={handleSendEmail}
-            disabled={sending}
-            sx={{
-              bgcolor: composeMode === 'broadcast' ? THEME.success : THEME.primary,
-              '&:hover': { bgcolor: composeMode === 'broadcast' ? '#059669' : '#1d4ed8' },
-            }}
-          >
-            {sending ? 'กำลังส่ง...' : composeMode === 'broadcast' ? `ส่ง ${selectedCustomers.length} ฉบับ` : 'ส่งอีเมล'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="compose-message" className="text-[var(--muted-foreground)]">
+                  ข้อความ *
+                </Label>
+                <Textarea
+                  id="compose-message"
+                  value={composeMessage}
+                  onChange={(e) => setComposeMessage(e.target.value)}
+                  rows={6}
+                  placeholder="พิมพ์ข้อความที่ต้องการส่ง..."
+                  className="border-[var(--border)] text-[var(--foreground)]"
+                />
+              </div>
+
+              <Alert className="border-[var(--primary)] bg-[color-mix(in_srgb,var(--primary)_10%,transparent)] text-[var(--primary)]">
+                <AlertDescription>
+                  อีเมลจะถูกส่งในรูปแบบ HTML พร้อมดีไซน์สวยงาม โดยอัตโนมัติ
+                </AlertDescription>
+              </Alert>
+            </div>
+
+            <DialogFooter className="border-t border-[var(--border)] pt-4">
+              <Button
+                variant="ghost"
+                onClick={() => setComposeOpen(false)}
+                className="text-[var(--muted-foreground)]"
+              >
+                ยกเลิก
+              </Button>
+              <Button
+                onClick={handleSendEmail}
+                disabled={sending}
+                className={cn(
+                  'text-white',
+                  composeMode === 'broadcast'
+                    ? 'bg-[var(--success)] hover:bg-[var(--success)]/90'
+                    : 'bg-[var(--primary)] hover:bg-[var(--primary)]/90'
+                )}
+              >
+                {sending ? (
+                  <>
+                    <Loader2 className="animate-spin" />
+                    กำลังส่ง...
+                  </>
+                ) : (
+                  <>
+                    <Send />
+                    {composeMode === 'broadcast' ? `ส่ง ${selectedCustomers.length} ฉบับ` : 'ส่งอีเมล'}
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </TooltipProvider>
   );
 }
 
 // Stat Card Component
 function StatCard({ icon, label, value, color }: { icon: ReactElement; label: string; value: number; color: string }) {
   return (
-    <Card sx={{ bgcolor: THEME.glassSoft, border: `1px solid ${THEME.border}`, borderRadius: '12px' }}>
-      <CardContent sx={{ p: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Box sx={{
-            width: 40,
-            height: 40,
-            borderRadius: '10px',
-            bgcolor: `${color}20`,
-            display: 'grid',
-            placeItems: 'center',
-            color: color,
-          }}>
+    <Card className="rounded-xl border-[var(--border)] bg-[var(--glass-bg)] py-0 shadow-none">
+      <CardContent className="p-4">
+        <div className="flex items-center gap-3">
+          <div
+            className="grid size-10 place-items-center rounded-[10px]"
+            style={{
+              backgroundColor: `color-mix(in srgb, ${color} 20%, transparent)`,
+              color,
+            }}
+          >
             {icon}
-          </Box>
-          <Box>
-            <Typography sx={{ color: THEME.muted, fontSize: '0.75rem' }}>
+          </div>
+          <div>
+            <p className="text-[0.75rem] text-[var(--muted-foreground)]">
               {label}
-            </Typography>
-            <Typography sx={{ color: THEME.text, fontWeight: 700, fontSize: '1.25rem' }}>
+            </p>
+            <p className="text-[1.25rem] font-bold text-[var(--foreground)]">
               {value.toLocaleString()}
-            </Typography>
-          </Box>
-        </Box>
+            </p>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );

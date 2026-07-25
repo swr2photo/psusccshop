@@ -1,26 +1,27 @@
 'use client';
 
 import { apiFetch, uploadImageApi } from '@/lib/api-client';
-// src/components/admin/ShopManagement.tsx
-// Multi-shop management panel for Admin page
-
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Box, Typography, Button, TextField, Dialog, DialogTitle, DialogContent,
-  DialogActions, IconButton, Switch, Chip, Avatar, Tooltip, CircularProgress,
-} from '@mui/material';
-import {
-  Store, Plus, Trash2, Edit, Save, X, Users, ShieldCheck, Eye, EyeOff, Copy,
-  ExternalLink, Settings, DollarSign, ChevronDown, ChevronUp, UserPlus, Check,
-  Image, Upload,
+  Store, Plus, Trash2, Edit, Save, Users, ChevronDown, ChevronUp, UserPlus,
+  Image, Upload, ExternalLink, Loader2,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
-  ADMIN_THEME,
-  adminDialogPaperSx,
-  adminInputSx,
-} from '@/lib/adminTheme';
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
 
-// ==================== TYPES ====================
 interface Shop {
   id: string;
   slug: string;
@@ -112,8 +113,10 @@ const PERM_LABELS: Record<string, string> = {
   canAddAdmins: 'เพิ่มแอดมิน',
 };
 
-// ==================== COMPONENT ====================
-export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: ShopManagementProps) {
+const gradientBtnClass =
+  'rounded-[10px] bg-gradient-to-br from-indigo-500 to-violet-500 font-bold text-white hover:opacity-90';
+
+export default function ShopManagement({ showToast, isSuperAdmin }: ShopManagementProps) {
   const [shops, setShops] = useState<Shop[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
@@ -124,16 +127,13 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
   const [saving, setSaving] = useState(false);
   const [uploadingImage, setUploadingImage] = useState<'logo' | 'banner' | null>(null);
 
-  // Create form state
   const [newShop, setNewShop] = useState({
     name: '', nameEn: '', slug: '', description: '', descriptionEn: '',
     promptPayId: '', bankName: '', accountName: '', accountNumber: '',
   });
 
-  // New admin form state
   const [newAdminEmail, setNewAdminEmail] = useState('');
 
-  // ==================== DATA FETCHING ====================
   const fetchShops = useCallback(async () => {
     try {
       setLoading(true);
@@ -142,7 +142,7 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
       if (data.status === 'success') {
         setShops(data.shops || []);
       }
-    } catch (e) {
+    } catch {
       showToast('error', 'โหลดรายชื่อร้านค้าไม่สำเร็จ');
     } finally {
       setLoading(false);
@@ -174,7 +174,6 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
     }
   };
 
-  // ==================== IMAGE UPLOAD ====================
   const handleImageUpload = async (file: File, type: 'logo' | 'banner') => {
     if (!file || !editingShop) return;
     if (file.size > 5 * 1024 * 1024) {
@@ -214,7 +213,6 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
     }
   };
 
-  // ==================== ACTIONS ====================
   const handleCreateShop = async () => {
     if (!newShop.name || !newShop.slug) {
       showToast('error', 'กรุณาระบุชื่อร้านและ URL slug');
@@ -363,8 +361,6 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
     }
   };
 
-  const inputSx = adminInputSx;
-
   const SettingToggle = ({
     title,
     description,
@@ -376,617 +372,365 @@ export default function ShopManagement({ showToast, isSuperAdmin, userEmail }: S
     checked: boolean;
     onChange: (checked: boolean) => void;
   }) => (
-    <Box sx={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 2,
-      p: 1.5,
-      borderRadius: '10px',
-      bgcolor: ADMIN_THEME.glassSoft,
-      border: `1px solid ${ADMIN_THEME.border}`,
-    }}>
-      <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: ADMIN_THEME.text }}>{title}</Typography>
-        <Typography sx={{ fontSize: '0.75rem', color: ADMIN_THEME.muted, mt: 0.25 }}>{description}</Typography>
-      </Box>
-      <Switch
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        sx={{
-          flexShrink: 0,
-          '& .MuiSwitch-switchBase.Mui-checked': { color: '#10b981' },
-          '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: '#10b981' },
-        }}
-      />
-    </Box>
+    <div className="flex items-center justify-between gap-2 rounded-[10px] border border-[var(--border)] bg-[var(--card)] p-1.5">
+      <div className="min-w-0 flex-1">
+        <p className="text-[0.9rem] font-semibold text-[var(--foreground)]">{title}</p>
+        <p className="mt-0.5 text-[0.75rem] text-[var(--muted-foreground)]">{description}</p>
+      </div>
+      <Switch checked={checked} onCheckedChange={onChange} className="shrink-0 data-[state=checked]:bg-emerald-500" />
+    </div>
   );
 
-  // ==================== RENDER ====================
   if (loading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-        <CircularProgress sx={{ color: ADMIN_THEME.accent }} />
-      </Box>
+      <div className="flex justify-center py-8">
+        <Loader2 className="size-8 animate-spin text-violet-500" />
+      </div>
     );
   }
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-      {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-        <Box>
-          <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: ADMIN_THEME.text, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Store size={24} />
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="flex items-center gap-1 text-2xl font-extrabold text-[var(--foreground)]">
+            <Store className="size-6" />
             จัดการร้านค้า
-          </Typography>
-          <Typography sx={{ fontSize: '0.85rem', color: ADMIN_THEME.muted }}>
+          </h2>
+          <p className="text-[0.85rem] text-[var(--muted-foreground)]">
             สร้างและจัดการร้านค้าแยก (สโมสร, ชุมนุม ฯลฯ)
-          </Typography>
-        </Box>
+          </p>
+        </div>
         {isSuperAdmin && (
-          <Button
-            variant="contained"
-            startIcon={<Plus size={18} />}
-            onClick={() => setCreateOpen(true)}
-            sx={{
-              background: ADMIN_THEME.gradient,
-              borderRadius: '10px',
-              textTransform: 'none',
-              fontWeight: 700,
-            }}
-          >
+          <Button className={gradientBtnClass} onClick={() => setCreateOpen(true)}>
+            <Plus className="size-[18px]" />
             สร้างร้านค้าใหม่
           </Button>
         )}
-      </Box>
+      </div>
 
-      {/* Shop List */}
       {shops.length === 0 ? (
-        <Box sx={{
-          p: 6, textAlign: 'center', borderRadius: '16px',
-          bgcolor: ADMIN_THEME.glass, border: `1px solid ${ADMIN_THEME.border}`,
-        }}>
-          <Store size={48} color={ADMIN_THEME.muted} />
-          <Typography sx={{ mt: 2, color: ADMIN_THEME.muted }}>ยังไม่มีร้านค้า</Typography>
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 text-center">
+          <Store className="mx-auto size-12 text-[var(--muted-foreground)]" />
+          <p className="mt-2 text-[var(--muted-foreground)]">ยังไม่มีร้านค้า</p>
           {isSuperAdmin && (
-            <Button
-              variant="outlined"
-              startIcon={<Plus size={18} />}
-              onClick={() => setCreateOpen(true)}
-              sx={{ mt: 2, borderColor: ADMIN_THEME.accent, color: ADMIN_THEME.accent, borderRadius: '10px', textTransform: 'none' }}
-            >
+            <Button variant="outline" className="mt-2 rounded-[10px] border-violet-500 text-violet-500" onClick={() => setCreateOpen(true)}>
+              <Plus className="size-[18px]" />
               สร้างร้านค้าแรก
             </Button>
           )}
-        </Box>
+        </div>
       ) : (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <div className="flex flex-col gap-2">
           {shops.map((shop) => {
             const isExpanded = expandedShopId === shop.id;
             return (
-              <Box key={shop.id} sx={{
-                borderRadius: '16px',
-                bgcolor: ADMIN_THEME.glass,
-                border: `1px solid ${ADMIN_THEME.border}`,
-                overflow: 'hidden',
-                transition: 'all 0.2s',
-              }}>
-                {/* Shop Header */}
-                <Box
+              <div key={shop.id} className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] transition-all">
+                <div
                   onClick={() => setExpandedShopId(isExpanded ? null : shop.id)}
-                  sx={{
-                    p: 2.5, display: 'flex', alignItems: 'center', gap: 2,
-                    cursor: 'pointer',
-                    '&:hover': { bgcolor: ADMIN_THEME.cardHover },
-                  }}
+                  className="flex cursor-pointer items-center gap-2 p-2.5 hover:bg-[var(--card)]/80"
                 >
-                  <Avatar
-                    src={shop.logoUrl}
-                    sx={{ width: 48, height: 48, bgcolor: 'rgba(139,92,246,0.2)', fontSize: '1.3rem' }}
-                  >
-                    {shop.name[0]}
+                  <Avatar className="size-12">
+                    <AvatarImage src={shop.logoUrl} />
+                    <AvatarFallback className="bg-violet-500/20 text-[1.3rem]">{shop.name[0]}</AvatarFallback>
                   </Avatar>
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography sx={{ fontWeight: 700, color: ADMIN_THEME.text, fontSize: '1rem' }}>
-                        {shop.name}
-                      </Typography>
-                      <Chip
-                        label={shop.isActive ? 'เปิด' : 'ปิด'}
-                        size="small"
-                        sx={{
-                          height: 22,
-                          bgcolor: shop.isActive ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
-                          color: shop.isActive ? '#10b981' : '#ef4444',
-                          fontSize: '0.7rem', fontWeight: 700,
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1">
+                      <span className="text-base font-bold text-[var(--foreground)]">{shop.name}</span>
+                      <Badge
+                        className="h-[22px] text-[0.7rem] font-bold"
+                        style={{
+                          backgroundColor: shop.isActive ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
+                          color: shop.isActive ? 'var(--success)' : 'var(--error)',
+                          borderColor: 'transparent',
                         }}
-                      />
-                    </Box>
-                    <Typography sx={{ fontSize: '0.8rem', color: ADMIN_THEME.muted }}>
-                      /shop/{shop.slug} • {shop.productCount} สินค้า
-                    </Typography>
-                  </Box>
-                  {isExpanded ? <ChevronUp size={20} color={ADMIN_THEME.muted} /> : <ChevronDown size={20} color={ADMIN_THEME.muted} />}
-                </Box>
-
-                {/* Expanded Actions */}
-                {isExpanded && (
-                  <Box sx={{ px: 2.5, pb: 2.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                      <Button
-                        size="small"
-                        startIcon={<Edit size={14} />}
-                        onClick={async () => {
-                          const detail = await fetchShopDetail(shop.id);
-                          if (detail) setEditingShop(normalizeShopDetail(detail));
-                        }}
-                        sx={{ color: '#60a5fa', textTransform: 'none', fontSize: '0.8rem' }}
                       >
+                        {shop.isActive ? 'เปิด' : 'ปิด'}
+                      </Badge>
+                    </div>
+                    <p className="text-[0.8rem] text-[var(--muted-foreground)]">
+                      /shop/{shop.slug} • {shop.productCount} สินค้า
+                    </p>
+                  </div>
+                  {isExpanded ? <ChevronUp className="size-5 text-[var(--muted-foreground)]" /> : <ChevronDown className="size-5 text-[var(--muted-foreground)]" />}
+                </div>
+
+                {isExpanded && (
+                  <div className="flex flex-col gap-1.5 px-2.5 pb-2.5">
+                    <div className="flex flex-wrap gap-1">
+                      <Button variant="ghost" size="sm" className="text-[0.8rem] text-blue-400" onClick={async () => {
+                        const detail = await fetchShopDetail(shop.id);
+                        if (detail) setEditingShop(normalizeShopDetail(detail));
+                      }}>
+                        <Edit className="size-[14px]" />
                         แก้ไขร้าน
                       </Button>
-                      <Button
-                        size="small"
-                        startIcon={<Users size={14} />}
-                        onClick={() => fetchShopAdmins(shop.id)}
-                        sx={{ color: '#a78bfa', textTransform: 'none', fontSize: '0.8rem' }}
-                      >
+                      <Button variant="ghost" size="sm" className="text-[0.8rem] text-violet-400" onClick={() => fetchShopAdmins(shop.id)}>
+                        <Users className="size-[14px]" />
                         จัดการแอดมิน
                       </Button>
-                      <Button
-                        size="small"
-                        startIcon={<ExternalLink size={14} />}
-                        onClick={() => window.open(`/shop/${shop.slug}`, '_blank')}
-                        sx={{ color: '#34d399', textTransform: 'none', fontSize: '0.8rem' }}
-                      >
+                      <Button variant="ghost" size="sm" className="text-[0.8rem] text-emerald-400" onClick={() => window.open(`/shop/${shop.slug}`, '_blank')}>
+                        <ExternalLink className="size-[14px]" />
                         ดูหน้าร้าน
                       </Button>
                       {isSuperAdmin && (
-                        <Button
-                          size="small"
-                          startIcon={<Trash2 size={14} />}
-                          onClick={() => handleDeleteShop(shop.id, shop.name)}
-                          sx={{ color: '#ef4444', textTransform: 'none', fontSize: '0.8rem' }}
-                        >
+                        <Button variant="ghost" size="sm" className="text-[0.8rem] text-[var(--error)]" onClick={() => handleDeleteShop(shop.id, shop.name)}>
+                          <Trash2 className="size-[14px]" />
                           ลบร้าน
                         </Button>
                       )}
-                    </Box>
+                    </div>
 
-                    {/* Inline Admin Management */}
                     {adminsShopId === shop.id && (
-                      <Box sx={{
-                        mt: 1, p: 2, borderRadius: '12px',
-                        bgcolor: ADMIN_THEME.glassSoft,
-                        border: '1px solid rgba(139,92,246,0.15)',
-                      }}>
-                        <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#a78bfa', mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Users size={16} /> แอดมินร้าน ({shopAdmins.length})
-                        </Typography>
+                      <div className="mt-1 rounded-xl border border-violet-500/15 bg-[var(--card)] p-2">
+                        <p className="mb-1.5 flex items-center gap-1 text-[0.9rem] font-bold text-violet-400">
+                          <Users className="size-4" /> แอดมินร้าน ({shopAdmins.length})
+                        </p>
 
-                        {/* Add admin */}
-                        <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                          <TextField
-                            size="small"
+                        <div className="mb-2 flex gap-1">
+                          <Input
                             placeholder="อีเมลแอดมินใหม่"
                             value={newAdminEmail}
                             onChange={(e) => setNewAdminEmail(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleAddAdmin(shop.id)}
-                            sx={{ flex: 1, ...inputSx }}
+                            className="flex-1"
                           />
-                          <Button
-                            variant="contained"
-                            size="small"
-                            onClick={() => handleAddAdmin(shop.id)}
-                            disabled={!newAdminEmail.trim()}
-                            sx={{
-                              background: ADMIN_THEME.gradient,
-                              borderRadius: '10px',
-                              textTransform: 'none',
-                              minWidth: 'auto',
-                              px: 2,
-                            }}
-                          >
-                            <UserPlus size={16} />
+                          <Button className={cn(gradientBtnClass, 'px-2')} onClick={() => handleAddAdmin(shop.id)} disabled={!newAdminEmail.trim()}>
+                            <UserPlus className="size-4" />
                           </Button>
-                        </Box>
+                        </div>
 
-                        {/* Admin list */}
                         {shopAdmins.map((admin) => (
-                          <Box key={admin.id} sx={{
-                            p: 1.5, mb: 1, borderRadius: '10px',
-                            bgcolor: ADMIN_THEME.glassSoft,
-                            border: `1px solid ${ADMIN_THEME.border}`,
-                          }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                              <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: ADMIN_THEME.text, flex: 1 }}>
-                                {admin.email}
-                              </Typography>
-                              <Chip
-                                label={admin.role === 'owner' ? 'เจ้าของ' : 'แอดมิน'}
-                                size="small"
-                                sx={{
-                                  height: 20, fontSize: '0.65rem', fontWeight: 700,
-                                  bgcolor: admin.role === 'owner' ? 'rgba(251,191,36,0.15)' : 'rgba(139,92,246,0.15)',
+                          <div key={admin.id} className="mb-1 rounded-[10px] border border-[var(--border)] bg-[var(--card)] p-1.5">
+                            <div className="mb-1 flex items-center gap-1">
+                              <span className="flex-1 text-[0.85rem] font-semibold text-[var(--foreground)]">{admin.email}</span>
+                              <Badge
+                                className="h-5 text-[0.65rem] font-bold"
+                                style={{
+                                  backgroundColor: admin.role === 'owner' ? 'rgba(251,191,36,0.15)' : 'rgba(139,92,246,0.15)',
                                   color: admin.role === 'owner' ? '#fbbf24' : '#a78bfa',
+                                  borderColor: 'transparent',
                                 }}
-                              />
+                              >
+                                {admin.role === 'owner' ? 'เจ้าของ' : 'แอดมิน'}
+                              </Badge>
                               {admin.role !== 'owner' && (
-                                <IconButton
-                                  size="small"
-                                  onClick={() => handleRemoveAdmin(shop.id, admin.email)}
-                                  sx={{ color: '#ef4444', p: 0.5 }}
-                                >
-                                  <Trash2 size={14} />
-                                </IconButton>
+                                <Button variant="ghost" size="icon" className="size-7 text-[var(--error)]" onClick={() => handleRemoveAdmin(shop.id, admin.email)}>
+                                  <Trash2 className="size-[14px]" />
+                                </Button>
                               )}
-                            </Box>
-                            {/* Permissions toggle */}
-                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                            </div>
+                            <div className="flex flex-wrap gap-0.5">
                               {Object.entries(PERM_LABELS).map(([key, label]) => (
-                                <Chip
+                                <Badge
                                   key={key}
-                                  label={label}
-                                  size="small"
+                                  className={cn(
+                                    'h-[22px] cursor-pointer text-[0.65rem] hover:opacity-80',
+                                    admin.permissions[key]
+                                      ? 'border-emerald-500/30 bg-emerald-500/15 text-[var(--success)]'
+                                      : 'border-[var(--border)] bg-[var(--card)] text-[var(--muted-foreground)]'
+                                  )}
                                   onClick={() => handleTogglePermission(shop.id, admin.email, admin.permissions, key)}
-                                  sx={{
-                                    height: 22, fontSize: '0.65rem', cursor: 'pointer',
-                                    bgcolor: admin.permissions[key]
-                                      ? 'rgba(16,185,129,0.15)'
-                                      : ADMIN_THEME.glassSoft,
-                                    color: admin.permissions[key] ? '#10b981' : ADMIN_THEME.muted,
-                                    border: `1px solid ${admin.permissions[key] ? 'rgba(16,185,129,0.3)' : ADMIN_THEME.border}`,
-                                    '&:hover': {
-                                      bgcolor: admin.permissions[key]
-                                        ? 'rgba(16,185,129,0.25)'
-                                        : ADMIN_THEME.cardHover,
-                                    },
-                                  }}
-                                />
+                                >
+                                  {label}
+                                </Badge>
                               ))}
-                            </Box>
-                          </Box>
+                            </div>
+                          </div>
                         ))}
-                      </Box>
+                      </div>
                     )}
-                  </Box>
+                  </div>
                 )}
-              </Box>
+              </div>
             );
           })}
-        </Box>
+        </div>
       )}
 
-      {/* ==================== CREATE SHOP DIALOG ==================== */}
-      <Dialog
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{ sx: adminDialogPaperSx }}
-      >
-        <DialogTitle sx={{ fontWeight: 700, color: ADMIN_THEME.text, display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Store size={20} /> สร้างร้านค้าใหม่
-        </DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '12px !important', color: ADMIN_THEME.text }}>
-          <TextField
-            label="ชื่อร้านค้า *"
-            value={newShop.name}
-            onChange={(e) => {
-              const name = e.target.value;
-              setNewShop(prev => ({
-                ...prev,
-                name,
-                // Auto-generate slug from name
-                slug: prev.slug || name.toLowerCase().replace(/[^a-z0-9ก-๛]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, ''),
-              }));
-            }}
-            fullWidth
-            sx={inputSx}
-          />
-          <TextField
-            label="ชื่อภาษาอังกฤษ"
-            value={newShop.nameEn}
-            onChange={(e) => setNewShop(prev => ({ ...prev, nameEn: e.target.value }))}
-            fullWidth
-            sx={inputSx}
-          />
-          <TextField
-            label="URL Slug * (เช่น smosor, chumnoom-a)"
-            value={newShop.slug}
-            onChange={(e) => setNewShop(prev => ({ ...prev, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') }))}
-            fullWidth
-            helperText={newShop.slug ? `จะเข้าถึงได้ที่ /shop/${newShop.slug}` : ''}
-            sx={inputSx}
-          />
-          <TextField
-            label="คำอธิบาย (ไทย)"
-            value={newShop.description}
-            onChange={(e) => setNewShop(prev => ({ ...prev, description: e.target.value }))}
-            fullWidth
-            multiline
-            rows={2}
-            sx={inputSx}
-          />
-          <TextField
-            label="คำอธิบาย (อังกฤษ)"
-            value={newShop.descriptionEn}
-            onChange={(e) => setNewShop(prev => ({ ...prev, descriptionEn: e.target.value }))}
-            fullWidth
-            multiline
-            rows={2}
-            sx={inputSx}
-          />
-          <Box sx={{ p: 1.5, borderRadius: '10px', bgcolor: 'rgba(99,102,241,0.08)', border: `1px solid ${ADMIN_THEME.border}` }}>
-            <Typography sx={{ fontSize: '0.78rem', color: ADMIN_THEME.muted, lineHeight: 1.5 }}>
-              การชำระเงินใช้บัญชี PromptPay ของร้านหลัก (SCC Shop) ร่วมกัน — ไม่ต้องตั้งค่าแยกต่อร้านย่อย
-            </Typography>
-          </Box>
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-w-md border-[var(--border)] bg-[var(--card)] text-[var(--foreground)]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-1 font-bold">
+              <Store className="size-5" /> สร้างร้านค้าใหม่
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 pt-1">
+            <div>
+              <Label>ชื่อร้านค้า *</Label>
+              <Input
+                value={newShop.name}
+                onChange={(e) => {
+                  const name = e.target.value;
+                  setNewShop(prev => ({
+                    ...prev,
+                    name,
+                    slug: prev.slug || name.toLowerCase().replace(/[^a-z0-9ก-๛]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, ''),
+                  }));
+                }}
+              />
+            </div>
+            <div>
+              <Label>ชื่อภาษาอังกฤษ</Label>
+              <Input value={newShop.nameEn} onChange={(e) => setNewShop(prev => ({ ...prev, nameEn: e.target.value }))} />
+            </div>
+            <div>
+              <Label>URL Slug * (เช่น smosor, chumnoom-a)</Label>
+              <Input
+                value={newShop.slug}
+                onChange={(e) => setNewShop(prev => ({ ...prev, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') }))}
+              />
+              {newShop.slug && (
+                <p className="mt-1 text-xs text-[var(--muted-foreground)]">จะเข้าถึงได้ที่ /shop/{newShop.slug}</p>
+              )}
+            </div>
+            <div>
+              <Label>คำอธิบาย (ไทย)</Label>
+              <Textarea rows={2} value={newShop.description} onChange={(e) => setNewShop(prev => ({ ...prev, description: e.target.value }))} />
+            </div>
+            <div>
+              <Label>คำอธิบาย (อังกฤษ)</Label>
+              <Textarea rows={2} value={newShop.descriptionEn} onChange={(e) => setNewShop(prev => ({ ...prev, descriptionEn: e.target.value }))} />
+            </div>
+            <div className="rounded-[10px] border border-[var(--border)] bg-indigo-500/8 p-1.5">
+              <p className="text-[0.78rem] leading-snug text-[var(--muted-foreground)]">
+                การชำระเงินใช้บัญชี PromptPay ของร้านหลัก (SCC Shop) ร่วมกัน — ไม่ต้องตั้งค่าแยกต่อร้านย่อย
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setCreateOpen(false)} className="text-[var(--muted-foreground)]">ยกเลิก</Button>
+            <Button className={gradientBtnClass} onClick={handleCreateShop} disabled={saving || !newShop.name || !newShop.slug}>
+              {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+              สร้างร้าน
+            </Button>
+          </DialogFooter>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setCreateOpen(false)} sx={{ color: ADMIN_THEME.muted, textTransform: 'none' }}>
-            ยกเลิก
-          </Button>
-          <Button
-            variant="contained"
-            onClick={handleCreateShop}
-            disabled={saving || !newShop.name || !newShop.slug}
-            startIcon={saving ? <CircularProgress size={16} /> : <Save size={16} />}
-            sx={{ background: ADMIN_THEME.gradient, borderRadius: '10px', textTransform: 'none', fontWeight: 700 }}
-          >
-            สร้างร้าน
-          </Button>
-        </DialogActions>
       </Dialog>
 
-      {/* ==================== EDIT SHOP DIALOG ==================== */}
-      <Dialog
-        open={!!editingShop}
-        onClose={() => setEditingShop(null)}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{ sx: adminDialogPaperSx }}
-      >
-        {editingShop && (
-          <>
-            <DialogTitle sx={{ fontWeight: 700, color: ADMIN_THEME.text, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Edit size={20} /> แก้ไขร้าน: {editingShop.name}
-            </DialogTitle>
-            <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: '12px !important', color: ADMIN_THEME.text }}>
-              {/* Banner & Logo Upload */}
-              <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: ADMIN_THEME.primary, display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Image size={16} /> รูปภาพร้านค้า
-              </Typography>
+      <Dialog open={!!editingShop} onOpenChange={(open) => !open && setEditingShop(null)}>
+        <DialogContent className="max-h-[90vh] max-w-md overflow-y-auto border-[var(--border)] bg-[var(--card)] text-[var(--foreground)]">
+          {editingShop && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-1 font-bold">
+                  <Edit className="size-5" /> แก้ไขร้าน: {editingShop.name}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="flex flex-col gap-2 pt-1">
+                <p className="flex items-center gap-1 text-[0.9rem] font-bold text-blue-600">
+                  <Image className="size-4" /> รูปภาพร้านค้า
+                </p>
 
-              <Box>
-                <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: ADMIN_THEME.textSecondary, mb: 0.75 }}>
-                  รูปปกร้าน (แบนเนอร์)
-                </Typography>
-                <Box
-                  component="label"
-                  sx={{
-                    display: 'block',
-                    position: 'relative',
-                    height: 160,
-                    borderRadius: '12px',
-                    overflow: 'hidden',
-                    border: `2px dashed ${editingShop.bannerUrl ? ADMIN_THEME.primary : ADMIN_THEME.border}`,
-                    bgcolor: ADMIN_THEME.glassSoft,
-                    cursor: uploadingImage === 'banner' ? 'wait' : 'pointer',
-                    backgroundImage: editingShop.bannerUrl ? `url(${editingShop.bannerUrl})` : 'none',
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                    transition: 'border-color 0.2s ease',
-                    '&:hover': { borderColor: ADMIN_THEME.primary },
-                  }}
-                >
-                  <input
-                    type="file"
-                    hidden
-                    accept="image/jpeg,image/png,image/webp,image/gif"
-                    disabled={uploadingImage === 'banner'}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleImageUpload(file, 'banner');
-                      e.target.value = '';
-                    }}
-                  />
-                  <Box sx={{
-                    position: 'absolute',
-                    inset: 0,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 1,
-                    bgcolor: editingShop.bannerUrl ? 'rgba(0,0,0,0.35)' : 'transparent',
-                    color: editingShop.bannerUrl ? '#fff' : ADMIN_THEME.textSecondary,
-                  }}>
-                    {uploadingImage === 'banner' ? (
-                      <CircularProgress size={28} sx={{ color: editingShop.bannerUrl ? '#fff' : ADMIN_THEME.primary }} />
-                    ) : (
-                      <>
-                        <Upload size={28} strokeWidth={1.75} />
-                        <Typography sx={{ fontSize: '0.85rem', fontWeight: 600 }}>
-                          {editingShop.bannerUrl ? 'คลิกเพื่อเปลี่ยนรูปปก' : 'คลิกเพื่อแนบรูปปกร้าน'}
-                        </Typography>
-                        <Typography sx={{ fontSize: '0.72rem', opacity: 0.85 }}>
-                          JPG, PNG, WebP — สูงสุด 5MB
-                        </Typography>
-                      </>
+                <div>
+                  <Label className="mb-0.75 text-[0.8rem]">รูปปกร้าน (แบนเนอร์)</Label>
+                  <label
+                    className={cn(
+                      'relative block h-40 cursor-pointer overflow-hidden rounded-xl border-2 border-dashed bg-[var(--card)] transition-colors hover:border-blue-600',
+                      editingShop.bannerUrl ? 'border-blue-600' : 'border-[var(--border)]',
+                      uploadingImage === 'banner' && 'cursor-wait'
                     )}
-                  </Box>
-                </Box>
-              </Box>
-
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 1.5, borderRadius: '12px', bgcolor: ADMIN_THEME.glassSoft, border: `1px solid ${ADMIN_THEME.border}` }}>
-                <Avatar
-                  src={editingShop.logoUrl}
-                  sx={{
-                    width: 64,
-                    height: 64,
-                    border: `2px solid ${ADMIN_THEME.border}`,
-                    bgcolor: ADMIN_THEME.surface2,
-                    fontSize: '1.25rem',
-                    fontWeight: 700,
-                    color: ADMIN_THEME.primary,
-                  }}
-                >
-                  {editingShop.name[0]}
-                </Avatar>
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: ADMIN_THEME.text, mb: 0.5 }}>
-                    โลโก้ร้าน
-                  </Typography>
-                  <Button
-                    component="label"
-                    variant="outlined"
-                    size="small"
-                    disabled={uploadingImage === 'logo'}
-                    startIcon={uploadingImage === 'logo' ? <CircularProgress size={14} /> : <Upload size={14} />}
-                    sx={{
-                      textTransform: 'none',
-                      borderRadius: '8px',
-                      borderColor: ADMIN_THEME.border,
-                      color: ADMIN_THEME.text,
-                      '&:hover': { borderColor: ADMIN_THEME.primary, bgcolor: 'rgba(99,102,241,0.06)' },
-                    }}
+                    style={editingShop.bannerUrl ? { backgroundImage: `url(${editingShop.bannerUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
                   >
-                    {editingShop.logoUrl ? 'เปลี่ยนโลโก้' : 'แนบรูปโลโก้'}
                     <input
                       type="file"
                       hidden
                       accept="image/jpeg,image/png,image/webp,image/gif"
+                      disabled={uploadingImage === 'banner'}
                       onChange={(e) => {
                         const file = e.target.files?.[0];
-                        if (file) handleImageUpload(file, 'logo');
+                        if (file) handleImageUpload(file, 'banner');
                         e.target.value = '';
                       }}
                     />
-                  </Button>
-                </Box>
-              </Box>
+                    <div className={cn(
+                      'absolute inset-0 flex flex-col items-center justify-center gap-1',
+                      editingShop.bannerUrl ? 'bg-black/35 text-white' : 'text-[var(--muted-foreground)]'
+                    )}>
+                      {uploadingImage === 'banner' ? (
+                        <Loader2 className="size-7 animate-spin" />
+                      ) : (
+                        <>
+                          <Upload className="size-7" strokeWidth={1.75} />
+                          <span className="text-[0.85rem] font-semibold">
+                            {editingShop.bannerUrl ? 'คลิกเพื่อเปลี่ยนรูปปก' : 'คลิกเพื่อแนบรูปปกร้าน'}
+                          </span>
+                          <span className="text-[0.72rem] opacity-85">JPG, PNG, WebP — สูงสุด 5MB</span>
+                        </>
+                      )}
+                    </div>
+                  </label>
+                </div>
 
-              <TextField
-                label="ชื่อร้านค้า"
-                value={editingShop.name}
-                onChange={(e) => setEditingShop(prev => prev ? { ...prev, name: e.target.value } : null)}
-                fullWidth
-                sx={inputSx}
-              />
-              <TextField
-                label="ชื่อภาษาอังกฤษ"
-                value={editingShop.nameEn || ''}
-                onChange={(e) => setEditingShop(prev => prev ? { ...prev, nameEn: e.target.value } : null)}
-                fullWidth
-                sx={inputSx}
-              />
-              <TextField
-                label="URL Slug"
-                value={editingShop.slug}
-                onChange={(e) => setEditingShop(prev => prev ? { ...prev, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') } : null)}
-                fullWidth
-                sx={inputSx}
-              />
-              <TextField
-                label="คำอธิบาย (ไทย)"
-                value={editingShop.description || ''}
-                onChange={(e) => setEditingShop(prev => prev ? { ...prev, description: e.target.value } : null)}
-                fullWidth
-                multiline
-                rows={2}
-                sx={inputSx}
-              />
-              <TextField
-                label="คำอธิบาย (อังกฤษ)"
-                value={editingShop.descriptionEn || ''}
-                onChange={(e) => setEditingShop(prev => prev ? { ...prev, descriptionEn: e.target.value } : null)}
-                fullWidth
-                multiline
-                rows={2}
-                sx={inputSx}
-              />
+                <div className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card)] p-1.5">
+                  <Avatar className="size-16 border-2 border-[var(--border)]">
+                    <AvatarImage src={editingShop.logoUrl} />
+                    <AvatarFallback className="text-xl font-bold text-blue-600">{editingShop.name[0]}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <Label className="mb-0.5 text-[0.8rem]">โลโก้ร้าน</Label>
+                    <Button variant="outline" size="sm" disabled={uploadingImage === 'logo'} asChild className="rounded-lg">
+                      <label className="cursor-pointer">
+                        {uploadingImage === 'logo' ? <Loader2 className="size-[14px] animate-spin" /> : <Upload className="size-[14px]" />}
+                        {editingShop.logoUrl ? 'เปลี่ยนโลโก้' : 'แนบรูปโลโก้'}
+                        <input
+                          type="file"
+                          hidden
+                          accept="image/jpeg,image/png,image/webp,image/gif"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleImageUpload(file, 'logo');
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
+                    </Button>
+                  </div>
+                </div>
 
-              <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: ADMIN_THEME.primary, mt: 0.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Settings size={16} /> สถานะร้าน
-              </Typography>
-              <SettingToggle
-                title="แสดงร้านบนเว็บ"
-                description="ปิด = ซ่อนร้านจากหน้าร้านหลักและ /shop/slug"
-                checked={editingShop.isActive}
-                onChange={(checked) => setEditingShop(prev => prev ? { ...prev, isActive: checked } : null)}
-              />
-              <SettingToggle
-                title="เปิดรับออเดอร์"
-                description="ปิด = ลูกค้ายังดูสินค้าได้ แต่สั่งซื้อไม่ได้"
-                checked={editingShop.settings.isOpen}
-                onChange={(checked) => setEditingShop(prev => prev ? { ...prev, settings: { ...prev.settings, isOpen: checked } } : null)}
-              />
-              {!editingShop.settings.isOpen && (
-                <TextField
-                  label="ข้อความเมื่อปิดรับออเดอร์"
-                  value={editingShop.settings.closedMessage || ''}
-                  onChange={(e) => setEditingShop(prev => prev ? { ...prev, settings: { ...prev.settings, closedMessage: e.target.value } } : null)}
-                  fullWidth
-                  multiline
-                  rows={2}
-                  placeholder="เช่น ปิดรับออเดอร์ชั่วคราว"
-                  sx={inputSx}
-                />
-              )}
+                <div><Label>ชื่อร้านค้า</Label><Input value={editingShop.name} onChange={(e) => setEditingShop(prev => prev ? { ...prev, name: e.target.value } : null)} /></div>
+                <div><Label>ชื่อภาษาอังกฤษ</Label><Input value={editingShop.nameEn || ''} onChange={(e) => setEditingShop(prev => prev ? { ...prev, nameEn: e.target.value } : null)} /></div>
+                <div><Label>URL Slug</Label><Input value={editingShop.slug} onChange={(e) => setEditingShop(prev => prev ? { ...prev, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') } : null)} /></div>
+                <div><Label>คำอธิบาย (ไทย)</Label><Textarea rows={2} value={editingShop.description || ''} onChange={(e) => setEditingShop(prev => prev ? { ...prev, description: e.target.value } : null)} /></div>
+                <div><Label>คำอธิบาย (อังกฤษ)</Label><Textarea rows={2} value={editingShop.descriptionEn || ''} onChange={(e) => setEditingShop(prev => prev ? { ...prev, descriptionEn: e.target.value } : null)} /></div>
 
-              <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: ADMIN_THEME.primary, mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Users size={16} /> ข้อมูลติดต่อ
-              </Typography>
-              <TextField
-                label="อีเมลติดต่อ"
-                value={editingShop.contactEmail || ''}
-                onChange={(e) => setEditingShop(prev => prev ? { ...prev, contactEmail: e.target.value } : null)}
-                fullWidth
-                sx={inputSx}
-              />
-              <TextField
-                label="เบอร์โทรติดต่อ"
-                value={editingShop.contactPhone || ''}
-                onChange={(e) => setEditingShop(prev => prev ? { ...prev, contactPhone: e.target.value } : null)}
-                fullWidth
-                sx={inputSx}
-              />
-              <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: ADMIN_THEME.primary, mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Store size={16} /> การแสดงผล
-              </Typography>
-              <TextField
-                label="ลำดับการแสดง (น้อย = ขึ้นก่อน)"
-                type="number"
-                value={editingShop.sortOrder}
-                onChange={(e) => setEditingShop(prev => prev ? { ...prev, sortOrder: Number(e.target.value) || 0 } : null)}
-                fullWidth
-                helperText="ใช้เรียงร้านย่อยบนหน้าร้านหลัก"
-                sx={inputSx}
-              />
-              <Box sx={{ p: 1.5, borderRadius: '10px', bgcolor: 'rgba(99,102,241,0.08)', border: `1px solid ${ADMIN_THEME.border}` }}>
-                <Typography sx={{ fontSize: '0.78rem', color: ADMIN_THEME.muted, lineHeight: 1.5 }}>
-                  การชำระเงินใช้บัญชี PromptPay ของร้านหลัก (SCC Shop) ร่วมกัน — ไม่ต้องตั้งค่าแยกต่อร้านย่อย
-                </Typography>
-              </Box>
-            </DialogContent>
-            <DialogActions sx={{ px: 3, pb: 2 }}>
-              <Button onClick={() => setEditingShop(null)} sx={{ color: ADMIN_THEME.muted, textTransform: 'none' }}>
-                ยกเลิก
-              </Button>
-              <Button
-                variant="contained"
-                onClick={handleUpdateShop}
-                disabled={saving}
-                startIcon={saving ? <CircularProgress size={16} /> : <Save size={16} />}
-                sx={{ background: ADMIN_THEME.gradient, borderRadius: '10px', textTransform: 'none', fontWeight: 700 }}
-              >
-                บันทึก
-              </Button>
-            </DialogActions>
-          </>
-        )}
+                <p className="mt-0.5 flex items-center gap-1 text-[0.9rem] font-bold text-blue-600">สถานะร้าน</p>
+                <SettingToggle title="แสดงร้านบนเว็บ" description="ปิด = ซ่อนร้านจากหน้าร้านหลักและ /shop/slug" checked={editingShop.isActive} onChange={(checked) => setEditingShop(prev => prev ? { ...prev, isActive: checked } : null)} />
+                <SettingToggle title="เปิดรับออเดอร์" description="ปิด = ลูกค้ายังดูสินค้าได้ แต่สั่งซื้อไม่ได้" checked={editingShop.settings.isOpen} onChange={(checked) => setEditingShop(prev => prev ? { ...prev, settings: { ...prev.settings, isOpen: checked } } : null)} />
+                {!editingShop.settings.isOpen && (
+                  <div>
+                    <Label>ข้อความเมื่อปิดรับออเดอร์</Label>
+                    <Textarea rows={2} placeholder="เช่น ปิดรับออเดอร์ชั่วคราว" value={editingShop.settings.closedMessage || ''} onChange={(e) => setEditingShop(prev => prev ? { ...prev, settings: { ...prev.settings, closedMessage: e.target.value } } : null)} />
+                  </div>
+                )}
+
+                <p className="mt-1 flex items-center gap-1 text-[0.9rem] font-bold text-blue-600"><Users className="size-4" /> ข้อมูลติดต่อ</p>
+                <div><Label>อีเมลติดต่อ</Label><Input value={editingShop.contactEmail || ''} onChange={(e) => setEditingShop(prev => prev ? { ...prev, contactEmail: e.target.value } : null)} /></div>
+                <div><Label>เบอร์โทรติดต่อ</Label><Input value={editingShop.contactPhone || ''} onChange={(e) => setEditingShop(prev => prev ? { ...prev, contactPhone: e.target.value } : null)} /></div>
+
+                <p className="mt-1 flex items-center gap-1 text-[0.9rem] font-bold text-blue-600"><Store className="size-4" /> การแสดงผล</p>
+                <div>
+                  <Label>ลำดับการแสดง (น้อย = ขึ้นก่อน)</Label>
+                  <Input type="number" value={editingShop.sortOrder} onChange={(e) => setEditingShop(prev => prev ? { ...prev, sortOrder: Number(e.target.value) || 0 } : null)} />
+                  <p className="mt-1 text-xs text-[var(--muted-foreground)]">ใช้เรียงร้านย่อยบนหน้าร้านหลัก</p>
+                </div>
+                <div className="rounded-[10px] border border-[var(--border)] bg-indigo-500/8 p-1.5">
+                  <p className="text-[0.78rem] leading-snug text-[var(--muted-foreground)]">
+                    การชำระเงินใช้บัญชี PromptPay ของร้านหลัก (SCC Shop) ร่วมกัน — ไม่ต้องตั้งค่าแยกต่อร้านย่อย
+                  </p>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="ghost" onClick={() => setEditingShop(null)} className="text-[var(--muted-foreground)]">ยกเลิก</Button>
+                <Button className={gradientBtnClass} onClick={handleUpdateShop} disabled={saving}>
+                  {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                  บันทึก
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
       </Dialog>
-    </Box>
+    </div>
   );
 }

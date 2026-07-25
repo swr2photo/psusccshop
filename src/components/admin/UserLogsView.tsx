@@ -4,25 +4,6 @@ import { apiFetch } from '@/lib/api-client';
 import { useState, useEffect, useCallback } from 'react';
 import type { ReactElement } from 'react';
 import {
-  Box,
-  Typography,
-  Button,
-  TextField,
-  Chip,
-  CircularProgress,
-  InputAdornment,
-  Pagination,
-  Select,
-  MenuItem,
-  FormControl,
-  Avatar,
-  Collapse,
-  IconButton,
-  Alert,
-  Drawer,
-  Divider,
-} from '@mui/material';
-import {
   Search,
   RotateCcw as Refresh,
   ChevronDown as ExpandMore,
@@ -42,9 +23,30 @@ import {
   X as Close,
   Shield,
   FileText,
+  Loader2,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
-
-import { ADMIN_THEME as THEME } from '@/lib/adminTheme';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Separator } from '@/components/ui/separator';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
+import { cn } from '@/lib/utils';
 
 interface UserLog {
   id: string;
@@ -83,27 +85,27 @@ interface Props {
 }
 
 const actionLabels: Record<string, { label: string; color: string; icon: ReactElement }> = {
-  login: { label: 'เข้าสู่ระบบ', color: '#10b981', icon: <Login size={16} /> },
-  logout: { label: 'ออกจากระบบ', color: 'var(--text-muted)', icon: <Logout size={16} /> },
+  login: { label: 'เข้าสู่ระบบ', color: 'var(--success)', icon: <Login size={16} /> },
+  logout: { label: 'ออกจากระบบ', color: 'var(--muted-foreground)', icon: <Logout size={16} /> },
   new_user: { label: 'ผู้ใช้ใหม่', color: '#1e40af', icon: <Person size={16} /> },
   view_product: { label: 'ดูสินค้า', color: '#2563eb', icon: <Visibility size={16} /> },
-  add_to_cart: { label: 'เพิ่มตะกร้า', color: '#f59e0b', icon: <ShoppingCart size={16} /> },
-  remove_from_cart: { label: 'ลบตะกร้า', color: '#ef4444', icon: <ShoppingCart size={16} /> },
-  place_order: { label: 'สั่งซื้อ', color: '#10b981', icon: <Receipt size={16} /> },
+  add_to_cart: { label: 'เพิ่มตะกร้า', color: 'var(--warning)', icon: <ShoppingCart size={16} /> },
+  remove_from_cart: { label: 'ลบตะกร้า', color: 'var(--error)', icon: <ShoppingCart size={16} /> },
+  place_order: { label: 'สั่งซื้อ', color: 'var(--success)', icon: <Receipt size={16} /> },
   upload_slip: { label: 'อัปโหลดสลิป', color: '#0ea5e9', icon: <Payment size={16} /> },
-  verify_payment: { label: 'ยืนยันชำระเงิน', color: '#10b981', icon: <Payment size={16} /> },
+  verify_payment: { label: 'ยืนยันชำระเงิน', color: 'var(--success)', icon: <Payment size={16} /> },
   view_order: { label: 'ดูออเดอร์', color: '#1e40af', icon: <Receipt size={16} /> },
   profile_update: { label: 'อัปเดตโปรไฟล์', color: '#f472b6', icon: <Person size={16} /> },
   upload_image: { label: 'อัปโหลดรูป', color: '#0ea5e9', icon: <Visibility size={16} /> },
-  page_view: { label: 'เยี่ยมชมหน้า', color: 'var(--text-muted)', icon: <Visibility size={16} /> },
-  error: { label: 'เกิดข้อผิดพลาด', color: '#ef4444', icon: <ErrorIcon size={16} /> },
-  refund_request: { label: 'ขอคืนเงิน', color: '#f59e0b', icon: <Payment size={16} /> },
-  refund_approve: { label: 'อนุมัติคืนเงิน', color: '#10b981', icon: <Payment size={16} /> },
-  refund_reject: { label: 'ปฏิเสธคืนเงิน', color: '#ef4444', icon: <Payment size={16} /> },
-  refund_complete: { label: 'คืนเงินสำเร็จ', color: '#10b981', icon: <Payment size={16} /> },
-  admin_change_status: { label: 'แอดมินเปลี่ยนสถานะ', color: '#f59e0b', icon: <Receipt size={16} /> },
-  admin_pickup_confirm: { label: 'แอดมินยืนยันรับสินค้า', color: '#10b981', icon: <Receipt size={16} /> },
-  admin_pickup_cancel: { label: 'แอดมินยกเลิกรับสินค้า', color: '#ef4444', icon: <Receipt size={16} /> },
+  page_view: { label: 'เยี่ยมชมหน้า', color: 'var(--muted-foreground)', icon: <Visibility size={16} /> },
+  error: { label: 'เกิดข้อผิดพลาด', color: 'var(--error)', icon: <ErrorIcon size={16} /> },
+  refund_request: { label: 'ขอคืนเงิน', color: 'var(--warning)', icon: <Payment size={16} /> },
+  refund_approve: { label: 'อนุมัติคืนเงิน', color: 'var(--success)', icon: <Payment size={16} /> },
+  refund_reject: { label: 'ปฏิเสธคืนเงิน', color: 'var(--error)', icon: <Payment size={16} /> },
+  refund_complete: { label: 'คืนเงินสำเร็จ', color: 'var(--success)', icon: <Payment size={16} /> },
+  admin_change_status: { label: 'แอดมินเปลี่ยนสถานะ', color: 'var(--warning)', icon: <Receipt size={16} /> },
+  admin_pickup_confirm: { label: 'แอดมินยืนยันรับสินค้า', color: 'var(--success)', icon: <Receipt size={16} /> },
+  admin_pickup_cancel: { label: 'แอดมินยกเลิกรับสินค้า', color: 'var(--error)', icon: <Receipt size={16} /> },
   admin_config_change: { label: 'แอดมินแก้ไขตั้งค่า', color: '#1e40af', icon: <Computer size={16} /> },
   admin_permissions_change: { label: 'แก้ไขสิทธิ์แอดมิน', color: '#7c3aed', icon: <Shield size={16} /> },
 };
@@ -111,10 +113,34 @@ const actionLabels: Record<string, { label: string; color: string; icon: ReactEl
 const sourceLabels: Record<TimelineEvent['source'], { label: string; color: string }> = {
   user_log: { label: 'กิจกรรม', color: '#2563eb' },
   audit_trail: { label: 'Audit', color: '#7c3aed' },
-  security: { label: 'ความปลอดภัย', color: '#ef4444' },
+  security: { label: 'ความปลอดภัย', color: 'var(--error)' },
   email: { label: 'อีเมล', color: '#0ea5e9' },
-  order: { label: 'ออเดอร์', color: '#10b981' },
+  order: { label: 'ออเดอร์', color: 'var(--success)' },
 };
+
+function SimplePagination({
+  page,
+  totalPages,
+  onPageChange,
+}: {
+  page: number;
+  totalPages: number;
+  onPageChange: (p: number) => void;
+}) {
+  return (
+    <div className="mt-2 flex items-center justify-center gap-1">
+      <Button variant="outline" size="icon" className="size-8" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>
+        <ChevronLeft className="size-4" />
+      </Button>
+      <span className="px-2 text-xs text-[var(--muted-foreground)]">
+        {page} / {totalPages}
+      </span>
+      <Button variant="outline" size="icon" className="size-8" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>
+        <ChevronRight className="size-4" />
+      </Button>
+    </div>
+  );
+}
 
 export default function UserLogsView({ showToast }: Props) {
   const [logs, setLogs] = useState<UserLog[]>([]);
@@ -218,251 +244,165 @@ export default function UserLogsView({ showToast }: Props) {
   };
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, height: '100%' }}>
-      <Alert
-        severity="info"
-        icon={<FileText size={18} />}
-        sx={{
-          bgcolor: 'rgba(37,99,235,0.08)',
-          color: THEME.text,
-          border: `1px solid ${THEME.border}`,
-          '& .MuiAlert-icon': { color: THEME.primary },
-          fontSize: '0.75rem',
-        }}
-      >
-        เก็บประวัติกิจกรรม / audit / ความปลอดภัย 2 ปี (730 วัน) ตามนโยบายความเป็นส่วนตัวและข้อกำหนดทางบัญชี
-        — คลิกอีเมลเพื่อเปิดไทม์ไลน์รวมทุกลายละเอียด
+    <div className="flex h-full flex-col gap-2">
+      <Alert className="border-[var(--border)] bg-blue-500/8 text-[0.75rem] text-[var(--foreground)]">
+        <FileText className="size-[18px] text-blue-600" />
+        <AlertDescription>
+          เก็บประวัติกิจกรรม / audit / ความปลอดภัย 2 ปี (730 วัน) ตามนโยบายความเป็นส่วนตัวและข้อกำหนดทางบัญชี
+          — คลิกอีเมลเพื่อเปิดไทม์ไลน์รวมทุกลายละเอียด
+        </AlertDescription>
       </Alert>
 
-      <Box
-        sx={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 10,
-          bgcolor: THEME.bg,
-          pb: 1.5,
-          mx: { xs: -2, md: -3 },
-          px: { xs: 2, md: 3 },
-        }}
-      >
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5, mb: 1.5 }}>
-          <Box>
-            <Typography sx={{ fontSize: { xs: '1rem', md: '1.3rem' }, fontWeight: 800, color: THEME.text }}>
-              ประวัติผู้ใช้
-            </Typography>
-            <Typography sx={{ color: THEME.textSecondary, fontSize: '0.75rem' }}>
+      <div className="sticky top-0 z-10 bg-[var(--background)] pb-1.5 -mx-2 px-2 md:-mx-3 md:px-3">
+        <div className="mb-1.5 flex flex-wrap items-center justify-between gap-1.5">
+          <div>
+            <h2 className="text-base font-extrabold text-[var(--foreground)] md:text-[1.3rem]">ประวัติผู้ใช้</h2>
+            <p className="text-[0.75rem] text-[var(--muted-foreground)]">
               {filteredLogs.length}/{logs.length} รายการ · retention {retentionDays} วัน
-            </Typography>
-          </Box>
-          <IconButton
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="icon"
+            className="size-8 border-[var(--border)] bg-blue-500/10 text-blue-600"
             onClick={fetchData}
             disabled={loading}
-            size="small"
-            sx={{
-              bgcolor: 'rgba(37,99,235,0.1)',
-              border: `1px solid ${THEME.border}`,
-              color: THEME.primary,
-            }}
           >
-            {loading ? <CircularProgress size={18} sx={{ color: THEME.primary }} /> : <Refresh size={18} />}
-          </IconButton>
-        </Box>
+            {loading ? <Loader2 className="size-[18px] animate-spin" /> : <Refresh className="size-[18px]" />}
+          </Button>
+        </div>
 
-        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-          <TextField
-            placeholder="ค้นหา หรือใส่ email เพื่อเปิดไทม์ไลน์..."
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setPage(1);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && searchTerm.includes('@')) {
-                openTimeline(searchTerm.trim());
-              }
-            }}
-            size="small"
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search size={18} color={THEME.muted} />
-                </InputAdornment>
-              ),
-            }}
-            sx={{
-              flex: 1,
-              minWidth: 150,
-              '& .MuiOutlinedInput-root': {
-                bgcolor: THEME.glassSoft,
-                borderRadius: '10px',
-                '& fieldset': { borderColor: THEME.border },
-              },
-              '& .MuiInputBase-input': { color: THEME.text, fontSize: '0.8rem', py: 0.8 },
-            }}
-          />
-
-          <FormControl size="small" sx={{ minWidth: { xs: 100, sm: 150 } }}>
-            <Select
-              value={filterAction}
-              onChange={(e) => setFilterAction(e.target.value)}
-              displayEmpty
-              sx={{
-                bgcolor: THEME.glassSoft,
-                color: THEME.text,
-                fontSize: '0.75rem',
-                borderRadius: '10px',
-                '& fieldset': { borderColor: THEME.border },
-                '& .MuiSvgIcon-root': { color: THEME.muted },
-                '& .MuiSelect-select': { py: 0.8 },
+        <div className="flex flex-wrap gap-1">
+          <div className="relative min-w-[150px] flex-1">
+            <Search className="absolute top-1/2 left-2.5 size-[18px] -translate-y-1/2 text-[var(--muted-foreground)]" />
+            <Input
+              placeholder="ค้นหา หรือใส่ email เพื่อเปิดไทม์ไลน์..."
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setPage(1);
               }}
-            >
-              <MenuItem value="" sx={{ fontSize: '0.8rem' }}>
-                ทั้งหมด
-              </MenuItem>
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && searchTerm.includes('@')) {
+                  openTimeline(searchTerm.trim());
+                }
+              }}
+              className="rounded-[10px] border-[var(--border)] bg-[var(--card)] py-2 pl-9 text-[0.8rem] text-[var(--foreground)]"
+            />
+          </div>
+
+          <Select
+            value={filterAction || '__all__'}
+            onValueChange={(v) => setFilterAction(v === '__all__' ? '' : v)}
+          >
+            <SelectTrigger className="min-w-[100px] rounded-[10px] border-[var(--border)] bg-[var(--card)] text-[0.75rem] sm:min-w-[150px]">
+              <SelectValue placeholder="ทั้งหมด" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">ทั้งหมด</SelectItem>
               {Object.entries(actionLabels).map(([key, { label }]) => (
-                <MenuItem key={key} value={key} sx={{ fontSize: '0.8rem' }}>
+                <SelectItem key={key} value={key} className="text-[0.8rem]">
                   {label}
-                </MenuItem>
+                </SelectItem>
               ))}
-            </Select>
-          </FormControl>
+            </SelectContent>
+          </Select>
 
           {searchTerm.includes('@') && (
-            <Button
-              size="small"
-              variant="contained"
-              onClick={() => openTimeline(searchTerm.trim())}
-              sx={{ textTransform: 'none', bgcolor: THEME.primary, borderRadius: '10px' }}
-            >
+            <Button size="sm" className="rounded-[10px]" onClick={() => openTimeline(searchTerm.trim())}>
               ไทม์ไลน์
             </Button>
           )}
-        </Box>
-      </Box>
+        </div>
+      </div>
 
       {stats && (
-        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1 }}>
-          <StatCard icon={<TrendingUp />} label="ทั้งหมด" value={stats.total} color={THEME.primary} />
-          <StatCard icon={<Groups />} label="ผู้ใช้" value={stats.uniqueUsers} color={THEME.success} />
-          <StatCard icon={<AccessTime />} label="24ชม." value={stats.last24h} color={THEME.info} />
-          <StatCard icon={<Login />} label="ล็อกอิน" value={stats.byAction['login'] || 0} color={THEME.warning} />
-        </Box>
+        <div className="grid grid-cols-4 gap-1">
+          <StatCard icon={<TrendingUp />} label="ทั้งหมด" value={stats.total} color="#2563eb" />
+          <StatCard icon={<Groups />} label="ผู้ใช้" value={stats.uniqueUsers} color="var(--success)" />
+          <StatCard icon={<AccessTime />} label="24ชม." value={stats.last24h} color="#0ea5e9" />
+          <StatCard icon={<Login />} label="ล็อกอิน" value={stats.byAction['login'] || 0} color="var(--warning)" />
+        </div>
       )}
 
       {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-          <CircularProgress sx={{ color: THEME.primary }} />
-        </Box>
+        <div className="flex justify-center py-4">
+          <Loader2 className="size-8 animate-spin text-blue-600" />
+        </div>
       ) : (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+        <div className="flex flex-col gap-1">
           {paginatedLogs.map((log) => {
             const actionInfo = actionLabels[log.action] || {
               label: log.action,
-              color: THEME.muted,
+              color: 'var(--muted-foreground)',
               icon: <Visibility size={14} />,
             };
             const isExpanded = expandedLog === log.id;
             const ua = parseUserAgent(log.userAgent);
 
             return (
-              <Box
+              <div
                 key={log.id}
-                sx={{
-                  bgcolor: THEME.bgCard,
-                  border: `1px solid ${THEME.border}`,
-                  borderRadius: '12px',
-                  p: 1.5,
-                  transition: 'all 0.15s ease',
-                }}
+                className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-1.5 transition-all"
               >
-                <Box
-                  sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.8, cursor: 'pointer' }}
+                <div
+                  className="mb-0.5 flex cursor-pointer items-center gap-1"
                   onClick={() => setExpandedLog(isExpanded ? null : log.id)}
                 >
-                  <Box
-                    sx={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: '8px',
-                      bgcolor: `${actionInfo.color}20`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: actionInfo.color,
-                    }}
+                  <div
+                    className="flex size-7 items-center justify-center rounded-lg"
+                    style={{ backgroundColor: `${actionInfo.color}20`, color: actionInfo.color }}
                   >
                     {actionInfo.icon}
-                  </Box>
-                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: actionInfo.color, flex: 1 }}>
+                  </div>
+                  <span className="flex-1 text-[0.7rem] font-semibold" style={{ color: actionInfo.color }}>
                     {actionInfo.label}
-                  </Typography>
-                  <Typography sx={{ color: THEME.muted, fontSize: '0.65rem' }}>{formatDate(log.timestamp)}</Typography>
-                  <IconButton size="small" sx={{ p: 0.3, color: THEME.muted }}>
-                    {isExpanded ? <ExpandLess size={16} /> : <ExpandMore size={16} />}
-                  </IconButton>
-                </Box>
+                  </span>
+                  <span className="text-[0.65rem] text-[var(--muted-foreground)]">{formatDate(log.timestamp)}</span>
+                  <Button variant="ghost" size="icon" className="size-6 text-[var(--muted-foreground)]">
+                    {isExpanded ? <ExpandLess className="size-4" /> : <ExpandMore className="size-4" />}
+                  </Button>
+                </div>
 
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, mb: 0.5 }}>
-                  <Avatar sx={{ bgcolor: THEME.primary, width: 20, height: 20, fontSize: '0.65rem' }}>
-                    {(log.name || log.email).charAt(0).toUpperCase()}
+                <div className="mb-0.5 flex items-center gap-0.5">
+                  <Avatar className="size-5">
+                    <AvatarFallback className="bg-blue-600 text-[0.65rem] text-white">
+                      {(log.name || log.email).charAt(0).toUpperCase()}
+                    </AvatarFallback>
                   </Avatar>
-                  <Typography
+                  <button
+                    type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       openTimeline(log.email);
                     }}
-                    sx={{
-                      color: THEME.primary,
-                      fontSize: '0.75rem',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      textDecoration: 'underline',
-                      textUnderlineOffset: 2,
-                    }}
+                    className="cursor-pointer text-[0.75rem] font-semibold text-blue-600 underline underline-offset-2"
                   >
                     {log.name || log.email.split('@')[0]}
-                  </Typography>
-                  <Typography sx={{ color: THEME.muted, fontSize: '0.65rem' }}>{log.email}</Typography>
-                </Box>
+                  </button>
+                  <span className="text-[0.65rem] text-[var(--muted-foreground)]">{log.email}</span>
+                </div>
 
                 {log.details && (
-                  <Typography
-                    sx={{
-                      color: THEME.textSecondary,
-                      fontSize: '0.7rem',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: isExpanded ? 'normal' : 'nowrap',
-                    }}
+                  <p
+                    className={cn(
+                      'text-[0.7rem] text-[var(--muted-foreground)]',
+                      !isExpanded && 'truncate whitespace-nowrap'
+                    )}
                   >
                     {log.details}
-                  </Typography>
+                  </p>
                 )}
 
-                <Collapse in={isExpanded}>
-                  <Box sx={{ mt: 1, pt: 1, borderTop: `1px solid ${THEME.border}` }}>
+                {isExpanded && (
+                  <div className="mt-1 border-t border-[var(--border)] pt-1">
                     <DetailRow label="อีเมล" value={log.email} />
                     <DetailRow label="IP" value={log.ip || '—'} />
                     <DetailRow label="Browser / OS" value={`${ua.browser} · ${ua.os}`} />
                     <DetailRow label="User-Agent" value={ua.raw || '—'} mono />
                     <DetailRow label="Log ID" value={log.id} mono />
-                    <Typography sx={{ color: THEME.muted, fontSize: '0.65rem', mt: 0.8, mb: 0.3 }}>
-                      Metadata (เต็ม)
-                    </Typography>
-                    <Box
-                      sx={{
-                        bgcolor: THEME.glassSoft,
-                        borderRadius: '6px',
-                        p: 0.8,
-                        fontSize: '0.65rem',
-                        color: THEME.textSecondary,
-                        fontFamily: 'ui-monospace, monospace',
-                        overflow: 'auto',
-                        maxHeight: 240,
-                        whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-word',
-                      }}
-                    >
+                    <p className="mt-0.5 mb-0.5 text-[0.65rem] text-[var(--muted-foreground)]">Metadata (เต็ม)</p>
+                    <pre className="max-h-60 overflow-auto rounded-md bg-[var(--card)] p-2 font-mono text-[0.65rem] whitespace-pre-wrap break-words text-[var(--muted-foreground)]">
                       {JSON.stringify(
                         {
                           action: log.action,
@@ -473,186 +413,114 @@ export default function UserLogsView({ showToast }: Props) {
                           timestamp: log.timestamp,
                         },
                         null,
-                        2,
+                        2
                       )}
-                    </Box>
-                    <Button
-                      size="small"
-                      onClick={() => openTimeline(log.email)}
-                      sx={{ mt: 1, textTransform: 'none', fontSize: '0.7rem' }}
-                    >
+                    </pre>
+                    <Button variant="link" size="sm" className="mt-1 h-auto p-0 text-[0.7rem]" onClick={() => openTimeline(log.email)}>
                       เปิดไทม์ไลน์รวมของผู้ใช้นี้
                     </Button>
-                  </Box>
-                </Collapse>
-              </Box>
+                  </div>
+                )}
+              </div>
             );
           })}
 
           {paginatedLogs.length === 0 && (
-            <Box sx={{ textAlign: 'center', py: 4, color: THEME.muted }}>
+            <div className="py-4 text-center text-[var(--muted-foreground)]">
               {searchTerm || filterAction ? 'ไม่พบผลลัพธ์' : 'ยังไม่มีประวัติ'}
-            </Box>
+            </div>
           )}
 
           {totalPages > 1 && (
-            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-              <Pagination
-                count={totalPages}
-                page={page}
-                onChange={(_, p) => setPage(p)}
-                size="small"
-                sx={{
-                  '& .MuiPaginationItem-root': {
-                    color: THEME.textSecondary,
-                    fontSize: '0.75rem',
-                    '&.Mui-selected': { bgcolor: THEME.primary, color: '#fff' },
-                  },
-                }}
-              />
-            </Box>
+            <SimplePagination page={page} totalPages={totalPages} onPageChange={setPage} />
           )}
-        </Box>
+        </div>
       )}
 
-      <Drawer
-        anchor="right"
-        open={Boolean(timelineEmail)}
-        onClose={() => setTimelineEmail(null)}
-        PaperProps={{
-          sx: {
-            width: { xs: '100%', sm: 440, md: 520 },
-            bgcolor: THEME.bg,
-            color: THEME.text,
-            p: 2,
-          },
-        }}
-      >
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
-          <Box>
-            <Typography sx={{ fontWeight: 800, fontSize: '1rem' }}>ไทม์ไลน์ผู้ใช้</Typography>
-            <Typography sx={{ fontSize: '0.75rem', color: THEME.textSecondary }}>{timelineEmail}</Typography>
-          </Box>
-          <IconButton onClick={() => setTimelineEmail(null)} size="small" sx={{ color: THEME.muted }}>
-            <Close size={18} />
-          </IconButton>
-        </Box>
-        <Typography sx={{ fontSize: '0.7rem', color: THEME.muted, mb: 1.5 }}>
-          รวม user_logs · audit_trail · security · email · orders · เก็บ {retentionDays} วัน
-        </Typography>
-        <Divider sx={{ borderColor: THEME.border, mb: 1.5 }} />
+      <Sheet open={Boolean(timelineEmail)} onOpenChange={(open) => !open && setTimelineEmail(null)}>
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-[440px] md:max-w-[520px]">
+          <SheetHeader>
+            <SheetTitle className="text-base font-extrabold">ไทม์ไลน์ผู้ใช้</SheetTitle>
+            <p className="text-[0.75rem] text-[var(--muted-foreground)]">{timelineEmail}</p>
+          </SheetHeader>
+          <p className="mb-1.5 text-[0.7rem] text-[var(--muted-foreground)]">
+            รวม user_logs · audit_trail · security · email · orders · เก็บ {retentionDays} วัน
+          </p>
+          <Separator className="mb-1.5" />
 
-        {timelineLoading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-            <CircularProgress size={28} sx={{ color: THEME.primary }} />
-          </Box>
-        ) : timelineEvents.length === 0 ? (
-          <Typography sx={{ color: THEME.muted, textAlign: 'center', py: 4, fontSize: '0.85rem' }}>
-            ไม่พบเหตุการณ์
-          </Typography>
-        ) : (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, pb: 4 }}>
-            {timelineEvents.map((ev) => {
-              const src = sourceLabels[ev.source];
-              const open = expandedTimeline === ev.id;
-              return (
-                <Box
-                  key={ev.id}
-                  onClick={() => setExpandedTimeline(open ? null : ev.id)}
-                  sx={{
-                    border: `1px solid ${THEME.border}`,
-                    borderRadius: '10px',
-                    p: 1.2,
-                    bgcolor: THEME.bgCard,
-                    cursor: 'pointer',
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, mb: 0.4 }}>
-                    <Chip
-                      size="small"
-                      label={src.label}
-                      sx={{
-                        height: 20,
-                        fontSize: '0.6rem',
-                        bgcolor: `${src.color}22`,
-                        color: src.color,
-                      }}
-                    />
-                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: THEME.text, flex: 1 }}>
-                      {ev.action}
-                    </Typography>
-                    <Typography sx={{ fontSize: '0.6rem', color: THEME.muted }}>{formatDate(ev.at)}</Typography>
-                  </Box>
-                  {ev.summary && (
-                    <Typography sx={{ fontSize: '0.7rem', color: THEME.textSecondary }}>{ev.summary}</Typography>
-                  )}
-                  <Collapse in={open}>
-                    <Box sx={{ mt: 1 }}>
-                      <DetailRow label="Actor" value={ev.actorEmail || '—'} />
-                      <DetailRow label="Subject" value={ev.subjectEmail || '—'} />
-                      <DetailRow label="IP" value={ev.ip || '—'} />
-                      <DetailRow label="UA" value={ev.userAgent || '—'} mono />
-                      <Box
-                        sx={{
-                          mt: 0.5,
-                          bgcolor: THEME.glassSoft,
-                          borderRadius: '6px',
-                          p: 0.8,
-                          fontSize: '0.6rem',
-                          fontFamily: 'ui-monospace, monospace',
-                          whiteSpace: 'pre-wrap',
-                          wordBreak: 'break-word',
-                          maxHeight: 280,
-                          overflow: 'auto',
-                          color: THEME.textSecondary,
-                        }}
+          {timelineLoading ? (
+            <div className="flex justify-center py-6">
+              <Loader2 className="size-7 animate-spin text-blue-600" />
+            </div>
+          ) : timelineEvents.length === 0 ? (
+            <p className="py-4 text-center text-[0.85rem] text-[var(--muted-foreground)]">ไม่พบเหตุการณ์</p>
+          ) : (
+            <div className="flex flex-col gap-1 pb-4">
+              {timelineEvents.map((ev) => {
+                const src = sourceLabels[ev.source];
+                const open = expandedTimeline === ev.id;
+                return (
+                  <div
+                    key={ev.id}
+                    onClick={() => setExpandedTimeline(open ? null : ev.id)}
+                    className="cursor-pointer rounded-[10px] border border-[var(--border)] bg-[var(--card)] p-1.5"
+                  >
+                    <div className="mb-0.5 flex items-center gap-0.5">
+                      <Badge
+                        className="h-5 text-[0.6rem]"
+                        style={{ backgroundColor: `${src.color}22`, color: src.color, borderColor: 'transparent' }}
                       >
-                        {JSON.stringify(ev.detail, null, 2)}
-                      </Box>
-                    </Box>
-                  </Collapse>
-                </Box>
-              );
-            })}
-          </Box>
-        )}
-      </Drawer>
-    </Box>
+                        {src.label}
+                      </Badge>
+                      <span className="flex-1 text-[0.7rem] font-bold text-[var(--foreground)]">{ev.action}</span>
+                      <span className="text-[0.6rem] text-[var(--muted-foreground)]">{formatDate(ev.at)}</span>
+                    </div>
+                    {ev.summary && (
+                      <p className="text-[0.7rem] text-[var(--muted-foreground)]">{ev.summary}</p>
+                    )}
+                    {open && (
+                      <div className="mt-1">
+                        <DetailRow label="Actor" value={ev.actorEmail || '—'} />
+                        <DetailRow label="Subject" value={ev.subjectEmail || '—'} />
+                        <DetailRow label="IP" value={ev.ip || '—'} />
+                        <DetailRow label="UA" value={ev.userAgent || '—'} mono />
+                        <pre className="mt-0.5 max-h-[280px] overflow-auto rounded-md bg-[var(--card)] p-2 font-mono text-[0.6rem] whitespace-pre-wrap break-words text-[var(--muted-foreground)]">
+                          {JSON.stringify(ev.detail, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+    </div>
   );
 }
 
 function DetailRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <Typography
-      sx={{
-        color: THEME.muted,
-        fontSize: '0.65rem',
-        mb: 0.25,
-        fontFamily: mono ? 'ui-monospace, monospace' : undefined,
-        wordBreak: 'break-all',
-      }}
+    <p
+      className={cn(
+        'mb-0.5 text-[0.65rem] break-all text-[var(--muted-foreground)]',
+        mono && 'font-mono'
+      )}
     >
       {label}: {value}
-    </Typography>
+    </p>
   );
 }
 
 function StatCard({ icon, label, value, color }: { icon: ReactElement; label: string; value: number; color: string }) {
   return (
-    <Box
-      sx={{
-        bgcolor: THEME.glassSoft,
-        border: `1px solid ${THEME.border}`,
-        borderRadius: '10px',
-        p: 1,
-        textAlign: 'center',
-      }}
-    >
-      <Box sx={{ color: color, mb: 0.3, '& svg': { width: 18, height: 18 } }}>
+    <div className="rounded-[10px] border border-[var(--border)] bg-[var(--card)] p-1 text-center">
+      <div className="mb-0.5 [&_svg]:mx-auto [&_svg]:size-[18px]" style={{ color }}>
         {icon}
-      </Box>
-      <Typography sx={{ color: THEME.text, fontWeight: 700, fontSize: '1rem' }}>{value.toLocaleString()}</Typography>
-      <Typography sx={{ color: THEME.muted, fontSize: '0.6rem' }}>{label}</Typography>
-    </Box>
+      </div>
+      <p className="text-base font-bold text-[var(--foreground)]">{value.toLocaleString()}</p>
+      <p className="text-[0.6rem] text-[var(--muted-foreground)]">{label}</p>
+    </div>
   );
 }

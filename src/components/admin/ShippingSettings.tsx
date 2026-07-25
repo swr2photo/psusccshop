@@ -3,43 +3,19 @@
 import { apiFetch } from '@/lib/api-client';
 import { useState, useEffect } from 'react';
 import {
-  Box,
-  Typography,
-  Card,
-  CardContent,
-  Switch,
-  TextField,
-  Button,
-  IconButton,
-  Chip,
-  Stack,
-  Alert,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Divider,
-  Tooltip,
-  Collapse,
-  InputAdornment,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-} from '@mui/material';
-import {
   Truck as LocalShipping,
   Plus as Add,
   Trash2 as Delete,
-  Pencil as Edit,
   Save,
   ChevronDown as ExpandMore,
   ChevronUp as ExpandLess,
-  Copy as ContentCopy,
   ExternalLink as OpenInNew,
   Settings,
   Package as Inventory,
-  Store,
+  X,
+  Info,
+  CircleAlert,
+  CircleCheck,
 } from 'lucide-react';
 import {
   ShippingConfig,
@@ -48,11 +24,48 @@ import {
   SHIPPING_PROVIDERS,
   DEFAULT_SHIPPING_CONFIG,
 } from '@/lib/shipping';
-import { ADMIN_THEME, adminCardSx, adminDialogPaperSx, adminInputSxCompact as inputSx } from '@/lib/adminTheme';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 interface ShippingSettingsProps {
   onSave?: () => void;
 }
+
+const glassCardClass =
+  'rounded-xl border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)]';
+
+const gradientBtnClass =
+  'rounded-[10px] bg-gradient-to-br from-indigo-500 to-violet-500 font-bold text-white shadow-[0_4px_15px_rgba(139,92,246,0.3)] hover:opacity-90';
+
+const inputClass = 'rounded-[10px]';
 
 export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
   const [config, setConfig] = useState<ShippingConfig>(DEFAULT_SHIPPING_CONFIG);
@@ -90,21 +103,21 @@ export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
     try {
       setSaving(true);
       setError(null);
-      
+
       const res = await apiFetch('/api/shipping/options', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ config }),
       });
-      
+
       const data = await res.json();
       if (data.success) {
         setSuccess('บันทึกการตั้งค่าสำเร็จ');
         setTimeout(() => setSuccess(null), 3000);
         onSave?.();
       } else {
-        const errorMsg = data.details 
-          ? `${data.error}: ${data.details}` 
+        const errorMsg = data.details
+          ? `${data.error}: ${data.details}`
           : (data.error || 'Failed to save');
         setError(errorMsg);
       }
@@ -151,252 +164,229 @@ export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
 
   if (loading) {
     return (
-      <Box sx={{ p: 3, textAlign: 'center' }}>
-        <Typography color="textSecondary">กำลังโหลด...</Typography>
-      </Box>
+      <div className="p-6 text-center">
+        <p className="text-muted-foreground">กำลังโหลด...</p>
+      </div>
     );
   }
 
   return (
-    <Box>
+    <div>
       {/* Header */}
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <LocalShipping size={28} color={ADMIN_THEME.primary} />
-          <Typography variant="h5" fontWeight="bold">
+      <div className="mb-6 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <LocalShipping size={28} className="text-indigo-500" />
+          <h2 className="text-xl font-bold text-[var(--foreground)]">
             ตั้งค่าการจัดส่ง
-          </Typography>
-        </Box>
+          </h2>
+        </div>
         <Button
-          variant="contained"
-          startIcon={<Save />}
+          className={gradientBtnClass}
           onClick={saveConfig}
           disabled={saving}
-          sx={{
-            bgcolor: ADMIN_THEME.primary,
-            '&:hover': { bgcolor: ADMIN_THEME.accent },
-          }}
         >
+          <Save />
           {saving ? 'กำลังบันทึก...' : 'บันทึก'}
         </Button>
-      </Box>
+      </div>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-          {error}
+        <Alert variant="destructive" className="relative mb-4 pr-10">
+          <CircleAlert />
+          <AlertDescription>{error}</AlertDescription>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            className="absolute top-2 right-2"
+            onClick={() => setError(null)}
+          >
+            <X className="size-4" />
+          </Button>
         </Alert>
       )}
-      
+
       {success && (
-        <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess(null)}>
-          {success}
+        <Alert className="relative mb-4 border-emerald-500/30 bg-emerald-500/10 pr-10 text-emerald-700 dark:text-emerald-400">
+          <CircleCheck />
+          <AlertDescription>{success}</AlertDescription>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            className="absolute top-2 right-2"
+            onClick={() => setSuccess(null)}
+          >
+            <X className="size-4" />
+          </Button>
         </Alert>
       )}
 
       {/* General Settings */}
-      <Card sx={{ 
-        mb: 3, 
-        bgcolor: ADMIN_THEME.glass,
-        border: `1px solid ${ADMIN_THEME.border}`,
-        borderRadius: '12px',
-      }}>
-        <CardContent>
-          <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+      <Card className={cn(glassCardClass, 'mb-6')}>
+        <CardContent className="pt-6">
+          <p className="mb-4 flex items-center gap-2 text-base font-bold text-[var(--foreground)]">
             <Settings size={20} />
             ตั้งค่าทั่วไป
-          </Typography>
-          
-          <Stack spacing={2}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Box>
-                <Typography>แสดงตัวเลือกการจัดส่ง</Typography>
-                <Typography variant="caption" color="textSecondary">
+          </p>
+
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[var(--foreground)]">แสดงตัวเลือกการจัดส่ง</p>
+                <p className="text-xs text-muted-foreground">
                   ให้ลูกค้าเลือกวิธีจัดส่งเอง
-                </Typography>
-              </Box>
+                </p>
+              </div>
               <Switch
                 checked={config.showOptions}
-                onChange={(e) => setConfig(prev => ({ ...prev, showOptions: e.target.checked }))}
-                color="secondary"
+                onCheckedChange={(checked) => setConfig(prev => ({ ...prev, showOptions: checked }))}
+                className="data-[state=checked]:bg-indigo-500"
               />
-            </Box>
+            </div>
 
-            <Divider sx={{ borderColor: ADMIN_THEME.border }} />
+            <Separator />
 
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Box>
-                <Typography>เปิดให้รับหน้าร้าน</Typography>
-                <Typography variant="caption" color="textSecondary">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[var(--foreground)]">เปิดให้รับหน้าร้าน</p>
+                <p className="text-xs text-muted-foreground">
                   ลูกค้าสามารถมารับสินค้าได้
-                </Typography>
-              </Box>
+                </p>
+              </div>
               <Switch
                 checked={config.allowPickup}
-                onChange={(e) => setConfig(prev => ({ ...prev, allowPickup: e.target.checked }))}
-                color="secondary"
+                onCheckedChange={(checked) => setConfig(prev => ({ ...prev, allowPickup: checked }))}
+                className="data-[state=checked]:bg-indigo-500"
               />
-            </Box>
+            </div>
 
             {config.allowPickup && (
-              <Box sx={{ pl: 2 }}>
-                <TextField
-                  label="สถานที่รับสินค้า"
-                  value={config.pickupLocation || ''}
-                  onChange={(e) => setConfig(prev => ({ ...prev, pickupLocation: e.target.value }))}
-                  fullWidth
-                  sx={inputSx}
-                  size="small"
-                />
-                <TextField
-                  label="คำแนะนำ"
-                  value={config.pickupInstructions || ''}
-                  onChange={(e) => setConfig(prev => ({ ...prev, pickupInstructions: e.target.value }))}
-                  fullWidth
-                  multiline
-                  rows={2}
-                  sx={{ ...inputSx, mt: 2 }}
-                  size="small"
-                  placeholder="เช่น: รับได้วันจันทร์-ศุกร์ 10:00-16:00 น."
-                />
-              </Box>
+              <div className="space-y-4 pl-4">
+                <div className="space-y-2">
+                  <Label htmlFor="pickupLocation">สถานที่รับสินค้า</Label>
+                  <Input
+                    id="pickupLocation"
+                    className={inputClass}
+                    value={config.pickupLocation || ''}
+                    onChange={(e) => setConfig(prev => ({ ...prev, pickupLocation: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pickupInstructions">คำแนะนำ</Label>
+                  <Textarea
+                    id="pickupInstructions"
+                    className={inputClass}
+                    value={config.pickupInstructions || ''}
+                    onChange={(e) => setConfig(prev => ({ ...prev, pickupInstructions: e.target.value }))}
+                    rows={2}
+                    placeholder="เช่น: รับได้วันจันทร์-ศุกร์ 10:00-16:00 น."
+                  />
+                </div>
+              </div>
             )}
 
-            <Divider sx={{ borderColor: ADMIN_THEME.border }} />
+            <Separator />
 
-            <TextField
-              label="ส่งฟรีขั้นต่ำ (บาท)"
-              type="number"
-              value={config.globalFreeShippingMinimum || ''}
-              onChange={(e) => setConfig(prev => ({ 
-                ...prev, 
-                globalFreeShippingMinimum: e.target.value ? parseInt(e.target.value) : undefined 
-              }))}
-              fullWidth
-              sx={inputSx}
-              size="small"
-              helperText="ยอดสั่งซื้อขั้นต่ำที่ส่งฟรี (เว้นว่างไม่มี)"
-              InputProps={{
-                endAdornment: <InputAdornment position="end">฿</InputAdornment>,
-              }}
-            />
-          </Stack>
+            <div className="space-y-2">
+              <Label htmlFor="globalFreeShippingMinimum">ส่งฟรีขั้นต่ำ (บาท)</Label>
+              <div className="relative">
+                <Input
+                  id="globalFreeShippingMinimum"
+                  className={cn(inputClass, 'pr-8')}
+                  type="number"
+                  value={config.globalFreeShippingMinimum || ''}
+                  onChange={(e) => setConfig(prev => ({
+                    ...prev,
+                    globalFreeShippingMinimum: e.target.value ? parseInt(e.target.value) : undefined,
+                  }))}
+                />
+                <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-muted-foreground">
+                  ฿
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                ยอดสั่งซื้อขั้นต่ำที่ส่งฟรี (เว้นว่างไม่มี)
+              </p>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
       {/* Track123 API Info */}
-      <Card sx={{ 
-        mb: 3, 
-        bgcolor: 'rgba(30, 64, 175, 0.1)', 
-        border: '1px solid rgba(30, 64, 175, 0.3)',
-        borderRadius: '12px',
-      }}>
-        <CardContent>
-          <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1, color: '#a78bfa' }}>
+      <Card className="mb-6 rounded-xl border border-blue-700/30 bg-blue-900/10">
+        <CardContent className="pt-6">
+          <p className="mb-4 flex items-center gap-2 text-base font-bold text-violet-400">
             <OpenInNew size={20} />
             Track123 API (ระบบติดตามพัสดุ)
-          </Typography>
-          
-          <Typography variant="body2" sx={{ mb: 2, color: 'var(--text-muted)' }}>
+          </p>
+
+          <p className="mb-4 text-sm text-[var(--text-muted)]">
             ระบบใช้ Track123 API สำหรับติดตามพัสดุจากทุกขนส่ง รองรับการติดตามแบบ batch และ webhook
-          </Typography>
-          
-          <Stack spacing={1.5}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Chip 
-                label="Thailand Post" 
-                size="small"
-                sx={{ bgcolor: ADMIN_THEME.glassSoft }}
-              />
-              <Chip 
-                label="Kerry Express" 
-                size="small"
-                sx={{ bgcolor: ADMIN_THEME.glassSoft }}
-              />
-              <Chip 
-                label="J&T Express" 
-                size="small"
-                sx={{ bgcolor: ADMIN_THEME.glassSoft }}
-              />
-              <Chip 
-                label="Flash Express" 
-                size="small"
-                sx={{ bgcolor: ADMIN_THEME.glassSoft }}
-              />
-              <Chip 
-                label="+1700 carriers" 
-                size="small"
-                sx={{ bgcolor: 'rgba(30, 64, 175, 0.2)', color: '#a78bfa' }}
-              />
-            </Box>
-            
-            <Box sx={{ display: 'flex', gap: 1 }}>
+          </p>
+
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="secondary">Thailand Post</Badge>
+              <Badge variant="secondary">Kerry Express</Badge>
+              <Badge variant="secondary">J&T Express</Badge>
+              <Badge variant="secondary">Flash Express</Badge>
+              <Badge className="border-0 bg-blue-700/20 text-violet-400">+1700 carriers</Badge>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
               <Button
-                size="small"
-                variant="outlined"
-                startIcon={<OpenInNew />}
-                href="https://member.track123.com/api"
-                target="_blank"
-                sx={{
-                  borderColor: 'rgba(30, 64, 175, 0.5)',
-                  color: '#a78bfa',
-                  '&:hover': { borderColor: ADMIN_THEME.primary, bgcolor: 'rgba(99,102,241,0.1)' },
-                }}
+                size="sm"
+                variant="outline"
+                className="border-blue-700/50 text-violet-400 hover:border-indigo-500 hover:bg-indigo-500/10"
+                asChild
               >
-                ดู API Key
+                <a href="https://member.track123.com/api" target="_blank" rel="noopener noreferrer">
+                  <OpenInNew />
+                  ดู API Key
+                </a>
               </Button>
               <Button
-                size="small"
-                variant="outlined"
-                startIcon={<OpenInNew />}
-                href="https://docs.track123.com/reference/request"
-                target="_blank"
-                sx={{
-                  borderColor: ADMIN_THEME.border,
-                  color: 'var(--text-muted)',
-                  '&:hover': { borderColor: ADMIN_THEME.primary },
-                }}
+                size="sm"
+                variant="outline"
+                className="text-[var(--text-muted)] hover:border-indigo-500"
+                asChild
               >
-                API Docs
+                <a href="https://docs.track123.com/reference/request" target="_blank" rel="noopener noreferrer">
+                  <OpenInNew />
+                  API Docs
+                </a>
               </Button>
-            </Box>
-            
-            <Alert severity="info" sx={{ bgcolor: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
-              <Typography variant="caption">
-                ตั้งค่า <code>TRACK123_API_KEY</code> ใน .env.local เพื่อเปิดใช้งานการติดตามพัสดุอัตโนมัติ
-              </Typography>
+            </div>
+
+            <Alert className="border-blue-500/20 bg-blue-500/10">
+              <Info />
+              <AlertDescription className="text-xs">
+                ตั้งค่า <code className="rounded bg-black/20 px-1 py-0.5">TRACK123_API_KEY</code> ใน .env.local เพื่อเปิดใช้งานการติดตามพัสดุอัตโนมัติ
+              </AlertDescription>
             </Alert>
-          </Stack>
+          </div>
         </CardContent>
       </Card>
 
       {/* Shipping Options */}
-      <Card sx={{ 
-        bgcolor: ADMIN_THEME.glass,
-        border: `1px solid ${ADMIN_THEME.border}`,
-        borderRadius: '12px',
-      }}>
-        <CardContent>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-            <Typography variant="subtitle1" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      <Card className={glassCardClass}>
+        <CardContent className="pt-6">
+          <div className="mb-4 flex items-center justify-between">
+            <p className="flex items-center gap-2 text-base font-bold text-[var(--foreground)]">
               <Inventory size={20} />
               ตัวเลือกการจัดส่ง
-            </Typography>
+            </p>
             <Button
-              variant="outlined"
-              size="small"
-              startIcon={<Add />}
+              variant="outline"
+              size="sm"
+              className="border-indigo-500 text-indigo-500 hover:border-violet-600 hover:bg-indigo-500/10"
               onClick={() => setAddDialogOpen(true)}
-              sx={{
-                borderColor: ADMIN_THEME.primary,
-                color: ADMIN_THEME.primary,
-                '&:hover': { borderColor: '#7c3aed', bgcolor: 'rgba(30, 64, 175, 0.1)' },
-              }}
             >
+              <Add />
               เพิ่ม
             </Button>
-          </Box>
+          </div>
 
-          <Stack spacing={1}>
+          <div className="flex flex-col gap-2">
             {config.options.map((option) => (
               <ShippingOptionCard
                 key={option.id}
@@ -408,7 +398,7 @@ export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
                 onDelete={() => deleteOption(option.id)}
               />
             ))}
-          </Stack>
+          </div>
         </CardContent>
       </Card>
 
@@ -418,7 +408,7 @@ export default function ShippingSettings({ onSave }: ShippingSettingsProps) {
         onClose={() => setAddDialogOpen(false)}
         onAdd={addOption}
       />
-    </Box>
+    </div>
   );
 }
 
@@ -441,174 +431,176 @@ function ShippingOptionCard({
   const providerInfo = SHIPPING_PROVIDERS[option.provider];
 
   return (
-    <Card sx={{
-      bgcolor: option.enabled ? 'rgba(99,102,241,0.1)' : ADMIN_THEME.glassSoft,
-      border: `1px solid ${option.enabled ? 'rgba(99,102,241,0.3)' : ADMIN_THEME.border}`,
-      borderRadius: '10px',
-      transition: 'all 0.2s',
-    }}>
-      <Box sx={{ p: 2 }}>
+    <Card
+      className={cn(
+        'rounded-[10px] transition-all duration-200',
+        option.enabled
+          ? 'border-indigo-500/30 bg-indigo-500/10'
+          : 'border-[var(--border)] bg-[var(--card)]/50',
+      )}
+    >
+      <div className="p-4">
         {/* Header Row */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <div className="flex items-center gap-4">
           <Switch
             checked={option.enabled}
-            onChange={onToggleEnabled}
-            color="secondary"
-            size="small"
+            onCheckedChange={onToggleEnabled}
+            className="data-[state=checked]:bg-indigo-500"
           />
-          
-          <Box sx={{ flex: 1 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography fontWeight="bold">{option.name}</Typography>
-              <Chip 
-                label={providerInfo?.nameThai || option.provider} 
-                size="small" 
-                sx={{ 
-                  bgcolor: ADMIN_THEME.glassSoft,
-                  fontSize: '0.7rem',
-                  height: '20px',
-                }}
-              />
-            </Box>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="font-bold text-[var(--foreground)]">{option.name}</p>
+              <Badge variant="secondary" className="h-5 text-[0.7rem]">
+                {providerInfo?.nameThai || option.provider}
+              </Badge>
+            </div>
             {option.description && (
-              <Typography variant="caption" color="textSecondary">
-                {option.description}
-              </Typography>
+              <p className="text-xs text-muted-foreground">{option.description}</p>
             )}
-          </Box>
+          </div>
 
-          <Typography fontWeight="bold" sx={{ color: '#22d3ee', minWidth: '60px', textAlign: 'right' }}>
+          <p className="min-w-[60px] text-right font-bold text-cyan-400">
             {option.baseFee === 0 ? 'ฟรี' : `฿${option.baseFee}`}
-          </Typography>
+          </p>
 
-          <IconButton size="small" onClick={onToggleExpand}>
+          <Button variant="ghost" size="icon-sm" onClick={onToggleExpand}>
             {expanded ? <ExpandLess /> : <ExpandMore />}
-          </IconButton>
-        </Box>
+          </Button>
+        </div>
 
         {/* Expanded Content */}
-        <Collapse in={expanded}>
-          <Box sx={{ mt: 2, pt: 2, borderTop: `1px solid ${ADMIN_THEME.border}` }}>
-            <Stack spacing={2}>
-              <TextField
-                label="ชื่อ"
-                value={option.name}
-                onChange={(e) => onUpdate({ name: e.target.value })}
-                fullWidth
-                size="small"
-                sx={inputSx}
-              />
-
-              <TextField
-                label="คำอธิบาย"
-                value={option.description || ''}
-                onChange={(e) => onUpdate({ description: e.target.value })}
-                fullWidth
-                size="small"
-                sx={inputSx}
-              />
-
-              <Box sx={{ display: 'flex', gap: 2 }}>
-                <TextField
-                  label="ค่าส่ง (บาท)"
-                  type="number"
-                  value={option.baseFee}
-                  onChange={(e) => onUpdate({ baseFee: parseInt(e.target.value) || 0 })}
-                  sx={{ ...inputSx, flex: 1 }}
-                  size="small"
+        {expanded && (
+          <div className="mt-4 border-t border-[var(--border)] pt-4">
+            <div className="flex flex-col gap-4">
+              <div className="space-y-2">
+                <Label>ชื่อ</Label>
+                <Input
+                  className={inputClass}
+                  value={option.name}
+                  onChange={(e) => onUpdate({ name: e.target.value })}
                 />
-                <TextField
-                  label="ค่าส่งเพิ่ม/ชิ้น"
-                  type="number"
-                  value={option.perItemFee || ''}
-                  onChange={(e) => onUpdate({ perItemFee: e.target.value ? parseInt(e.target.value) : undefined })}
-                  sx={{ ...inputSx, flex: 1 }}
-                  size="small"
-                />
-              </Box>
+              </div>
 
-              <Box sx={{ display: 'flex', gap: 2 }}>
-                <TextField
-                  label="จัดส่ง (วันต่ำสุด)"
-                  type="number"
-                  value={option.estimatedDays?.min || ''}
-                  onChange={(e) => onUpdate({ 
-                    estimatedDays: { 
-                      ...option.estimatedDays, 
-                      min: parseInt(e.target.value) || 1,
-                      max: option.estimatedDays?.max || 3,
-                    }
-                  })}
-                  sx={{ ...inputSx, flex: 1 }}
-                  size="small"
+              <div className="space-y-2">
+                <Label>คำอธิบาย</Label>
+                <Input
+                  className={inputClass}
+                  value={option.description || ''}
+                  onChange={(e) => onUpdate({ description: e.target.value })}
                 />
-                <TextField
-                  label="จัดส่ง (วันสูงสุด)"
-                  type="number"
-                  value={option.estimatedDays?.max || ''}
-                  onChange={(e) => onUpdate({ 
-                    estimatedDays: { 
-                      min: option.estimatedDays?.min || 1,
-                      max: parseInt(e.target.value) || 3,
-                    }
-                  })}
-                  sx={{ ...inputSx, flex: 1 }}
-                  size="small"
-                />
-              </Box>
+              </div>
 
-              <TextField
-                label="ส่งฟรีขั้นต่ำ (บาท)"
-                type="number"
-                value={option.freeShippingMinimum || ''}
-                onChange={(e) => onUpdate({ freeShippingMinimum: e.target.value ? parseInt(e.target.value) : undefined })}
-                fullWidth
-                size="small"
-                sx={inputSx}
-                helperText="ยอดสั่งซื้อขั้นต่ำที่ส่งฟรี"
-              />
+              <div className="flex gap-4">
+                <div className="flex-1 space-y-2">
+                  <Label>ค่าส่ง (บาท)</Label>
+                  <Input
+                    className={inputClass}
+                    type="number"
+                    value={option.baseFee}
+                    onChange={(e) => onUpdate({ baseFee: parseInt(e.target.value) || 0 })}
+                  />
+                </div>
+                <div className="flex-1 space-y-2">
+                  <Label>ค่าส่งเพิ่ม/ชิ้น</Label>
+                  <Input
+                    className={inputClass}
+                    type="number"
+                    value={option.perItemFee || ''}
+                    onChange={(e) => onUpdate({ perItemFee: e.target.value ? parseInt(e.target.value) : undefined })}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                <div className="flex-1 space-y-2">
+                  <Label>จัดส่ง (วันต่ำสุด)</Label>
+                  <Input
+                    className={inputClass}
+                    type="number"
+                    value={option.estimatedDays?.min || ''}
+                    onChange={(e) => onUpdate({
+                      estimatedDays: {
+                        ...option.estimatedDays,
+                        min: parseInt(e.target.value) || 1,
+                        max: option.estimatedDays?.max || 3,
+                      },
+                    })}
+                  />
+                </div>
+                <div className="flex-1 space-y-2">
+                  <Label>จัดส่ง (วันสูงสุด)</Label>
+                  <Input
+                    className={inputClass}
+                    type="number"
+                    value={option.estimatedDays?.max || ''}
+                    onChange={(e) => onUpdate({
+                      estimatedDays: {
+                        min: option.estimatedDays?.min || 1,
+                        max: parseInt(e.target.value) || 3,
+                      },
+                    })}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>ส่งฟรีขั้นต่ำ (บาท)</Label>
+                <Input
+                  className={inputClass}
+                  type="number"
+                  value={option.freeShippingMinimum || ''}
+                  onChange={(e) => onUpdate({ freeShippingMinimum: e.target.value ? parseInt(e.target.value) : undefined })}
+                />
+                <p className="text-xs text-muted-foreground">ยอดสั่งซื้อขั้นต่ำที่ส่งฟรี</p>
+              </div>
 
               {option.provider !== 'pickup' && option.provider !== 'custom' && (
-                <TextField
-                  label="URL ติดตามพัสดุ (ใช้ {tracking} แทนเลขพัสดุ)"
-                  value={option.trackingUrlTemplate || ''}
-                  onChange={(e) => onUpdate({ trackingUrlTemplate: e.target.value })}
-                  fullWidth
-                  size="small"
-                  sx={inputSx}
-                  placeholder="https://track.example.com/?track={tracking}"
-                  InputProps={{
-                    endAdornment: option.trackingUrlTemplate && (
-                      <InputAdornment position="end">
-                        <Tooltip title="เปิดตัวอย่าง">
-                          <IconButton 
-                            size="small"
-                            onClick={() => window.open(option.trackingUrlTemplate?.replace('{tracking}', 'TEST123'), '_blank')}
-                          >
-                            <OpenInNew size={18} />
-                          </IconButton>
+                <div className="space-y-2">
+                  <Label>URL ติดตามพัสดุ (ใช้ {'{tracking}'} แทนเลขพัสดุ)</Label>
+                  <div className="relative">
+                    <Input
+                      className={cn(inputClass, option.trackingUrlTemplate ? 'pr-10' : undefined)}
+                      value={option.trackingUrlTemplate || ''}
+                      onChange={(e) => onUpdate({ trackingUrlTemplate: e.target.value })}
+                      placeholder="https://track.example.com/?track={tracking}"
+                    />
+                    {option.trackingUrlTemplate && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon-xs"
+                              className="absolute top-1/2 right-1 -translate-y-1/2"
+                              onClick={() => window.open(option.trackingUrlTemplate?.replace('{tracking}', 'TEST123'), '_blank')}
+                            >
+                              <OpenInNew className="size-[18px]" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>เปิดตัวอย่าง</TooltipContent>
                         </Tooltip>
-                      </InputAdornment>
-                    ),
-                  }}
-                />
+                      </TooltipProvider>
+                    )}
+                  </div>
+                </div>
               )}
 
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, pt: 1 }}>
+              <div className="flex justify-end gap-2 pt-2">
                 <Button
-                  variant="outlined"
-                  color="error"
-                  size="small"
-                  startIcon={<Delete />}
+                  variant="outline"
+                  size="sm"
+                  className="border-destructive text-destructive hover:bg-destructive/10"
                   onClick={onDelete}
                 >
+                  <Delete />
                   ลบ
                 </Button>
-              </Box>
-            </Stack>
-          </Box>
-        </Collapse>
-      </Box>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </Card>
   );
 }
@@ -648,66 +640,77 @@ function AddShippingOptionDialog({
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth PaperProps={{ sx: adminDialogPaperSx }}>
-      <DialogTitle>เพิ่มตัวเลือกการจัดส่ง</DialogTitle>
-      <DialogContent>
-        <Stack spacing={2} sx={{ mt: 1 }}>
-          <FormControl fullWidth size="small">
-            <InputLabel>ผู้ให้บริการ</InputLabel>
-            <Select
-              value={provider}
-              label="ผู้ให้บริการ"
-              onChange={(e) => setProvider(e.target.value as ShippingProvider)}
-            >
-              {Object.entries(SHIPPING_PROVIDERS).map(([key, info]) => (
-                <MenuItem key={key} value={key}>
-                  {info.nameThai} ({info.name})
-                </MenuItem>
-              ))}
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>เพิ่มตัวเลือกการจัดส่ง</DialogTitle>
+        </DialogHeader>
+
+        <div className="flex flex-col gap-4">
+          <div className="space-y-2">
+            <Label>ผู้ให้บริการ</Label>
+            <Select value={provider} onValueChange={(v) => setProvider(v as ShippingProvider)}>
+              <SelectTrigger className={cn(inputClass, 'w-full')}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(SHIPPING_PROVIDERS).map(([key, info]) => (
+                  <SelectItem key={key} value={key}>
+                    {info.nameThai} ({info.name})
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
-          </FormControl>
+          </div>
 
-          <TextField
-            label="ชื่อ"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            fullWidth
-            size="small"
-            placeholder={SHIPPING_PROVIDERS[provider]?.nameThai}
-          />
+          <div className="space-y-2">
+            <Label>ชื่อ</Label>
+            <Input
+              className={inputClass}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={SHIPPING_PROVIDERS[provider]?.nameThai}
+            />
+          </div>
 
-          <TextField
-            label="คำอธิบาย"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            fullWidth
-            size="small"
-            placeholder="เช่น: 1-3 วันทำการ"
-          />
+          <div className="space-y-2">
+            <Label>คำอธิบาย</Label>
+            <Input
+              className={inputClass}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="เช่น: 1-3 วันทำการ"
+            />
+          </div>
 
-          <TextField
-            label="ค่าส่ง (บาท)"
-            type="number"
-            value={baseFee}
-            onChange={(e) => setBaseFee(parseInt(e.target.value) || 0)}
-            fullWidth
-            size="small"
-            InputProps={{
-              endAdornment: <InputAdornment position="end">฿</InputAdornment>,
-            }}
-          />
-        </Stack>
+          <div className="space-y-2">
+            <Label>ค่าส่ง (บาท)</Label>
+            <div className="relative">
+              <Input
+                className={cn(inputClass, 'pr-8')}
+                type="number"
+                value={baseFee}
+                onChange={(e) => setBaseFee(parseInt(e.target.value) || 0)}
+              />
+              <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-muted-foreground">
+                ฿
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            ยกเลิก
+          </Button>
+          <Button
+            className="bg-blue-800 hover:bg-violet-600"
+            onClick={handleAdd}
+          >
+            เพิ่ม
+          </Button>
+        </DialogFooter>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>ยกเลิก</Button>
-        <Button 
-          onClick={handleAdd} 
-          variant="contained"
-          sx={{ bgcolor: '#1e40af', '&:hover': { bgcolor: '#7c3aed' } }}
-        >
-          เพิ่ม
-        </Button>
-      </DialogActions>
     </Dialog>
   );
 }

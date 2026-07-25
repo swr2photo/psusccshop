@@ -4,40 +4,28 @@ import { apiFetch, uploadImageApi } from '@/lib/api-client';
 // src/components/admin/SupportChatPanel.tsx
 // Admin Panel for Support Chat Management - Mobile Responsive with Typing & Read Receipts
 
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useNotification } from '../NotificationContext';
 import { usePushNotification } from '@/hooks/usePushNotification';
 import { useRealtimeChat, useRealtimeChatList } from '@/hooks/useRealtimeChat';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
+import { Separator } from '@/components/ui/separator';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
-  Box,
-  Typography,
-  TextField,
-  Avatar,
-  Paper,
-  CircularProgress,
-  Badge,
-  Button,
-  Chip,
-  IconButton,
-  List,
-  ListItemAvatar,
-  ListItemText,
-  ListItemButton,
-  Divider,
-  Tab,
-  Tabs,
-  Rating,
   Dialog,
-  DialogTitle,
   DialogContent,
-  DialogActions,
-  Switch,
-  FormControlLabel,
-  useMediaQuery,
-  useTheme,
-} from '@mui/material';
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { cn } from '@/lib/utils';
 import {
   Headphones as SupportAgentIcon,
   Send as SendIcon,
@@ -57,16 +45,13 @@ import {
   Receipt as ReceiptIcon,
   Search as SearchIcon,
   Eye as ViewIcon,
-  Pencil as EditIcon,
-  ShoppingBag as ShoppingBagIcon,
   ZoomIn as ZoomInIcon,
-  Wifi as WifiIcon,
-  WifiOff as WifiOffIcon,
+  Loader2,
 } from 'lucide-react';
-
-import { ADMIN_THEME } from '@/lib/adminTheme';
 import { chatMessagesChanged, getDbTypingFromSession } from '@/lib/support-chat-typing';
 import { fetchChatSync, mergeChatMessages, getChatPollIntervalMs } from '@/lib/support-chat-sync';
+
+const TAB_KEYS = ['all', 'pending', 'my', 'closed'] as const;
 
 interface ChatSession {
   id: string;
@@ -120,13 +105,45 @@ interface ChatSettings {
   notification_sound: boolean;
 }
 
+function StarRating({ value }: { value: number }) {
+  return (
+    <div className="flex items-center gap-0.5">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <StarIcon
+          key={star}
+          className={cn(
+            'size-4',
+            star <= value ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30'
+          )}
+        />
+      ))}
+    </div>
+  );
+}
+
+function UnreadAvatarBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <span className="absolute -top-1 -right-1 z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white ring-2 ring-card">
+      {count > 99 ? '99+' : count}
+    </span>
+  );
+}
+
 export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: string }) {
   const { data: session } = useSession();
   const { warning: toastWarning, error: toastError } = useNotification();
   const { isSupported: pushSupported, isSubscribed: pushSubscribed, subscribe: pushSubscribe } = usePushNotification();
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  
+
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 899px)');
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+
   const [loading, setLoading] = useState(true);
   const [chats, setChats] = useState<ChatSession[]>([]);
   const [stats, setStats] = useState<ChatStats | null>(null);
@@ -146,7 +163,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     quick_replies: ['สวัสดีค่ะ', 'รอสักครู่นะคะ', 'ขอบคุณที่รอค่ะ', 'ยินดีให้บริการค่ะ'],
     notification_sound: true,
   });
-  
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -154,8 +171,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
   const lastMessageAtRef = useRef<string | null>(null);
   const prevMessageCountRef = useRef<number>(0);
   const isUserScrollingRef = useRef<boolean>(false);
-  
-  // === Supabase Realtime: live messages, typing, read receipts ===
+
   const {
     messages: realtimeMessages,
     setMessages: setRealtimeMessages,
@@ -172,23 +188,19 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     session?.user?.email || null,
     'admin'
   );
-  
+
   const dbCustomerTyping = React.useMemo(() => {
     const source = (realtimeSession || selectedChat) as Record<string, unknown> | null;
     return getDbTypingFromSession(source).customerTyping;
   }, [realtimeSession, selectedChat]);
 
-  // Merge typing from realtime broadcast + API poll + DB session fields
   const otherTyping = rtOtherTyping || fallbackTyping || dbCustomerTyping;
 
-  // Realtime chat list — live updates to sidebar
   const {
     sessions: realtimeSessions,
-    setSessions: setRealtimeSessions,
     connectionState: listConnectionState,
   } = useRealtimeChatList(session?.user?.email || null);
-  
-  // New states for order lookup and image lightbox
+
   const [orderLookupOpen, setOrderLookupOpen] = useState(false);
   const [orderSearchRef, setOrderSearchRef] = useState('');
   const [foundOrder, setFoundOrder] = useState<any>(null);
@@ -197,7 +209,6 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
   const [customerOrders, setCustomerOrders] = useState<any[]>([]);
   const [loadingCustomerOrders, setLoadingCustomerOrders] = useState(false);
 
-  // Detect touch device for mobile-friendly Enter key behavior
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   useEffect(() => {
     setIsTouchDevice(
@@ -211,7 +222,6 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     }
   }, []);
 
-  // Deep link: auto-open a specific chat from push notification (?chatId=<id>)
   const deepLinkHandledRef = useRef(false);
   useEffect(() => {
     if (deepLinkHandledRef.current) return;
@@ -219,11 +229,9 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     const chatIdParam = params.get('chatId');
     if (chatIdParam) {
       deepLinkHandledRef.current = true;
-      // Clean the URL without reloading
       const url = new URL(window.location.href);
       url.searchParams.delete('chatId');
       window.history.replaceState({}, '', url.pathname + url.search + url.hash);
-      // Fetch and open the specific chat (single request seeds Realtime messages)
       fetchChatDetails(chatIdParam, true).then(() => {
         /* selectedChat + messages applied inside fetchChatDetails */
       });
@@ -265,21 +273,18 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     fetchChats({ includeStats: true }).finally(() => setLoading(false));
   }, [fetchChats]);
 
-  // Sync realtime messages into selectedChat state
   useEffect(() => {
     if (realtimeMessages.length > 0 && selectedChat) {
       setSelectedChat(prev => prev ? { ...prev, messages: realtimeMessages as ChatMessage[] } : prev);
     }
   }, [realtimeMessages]);
 
-  // Sync realtime session status updates
   useEffect(() => {
     if (realtimeSession && selectedChat) {
       setSelectedChat(prev => prev ? { ...prev, ...realtimeSession } : prev);
     }
   }, [realtimeSession]);
 
-  // Sync realtime chat list updates into sidebar
   useEffect(() => {
     if (realtimeSessions.length > 0) {
       setChats(prev => {
@@ -297,7 +302,6 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     }
   }, [realtimeSessions]);
 
-  // Mark as read once when selecting a chat (not on every new message)
   useEffect(() => {
     if (!selectedChat?.id) return;
     if ((selectedChat.unread_count || 0) <= 0) {
@@ -308,7 +312,6 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     broadcastRead();
   }, [selectedChat?.id, broadcastRead]);
 
-  // Sidebar list polling — skip expensive stats on background polls
   useEffect(() => {
     const isRealtimeUp = connectionState === 'connected' && listConnectionState === 'connected';
     const pollInterval = isRealtimeUp ? 60_000 : 8000;
@@ -319,7 +322,6 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
       if (cancelled || document.visibilityState === 'hidden') return;
       try {
         tick += 1;
-        // Refresh stats every ~5th poll to keep badges fresh without 4 extra queries each time
         await fetchChats({ includeStats: tick % 5 === 0 });
       } catch {}
     };
@@ -327,7 +329,6 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     return () => { cancelled = true; clearInterval(interval); };
   }, [fetchChats, connectionState, listConnectionState]);
 
-  // Active chat message polling — delta sync + adaptive interval
   useEffect(() => {
     if (!selectedChat?.id) return;
     if (selectedChat.status !== 'active' && selectedChat.status !== 'pending') return;
@@ -393,7 +394,6 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     return () => { cancelled = true; clearInterval(interval); };
   }, [selectedChat?.id, selectedChat?.status, setRealtimeMessages, connectionState]);
 
-  // Refetch active chat when admin returns to the tab (delta/ETag)
   useEffect(() => {
     if (!selectedChat?.id) return;
 
@@ -432,7 +432,6 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [selectedChat?.id, setRealtimeMessages]);
 
-  // Poll typing status (skip when Realtime broadcast is active)
   useEffect(() => {
     if (!selectedChat?.id) return;
     if (selectedChat.status !== 'active' && selectedChat.status !== 'pending') return;
@@ -456,11 +455,9 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
   useEffect(() => {
     if (selectedChat?.messages) {
       const currentCount = selectedChat.messages.length;
-      // Only auto-scroll when new messages arrive (not on initial load)
       if (prevMessageCountRef.current > 0 && currentCount > prevMessageCountRef.current) {
         scrollToBottom();
-        
-        // Show browser notification if tab is hidden and new message is from customer
+
         const latestMsg = selectedChat.messages[selectedChat.messages.length - 1];
         if (document.hidden && latestMsg?.sender === 'customer') {
           if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
@@ -480,33 +477,27 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
           }
         }
       }
-      // Don't force scroll on initial chat selection - let user see from top
       prevMessageCountRef.current = currentCount;
     }
   }, [selectedChat?.messages?.length, scrollToBottom]);
 
-  // Auto-request push notification permission for admin
   useEffect(() => {
     if (pushSupported && !pushSubscribed && session?.user?.email) {
-      // Auto-subscribe admin to push (will show permission prompt)
       if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
         pushSubscribe().catch(() => {});
       }
     }
   }, [pushSupported, pushSubscribed, session?.user?.email, pushSubscribe]);
 
-  // Typing indicator: Realtime broadcast when connected, API fallback otherwise
   const sendTypingIndicator = useCallback(() => {
     const adminName = chatSettings.admin_display_name || session?.user?.name || 'แอดมิน';
     if (connectionState === 'connected') {
-      // Fast path: Realtime broadcast (no DB writes)
       rtSendTyping(true, adminName);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       typingTimeoutRef.current = setTimeout(() => {
         rtSendTyping(false, adminName);
       }, 3000);
     } else if (selectedChat) {
-      // Fallback: API call
       apiFetch('/api/support-chat/' + selectedChat.id + '/typing', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -525,8 +516,6 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     }
   }, [rtSendTyping, chatSettings.admin_display_name, session?.user?.name, connectionState, selectedChat?.id]);
 
-  // Removed redundant /read call - now handled by fetchChatDetails with markRead=true
-
   useEffect(() => {
     apiFetch('/api/support-chat/settings')
       .then(res => res.json())
@@ -535,18 +524,14 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
   }, []);
 
   const handleSelectChat = async (chatId: string) => {
-    // Reset scroll tracking when selecting new chat
     isUserScrollingRef.current = false;
     prevMessageCountRef.current = 0;
-    // Fetch with markRead=true when user explicitly selects a chat
     const res = await apiFetch('/api/support-chat/' + chatId + '?markRead=true');
     const data = await res.json();
     if (data.chat) {
       setSelectedChat(data.chat);
-      // Seed realtime hook with initial messages
       setRealtimeMessages(data.chat.messages || []);
     }
-    // Refresh chat list to update unread counts
     fetchChats();
     broadcastRead();
     if (isMobile) setMobileShowChat(true);
@@ -609,16 +594,15 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
   const handleSendMessage = async () => {
     if (previewImage) { await handleSendWithImage(); return; }
     if (!message.trim() || !selectedChat) return;
-    
+
     const msgText = message.trim();
     const tempId = `opt_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    
-    // Optimistic: show message instantly
+
     addOptimisticMessage(tempId, msgText, session?.user?.name || chatSettings.admin_display_name, session?.user?.image || undefined);
     setMessage('');
     rtSendTyping(false, chatSettings.admin_display_name || 'แอดมิน');
     scrollToBottom(true);
-    
+
     setSending(true);
     try {
       const res = await apiFetch('/api/support-chat/' + selectedChat.id + '/message', {
@@ -630,10 +614,10 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
       if (data.success && data.message) {
         resolveOptimistic(tempId, data.message);
       } else {
-        resolveOptimistic(tempId, null); // Mark as failed
+        resolveOptimistic(tempId, null);
       }
     } catch {
-      resolveOptimistic(tempId, null); // Mark as failed
+      resolveOptimistic(tempId, null);
     } finally {
       setSending(false);
     }
@@ -652,14 +636,14 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
   const handleSendWithImage = async () => {
     if (!previewImage || !selectedChat) return;
     setUploadingImage(true);
-    
+
     const tempId = `opt_img_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const msgText = message.trim() ? message.trim() + '\n[กำลังอัปโหลดรูปภาพ...]' : '[กำลังอัปโหลดรูปภาพ...]';
     addOptimisticMessage(tempId, msgText, session?.user?.name || chatSettings.admin_display_name, session?.user?.image || undefined);
     setPreviewImage(null);
     setMessage('');
     scrollToBottom(true);
-    
+
     try {
       const mimeMatch = previewImage.match(/data:([^;]+);/);
       const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
@@ -741,7 +725,6 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
       const textPart = msg.replace(imageMatch[0], '').trim();
       return { text: textPart, imageUrl };
     }
-    // Check for order reference
     const orderMatch = msg.match(/\[ORDER_REF:([^\]]+)\]/);
     if (orderMatch) {
       const orderRef = orderMatch[1];
@@ -751,7 +734,6 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     return { text: msg, imageUrl: null, orderRef: null };
   };
 
-  // Search for order by ref
   const handleSearchOrder = async () => {
     if (!orderSearchRef.trim()) return;
     setSearchingOrder(true);
@@ -772,7 +754,6 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     }
   };
 
-  // Fetch customer's orders
   const fetchCustomerOrders = async (email: string) => {
     if (!email) return;
     setLoadingCustomerOrders(true);
@@ -792,7 +773,6 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     }
   };
 
-  // Send order reference to chat
   const handleSendOrderToChat = async (order: any) => {
     if (!selectedChat || selectedChat.status !== 'active') return;
     const orderMsg = `*ออเดอร์ #${order.ref}*
@@ -800,12 +780,12 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
 วันที่: ${new Date(order.date || order.createdAt).toLocaleDateString('th-TH')}
 สถานะ: ${getOrderStatusLabel(order.status)}
 [ORDER_REF:${order.ref}]`;
-    
+
     setSending(true);
     const tempId = `opt_order_${Date.now()}`;
     addOptimisticMessage(tempId, orderMsg, session?.user?.name || chatSettings.admin_display_name, session?.user?.image || undefined);
     scrollToBottom(true);
-    
+
     try {
       const res = await apiFetch('/api/support-chat/' + selectedChat.id + '/message', {
         method: 'POST',
@@ -842,854 +822,791 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
 
   return (
     <>
-      <input type="file" ref={fileInputRef} accept="image/*" style={{ display: 'none' }} onChange={handleImageSelect} />
-      
+      <input type="file" ref={fileInputRef} accept="image/*" className="hidden" onChange={handleImageSelect} />
+
       <style>{`
         @keyframes bounce {
           0%, 80%, 100% { transform: scale(0); }
           40% { transform: scale(1); }
         }
+        @keyframes pulse-dot {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.3; }
+        }
+        @keyframes chat-pulse {
+          0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4); }
+          70% { box-shadow: 0 0 0 20px rgba(37, 99, 235, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+        }
       `}</style>
 
-      {/* Image Lightbox */}
       {lightboxImage && (
-        <Box
+        <div
           onClick={() => setLightboxImage(null)}
-          sx={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 9999,
-            bgcolor: 'rgba(0,0,0,0.95)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'zoom-out',
-          }}
+          className="fixed inset-0 z-[9999] flex cursor-zoom-out items-center justify-center bg-black/95"
         >
-          <IconButton
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
             onClick={() => setLightboxImage(null)}
-            sx={{
-              position: 'absolute',
-              top: 16,
-              right: 16,
-              color: 'white',
-              bgcolor: 'var(--glass-bg)',
-              '&:hover': { bgcolor: 'var(--glass-strong)' },
-            }}
+            className="absolute top-4 right-4 bg-[var(--glass-bg)] text-white hover:bg-[var(--glass-strong)]"
           >
             <CloseIcon />
-          </IconButton>
-          <IconButton
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
             onClick={(e) => { e.stopPropagation(); window.open(lightboxImage, '_blank'); }}
-            sx={{
-              position: 'absolute',
-              top: 16,
-              right: 64,
-              color: 'white',
-              bgcolor: 'var(--glass-bg)',
-              '&:hover': { bgcolor: 'var(--glass-strong)' },
-            }}
+            className="absolute top-4 right-16 bg-[var(--glass-bg)] text-white hover:bg-[var(--glass-strong)]"
             title="เปิดในแท็บใหม่"
           >
             <ZoomInIcon />
-          </IconButton>
-          <Box
-            component="img"
+          </Button>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
             src={lightboxImage}
             alt="รูปภาพขยาย"
             onClick={(e) => e.stopPropagation()}
-            sx={{
-              maxWidth: '95vw',
-              maxHeight: '90vh',
-              objectFit: 'contain',
-              borderRadius: 2,
-              cursor: 'default',
-              boxShadow: '0 25px 50px rgba(0,0,0,0.5)',
-            }}
+            className="max-h-[90vh] max-w-[95vw] cursor-default rounded-lg object-contain shadow-2xl"
           />
-          <Typography sx={{
-            position: 'absolute',
-            bottom: 24,
-            color: 'var(--text-muted)',
-            fontSize: '0.8rem',
-          }}>
+          <p className="absolute bottom-6 text-sm text-[var(--text-muted)]">
             คลิกที่ใดก็ได้เพื่อปิด
-          </Typography>
-        </Box>
+          </p>
+        </div>
       )}
 
-      {/* Order Lookup Dialog */}
-      <Dialog 
-        open={orderLookupOpen} 
-        onClose={() => setOrderLookupOpen(false)} 
-        maxWidth="sm" 
-        fullWidth
-        PaperProps={{ sx: { bgcolor: ADMIN_THEME.bgCard, color: ADMIN_THEME.text } }}
-      >
-        <DialogTitle sx={{ borderBottom: '1px solid ' + ADMIN_THEME.border, display: 'flex', alignItems: 'center', gap: 1 }}>
-          <ReceiptIcon size={24} color="#2563eb" />
-          ค้นหาออเดอร์ / ดูประวัติลูกค้า
-        </DialogTitle>
-        <DialogContent sx={{ mt: 2 }}>
-          {/* Search by Order Ref */}
-          <Typography sx={{ fontSize: '0.85rem', color: ADMIN_THEME.textMuted, mb: 1 }}>
-            ค้นหาจากหมายเลขออเดอร์
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 1, mb: 3 }}>
-            <TextField
-              fullWidth
-              size="small"
-              placeholder="เช่น ABC123"
-              value={orderSearchRef}
-              onChange={(e) => setOrderSearchRef(e.target.value)}
-              onKeyPress={(e) => { if (e.key === 'Enter') handleSearchOrder(); }}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  color: ADMIN_THEME.text,
-                  '& fieldset': { borderColor: ADMIN_THEME.border },
-                  '&:hover fieldset': { borderColor: '#2563eb' },
-                },
-              }}
-            />
-            <Button
-              variant="contained"
-              onClick={handleSearchOrder}
-              disabled={searchingOrder || !orderSearchRef.trim()}
-              sx={{ bgcolor: '#2563eb', '&:hover': { bgcolor: '#1d4ed8' }, minWidth: 80 }}
-            >
-              {searchingOrder ? <CircularProgress size={20} color="inherit" /> : <SearchIcon />}
-            </Button>
-          </Box>
-          
-          {/* Search Result */}
-          {foundOrder && (
-            <Paper sx={{ p: 2, mb: 3, bgcolor: 'var(--surface)', borderRadius: 2 }}>
-              {foundOrder.notFound ? (
-                <Typography sx={{ color: '#f87171', textAlign: 'center' }}>
-                  ไม่พบออเดอร์ "{orderSearchRef}"
-                </Typography>
-              ) : foundOrder.error ? (
-                <Typography sx={{ color: '#f87171', textAlign: 'center' }}>
-                  เกิดข้อผิดพลาดในการค้นหา
-                </Typography>
-              ) : (
-                <Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                    <Box sx={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: 1.5,
-                      bgcolor: '#2563eb',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'white',
-                      fontWeight: 700,
-                      fontSize: '0.75rem',
-                    }}>
-                      #{foundOrder.ref?.slice(-3)}
-                    </Box>
-                    <Box sx={{ flex: 1 }}>
-                      <Typography sx={{ fontWeight: 600, color: ADMIN_THEME.text }}>
-                        ออเดอร์ #{foundOrder.ref}
-                      </Typography>
-                      <Typography sx={{ fontSize: '0.75rem', color: ADMIN_THEME.textMuted }}>
-                        {foundOrder.customerName || foundOrder.name} · {foundOrder.customerEmail || foundOrder.email}
-                      </Typography>
-                    </Box>
-                    <Chip
-                      size="small"
-                      label={getOrderStatusLabel(foundOrder.status)}
-                      sx={{
-                        bgcolor: foundOrder.status === 'PAID' ? 'rgba(34, 197, 94, 0.2)' : 'rgba(251, 191, 36, 0.2)',
-                        color: foundOrder.status === 'PAID' ? '#22c55e' : '#fbbf24',
-                        fontSize: '0.7rem',
-                      }}
-                    />
-                  </Box>
-                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', fontSize: '0.8rem', color: ADMIN_THEME.textMuted, mb: 2 }}>
-                    <span>฿{foundOrder.totalAmount?.toLocaleString() || foundOrder.amount?.toLocaleString()}</span>
-                    <span>{new Date(foundOrder.date || foundOrder.createdAt).toLocaleDateString('th-TH')}</span>
-                  </Box>
-                  <Box sx={{ display: 'flex', gap: 1 }}>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      startIcon={<ViewIcon />}
-                      onClick={() => window.open(`/admin?tab=orders&ref=${foundOrder.ref}`, '_blank')}
-                      sx={{ borderColor: ADMIN_THEME.border, color: ADMIN_THEME.text, fontSize: '0.75rem' }}
-                    >
-                      ดูรายละเอียด
-                    </Button>
-                    <Button
-                      size="small"
-                      variant="contained"
-                      startIcon={<SendIcon />}
-                      onClick={() => handleSendOrderToChat(foundOrder)}
-                      disabled={!selectedChat || selectedChat.status !== 'active'}
-                      sx={{ bgcolor: '#22c55e', '&:hover': { bgcolor: '#16a34a' }, fontSize: '0.75rem' }}
-                    >
-                      ส่งในแชท
-                    </Button>
-                  </Box>
-                </Box>
-              )}
-            </Paper>
-          )}
+      <Dialog open={orderLookupOpen} onOpenChange={setOrderLookupOpen}>
+        <DialogContent className="max-w-lg bg-card text-foreground">
+          <DialogHeader className="border-b border-border pb-4">
+            <DialogTitle className="flex items-center gap-2">
+              <ReceiptIcon className="size-6 text-blue-600" />
+              ค้นหาออเดอร์ / ดูประวัติลูกค้า
+            </DialogTitle>
+          </DialogHeader>
 
-          {/* Customer's Order History */}
-          {selectedChat && (
-            <>
-              <Divider sx={{ borderColor: ADMIN_THEME.border, my: 2 }} />
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
-                <Typography sx={{ fontSize: '0.85rem', color: ADMIN_THEME.textMuted }}>
-                  ประวัติออเดอร์ของ {selectedChat.customer_name}
-                </Typography>
-                <Button
-                  size="small"
-                  onClick={() => fetchCustomerOrders(selectedChat.customer_email)}
-                  disabled={loadingCustomerOrders}
-                  sx={{ color: '#2563eb', fontSize: '0.75rem' }}
-                >
-                  {loadingCustomerOrders ? <CircularProgress size={16} /> : <RefreshIcon size={16} />}
-                </Button>
-              </Box>
-              <Box sx={{ maxHeight: 200, overflowY: 'auto' }}>
-                {customerOrders.length === 0 ? (
-                  <Typography sx={{ color: ADMIN_THEME.textMuted, fontSize: '0.8rem', textAlign: 'center', py: 2 }}>
-                    {loadingCustomerOrders ? 'กำลังโหลด...' : 'กดปุ่มรีเฟรชเพื่อโหลดประวัติ'}
-                  </Typography>
+          <div className="space-y-4 pt-2">
+            <p className="text-sm text-[var(--text-muted)]">ค้นหาจากหมายเลขออเดอร์</p>
+            <div className="flex gap-2">
+              <Input
+                placeholder="เช่น ABC123"
+                value={orderSearchRef}
+                onChange={(e) => setOrderSearchRef(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSearchOrder(); }}
+                className="bg-[var(--surface)]"
+              />
+              <Button
+                onClick={handleSearchOrder}
+                disabled={searchingOrder || !orderSearchRef.trim()}
+                className="min-w-20 bg-blue-600 hover:bg-blue-700"
+              >
+                {searchingOrder ? <Loader2 className="size-5 animate-spin" /> : <SearchIcon className="size-5" />}
+              </Button>
+            </div>
+
+            {foundOrder && (
+              <div className="rounded-lg bg-[var(--surface)] p-4">
+                {foundOrder.notFound ? (
+                  <p className="text-center text-red-400">ไม่พบออเดอร์ &quot;{orderSearchRef}&quot;</p>
+                ) : foundOrder.error ? (
+                  <p className="text-center text-red-400">เกิดข้อผิดพลาดในการค้นหา</p>
                 ) : (
-                  customerOrders.map((order) => (
-                    <Paper
-                      key={order.ref}
-                      sx={{
-                        p: 1.5,
-                        mb: 1,
-                        bgcolor: 'var(--surface)',
-                        borderRadius: 1.5,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 1,
-                        cursor: 'pointer',
-                        '&:hover': { bgcolor: 'rgba(37, 99, 235, 0.1)' },
-                      }}
-                      onClick={() => handleSendOrderToChat(order)}
-                    >
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: ADMIN_THEME.text }}>
-                          #{order.ref} · ฿{order.totalAmount?.toLocaleString() || order.amount?.toLocaleString()}
-                        </Typography>
-                        <Typography sx={{ fontSize: '0.7rem', color: ADMIN_THEME.textMuted }}>
-                          {new Date(order.date || order.createdAt).toLocaleDateString('th-TH')} · {order.status}
-                        </Typography>
-                      </Box>
-                      <SendIcon size={16} color="#2563eb" />
-                    </Paper>
-                  ))
+                  <div>
+                    <div className="mb-3 flex items-center gap-2">
+                      <div className="flex size-10 items-center justify-center rounded-md bg-blue-600 text-xs font-bold text-white">
+                        #{foundOrder.ref?.slice(-3)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold">ออเดอร์ #{foundOrder.ref}</p>
+                        <p className="text-xs text-[var(--text-muted)]">
+                          {foundOrder.customerName || foundOrder.name} · {foundOrder.customerEmail || foundOrder.email}
+                        </p>
+                      </div>
+                      <Badge
+                        className={cn(
+                          'text-[0.7rem]',
+                          foundOrder.status === 'PAID'
+                            ? 'bg-green-500/20 text-green-500'
+                            : 'bg-amber-400/20 text-amber-400'
+                        )}
+                      >
+                        {getOrderStatusLabel(foundOrder.status)}
+                      </Badge>
+                    </div>
+                    <div className="mb-3 flex flex-wrap gap-2 text-sm text-[var(--text-muted)]">
+                      <span>฿{foundOrder.totalAmount?.toLocaleString() || foundOrder.amount?.toLocaleString()}</span>
+                      <span>{new Date(foundOrder.date || foundOrder.createdAt).toLocaleDateString('th-TH')}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => window.open(`/admin?tab=orders&ref=${foundOrder.ref}`, '_blank')}
+                      >
+                        <ViewIcon className="size-4" />
+                        ดูรายละเอียด
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="bg-green-500 text-xs hover:bg-green-600"
+                        onClick={() => handleSendOrderToChat(foundOrder)}
+                        disabled={!selectedChat || selectedChat.status !== 'active'}
+                      >
+                        <SendIcon className="size-4" />
+                        ส่งในแชท
+                      </Button>
+                    </div>
+                  </div>
                 )}
-              </Box>
-            </>
-          )}
+              </div>
+            )}
+
+            {selectedChat && (
+              <>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-[var(--text-muted)]">
+                    ประวัติออเดอร์ของ {selectedChat.customer_name}
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => fetchCustomerOrders(selectedChat.customer_email)}
+                    disabled={loadingCustomerOrders}
+                    className="text-blue-600"
+                  >
+                    {loadingCustomerOrders ? <Loader2 className="size-4 animate-spin" /> : <RefreshIcon className="size-4" />}
+                  </Button>
+                </div>
+                <div className="max-h-[200px] overflow-y-auto">
+                  {customerOrders.length === 0 ? (
+                    <p className="py-4 text-center text-sm text-[var(--text-muted)]">
+                      {loadingCustomerOrders ? 'กำลังโหลด...' : 'กดปุ่มรีเฟรชเพื่อโหลดประวัติ'}
+                    </p>
+                  ) : (
+                    customerOrders.map((order) => (
+                      <div
+                        key={order.ref}
+                        className="mb-2 flex cursor-pointer items-center gap-2 rounded-md bg-[var(--surface)] p-3 hover:bg-blue-600/10"
+                        onClick={() => handleSendOrderToChat(order)}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold">
+                            #{order.ref} · ฿{order.totalAmount?.toLocaleString() || order.amount?.toLocaleString()}
+                          </p>
+                          <p className="text-xs text-[var(--text-muted)]">
+                            {new Date(order.date || order.createdAt).toLocaleDateString('th-TH')} · {order.status}
+                          </p>
+                        </div>
+                        <SendIcon className="size-4 shrink-0 text-blue-600" />
+                      </div>
+                    ))
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          <DialogFooter className="border-t border-border pt-4">
+            <Button variant="ghost" onClick={() => setOrderLookupOpen(false)} className="text-[var(--text-muted)]">
+              ปิด
+            </Button>
+          </DialogFooter>
         </DialogContent>
-        <DialogActions sx={{ borderTop: '1px solid ' + ADMIN_THEME.border, p: 2 }}>
-          <Button onClick={() => setOrderLookupOpen(false)} sx={{ color: ADMIN_THEME.textMuted }}>ปิด</Button>
-        </DialogActions>
       </Dialog>
 
-      <Box sx={{ display: 'flex', height: isMobile ? 'calc(100vh - 120px)' : 'calc(100vh - 200px)', minHeight: 400 }}>
+      <div className={cn(
+        'flex min-h-[400px]',
+        isMobile ? 'h-[calc(100vh-120px)]' : 'h-[calc(100vh-200px)]'
+      )}>
         {/* Chat List Panel */}
-        <Paper sx={{
-          width: isMobile ? '100%' : 340,
-          flexShrink: 0,
-          bgcolor: ADMIN_THEME.bgCard,
-          borderRadius: isMobile ? 0 : 2,
-          overflow: 'hidden',
-          display: isMobile && mobileShowChat ? 'none' : 'flex',
-          flexDirection: 'column',
-          mr: isMobile ? 0 : 2,
-          height: '100%',
-        }}>
-          <Box sx={{ p: 2, borderBottom: '1px solid ' + ADMIN_THEME.border }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
-              <Typography sx={{ fontWeight: 700, color: ADMIN_THEME.text, fontSize: { xs: '0.9rem', sm: '1rem' } }}>
-                <SupportAgentIcon size={24} style={{ marginRight: 8, verticalAlign: 'middle' }} />
+        <div className={cn(
+          'flex shrink-0 flex-col overflow-hidden border bg-card',
+          isMobile ? 'w-full rounded-none' : 'mr-2 w-[340px] rounded-lg',
+          isMobile && mobileShowChat && 'hidden'
+        )}>
+          <div className="border-b border-border p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="flex items-center text-sm font-bold sm:text-base">
+                <SupportAgentIcon className="mr-2 size-6" />
                 แชทสนับสนุน
-                <Box
-                  component="span"
-                  sx={{
-                    display: 'inline-block',
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    ml: 1,
-                    verticalAlign: 'middle',
-                    bgcolor: listConnectionState === 'connected' ? '#30d158'
-                      : listConnectionState === 'connecting' ? '#ff9f0a'
-                      : '#ff453a',
-                    boxShadow: listConnectionState === 'connected' ? '0 0 4px #30d158' : 'none',
-                    animation: listConnectionState === 'connecting' ? 'pulse-dot 1.2s ease-in-out infinite' : 'none',
-                    '@keyframes pulse-dot': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.3 } },
-                  }}
-                  title={listConnectionState === 'connected' ? 'เชื่อมต่อแบบ Realtime' : listConnectionState === 'connecting' ? 'กำลังเชื่อมต่อ...' : 'ไม่ได้เชื่อมต่อ'}
+                <span
+                  className={cn(
+                    'ml-2 inline-block size-2 rounded-full align-middle',
+                    listConnectionState === 'connected' && 'bg-[#30d158] shadow-[0_0_4px_#30d158]',
+                    listConnectionState === 'connecting' && 'animate-[pulse-dot_1.2s_ease-in-out_infinite] bg-[#ff9f0a]',
+                    listConnectionState !== 'connected' && listConnectionState !== 'connecting' && 'bg-[#ff453a]'
+                  )}
+                  title={
+                    listConnectionState === 'connected' ? 'เชื่อมต่อแบบ Realtime'
+                      : listConnectionState === 'connecting' ? 'กำลังเชื่อมต่อ...'
+                      : 'ไม่ได้เชื่อมต่อ'
+                  }
                 />
-              </Typography>
-              <Box>
-                <IconButton size="small" onClick={() => setSettingsOpen(true)} sx={{ color: ADMIN_THEME.textMuted }}>
-                  <SettingsIcon size={18} />
-                </IconButton>
-                <IconButton size="small" onClick={() => fetchChats()} sx={{ color: ADMIN_THEME.textMuted }}>
-                  <RefreshIcon size={18} />
-                </IconButton>
-              </Box>
-            </Box>
+              </h2>
+              <div className="flex items-center">
+                <Button variant="ghost" size="icon-sm" onClick={() => setSettingsOpen(true)} className="text-[var(--text-muted)]">
+                  <SettingsIcon className="size-[18px]" />
+                </Button>
+                <Button variant="ghost" size="icon-sm" onClick={() => fetchChats()} className="text-[var(--text-muted)]">
+                  <RefreshIcon className="size-[18px]" />
+                </Button>
+              </div>
+            </div>
             {stats && (
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                <Chip size="small" icon={<DotIcon size={10} color="#fbbf24" />}
-                  label={'รอ ' + stats.pendingCount}
-                  sx={{ bgcolor: 'rgba(251, 191, 36, 0.1)', color: '#fbbf24', fontWeight: 500, fontSize: '0.7rem' }} />
-                <Chip size="small" icon={<DotIcon size={10} color="#22c55e" />}
-                  label={'Active ' + stats.activeCount}
-                  sx={{ bgcolor: 'rgba(34, 197, 94, 0.1)', color: '#22c55e', fontWeight: 500, fontSize: '0.7rem' }} />
+              <div className="flex flex-wrap gap-2">
+                <Badge className="bg-amber-400/10 text-[0.7rem] font-medium text-amber-400">
+                  <DotIcon className="size-2.5 fill-amber-400 text-amber-400" />
+                  รอ {stats.pendingCount}
+                </Badge>
+                <Badge className="bg-green-500/10 text-[0.7rem] font-medium text-green-500">
+                  <DotIcon className="size-2.5 fill-green-500 text-green-500" />
+                  Active {stats.activeCount}
+                </Badge>
                 {stats.avgRating > 0 && (
-                  <Chip size="small" icon={<StarIcon size={12} color="#fbbf24" />}
-                    label={stats.avgRating.toFixed(1)}
-                    sx={{ bgcolor: 'rgba(251, 191, 36, 0.1)', color: '#fbbf24', fontWeight: 500, fontSize: '0.7rem' }} />
+                  <Badge className="bg-amber-400/10 text-[0.7rem] font-medium text-amber-400">
+                    <StarIcon className="size-3 fill-amber-400 text-amber-400" />
+                    {stats.avgRating.toFixed(1)}
+                  </Badge>
                 )}
-              </Box>
+              </div>
             )}
-          </Box>
+          </div>
 
-          <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)} variant="fullWidth"
-            sx={{
-              borderBottom: '1px solid ' + ADMIN_THEME.border,
-              '& .MuiTab-root': { color: ADMIN_THEME.textMuted, minHeight: 36, fontSize: '0.7rem', px: 0.5, '&.Mui-selected': { color: '#2563eb' } },
-              '& .MuiTabs-indicator': { bgcolor: '#2563eb' },
-            }}>
-            <Tab label="ทั้งหมด" />
-            <Tab label={<Badge badgeContent={stats?.pendingCount} color="warning" max={99}><span>รอรับ</span></Badge>} />
-            <Tab label="ของฉัน" />
-            <Tab label="ปิด" />
+          <Tabs
+            value={TAB_KEYS[tabValue]}
+            onValueChange={(v) => setTabValue(TAB_KEYS.indexOf(v as typeof TAB_KEYS[number]))}
+            className="flex min-h-0 flex-1 flex-col"
+          >
+            <TabsList variant="line" className="h-9 w-full rounded-none border-b border-border bg-transparent p-0">
+              <TabsTrigger value="all" className="min-h-9 flex-1 px-0.5 text-[0.7rem] data-[state=active]:text-blue-600">
+                ทั้งหมด
+              </TabsTrigger>
+              <TabsTrigger value="pending" className="relative min-h-9 flex-1 px-0.5 text-[0.7rem] data-[state=active]:text-blue-600">
+                รอรับ
+                {(stats?.pendingCount ?? 0) > 0 && (
+                  <span className="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
+                    {stats!.pendingCount > 99 ? '99+' : stats!.pendingCount}
+                  </span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="my" className="min-h-9 flex-1 px-0.5 text-[0.7rem] data-[state=active]:text-blue-600">
+                ของฉัน
+              </TabsTrigger>
+              <TabsTrigger value="closed" className="min-h-9 flex-1 px-0.5 text-[0.7rem] data-[state=active]:text-blue-600">
+                ปิด
+              </TabsTrigger>
+            </TabsList>
           </Tabs>
 
-          <Box sx={{ flex: 1, overflowY: 'auto' }}>
+          <div className="min-h-0 flex-1 overflow-y-auto">
             {loading ? (
-              <Box sx={{ display: 'grid', placeItems: 'center', height: 200 }}>
-                <CircularProgress size={32} sx={{ color: '#2563eb' }} />
-              </Box>
+              <div className="grid h-[200px] place-items-center">
+                <Loader2 className="size-8 animate-spin text-blue-600" />
+              </div>
             ) : chats.length === 0 ? (
-              <Box sx={{ p: 3, textAlign: 'center' }}>
-                <ChatIcon size={48} color={ADMIN_THEME.textMuted} style={{ marginBottom: 8 }} />
-                <Typography sx={{ color: ADMIN_THEME.textMuted }}>ไม่มีแชท</Typography>
-              </Box>
+              <div className="p-6 text-center">
+                <ChatIcon className="mx-auto mb-2 size-12 text-[var(--text-muted)]" />
+                <p className="text-[var(--text-muted)]">ไม่มีแชท</p>
+              </div>
             ) : (
-              <List sx={{ py: 0 }}>
+              <div>
                 {chats.map((chat) => (
                   <React.Fragment key={chat.id}>
-                    <ListItemButton selected={selectedChat?.id === chat.id} onClick={() => handleSelectChat(chat.id)}
-                      sx={{ py: 1.5, '&.Mui-selected': { bgcolor: 'rgba(37, 99, 235, 0.1)', borderLeft: '3px solid #2563eb' }, '&:hover': { bgcolor: ADMIN_THEME.cardHover } }}>
-                      <ListItemAvatar>
-                        <Badge badgeContent={chat.unread_count} color="error" overlap="circular">
-                          <Avatar 
-                            src={chat.customer_avatar || undefined}
-                            sx={{ bgcolor: getStatusColor(chat.status), width: 40, height: 40 }}
+                    <button
+                      type="button"
+                      onClick={() => handleSelectChat(chat.id)}
+                      className={cn(
+                        'flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/50',
+                        selectedChat?.id === chat.id && 'border-l-[3px] border-l-blue-600 bg-blue-600/10'
+                      )}
+                    >
+                      <div className="relative shrink-0">
+                        <Avatar className="size-10">
+                          {chat.customer_avatar && (
+                            <AvatarImage src={chat.customer_avatar} alt={chat.customer_name} />
+                          )}
+                          <AvatarFallback style={{ backgroundColor: getStatusColor(chat.status) }}>
+                            <PersonIcon className="size-4 text-white" />
+                          </AvatarFallback>
+                        </Avatar>
+                        <UnreadAvatarBadge count={chat.unread_count} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1">
+                          <p className={cn(
+                            'flex-1 truncate text-sm',
+                            chat.unread_count > 0 ? 'font-bold' : 'font-medium'
+                          )}>
+                            {chat.customer_name}
+                          </p>
+                          <Badge
+                            className="h-4 px-1 text-[0.55rem]"
+                            style={{
+                              backgroundColor: getStatusColor(chat.status) + '20',
+                              color: getStatusColor(chat.status),
+                            }}
                           >
-                            {!chat.customer_avatar && <PersonIcon />}
-                          </Avatar>
-                        </Badge>
-                      </ListItemAvatar>
-                      <ListItemText
-                        primary={
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <Typography sx={{ fontWeight: chat.unread_count > 0 ? 700 : 500, color: ADMIN_THEME.text, fontSize: '0.85rem', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {chat.customer_name}
-                            </Typography>
-                            <Chip size="small" label={getStatusLabel(chat.status)} sx={{ height: 16, fontSize: '0.55rem', bgcolor: getStatusColor(chat.status) + '20', color: getStatusColor(chat.status) }} />
-                          </Box>
-                        }
-                        secondary={
-                          <Box component="span" sx={{ display: 'block' }}>
-                            <Typography component="span" sx={{ display: 'block', color: ADMIN_THEME.textMuted, fontSize: '0.7rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {chat.last_message_preview || chat.subject}
-                            </Typography>
-                            <Typography component="span" sx={{ display: 'block', color: ADMIN_THEME.textMuted, fontSize: '0.65rem', mt: 0.25 }}>
-                              {formatTime(chat.last_message_at || chat.created_at)}
-                            </Typography>
-                          </Box>
-                        }
-                      />
-                    </ListItemButton>
-                    <Divider sx={{ borderColor: ADMIN_THEME.border }} />
+                            {getStatusLabel(chat.status)}
+                          </Badge>
+                        </div>
+                        <p className="truncate text-xs text-[var(--text-muted)]">
+                          {chat.last_message_preview || chat.subject}
+                        </p>
+                        <p className="mt-0.5 text-[0.65rem] text-[var(--text-muted)]">
+                          {formatTime(chat.last_message_at || chat.created_at)}
+                        </p>
+                      </div>
+                    </button>
+                    <Separator />
                   </React.Fragment>
                 ))}
-              </List>
+              </div>
             )}
-          </Box>
-        </Paper>
+          </div>
+        </div>
 
         {/* Chat Detail Panel */}
-        <Paper sx={{
-          flex: 1,
-          bgcolor: ADMIN_THEME.bgCard,
-          borderRadius: isMobile ? 0 : 2,
-          overflow: 'hidden',
-          display: isMobile && !mobileShowChat ? 'none' : 'flex',
-          flexDirection: 'column',
-          height: '100%',
-          minHeight: 0,
-        }}>
+        <div className={cn(
+          'flex min-h-0 flex-1 flex-col overflow-hidden border bg-card',
+          isMobile ? 'rounded-none' : 'rounded-lg',
+          isMobile && !mobileShowChat && 'hidden'
+        )}>
           {selectedChat ? (
             <>
-              <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid ' + ADMIN_THEME.border, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <div className="flex items-center gap-2 border-b border-border px-4 py-3">
                 {isMobile && (
-                  <IconButton onClick={handleMobileBack} sx={{ color: ADMIN_THEME.text, mr: 0.5 }}>
+                  <Button variant="ghost" size="icon-sm" onClick={handleMobileBack} className="mr-1">
                     <ArrowBackIcon />
-                  </IconButton>
+                  </Button>
                 )}
-                <Avatar 
-                  src={selectedChat.customer_avatar || undefined} 
-                  sx={{ bgcolor: getStatusColor(selectedChat.status), width: 36, height: 36 }}
-                >
-                  {!selectedChat.customer_avatar && <PersonIcon />}
+                <Avatar className="size-9">
+                  {selectedChat.customer_avatar && (
+                    <AvatarImage src={selectedChat.customer_avatar} alt={selectedChat.customer_name} />
+                  )}
+                  <AvatarFallback style={{ backgroundColor: getStatusColor(selectedChat.status) }}>
+                    <PersonIcon className="size-4 text-white" />
+                  </AvatarFallback>
                 </Avatar>
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography sx={{ fontWeight: 700, color: ADMIN_THEME.text, fontSize: '0.9rem' }}>{selectedChat.customer_name}</Typography>
-                  <Typography sx={{ fontSize: '0.7rem', color: ADMIN_THEME.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Box
-                      component="span"
-                      sx={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: '50%',
-                        flexShrink: 0,
-                        bgcolor: connectionState === 'connected' ? '#30d158'
-                          : connectionState === 'connecting' ? '#ff9f0a'
-                          : '#ff453a',
-                        boxShadow: connectionState === 'connected' ? '0 0 3px #30d158' : 'none',
-                      }}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold">{selectedChat.customer_name}</p>
+                  <p className="flex items-center gap-1 truncate text-xs text-[var(--text-muted)]">
+                    <span
+                      className={cn(
+                        'size-1.5 shrink-0 rounded-full',
+                        connectionState === 'connected' && 'bg-[#30d158] shadow-[0_0_3px_#30d158]',
+                        connectionState === 'connecting' && 'bg-[#ff9f0a]',
+                        connectionState !== 'connected' && connectionState !== 'connecting' && 'bg-[#ff453a]'
+                      )}
                     />
-                    {otherTyping 
+                    {otherTyping
                       ? (typingDisplay || 'ลูกค้ากำลังพิมพ์...')
                       : selectedChat.subject}
-                  </Typography>
-                </Box>
-                {/* Order Lookup Button */}
-                <IconButton
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
                   onClick={() => {
                     setOrderLookupOpen(true);
                     setFoundOrder(null);
                     setOrderSearchRef('');
                     fetchCustomerOrders(selectedChat.customer_email);
                   }}
-                  sx={{ 
-                    color: '#22c55e',
-                    bgcolor: 'rgba(34, 197, 94, 0.1)',
-                    '&:hover': { bgcolor: 'rgba(34, 197, 94, 0.2)' },
-                  }}
+                  className="bg-green-500/10 text-green-500 hover:bg-green-500/20"
                   title="ค้นหาออเดอร์"
                 >
-                  <ReceiptIcon size={20} />
-                </IconButton>
+                  <ReceiptIcon className="size-5" />
+                </Button>
                 {selectedChat.status === 'pending' && (
-                  <Button variant="contained" size="small" startIcon={<AcceptIcon />} onClick={() => handleAcceptChat(selectedChat.id)}
-                    sx={{ bgcolor: '#22c55e', '&:hover': { bgcolor: '#16a34a' }, fontSize: '0.75rem', py: 0.5 }}>
+                  <Button
+                    size="sm"
+                    onClick={() => handleAcceptChat(selectedChat.id)}
+                    className="bg-green-500 text-xs hover:bg-green-600"
+                  >
+                    <AcceptIcon className="size-4" />
                     รับเคส
                   </Button>
                 )}
                 {selectedChat.status === 'active' && (
-                  <Button variant="outlined" size="small" startIcon={<CheckCircleIcon />} onClick={handleCloseChat}
-                    sx={{ borderColor: '#64748b', color: 'var(--text-muted)', '&:hover': { borderColor: '#94a3b8', bgcolor: 'rgba(148, 163, 184, 0.1)' }, fontSize: '0.75rem', py: 0.5 }}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleCloseChat}
+                    className="border-slate-500 text-xs text-[var(--text-muted)] hover:bg-slate-500/10"
+                  >
+                    <CheckCircleIcon className="size-4" />
                     ปิด
                   </Button>
                 )}
                 {selectedChat.status === 'closed' && selectedChat.rating && (
-                  <Rating value={selectedChat.rating} readOnly size="small" />
+                  <StarRating value={selectedChat.rating} />
                 )}
-              </Box>
+              </div>
 
-              <Box sx={{ flex: 1, overflowY: 'auto', p: 2, display: 'flex', flexDirection: 'column', gap: 1.5, bgcolor: 'var(--surface)' }}
+              <div
+                className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto bg-[var(--surface)] p-4"
                 onScroll={(e) => {
                   const el = e.target as HTMLDivElement;
                   isUserScrollingRef.current = el.scrollHeight - el.scrollTop - el.clientHeight > 100;
-                }}>
+                }}
+              >
                 {(() => {
                   const messages = selectedChat.messages;
                   const lastAdminMsgIndex = messages.map(m => m.sender).lastIndexOf('admin');
                   return messages.map((msg, index) => {
-                  const { text, imageUrl, orderRef } = parseMessage(msg.message);
-                  const isImageOnly = Boolean(imageUrl && !text && !orderRef);
-                  const isLastAdminMessage = msg.sender === 'admin' && index === lastAdminMsgIndex;
-                  return (
-                    <Box key={msg.id} sx={{ display: 'flex', justifyContent: msg.sender === 'admin' ? 'flex-end' : msg.sender === 'system' ? 'center' : 'flex-start' }}>
-                      {msg.sender === 'system' ? (
-                        <Chip size="small" label={msg.message} sx={{ bgcolor: 'var(--glass-bg)', color: ADMIN_THEME.textMuted, fontSize: '0.7rem' }} />
-                      ) : (
-                        <Box sx={{ maxWidth: { xs: '85%', sm: '75%' }, display: 'flex', flexDirection: msg.sender === 'admin' ? 'row-reverse' : 'row', alignItems: 'flex-start', gap: 1 }}>
-                          {msg.sender === 'customer' && (
-                            <Avatar src={msg.sender_avatar || undefined} sx={{ width: 28, height: 28, bgcolor: '#fbbf24', flexShrink: 0 }}>
-                              {!msg.sender_avatar && <PersonIcon size={16} />}
-                            </Avatar>
-                          )}
-                          {msg.sender === 'admin' && (
-                            <Avatar src={msg.sender_avatar || undefined} sx={{ width: 28, height: 28, bgcolor: '#2563eb', flexShrink: 0 }}>
-                              {!msg.sender_avatar && <SupportAgentIcon size={16} />}
-                            </Avatar>
-                          )}
-                          <Box sx={{ minWidth: 0 }}>
-                            {isImageOnly ? (
-                              <Box
-                                component="img"
-                                src={imageUrl!}
-                                alt="รูปภาพ"
-                                loading="lazy"
-                                onClick={(e) => { e.stopPropagation(); setLightboxImage(imageUrl!); }}
-                                sx={{
-                                  display: 'block',
-                                  maxWidth: { xs: 200, sm: 260 },
-                                  maxHeight: { xs: 260, sm: 340 },
-                                  width: 'auto',
-                                  height: 'auto',
-                                  objectFit: 'contain',
-                                  borderRadius: '14px',
-                                  cursor: 'zoom-in',
-                                  boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
-                                  opacity: (msg as any)._optimistic ? 0.6 : 1,
-                                  transition: 'opacity 0.3s ease',
-                                  '&:hover': { opacity: 0.92 },
-                                }}
-                              />
-                            ) : (
-                              <Paper elevation={0} sx={{
-                                px: 1.5, py: 1,
-                                bgcolor: (msg as any)._failed ? '#ff453a' : msg.sender === 'admin' ? '#2563eb' : ADMIN_THEME.bgCard,
-                                color: ADMIN_THEME.text,
-                                borderRadius: 2,
-                                borderBottomRightRadius: msg.sender === 'admin' ? 4 : 16,
-                                borderBottomLeftRadius: msg.sender === 'customer' ? 4 : 16,
-                                opacity: (msg as any)._optimistic ? 0.6 : 1,
-                                transition: 'opacity 0.3s ease',
-                              }}>
-                                {text && <Typography sx={{ fontSize: '0.85rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.4 }}>{text}</Typography>}
-                                {orderRef && (
-                                  <Box
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setOrderSearchRef(orderRef || '');
-                                      setOrderLookupOpen(true);
-                                      handleSearchOrder();
-                                    }}
-                                    sx={{
-                                      mt: text ? 1 : 0,
-                                      p: 1.5,
-                                      bgcolor: msg.sender === 'admin' ? 'var(--glass-bg)' : 'var(--surface)',
-                                      borderRadius: 1.5,
-                                      border: '1px solid',
-                                      borderColor: msg.sender === 'admin' ? 'var(--glass-border)' : ADMIN_THEME.border,
-                                      cursor: 'pointer',
-                                      transition: 'all 0.2s',
-                                      '&:hover': { 
-                                        bgcolor: msg.sender === 'admin' ? 'var(--glass-strong)' : 'rgba(37, 99, 235, 0.1)',
-                                      },
-                                    }}
-                                  >
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                      <Box sx={{
-                                        width: 32,
-                                        height: 32,
-                                        borderRadius: 1,
-                                        bgcolor: '#22c55e',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                      }}>
-                                        <ReceiptIcon size={18} color="white" />
-                                      </Box>
-                                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                                        <Typography sx={{ 
-                                          fontSize: '0.8rem', 
-                                          fontWeight: 600,
-                                          color: msg.sender === 'admin' ? 'white' : ADMIN_THEME.text,
-                                        }}>
-                                          ออเดอร์ #{orderRef}
-                                        </Typography>
-                                        <Typography sx={{ 
-                                          fontSize: '0.7rem',
-                                          color: msg.sender === 'admin' ? ADMIN_THEME.text : ADMIN_THEME.textMuted,
-                                        }}>
-                                          คลิกเพื่อดูรายละเอียด
-                                        </Typography>
-                                      </Box>
-                                      <ViewIcon size={16} color={msg.sender === 'admin' ? 'var(--text-muted)' : ADMIN_THEME.textMuted} />
-                                    </Box>
-                                  </Box>
-                                )}
-                                {imageUrl && (
-                                  <Box component="img" src={imageUrl} alt="รูปภาพ" loading="lazy"
-                                    sx={{ width: '100%', maxWidth: { xs: 160, sm: 200 }, height: 'auto', maxHeight: { xs: 140, sm: 180 }, objectFit: 'cover', borderRadius: 1.5, mt: text || orderRef ? 1 : 0, cursor: 'zoom-in', transition: 'transform 0.2s', '&:hover': { transform: 'scale(1.02)' } }}
-                                    onClick={(e) => { e.stopPropagation(); setLightboxImage(imageUrl); }} />
-                                )}
-                              </Paper>
+                    const { text, imageUrl, orderRef } = parseMessage(msg.message);
+                    const isImageOnly = Boolean(imageUrl && !text && !orderRef);
+                    const isLastAdminMessage = msg.sender === 'admin' && index === lastAdminMsgIndex;
+                    const isOptimistic = (msg as ChatMessage & { _optimistic?: boolean })._optimistic;
+                    const isFailed = (msg as ChatMessage & { _failed?: boolean })._failed;
+
+                    return (
+                      <div
+                        key={msg.id}
+                        className={cn(
+                          'flex',
+                          msg.sender === 'admin' ? 'justify-end' : msg.sender === 'system' ? 'justify-center' : 'justify-start'
+                        )}
+                      >
+                        {msg.sender === 'system' ? (
+                          <Badge variant="secondary" className="bg-[var(--glass-bg)] text-[0.7rem] text-[var(--text-muted)]">
+                            {msg.message}
+                          </Badge>
+                        ) : (
+                          <div className={cn(
+                            'flex max-w-[85%] items-start gap-2 sm:max-w-[75%]',
+                            msg.sender === 'admin' && 'flex-row-reverse'
+                          )}>
+                            {msg.sender === 'customer' && (
+                              <Avatar size="sm" className="size-7 shrink-0">
+                                {msg.sender_avatar && <AvatarImage src={msg.sender_avatar} alt="" />}
+                                <AvatarFallback className="bg-amber-400">
+                                  <PersonIcon className="size-4" />
+                                </AvatarFallback>
+                              </Avatar>
                             )}
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.25, justifyContent: msg.sender === 'admin' ? 'flex-end' : 'flex-start', flexWrap: 'wrap' }}>
-                              <Typography sx={{ fontSize: '0.6rem', color: ADMIN_THEME.textMuted }}>
-                                {new Date(msg.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} · {formatTime(msg.created_at)}
-                              </Typography>
-                              {/* Read receipts only for the last admin message */}
-                              {isLastAdminMessage && (
-                                <>
-                                  {msg.is_read 
-                                    ? <DoneAllIcon size={12} color="#22c55e" /> 
-                                    : <DoneIcon size={12} color={ADMIN_THEME.textMuted} />
-                                  }
-                                  {msg.is_read && msg.read_at && (
-                                    <Typography sx={{ fontSize: '0.55rem', color: '#22c55e' }}>
-                                      ลูกค้าอ่านแล้ว {formatTime(msg.read_at)}
-                                    </Typography>
+                            {msg.sender === 'admin' && (
+                              <Avatar size="sm" className="size-7 shrink-0">
+                                {msg.sender_avatar && <AvatarImage src={msg.sender_avatar} alt="" />}
+                                <AvatarFallback className="bg-blue-600">
+                                  <SupportAgentIcon className="size-4 text-white" />
+                                </AvatarFallback>
+                              </Avatar>
+                            )}
+                            <div className="min-w-0">
+                              {isImageOnly ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={imageUrl!}
+                                  alt="รูปภาพ"
+                                  loading="lazy"
+                                  onClick={(e) => { e.stopPropagation(); setLightboxImage(imageUrl!); }}
+                                  className={cn(
+                                    'block max-h-[260px] max-w-[200px] cursor-zoom-in rounded-[14px] object-contain shadow-md transition-opacity hover:opacity-90 sm:max-h-[340px] sm:max-w-[260px]',
+                                    isOptimistic && 'opacity-60'
                                   )}
-                                </>
+                                />
+                              ) : (
+                                <div
+                                  className={cn(
+                                    'rounded-lg px-3 py-2 transition-opacity',
+                                    isFailed ? 'bg-[#ff453a]' : msg.sender === 'admin' ? 'bg-blue-600 text-white' : 'bg-card',
+                                    msg.sender === 'admin' ? 'rounded-br-sm' : 'rounded-bl-sm',
+                                    isOptimistic && 'opacity-60'
+                                  )}
+                                >
+                                  {text && (
+                                    <p className="whitespace-pre-wrap break-words text-sm leading-snug">{text}</p>
+                                  )}
+                                  {orderRef && (
+                                    <div
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setOrderSearchRef(orderRef || '');
+                                        setOrderLookupOpen(true);
+                                        handleSearchOrder();
+                                      }}
+                                      className={cn(
+                                        'cursor-pointer rounded-md border p-3 transition-all',
+                                        text && 'mt-2',
+                                        msg.sender === 'admin'
+                                          ? 'border-[var(--glass-border)] bg-[var(--glass-bg)] hover:bg-[var(--glass-strong)]'
+                                          : 'border-border bg-[var(--surface)] hover:bg-blue-600/10'
+                                      )}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <div className="flex size-8 items-center justify-center rounded bg-green-500">
+                                          <ReceiptIcon className="size-[18px] text-white" />
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                          <p className={cn(
+                                            'text-sm font-semibold',
+                                            msg.sender === 'admin' ? 'text-white' : 'text-foreground'
+                                          )}>
+                                            ออเดอร์ #{orderRef}
+                                          </p>
+                                          <p className={cn(
+                                            'text-xs',
+                                            msg.sender === 'admin' ? 'text-[var(--text-muted)]' : 'text-[var(--text-muted)]'
+                                          )}>
+                                            คลิกเพื่อดูรายละเอียด
+                                          </p>
+                                        </div>
+                                        <ViewIcon className="size-4 text-[var(--text-muted)]" />
+                                      </div>
+                                    </div>
+                                  )}
+                                  {imageUrl && (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                      src={imageUrl}
+                                      alt="รูปภาพ"
+                                      loading="lazy"
+                                      className={cn(
+                                        'mt-2 max-h-[140px] w-full max-w-[160px] cursor-zoom-in rounded-md object-cover transition-transform hover:scale-[1.02] sm:max-h-[180px] sm:max-w-[200px]',
+                                        !text && !orderRef && 'mt-0'
+                                      )}
+                                      onClick={(e) => { e.stopPropagation(); setLightboxImage(imageUrl); }}
+                                    />
+                                  )}
+                                </div>
                               )}
-                            </Box>
-                          </Box>
-                        </Box>
-                      )}
-                    </Box>
-                  );
-                });
+                              <div className={cn(
+                                'mt-0.5 flex flex-wrap items-center gap-1',
+                                msg.sender === 'admin' ? 'justify-end' : 'justify-start'
+                              )}>
+                                <span className="text-[0.6rem] text-[var(--text-muted)]">
+                                  {new Date(msg.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} · {formatTime(msg.created_at)}
+                                </span>
+                                {isLastAdminMessage && (
+                                  <>
+                                    {msg.is_read
+                                      ? <DoneAllIcon className="size-3 text-green-500" />
+                                      : <DoneIcon className="size-3 text-[var(--text-muted)]" />
+                                    }
+                                    {msg.is_read && msg.read_at && (
+                                      <span className="text-[0.55rem] text-green-500">
+                                        ลูกค้าอ่านแล้ว {formatTime(msg.read_at)}
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  });
                 })()}
-                
+
                 {otherTyping && (
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Avatar sx={{ width: 28, height: 28, bgcolor: '#fbbf24' }}><PersonIcon size={16} /></Avatar>
-                    <Paper sx={{ px: 2, py: 1, bgcolor: ADMIN_THEME.bgCard, borderRadius: 2 }}>
-                      <Typography sx={{ fontSize: '0.75rem', color: ADMIN_THEME.textMuted, mb: 0.5 }}>
+                  <div className="flex items-center gap-2">
+                    <Avatar size="sm" className="size-7 bg-amber-400">
+                      <AvatarFallback className="bg-amber-400">
+                        <PersonIcon className="size-4" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="rounded-lg bg-card px-4 py-2">
+                      <p className="mb-1 text-xs text-[var(--text-muted)]">
                         {typingDisplay || 'ลูกค้ากำลังพิมพ์...'}
-                      </Typography>
-                      <Box sx={{ display: 'flex', gap: 0.5 }}>
-                        <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: ADMIN_THEME.textMuted, animation: 'bounce 1.4s infinite ease-in-out both', animationDelay: '0s' }} />
-                        <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: ADMIN_THEME.textMuted, animation: 'bounce 1.4s infinite ease-in-out both', animationDelay: '0.2s' }} />
-                        <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: ADMIN_THEME.textMuted, animation: 'bounce 1.4s infinite ease-in-out both', animationDelay: '0.4s' }} />
-                      </Box>
-                    </Paper>
-                  </Box>
+                      </p>
+                      <div className="flex gap-1">
+                        {[0, 0.2, 0.4].map((delay) => (
+                          <span
+                            key={delay}
+                            className="size-1.5 rounded-full bg-[var(--text-muted)]"
+                            style={{ animation: 'bounce 1.4s infinite ease-in-out both', animationDelay: `${delay}s` }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 )}
                 <div ref={messagesEndRef} />
-              </Box>
+              </div>
 
               {selectedChat.status === 'active' && selectedChat.admin_email === session?.user?.email && (
-                <Box sx={{ px: 2, py: 1, borderTop: '1px solid ' + ADMIN_THEME.border, overflowX: 'auto', display: 'flex', gap: 0.5 }}>
+                <div className="flex gap-1 overflow-x-auto border-t border-border px-4 py-2">
                   {chatSettings.quick_replies.map((reply, idx) => (
-                    <Chip key={idx} label={reply} size="small" onClick={() => handleQuickReply(reply)}
-                      sx={{ bgcolor: 'rgba(37, 99, 235, 0.1)', color: '#2563eb', fontSize: '0.7rem', cursor: 'pointer', '&:hover': { bgcolor: 'rgba(37, 99, 235, 0.2)' }, flexShrink: 0 }} />
+                    <Badge
+                      key={idx}
+                      className="shrink-0 cursor-pointer bg-blue-600/10 text-[0.7rem] text-blue-600 hover:bg-blue-600/20"
+                      onClick={() => handleQuickReply(reply)}
+                    >
+                      {reply}
+                    </Badge>
                   ))}
-                </Box>
+                </div>
               )}
 
               {previewImage && (
-                <Box sx={{ px: 2, py: 1, bgcolor: 'var(--surface)', borderTop: '1px solid ' + ADMIN_THEME.border }}>
-                  <Box sx={{ position: 'relative', display: 'inline-block' }}>
-                    <Box component="img" src={previewImage} alt="Preview" sx={{ maxHeight: 80, borderRadius: 1 }} />
-                    <IconButton size="small" onClick={() => setPreviewImage(null)}
-                      sx={{ position: 'absolute', top: -8, right: -8, bgcolor: '#ef4444', color: 'white', width: 20, height: 20, '&:hover': { bgcolor: '#dc2626' } }}>
-                      <CloseIcon size={14} />
-                    </IconButton>
-                  </Box>
-                </Box>
+                <div className="border-t border-border bg-[var(--surface)] px-4 py-2">
+                  <div className="relative inline-block">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={previewImage} alt="Preview" className="max-h-20 rounded" />
+                    <Button
+                      type="button"
+                      size="icon-xs"
+                      onClick={() => setPreviewImage(null)}
+                      className="absolute -top-2 -right-2 size-5 bg-red-500 text-white hover:bg-red-600"
+                    >
+                      <CloseIcon className="size-3.5" />
+                    </Button>
+                  </div>
+                </div>
               )}
 
               {selectedChat.status === 'active' && selectedChat.admin_email === session?.user?.email && (
-                <Box sx={{ p: 1.5, borderTop: '1px solid ' + ADMIN_THEME.border, display: 'flex', gap: 1 }}>
-                  <IconButton onClick={() => fileInputRef.current?.click()} disabled={uploadingImage}
-                    sx={{ color: ADMIN_THEME.textMuted, '&:hover': { color: '#2563eb' } }}>
+                <div className="flex gap-2 border-t border-border p-3">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingImage}
+                    className="text-[var(--text-muted)] hover:text-blue-600"
+                  >
                     <ImageIcon />
-                  </IconButton>
-                  <TextField fullWidth size="small" placeholder={isTouchDevice ? "พิมพ์ข้อความ..." : "พิมพ์ข้อความ... (Shift+Enter = ขึ้นบรรทัดใหม่)"} value={message}
-                    multiline maxRows={5}
+                  </Button>
+                  <Textarea
+                    placeholder={isTouchDevice ? 'พิมพ์ข้อความ...' : 'พิมพ์ข้อความ... (Shift+Enter = ขึ้นบรรทัดใหม่)'}
+                    value={message}
+                    rows={1}
+                    className="min-h-9 max-h-32 flex-1 resize-none bg-[var(--surface)] text-sm"
                     onChange={(e) => { setMessage(e.target.value); sendTypingIndicator(); }}
                     onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !isTouchDevice) { e.preventDefault(); handleSendMessage(); } }}
                     disabled={sending || uploadingImage}
-                    sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'var(--surface)', color: ADMIN_THEME.text, fontSize: '0.9rem', '& fieldset': { borderColor: ADMIN_THEME.border }, '&:hover fieldset': { borderColor: '#2563eb' }, '&.Mui-focused fieldset': { borderColor: '#2563eb' } } }} />
-                  <IconButton onClick={handleSendMessage} disabled={(!message.trim() && !previewImage) || sending || uploadingImage}
-                    sx={{ bgcolor: '#2563eb', color: 'white', '&:hover': { bgcolor: '#1d4ed8' }, '&.Mui-disabled': { bgcolor: ADMIN_THEME.border } }}>
-                    {sending || uploadingImage ? <CircularProgress size={20} color="inherit" /> : <SendIcon />}
-                  </IconButton>
-                </Box>
+                  />
+                  <Button
+                    size="icon"
+                    onClick={handleSendMessage}
+                    disabled={(!message.trim() && !previewImage) || sending || uploadingImage}
+                    className="bg-blue-600 hover:bg-blue-700 disabled:bg-border"
+                  >
+                    {sending || uploadingImage ? <Loader2 className="size-5 animate-spin" /> : <SendIcon className="size-5" />}
+                  </Button>
+                </div>
               )}
             </>
           ) : (
-            /* Empty State - No Chat Selected */
-            <Box sx={{ 
-              flex: 1, 
-              display: 'flex', 
-              flexDirection: 'column',
-              alignItems: 'center', 
-              background: 'var(--background)',
-              overflowY: 'auto',
-              minHeight: 0,
-            }}>
-              {/* Inner content wrapper for centering */}
-              <Box sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                minHeight: '100%',
-                p: 3,
-                py: 4,
-              }}>
-              {/* Animated Icon */}
-              <Box sx={{
-                width: 100,
-                height: 100,
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(30, 64, 175, 0.2) 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                mb: 3,
-                flexShrink: 0,
-                border: '2px solid rgba(37, 99, 235, 0.3)',
-                animation: 'pulse 2s infinite',
-                '@keyframes pulse': {
-                  '0%': { boxShadow: '0 0 0 0 rgba(37, 99, 235, 0.4)' },
-                  '70%': { boxShadow: '0 0 0 20px rgba(37, 99, 235, 0)' },
-                  '100%': { boxShadow: '0 0 0 0 rgba(37, 99, 235, 0)' },
-                },
-              }}>
-                <ChatIcon size={48} color="#2563eb" />
-              </Box>
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-background">
+              <div className="flex min-h-full flex-col items-center justify-center p-6 py-8">
+                <div
+                  className="mb-6 flex size-[100px] shrink-0 items-center justify-center rounded-full border-2 border-blue-600/30"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(30, 64, 175, 0.2) 100%)',
+                    animation: 'chat-pulse 2s infinite',
+                  }}
+                >
+                  <ChatIcon className="size-12 text-blue-600" />
+                </div>
 
-              <Typography sx={{ 
-                color: ADMIN_THEME.text, 
-                fontSize: '1.25rem', 
-                fontWeight: 700, 
-                mb: 1,
-                textAlign: 'center',
-              }}>
-                ศูนย์กลางการสนทนา
-              </Typography>
-              
-              <Typography sx={{ 
-                color: ADMIN_THEME.textMuted, 
-                fontSize: '0.9rem',
-                textAlign: 'center',
-                maxWidth: 280,
-                mb: 3,
-                lineHeight: 1.6,
-              }}>
-                {isMobile ? 'เลือกแชทจากรายการเพื่อเริ่มสนทนา' : 'เลือกแชทจากรายการด้านซ้ายเพื่อเริ่มสนทนากับลูกค้า'}
-              </Typography>
+                <h3 className="mb-1 text-center text-xl font-bold">ศูนย์กลางการสนทนา</h3>
 
-              {/* Stats Summary */}
-              <Box sx={{ 
-                display: 'flex', 
-                gap: 2, 
-                flexWrap: 'wrap',
-                justifyContent: 'center',
-              }}>
-                <Box sx={{
-                  px: 2.5,
-                  py: 1.5,
-                  borderRadius: 2,
-                  bgcolor: 'rgba(251, 191, 36, 0.1)',
-                  border: '1px solid rgba(251, 191, 36, 0.3)',
-                  textAlign: 'center',
-                  minWidth: 90,
-                }}>
-                  <Typography sx={{ color: '#fbbf24', fontSize: '1.5rem', fontWeight: 700 }}>
-                    {stats?.pendingCount || 0}
-                  </Typography>
-                  <Typography sx={{ color: '#fbbf24', fontSize: '0.7rem', opacity: 0.8 }}>
-                    รอรับเคส
-                  </Typography>
-                </Box>
-                <Box sx={{
-                  px: 2.5,
-                  py: 1.5,
-                  borderRadius: 2,
-                  bgcolor: 'rgba(34, 197, 94, 0.1)',
-                  border: '1px solid rgba(34, 197, 94, 0.3)',
-                  textAlign: 'center',
-                  minWidth: 90,
-                }}>
-                  <Typography sx={{ color: '#22c55e', fontSize: '1.5rem', fontWeight: 700 }}>
-                    {stats?.activeCount || 0}
-                  </Typography>
-                  <Typography sx={{ color: '#22c55e', fontSize: '0.7rem', opacity: 0.8 }}>
-                    กำลังสนทนา
-                  </Typography>
-                </Box>
-              </Box>
+                <p className="mb-6 max-w-[280px] text-center text-sm leading-relaxed text-[var(--text-muted)]">
+                  {isMobile ? 'เลือกแชทจากรายการเพื่อเริ่มสนทนา' : 'เลือกแชทจากรายการด้านซ้ายเพื่อเริ่มสนทนากับลูกค้า'}
+                </p>
 
-              {/* Quick Tips */}
-              <Box sx={{ 
-                mt: 4, 
-                p: 2, 
-                borderRadius: 2, 
-                bgcolor: 'rgba(37, 99, 235, 0.1)',
-                border: '1px solid rgba(37, 99, 235, 0.2)',
-                maxWidth: 320,
-              }}>
-                <Typography sx={{ 
-                  color: '#2563eb', 
-                  fontSize: '0.75rem', 
-                  fontWeight: 600,
-                  mb: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 0.5,
-                }}>
-                  เคล็ดลับ
-                </Typography>
-                <Typography sx={{ color: ADMIN_THEME.textMuted, fontSize: '0.75rem', lineHeight: 1.5 }}>
-                  คลิกที่แชทในรายการเพื่อดูรายละเอียด กดปุ่ม &quot;รับเคส&quot; เพื่อเริ่มช่วยเหลือลูกค้า
-                </Typography>
-              </Box>
-              </Box>
-            </Box>
+                <div className="flex flex-wrap justify-center gap-4">
+                  <div className="min-w-[90px] rounded-lg border border-amber-400/30 bg-amber-400/10 px-5 py-3 text-center">
+                    <p className="text-2xl font-bold text-amber-400">{stats?.pendingCount || 0}</p>
+                    <p className="text-xs text-amber-400/80">รอรับเคส</p>
+                  </div>
+                  <div className="min-w-[90px] rounded-lg border border-green-500/30 bg-green-500/10 px-5 py-3 text-center">
+                    <p className="text-2xl font-bold text-green-500">{stats?.activeCount || 0}</p>
+                    <p className="text-xs text-green-500/80">กำลังสนทนา</p>
+                  </div>
+                </div>
+
+                <div className="mt-8 max-w-[320px] rounded-lg border border-blue-600/20 bg-blue-600/10 p-4">
+                  <p className="mb-1 text-xs font-semibold text-blue-600">เคล็ดลับ</p>
+                  <p className="text-xs leading-normal text-[var(--text-muted)]">
+                    คลิกที่แชทในรายการเพื่อดูรายละเอียด กดปุ่ม &quot;รับเคส&quot; เพื่อเริ่มช่วยเหลือลูกค้า
+                  </p>
+                </div>
+              </div>
+            </div>
           )}
-        </Paper>
-      </Box>
+        </div>
+      </div>
 
-      <Dialog open={settingsOpen} onClose={() => setSettingsOpen(false)} maxWidth="sm" fullWidth
-        PaperProps={{ sx: { bgcolor: ADMIN_THEME.bgCard, color: ADMIN_THEME.text } }}>
-        <DialogTitle sx={{ borderBottom: '1px solid ' + ADMIN_THEME.border }}>
-          <SettingsIcon size={24} style={{ marginRight: 8, verticalAlign: 'middle' }} />
-          ตั้งค่าแชท
-        </DialogTitle>
-        <DialogContent sx={{ mt: 2 }}>
-          <TextField fullWidth label="ชื่อทีมแอดมินที่แสดง" value={chatSettings.admin_display_name}
-            onChange={(e) => setChatSettings(s => ({ ...s, admin_display_name: e.target.value }))}
-            placeholder="เช่น ทีมงาน PSU SCC"
-            helperText="ชื่อที่ลูกค้าจะเห็นในหัวข้อแชท"
-            sx={{ mb: 2, '& .MuiOutlinedInput-root': { color: ADMIN_THEME.text, '& fieldset': { borderColor: ADMIN_THEME.border } }, '& .MuiInputLabel-root': { color: ADMIN_THEME.textMuted }, '& .MuiFormHelperText-root': { color: ADMIN_THEME.textMuted } }} />
-          <FormControlLabel
-            control={<Switch checked={chatSettings.auto_reply_enabled} onChange={(e) => setChatSettings(s => ({ ...s, auto_reply_enabled: e.target.checked }))} />}
-            label="เปิดใช้ข้อความตอบอัตโนมัติ"
-            sx={{ color: ADMIN_THEME.text, mb: 2 }}
-          />
-          <TextField fullWidth multiline rows={2} label="ข้อความตอบอัตโนมัติ" value={chatSettings.auto_reply_message}
-            onChange={(e) => setChatSettings(s => ({ ...s, auto_reply_message: e.target.value }))}
-            sx={{ mb: 2, '& .MuiOutlinedInput-root': { color: ADMIN_THEME.text, '& fieldset': { borderColor: ADMIN_THEME.border } }, '& .MuiInputLabel-root': { color: ADMIN_THEME.textMuted } }} />
-          <FormControlLabel
-            control={<Switch checked={chatSettings.notification_sound} onChange={(e) => setChatSettings(s => ({ ...s, notification_sound: e.target.checked }))} />}
-            label="เปิดเสียงแจ้งเตือน"
-            sx={{ color: ADMIN_THEME.text }}
-          />
-          <Typography sx={{ color: ADMIN_THEME.textMuted, mt: 3, mb: 1, fontSize: '0.9rem' }}>ข้อความตอบด่วน</Typography>
-          {chatSettings.quick_replies.map((reply, idx) => (
-            <TextField key={idx} fullWidth size="small" value={reply}
-              onChange={(e) => {
-                const newReplies = [...chatSettings.quick_replies];
-                newReplies[idx] = e.target.value;
-                setChatSettings(s => ({ ...s, quick_replies: newReplies }));
-              }}
-              sx={{ mb: 1, '& .MuiOutlinedInput-root': { color: ADMIN_THEME.text, fontSize: '0.85rem', '& fieldset': { borderColor: ADMIN_THEME.border } } }} />
-          ))}
+      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <DialogContent className="max-w-lg bg-card text-foreground">
+          <DialogHeader className="border-b border-border pb-4">
+            <DialogTitle className="flex items-center gap-2">
+              <SettingsIcon className="size-6" />
+              ตั้งค่าแชท
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <Label htmlFor="admin-display-name">ชื่อทีมแอดมินที่แสดง</Label>
+              <Input
+                id="admin-display-name"
+                value={chatSettings.admin_display_name}
+                onChange={(e) => setChatSettings(s => ({ ...s, admin_display_name: e.target.value }))}
+                placeholder="เช่น ทีมงาน PSU SCC"
+              />
+              <p className="text-xs text-[var(--text-muted)]">ชื่อที่ลูกค้าจะเห็นในหัวข้อแชท</p>
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
+              <Label htmlFor="auto-reply">เปิดใช้ข้อความตอบอัตโนมัติ</Label>
+              <Switch
+                id="auto-reply"
+                checked={chatSettings.auto_reply_enabled}
+                onCheckedChange={(checked) => setChatSettings(s => ({ ...s, auto_reply_enabled: checked }))}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="auto-reply-message">ข้อความตอบอัตโนมัติ</Label>
+              <Textarea
+                id="auto-reply-message"
+                rows={2}
+                value={chatSettings.auto_reply_message}
+                onChange={(e) => setChatSettings(s => ({ ...s, auto_reply_message: e.target.value }))}
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
+              <Label htmlFor="notification-sound">เปิดเสียงแจ้งเตือน</Label>
+              <Switch
+                id="notification-sound"
+                checked={chatSettings.notification_sound}
+                onCheckedChange={(checked) => setChatSettings(s => ({ ...s, notification_sound: checked }))}
+              />
+            </div>
+
+            <div>
+              <p className="mb-2 text-sm text-[var(--text-muted)]">ข้อความตอบด่วน</p>
+              {chatSettings.quick_replies.map((reply, idx) => (
+                <Input
+                  key={idx}
+                  value={reply}
+                  onChange={(e) => {
+                    const newReplies = [...chatSettings.quick_replies];
+                    newReplies[idx] = e.target.value;
+                    setChatSettings(s => ({ ...s, quick_replies: newReplies }));
+                  }}
+                  className="mb-2 text-sm"
+                />
+              ))}
+            </div>
+          </div>
+
+          <DialogFooter className="border-t border-border pt-4">
+            <Button variant="ghost" onClick={() => setSettingsOpen(false)} className="text-[var(--text-muted)]">
+              ยกเลิก
+            </Button>
+            <Button onClick={handleSaveSettings} className="bg-blue-600 hover:bg-blue-700">
+              บันทึก
+            </Button>
+          </DialogFooter>
         </DialogContent>
-        <DialogActions sx={{ borderTop: '1px solid ' + ADMIN_THEME.border, p: 2 }}>
-          <Button onClick={() => setSettingsOpen(false)} sx={{ color: ADMIN_THEME.textMuted }}>ยกเลิก</Button>
-          <Button variant="contained" onClick={handleSaveSettings} sx={{ bgcolor: '#2563eb', '&:hover': { bgcolor: '#1d4ed8' } }}>บันทึก</Button>
-        </DialogActions>
       </Dialog>
     </>
   );

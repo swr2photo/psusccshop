@@ -1,16 +1,4 @@
 import React from 'react';
-import useSWR from 'swr';
-import {
-  Box,
-  Typography,
-  Chip,
-  Button,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-} from '@mui/material';
 import {
   DollarSign as AttachMoney,
   CalendarRange as DateRange,
@@ -31,27 +19,35 @@ import {
   ShoppingBag as LocalMall,
 } from 'lucide-react';
 
+import { ShopConfig } from '@/lib/config';
+import { STATUS_THEME } from '@/lib/adminTheme';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import {
-  ShopConfig,
-} from '@/lib/config';
-
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+} from '@/components/ui/card';
 import {
-  ADMIN_THEME,
-  STATUS_THEME,
-  adminGlassCardSx as glassCardSx,
-  adminSecondaryButtonSx as secondaryButtonSx,
-  adminGradientButtonSx as gradientButtonSx,
-} from '@/lib/adminTheme';
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '@/components/ui/table';
+import { Separator } from '@/components/ui/separator';
 
 const Shirt = ({ size, color }: { size?: number; color?: string }) => (
-  // Simple fallback SVG for Shirt icon
   <svg
     xmlns="http://www.w3.org/2000/svg"
     width={size || 24}
     height={size || 24}
     viewBox="0 0 24 24"
     fill="none"
-    stroke={color || "currentColor"}
+    stroke={color || 'currentColor'}
     strokeWidth="2"
     strokeLinecap="round"
     strokeLinejoin="round"
@@ -125,6 +121,18 @@ interface DashboardViewProps {
   triggerSheetSync: (action: 'sync' | 'create') => void;
 }
 
+const glassCardClass = cn(
+  'admin-glass gap-0 overflow-hidden border-[var(--border)] bg-[var(--card)] py-0 shadow-none',
+);
+
+const secondaryButtonClass = cn(
+  'h-auto w-full justify-start gap-3 rounded-xl border-[var(--border)] bg-[var(--card)] py-3 font-semibold text-[var(--muted-foreground)] hover:bg-[var(--surface-2)]',
+);
+
+const gradientButtonClass = cn(
+  'h-auto w-full justify-start gap-3 rounded-xl border-0 bg-gradient-to-br from-indigo-500 to-violet-500 py-3 font-bold text-white shadow-[0_4px_14px_rgba(99,102,241,0.35)] hover:from-indigo-600 hover:to-violet-600 hover:shadow-[0_6px_20px_rgba(99,102,241,0.45)] disabled:opacity-50',
+);
+
 export const DashboardView = React.memo(function DashboardView({
   shopOrders,
   orders,
@@ -149,33 +157,33 @@ export const DashboardView = React.memo(function DashboardView({
   const cancelledOrders = shopOrders.filter(o => o.status === 'CANCELLED').length;
 
   const statsData = [
-    { 
-      label: 'ยอดขายรวม', 
-      value: `฿${totalSales.toLocaleString()}`, 
+    {
+      label: 'ยอดขายรวม',
+      value: `฿${totalSales.toLocaleString()}`,
       subtitle: `${validOrders.length} ออเดอร์`,
       gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
       iconBg: 'rgba(16,185,129,0.2)',
       icon: <AttachMoney size={28} color="#34d399" />,
     },
-    { 
-      label: 'รอชำระเงิน', 
-      value: `${pendingOrders}`, 
+    {
+      label: 'รอชำระเงิน',
+      value: `${pendingOrders}`,
       subtitle: 'รายการ',
       gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
       iconBg: 'rgba(245,158,11,0.2)',
       icon: <DateRange size={28} color="#fbbf24" />,
     },
-    { 
-      label: 'ชำระแล้ว', 
-      value: `${paidOrders}`, 
+    {
+      label: 'ชำระแล้ว',
+      value: `${paidOrders}`,
       subtitle: 'พร้อมจัดส่ง',
       gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
       iconBg: 'rgba(59,130,246,0.2)',
       icon: <CheckCircle size={28} color="#60a5fa" />,
     },
-    { 
-      label: 'จัดส่งแล้ว', 
-      value: `${readyOrders + completedOrders}`, 
+    {
+      label: 'จัดส่งแล้ว',
+      value: `${readyOrders + completedOrders}`,
       subtitle: 'เสร็จสมบูรณ์',
       gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
       iconBg: 'rgba(139,92,246,0.2)',
@@ -184,418 +192,382 @@ export const DashboardView = React.memo(function DashboardView({
   ];
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+    <div className="flex flex-col gap-6">
       {/* Welcome Header — Aurora + Grid Pattern */}
-      <Box className="aurora-bg grid-pattern noise-overlay" sx={{ 
-        p: 3, 
-        borderRadius: '20px', 
-        border: '1px solid rgba(99,102,241,0.15)',
-        position: 'relative',
-        overflow: 'hidden',
-      }}>
-        <Typography sx={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--foreground)', mb: 0.5, display: 'flex', alignItems: 'center', gap: 1, position: 'relative', zIndex: 2 }}>
+      <div
+        className={cn(
+          'aurora-bg grid-pattern noise-overlay relative overflow-hidden rounded-[20px] border border-indigo-500/15 p-6',
+        )}
+      >
+        <h2 className="relative z-[2] mb-1 flex items-center gap-2 text-[1.4rem] font-extrabold text-[var(--foreground)]">
           <WavingHand size={22} color="#fbbf24" />
           ยินดีต้อนรับ, {session?.user?.name?.split(' ')[0] || 'Admin'}
-        </Typography>
+        </h2>
         {isShopMode && (
-          <Chip 
-            icon={<Store size={14} />}
-            label={`กำลังดูร้าน: ${myShops.find(s => s.id === selectedShopId)?.name || 'ร้านค้าย่อย'}`}
-            size="small"
-            sx={{ mb: 1, bgcolor: 'rgba(139,92,246,0.2)', color: '#c084fc', fontWeight: 700, borderRadius: '10px' }}
-          />
+          <Badge
+            className="relative z-[2] mb-2 rounded-[10px] border-transparent bg-violet-500/20 font-bold text-violet-300"
+          >
+            <Store size={14} />
+            กำลังดูร้าน: {myShops.find(s => s.id === selectedShopId)?.name || 'ร้านค้าย่อย'}
+          </Badge>
         )}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-          <Typography sx={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-            จัดการร้านค้าและออเดอร์ของคุณได้ที่นี่ • อัพเดทล่าสุด: {lastSavedTime?.toLocaleTimeString('th-TH') || 'กำลังโหลด...'}
-          </Typography>
-          {/* Realtime Status Indicator */}
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: 0.5, 
-            px: 1.5, 
-            py: 0.5, 
-            borderRadius: '20px',
-            bgcolor: realtimeConnected ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)',
-            border: `1px solid ${realtimeConnected ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)'}`,
-          }}>
-            <Box sx={{ 
-              width: 8, 
-              height: 8, 
-              borderRadius: '50%', 
-              bgcolor: realtimeConnected ? '#10b981' : '#f59e0b',
-              animation: realtimeConnected ? 'pulse 2s infinite' : 'none',
-              '@keyframes pulse': {
-                '0%, 100%': { opacity: 1 },
-                '50%': { opacity: 0.5 },
-              },
-            }} />
-            <Typography sx={{ fontSize: '0.7rem', color: realtimeConnected ? '#10b981' : '#f59e0b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              {realtimeConnected ? <><Radio size={10} /> Live</> : <><Timer size={10} /> Polling</>}
-            </Typography>
-          </Box>
-        </Box>
-      </Box>
+        <div className="relative z-[2] flex flex-wrap items-center gap-4">
+          <p className="text-[0.9rem] text-[var(--muted-foreground)]">
+            จัดการร้านค้าและออเดอร์ของคุณได้ที่นี่ • อัพเดทล่าสุด:{' '}
+            {lastSavedTime?.toLocaleTimeString('th-TH') || 'กำลังโหลด...'}
+          </p>
+          <div
+            className={cn(
+              'flex items-center gap-1 rounded-full px-3 py-1',
+              realtimeConnected
+                ? 'border border-emerald-500/30 bg-emerald-500/15'
+                : 'border border-amber-500/30 bg-amber-500/15',
+            )}
+          >
+            <span
+              className={cn(
+                'size-2 rounded-full',
+                realtimeConnected ? 'animate-pulse bg-[var(--success)]' : 'bg-amber-500',
+              )}
+            />
+            <span
+              className={cn(
+                'flex items-center gap-1 text-[0.7rem] font-semibold',
+                realtimeConnected ? 'text-[var(--success)]' : 'text-amber-500',
+              )}
+            >
+              {realtimeConnected ? (
+                <>
+                  <Radio size={10} /> Live
+                </>
+              ) : (
+                <>
+                  <Timer size={10} /> Polling
+                </>
+              )}
+            </span>
+          </div>
+        </div>
+      </div>
 
       {/* Stats Grid - Modern Cards */}
-      <Box sx={{
-        display: 'grid',
-        gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
-        gap: 2,
-      }}>
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         {statsData.map((stat, idx) => (
-          <Box
+          <div
             key={idx}
-            sx={{
-              p: 2.5,
-              borderRadius: '18px',
-              bgcolor: ADMIN_THEME.glass,
-              border: `1px solid ${ADMIN_THEME.border}`,
-              backdropFilter: 'blur(20px)',
-              position: 'relative',
-              overflow: 'hidden',
-              transition: 'all 0.2s ease',
-              '&:hover': {
-                transform: 'translateY(-2px)',
-                boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
-              },
-            }}
+            className={cn(
+              'admin-glass relative overflow-hidden rounded-[18px] p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(0,0,0,0.3)]',
+            )}
           >
-            {/* Background Glow */}
-            <Box sx={{
-              position: 'absolute',
-              top: -20,
-              right: -20,
-              width: 80,
-              height: 80,
-              borderRadius: '50%',
-              background: stat.gradient,
-              opacity: 0.15,
-              filter: 'blur(20px)',
-            }} />
-            
-            <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2, position: 'relative' }}>
-              <Box sx={{
-                width: 48,
-                height: 48,
-                borderRadius: '14px',
-                bgcolor: stat.iconBg,
-                display: 'grid',
-                placeItems: 'center',
-              }}>
+            <div
+              className="absolute -right-5 -top-5 size-20 rounded-full opacity-15 blur-[20px]"
+              style={{ background: stat.gradient }}
+            />
+
+            <div className="relative mb-4 flex items-start justify-between">
+              <div
+                className="grid size-12 place-items-center rounded-[14px]"
+                style={{ backgroundColor: stat.iconBg }}
+              >
                 {stat.icon}
-              </Box>
-            </Box>
-            
-            <Typography sx={{ fontSize: '1.75rem', fontWeight: 900, color: 'var(--foreground)', lineHeight: 1, mb: 0.5 }}>
+              </div>
+            </div>
+
+            <p className="mb-1 text-[1.75rem] font-black leading-none text-[var(--foreground)]">
               {stat.value}
-            </Typography>
-            <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-              {stat.label}
-            </Typography>
-            <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', mt: 0.5 }}>
-              {stat.subtitle}
-            </Typography>
-          </Box>
+            </p>
+            <p className="text-[0.8rem] font-semibold text-[var(--muted-foreground)]">{stat.label}</p>
+            <p className="mt-1 text-[0.7rem] text-[var(--muted-foreground)]">{stat.subtitle}</p>
+          </div>
         ))}
-      </Box>
+      </div>
 
       {/* ===== Analytics Charts ===== */}
-      <Box sx={{
-        display: 'grid',
-        gridTemplateColumns: { xs: '1fr', md: '2fr 1fr' },
-        gap: 2,
-      }}>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-[2fr_1fr]">
         {/* Revenue Trend - Last 7 days */}
-        <Box sx={{ ...glassCardSx, p: 3 }}>
-          <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--foreground)', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <TrendingUp size={20} color="#34c759" />
-            Revenue Trend (7 Days)
-          </Typography>
-          {(() => {
-            // Calculate daily revenue for last 7 days
-            const days = 7;
-            const dailyData: { date: string; revenue: number; count: number }[] = [];
-            for (let i = days - 1; i >= 0; i--) {
-              const d = new Date();
-              d.setDate(d.getDate() - i);
-              const dateStr = d.toISOString().split('T')[0];
-              const dayLabel = d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
-              const dayOrders = validOrders.filter(o => {
-                const od = new Date(o.date || '');
-                return od.toISOString().split('T')[0] === dateStr;
-              });
-              dailyData.push({
-                date: dayLabel,
-                revenue: dayOrders.reduce((s, o) => s + (Number(o.amount) || 0), 0),
-                count: dayOrders.length,
-              });
-            }
-            const maxRev = Math.max(...dailyData.map(d => d.revenue), 1);
-            return (
-              <Box>
-                {/* Bar chart using pure CSS */}
-                <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: 0.5, height: 120, mb: 1 }}>
-                  {dailyData.map((d, i) => (
-                    <Box key={i} sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
-                      <Typography sx={{ fontSize: '0.55rem', color: '#34c759', fontWeight: 700, opacity: d.revenue > 0 ? 1 : 0 }}>
-                        ฿{d.revenue >= 1000 ? `${(d.revenue / 1000).toFixed(1)}k` : d.revenue.toLocaleString()}
-                      </Typography>
-                      <Box sx={{
-                        width: '100%',
-                        height: `${Math.max((d.revenue / maxRev) * 100, 3)}%`,
-                        background: d.revenue > 0 ? 'linear-gradient(180deg, #34c759, #059669)' : 'rgba(100,116,139,0.15)',
-                        borderRadius: '6px 6px 2px 2px',
-                        transition: 'height 0.5s ease',
-                        minHeight: 4,
-                      }} />
-                    </Box>
-                  ))}
-                </Box>
-                <Box sx={{ display: 'flex', gap: 0.5 }}>
-                  {dailyData.map((d, i) => (
-                    <Box key={i} sx={{ flex: 1, textAlign: 'center' }}>
-                      <Typography sx={{ fontSize: '0.55rem', color: 'var(--text-muted)' }}>{d.date}</Typography>
-                      <Typography sx={{ fontSize: '0.55rem', color: 'var(--text-muted)', opacity: 0.6 }}>{d.count} orders</Typography>
-                    </Box>
-                  ))}
-                </Box>
-              </Box>
-            );
-          })()}
-        </Box>
+        <Card className={cn(glassCardClass, 'p-0')}>
+          <CardHeader className="px-6 pt-6 pb-0">
+            <CardTitle className="flex items-center gap-2 text-base font-bold text-[var(--foreground)]">
+              <TrendingUp size={20} color="#34c759" />
+              Revenue Trend (7 Days)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-6 pb-6">
+            {(() => {
+              const days = 7;
+              const dailyData: { date: string; revenue: number; count: number }[] = [];
+              for (let i = days - 1; i >= 0; i--) {
+                const d = new Date();
+                d.setDate(d.getDate() - i);
+                const dateStr = d.toISOString().split('T')[0];
+                const dayLabel = d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+                const dayOrders = validOrders.filter(o => {
+                  const od = new Date(o.date || '');
+                  return od.toISOString().split('T')[0] === dateStr;
+                });
+                dailyData.push({
+                  date: dayLabel,
+                  revenue: dayOrders.reduce((s, o) => s + (Number(o.amount) || 0), 0),
+                  count: dayOrders.length,
+                });
+              }
+              const maxRev = Math.max(...dailyData.map(d => d.revenue), 1);
+              return (
+                <div>
+                  <div className="mb-2 flex h-[120px] items-end gap-1">
+                    {dailyData.map((d, i) => (
+                      <div key={i} className="flex flex-1 flex-col items-center gap-1">
+                        <span
+                          className={cn(
+                            'text-[0.55rem] font-bold text-[var(--success)]',
+                            d.revenue > 0 ? 'opacity-100' : 'opacity-0',
+                          )}
+                        >
+                          ฿{d.revenue >= 1000 ? `${(d.revenue / 1000).toFixed(1)}k` : d.revenue.toLocaleString()}
+                        </span>
+                        <div
+                          className="w-full min-h-1 rounded-t-md rounded-b-sm transition-[height] duration-500 ease-out"
+                          style={{
+                            height: `${Math.max((d.revenue / maxRev) * 100, 3)}%`,
+                            background:
+                              d.revenue > 0
+                                ? 'linear-gradient(180deg, #34c759, #059669)'
+                                : 'rgba(100,116,139,0.15)',
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex gap-1">
+                    {dailyData.map((d, i) => (
+                      <div key={i} className="flex-1 text-center">
+                        <p className="text-[0.55rem] text-[var(--muted-foreground)]">{d.date}</p>
+                        <p className="text-[0.55rem] text-[var(--muted-foreground)] opacity-60">
+                          {d.count} orders
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+          </CardContent>
+        </Card>
 
         {/* Order Status Donut Chart */}
-        <Box sx={{ ...glassCardSx, p: 3 }}>
-          <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--foreground)', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <BarChart3 size={20} color="#a5b4fc" />
-            Order Distribution
-          </Typography>
-          {(() => {
-            const total = orders.length || 1;
-            const segments = [
-              { label: 'Pending', count: pendingOrders, color: '#ff9f0a' },
-              { label: 'Paid', count: paidOrders, color: '#34c759' },
-              { label: 'Ready/Shipped', count: readyOrders, color: '#2997ff' },
-              { label: 'Completed', count: completedOrders, color: '#30d158' },
-              { label: 'Cancelled', count: cancelledOrders, color: '#ff453a' },
-            ].filter(s => s.count > 0);
+        <Card className={cn(glassCardClass, 'p-0')}>
+          <CardHeader className="px-6 pt-6 pb-0">
+            <CardTitle className="flex items-center gap-2 text-base font-bold text-[var(--foreground)]">
+              <BarChart3 size={20} color="#a5b4fc" />
+              Order Distribution
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-6 pb-6">
+            {(() => {
+              const total = orders.length || 1;
+              const segments = [
+                { label: 'Pending', count: pendingOrders, color: '#ff9f0a' },
+                { label: 'Paid', count: paidOrders, color: '#34c759' },
+                { label: 'Ready/Shipped', count: readyOrders, color: '#2997ff' },
+                { label: 'Completed', count: completedOrders, color: '#30d158' },
+                { label: 'Cancelled', count: cancelledOrders, color: '#ff453a' },
+              ].filter(s => s.count > 0);
 
-            // CSS conic-gradient for donut
-            let accumulated = 0;
-            const gradientParts = segments.map(s => {
-              const start = accumulated;
-              const end = accumulated + (s.count / total) * 360;
-              accumulated = end;
-              return `${s.color} ${start}deg ${end}deg`;
-            });
+              let accumulated = 0;
+              const gradientParts = segments.map(s => {
+                const start = accumulated;
+                const end = accumulated + (s.count / total) * 360;
+                accumulated = end;
+                return `${s.color} ${start}deg ${end}deg`;
+              });
 
-            return (
-              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                {/* Donut */}
-                <Box sx={{
-                  width: 120, height: 120, borderRadius: '50%',
-                  background: `conic-gradient(${gradientParts.join(', ')})`,
-                  position: 'relative',
-                  '&::after': {
-                    content: '""',
-                    position: 'absolute',
-                    inset: '25%',
-                    borderRadius: '50%',
-                    bgcolor: 'var(--surface)',
-                  },
-                }}>
-                  <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', zIndex: 1 }}>
-                    <Typography sx={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--foreground)', mx: 'auto' }}>{total}</Typography>
-                  </Box>
-                </Box>
-                {/* Legend */}
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'center' }}>
-                  {segments.map((s) => (
-                    <Box key={s.label} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: s.color }} />
-                      <Typography sx={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>
-                        {s.label} ({s.count})
-                      </Typography>
-                    </Box>
-                  ))}
-                </Box>
-              </Box>
-            );
-          })()}
-        </Box>
-      </Box>
+              return (
+                <div className="flex flex-col items-center gap-4">
+                  <div
+                    className="relative size-[120px] rounded-full"
+                    style={{ background: `conic-gradient(${gradientParts.join(', ')})` }}
+                  >
+                    <div className="absolute inset-[25%] rounded-full bg-[var(--surface)]" />
+                    <div className="absolute inset-0 z-[1] flex items-center justify-center">
+                      <span className="text-[1.2rem] font-extrabold text-[var(--foreground)]">{total}</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {segments.map(s => (
+                      <div key={s.label} className="flex items-center gap-1">
+                        <span className="size-2 rounded-full" style={{ backgroundColor: s.color }} />
+                        <span className="text-[0.6rem] text-[var(--muted-foreground)]">
+                          {s.label} ({s.count})
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* ===== Best Sellers ===== */}
-      <Box sx={{ ...glassCardSx, p: 3 }}>
-        <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--foreground)', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Fire size={20} color="#ff9f0a" />
-          Best Selling Products
-        </Typography>
-        {(() => {
-          // Count product sales from order carts
-          const productSales: Record<string, { name: string; count: number; revenue: number }> = {};
-          for (const order of validOrders) {
-            const cart = typeof order.cart === 'string' ? JSON.parse(order.cart || '[]') : order.cart || [];
-            for (const item of cart) {
-              const key = item.name || item.id || 'Unknown';
-              if (!productSales[key]) productSales[key] = { name: key, count: 0, revenue: 0 };
-              productSales[key].count += item.qty || 1;
-              productSales[key].revenue += item.total || item.price || 0;
+      <Card className={cn(glassCardClass, 'p-0')}>
+        <CardHeader className="px-6 pt-6 pb-0">
+          <CardTitle className="flex items-center gap-2 text-base font-bold text-[var(--foreground)]">
+            <Fire size={20} color="#ff9f0a" />
+            Best Selling Products
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-6 pb-6">
+          {(() => {
+            const productSales: Record<string, { name: string; count: number; revenue: number }> = {};
+            for (const order of validOrders) {
+              const cart =
+                typeof order.cart === 'string' ? JSON.parse(order.cart || '[]') : order.cart || [];
+              for (const item of cart) {
+                const key = item.name || item.id || 'Unknown';
+                if (!productSales[key]) productSales[key] = { name: key, count: 0, revenue: 0 };
+                productSales[key].count += item.qty || 1;
+                productSales[key].revenue += item.total || item.price || 0;
+              }
             }
-          }
-          const sorted = Object.values(productSales).sort((a, b) => b.count - a.count).slice(0, 5);
-          if (sorted.length === 0) {
-            return <Typography sx={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>No sales data yet</Typography>;
-          }
-          const maxCount = sorted[0].count;
-          return (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              {sorted.map((product, idx) => (
-                <Box key={idx} sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                  <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, color: idx === 0 ? '#ff9f0a' : 'var(--text-muted)', width: 20 }}>
-                    #{idx + 1}
-                  </Typography>
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {product.name}
-                    </Typography>
-                    <Box sx={{ 
-                      height: 4, borderRadius: 2, mt: 0.5,
-                      bgcolor: 'rgba(100,116,139,0.1)',
-                      position: 'relative',
-                      overflow: 'hidden',
-                    }}>
-                      <Box sx={{
-                        position: 'absolute', left: 0, top: 0, bottom: 0,
-                        width: `${(product.count / maxCount) * 100}%`,
-                        background: 'linear-gradient(90deg, #0071e3, #2997ff)',
-                        borderRadius: 2,
-                        transition: 'width 0.5s ease',
-                      }} />
-                    </Box>
-                  </Box>
-                  <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
-                    <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--foreground)' }}>{product.count} pcs</Typography>
-                    <Typography sx={{ fontSize: '0.6rem', color: '#34c759' }}>฿{product.revenue.toLocaleString()}</Typography>
-                  </Box>
-                </Box>
-              ))}
-            </Box>
-          );
-        })()}
-      </Box>
+            const sorted = Object.values(productSales).sort((a, b) => b.count - a.count).slice(0, 5);
+            if (sorted.length === 0) {
+              return (
+                <p className="text-[0.85rem] text-[var(--muted-foreground)]">No sales data yet</p>
+              );
+            }
+            const maxCount = sorted[0].count;
+            return (
+              <div className="flex flex-col gap-2">
+                {sorted.map((product, idx) => (
+                  <div key={idx} className="flex items-center gap-3">
+                    <span
+                      className={cn(
+                        'w-5 text-[0.75rem] font-extrabold',
+                        idx === 0 ? 'text-amber-500' : 'text-[var(--muted-foreground)]',
+                      )}
+                    >
+                      #{idx + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[0.8rem] font-semibold text-[var(--foreground)]">
+                        {product.name}
+                      </p>
+                      <div className="relative mt-1 h-1 overflow-hidden rounded-sm bg-slate-500/10">
+                        <div
+                          className="absolute inset-y-0 left-0 rounded-sm bg-gradient-to-r from-blue-600 to-blue-400 transition-[width] duration-500 ease-out"
+                          style={{ width: `${(product.count / maxCount) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-[0.75rem] font-bold text-[var(--foreground)]">
+                        {product.count} pcs
+                      </p>
+                      <p className="text-[0.6rem] text-[var(--success)]">
+                        ฿{product.revenue.toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </CardContent>
+      </Card>
 
       {/* Quick Status Overview */}
-      <Box sx={{
-        display: 'grid',
-        gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
-        gap: 2,
-      }}>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {/* Order Status Breakdown */}
-        <Box sx={{ ...glassCardSx, p: 3 }}>
-          <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--foreground)', mb: 2.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Receipt size={20} color="#a5b4fc" />
-            สถานะออเดอร์
-          </Typography>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-            {[
-              { status: 'WAITING_PAYMENT', count: pendingOrders },
-              { status: 'PAID', count: paidOrders },
-              { status: 'READY', count: readyOrders },
-              { status: 'COMPLETED', count: completedOrders },
-              { status: 'CANCELLED', count: cancelledOrders },
-            ].map((item) => {
-              const theme = STATUS_THEME[item.status] || STATUS_THEME.PENDING;
-              const total = orders.length || 1;
-              const percent = Math.round((item.count / total) * 100);
-              return (
-                <Box key={item.status} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Box sx={{ 
-                    width: 100, 
-                    flexShrink: 0,
-                    px: 1.5, 
-                    py: 0.5, 
-                    borderRadius: '8px', 
-                    bgcolor: theme.bg, 
-                    border: `1px solid ${theme.border}`,
-                    textAlign: 'center',
-                  }}>
-                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: theme.text }}>
-                      {item.status.replace('_', ' ')}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ flex: 1, height: 8, bgcolor: 'var(--glass-bg)', borderRadius: '4px', overflow: 'hidden' }}>
-                    <Box sx={{ 
-                      width: `${percent}%`, 
-                      height: '100%', 
-                      bgcolor: theme.text.replace('1)', '0.8)'),
-                      borderRadius: '4px',
-                      transition: 'width 0.5s ease',
-                    }} />
-                  </Box>
-                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: theme.text, minWidth: 30, textAlign: 'right' }}>
-                    {item.count}
-                  </Typography>
-                </Box>
-              );
-            })}
-          </Box>
-        </Box>
+        <Card className={cn(glassCardClass, 'p-0')}>
+          <CardHeader className="px-6 pt-6 pb-0">
+            <CardTitle className="flex items-center gap-2 text-base font-bold text-[var(--foreground)]">
+              <Receipt size={20} color="#a5b4fc" />
+              สถานะออเดอร์
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-6 pb-6">
+            <div className="flex flex-col gap-3">
+              {[
+                { status: 'WAITING_PAYMENT', count: pendingOrders },
+                { status: 'PAID', count: paidOrders },
+                { status: 'READY', count: readyOrders },
+                { status: 'COMPLETED', count: completedOrders },
+                { status: 'CANCELLED', count: cancelledOrders },
+              ].map(item => {
+                const theme = STATUS_THEME[item.status] || STATUS_THEME.PENDING;
+                const total = orders.length || 1;
+                const percent = Math.round((item.count / total) * 100);
+                return (
+                  <div key={item.status} className="flex items-center gap-4">
+                    <div
+                      className="w-[100px] shrink-0 rounded-lg px-3 py-1 text-center"
+                      style={{
+                        backgroundColor: theme.bg,
+                        border: `1px solid ${theme.border}`,
+                      }}
+                    >
+                      <span className="text-[0.7rem] font-bold" style={{ color: theme.text }}>
+                        {item.status.replace('_', ' ')}
+                      </span>
+                    </div>
+                    <div className="h-2 flex-1 overflow-hidden rounded bg-[var(--glass-bg)]">
+                      <div
+                        className="h-full rounded transition-[width] duration-500 ease-out"
+                        style={{
+                          width: `${percent}%`,
+                          backgroundColor: theme.text.replace('1)', '0.8)'),
+                        }}
+                      />
+                    </div>
+                    <span
+                      className="min-w-[30px] text-right text-[0.85rem] font-bold"
+                      style={{ color: theme.text }}
+                    >
+                      {item.count}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Quick Actions */}
-        <Box sx={{ ...glassCardSx, p: 3 }}>
-          <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--foreground)', mb: 2.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Bolt size={20} color="#fbbf24" />
-            Quick Actions
-          </Typography>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-            <Button
-              fullWidth
-              onClick={() => setActiveTab(1)}
-              sx={{
-                ...secondaryButtonSx,
-                justifyContent: 'flex-start',
-                gap: 1.5,
-              }}
-            >
+        <Card className={cn(glassCardClass, 'p-0')}>
+          <CardHeader className="px-6 pt-6 pb-0">
+            <CardTitle className="flex items-center gap-2 text-base font-bold text-[var(--foreground)]">
+              <Bolt size={20} color="#fbbf24" />
+              Quick Actions
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3 px-6 pb-6">
+            <Button variant="outline" className={secondaryButtonClass} onClick={() => setActiveTab(1)}>
               <Store size={20} />
               จัดการสินค้า ({config.products?.length || 0} รายการ)
             </Button>
-            <Button
-              fullWidth
-              onClick={() => setActiveTab(2)}
-              sx={{
-                ...secondaryButtonSx,
-                justifyContent: 'flex-start',
-                gap: 1.5,
-              }}
-            >
+            <Button variant="outline" className={secondaryButtonClass} onClick={() => setActiveTab(2)}>
               <Receipt size={20} />
               ดูออเดอร์ทั้งหมด ({orders.length} รายการ)
             </Button>
             <Button
-              fullWidth
-              onClick={() => triggerSheetSync(config.sheetId ? 'sync' : 'create')}
+              className={gradientButtonClass}
               disabled={sheetSyncing}
-              sx={{
-                ...gradientButtonSx,
-                justifyContent: 'flex-start',
-                gap: 1.5,
-              }}
+              onClick={() => triggerSheetSync(config.sheetId ? 'sync' : 'create')}
             >
               <Bolt size={20} />
               {sheetSyncing ? 'กำลังซิงก์...' : 'ซิงก์ Google Sheet'}
             </Button>
-          </Box>
-        </Box>
-      </Box>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Factory Production Summary - Size & Sleeve breakdown for PAID orders */}
       {(() => {
-        const paidOrders = orders.filter(o => o.status === 'PAID');
-        const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL', '7XL', '8XL', '9XL', '10XL'];
+        const paidOrdersList = orders.filter(o => o.status === 'PAID');
+        const sizeOrder = [
+          'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL', '7XL', '8XL', '9XL', '10XL',
+        ];
         const getSizeIndex = (size: string) => {
           const idx = sizeOrder.findIndex(s => size?.toUpperCase()?.includes(s));
           return idx === -1 ? 999 : idx;
@@ -606,7 +578,7 @@ export const DashboardView = React.memo(function DashboardView({
         const sizeShortSleeveCount: Record<string, number> = {};
         let totalItems = 0;
 
-        paidOrders.forEach((o) => {
+        paidOrdersList.forEach(o => {
           const items = o?.items || o?.cart || [];
           items.forEach((item: DashboardOrderItem) => {
             const size = item.size || 'ไม่ระบุ';
@@ -628,182 +600,203 @@ export const DashboardView = React.memo(function DashboardView({
         const totalLongSleeve = Object.values(sizeLongSleeveCount).reduce((a, b) => a + b, 0);
 
         return (
-          <Box sx={{ ...glassCardSx, p: 3 }}>
-            <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--foreground)', mb: 2.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <LocalMall size={20} color="#f472b6" />
-              สรุปการผลิต (ออเดอร์ชำระแล้ว)
-            </Typography>
-            
-            {/* Summary Stats */}
-            <Box sx={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(3, 1fr)', 
-              gap: 2, 
-              mb: 3,
-              p: 2,
-              borderRadius: '12px',
-              bgcolor: 'rgba(99,102,241,0.1)',
-              border: '1px solid rgba(99,102,241,0.2)',
-            }}>
-              <Box sx={{ textAlign: 'center' }}>
-                <Typography sx={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--foreground)' }}>{paidOrders.length}</Typography>
-                <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 0.5 }}><Inventory size={12} /> ออเดอร์</Typography>
-              </Box>
-              <Box sx={{ textAlign: 'center' }}>
-                <Typography sx={{ fontSize: '1.5rem', fontWeight: 900, color: '#22d3ee' }}>{totalItems}</Typography>
-                <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 0.5 }}><Shirt size={12} /> ตัวทั้งหมด</Typography>
-              </Box>
-              <Box sx={{ textAlign: 'center' }}>
-                <Typography sx={{ fontSize: '1.5rem', fontWeight: 900, color: '#a78bfa' }}>{sortedSizes.length}</Typography>
-                <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 0.5 }}><Ruler size={12} /> ไซส์</Typography>
-              </Box>
-            </Box>
+          <Card className={cn(glassCardClass, 'p-0')}>
+            <CardHeader className="px-6 pt-6 pb-0">
+              <CardTitle className="flex items-center gap-2 text-base font-bold text-[var(--foreground)]">
+                <LocalMall size={20} color="#f472b6" />
+                สรุปการผลิต (ออเดอร์ชำระแล้ว)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-6 pb-6">
+              <div className="mb-6 grid grid-cols-3 gap-4 rounded-xl border border-indigo-500/20 bg-indigo-500/10 p-4">
+                <div className="text-center">
+                  <p className="text-2xl font-black text-[var(--foreground)]">{paidOrdersList.length}</p>
+                  <p className="flex items-center justify-center gap-1 text-[0.7rem] text-[var(--muted-foreground)]">
+                    <Inventory size={12} /> ออเดอร์
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-black text-cyan-400">{totalItems}</p>
+                  <p className="flex items-center justify-center gap-1 text-[0.7rem] text-[var(--muted-foreground)]">
+                    <Shirt size={12} /> ตัวทั้งหมด
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-black text-violet-400">{sortedSizes.length}</p>
+                  <p className="flex items-center justify-center gap-1 text-[0.7rem] text-[var(--muted-foreground)]">
+                    <Ruler size={12} /> ไซส์
+                  </p>
+                </div>
+              </div>
 
-            {/* Size Breakdown Table */}
-            {sortedSizes.length > 0 ? (
-              <Box sx={{ overflowX: 'auto' }}>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell sx={{ color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>ไซส์</TableCell>
-                      <TableCell align="center" sx={{ color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>แขนสั้น</TableCell>
-                      <TableCell align="center" sx={{ color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>แขนยาว</TableCell>
-                      <TableCell align="center" sx={{ color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>รวม</TableCell>
+              {sortedSizes.length > 0 ? (
+                <Table className="min-w-[400px]">
+                  <TableHeader>
+                    <TableRow className="border-[var(--border)] hover:bg-transparent">
+                      <TableHead className="border-[var(--border)] text-[0.75rem] font-semibold text-[var(--muted-foreground)]">
+                        ไซส์
+                      </TableHead>
+                      <TableHead className="border-[var(--border)] text-center text-[0.75rem] font-semibold text-[var(--muted-foreground)]">
+                        แขนสั้น
+                      </TableHead>
+                      <TableHead className="border-[var(--border)] text-center text-[0.75rem] font-semibold text-[var(--muted-foreground)]">
+                        แขนยาว
+                      </TableHead>
+                      <TableHead className="border-[var(--border)] text-center text-[0.75rem] font-semibold text-[var(--muted-foreground)]">
+                        รวม
+                      </TableHead>
                     </TableRow>
-                  </TableHead>
+                  </TableHeader>
                   <TableBody>
-                    {sortedSizes.map((size) => (
-                      <TableRow key={size} sx={{ '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' } }}>
-                        <TableCell sx={{ borderColor: ADMIN_THEME.border }}>
-                          <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>{size}</Typography>
+                    {sortedSizes.map(size => (
+                      <TableRow key={size} className="border-[var(--border)] hover:bg-white/[0.02]">
+                        <TableCell className="border-[var(--border)]">
+                          <span className="text-[0.85rem] font-bold text-[var(--foreground)]">{size}</span>
                         </TableCell>
-                        <TableCell align="center" sx={{ borderColor: ADMIN_THEME.border }}>
-                          <Typography sx={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{sizeShortSleeveCount[size] || 0}</Typography>
+                        <TableCell className="border-[var(--border)] text-center">
+                          <span className="text-[0.85rem] text-[var(--muted-foreground)]">
+                            {sizeShortSleeveCount[size] || 0}
+                          </span>
                         </TableCell>
-                        <TableCell align="center" sx={{ borderColor: ADMIN_THEME.border }}>
-                          <Typography sx={{ fontSize: '0.85rem', color: '#60a5fa' }}>{sizeLongSleeveCount[size] || 0}</Typography>
+                        <TableCell className="border-[var(--border)] text-center">
+                          <span className="text-[0.85rem] text-blue-400">
+                            {sizeLongSleeveCount[size] || 0}
+                          </span>
                         </TableCell>
-                        <TableCell align="center" sx={{ borderColor: ADMIN_THEME.border }}>
-                          <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#10b981' }}>{sizeCount[size]}</Typography>
+                        <TableCell className="border-[var(--border)] text-center">
+                          <span className="text-[0.9rem] font-bold text-[var(--success)]">
+                            {sizeCount[size]}
+                          </span>
                         </TableCell>
                       </TableRow>
                     ))}
-                    {/* Total Row */}
-                    <TableRow sx={{ bgcolor: 'rgba(99,102,241,0.1)' }}>
-                      <TableCell sx={{ borderColor: ADMIN_THEME.border }}>
-                        <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#a5b4fc', display: 'flex', alignItems: 'center', gap: 0.5 }}><Target size={14} /> รวมทั้งหมด</Typography>
+                    <TableRow className="border-[var(--border)] bg-indigo-500/10 hover:bg-indigo-500/10">
+                      <TableCell className="border-[var(--border)]">
+                        <span className="flex items-center gap-1 text-[0.85rem] font-bold text-indigo-300">
+                          <Target size={14} /> รวมทั้งหมด
+                        </span>
                       </TableCell>
-                      <TableCell align="center" sx={{ borderColor: ADMIN_THEME.border }}>
-                        <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)' }}>{totalShortSleeve}</Typography>
+                      <TableCell className="border-[var(--border)] text-center">
+                        <span className="text-[0.9rem] font-bold text-[var(--foreground)]">
+                          {totalShortSleeve}
+                        </span>
                       </TableCell>
-                      <TableCell align="center" sx={{ borderColor: ADMIN_THEME.border }}>
-                        <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#60a5fa' }}>{totalLongSleeve}</Typography>
+                      <TableCell className="border-[var(--border)] text-center">
+                        <span className="text-[0.9rem] font-bold text-blue-400">{totalLongSleeve}</span>
                       </TableCell>
-                      <TableCell align="center" sx={{ borderColor: ADMIN_THEME.border }}>
-                        <Typography sx={{ fontSize: '1rem', fontWeight: 900, color: '#10b981' }}>{totalItems}</Typography>
+                      <TableCell className="border-[var(--border)] text-center">
+                        <span className="text-base font-black text-[var(--success)]">{totalItems}</span>
                       </TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
-              </Box>
-            ) : (
-              <Typography sx={{ fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center', py: 3 }}>
-                ยังไม่มีออเดอร์ที่ชำระแล้ว
-              </Typography>
-            )}
-          </Box>
+              ) : (
+                <p className="py-6 text-center text-[0.85rem] text-[var(--muted-foreground)]">
+                  ยังไม่มีออเดอร์ที่ชำระแล้ว
+                </p>
+              )}
+            </CardContent>
+          </Card>
         );
       })()}
 
       {/* Recent Orders - Modern Table */}
-      <Box sx={{ ...glassCardSx, p: 0 }}>
-        <Box sx={{ 
-          px: 3, 
-          py: 2.5, 
-          borderBottom: `1px solid ${ADMIN_THEME.border}`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}>
-          <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--foreground)', display: 'flex', alignItems: 'center', gap: 1 }}>
+      <Card className={glassCardClass}>
+        <CardHeader className="flex-row items-center justify-between space-y-0 px-6 py-5">
+          <CardTitle className="flex items-center gap-2 text-base font-bold text-[var(--foreground)]">
             <LocalShipping size={20} color="#22d3ee" />
             ออเดอร์ล่าสุด
-          </Typography>
+          </CardTitle>
           <Button
-            size="small"
+            variant="ghost"
+            size="sm"
+            className="text-[0.8rem] text-indigo-300 hover:text-indigo-200"
             onClick={() => setActiveTab(2)}
-            sx={{ color: '#a5b4fc', fontSize: '0.8rem', textTransform: 'none' }}
           >
             ดูทั้งหมด →
           </Button>
-        </Box>
-        <Box sx={{ overflowX: 'auto' }}>
-          <Table sx={{ minWidth: 600 }}>
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>REF</TableCell>
-                <TableCell sx={{ color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>ลูกค้า</TableCell>
-                <TableCell align="right" sx={{ color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>ยอด</TableCell>
-                <TableCell sx={{ color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>สถานะ</TableCell>
-                <TableCell sx={{ color: 'var(--text-muted)', fontWeight: 600, fontSize: '0.75rem', borderColor: ADMIN_THEME.border }}>วันที่</TableCell>
+        </CardHeader>
+        <Separator className="bg-[var(--border)]" />
+        <CardContent className="px-0 pb-0">
+          <Table className="min-w-[600px]">
+            <TableHeader>
+              <TableRow className="border-[var(--border)] hover:bg-transparent">
+                <TableHead className="border-[var(--border)] text-[0.75rem] font-semibold text-[var(--muted-foreground)]">
+                  REF
+                </TableHead>
+                <TableHead className="border-[var(--border)] text-[0.75rem] font-semibold text-[var(--muted-foreground)]">
+                  ลูกค้า
+                </TableHead>
+                <TableHead className="border-[var(--border)] text-right text-[0.75rem] font-semibold text-[var(--muted-foreground)]">
+                  ยอด
+                </TableHead>
+                <TableHead className="border-[var(--border)] text-[0.75rem] font-semibold text-[var(--muted-foreground)]">
+                  สถานะ
+                </TableHead>
+                <TableHead className="border-[var(--border)] text-[0.75rem] font-semibold text-[var(--muted-foreground)]">
+                  วันที่
+                </TableHead>
               </TableRow>
-            </TableHead>
+            </TableHeader>
             <TableBody>
-              {orders.slice(0, 5).map((order) => {
+              {orders.slice(0, 5).map(order => {
                 const theme = STATUS_THEME[order.status] || STATUS_THEME.PENDING;
                 return (
-                  <TableRow 
-                    key={order.ref} 
-                    sx={{ 
-                      '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' },
-                      cursor: 'pointer',
+                  <TableRow
+                    key={order.ref}
+                    className="cursor-pointer border-[var(--border)] hover:bg-white/[0.02]"
+                    onClick={() => {
+                      setActiveTab(2);
+                      setSearchTerm(order.ref);
                     }}
-                    onClick={() => { setActiveTab(2); setSearchTerm(order.ref); }}
                   >
-                    <TableCell sx={{ borderColor: ADMIN_THEME.border }}>
-                      <Typography sx={{ fontSize: '0.8rem', fontFamily: 'monospace', color: '#a5b4fc', fontWeight: 600 }}>
+                    <TableCell className="border-[var(--border)]">
+                      <span className="font-mono text-[0.8rem] font-semibold text-indigo-300">
                         {order.ref.slice(-8)}
-                      </Typography>
+                      </span>
                     </TableCell>
-                    <TableCell sx={{ borderColor: ADMIN_THEME.border }}>
-                      <Typography sx={{ fontSize: '0.85rem', color: 'var(--foreground)', fontWeight: 600 }}>
+                    <TableCell className="border-[var(--border)]">
+                      <p className="text-[0.85rem] font-semibold text-[var(--foreground)]">
                         {order.name || '—'}
-                      </Typography>
-                      <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                      </p>
+                      <p className="text-[0.7rem] text-[var(--muted-foreground)]">
                         {order.email?.slice(0, 20) || ''}
-                      </Typography>
+                      </p>
                     </TableCell>
-                    <TableCell align="right" sx={{ borderColor: ADMIN_THEME.border }}>
-                      <Typography sx={{ fontSize: '0.9rem', color: '#10b981', fontWeight: 700 }}>
+                    <TableCell className="border-[var(--border)] text-right">
+                      <span className="text-[0.9rem] font-bold text-[var(--success)]">
                         ฿{Number(order.amount).toLocaleString()}
-                      </Typography>
+                      </span>
                     </TableCell>
-                    <TableCell sx={{ borderColor: ADMIN_THEME.border }}>
-                      <Box sx={{
-                        display: 'inline-flex',
-                        px: 1.5,
-                        py: 0.5,
-                        borderRadius: '8px',
-                        bgcolor: theme.bg,
-                        border: `1px solid ${theme.border}`,
-                      }}>
-                        <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: theme.text }}>
-                          {order.status.replace('_', ' ')}
-                        </Typography>
-                      </Box>
+                    <TableCell className="border-[var(--border)]">
+                      <span
+                        className="inline-flex rounded-lg px-3 py-1 text-[0.7rem] font-bold"
+                        style={{
+                          backgroundColor: theme.bg,
+                          border: `1px solid ${theme.border}`,
+                          color: theme.text,
+                        }}
+                      >
+                        {order.status.replace('_', ' ')}
+                      </span>
                     </TableCell>
-                    <TableCell sx={{ borderColor: ADMIN_THEME.border }}>
-                      <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        {order.date ? new Date(order.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }) : '-'}
-                      </Typography>
+                    <TableCell className="border-[var(--border)]">
+                      <span className="text-[0.8rem] text-[var(--muted-foreground)]">
+                        {order.date
+                          ? new Date(order.date).toLocaleDateString('th-TH', {
+                              day: 'numeric',
+                              month: 'short',
+                            })
+                          : '-'}
+                      </span>
                     </TableCell>
                   </TableRow>
                 );
               })}
             </TableBody>
           </Table>
-        </Box>
-      </Box>
-    </Box>
+        </CardContent>
+      </Card>
+    </div>
   );
 });

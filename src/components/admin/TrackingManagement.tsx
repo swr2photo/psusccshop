@@ -1,38 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
-import {
-  Box,
-  Typography,
-  Card,
-  CardContent,
-  TextField,
-  Button,
-  IconButton,
-  Chip,
-  Stack,
-  Alert,
-  Tooltip,
-  CircularProgress,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Checkbox,
-  Tabs,
-  Tab,
-  InputAdornment,
-} from '@mui/material';
+import { useState, useMemo, useCallback, type ReactNode } from 'react';
 import {
   Truck as LocalShipping,
   Search,
@@ -56,6 +24,7 @@ import {
   User as Person,
   Phone,
   Home,
+  Loader2,
 } from 'lucide-react';
 import {
   TrackingInfo,
@@ -69,7 +38,51 @@ import {
   useUpdateTracking,
   useTrackShipment,
 } from '@/hooks/useShippingOrders';
-import { ADMIN_THEME, adminInputSxCompact as inputSx } from '@/lib/adminTheme';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 interface TrackingManagementProps {
   showToast?: (type: 'success' | 'error' | 'warning' | 'info', message: string) => void;
@@ -92,72 +105,124 @@ interface Order {
   shippingOption?: string;
 }
 
-const STATUS_ICONS: Record<TrackingStatus, React.ReactNode> = {
-  pending: <Schedule size={18} color="#94a3b8" />,
-  picked_up: <Flight size={18} color="#a78bfa" />,
-  in_transit: <LocalShipping size={18} color="#60a5fa" />,
-  out_for_delivery: <LocalShipping size={18} color="#22d3ee" />,
-  delivered: <CheckCircle size={18} color="#22c55e" />,
-  returned: <ErrorIcon size={18} color="#f59e0b" />,
-  failed: <ErrorIcon size={18} color="#ef4444" />,
-  unknown: <Schedule size={18} color="#94a3b8" />,
+const STATUS_ICONS: Record<TrackingStatus, ReactNode> = {
+  pending: <Schedule size={18} className="text-slate-400" />,
+  picked_up: <Flight size={18} className="text-violet-400" />,
+  in_transit: <LocalShipping size={18} className="text-blue-400" />,
+  out_for_delivery: <LocalShipping size={18} className="text-cyan-400" />,
+  delivered: <CheckCircle size={18} className="text-green-500" />,
+  returned: <ErrorIcon size={18} className="text-amber-500" />,
+  failed: <ErrorIcon size={18} className="text-red-500" />,
+  unknown: <Schedule size={18} className="text-slate-400" />,
 };
 
-// Label printing URLs for different carriers
-// These are the main shipping label/booking portals for each carrier
+const glassCardClass =
+  'rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)] py-0 shadow-none';
+
 const CARRIER_LABEL_URLS: Record<string, string> = {
-  thailand_post: 'https://etracking.thailandpost.com/', // Thailand Post tracking & services portal
-  kerry: 'https://th.kerryexpress.com/en/ship', // Kerry Express shipping
-  jandt: 'https://www.jtexpress.co.th/index/index/index.html', // J&T Express main page with shipping
-  flash: 'https://merchant.flashexpress.com/', // Flash Express merchant portal
+  thailand_post: 'https://etracking.thailandpost.com/',
+  kerry: 'https://th.kerryexpress.com/en/ship',
+  jandt: 'https://www.jtexpress.co.th/index/index/index.html',
+  flash: 'https://merchant.flashexpress.com/',
 };
+
+function getShippingOptionBadge(order: Order) {
+  if (order.shippingOption === 'pickup') {
+    return (
+      <Badge className="h-[22px] gap-1 border-transparent bg-emerald-500/20 text-[0.7rem] text-emerald-500">
+        <Home size={14} />
+        รับหน้าร้าน
+      </Badge>
+    );
+  }
+  if (order.shippingOption === 'delivery_legacy') {
+    return (
+      <Badge className="h-[22px] gap-1 border-transparent bg-amber-400/20 text-[0.7rem] text-amber-400">
+        <LocalShipping size={14} />
+        จัดส่ง (เดิม)
+      </Badge>
+    );
+  }
+  if (order.shippingOption === 'thailand_post_ems') {
+    return (
+      <Badge className="h-[22px] gap-1 border-transparent bg-blue-400/20 text-[0.7rem] text-blue-400">
+        <LocalShipping size={14} />
+        EMS ไปรษณีย์ไทย
+      </Badge>
+    );
+  }
+  if (order.shippingProvider) {
+    return (
+      <Badge className="h-[22px] gap-1 border-transparent bg-blue-400/20 text-[0.7rem] text-blue-400">
+        <LocalShipping size={14} />
+        {SHIPPING_PROVIDERS[order.shippingProvider]?.nameThai || order.shippingProvider}
+      </Badge>
+    );
+  }
+  if (order.shippingOption) {
+    const label =
+      order.shippingOption === 'thailand_post_registered' ? 'ลงทะเบียน ไปรษณีย์ไทย' :
+      order.shippingOption === 'kerry' ? 'Kerry Express' :
+      order.shippingOption === 'flash' ? 'Flash Express' :
+      order.shippingOption === 'jandt' ? 'J&T Express' :
+      order.shippingOption === 'ninja_van' ? 'Ninja Van' :
+      order.shippingOption === 'best' ? 'BEST Express' :
+      order.shippingOption === 'scg' ? 'SCG Express' :
+      order.shippingOption;
+    return (
+      <Badge className="h-[22px] gap-1 border-transparent bg-blue-400/20 text-[0.7rem] text-blue-400">
+        <LocalShipping size={14} />
+        {label}
+      </Badge>
+    );
+  }
+  return (
+    <Badge className="h-[22px] gap-1 border-transparent bg-slate-400/20 text-[0.7rem] text-[var(--text-muted)]">
+      <LocalShipping size={14} />
+      จัดส่ง
+    </Badge>
+  );
+}
 
 export default function TrackingManagement({ showToast, selectedShopId }: TrackingManagementProps) {
-  // ============== SWR HOOKS ==============
-  const { 
-    orders: allOrders, 
-    isLoading: loadingOrders, 
+  const {
+    orders: allOrders,
+    isLoading: loadingOrders,
     refresh: refreshOrders,
-    error: ordersError 
+    error: ordersError,
   } = useShippingOrders(selectedShopId);
-  
-  const { 
-    updateTracking, 
-    deleteTracking: deleteTrackingMutation, 
-    isUpdating: saving 
+
+  const {
+    updateTracking,
+    deleteTracking: deleteTrackingMutation,
+    isUpdating: saving,
   } = useUpdateTracking();
-  
-  const { 
-    trackShipment, 
-    isTracking: loadingTracking, 
+
+  const {
+    trackShipment,
+    isTracking: loadingTracking,
     error: trackingErrorObj,
-    resetError: resetTrackingError 
+    resetError: resetTrackingError,
   } = useTrackShipment();
-  
-  // Tab state
+
   const [activeTab, setActiveTab] = useState(0);
-  
-  // State for tracking lookup
+
   const [searchTrackingNumber, setSearchTrackingNumber] = useState('');
   const [searchProvider, setSearchProvider] = useState<ShippingProvider | ''>('');
   const [trackingResult, setTrackingResult] = useState<TrackingInfo | null>(null);
   const [trackingError, setTrackingError] = useState<string | null>(null);
 
-  // State for orders search/filter
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'shipped'>('pending');
 
-  // State for editing tracking
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [editTrackingNumber, setEditTrackingNumber] = useState('');
   const [editProvider, setEditProvider] = useState<ShippingProvider>('thailand_post');
 
-  // State for bulk actions
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
   const [bulkTrackingInput, setBulkTrackingInput] = useState('');
   const [bulkProvider, setBulkProvider] = useState<ShippingProvider>('thailand_post');
-  
-  // Show error toast when orders fail to load
+
   const loadOrders = useCallback(() => {
     refreshOrders();
     if (ordersError) {
@@ -165,14 +230,11 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
     }
   }, [refreshOrders, ordersError, showToast]);
 
-  // Filtered orders
   const filteredOrders = useMemo((): Order[] => {
     return (allOrders as Order[]).filter((order: Order) => {
-      // Filter by status
       if (filterStatus === 'pending' && order.trackingNumber) return false;
       if (filterStatus === 'shipped' && !order.trackingNumber) return false;
 
-      // Filter by search query
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         return (
@@ -186,19 +248,16 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
     });
   }, [allOrders, filterStatus, searchQuery]);
 
-  // Orders pending shipping (no tracking number)
-  const pendingOrders = useMemo((): Order[] => 
+  const pendingOrders = useMemo((): Order[] =>
     (allOrders as Order[]).filter((o: Order) => !o.trackingNumber),
     [allOrders]
   );
 
-  // Orders already shipped (has tracking number)
-  const shippedOrders = useMemo((): Order[] => 
+  const shippedOrders = useMemo((): Order[] =>
     (allOrders as Order[]).filter((o: Order) => !!o.trackingNumber),
     [allOrders]
   );
 
-  // Track shipment using SWR
   const handleTrack = async () => {
     if (!searchTrackingNumber.trim()) {
       setTrackingError('กรุณาใส่เลขพัสดุ');
@@ -220,7 +279,6 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
     }
   };
 
-  // Update order tracking number using SWR
   const handleSaveTracking = async () => {
     if (!editingOrder) return;
 
@@ -231,8 +289,8 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
         editTrackingNumber.trim() ? editProvider : null,
         'SHIPPED'
       );
-      
-      showToast?.('success', editTrackingNumber.trim() 
+
+      showToast?.('success', editTrackingNumber.trim()
         ? `บันทึกเลขพัสดุสำหรับ ${editingOrder.ref} แล้ว`
         : `ลบเลขพัสดุสำหรับ ${editingOrder.ref} แล้ว`
       );
@@ -242,7 +300,6 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
     }
   };
 
-  // Delete tracking number using SWR
   const handleDeleteTracking = async (order: Order) => {
     if (!confirm(`ต้องการลบเลขพัสดุของ ${order.ref} ใช่หรือไม่?`)) return;
 
@@ -254,7 +311,6 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
     }
   };
 
-  // Bulk add tracking (format: REF:TRACKING per line) using SWR
   const handleBulkAddTracking = async () => {
     const lines = bulkTrackingInput.trim().split('\n').filter(l => l.trim());
     if (lines.length === 0) {
@@ -270,7 +326,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
       if (parts.length < 2) continue;
 
       const [ref, trackingNumber] = parts;
-      
+
       try {
         await updateTracking(ref, trackingNumber, bulkProvider, 'SHIPPED');
         success++;
@@ -279,18 +335,17 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
       }
     }
 
-    showToast?.(success > 0 ? 'success' : 'error', 
+    showToast?.(success > 0 ? 'success' : 'error',
       `เพิ่มเลขพัสดุสำเร็จ ${success} รายการ${failed > 0 ? `, ล้มเหลว ${failed} รายการ` : ''}`
     );
-    
+
     if (success > 0) {
       setBulkTrackingInput('');
     }
   };
 
-  // Export shipping data
   const handleExportShipping = () => {
-    const ordersToExport = selectedOrders.size > 0 
+    const ordersToExport = selectedOrders.size > 0
       ? filteredOrders.filter(o => selectedOrders.has(o.ref))
       : pendingOrders;
 
@@ -299,7 +354,6 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
       return;
     }
 
-    // Create CSV content
     const headers = ['ลำดับ', 'เลขออเดอร์', 'ชื่อผู้รับ', 'เบอร์โทร', 'ที่อยู่', 'อีเมล', 'รายการสินค้า', 'ยอดรวม', 'เลขพัสดุ', 'ขนส่ง'];
     const rows = ordersToExport.map((order, idx) => {
       const items = order.cart?.map((item: any) => {
@@ -308,11 +362,11 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
         const qty = item.quantity || item.qty || 1;
         return `${name} (${size}) x${qty}`;
       }).join(', ') || '-';
-      
-      const providerName = order.shippingProvider 
-        ? (SHIPPING_PROVIDERS[order.shippingProvider]?.nameThai || order.shippingProvider) 
+
+      const providerName = order.shippingProvider
+        ? (SHIPPING_PROVIDERS[order.shippingProvider]?.nameThai || order.shippingProvider)
         : '-';
-      
+
       return [
         idx + 1,
         order.ref,
@@ -332,7 +386,6 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
       ...rows.map(row => row.join(','))
     ].join('\n');
 
-    // Download CSV
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -342,11 +395,9 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
     showToast?.('success', `ส่งออกข้อมูล ${ordersToExport.length} รายการแล้ว`);
   };
 
-  // Print labels (open carrier websites) - uses anchor element to avoid popup blocker
   const handlePrintLabels = (provider: ShippingProvider) => {
     const url = CARRIER_LABEL_URLS[provider];
     if (url) {
-      // Create temporary anchor element to properly open link without popup blocker
       const a = document.createElement('a');
       a.href = url;
       a.target = '_blank';
@@ -360,13 +411,11 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
     }
   };
 
-  // Copy to clipboard
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     showToast?.('info', 'คัดลอกแล้ว');
   };
 
-  // Toggle select order
   const toggleSelectOrder = (ref: string) => {
     const newSelected = new Set(selectedOrders);
     if (newSelected.has(ref)) {
@@ -377,773 +426,714 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
     setSelectedOrders(newSelected);
   };
 
-  // Select all visible orders
   const selectAllOrders = () => {
     const allRefs = filteredOrders.map(o => o.ref);
     setSelectedOrders(new Set(allRefs));
   };
 
-  // Clear selection
   const clearSelection = () => {
     setSelectedOrders(new Set());
   };
 
+  const headerCheckboxState =
+    selectedOrders.size === filteredOrders.length && filteredOrders.length > 0
+      ? true
+      : selectedOrders.size > 0 && selectedOrders.size < filteredOrders.length
+        ? 'indeterminate'
+        : false;
+
   return (
-    <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1400, mx: 'auto' }}>
-      {/* Header */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h5" sx={{ fontWeight: 700, color: ADMIN_THEME.text, mb: 1, display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <LocalShipping size={24} color="#1e40af" />
-          จัดการการจัดส่ง
-        </Typography>
-        <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-          เพิ่มเลขพัสดุ ติดตามสถานะ และส่งออกข้อมูลการจัดส่ง
-        </Typography>
-      </Box>
+    <TooltipProvider>
+      <div className="mx-auto max-w-[1400px] p-4 md:p-6">
+        {/* Header */}
+        <div className="mb-6">
+          <h2 className="mb-1 flex items-center gap-3 text-xl font-bold text-[var(--foreground)]">
+            <LocalShipping size={24} className="text-blue-800" />
+            จัดการการจัดส่ง
+          </h2>
+          <p className="text-[0.9rem] text-[var(--text-muted)]">
+            เพิ่มเลขพัสดุ ติดตามสถานะ และส่งออกข้อมูลการจัดส่ง
+          </p>
+        </div>
 
-      {/* Quick Stats */}
-      <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap' }}>
-        <Card sx={{ 
-          bgcolor: 'rgba(251, 191, 36, 0.1)', 
-          border: '1px solid rgba(251, 191, 36, 0.3)', 
-          borderRadius: 2,
-          flex: '1 1 150px',
-        }}>
-          <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-            <Typography sx={{ color: '#fbbf24', fontWeight: 700, fontSize: '1.5rem' }}>
-              {pendingOrders.length}
-            </Typography>
-            <Typography sx={{ color: '#fbbf24', fontSize: '0.8rem' }}>
-              รอจัดส่ง
-            </Typography>
-          </CardContent>
-        </Card>
-        <Card sx={{ 
-          bgcolor: 'rgba(34, 211, 238, 0.1)', 
-          border: '1px solid rgba(34, 211, 238, 0.3)', 
-          borderRadius: 2,
-          flex: '1 1 150px',
-        }}>
-          <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
-            <Typography sx={{ color: '#22d3ee', fontWeight: 700, fontSize: '1.5rem' }}>
-              {shippedOrders.length}
-            </Typography>
-            <Typography sx={{ color: '#22d3ee', fontSize: '0.8rem' }}>
-              จัดส่งแล้ว
-            </Typography>
-          </CardContent>
-        </Card>
-      </Box>
+        {/* Quick Stats */}
+        <div className="mb-6 flex flex-wrap gap-4">
+          <Card className="min-w-[150px] flex-1 rounded-lg border-amber-400/30 bg-amber-400/10 py-0 shadow-none">
+            <CardContent className="px-4 py-3">
+              <p className="text-2xl font-bold text-amber-400">{pendingOrders.length}</p>
+              <p className="text-[0.8rem] text-amber-400">รอจัดส่ง</p>
+            </CardContent>
+          </Card>
+          <Card className="min-w-[150px] flex-1 rounded-lg border-cyan-400/30 bg-cyan-400/10 py-0 shadow-none">
+            <CardContent className="px-4 py-3">
+              <p className="text-2xl font-bold text-cyan-400">{shippedOrders.length}</p>
+              <p className="text-[0.8rem] text-cyan-400">จัดส่งแล้ว</p>
+            </CardContent>
+          </Card>
+        </div>
 
-      {/* Tabs */}
-      <Tabs 
-        value={activeTab} 
-        onChange={(_, v) => setActiveTab(v)}
-        sx={{
-          mb: 3,
-          '& .MuiTab-root': { color: 'var(--text-muted)', fontWeight: 600 },
-          '& .Mui-selected': { color: '#1e40af' },
-          '& .MuiTabs-indicator': { bgcolor: '#1e40af' },
-        }}
-      >
-        <Tab label="รายการออเดอร์" />
-        <Tab label="เพิ่มเลขพัสดุแบบกลุ่ม" />
-        <Tab label="ค้นหาพัสดุ" />
-      </Tabs>
-
-      {/* Tab 0: Order List */}
-      {activeTab === 0 && (
-        <Card sx={{ bgcolor: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 3 }}>
-          <CardContent sx={{ p: 3 }}>
-            {/* Toolbar */}
-            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, mb: 3 }}>
-              {/* Search */}
-              <TextField
-                placeholder="ค้นหา ออเดอร์/ชื่อ/อีเมล/เลขพัสดุ..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                size="small"
-                sx={{ ...inputSx, flex: 1 }}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Search size={24} color="#64748b" />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-
-              {/* Filter */}
-              <FormControl size="small" sx={{ minWidth: 150, ...inputSx }}>
-                <Select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value as any)}
-                  startAdornment={<FilterList size={24} color="#64748b" style={{ marginRight: 8 }} />}
-                >
-                  <MenuItem value="all">ทั้งหมด ({allOrders.length})</MenuItem>
-                  <MenuItem value="pending">รอจัดส่ง ({pendingOrders.length})</MenuItem>
-                  <MenuItem value="shipped">จัดส่งแล้ว ({shippedOrders.length})</MenuItem>
-                </Select>
-              </FormControl>
-
-              {/* Refresh */}
-              <IconButton onClick={loadOrders} disabled={loadingOrders} sx={{ color: 'var(--text-muted)' }}>
-                <Refresh />
-              </IconButton>
-            </Box>
-
-            {/* Action Buttons */}
-            <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-              <Button
-                size="small"
-                startIcon={<SelectAll />}
-                onClick={selectAllOrders}
-                sx={{ color: '#60a5fa' }}
-              >
-                เลือกทั้งหมด
-              </Button>
-              {selectedOrders.size > 0 && (
-                <Button
-                  size="small"
-                  startIcon={<ClearAll />}
-                  onClick={clearSelection}
-                  sx={{ color: 'var(--text-muted)' }}
-                >
-                  ยกเลิก ({selectedOrders.size})
-                </Button>
-              )}
-              <Box sx={{ flex: 1 }} />
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={<Download />}
-                onClick={handleExportShipping}
-                sx={{ 
-                  borderColor: '#10b981', 
-                  color: '#10b981',
-                  '&:hover': { borderColor: '#059669', bgcolor: 'rgba(16, 185, 129, 0.1)' },
-                }}
-              >
-                ส่งออก CSV {selectedOrders.size > 0 ? `(${selectedOrders.size})` : `(${pendingOrders.length})`}
-              </Button>
-            </Box>
-
-            {/* Print Labels Buttons */}
-            <Box sx={{ display: 'flex', gap: 1, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
-              <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.8rem', mr: 1 }}>
-                <Print size={16} style={{ verticalAlign: 'middle', marginRight: 4 }} />
-                พิมพ์ใบจ่าหน้า:
-              </Typography>
-              {Object.entries(SHIPPING_PROVIDERS)
-                .filter(([key]) => CARRIER_LABEL_URLS[key])
-                .map(([key, info]) => (
-                  <Button
-                    key={key}
-                    component="a"
-                    href={CARRIER_LABEL_URLS[key]}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    size="small"
-                    sx={{ 
-                      bgcolor: 'rgba(30, 64, 175, 0.1)',
-                      color: '#a78bfa',
-                      fontSize: '0.75rem',
-                      textDecoration: 'none',
-                      '&:hover': { bgcolor: 'rgba(30, 64, 175, 0.2)' },
-                    }}
-                  >
-                    {info.nameThai}
-                  </Button>
-                ))
-              }
-            </Box>
-
-            {/* Orders Table */}
-            {loadingOrders ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                <CircularProgress size={32} />
-              </Box>
-            ) : filteredOrders.length === 0 ? (
-              <Alert severity="info" sx={{ bgcolor: 'rgba(59, 130, 246, 0.1)' }}>
-                ไม่พบออเดอร์ที่ตรงกับเงื่อนไข
-              </Alert>
-            ) : (
-              <TableContainer sx={{ maxHeight: 500 }}>
-                <Table size="small" stickyHeader>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell padding="checkbox" sx={{ bgcolor: 'var(--surface-2)', color: 'var(--text-muted)', borderColor: 'var(--glass-border)' }}>
-                        <Checkbox 
-                          checked={selectedOrders.size === filteredOrders.length && filteredOrders.length > 0}
-                          indeterminate={selectedOrders.size > 0 && selectedOrders.size < filteredOrders.length}
-                          onChange={(e) => e.target.checked ? selectAllOrders() : clearSelection()}
-                          sx={{ color: 'var(--text-muted)' }}
-                        />
-                      </TableCell>
-                      <TableCell sx={{ bgcolor: 'var(--surface-2)', color: 'var(--text-muted)', borderColor: 'var(--glass-border)' }}>ออเดอร์</TableCell>
-                      <TableCell sx={{ bgcolor: 'var(--surface-2)', color: 'var(--text-muted)', borderColor: 'var(--glass-border)' }}>ลูกค้า</TableCell>
-                      <TableCell sx={{ bgcolor: 'var(--surface-2)', color: 'var(--text-muted)', borderColor: 'var(--glass-border)' }}>ที่อยู่</TableCell>
-                      <TableCell sx={{ bgcolor: 'var(--surface-2)', color: 'var(--text-muted)', borderColor: 'var(--glass-border)' }}>ตัวเลือกจัดส่ง</TableCell>
-                      <TableCell sx={{ bgcolor: 'var(--surface-2)', color: 'var(--text-muted)', borderColor: 'var(--glass-border)' }}>เลขพัสดุ</TableCell>
-                      <TableCell sx={{ bgcolor: 'var(--surface-2)', color: 'var(--text-muted)', borderColor: 'var(--glass-border)' }} align="right">จัดการ</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {filteredOrders.map((order) => (
-                      <TableRow 
-                        key={order.ref}
-                        selected={selectedOrders.has(order.ref)}
-                        sx={{ 
-                          '&:hover': { bgcolor: ADMIN_THEME.cardHover },
-                          '&.Mui-selected': { bgcolor: 'rgba(30, 64, 175, 0.1)' },
-                        }}
-                      >
-                        <TableCell padding="checkbox" sx={{ borderColor: 'var(--glass-border)' }}>
-                          <Checkbox 
-                            checked={selectedOrders.has(order.ref)}
-                            onChange={() => toggleSelectOrder(order.ref)}
-                            sx={{ color: 'var(--text-muted)' }}
-                          />
-                        </TableCell>
-                        <TableCell sx={{ borderColor: 'var(--glass-border)' }}>
-                          <Typography sx={{ fontWeight: 600, fontSize: '0.85rem', color: ADMIN_THEME.text }}>
-                            {order.ref}
-                          </Typography>
-                          <Chip
-                            label={order.status}
-                            size="small"
-                            sx={{
-                              height: 18,
-                              fontSize: '0.65rem',
-                              bgcolor: order.trackingNumber ? 'rgba(34, 211, 238, 0.2)' : 'rgba(251, 191, 36, 0.2)',
-                              color: order.trackingNumber ? '#22d3ee' : '#fbbf24',
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell sx={{ borderColor: 'var(--glass-border)' }}>
-                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.3 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              <Person size={14} color="#a78bfa" />
-                              <Typography sx={{ color: ADMIN_THEME.text, fontSize: '0.85rem' }}>
-                                {order.customerName || order.name || '-'}
-                              </Typography>
-                            </Box>
-                            {order.phone && (
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <Phone size={12} color="#64748b" />
-                                <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-                                  {order.phone}
-                                </Typography>
-                              </Box>
-                            )}
-                          </Box>
-                        </TableCell>
-                        <TableCell sx={{ borderColor: 'var(--glass-border)', maxWidth: 200 }}>
-                          <Tooltip title={order.address || '-'}>
-                            <Typography sx={{ 
-                              color: 'var(--text-muted)', 
-                              fontSize: '0.75rem',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}>
-                              {order.address || '-'}
-                            </Typography>
-                          </Tooltip>
-                        </TableCell>
-                        <TableCell sx={{ borderColor: 'var(--glass-border)' }}>
-                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.3 }}>
-                            {order.shippingOption === 'pickup' ? (
-                              <Chip
-                                label="รับหน้าร้าน"
-                                size="small"
-                                icon={<Home size={14} />}
-                                sx={{
-                                  height: 22,
-                                  fontSize: '0.7rem',
-                                  bgcolor: 'rgba(16, 185, 129, 0.2)',
-                                  color: '#10b981',
-                                  '& .MuiChip-icon': { color: '#10b981' },
-                                }}
-                              />
-                            ) : order.shippingOption === 'delivery_legacy' ? (
-                              <Chip
-                                label="จัดส่ง (เดิม)"
-                                size="small"
-                                icon={<LocalShipping size={14} />}
-                                sx={{
-                                  height: 22,
-                                  fontSize: '0.7rem',
-                                  bgcolor: 'rgba(251, 191, 36, 0.2)',
-                                  color: '#fbbf24',
-                                  '& .MuiChip-icon': { color: '#fbbf24' },
-                                }}
-                              />
-                            ) : order.shippingOption === 'thailand_post_ems' ? (
-                              <Chip
-                                label="EMS ไปรษณีย์ไทย"
-                                size="small"
-                                icon={<LocalShipping size={14} />}
-                                sx={{
-                                  height: 22,
-                                  fontSize: '0.7rem',
-                                  bgcolor: 'rgba(96, 165, 250, 0.2)',
-                                  color: '#60a5fa',
-                                  '& .MuiChip-icon': { color: '#60a5fa' },
-                                }}
-                              />
-                            ) : order.shippingProvider ? (
-                              <Chip
-                                label={SHIPPING_PROVIDERS[order.shippingProvider]?.nameThai || order.shippingProvider}
-                                size="small"
-                                icon={<LocalShipping size={14} />}
-                                sx={{
-                                  height: 22,
-                                  fontSize: '0.7rem',
-                                  bgcolor: 'rgba(96, 165, 250, 0.2)',
-                                  color: '#60a5fa',
-                                  '& .MuiChip-icon': { color: '#60a5fa' },
-                                }}
-                              />
-                            ) : order.shippingOption ? (
-                              <Chip
-                                label={
-                                  order.shippingOption === 'thailand_post_registered' ? 'ลงทะเบียน ไปรษณีย์ไทย' :
-                                  order.shippingOption === 'kerry' ? 'Kerry Express' :
-                                  order.shippingOption === 'flash' ? 'Flash Express' :
-                                  order.shippingOption === 'jandt' ? 'J&T Express' :
-                                  order.shippingOption === 'ninja_van' ? 'Ninja Van' :
-                                  order.shippingOption === 'best' ? 'BEST Express' :
-                                  order.shippingOption === 'scg' ? 'SCG Express' :
-                                  order.shippingOption
-                                }
-                                size="small"
-                                icon={<LocalShipping size={14} />}
-                                sx={{
-                                  height: 22,
-                                  fontSize: '0.7rem',
-                                  bgcolor: 'rgba(96, 165, 250, 0.2)',
-                                  color: '#60a5fa',
-                                  '& .MuiChip-icon': { color: '#60a5fa' },
-                                }}
-                              />
-                            ) : (
-                              <Chip
-                                label="จัดส่ง"
-                                size="small"
-                                icon={<LocalShipping size={14} />}
-                                sx={{
-                                  height: 22,
-                                  fontSize: '0.7rem',
-                                  bgcolor: 'rgba(148, 163, 184, 0.2)',
-                                  color: 'var(--text-muted)',
-                                  '& .MuiChip-icon': { color: 'var(--text-muted)' },
-                                }}
-                              />
-                            )}
-                          </Box>
-                        </TableCell>
-                        <TableCell sx={{ borderColor: 'var(--glass-border)' }}>
-                          {order.trackingNumber ? (
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                              <Typography sx={{ color: '#10b981', fontSize: '0.85rem', fontWeight: 600, fontFamily: 'monospace' }}>
-                                {order.trackingNumber}
-                              </Typography>
-                              <IconButton size="small" onClick={() => copyToClipboard(order.trackingNumber!)}>
-                                <ContentCopy size={14} color="#64748b" />
-                              </IconButton>
-                              {order.shippingProvider && SHIPPING_PROVIDERS[order.shippingProvider] && (
-                                <Chip 
-                                  label={SHIPPING_PROVIDERS[order.shippingProvider].nameThai}
-                                  size="small"
-                                  sx={{ height: 18, fontSize: '0.6rem', bgcolor: 'rgba(96, 165, 250, 0.2)', color: '#60a5fa' }}
-                                />
-                              )}
-                            </Box>
-                          ) : (
-                            <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontStyle: 'italic' }}>
-                              ยังไม่มี
-                            </Typography>
-                          )}
-                        </TableCell>
-                        <TableCell sx={{ borderColor: 'var(--glass-border)' }} align="right">
-                          <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
-                            <Tooltip title={order.trackingNumber ? 'แก้ไขเลขพัสดุ' : 'เพิ่มเลขพัสดุ'}>
-                              <IconButton
-                                size="small"
-                                onClick={() => {
-                                  setEditingOrder(order);
-                                  setEditTrackingNumber(order.trackingNumber || '');
-                                  setEditProvider(order.shippingProvider || 'thailand_post');
-                                }}
-                              >
-                                {order.trackingNumber ? (
-                                  <Edit size={18} color="#60a5fa" />
-                                ) : (
-                                  <Add size={18} color="#10b981" />
-                                )}
-                              </IconButton>
-                            </Tooltip>
-                            {order.trackingNumber && (
-                              <>
-                                <Tooltip title="ติดตามพัสดุ">
-                                  <IconButton
-                                    size="small"
-                                    onClick={() => {
-                                      setSearchTrackingNumber(order.trackingNumber!);
-                                      setSearchProvider(order.shippingProvider || '');
-                                      setActiveTab(2);
-                                      setTimeout(() => handleTrack(), 100);
-                                    }}
-                                  >
-                                    <Search size={18} color="#a78bfa" />
-                                  </IconButton>
-                                </Tooltip>
-                                <Tooltip title="ลบเลขพัสดุ">
-                                  <IconButton
-                                    size="small"
-                                    onClick={() => handleDeleteTracking(order)}
-                                  >
-                                    <Delete size={18} color="#ef4444" />
-                                  </IconButton>
-                                </Tooltip>
-                              </>
-                            )}
-                          </Box>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Tab 1: Bulk Add */}
-      {activeTab === 1 && (
-        <Card sx={{ bgcolor: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 3 }}>
-          <CardContent sx={{ p: 3 }}>
-            <Typography sx={{ fontWeight: 700, color: ADMIN_THEME.text, mb: 2 }}>
+        {/* Tabs */}
+        <Tabs
+          value={String(activeTab)}
+          onValueChange={(v) => setActiveTab(Number(v))}
+          className="mb-6"
+        >
+          <TabsList variant="line" className="mb-6 w-full justify-start bg-transparent">
+            <TabsTrigger
+              value="0"
+              className="data-[state=active]:text-blue-800 after:bg-blue-800"
+            >
+              รายการออเดอร์
+            </TabsTrigger>
+            <TabsTrigger
+              value="1"
+              className="data-[state=active]:text-blue-800 after:bg-blue-800"
+            >
               เพิ่มเลขพัสดุแบบกลุ่ม
-            </Typography>
-            <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem', mb: 2 }}>
-              ใส่ข้อมูลในรูปแบบ <code style={{ color: '#a78bfa' }}>เลขออเดอร์:เลขพัสดุ</code> บรรทัดละ 1 รายการ
-            </Typography>
+            </TabsTrigger>
+            <TabsTrigger
+              value="2"
+              className="data-[state=active]:text-blue-800 after:bg-blue-800"
+            >
+              ค้นหาพัสดุ
+            </TabsTrigger>
+          </TabsList>
 
-            <FormControl fullWidth sx={{ ...inputSx, mb: 2 }}>
-              <InputLabel>ขนส่ง</InputLabel>
-              <Select
-                value={bulkProvider}
-                label="ขนส่ง"
-                onChange={(e) => setBulkProvider(e.target.value as ShippingProvider)}
-              >
-                {Object.entries(SHIPPING_PROVIDERS)
-                  .filter(([key]) => key !== 'pickup' && key !== 'custom')
-                  .map(([key, info]) => (
-                    <MenuItem key={key} value={key}>{info.nameThai}</MenuItem>
-                  ))
-                }
-              </Select>
-            </FormControl>
-
-            <TextField
-              fullWidth
-              multiline
-              rows={8}
-              placeholder={`ORD-123456789:EY123456789TH\nORD-987654321:KERTH00012345678\nORD-111222333:SPXTH012345678`}
-              value={bulkTrackingInput}
-              onChange={(e) => setBulkTrackingInput(e.target.value)}
-              sx={inputSx}
-            />
-
-            <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
-              <Button
-                variant="contained"
-                onClick={handleBulkAddTracking}
-                disabled={!bulkTrackingInput.trim()}
-                startIcon={<Save />}
-                sx={{
-                  bgcolor: '#10b981',
-                  '&:hover': { bgcolor: '#059669' },
-                }}
-              >
-                บันทึกทั้งหมด
-              </Button>
-            </Box>
-
-            {/* Quick reference */}
-            <Box sx={{ mt: 3, p: 2, bgcolor: 'var(--glass-bg)', borderRadius: 2 }}>
-              <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.8rem', mb: 1 }}>
-                รายการรอจัดส่ง (คัดลอกเลขออเดอร์):
-              </Typography>
-              <Box sx={{ maxHeight: 150, overflow: 'auto' }}>
-                {pendingOrders.map(order => (
-                  <Box 
-                    key={order.ref}
-                    sx={{ 
-                      display: 'flex', 
-                      justifyContent: 'space-between', 
-                      alignItems: 'center',
-                      py: 0.5,
-                      borderBottom: `1px solid ${ADMIN_THEME.border}`,
-                    }}
-                  >
-                    <Typography sx={{ color: ADMIN_THEME.text, fontSize: '0.8rem', fontFamily: 'monospace' }}>
-                      {order.ref}
-                    </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-                        {order.customerName || order.name}
-                      </Typography>
-                      <IconButton size="small" onClick={() => copyToClipboard(order.ref)}>
-                        <ContentCopy size={14} color="#64748b" />
-                      </IconButton>
-                    </Box>
-                  </Box>
-                ))}
-              </Box>
-            </Box>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Tab 2: Track Lookup */}
-      {activeTab === 2 && (
-        <Card sx={{ bgcolor: 'var(--glass-bg)', border: '1px solid var(--glass-border)', borderRadius: 3 }}>
-          <CardContent sx={{ p: 3 }}>
-            <Typography sx={{ fontWeight: 700, color: ADMIN_THEME.text, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Search size={20} color="#60a5fa" />
-              ค้นหาสถานะพัสดุ
-            </Typography>
-
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 2 }}>
-              <FormControl sx={{ minWidth: 180, ...inputSx }}>
-                <InputLabel>ขนส่ง (ไม่บังคับ)</InputLabel>
-                <Select
-                  value={searchProvider}
-                  label="ขนส่ง (ไม่บังคับ)"
-                  onChange={(e) => setSearchProvider(e.target.value as ShippingProvider | '')}
-                >
-                  <MenuItem value="">ตรวจจับอัตโนมัติ</MenuItem>
-                  {Object.entries(SHIPPING_PROVIDERS).map(([key, info]) => (
-                    <MenuItem key={key} value={key}>{info.nameThai}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <TextField
-                fullWidth
-                label="เลขพัสดุ"
-                value={searchTrackingNumber}
-                onChange={(e) => setSearchTrackingNumber(e.target.value.toUpperCase())}
-                onKeyPress={(e) => e.key === 'Enter' && handleTrack()}
-                sx={inputSx}
-                placeholder="เช่น EY123456789TH"
-              />
-              <Button
-                variant="contained"
-                onClick={handleTrack}
-                disabled={loadingTracking || !searchTrackingNumber.trim()}
-                sx={{
-                  minWidth: 120,
-                  bgcolor: '#2563eb',
-                  '&:hover': { bgcolor: '#1d4ed8' },
-                }}
-              >
-                {loadingTracking ? <CircularProgress size={24} color="inherit" /> : 'ค้นหา'}
-              </Button>
-            </Stack>
-
-            {trackingError && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {trackingError}
-              </Alert>
-            )}
-
-            {/* Tracking Result */}
-            {trackingResult && (
-              <Box sx={{ mt: 3, p: 2, borderRadius: 2, bgcolor: 'var(--glass-bg)', border: '1px solid var(--glass-border)' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                  <Box>
-                    <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>เลขพัสดุ</Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography sx={{ color: ADMIN_THEME.text, fontWeight: 700, fontSize: '1.1rem' }}>
-                        {trackingResult.trackingNumber}
-                      </Typography>
-                      <IconButton size="small" onClick={() => copyToClipboard(trackingResult.trackingNumber)}>
-                        <ContentCopy size={16} color="#64748b" />
-                      </IconButton>
-                    </Box>
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    {STATUS_ICONS[trackingResult.status]}
-                    <Chip
-                      label={TRACKING_STATUS_THAI[trackingResult.status]}
-                      sx={{
-                        bgcolor: `${trackingResult.status === 'delivered' ? '#22c55e' : '#64748b'}20`,
-                        color: trackingResult.status === 'delivered' ? '#22c55e' : '#94a3b8',
-                        fontWeight: 600,
-                      }}
+          {/* Tab 0: Order List */}
+          <TabsContent value="0">
+            <Card className={glassCardClass}>
+              <CardContent className="p-6">
+                {/* Toolbar */}
+                <div className="mb-6 flex flex-col gap-4 md:flex-row">
+                  <div className="relative flex-1">
+                    <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-500" />
+                    <Input
+                      placeholder="ค้นหา ออเดอร์/ชื่อ/อีเมล/เลขพัสดุ..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9"
                     />
-                  </Box>
-                </Box>
+                  </div>
 
-                {/* Events */}
-                {trackingResult.events && trackingResult.events.length > 0 && (
-                  <Box sx={{ mt: 2 }}>
-                    <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.8rem', mb: 1 }}>ประวัติการเคลื่อนไหว</Typography>
-                    <Box sx={{ maxHeight: 200, overflow: 'auto' }}>
-                      {trackingResult.events.slice(0, 10).map((event, idx) => (
-                        <Box
-                          key={idx}
-                          sx={{
-                            display: 'flex',
-                            gap: 2,
-                            py: 1,
-                            borderBottom: idx < trackingResult.events.length - 1 ? `1px solid ${ADMIN_THEME.border}` : 'none',
-                          }}
+                  <Select
+                    value={filterStatus}
+                    onValueChange={(v) => setFilterStatus(v as 'all' | 'pending' | 'shipped')}
+                  >
+                    <SelectTrigger className="min-w-[150px]">
+                      <FilterList className="size-4 text-slate-500" />
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">ทั้งหมด ({allOrders.length})</SelectItem>
+                      <SelectItem value="pending">รอจัดส่ง ({pendingOrders.length})</SelectItem>
+                      <SelectItem value="shipped">จัดส่งแล้ว ({shippedOrders.length})</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={loadOrders}
+                    disabled={loadingOrders}
+                    className="text-[var(--text-muted)]"
+                  >
+                    <Refresh />
+                  </Button>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="mb-4 flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={selectAllOrders}
+                    className="text-blue-400"
+                  >
+                    <SelectAll />
+                    เลือกทั้งหมด
+                  </Button>
+                  {selectedOrders.size > 0 && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={clearSelection}
+                      className="text-[var(--text-muted)]"
+                    >
+                      <ClearAll />
+                      ยกเลิก ({selectedOrders.size})
+                    </Button>
+                  )}
+                  <div className="flex-1" />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleExportShipping}
+                    className="border-emerald-500 text-emerald-500 hover:bg-emerald-500/10"
+                  >
+                    <Download />
+                    ส่งออก CSV {selectedOrders.size > 0 ? `(${selectedOrders.size})` : `(${pendingOrders.length})`}
+                  </Button>
+                </div>
+
+                {/* Print Labels Buttons */}
+                <div className="mb-6 flex flex-wrap items-center gap-2">
+                  <span className="mr-1 text-[0.8rem] text-[var(--text-muted)]">
+                    <Print size={16} className="mr-1 inline align-middle" />
+                    พิมพ์ใบจ่าหน้า:
+                  </span>
+                  {Object.entries(SHIPPING_PROVIDERS)
+                    .filter(([key]) => CARRIER_LABEL_URLS[key])
+                    .map(([key, info]) => (
+                      <Button
+                        key={key}
+                        asChild
+                        size="sm"
+                        className="bg-blue-800/10 text-[0.75rem] text-violet-400 hover:bg-blue-800/20"
+                      >
+                        <a
+                          href={CARRIER_LABEL_URLS[key]}
+                          target="_blank"
+                          rel="noopener noreferrer"
                         >
-                          <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.75rem', minWidth: 90 }}>
-                            {new Date(event.timestamp).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}
-                          </Typography>
-                          <Typography sx={{ color: ADMIN_THEME.text, fontSize: '0.8rem', flex: 1 }}>
-                            {event.descriptionThai || event.description}
-                          </Typography>
-                        </Box>
-                      ))}
-                    </Box>
-                  </Box>
+                          {info.nameThai}
+                        </a>
+                      </Button>
+                    ))
+                  }
+                </div>
+
+                {/* Orders Table */}
+                {loadingOrders ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="size-8 animate-spin text-[var(--text-muted)]" />
+                  </div>
+                ) : filteredOrders.length === 0 ? (
+                  <Alert className="border-blue-500/20 bg-blue-500/10">
+                    <AlertDescription>ไม่พบออเดอร์ที่ตรงกับเงื่อนไข</AlertDescription>
+                  </Alert>
+                ) : (
+                  <ScrollArea className="max-h-[500px] rounded-md border border-[var(--glass-border)]">
+                    <Table>
+                      <TableHeader className="sticky top-0 z-10 bg-[var(--surface-2)]">
+                        <TableRow className="border-[var(--glass-border)] hover:bg-transparent">
+                          <TableHead className="w-10 bg-[var(--surface-2)] text-[var(--text-muted)]">
+                            <Checkbox
+                              checked={headerCheckboxState}
+                              onCheckedChange={(checked) =>
+                                checked ? selectAllOrders() : clearSelection()
+                              }
+                            />
+                          </TableHead>
+                          <TableHead className="bg-[var(--surface-2)] text-[var(--text-muted)]">ออเดอร์</TableHead>
+                          <TableHead className="bg-[var(--surface-2)] text-[var(--text-muted)]">ลูกค้า</TableHead>
+                          <TableHead className="bg-[var(--surface-2)] text-[var(--text-muted)]">ที่อยู่</TableHead>
+                          <TableHead className="bg-[var(--surface-2)] text-[var(--text-muted)]">ตัวเลือกจัดส่ง</TableHead>
+                          <TableHead className="bg-[var(--surface-2)] text-[var(--text-muted)]">เลขพัสดุ</TableHead>
+                          <TableHead className="bg-[var(--surface-2)] text-right text-[var(--text-muted)]">จัดการ</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredOrders.map((order) => (
+                          <TableRow
+                            key={order.ref}
+                            data-state={selectedOrders.has(order.ref) ? 'selected' : undefined}
+                            className={cn(
+                              'border-[var(--glass-border)] hover:bg-[var(--surface-2)]/50',
+                              selectedOrders.has(order.ref) && 'bg-blue-800/10'
+                            )}
+                          >
+                            <TableCell className="border-[var(--glass-border)]">
+                              <Checkbox
+                                checked={selectedOrders.has(order.ref)}
+                                onCheckedChange={() => toggleSelectOrder(order.ref)}
+                              />
+                            </TableCell>
+                            <TableCell className="border-[var(--glass-border)]">
+                              <p className="text-[0.85rem] font-semibold text-[var(--foreground)]">
+                                {order.ref}
+                              </p>
+                              <Badge
+                                className={cn(
+                                  'mt-0.5 h-[18px] border-transparent text-[0.65rem]',
+                                  order.trackingNumber
+                                    ? 'bg-cyan-400/20 text-cyan-400'
+                                    : 'bg-amber-400/20 text-amber-400'
+                                )}
+                              >
+                                {order.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="border-[var(--glass-border)]">
+                              <div className="flex flex-col gap-0.5">
+                                <div className="flex items-center gap-1">
+                                  <Person size={14} className="text-violet-400" />
+                                  <span className="text-[0.85rem] text-[var(--foreground)]">
+                                    {order.customerName || order.name || '-'}
+                                  </span>
+                                </div>
+                                {order.phone && (
+                                  <div className="flex items-center gap-1">
+                                    <Phone size={12} className="text-slate-500" />
+                                    <span className="text-[0.75rem] text-[var(--text-muted)]">
+                                      {order.phone}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="max-w-[200px] border-[var(--glass-border)]">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <p className="truncate text-[0.75rem] text-[var(--text-muted)]">
+                                    {order.address || '-'}
+                                  </p>
+                                </TooltipTrigger>
+                                <TooltipContent>{order.address || '-'}</TooltipContent>
+                              </Tooltip>
+                            </TableCell>
+                            <TableCell className="border-[var(--glass-border)]">
+                              <div className="flex flex-col gap-0.5">
+                                {getShippingOptionBadge(order)}
+                              </div>
+                            </TableCell>
+                            <TableCell className="border-[var(--glass-border)]">
+                              {order.trackingNumber ? (
+                                <div className="flex items-center gap-1">
+                                  <span className="font-mono text-[0.85rem] font-semibold text-emerald-500">
+                                    {order.trackingNumber}
+                                  </span>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon-xs"
+                                    onClick={() => copyToClipboard(order.trackingNumber!)}
+                                  >
+                                    <ContentCopy size={14} className="text-slate-500" />
+                                  </Button>
+                                  {order.shippingProvider && SHIPPING_PROVIDERS[order.shippingProvider] && (
+                                    <Badge className="h-[18px] border-transparent bg-blue-400/20 text-[0.6rem] text-blue-400">
+                                      {SHIPPING_PROVIDERS[order.shippingProvider].nameThai}
+                                    </Badge>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-[0.8rem] italic text-[var(--text-muted)]">
+                                  ยังไม่มี
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className="border-[var(--glass-border)] text-right">
+                              <div className="flex justify-end gap-1">
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon-xs"
+                                      onClick={() => {
+                                        setEditingOrder(order);
+                                        setEditTrackingNumber(order.trackingNumber || '');
+                                        setEditProvider(order.shippingProvider || 'thailand_post');
+                                      }}
+                                    >
+                                      {order.trackingNumber ? (
+                                        <Edit size={18} className="text-blue-400" />
+                                      ) : (
+                                        <Add size={18} className="text-emerald-500" />
+                                      )}
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    {order.trackingNumber ? 'แก้ไขเลขพัสดุ' : 'เพิ่มเลขพัสดุ'}
+                                  </TooltipContent>
+                                </Tooltip>
+                                {order.trackingNumber && (
+                                  <>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon-xs"
+                                          onClick={() => {
+                                            setSearchTrackingNumber(order.trackingNumber!);
+                                            setSearchProvider(order.shippingProvider || '');
+                                            setActiveTab(2);
+                                            setTimeout(() => handleTrack(), 100);
+                                          }}
+                                        >
+                                          <Search size={18} className="text-violet-400" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>ติดตามพัสดุ</TooltipContent>
+                                    </Tooltip>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon-xs"
+                                          onClick={() => handleDeleteTracking(order)}
+                                        >
+                                          <Delete size={18} className="text-red-500" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>ลบเลขพัสดุ</TooltipContent>
+                                    </Tooltip>
+                                  </>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </ScrollArea>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Tab 1: Bulk Add */}
+          <TabsContent value="1">
+            <Card className={glassCardClass}>
+              <CardContent className="p-6">
+                <h3 className="mb-4 font-bold text-[var(--foreground)]">
+                  เพิ่มเลขพัสดุแบบกลุ่ม
+                </h3>
+                <p className="mb-4 text-[0.85rem] text-[var(--text-muted)]">
+                  ใส่ข้อมูลในรูปแบบ{' '}
+                  <code className="text-violet-400">เลขออเดอร์:เลขพัสดุ</code>{' '}
+                  บรรทัดละ 1 รายการ
+                </p>
+
+                <div className="mb-4 space-y-2">
+                  <Label htmlFor="bulk-provider">ขนส่ง</Label>
+                  <Select
+                    value={bulkProvider}
+                    onValueChange={(v) => setBulkProvider(v as ShippingProvider)}
+                  >
+                    <SelectTrigger id="bulk-provider" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(SHIPPING_PROVIDERS)
+                        .filter(([key]) => key !== 'pickup' && key !== 'custom')
+                        .map(([key, info]) => (
+                          <SelectItem key={key} value={key}>{info.nameThai}</SelectItem>
+                        ))
+                      }
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Textarea
+                  rows={8}
+                  placeholder={`ORD-123456789:EY123456789TH\nORD-987654321:KERTH00012345678\nORD-111222333:SPXTH012345678`}
+                  value={bulkTrackingInput}
+                  onChange={(e) => setBulkTrackingInput(e.target.value)}
+                />
+
+                <div className="mt-4 flex justify-end">
+                  <Button
+                    onClick={handleBulkAddTracking}
+                    disabled={!bulkTrackingInput.trim()}
+                    className="bg-emerald-500 text-white hover:bg-emerald-600"
+                  >
+                    <Save />
+                    บันทึกทั้งหมด
+                  </Button>
+                </div>
+
+                {/* Quick reference */}
+                <div className="mt-6 rounded-lg bg-[var(--glass-bg)] p-4">
+                  <p className="mb-2 text-[0.8rem] text-[var(--text-muted)]">
+                    รายการรอจัดส่ง (คัดลอกเลขออเดอร์):
+                  </p>
+                  <ScrollArea className="max-h-[150px]">
+                    {pendingOrders.map(order => (
+                      <div
+                        key={order.ref}
+                        className="flex items-center justify-between border-b border-[var(--glass-border)] py-1"
+                      >
+                        <span className="font-mono text-[0.8rem] text-[var(--foreground)]">
+                          {order.ref}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[0.75rem] text-[var(--text-muted)]">
+                            {order.customerName || order.name}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="icon-xs"
+                            onClick={() => copyToClipboard(order.ref)}
+                          >
+                            <ContentCopy size={14} className="text-slate-500" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </ScrollArea>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Tab 2: Track Lookup */}
+          <TabsContent value="2">
+            <Card className={glassCardClass}>
+              <CardContent className="p-6">
+                <h3 className="mb-4 flex items-center gap-2 font-bold text-[var(--foreground)]">
+                  <Search size={20} className="text-blue-400" />
+                  ค้นหาสถานะพัสดุ
+                </h3>
+
+                <div className="mb-4 flex flex-col gap-4 sm:flex-row">
+                  <div className="space-y-2 sm:min-w-[180px]">
+                    <Label htmlFor="search-provider">ขนส่ง (ไม่บังคับ)</Label>
+                    <Select
+                      value={searchProvider || 'auto'}
+                      onValueChange={(v) =>
+                        setSearchProvider(v === 'auto' ? '' : (v as ShippingProvider))
+                      }
+                    >
+                      <SelectTrigger id="search-provider" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto">ตรวจจับอัตโนมัติ</SelectItem>
+                        {Object.entries(SHIPPING_PROVIDERS).map(([key, info]) => (
+                          <SelectItem key={key} value={key}>{info.nameThai}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <Label htmlFor="search-tracking">เลขพัสดุ</Label>
+                    <Input
+                      id="search-tracking"
+                      value={searchTrackingNumber}
+                      onChange={(e) => setSearchTrackingNumber(e.target.value.toUpperCase())}
+                      onKeyDown={(e) => e.key === 'Enter' && handleTrack()}
+                      placeholder="เช่น EY123456789TH"
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <Button
+                      onClick={handleTrack}
+                      disabled={loadingTracking || !searchTrackingNumber.trim()}
+                      className="min-w-[120px] bg-blue-600 text-white hover:bg-blue-700"
+                    >
+                      {loadingTracking ? (
+                        <Loader2 className="animate-spin" />
+                      ) : (
+                        'ค้นหา'
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                {trackingError && (
+                  <Alert variant="destructive" className="mb-4">
+                    <AlertDescription>{trackingError}</AlertDescription>
+                  </Alert>
                 )}
 
-                {/* External Links */}
-                <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
-                  {trackingResult.trackingUrl && (
-                    <Button
-                      size="small"
-                      href={trackingResult.trackingUrl}
-                      target="_blank"
-                      startIcon={<OpenInNew />}
-                      sx={{ color: '#60a5fa' }}
-                    >
-                      ติดตามที่เว็บขนส่ง
-                    </Button>
-                  )}
-                  {trackingResult.track123Url && (
-                    <Button
-                      size="small"
-                      href={trackingResult.track123Url}
-                      target="_blank"
-                      startIcon={<OpenInNew />}
-                      sx={{ color: '#a78bfa' }}
-                    >
-                      Track123
-                    </Button>
-                  )}
-                </Box>
-              </Box>
-            )}
-          </CardContent>
-        </Card>
-      )}
+                {/* Tracking Result */}
+                {trackingResult && (
+                  <div className="mt-6 rounded-lg border border-[var(--glass-border)] bg-[var(--glass-bg)] p-4">
+                    <div className="mb-4 flex items-start justify-between">
+                      <div>
+                        <p className="text-[0.8rem] text-[var(--text-muted)]">เลขพัสดุ</p>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[1.1rem] font-bold text-[var(--foreground)]">
+                            {trackingResult.trackingNumber}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="icon-xs"
+                            onClick={() => copyToClipboard(trackingResult.trackingNumber)}
+                          >
+                            <ContentCopy size={16} className="text-slate-500" />
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {STATUS_ICONS[trackingResult.status]}
+                        <Badge
+                          className={cn(
+                            'font-semibold',
+                            trackingResult.status === 'delivered'
+                              ? 'border-transparent bg-green-500/20 text-green-500'
+                              : 'border-transparent bg-slate-500/20 text-slate-400'
+                          )}
+                        >
+                          {TRACKING_STATUS_THAI[trackingResult.status]}
+                        </Badge>
+                      </div>
+                    </div>
 
-      {/* Edit Tracking Dialog */}
-      <Dialog
-        open={!!editingOrder}
-        onClose={() => setEditingOrder(null)}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{
-          sx: {
-            bgcolor: 'var(--surface)',
-            color: ADMIN_THEME.text,
-            borderRadius: 2,
-          },
-        }}
-      >
-        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <LocalShipping size={24} color="#1e40af" />
-            {editingOrder?.trackingNumber ? 'แก้ไขเลขพัสดุ' : 'เพิ่มเลขพัสดุ'}
-          </Box>
-          <IconButton onClick={() => setEditingOrder(null)} sx={{ color: 'var(--text-muted)' }}>
-            <Close />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent dividers sx={{ borderColor: 'var(--glass-border)' }}>
-          {editingOrder && (
-            <>
-              <Box sx={{ mb: 2, p: 2, bgcolor: 'var(--glass-bg)', borderRadius: 2 }}>
-                <Typography sx={{ color: ADMIN_THEME.text, fontWeight: 600, mb: 1 }}>
-                  {editingOrder.ref}
-                </Typography>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Person size={14} color="#a78bfa" />
-                    <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                      {editingOrder.customerName || editingOrder.name || '-'}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <Home size={14} color="#64748b" />
-                    <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                      {editingOrder.address || '-'}
-                    </Typography>
-                  </Box>
-                </Box>
-              </Box>
-              
-              <Stack spacing={2}>
-                <FormControl fullWidth sx={inputSx}>
-                  <InputLabel>ขนส่ง</InputLabel>
+                    {/* Events */}
+                    {trackingResult.events && trackingResult.events.length > 0 && (
+                      <div className="mt-4">
+                        <p className="mb-2 text-[0.8rem] text-[var(--text-muted)]">ประวัติการเคลื่อนไหว</p>
+                        <ScrollArea className="max-h-[200px]">
+                          {trackingResult.events.slice(0, 10).map((event, idx) => (
+                            <div
+                              key={idx}
+                              className={cn(
+                                'flex gap-4 py-2',
+                                idx < trackingResult.events.length - 1 && 'border-b border-[var(--glass-border)]'
+                              )}
+                            >
+                              <span className="min-w-[90px] text-[0.75rem] text-[var(--text-muted)]">
+                                {new Date(event.timestamp).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}
+                              </span>
+                              <span className="flex-1 text-[0.8rem] text-[var(--foreground)]">
+                                {event.descriptionThai || event.description}
+                              </span>
+                            </div>
+                          ))}
+                        </ScrollArea>
+                      </div>
+                    )}
+
+                    {/* External Links */}
+                    <div className="mt-4 flex gap-2">
+                      {trackingResult.trackingUrl && (
+                        <Button asChild size="sm" variant="ghost" className="text-blue-400">
+                          <a href={trackingResult.trackingUrl} target="_blank" rel="noopener noreferrer">
+                            <OpenInNew />
+                            ติดตามที่เว็บขนส่ง
+                          </a>
+                        </Button>
+                      )}
+                      {trackingResult.track123Url && (
+                        <Button asChild size="sm" variant="ghost" className="text-violet-400">
+                          <a href={trackingResult.track123Url} target="_blank" rel="noopener noreferrer">
+                            <OpenInNew />
+                            Track123
+                          </a>
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        {/* Edit Tracking Dialog */}
+        <Dialog
+          open={!!editingOrder}
+          onOpenChange={(open) => !open && setEditingOrder(null)}
+        >
+          <DialogContent
+            showCloseButton={false}
+            className="border-[var(--glass-border)] bg-[var(--surface)] text-[var(--foreground)] sm:max-w-md"
+          >
+            <DialogHeader>
+              <div className="flex items-center justify-between">
+                <DialogTitle className="flex items-center gap-2">
+                  <LocalShipping size={24} className="text-blue-800" />
+                  {editingOrder?.trackingNumber ? 'แก้ไขเลขพัสดุ' : 'เพิ่มเลขพัสดุ'}
+                </DialogTitle>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  onClick={() => setEditingOrder(null)}
+                  className="text-[var(--text-muted)]"
+                >
+                  <Close />
+                </Button>
+              </div>
+            </DialogHeader>
+
+            <Separator className="bg-[var(--glass-border)]" />
+
+            {editingOrder && (
+              <div className="space-y-4">
+                <div className="rounded-lg bg-[var(--glass-bg)] p-4">
+                  <p className="mb-2 font-semibold text-[var(--foreground)]">
+                    {editingOrder.ref}
+                  </p>
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-1">
+                      <Person size={14} className="text-violet-400" />
+                      <span className="text-[0.85rem] text-[var(--text-muted)]">
+                        {editingOrder.customerName || editingOrder.name || '-'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Home size={14} className="text-slate-500" />
+                      <span className="text-[0.8rem] text-[var(--text-muted)]">
+                        {editingOrder.address || '-'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-provider">ขนส่ง</Label>
                   <Select
                     value={editProvider}
-                    label="ขนส่ง"
-                    onChange={(e) => setEditProvider(e.target.value as ShippingProvider)}
+                    onValueChange={(v) => setEditProvider(v as ShippingProvider)}
                   >
-                    {Object.entries(SHIPPING_PROVIDERS)
-                      .filter(([key]) => key !== 'pickup' && key !== 'custom')
-                      .map(([key, info]) => (
-                        <MenuItem key={key} value={key}>{info.nameThai}</MenuItem>
-                      ))
-                    }
+                    <SelectTrigger id="edit-provider" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(SHIPPING_PROVIDERS)
+                        .filter(([key]) => key !== 'pickup' && key !== 'custom')
+                        .map(([key, info]) => (
+                          <SelectItem key={key} value={key}>{info.nameThai}</SelectItem>
+                        ))
+                      }
+                    </SelectContent>
                   </Select>
-                </FormControl>
-                
-                <TextField
-                  fullWidth
-                  label="เลขพัสดุ"
-                  value={editTrackingNumber}
-                  onChange={(e) => setEditTrackingNumber(e.target.value.toUpperCase())}
-                  sx={inputSx}
-                  placeholder="เช่น EY123456789TH (เว้นว่างเพื่อลบ)"
-                  helperText={editingOrder.trackingNumber ? "เว้นว่างเพื่อลบเลขพัสดุ" : ""}
-                />
-              </Stack>
-            </>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button
-            onClick={() => setEditingOrder(null)}
-            sx={{ color: 'var(--text-muted)' }}
-          >
-            ยกเลิก
-          </Button>
-          <Button
-            onClick={handleSaveTracking}
-            variant="contained"
-            disabled={saving}
-            startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <Save />}
-            sx={{
-              bgcolor: '#10b981',
-              '&:hover': { bgcolor: '#059669' },
-            }}
-          >
-            {saving ? 'กำลังบันทึก...' : 'บันทึก'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-tracking">เลขพัสดุ</Label>
+                  <Input
+                    id="edit-tracking"
+                    value={editTrackingNumber}
+                    onChange={(e) => setEditTrackingNumber(e.target.value.toUpperCase())}
+                    placeholder="เช่น EY123456789TH (เว้นว่างเพื่อลบ)"
+                  />
+                  {editingOrder.trackingNumber && (
+                    <p className="text-xs text-[var(--text-muted)]">เว้นว่างเพื่อลบเลขพัสดุ</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                variant="ghost"
+                onClick={() => setEditingOrder(null)}
+                className="text-[var(--text-muted)]"
+              >
+                ยกเลิก
+              </Button>
+              <Button
+                onClick={handleSaveTracking}
+                disabled={saving}
+                className="bg-emerald-500 text-white hover:bg-emerald-600"
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="animate-spin" />
+                    กำลังบันทึก...
+                  </>
+                ) : (
+                  <>
+                    <Save />
+                    บันทึก
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </TooltipProvider>
   );
 }

@@ -1,16 +1,5 @@
 import React from 'react';
 import {
-  Box,
-  Typography,
-  Switch,
-  TextField,
-  Button,
-  Chip,
-  FormControlLabel,
-  Alert,
-  IconButton,
-} from '@mui/material';
-import {
   Settings,
   Save,
   AlertTriangle as Warning,
@@ -44,75 +33,51 @@ import {
   SUPER_ADMIN_EMAIL,
 } from '@/lib/config';
 
-import {
-  ADMIN_THEME,
-  adminGlassCardSx as glassCardSx,
-  adminInputSx as inputSx,
-  adminGradientButtonSx as gradientButtonSx,
-} from '@/lib/adminTheme';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { cn } from '@/lib/utils';
+
+const glassCardClass =
+  'overflow-hidden rounded-[20px] border border-[var(--glass-border)] bg-[var(--glass-bg)] text-[var(--foreground)] shadow-[0_8px_32px_rgba(0,0,0,0.12)] backdrop-blur-[20px]';
+
+const gradientBtnClass =
+  'rounded-[10px] bg-gradient-to-br from-indigo-500 to-violet-500 font-bold text-white shadow-[0_4px_15px_rgba(139,92,246,0.3)] hover:opacity-90';
+
+const inputClass = 'rounded-[10px]';
 
 // ============== SETTINGS COMPONENTS ==============
 const SettingSection = ({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) => (
-  <Box sx={{
-    ...glassCardSx,
-    overflow: 'hidden',
-  }}>
-    <Box sx={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 2,
-      p: 2.5,
-      borderBottom: `1px solid ${ADMIN_THEME.border}`,
-      background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(59, 130, 246, 0.05) 100%)',
-    }}>
-      <Box sx={{
-        width: 40,
-        height: 40,
-        borderRadius: '12px',
-        background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: '#fff',
-      }}>
+  <Card className={cn(glassCardClass, 'gap-0 py-0 shadow-none')}>
+    <CardHeader className="flex flex-row items-center gap-4 border-b border-[var(--glass-border)] bg-gradient-to-br from-violet-500/5 to-blue-500/5 px-5 py-4">
+      <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-500 text-white">
         {icon}
-      </Box>
-      <Typography sx={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--foreground)' }}>
-        {title}
-      </Typography>
-    </Box>
-    <Box sx={{ p: 2.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
-      {children}
-    </Box>
-  </Box>
+      </div>
+      <CardTitle className="text-lg font-bold">{title}</CardTitle>
+    </CardHeader>
+    <CardContent className="flex flex-col gap-4 px-5 py-5">{children}</CardContent>
+  </Card>
 );
 
 const SettingToggleRow = ({ label, description, checked, onChange }: { label: string; description?: string; checked: boolean; onChange: (checked: boolean) => void }) => (
-  <Box sx={{ 
-    display: 'flex', 
-    justifyContent: 'space-between', 
-    alignItems: 'center',
-    py: 0.5,
-  }}>
-    <Box>
-      <Typography sx={{ fontSize: '0.95rem', fontWeight: 500, color: 'var(--foreground)' }}>{label}</Typography>
+  <div className="flex items-center justify-between py-1">
+    <div>
+      <p className="text-[0.95rem] font-medium text-[var(--foreground)]">{label}</p>
       {description && (
-        <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{description}</Typography>
+        <p className="text-xs text-[var(--text-muted)]">{description}</p>
       )}
-    </Box>
+    </div>
     <Switch
       checked={checked}
-      onChange={(e) => onChange(e.target.checked)}
-      sx={{
-        '& .MuiSwitch-switchBase.Mui-checked': {
-          color: '#10b981',
-        },
-        '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-          backgroundColor: '#10b981',
-        },
-      }}
+      onCheckedChange={onChange}
+      className="data-[state=checked]:bg-emerald-500"
     />
-  </Box>
+  </div>
 );
 
 // ============== UTILITIES ==============
@@ -176,75 +141,54 @@ export const SettingsView = React.memo(function SettingsView({
   const canManageAnnouncement = isSuperAdminUser || adminPerms.canManageAnnouncement;
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, maxWidth: 700 }}>
+    <div className="flex max-w-[700px] flex-col gap-6">
       {/* Header with Save Button */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1, flexWrap: 'wrap', gap: 2 }}>
-        <Box>
-          <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--foreground)', display: 'flex', alignItems: 'center', gap: 1 }}>
+      <div className="mb-1 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="flex items-center gap-2 text-2xl font-extrabold text-[var(--foreground)]">
             <Settings size={24} />
             ตั้งค่าร้านค้า
-          </Typography>
-          <Typography sx={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+          </h2>
+          <p className="text-sm text-[var(--text-muted)]">
             {isSuperAdminUser ? 'จัดการการตั้งค่าทั้งหมดของร้าน' : 'จัดการประกาศและการตั้งค่าที่ได้รับอนุญาต'}
-          </Typography>
-        </Box>
-        
-        <Box sx={{ display: 'flex', gap: 1, opacity: hasChanges ? 1 : 0, pointerEvents: hasChanges ? 'auto' : 'none', transition: 'opacity 0.2s' }}>
+          </p>
+        </div>
+
+        <div
+          className={cn(
+            'flex gap-2 transition-opacity duration-200',
+            hasChanges ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0',
+          )}
+        >
           <Button
-            variant="outlined"
+            variant="outline"
             onClick={onReset}
-            sx={{
-              borderColor: ADMIN_THEME.border,
-              color: ADMIN_THEME.muted,
-              borderRadius: '10px',
-              textTransform: 'none',
-              '&:hover': { borderColor: '#ef4444', color: '#ef4444' },
-            }}
+            className="rounded-[10px] border-[var(--glass-border)] text-[var(--text-muted)] hover:border-red-500 hover:text-red-500"
           >
             ยกเลิก
           </Button>
           <Button
-            variant="contained"
             onClick={onSave}
-            startIcon={<Save />}
-            sx={{
-              background: ADMIN_THEME.gradient,
-              borderRadius: '10px',
-              textTransform: 'none',
-              fontWeight: 700,
-              boxShadow: '0 4px 15px rgba(139, 92, 246, 0.3)',
-              animation: hasChanges ? 'pulse 2s infinite' : 'none',
-              '@keyframes pulse': {
-                '0%, 100%': { boxShadow: '0 4px 15px rgba(139, 92, 246, 0.3)' },
-                '50%': { boxShadow: '0 4px 25px rgba(139, 92, 246, 0.5)' },
-              },
-            }}
+            className={cn(gradientBtnClass, hasChanges && 'animate-glow-pulse')}
           >
+            <Save size={18} />
             บันทึกการตั้งค่า
           </Button>
-        </Box>
-      </Box>
+        </div>
+      </div>
 
       {/* Unsaved Changes Warning - use opacity instead of conditional render to prevent layout shift */}
-      <Box sx={{
-        p: 2,
-        borderRadius: '12px',
-        bgcolor: 'rgba(251, 191, 36, 0.1)',
-        border: '1px solid rgba(251, 191, 36, 0.3)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 2,
-        opacity: hasChanges ? 1 : 0,
-        maxHeight: hasChanges ? 100 : 0,
-        overflow: 'hidden',
-        transition: 'opacity 0.2s, max-height 0.2s',
-        mb: hasChanges ? 0 : -3,
-      }}>
-        <Warning size={24} color="#fbbf24" />
-        <Typography sx={{ fontSize: '0.9rem', color: '#fbbf24' }}>
-          มีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก กดปุ่ม "บันทึกการตั้งค่า" เพื่อยืนยัน
-        </Typography>
-      </Box>
+      <div
+        className={cn(
+          'flex items-center gap-4 overflow-hidden rounded-xl border border-amber-400/30 bg-amber-400/10 p-4 transition-all duration-200',
+          hasChanges ? 'mb-0 max-h-[100px] opacity-100' : '-mb-6 max-h-0 opacity-0',
+        )}
+      >
+        <Warning size={24} className="shrink-0 text-amber-400" />
+        <p className="text-[0.9rem] text-amber-400">
+          มีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก กดปุ่ม &quot;บันทึกการตั้งค่า&quot; เพื่อยืนยัน
+        </p>
+      </div>
 
       {/* Shop Status - Only for Super Admin or admins with permission */}
       {canManageShop && (
@@ -256,91 +200,54 @@ export const SettingsView = React.memo(function SettingsView({
             onChange={(checked) => onConfigChange({...localConfig, isOpen: checked})}
           />
           {!localConfig.isOpen && (
-            <Box sx={{ 
-              mt: 1, 
-              p: 2, 
-              borderRadius: '12px', 
-              bgcolor: 'rgba(239, 68, 68, 0.1)',
-              border: '1px solid rgba(239, 68, 68, 0.2)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 2,
-            }}>
-              <Box>
-                <Typography sx={{ fontSize: '0.85rem', color: '#f87171', mb: 1 }}>
-                  <CalendarToday size={18} style={{ marginRight: 8, verticalAlign: 'middle' }} />
+            <div className="mt-2 flex flex-col gap-4 rounded-xl border border-red-500/20 bg-red-500/10 p-4">
+              <div>
+                <p className="mb-2 text-[0.85rem] text-red-400">
+                  <CalendarToday size={18} className="mr-2 inline align-middle" />
                   กำหนดวันเปิดร้านใหม่ (ถ้ามี)
-                </Typography>
-                <TextField
+                </p>
+                <Input
                   type="datetime-local"
                   value={localConfig.openDate || ''}
                   onChange={(e) => onConfigChange({...localConfig, openDate: e.target.value})}
                   placeholder="เช่น 2025-01-20T09:00"
-                  fullWidth
-                  sx={{
-                    ...inputSx,
-                    '& .MuiOutlinedInput-root': {
-                      ...inputSx['& .MuiOutlinedInput-root'],
-                      borderRadius: '10px',
-                    },
-                  }}
+                  className={inputClass}
                 />
-              </Box>
-              <Box>
-                <Typography sx={{ fontSize: '0.85rem', color: '#f87171', mb: 1 }}>
-                  <Warning size={18} style={{ marginRight: 8, verticalAlign: 'middle' }} />
+              </div>
+              <div>
+                <p className="mb-2 text-[0.85rem] text-red-400">
+                  <Warning size={18} className="mr-2 inline align-middle" />
                   ข้อความแจ้งผู้ใช้ (ไม่บังคับ)
-                </Typography>
-                <TextField
+                </p>
+                <Textarea
                   placeholder="เช่น: ร้านปิดปรับปรุงถึงวันที่ 20 ม.ค."
                   value={localConfig.closedMessage || ''}
                   onChange={(e) => onConfigChange({...localConfig, closedMessage: e.target.value})}
-                  fullWidth
-                  multiline
                   rows={2}
-                  sx={{
-                    ...inputSx,
-                    '& .MuiOutlinedInput-root': {
-                      ...inputSx['& .MuiOutlinedInput-root'],
-                      borderRadius: '10px',
-                    },
-                  }}
+                  className={inputClass}
                 />
-              </Box>
-            </Box>
+              </div>
+            </div>
           )}
-          
+
           {/* Close Date - กำหนดวันปิดรับออเดอร์ */}
           {localConfig.isOpen && (
-            <Box sx={{ 
-              mt: 1, 
-              p: 2, 
-              borderRadius: '12px', 
-              bgcolor: 'rgba(245, 158, 11, 0.1)',
-              border: '1px solid rgba(245, 158, 11, 0.2)',
-            }}>
-              <Typography sx={{ fontSize: '0.85rem', color: '#fbbf24', mb: 1 }}>
-                <CalendarToday size={18} style={{ marginRight: 8, verticalAlign: 'middle' }} />
+            <div className="mt-2 rounded-xl border border-amber-500/20 bg-amber-500/10 p-4">
+              <p className="mb-2 text-[0.85rem] text-amber-400">
+                <CalendarToday size={18} className="mr-2 inline align-middle" />
                 กำหนดวันปิดรับออเดอร์ (ไม่บังคับ)
-              </Typography>
-              <TextField
+              </p>
+              <Input
                 type="datetime-local"
                 value={localConfig.closeDate || ''}
                 onChange={(e) => onConfigChange({...localConfig, closeDate: e.target.value})}
                 placeholder="เช่น 2025-01-25T23:59"
-                fullWidth
-                sx={{
-                  ...inputSx,
-                  '& .MuiOutlinedInput-root': {
-                    ...inputSx['& .MuiOutlinedInput-root'],
-                    borderRadius: '10px',
-                  },
-                }}
+                className={inputClass}
               />
-              <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', mt: 1 }}>
-                เมื่อถึงวันนี้ ระบบจะแสดงสถานะ "หมดเขตสั่งซื้อ" โดยอัตโนมัติ
-              </Typography>
-            </Box>
+              <p className="mt-2 text-xs text-[var(--text-muted)]">
+                เมื่อถึงวันนี้ ระบบจะแสดงสถานะ &quot;หมดเขตสั่งซื้อ&quot; โดยอัตโนมัติ
+              </p>
+            </div>
           )}
         </SettingSection>
       )}
@@ -348,7 +255,6 @@ export const SettingsView = React.memo(function SettingsView({
       {/* Payment System Toggle - Only for Super Admin or admins with shop permission */}
       {canManageShop && (
         <SettingSection icon={<AttachMoney size={20} />} title="ระบบชำระเงิน">
-          {/* Mapped AttachMoney icon to Store for simple reuse, or we can use local label */}
           <SettingToggleRow
             label="เปิดรับชำระเงิน"
             description={localConfig.paymentEnabled !== false ? 'ผู้ใช้สามารถอัพโหลดสลิปได้' : 'ปิดรับชำระเงินชั่วคราว'}
@@ -356,33 +262,19 @@ export const SettingsView = React.memo(function SettingsView({
             onChange={(checked) => onConfigChange({...localConfig, paymentEnabled: checked})}
           />
           {localConfig.paymentEnabled === false && (
-            <Box sx={{ 
-              mt: 1, 
-              p: 2, 
-              borderRadius: '12px', 
-              bgcolor: 'rgba(249, 115, 22, 0.1)',
-              border: '1px solid rgba(249, 115, 22, 0.2)',
-            }}>
-              <Typography sx={{ fontSize: '0.85rem', color: '#fb923c', mb: 1.5 }}>
-                <Warning size={20} style={{ marginRight: 8, verticalAlign: 'middle' }} />
+            <div className="mt-2 rounded-xl border border-orange-500/20 bg-orange-500/10 p-4">
+              <p className="mb-3 text-[0.85rem] text-orange-400">
+                <Warning size={20} className="mr-2 inline align-middle" />
                 ข้อความแจ้งผู้ใช้ (ไม่บังคับ)
-              </Typography>
-              <TextField
+              </p>
+              <Textarea
                 placeholder="เช่น: ระบบปิดปรับปรุงถึง 18:00 น."
                 value={localConfig.paymentDisabledMessage || ''}
                 onChange={(e) => onConfigChange({...localConfig, paymentDisabledMessage: e.target.value})}
-                fullWidth
-                multiline
                 rows={2}
-                sx={{
-                  ...inputSx,
-                  '& .MuiOutlinedInput-root': {
-                    ...inputSx['& .MuiOutlinedInput-root'],
-                    borderRadius: '10px',
-                  },
-                }}
+                className={inputClass}
               />
-            </Box>
+            </div>
           )}
         </SettingSection>
       )}
@@ -396,80 +288,64 @@ export const SettingsView = React.memo(function SettingsView({
               onConfigChange({ ...localConfig, nameValidation: { ...nv, ...patch } });
             };
             return (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <div className="flex flex-col gap-4">
                 {/* Length settings */}
-                <Box sx={{ display: 'flex', gap: 1.5 }}>
-                  <TextField
-                    type="number"
-                    label="ความยาวขั้นต่ำ"
-                    value={nv.minLength}
-                    onChange={e => updateNV({ minLength: Math.max(1, Number(e.target.value) || 1) })}
-                    inputProps={{ min: 1, max: 200 }}
-                    size="small"
-                    sx={{
-                      flex: 1,
-                      ...inputSx,
-                      '& .MuiOutlinedInput-root': { ...inputSx['& .MuiOutlinedInput-root'], borderRadius: '10px' },
-                    }}
-                  />
-                  <TextField
-                    type="number"
-                    label="ความยาวสูงสุด"
-                    value={nv.maxLength}
-                    onChange={e => updateNV({ maxLength: Math.max(nv.minLength, Number(e.target.value) || 10) })}
-                    inputProps={{ min: nv.minLength, max: 500 }}
-                    size="small"
-                    sx={{
-                      flex: 1,
-                      ...inputSx,
-                      '& .MuiOutlinedInput-root': { ...inputSx['& .MuiOutlinedInput-root'], borderRadius: '10px' },
-                    }}
-                  />
-                </Box>
+                <div className="flex gap-3">
+                  <div className="flex-1 space-y-1.5">
+                    <Label htmlFor="name-min-length">ความยาวขั้นต่ำ</Label>
+                    <Input
+                      id="name-min-length"
+                      type="number"
+                      value={nv.minLength}
+                      onChange={e => updateNV({ minLength: Math.max(1, Number(e.target.value) || 1) })}
+                      min={1}
+                      max={200}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div className="flex-1 space-y-1.5">
+                    <Label htmlFor="name-max-length">ความยาวสูงสุด</Label>
+                    <Input
+                      id="name-max-length"
+                      type="number"
+                      value={nv.maxLength}
+                      onChange={e => updateNV({ maxLength: Math.max(nv.minLength, Number(e.target.value) || 10) })}
+                      min={nv.minLength}
+                      max={500}
+                      className={inputClass}
+                    />
+                  </div>
+                </div>
 
                 {/* Language toggles */}
-                <Box sx={{
-                  p: 2,
-                  borderRadius: '12px',
-                  bgcolor: 'rgba(99,102,241,0.08)',
-                  border: '1px solid rgba(99,102,241,0.2)',
-                }}>
-                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#818cf8', mb: 1.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/[0.08] p-4">
+                  <p className="mb-3 flex items-center gap-1 text-[0.85rem] font-bold text-indigo-400">
                     <Groups size={14} /> ภาษาที่อนุญาต
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  </p>
+                  <div className="flex flex-wrap gap-2">
                     {[
                       { key: 'allowThai' as const, label: 'ภาษาไทย', color: '#0071e3' },
                       { key: 'allowEnglish' as const, label: 'English', color: '#10b981' },
                     ].map(lang => (
-                      <Box
+                      <button
                         key={lang.key}
+                        type="button"
                         onClick={() => {
-                          // Don't allow disabling all languages
                           if (nv[lang.key] && !Object.entries(nv).some(([k, v]) => k !== lang.key && k.startsWith('allow') && k !== 'allowSpecialChars' && v === true)) return;
                           updateNV({ [lang.key]: !nv[lang.key] });
                         }}
-                        sx={{
-                          px: 2,
-                          py: 1,
-                          borderRadius: '10px',
-                          cursor: 'pointer',
-                          fontSize: '0.85rem',
-                          fontWeight: 600,
-                          bgcolor: nv[lang.key] ? `${lang.color}15` : 'rgba(255,255,255,0.05)',
+                        className="cursor-pointer rounded-[10px] border-[1.5px] px-4 py-2 text-[0.85rem] font-semibold transition-all"
+                        style={{
+                          backgroundColor: nv[lang.key] ? `${lang.color}15` : 'rgba(255,255,255,0.05)',
                           color: nv[lang.key] ? lang.color : '#64748b',
-                          border: `1.5px solid ${nv[lang.key] ? lang.color : 'transparent'}`,
-                          transition: 'all 0.2s ease',
-                          '&:hover': {
-                            bgcolor: nv[lang.key] ? `${lang.color}25` : 'rgba(255,255,255,0.1)',
-                          },
+                          borderColor: nv[lang.key] ? lang.color : 'transparent',
                         }}
                       >
                         {lang.label}
-                      </Box>
+                      </button>
                     ))}
-                  </Box>
-                </Box>
+                  </div>
+                </div>
 
                 {/* Special characters */}
                 <SettingToggleRow
@@ -479,31 +355,27 @@ export const SettingsView = React.memo(function SettingsView({
                   onChange={checked => updateNV({ allowSpecialChars: checked })}
                 />
                 {nv.allowSpecialChars && (
-                  <TextField
-                    label="อักษรพิเศษที่อนุญาต"
-                    value={nv.allowedSpecialChars}
-                    onChange={e => updateNV({ allowedSpecialChars: e.target.value })}
-                    placeholder=".-'"
-                    helperText="กรอกตัวอักษรพิเศษที่ต้องการอนุญาต เช่น . - ' ( )"
-                    size="small"
-                    sx={{
-                      ...inputSx,
-                      '& .MuiOutlinedInput-root': { ...inputSx['& .MuiOutlinedInput-root'], borderRadius: '10px' },
-                    }}
-                  />
+                  <div className="space-y-1.5">
+                    <Label htmlFor="name-special-chars">อักษรพิเศษที่อนุญาต</Label>
+                    <Input
+                      id="name-special-chars"
+                      value={nv.allowedSpecialChars}
+                      onChange={e => updateNV({ allowedSpecialChars: e.target.value })}
+                      placeholder=".-'"
+                      className={inputClass}
+                    />
+                    <p className="text-xs text-[var(--text-muted)]">
+                      กรอกตัวอักษรพิเศษที่ต้องการอนุญาต เช่น . - &apos; ( )
+                    </p>
+                  </div>
                 )}
 
                 {/* Preview */}
-                <Box sx={{
-                  p: 1.5,
-                  borderRadius: '10px',
-                  bgcolor: 'rgba(16,185,129,0.08)',
-                  border: '1px solid rgba(16,185,129,0.2)',
-                }}>
-                  <Typography sx={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 600, mb: 0.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <div className="rounded-[10px] border border-emerald-500/20 bg-emerald-500/[0.08] p-3">
+                  <p className="mb-1 flex items-center gap-1 text-xs font-semibold text-emerald-500">
                     <CheckCircle size={14} /> ตัวอย่างที่ระบบจะยอมรับ:
-                  </Typography>
-                  <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  </p>
+                  <p className="text-[0.8rem] text-[var(--text-muted)]">
                     {[
                       nv.allowThai && 'สมชาย ใจดี',
                       nv.allowEnglish && 'John Smith',
@@ -511,9 +383,9 @@ export const SettingsView = React.memo(function SettingsView({
                       nv.allowSpecialChars && (nv.allowThai ? `สมชาย ใจ${nv.allowedSpecialChars[0] || '.'}ดี` : `John O${nv.allowedSpecialChars[0] || "'"}Brien`),
                     ].filter(Boolean).join(' / ')}
                     {` (${nv.minLength}-${nv.maxLength} ตัว)`}
-                  </Typography>
-                </Box>
-              </Box>
+                  </p>
+                </div>
+              </div>
             );
           })()}
         </SettingSection>
@@ -522,290 +394,199 @@ export const SettingsView = React.memo(function SettingsView({
       {/* Google Sheet - Only for Super Admin or admins with permission */}
       {canManageSheet && (
         <SettingSection icon={<Bolt size={20} />} title="Google Sheet">
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <TextField
-              label="Sheet ID (ออเดอร์ + สรุปการผลิต)"
-              placeholder="วาง Sheet ID หรือ URL ก็ได้"
-              value={localConfig.sheetId || ''}
-              onChange={(e) => {
-                const { sheetId, sheetUrl } = extractSheetInfo(e.target.value);
-                onConfigChange({ ...localConfig, sheetId, sheetUrl });
-              }}
-              fullWidth
-              sx={{
-                ...inputSx,
-                '& .MuiOutlinedInput-root': {
-                  ...inputSx['& .MuiOutlinedInput-root'],
-                  borderRadius: '10px',
-                },
-              }}
-              helperText="ชีตหลัก — แท็บ Orders รวมทุกออเดอร์ และแท็บสรุปตามสินค้า"
-            />
-
-            <TextField
-              label="Vendor Sheet ID"
-              placeholder="วาง Sheet ID หรือ URL ให้โรงงาน"
-              value={localConfig.vendorSheetId || ''}
-              onChange={(e) => {
-                const { sheetId, sheetUrl } = extractSheetInfo(e.target.value);
-                onConfigChange({ ...localConfig, vendorSheetId: sheetId, vendorSheetUrl: sheetUrl });
-              }}
-              fullWidth
-              sx={{
-                ...inputSx,
-                '& .MuiOutlinedInput-root': {
-                  ...inputSx['& .MuiOutlinedInput-root'],
-                  borderRadius: '10px',
-                },
-              }}
-              helperText="ชีตแยกสำหรับส่งให้โรงงาน (ตัดอีเมล/ลิงก์สลิปออก) — ไม่บังคับ"
-            />
-
-            <Box sx={{
-              p: 2,
-              borderRadius: '12px',
-              bgcolor: 'var(--surface-2)',
-              border: `1px solid ${ADMIN_THEME.border}`,
-            }}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={localConfig.sheetSettings?.factoryPerProduct !== false}
-                    onChange={(e) => onConfigChange({
-                      ...localConfig,
-                      sheetSettings: {
-                        ...localConfig.sheetSettings,
-                        factoryPerProduct: e.target.checked,
-                      },
-                    })}
-                    sx={{
-                      '& .MuiSwitch-switchBase.Mui-checked': { color: '#10b981' },
-                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: '#10b981' },
-                    }}
-                  />
-                }
-                label={
-                  <Box>
-                    <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--foreground)' }}>
-                      แยกชีตสรุปตามสินค้า
-                    </Typography>
-                    <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                      แต่ละสินค้าจะมีแท็บชื่อ &quot;สรุป [ชื่อสินค้า]&quot; พร้อมรายการและสรุปไซซ์แยกกัน
-                    </Typography>
-                  </Box>
-                }
-                sx={{ alignItems: 'flex-start', ml: 0, mr: 0 }}
-              />
-
-              <TextField
-                label="สถานะออเดอร์ที่นำเข้าชีตสรุป"
-                placeholder="PAID"
-                value={(localConfig.sheetSettings?.factoryOrderStatuses || ['PAID']).join(', ')}
+          <div className="flex flex-col gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="sheet-id">Sheet ID (ออเดอร์ + สรุปการผลิต)</Label>
+              <Input
+                id="sheet-id"
+                placeholder="วาง Sheet ID หรือ URL ก็ได้"
+                value={localConfig.sheetId || ''}
                 onChange={(e) => {
-                  const statuses = e.target.value
-                    .split(',')
-                    .map((s) => s.trim().toUpperCase())
-                    .filter(Boolean);
-                  onConfigChange({
+                  const { sheetId, sheetUrl } = extractSheetInfo(e.target.value);
+                  onConfigChange({ ...localConfig, sheetId, sheetUrl });
+                }}
+                className={inputClass}
+              />
+              <p className="text-xs text-[var(--text-muted)]">
+                ชีตหลัก — แท็บ Orders รวมทุกออเดอร์ และแท็บสรุปตามสินค้า
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="vendor-sheet-id">Vendor Sheet ID</Label>
+              <Input
+                id="vendor-sheet-id"
+                placeholder="วาง Sheet ID หรือ URL ให้โรงงาน"
+                value={localConfig.vendorSheetId || ''}
+                onChange={(e) => {
+                  const { sheetId, sheetUrl } = extractSheetInfo(e.target.value);
+                  onConfigChange({ ...localConfig, vendorSheetId: sheetId, vendorSheetUrl: sheetUrl });
+                }}
+                className={inputClass}
+              />
+              <p className="text-xs text-[var(--text-muted)]">
+                ชีตแยกสำหรับส่งให้โรงงาน (ตัดอีเมล/ลิงก์สลิปออก) — ไม่บังคับ
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-[var(--glass-border)] bg-[var(--surface-2)] p-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[0.9rem] font-semibold text-[var(--foreground)]">
+                    แยกชีตสรุปตามสินค้า
+                  </p>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    แต่ละสินค้าจะมีแท็บชื่อ &quot;สรุป [ชื่อสินค้า]&quot; พร้อมรายการและสรุปไซซ์แยกกัน
+                  </p>
+                </div>
+                <Switch
+                  checked={localConfig.sheetSettings?.factoryPerProduct !== false}
+                  onCheckedChange={(checked) => onConfigChange({
                     ...localConfig,
                     sheetSettings: {
                       ...localConfig.sheetSettings,
-                      factoryOrderStatuses: statuses.length ? statuses : ['PAID'],
+                      factoryPerProduct: checked,
                     },
-                  });
-                }}
-                fullWidth
-                size="small"
-                sx={{ mt: 1.5, ...inputSx }}
-                helperText="คั่นด้วยจุลภาค เช่น PAID หรือ PAID, READY"
-              />
+                  })}
+                  className="shrink-0 data-[state=checked]:bg-emerald-500"
+                />
+              </div>
+
+              <div className="mt-4 space-y-1.5">
+                <Label htmlFor="factory-order-statuses">สถานะออเดอร์ที่นำเข้าชีตสรุป</Label>
+                <Input
+                  id="factory-order-statuses"
+                  placeholder="PAID"
+                  value={(localConfig.sheetSettings?.factoryOrderStatuses || ['PAID']).join(', ')}
+                  onChange={(e) => {
+                    const statuses = e.target.value
+                      .split(',')
+                      .map((s) => s.trim().toUpperCase())
+                      .filter(Boolean);
+                    onConfigChange({
+                      ...localConfig,
+                      sheetSettings: {
+                        ...localConfig.sheetSettings,
+                        factoryOrderStatuses: statuses.length ? statuses : ['PAID'],
+                      },
+                    });
+                  }}
+                  className={inputClass}
+                />
+                <p className="text-xs text-[var(--text-muted)]">
+                  คั่นด้วยจุลภาค เช่น PAID หรือ PAID, READY
+                </p>
+              </div>
 
               {localConfig.sheetSettings?.factoryPerProduct !== false && (localConfig.products?.length ?? 0) > 0 && (
-                <Box sx={{ mt: 1.5 }}>
-                  <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', mb: 0.75 }}>
+                <div className="mt-4">
+                  <p className="mb-1.5 text-xs text-[var(--text-muted)]">
                     แท็บสรุปที่จะสร้างเมื่อมีออเดอร์:
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                  </p>
+                  <div className="flex flex-wrap gap-1">
                     {(localConfig.products || [])
                       .filter((p) => p.isActive !== false)
                       .map((p) => (
-                        <Chip
+                        <Badge
                           key={p.id}
-                          label={`สรุป ${p.name}`}
-                          size="small"
-                          sx={{ fontSize: '0.7rem', bgcolor: 'rgba(99,102,241,0.12)', color: '#6366f1' }}
-                        />
+                          variant="secondary"
+                          className="bg-indigo-500/12 text-[0.7rem] text-indigo-500"
+                        >
+                          {`สรุป ${p.name}`}
+                        </Badge>
                       ))}
-                  </Box>
-                </Box>
+                  </div>
+                </div>
               )}
-            </Box>
-            
+            </div>
+
             {localConfig.sheetUrl && (
-              <Box sx={{
-                p: 2,
-                borderRadius: '12px',
-                bgcolor: 'rgba(16, 185, 129, 0.1)',
-                border: '1px solid rgba(16, 185, 129, 0.2)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 2,
-              }}>
-                <Box sx={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: '10px',
-                  bgcolor: '#10b981',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                  <Check size={20} color="#fff" />
-                </Box>
-                <Box sx={{ flex: 1 }}>
-                  <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: '#10b981' }}>
+              <div className="flex items-center gap-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-emerald-500">
+                  <Check size={20} className="text-white" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-[0.9rem] font-semibold text-emerald-500">
                     เชื่อมต่อแล้ว
-                  </Typography>
-                  <Typography 
-                    component="a"
+                  </p>
+                  <a
                     href={localConfig.sheetUrl}
                     target="_blank"
                     rel="noreferrer"
-                    sx={{ 
-                      fontSize: '0.8rem', 
-                      color: 'var(--text-muted)',
-                      textDecoration: 'underline',
-                      '&:hover': { color: 'var(--text-muted)' },
-                    }}
+                    className="text-[0.8rem] text-[var(--text-muted)] underline hover:text-[var(--text-muted)]"
                   >
                     เปิด Google Sheet
-                  </Typography>
-                </Box>
-              </Box>
+                  </a>
+                </div>
+              </div>
             )}
 
             {localConfig.vendorSheetUrl && (
-              <Box sx={{
-                p: 2,
-                borderRadius: '12px',
-                bgcolor: 'rgba(59,130,246,0.1)',
-                border: '1px solid rgba(59,130,246,0.2)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 2,
-              }}>
-                <Box sx={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: '10px',
-                  bgcolor: '#3b82f6',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                  <Check size={20} color="#fff" />
-                </Box>
-                <Box sx={{ flex: 1 }}>
-                  <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: '#3b82f6' }}>
+              <div className="flex items-center gap-4 rounded-xl border border-blue-500/20 bg-blue-500/10 p-4">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-blue-500">
+                  <Check size={20} className="text-white" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-[0.9rem] font-semibold text-blue-500">
                     เชื่อมต่อชีตโรงงานแล้ว
-                  </Typography>
-                  <Typography 
-                    component="a"
+                  </p>
+                  <a
                     href={localConfig.vendorSheetUrl}
                     target="_blank"
                     rel="noreferrer"
-                    sx={{ 
-                      fontSize: '0.8rem', 
-                      color: 'var(--text-muted)',
-                      textDecoration: 'underline',
-                      '&:hover': { color: 'var(--text-muted)' },
-                    }}
+                    className="text-[0.8rem] text-[var(--text-muted)] underline hover:text-[var(--text-muted)]"
                   >
                     เปิด Vendor Sheet
-                  </Typography>
-                </Box>
-              </Box>
+                  </a>
+                </div>
+              </div>
             )}
 
-            <Box sx={{ display: 'flex', gap: 1.5 }}>
+            <div className="flex gap-3">
               <Button
                 onClick={() => triggerSheetSync(localConfig.sheetId ? 'sync' : 'create')}
                 disabled={sheetSyncing}
-                sx={{ ...gradientButtonSx, flex: 1, gap: 1 }}
+                className={cn(gradientBtnClass, 'flex-1')}
               >
                 <Bolt size={18} />
                 {sheetSyncing ? 'กำลังซิงก์...' : localConfig.sheetId ? 'ซิงก์ทันที' : 'สร้าง Sheet ใหม่'}
               </Button>
-            </Box>
-          </Box>
+            </div>
+          </div>
         </SettingSection>
       )}
 
       {/* Admin Management - Only visible to Super Admin */}
       {isSuperAdminUser && (
         <SettingSection icon={<AdminPanelSettings size={20} />} title="จัดการแอดมิน">
-          <Box sx={{ mb: 2 }}>
-            <Box sx={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: 1, 
-              mb: 1.5,
-              p: 1.5,
-              borderRadius: '10px',
-              bgcolor: 'rgba(251, 191, 36, 0.1)',
-              border: '1px solid rgba(251, 191, 36, 0.3)',
-            }}>
-              <Shield size={18} color="#fbbf24" />
-              <Typography sx={{ fontSize: '0.8rem', color: '#fbbf24' }}>
+          <div className="mb-4">
+            <div className="mb-4 flex items-center gap-2 rounded-[10px] border border-amber-400/30 bg-amber-400/10 p-3">
+              <Shield size={18} className="shrink-0 text-amber-400" />
+              <p className="text-[0.8rem] text-amber-400">
                 เฉพาะบัญชีสูงสุดเท่านั้นที่สามารถจัดการแอดมินได้
-              </Typography>
-            </Box>
-            
+              </p>
+            </div>
+
             {/* Super Admin Badge */}
-            <Box sx={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: 1.5, 
-              p: 2,
-              borderRadius: '12px',
-              bgcolor: 'rgba(16, 185, 129, 0.1)',
-              border: '1px solid rgba(16, 185, 129, 0.3)',
-              mb: 2,
-            }}>
-              <Box sx={{
-                width: 40,
-                height: 40,
-                borderRadius: '10px',
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-                <Shield size={20} color="#fff" />
-              </Box>
-              <Box>
-                <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>บัญชีสูงสุด (Super Admin)</Typography>
-                <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: '#34d399' }}>
+            <div className="mb-4 flex items-center gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-gradient-to-br from-emerald-500 to-emerald-600">
+                <Shield size={20} className="text-white" />
+              </div>
+              <div>
+                <p className="text-xs text-[var(--text-muted)]">บัญชีสูงสุด (Super Admin)</p>
+                <p className="text-[0.9rem] font-semibold text-emerald-400">
                   {SUPER_ADMIN_EMAIL}
-                </Typography>
-              </Box>
-            </Box>
+                </p>
+              </div>
+            </div>
 
             {/* Add Admin Form */}
-            <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-              <TextField
+            <div className="mb-4 flex gap-2">
+              <Input
                 placeholder="กรอกอีเมลแอดมินใหม่..."
                 value={newAdminEmail}
                 onChange={(e) => onNewAdminEmailChange(e.target.value)}
-                fullWidth
-                size="small"
-                sx={{
-                  ...inputSx,
-                  '& .MuiOutlinedInput-root': {
-                    ...inputSx['& .MuiOutlinedInput-root'],
-                    borderRadius: '10px',
-                  },
-                }}
+                className={cn(inputClass, 'flex-1')}
               />
               <Button
                 onClick={() => {
@@ -831,40 +612,30 @@ export const SettingsView = React.memo(function SettingsView({
                   onNewAdminEmailChange('');
                   showToast('success', `เพิ่ม ${email} เป็นแอดมินแล้ว (กรุณาบันทึกการตั้งค่า)`);
                 }}
-                sx={{
-                  ...gradientButtonSx,
-                  minWidth: 100,
-                  whiteSpace: 'nowrap',
-                }}
+                className={cn(gradientBtnClass, 'min-w-[100px] whitespace-nowrap')}
               >
-                <PersonAdd size={18} style={{ marginRight: 4 }} />
+                <PersonAdd size={18} />
                 เพิ่ม
               </Button>
-            </Box>
+            </div>
 
             {/* Admin List */}
-            <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)', mb: 1 }}>
+            <p className="mb-2 text-[0.8rem] text-[var(--text-muted)]">
               รายชื่อแอดมิน ({(localConfig.adminEmails || []).length} คน)
-            </Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            </p>
+            <div className="flex flex-col gap-3">
               {(localConfig.adminEmails || []).length === 0 ? (
-                <Box sx={{
-                  p: 2,
-                  borderRadius: '10px',
-                  bgcolor: 'rgba(255,255,255,0.03)',
-                  border: `1px solid ${ADMIN_THEME.border}`,
-                  textAlign: 'center',
-                }}>
-                  <Typography sx={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                <div className="rounded-[10px] border border-[var(--glass-border)] bg-white/[0.03] p-4 text-center">
+                  <p className="text-[0.85rem] text-[var(--text-muted)]">
                     ยังไม่มีแอดมินเพิ่มเติม
-                  </Typography>
-                </Box>
+                  </p>
+                </div>
               ) : (
                 (localConfig.adminEmails || []).map((adminEmail, idx) => {
                   const perms: AdminPermissions = localConfig.adminPermissions?.[adminEmail.toLowerCase()]
                     ? { ...DEFAULT_ADMIN_PERMISSIONS, ...localConfig.adminPermissions[adminEmail.toLowerCase()] }
                     : { ...DEFAULT_ADMIN_PERMISSIONS };
-                  
+
                   const togglePermission = (key: string, value: boolean) => {
                     const currentPerms = localConfig.adminPermissions ?? {};
                     onConfigChange({
@@ -880,40 +651,21 @@ export const SettingsView = React.memo(function SettingsView({
                   };
 
                   return (
-                    <Box
+                    <div
                       key={idx}
-                      sx={{
-                        borderRadius: '12px',
-                        bgcolor: 'rgba(255,255,255,0.03)',
-                        border: `1px solid ${ADMIN_THEME.border}`,
-                        overflow: 'hidden',
-                      }}
+                      className="overflow-hidden rounded-xl border border-[var(--glass-border)] bg-white/[0.03]"
                     >
                       {/* Admin Header */}
-                      <Box sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 1.5,
-                        p: 1.5,
-                        borderBottom: `1px solid ${ADMIN_THEME.border}`,
-                        bgcolor: 'rgba(139, 92, 246, 0.05)',
-                      }}>
-                        <Box sx={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: '8px',
-                          bgcolor: 'rgba(139, 92, 246, 0.2)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}>
-                          <Person size={18} color="#a78bfa" />
-                        </Box>
-                        <Typography sx={{ flex: 1, fontSize: '0.9rem', color: 'var(--foreground)', fontWeight: 600 }}>
+                      <div className="flex items-center gap-3 border-b border-[var(--glass-border)] bg-violet-500/5 p-3">
+                        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-violet-500/20">
+                          <Person size={18} className="text-violet-400" />
+                        </div>
+                        <p className="flex-1 text-[0.9rem] font-semibold text-[var(--foreground)]">
                           {adminEmail}
-                        </Typography>
-                        <IconButton
-                          size="small"
+                        </p>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
                           onClick={() => {
                             const currentAdmins = localConfig.adminEmails || [];
                             const currentPerms = { ...(localConfig.adminPermissions ?? {}) };
@@ -925,19 +677,16 @@ export const SettingsView = React.memo(function SettingsView({
                             });
                             showToast('info', `ลบ ${adminEmail} ออกจากแอดมินแล้ว (กรุณาบันทึกการตั้งค่า)`);
                           }}
-                          sx={{
-                            color: '#ef4444',
-                            '&:hover': { bgcolor: 'rgba(239, 68, 68, 0.1)' },
-                          }}
+                          className="text-red-500 hover:bg-red-500/10 hover:text-red-500"
                         >
                           <Delete size={18} />
-                        </IconButton>
-                      </Box>
-                      
+                        </Button>
+                      </div>
+
                       {/* Permissions */}
-                      <Box sx={{ p: 1.5 }}>
-                        <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', mb: 1 }}>สิทธิ์การใช้งาน:</Typography>
-                        
+                      <div className="p-3">
+                        <p className="mb-2 text-xs text-[var(--text-muted)]">สิทธิ์การใช้งาน:</p>
+
                         {/* Permission Groups */}
                         {[
                           {
@@ -971,49 +720,40 @@ export const SettingsView = React.memo(function SettingsView({
                             ],
                           },
                         ].map((group) => (
-                          <Box key={group.group} sx={{ mb: 1.5 }}>
-                            <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', mb: 0.5, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <div key={group.group} className="mb-3">
+                            <p className="mb-1 flex items-center gap-1 text-[0.7rem] font-semibold text-[var(--text-muted)]">
                               {group.groupIcon} {group.group}
-                            </Typography>
-                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                            </p>
+                            <div className="flex flex-wrap gap-1">
                               {group.items.map(perm => (
-                                <Box
+                                <button
                                   key={perm.key}
+                                  type="button"
                                   onClick={() => togglePermission(perm.key, !perms[perm.key as keyof AdminPermissions])}
-                                  sx={{
-                                    px: 1.5,
-                                    py: 0.5,
-                                    borderRadius: '8px',
-                                    cursor: 'pointer',
-                                    fontSize: '0.75rem',
-                                    fontWeight: 500,
-                                    bgcolor: perms[perm.key as keyof AdminPermissions] 
-                                      ? `${perm.color}20` 
+                                  className="cursor-pointer rounded-lg border px-3 py-1 text-xs font-medium transition-all"
+                                  style={{
+                                    backgroundColor: perms[perm.key as keyof AdminPermissions]
+                                      ? `${perm.color}20`
                                       : 'rgba(255,255,255,0.05)',
-                                    color: perms[perm.key as keyof AdminPermissions] 
-                                      ? perm.color 
+                                    color: perms[perm.key as keyof AdminPermissions]
+                                      ? perm.color
                                       : '#64748b',
-                                    border: `1px solid ${perms[perm.key as keyof AdminPermissions] 
-                                      ? perm.color 
-                                      : 'transparent'}`,
-                                    transition: 'all 0.2s ease',
-                                    '&:hover': { 
-                                      bgcolor: perms[perm.key as keyof AdminPermissions] 
-                                        ? `${perm.color}30` 
-                                        : 'rgba(255,255,255,0.1)',
-                                    },
+                                    borderColor: perms[perm.key as keyof AdminPermissions]
+                                      ? perm.color
+                                      : 'transparent',
                                   }}
                                 >
                                   {perm.label}
-                                </Box>
+                                </button>
                               ))}
-                            </Box>
-                          </Box>
+                            </div>
+                          </div>
                         ))}
 
                         {/* Quick Actions */}
-                        <Box sx={{ display: 'flex', gap: 0.5, mt: 1, pt: 1, borderTop: `1px solid ${ADMIN_THEME.border}` }}>
-                          <Box
+                        <div className="mt-2 flex gap-1 border-t border-[var(--glass-border)] pt-2">
+                          <button
+                            type="button"
                             onClick={() => {
                               const allPerms: AdminPermissions = {};
                               Object.keys(DEFAULT_ADMIN_PERMISSIONS).forEach(k => {
@@ -1028,22 +768,12 @@ export const SettingsView = React.memo(function SettingsView({
                                 }
                               });
                             }}
-                            sx={{
-                              px: 1.5,
-                              py: 0.4,
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              fontSize: '0.7rem',
-                              fontWeight: 600,
-                              bgcolor: 'rgba(16,185,129,0.1)',
-                              color: '#10b981',
-                              border: '1px solid rgba(16,185,129,0.3)',
-                              '&:hover': { bgcolor: 'rgba(16,185,129,0.2)' },
-                            }}
+                            className="cursor-pointer rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-[0.7rem] font-semibold text-emerald-500 transition-colors hover:bg-emerald-500/20"
                           >
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}><Check size={12} /> เปิดทั้งหมด</Box>
-                          </Box>
-                          <Box
+                            <span className="flex items-center gap-1"><Check size={12} /> เปิดทั้งหมด</span>
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => {
                               const noPerms: AdminPermissions = {};
                               Object.keys(DEFAULT_ADMIN_PERMISSIONS).forEach(k => {
@@ -1058,22 +788,12 @@ export const SettingsView = React.memo(function SettingsView({
                                 }
                               });
                             }}
-                            sx={{
-                              px: 1.5,
-                              py: 0.4,
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              fontSize: '0.7rem',
-                              fontWeight: 600,
-                              bgcolor: 'rgba(239,68,68,0.1)',
-                              color: '#ef4444',
-                              border: '1px solid rgba(239,68,68,0.3)',
-                              '&:hover': { bgcolor: 'rgba(239,68,68,0.2)' },
-                            }}
+                            className="cursor-pointer rounded-md border border-red-500/30 bg-red-500/10 px-3 py-1 text-[0.7rem] font-semibold text-red-500 transition-colors hover:bg-red-500/20"
                           >
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}><Close size={12} /> ปิดทั้งหมด</Box>
-                          </Box>
-                          <Box
+                            <span className="flex items-center gap-1"><Close size={12} /> ปิดทั้งหมด</span>
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => {
                               const currentPerms = localConfig.adminPermissions ?? {};
                               onConfigChange({
@@ -1084,157 +804,116 @@ export const SettingsView = React.memo(function SettingsView({
                                 }
                               });
                             }}
-                            sx={{
-                              px: 1.5,
-                              py: 0.4,
-                              borderRadius: '6px',
-                              cursor: 'pointer',
-                              fontSize: '0.7rem',
-                              fontWeight: 600,
-                              bgcolor: 'rgba(99,102,241,0.1)',
-                              color: '#6366f1',
-                              border: '1px solid rgba(99,102,241,0.3)',
-                              '&:hover': { bgcolor: 'rgba(99,102,241,0.2)' },
-                            }}
+                            className="cursor-pointer rounded-md border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-[0.7rem] font-semibold text-indigo-500 transition-colors hover:bg-indigo-500/20"
                           >
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}><RefreshCw size={12} /> ค่าเริ่มต้น</Box>
-                          </Box>
-                        </Box>
-                      </Box>
-                    </Box>
+                            <span className="flex items-center gap-1"><RefreshCw size={12} /> ค่าเริ่มต้น</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   );
                 })
               )}
-            </Box>
-          </Box>
+            </div>
+          </div>
         </SettingSection>
       )}
 
       {/* Pickup Settings - Per Product Summary */}
       {canManageShop && (
         <SettingSection icon={<LocalMall size={20} />} title="สถานะรับสินค้า">
-          {/* Summary of products with pickup enabled */}
           {(() => {
             const productsWithPickup = localConfig.products?.filter(p => p.pickup?.enabled) || [];
             const totalProducts = localConfig.products?.length || 0;
-            
+
             return (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <Box sx={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: 2,
-                  p: 2,
-                  borderRadius: '12px',
-                  bgcolor: productsWithPickup.length > 0 ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.03)',
-                  border: `1px solid ${productsWithPickup.length > 0 ? 'rgba(16,185,129,0.3)' : ADMIN_THEME.border}`,
-                }}>
-                  <LocalMall size={32} color={productsWithPickup.length > 0 ? '#10b981' : ADMIN_THEME.muted} />
-                  <Box sx={{ flex: 1 }}>
-                    <Typography sx={{ fontWeight: 700, color: ADMIN_THEME.text }}>
-                      {productsWithPickup.length > 0 
-                        ? `เปิดรับ ${productsWithPickup.length} สินค้า` 
+              <div className="flex flex-col gap-4">
+                <div
+                  className={cn(
+                    'flex items-center gap-4 rounded-xl p-4',
+                    productsWithPickup.length > 0
+                      ? 'border border-emerald-500/30 bg-emerald-500/10'
+                      : 'border border-[var(--glass-border)] bg-white/[0.03]',
+                  )}
+                >
+                  <LocalMall
+                    size={32}
+                    className={productsWithPickup.length > 0 ? 'text-emerald-500' : 'text-[var(--text-muted)]'}
+                  />
+                  <div className="flex-1">
+                    <p className="font-bold text-[var(--foreground)]">
+                      {productsWithPickup.length > 0
+                        ? `เปิดรับ ${productsWithPickup.length} สินค้า`
                         : 'ยังไม่มีสินค้าเปิดรับ'}
-                    </Typography>
-                    <Typography sx={{ fontSize: '0.8rem', color: ADMIN_THEME.muted }}>
+                    </p>
+                    <p className="text-[0.8rem] text-[var(--text-muted)]">
                       จากทั้งหมด {totalProducts} สินค้า
-                    </Typography>
-                  </Box>
-                </Box>
+                    </p>
+                  </div>
+                </div>
 
                 {productsWithPickup.length > 0 && (
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                  <div className="flex flex-col gap-3">
                     {productsWithPickup.map(p => (
-                      <Box 
+                      <div
                         key={p.id}
-                        sx={{
-                          p: 1.5,
-                          borderRadius: '10px',
-                          bgcolor: 'rgba(6,182,212,0.05)',
-                          border: `1px solid rgba(6,182,212,0.15)`,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 1.5,
-                        }}
+                        className="flex items-center gap-3 rounded-[10px] border border-cyan-500/15 bg-cyan-500/[0.05] p-3"
                       >
-                        <CheckCircle size={18} color="#10b981" />
-                        <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <Typography sx={{ 
-                            fontWeight: 600, 
-                            color: ADMIN_THEME.text,
-                            fontSize: '0.85rem',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}>
+                        <CheckCircle size={18} className="shrink-0 text-emerald-500" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[0.85rem] font-semibold text-[var(--foreground)]">
                             {p.name}
-                          </Typography>
+                          </p>
                           {p.pickup?.location && (
-                            <Typography sx={{ fontSize: '0.75rem', color: ADMIN_THEME.muted, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <p className="flex items-center gap-1 text-xs text-[var(--text-muted)]">
                               <Crosshair size={12} /> {p.pickup.location}
-                            </Typography>
+                            </p>
                           )}
                           {(p.pickup?.startDate || p.pickup?.endDate) && (
-                            <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <p className="flex items-center gap-1 text-[0.7rem] text-[var(--text-muted)]">
                               <CalendarDays size={12} /> {p.pickup?.startDate ? new Date(p.pickup.startDate).toLocaleDateString('th-TH') : '...'} - {p.pickup?.endDate ? new Date(p.pickup.endDate).toLocaleDateString('th-TH') : '...'}
-                            </Typography>
+                            </p>
                           )}
-                        </Box>
-                      </Box>
+                        </div>
+                      </div>
                     ))}
-                  </Box>
+                  </div>
                 )}
 
-                <Alert 
-                  severity="info" 
-                  sx={{ 
-                    bgcolor: 'rgba(99,102,241,0.1)', 
-                    border: '1px solid rgba(99,102,241,0.2)',
-                    '& .MuiAlert-icon': { color: '#6366f1' },
-                    fontSize: '0.8rem',
-                  }}
-                >
-                  ไปที่แท็บ <strong>สินค้า</strong> และกดปุ่ม "ตั้งค่ารับสินค้า" ในแต่ละสินค้าเพื่อเปิด/ปิดการรับสินค้า
+                <Alert className="border border-indigo-500/20 bg-indigo-500/10 text-[0.8rem]">
+                  <AlertDescription>
+                    ไปที่แท็บ <strong>สินค้า</strong> และกดปุ่ม &quot;ตั้งค่ารับสินค้า&quot; ในแต่ละสินค้าเพื่อเปิด/ปิดการรับสินค้า
+                  </AlertDescription>
                 </Alert>
-              </Box>
+              </div>
             );
           })()}
         </SettingSection>
       )}
 
       {/* Save Status */}
-      <Box sx={{ 
-        ...glassCardSx,
-        p: 2,
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-      }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Box sx={{
-            width: 10,
-            height: 10,
-            borderRadius: '50%',
-            bgcolor: hasChanges ? '#f59e0b' : '#10b981',
-            boxShadow: `0 0 12px ${hasChanges ? '#f59e0b' : '#10b981'}`,
-          }} />
-          <Typography sx={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+      <div className={cn(glassCardClass, 'flex items-center justify-between p-4')}>
+        <div className="flex items-center gap-4">
+          <div
+            className="size-2.5 shrink-0 rounded-full"
+            style={{
+              backgroundColor: hasChanges ? '#f59e0b' : '#10b981',
+              boxShadow: `0 0 12px ${hasChanges ? '#f59e0b' : '#10b981'}`,
+            }}
+          />
+          <p className="text-[0.85rem] text-[var(--text-muted)]">
             {hasChanges ? 'มีการเปลี่ยนแปลงที่ยังไม่บันทึก' : 'บันทึกล่าสุด: ' + (lastSavedTime ? lastSavedTime.toLocaleString('th-TH') : '-')}
-          </Typography>
-        </Box>
+          </p>
+        </div>
         <Button
           onClick={onSave}
           disabled={!hasChanges || loading}
-          sx={{
-            ...gradientButtonSx,
-            minWidth: 120,
-            opacity: hasChanges ? 1 : 0.5,
-          }}
+          className={cn(gradientBtnClass, 'min-w-[120px]', !hasChanges && 'opacity-50')}
         >
-          <Save size={18} style={{ marginRight: 8 }} />
+          <Save size={18} />
           บันทึก
         </Button>
-      </Box>
-    </Box>
+      </div>
+    </div>
   );
 });

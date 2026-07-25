@@ -3,37 +3,39 @@
 import { apiFetch } from '@/lib/api-client';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Box,
-  Typography,
-  Button,
-  Chip,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  CircularProgress,
-  IconButton,
-  Tooltip,
-  Alert,
-} from '@mui/material';
-import {
   RotateCcw,
   CheckCircle,
   XCircle,
   Clock,
   Search,
-  Eye,
   ChevronDown,
   ChevronUp,
   Banknote,
-  User,
   Package,
-  MessageSquare,
   RefreshCw,
+  Loader2,
+  Info,
 } from 'lucide-react';
-
-import { ADMIN_THEME } from '@/lib/adminTheme';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 interface RefundOrder {
   ref: string;
@@ -171,479 +173,297 @@ export default function RefundManagement({ showToast, selectedShopId }: Props) {
   };
 
   return (
-    <Box sx={{ p: { xs: 2, sm: 3 }, maxWidth: 1200, mx: 'auto' }}>
-      {/* Header */}
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Box sx={{
-            width: 44,
-            height: 44,
-            borderRadius: '14px',
-            background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
-            display: 'grid',
-            placeItems: 'center',
-            boxShadow: '0 4px 14px rgba(124,58,237,0.3)',
-          }}>
-            <RotateCcw size={22} color="white" />
-          </Box>
-          <Box>
-            <Typography sx={{ fontSize: '1.2rem', fontWeight: 800, color: ADMIN_THEME.text }}>
-              จัดการคำขอคืนเงิน
-            </Typography>
-            <Typography sx={{ fontSize: '0.75rem', color: ADMIN_THEME.muted }}>
-              ตรวจสอบและดำเนินการคำขอคืนเงินจากลูกค้า
-            </Typography>
-          </Box>
-        </Box>
-        <Tooltip title="รีเฟรช">
-          <IconButton onClick={fetchRefundOrders} sx={{ color: ADMIN_THEME.textSecondary }}>
-            <RefreshCw size={20} />
-          </IconButton>
-        </Tooltip>
-      </Box>
+    <TooltipProvider>
+      <div className="mx-auto max-w-[1200px] p-4 sm:p-6">
+        {/* Header */}
+        <div className="mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="grid size-11 place-items-center rounded-[14px] bg-gradient-to-br from-violet-600 to-violet-700 shadow-[0_4px_14px_rgba(124,58,237,0.3)]">
+              <RotateCcw size={22} className="text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-extrabold text-[var(--foreground)]">จัดการคำขอคืนเงิน</h2>
+              <p className="text-xs text-muted-foreground">ตรวจสอบและดำเนินการคำขอคืนเงินจากลูกค้า</p>
+            </div>
+          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" onClick={fetchRefundOrders}>
+                <RefreshCw size={20} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>รีเฟรช</TooltipContent>
+          </Tooltip>
+        </div>
 
-      {/* Status Filter Chips */}
-      <Box sx={{ display: 'flex', gap: 1, mb: 2.5, flexWrap: 'wrap' }}>
-        {(['ALL', 'REQUESTED', 'APPROVED', 'COMPLETED', 'REJECTED'] as const).map((status) => {
-          const isActive = filterStatus === status;
-          const info = status === 'ALL'
-            ? { label: 'ทั้งหมด', color: '#a5b4fc', bg: 'rgba(165,180,252,0.15)' }
-            : getRefundStatusInfo(status);
-          return (
-            <Chip
-              key={status}
-              label={`${info.label} (${statusCounts[status]})`}
-              onClick={() => setFilterStatus(status)}
-              sx={{
-                bgcolor: isActive ? info.bg : ADMIN_THEME.glassSoft,
-                color: isActive ? info.color : ADMIN_THEME.muted,
-                border: `1px solid ${isActive ? `${info.color}40` : ADMIN_THEME.border}`,
-                fontWeight: 600,
-                fontSize: '0.78rem',
-                '&:hover': { bgcolor: info.bg },
-              }}
-            />
-          );
-        })}
-      </Box>
-
-      {/* Search */}
-      <Box sx={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 1,
-        px: 2,
-        py: 1,
-        mb: 2.5,
-        borderRadius: '12px',
-        bgcolor: ADMIN_THEME.glassSoft,
-        border: `1px solid ${ADMIN_THEME.border}`,
-      }}>
-        <Search size={18} style={{ color: ADMIN_THEME.muted }} />
-        <input
-          type="text"
-          placeholder="ค้นหาตาม REF, ชื่อลูกค้า..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          style={{
-            flex: 1,
-            background: 'transparent',
-            border: 'none',
-            outline: 'none',
-            color: ADMIN_THEME.text,
-            fontSize: '0.85rem',
-          }}
-        />
-      </Box>
-
-      {/* Content */}
-      {loading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-          <CircularProgress size={36} sx={{ color: '#7c3aed' }} />
-        </Box>
-      ) : filteredOrders.length === 0 ? (
-        <Box sx={{
-          textAlign: 'center',
-          py: 8,
-          bgcolor: ADMIN_THEME.glassSoft,
-          borderRadius: '16px',
-          border: `1px solid ${ADMIN_THEME.border}`,
-        }}>
-          <RotateCcw size={48} style={{ color: ADMIN_THEME.muted, marginBottom: 16 }} />
-          <Typography sx={{ color: ADMIN_THEME.textSecondary, fontSize: '0.95rem' }}>
-            {filterStatus === 'ALL' ? 'ยังไม่มีคำขอคืนเงิน' : 'ไม่พบคำขอในสถานะนี้'}
-          </Typography>
-        </Box>
-      ) : (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-          {filteredOrders.map((order) => {
-            const statusInfo = getRefundStatusInfo(order.refundStatus);
-            const isExpanded = expandedRef === order.ref;
-
+        {/* Status Filter Chips */}
+        <div className="mb-5 flex flex-wrap gap-2">
+          {(['ALL', 'REQUESTED', 'APPROVED', 'COMPLETED', 'REJECTED'] as const).map((status) => {
+            const isActive = filterStatus === status;
+            const info = status === 'ALL'
+              ? { label: 'ทั้งหมด', color: '#a5b4fc', bg: 'rgba(165,180,252,0.15)' }
+              : getRefundStatusInfo(status);
             return (
-              <Box
-                key={order.ref}
-                sx={{
-                  bgcolor: ADMIN_THEME.glass,
-                  border: `1px solid ${ADMIN_THEME.border}`,
-                  borderRadius: '16px',
-                  overflow: 'hidden',
-                  transition: 'all 0.2s ease',
-                  '&:hover': { borderColor: 'rgba(124,58,237,0.3)' },
-                }}
-              >
-                {/* Card Header */}
-                <Box
-                  onClick={() => setExpandedRef(isExpanded ? null : order.ref)}
-                  sx={{
-                    p: 2,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 2,
-                    '&:hover': { bgcolor: ADMIN_THEME.cardHover },
-                  }}
-                >
-                  {/* Status Icon */}
-                  <Box sx={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: '12px',
-                    bgcolor: statusInfo.bg,
-                    display: 'grid',
-                    placeItems: 'center',
-                    flexShrink: 0,
-                    color: statusInfo.color,
-                  }}>
-                    {statusInfo.icon}
-                  </Box>
-
-                  {/* Order Info */}
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.3 }}>
-                      <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: ADMIN_THEME.text }}>
-                        #{order.ref}
-                      </Typography>
-                      <Chip
-                        size="small"
-                        label={statusInfo.label}
-                        sx={{
-                          height: 22,
-                          fontSize: '0.68rem',
-                          fontWeight: 700,
-                          bgcolor: statusInfo.bg,
-                          color: statusInfo.color,
-                          border: `1px solid ${statusInfo.color}30`,
-                        }}
-                      />
-                    </Box>
-                    <Typography sx={{ fontSize: '0.73rem', color: ADMIN_THEME.muted }}>
-                      {order.customerName || order.customerEmail || '-'} • {order.refundReason}
-                    </Typography>
-                  </Box>
-
-                  {/* Amount */}
-                  <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
-                    <Typography sx={{ fontSize: '0.95rem', fontWeight: 800, color: '#f59e0b' }}>
-                      ฿{order.refundAmount?.toLocaleString() || '0'}
-                    </Typography>
-                    <Typography sx={{ fontSize: '0.65rem', color: ADMIN_THEME.muted }}>
-                      จาก ฿{order.total?.toLocaleString() || '0'}
-                    </Typography>
-                  </Box>
-
-                  {/* Expand Icon */}
-                  <Box sx={{ color: ADMIN_THEME.muted }}>
-                    {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                  </Box>
-                </Box>
-
-                {/* Expanded Details */}
-                {isExpanded && (
-                  <Box sx={{
-                    px: 2,
-                    pb: 2,
-                    borderTop: `1px solid ${ADMIN_THEME.border}`,
-                  }}>
-                    {/* Details Grid */}
-                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mt: 2 }}>
-                      {/* Order Info */}
-                      <Box sx={{
-                        p: 2,
-                        borderRadius: '12px',
-                        bgcolor: ADMIN_THEME.glassSoft,
-                        border: `1px solid ${ADMIN_THEME.border}`,
-                      }}>
-                        <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: '#a5b4fc', mb: 1.5, display: 'flex', alignItems: 'center', gap: 0.7 }}>
-                          <Package size={14} /> ข้อมูลออเดอร์
-                        </Typography>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.8 }}>
-                          <DetailRow label="REF" value={order.ref} />
-                          <DetailRow label="สถานะออเดอร์" value={order.status} />
-                          <DetailRow label="ยอดรวม" value={`฿${order.total?.toLocaleString() || '0'}`} />
-                          <DetailRow label="วันที่สั่ง" value={new Date(order.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })} />
-                          <DetailRow label="ลูกค้า" value={order.customerName || order.customerEmail || '-'} />
-                        </Box>
-                        {/* Ordered Items */}
-                        {order.items && order.items.length > 0 && (
-                          <Box sx={{ mt: 1.5 }}>
-                            <Typography sx={{ fontSize: '0.72rem', color: ADMIN_THEME.muted, mb: 0.5 }}>สินค้าที่สั่ง:</Typography>
-                            {order.items.map((item, i) => (
-                              <Typography key={i} sx={{ fontSize: '0.72rem', color: ADMIN_THEME.textSecondary }}>
-                                • {item.name || item.productName || 'สินค้า'} x{item.qty || item.quantity || 1}
-                              </Typography>
-                            ))}
-                          </Box>
-                        )}
-                      </Box>
-
-                      {/* Refund Info */}
-                      <Box sx={{
-                        p: 2,
-                        borderRadius: '12px',
-                        bgcolor: 'rgba(124,58,237,0.04)',
-                        border: `1px solid rgba(124,58,237,0.12)`,
-                      }}>
-                        <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: '#a78bfa', mb: 1.5, display: 'flex', alignItems: 'center', gap: 0.7 }}>
-                          <RotateCcw size={14} /> ข้อมูลคำขอคืนเงิน
-                        </Typography>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.8 }}>
-                          <DetailRow label="เหตุผล" value={order.refundReason} />
-                          {order.refundDetails && <DetailRow label="รายละเอียด" value={order.refundDetails} />}
-                          <DetailRow label="จำนวนเงินคืน" value={`฿${order.refundAmount?.toLocaleString() || '0'}`} highlight />
-                          <DetailRow label="วันที่ขอ" value={new Date(order.refundRequestedAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' })} />
-                          {order.refundReviewedAt && (
-                            <DetailRow label="วันที่ตรวจสอบ" value={new Date(order.refundReviewedAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' })} />
-                          )}
-                          {order.refundAdminNote && <DetailRow label="หมายเหตุแอดมิน" value={order.refundAdminNote} />}
-                        </Box>
-                      </Box>
-
-                      {/* Bank Info */}
-                      <Box sx={{
-                        p: 2,
-                        borderRadius: '12px',
-                        bgcolor: 'rgba(16,185,129,0.04)',
-                        border: `1px solid rgba(16,185,129,0.12)`,
-                        gridColumn: { sm: '1 / -1' },
-                      }}>
-                        <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: '#34d399', mb: 1.5, display: 'flex', alignItems: 'center', gap: 0.7 }}>
-                          <Banknote size={14} /> ข้อมูลบัญชีรับเงิน
-                        </Typography>
-                        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' }, gap: 1 }}>
-                          <DetailRow label="ธนาคาร" value={order.refundBankName} />
-                          <DetailRow label="เลขบัญชี" value={order.refundBankAccount} />
-                          <DetailRow label="ชื่อเจ้าของบัญชี" value={order.refundAccountName} />
-                        </Box>
-                      </Box>
-                    </Box>
-
-                    {/* Action Buttons */}
-                    {order.refundStatus === 'REQUESTED' && (
-                      <Box sx={{ display: 'flex', gap: 1, mt: 2, justifyContent: 'flex-end' }}>
-                        <Button
-                          onClick={() => openActionDialog(order.ref, 'REJECTED')}
-                          sx={{
-                            px: 2.5,
-                            py: 0.8,
-                            borderRadius: '10px',
-                            bgcolor: 'rgba(239,68,68,0.1)',
-                            border: '1px solid rgba(239,68,68,0.3)',
-                            color: '#f87171',
-                            fontSize: '0.8rem',
-                            fontWeight: 600,
-                            textTransform: 'none',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 0.5,
-                            '&:hover': {
-                              bgcolor: 'rgba(239,68,68,0.2)',
-                            },
-                          }}
-                        >
-                          <XCircle size={16} />
-                          ปฏิเสธ
-                        </Button>
-                        <Button
-                          onClick={() => openActionDialog(order.ref, 'APPROVED')}
-                          sx={{
-                            px: 2.5,
-                            py: 0.8,
-                            borderRadius: '10px',
-                            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                            color: 'white',
-                            fontSize: '0.8rem',
-                            fontWeight: 700,
-                            textTransform: 'none',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 0.5,
-                            boxShadow: '0 4px 14px rgba(16,185,129,0.3)',
-                            '&:hover': {
-                              background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
-                            },
-                          }}
-                        >
-                          <CheckCircle size={16} />
-                          อนุมัติ
-                        </Button>
-                      </Box>
-                    )}
-                    {order.refundStatus === 'APPROVED' && (
-                      <Box sx={{ display: 'flex', gap: 1, mt: 2, justifyContent: 'flex-end' }}>
-                        <Alert severity="info" sx={{ flex: 1, fontSize: '0.75rem', py: 0 }}>
-                          อนุมัติแล้ว — กรุณาโอนเงินคืนแล้วกดยืนยัน
-                        </Alert>
-                        <Button
-                          onClick={() => openActionDialog(order.ref, 'COMPLETED')}
-                          sx={{
-                            px: 2.5,
-                            py: 0.8,
-                            borderRadius: '10px',
-                            background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
-                            color: 'white',
-                            fontSize: '0.8rem',
-                            fontWeight: 700,
-                            textTransform: 'none',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 0.5,
-                            boxShadow: '0 4px 14px rgba(124,58,237,0.3)',
-                            '&:hover': {
-                              background: 'linear-gradient(135deg, #6d28d9 0%, #5b21b6 100%)',
-                            },
-                          }}
-                        >
-                          <Banknote size={16} />
-                          ยืนยันโอนเงินแล้ว
-                        </Button>
-                      </Box>
-                    )}
-                  </Box>
+              <button
+                key={status}
+                type="button"
+                onClick={() => setFilterStatus(status)}
+                className={cn(
+                  'rounded-full border px-3 py-1 text-[0.78rem] font-semibold transition-colors',
+                  isActive ? 'border-current' : 'border-[var(--border)] bg-[var(--surface-2)] text-muted-foreground',
                 )}
-              </Box>
+                style={isActive ? { backgroundColor: info.bg, color: info.color, borderColor: `${info.color}40` } : undefined}
+              >
+                {info.label} ({statusCounts[status]})
+              </button>
             );
           })}
-        </Box>
-      )}
+        </div>
 
-      {/* Action Confirmation Dialog */}
-      <Dialog
-        open={actionDialogOpen}
-        onClose={() => !actionLoading && setActionDialogOpen(false)}
-        maxWidth="xs"
-        fullWidth
-        PaperProps={{
-          sx: {
-            bgcolor: ADMIN_THEME.glass,
-            backgroundImage: 'none',
-            borderRadius: '16px',
-            border: `1px solid ${ADMIN_THEME.border}`,
-            backdropFilter: 'blur(20px)',
-          },
-        }}
-      >
-        <DialogTitle sx={{
-          fontWeight: 700,
-          fontSize: '1rem',
-          color: ADMIN_THEME.text,
-          borderBottom: `1px solid ${ADMIN_THEME.border}`,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1,
-        }}>
-          {actionType === 'APPROVED' && <><CheckCircle size={20} style={{ color: '#10b981' }} /> อนุมัติคำขอคืนเงิน</>}
-          {actionType === 'REJECTED' && <><XCircle size={20} style={{ color: '#ef4444' }} /> ปฏิเสธคำขอคืนเงิน</>}
-          {actionType === 'COMPLETED' && <><Banknote size={20} style={{ color: '#7c3aed' }} /> ยืนยันการโอนเงินคืน</>}
-        </DialogTitle>
-        <DialogContent sx={{ pt: '16px !important' }}>
-          <Typography sx={{ fontSize: '0.82rem', color: ADMIN_THEME.textSecondary, mb: 2 }}>
-            {actionType === 'APPROVED' && 'คำขอคืนเงินจะถูกอนุมัติ คุณจะต้องดำเนินการโอนเงินและยืนยันในขั้นตอนถัดไป'}
-            {actionType === 'REJECTED' && 'คำขอคืนเงินจะถูกปฏิเสธ ลูกค้าจะเห็นหมายเหตุที่คุณใส่'}
-            {actionType === 'COMPLETED' && 'ยืนยันว่าได้โอนเงินคืนให้ลูกค้าเรียบร้อยแล้ว สถานะออเดอร์จะเปลี่ยนเป็น REFUNDED'}
-          </Typography>
-          <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, mb: 0.5, color: ADMIN_THEME.text }}>
-            หมายเหตุ {actionType === 'REJECTED' ? '(แนะนำให้ระบุ)' : '(ถ้ามี)'}
-          </Typography>
-          <TextField
-            value={adminNote}
-            onChange={(e) => setAdminNote(e.target.value)}
-            multiline
-            rows={3}
-            fullWidth
-            placeholder={
-              actionType === 'REJECTED' ? 'ระบุเหตุผลที่ปฏิเสธ...' :
-              actionType === 'COMPLETED' ? 'เช่น โอนแล้วเวลา 14:30' :
-              'หมายเหตุเพิ่มเติม...'
-            }
-            sx={{
-              '& .MuiOutlinedInput-root': {
-                borderRadius: '10px',
-                fontSize: '0.85rem',
-                color: ADMIN_THEME.text,
-                bgcolor: ADMIN_THEME.glassSoft,
-                '& fieldset': { borderColor: ADMIN_THEME.border },
-                '&:hover fieldset': { borderColor: 'rgba(124,58,237,0.3)' },
-                '&.Mui-focused fieldset': { borderColor: '#7c3aed' },
-              },
-            }}
+        {/* Search */}
+        <div className="mb-5 flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-2">
+          <Search size={18} className="text-muted-foreground" />
+          <input
+            type="text"
+            placeholder="ค้นหาตาม REF, ชื่อลูกค้า..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="flex-1 border-none bg-transparent text-[0.85rem] text-[var(--foreground)] outline-none"
           />
-        </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2, borderTop: `1px solid ${ADMIN_THEME.border}` }}>
-          <Button
-            onClick={() => setActionDialogOpen(false)}
-            disabled={actionLoading}
-            sx={{ color: ADMIN_THEME.muted, textTransform: 'none', fontWeight: 600 }}
-          >
-            ยกเลิก
-          </Button>
-          <Button
-            onClick={handleAction}
-            disabled={actionLoading}
-            sx={{
-              px: 3,
-              borderRadius: '10px',
-              background: actionType === 'REJECTED'
-                ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
-                : actionType === 'COMPLETED'
-                ? 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)'
-                : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              color: 'white',
-              textTransform: 'none',
-              fontWeight: 700,
-              '&:disabled': {
-                background: 'rgba(100,116,139,0.2)',
-                color: 'rgba(100,116,139,0.5)',
-              },
-            }}
-          >
-            {actionLoading ? (
-              <CircularProgress size={18} sx={{ color: 'white' }} />
-            ) : (
-              actionType === 'APPROVED' ? 'อนุมัติ' :
-              actionType === 'REJECTED' ? 'ปฏิเสธ' :
-              'ยืนยัน'
-            )}
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+        </div>
+
+        {/* Content */}
+        {loading ? (
+          <div className="flex justify-center py-16">
+            <Loader2 className="size-9 animate-spin text-violet-600" />
+          </div>
+        ) : filteredOrders.length === 0 ? (
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] py-16 text-center">
+            <RotateCcw size={48} className="mx-auto mb-4 text-muted-foreground" />
+            <p className="text-[0.95rem] text-muted-foreground">
+              {filterStatus === 'ALL' ? 'ยังไม่มีคำขอคืนเงิน' : 'ไม่พบคำขอในสถานะนี้'}
+            </p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {filteredOrders.map((order) => {
+              const statusInfo = getRefundStatusInfo(order.refundStatus);
+              const isExpanded = expandedRef === order.ref;
+
+              return (
+                <div
+                  key={order.ref}
+                  className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] transition-colors hover:border-violet-500/30"
+                >
+                  <div
+                    onClick={() => setExpandedRef(isExpanded ? null : order.ref)}
+                    className="flex cursor-pointer items-center gap-4 p-4 hover:bg-[var(--surface-2)]"
+                  >
+                    <div
+                      className="grid size-10 shrink-0 place-items-center rounded-xl"
+                      style={{ backgroundColor: statusInfo.bg, color: statusInfo.color }}
+                    >
+                      {statusInfo.icon}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-0.5 flex items-center gap-2">
+                        <span className="text-[0.85rem] font-bold text-[var(--foreground)]">#{order.ref}</span>
+                        <Badge
+                          className="h-[22px] border text-[0.68rem] font-bold"
+                          style={{ backgroundColor: statusInfo.bg, color: statusInfo.color, borderColor: `${statusInfo.color}30` }}
+                        >
+                          {statusInfo.label}
+                        </Badge>
+                      </div>
+                      <p className="text-[0.73rem] text-muted-foreground">
+                        {order.customerName || order.customerEmail || '-'} • {order.refundReason}
+                      </p>
+                    </div>
+
+                    <div className="shrink-0 text-right">
+                      <p className="text-[0.95rem] font-extrabold text-amber-500">
+                        ฿{order.refundAmount?.toLocaleString() || '0'}
+                      </p>
+                      <p className="text-[0.65rem] text-muted-foreground">
+                        จาก ฿{order.total?.toLocaleString() || '0'}
+                      </p>
+                    </div>
+
+                    <div className="text-muted-foreground">
+                      {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                    </div>
+                  </div>
+
+                  {isExpanded && (
+                    <div className="border-t border-[var(--border)] px-4 pb-4">
+                      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-4">
+                          <p className="mb-3 flex items-center gap-1.5 text-[0.78rem] font-bold text-indigo-300">
+                            <Package size={14} /> ข้อมูลออเดอร์
+                          </p>
+                          <div className="flex flex-col gap-2">
+                            <DetailRow label="REF" value={order.ref} />
+                            <DetailRow label="สถานะออเดอร์" value={order.status} />
+                            <DetailRow label="ยอดรวม" value={`฿${order.total?.toLocaleString() || '0'}`} />
+                            <DetailRow label="วันที่สั่ง" value={new Date(order.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })} />
+                            <DetailRow label="ลูกค้า" value={order.customerName || order.customerEmail || '-'} />
+                          </div>
+                          {order.items && order.items.length > 0 && (
+                            <div className="mt-3">
+                              <p className="mb-1 text-[0.72rem] text-muted-foreground">สินค้าที่สั่ง:</p>
+                              {order.items.map((item, i) => (
+                                <p key={i} className="text-[0.72rem] text-muted-foreground">
+                                  • {item.name || item.productName || 'สินค้า'} x{item.qty || item.quantity || 1}
+                                </p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-4">
+                          <p className="mb-3 flex items-center gap-1.5 text-[0.78rem] font-bold text-violet-400">
+                            <RotateCcw size={14} /> ข้อมูลคำขอคืนเงิน
+                          </p>
+                          <div className="flex flex-col gap-2">
+                            <DetailRow label="เหตุผล" value={order.refundReason} />
+                            {order.refundDetails && <DetailRow label="รายละเอียด" value={order.refundDetails} />}
+                            <DetailRow label="จำนวนเงินคืน" value={`฿${order.refundAmount?.toLocaleString() || '0'}`} highlight />
+                            <DetailRow label="วันที่ขอ" value={new Date(order.refundRequestedAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' })} />
+                            {order.refundReviewedAt && (
+                              <DetailRow label="วันที่ตรวจสอบ" value={new Date(order.refundReviewedAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' })} />
+                            )}
+                            {order.refundAdminNote && <DetailRow label="หมายเหตุแอดมิน" value={order.refundAdminNote} />}
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 sm:col-span-2">
+                          <p className="mb-3 flex items-center gap-1.5 text-[0.78rem] font-bold text-emerald-400">
+                            <Banknote size={14} /> ข้อมูลบัญชีรับเงิน
+                          </p>
+                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                            <DetailRow label="ธนาคาร" value={order.refundBankName} />
+                            <DetailRow label="เลขบัญชี" value={order.refundBankAccount} />
+                            <DetailRow label="ชื่อเจ้าของบัญชี" value={order.refundAccountName} />
+                          </div>
+                        </div>
+                      </div>
+
+                      {order.refundStatus === 'REQUESTED' && (
+                        <div className="mt-4 flex justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            onClick={() => openActionDialog(order.ref, 'REJECTED')}
+                            className="border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                          >
+                            <XCircle size={16} className="mr-1" />
+                            ปฏิเสธ
+                          </Button>
+                          <Button
+                            onClick={() => openActionDialog(order.ref, 'APPROVED')}
+                            className="bg-gradient-to-br from-emerald-500 to-emerald-600 font-bold shadow-[0_4px_14px_rgba(16,185,129,0.3)]"
+                          >
+                            <CheckCircle size={16} className="mr-1" />
+                            อนุมัติ
+                          </Button>
+                        </div>
+                      )}
+                      {order.refundStatus === 'APPROVED' && (
+                        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+                          <Alert className="flex-1 border-blue-500/20 bg-blue-500/10 py-2">
+                            <Info className="size-4" />
+                            <AlertDescription className="text-[0.75rem]">
+                              อนุมัติแล้ว — กรุณาโอนเงินคืนแล้วกดยืนยัน
+                            </AlertDescription>
+                          </Alert>
+                          <Button
+                            onClick={() => openActionDialog(order.ref, 'COMPLETED')}
+                            className="bg-gradient-to-br from-violet-600 to-violet-700 font-bold shadow-[0_4px_14px_rgba(124,58,237,0.3)]"
+                          >
+                            <Banknote size={16} className="mr-1" />
+                            ยืนยันโอนเงินแล้ว
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Action Confirmation Dialog */}
+        <Dialog open={actionDialogOpen} onOpenChange={(open) => !actionLoading && setActionDialogOpen(open)}>
+          <DialogContent className="max-w-xs rounded-2xl border-[var(--border)] bg-[var(--card)] backdrop-blur-xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-base">
+                {actionType === 'APPROVED' && <><CheckCircle size={20} className="text-emerald-500" /> อนุมัติคำขอคืนเงิน</>}
+                {actionType === 'REJECTED' && <><XCircle size={20} className="text-red-500" /> ปฏิเสธคำขอคืนเงิน</>}
+                {actionType === 'COMPLETED' && <><Banknote size={20} className="text-violet-500" /> ยืนยันการโอนเงินคืน</>}
+              </DialogTitle>
+              <DialogDescription className="text-[0.82rem]">
+                {actionType === 'APPROVED' && 'คำขอคืนเงินจะถูกอนุมัติ คุณจะต้องดำเนินการโอนเงินและยืนยันในขั้นตอนถัดไป'}
+                {actionType === 'REJECTED' && 'คำขอคืนเงินจะถูกปฏิเสธ ลูกค้าจะเห็นหมายเหตุที่คุณใส่'}
+                {actionType === 'COMPLETED' && 'ยืนยันว่าได้โอนเงินคืนให้ลูกค้าเรียบร้อยแล้ว สถานะออเดอร์จะเปลี่ยนเป็น REFUNDED'}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2">
+              <Label className="text-[0.78rem] font-semibold">
+                หมายเหตุ {actionType === 'REJECTED' ? '(แนะนำให้ระบุ)' : '(ถ้ามี)'}
+              </Label>
+              <Textarea
+                value={adminNote}
+                onChange={(e) => setAdminNote(e.target.value)}
+                rows={3}
+                placeholder={
+                  actionType === 'REJECTED' ? 'ระบุเหตุผลที่ปฏิเสธ...' :
+                  actionType === 'COMPLETED' ? 'เช่น โอนแล้วเวลา 14:30' :
+                  'หมายเหตุเพิ่มเติม...'
+                }
+                className="rounded-[10px] bg-[var(--surface-2)] text-[0.85rem]"
+              />
+            </div>
+            <DialogFooter className="gap-2 border-t border-[var(--border)] pt-4">
+              <Button variant="ghost" onClick={() => setActionDialogOpen(false)} disabled={actionLoading}>
+                ยกเลิก
+              </Button>
+              <Button
+                onClick={handleAction}
+                disabled={actionLoading}
+                className={cn(
+                  'rounded-[10px] px-6 font-bold',
+                  actionType === 'REJECTED' && 'bg-gradient-to-br from-red-500 to-red-600',
+                  actionType === 'COMPLETED' && 'bg-gradient-to-br from-violet-600 to-violet-700',
+                  actionType === 'APPROVED' && 'bg-gradient-to-br from-emerald-500 to-emerald-600',
+                )}
+              >
+                {actionLoading ? (
+                  <Loader2 className="size-[18px] animate-spin" />
+                ) : (
+                  actionType === 'APPROVED' ? 'อนุมัติ' :
+                  actionType === 'REJECTED' ? 'ปฏิเสธ' :
+                  'ยืนยัน'
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </TooltipProvider>
   );
 }
 
 function DetailRow({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
-    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
-      <Typography sx={{ fontSize: '0.72rem', color: ADMIN_THEME.muted, flexShrink: 0 }}>{label}</Typography>
-      <Typography sx={{
-        fontSize: '0.72rem',
-        fontWeight: highlight ? 700 : 500,
-        color: highlight ? ADMIN_THEME.warning : ADMIN_THEME.text,
-        textAlign: 'right',
-        wordBreak: 'break-all',
-      }}>
+    <div className="flex items-start justify-between gap-2">
+      <span className="shrink-0 text-[0.72rem] text-muted-foreground">{label}</span>
+      <span className={cn(
+        'break-all text-right text-[0.72rem]',
+        highlight ? 'font-bold text-amber-500' : 'font-medium text-[var(--foreground)]',
+      )}>
         {value}
-      </Typography>
-    </Box>
+      </span>
+    </div>
   );
 }

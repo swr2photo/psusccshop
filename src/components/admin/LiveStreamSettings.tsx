@@ -4,21 +4,6 @@ import { apiFetch } from '@/lib/api-client';
 import React, { useState, useEffect } from 'react';
 import { invalidateLiveStreamCache } from '@/hooks/useLiveStream';
 import {
-  Box,
-  Typography,
-  TextField,
-  Button,
-  Switch,
-  Card,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-  Chip,
-  CircularProgress,
-  Alert,
-} from '@mui/material';
-import {
   Video,
   Play,
   Square,
@@ -29,9 +14,26 @@ import {
   Settings,
   MonitorPlay,
   Sparkles,
+  Loader2,
+  Info,
 } from 'lucide-react';
 import type { ShopConfig } from '@/lib/config';
-import { ADMIN_THEME, adminInputSx as inputSx, adminSelectSx as selectSx } from '@/lib/adminTheme';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 
 interface LiveStreamSettingsProps {
   config: ShopConfig;
@@ -40,20 +42,11 @@ interface LiveStreamSettingsProps {
   userEmail?: string | null;
 }
 
-const glassCardSx = {
-  background: ADMIN_THEME.glass,
-  backdropFilter: 'blur(20px)',
-  border: `1px solid ${ADMIN_THEME.border}`,
-  borderRadius: '16px',
-  p: 3,
-  mb: 3,
-  color: ADMIN_THEME.text,
-};
+const glassCardClass =
+  'mb-6 rounded-2xl border border-[var(--border)] bg-[var(--card)] p-6 text-[var(--foreground)] backdrop-blur-xl';
 
-// ==================== HELPER ====================
 function getStreamEmbedUrl(url: string, type: string): string {
   if (type === 'youtube') {
-    // Support various YouTube URL formats
     const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|live\/|embed\/))([a-zA-Z0-9_-]+)/);
     if (match) return `https://www.youtube.com/embed/${match[1]}?autoplay=1&mute=1`;
     return url;
@@ -74,7 +67,6 @@ function getStreamTypeLabel(type: string): { label: string; color: string; icon:
   }
 }
 
-// ==================== COMPONENT ====================
 export default function LiveStreamSettings({ config, saveConfig, showToast, userEmail }: LiveStreamSettingsProps) {
   const [live, setLive] = useState({
     enabled: false,
@@ -89,7 +81,6 @@ export default function LiveStreamSettings({ config, saveConfig, showToast, user
   const [saving, setSaving] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
 
-  // Load from config
   useEffect(() => {
     if (config.liveStream) {
       setLive({
@@ -120,11 +111,10 @@ export default function LiveStreamSettings({ config, saveConfig, showToast, user
       });
 
       if (!res.ok) throw new Error('Failed to save');
-      
+
       await invalidateLiveStreamCache();
       showToast('success', live.enabled ? '🔴 เปิดไลฟ์สดแล้ว!' : 'ปิดไลฟ์สดแล้ว');
-      
-      // Also update the parent config
+
       await saveConfig({
         ...config,
         liveStream: {
@@ -145,8 +135,7 @@ export default function LiveStreamSettings({ config, saveConfig, showToast, user
   const handleGoLive = async () => {
     const newState = { ...live, enabled: !live.enabled };
     setLive(newState);
-    
-    // Auto-save when toggling live
+
     setSaving(true);
     try {
       const res = await apiFetch('/api/live', {
@@ -159,7 +148,7 @@ export default function LiveStreamSettings({ config, saveConfig, showToast, user
       showToast(newState.enabled ? 'success' : 'info', newState.enabled ? '🔴 กำลังไลฟ์สด!' : '⏹ หยุดไลฟ์สดแล้ว');
     } catch {
       showToast('error', 'เกิดข้อผิดพลาด');
-      setLive(live); // rollback
+      setLive(live);
     } finally {
       setSaving(false);
     }
@@ -167,343 +156,283 @@ export default function LiveStreamSettings({ config, saveConfig, showToast, user
 
   const streamTypeInfo = getStreamTypeLabel(live.streamType);
 
+  const streamUrlLabel =
+    live.streamType === 'youtube' ? 'YouTube Live URL' :
+    live.streamType === 'facebook' ? 'Facebook Live URL' :
+    live.streamType === 'hls' ? 'HLS Stream URL (.m3u8)' :
+    'Embed URL';
+
+  const streamUrlPlaceholder =
+    live.streamType === 'youtube' ? 'https://www.youtube.com/watch?v=... หรือ https://youtu.be/...' :
+    live.streamType === 'facebook' ? 'https://www.facebook.com/.../videos/...' :
+    live.streamType === 'hls' ? 'https://your-server.com/live/stream.m3u8' :
+    'https://...';
+
   return (
-    <Box sx={{ maxWidth: 900, mx: 'auto' }}>
+    <div className="mx-auto max-w-[900px]">
       {/* Header */}
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Box sx={{
-            width: 48, height: 48, borderRadius: '14px',
-            background: live.enabled ? 'linear-gradient(135deg, #ef4444, #dc2626)' : ADMIN_THEME.glassSoft,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            animation: live.enabled ? 'pulse 2s ease-in-out infinite' : 'none',
-          }}>
-            <Video size={24} color={live.enabled ? '#fff' : '#64748b'} />
-          </Box>
-          <Box>
-            <Typography variant="h5" sx={{ color: ADMIN_THEME.text, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+      <div className="mb-6 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div
+            className={cn(
+              'flex size-12 items-center justify-center rounded-[14px]',
+              live.enabled && 'animate-pulse bg-gradient-to-br from-red-500 to-red-600',
+              !live.enabled && 'bg-[var(--surface-2)]',
+            )}
+          >
+            <Video size={24} className={live.enabled ? 'text-white' : 'text-muted-foreground'} />
+          </div>
+          <div>
+            <h2 className="flex items-center gap-2 text-xl font-bold text-[var(--foreground)]">
               ไลฟ์สด
               {live.enabled && (
-                <Chip
-                  label="LIVE"
-                  size="small"
-                  sx={{
-                    bgcolor: '#ef4444',
-                    color: '#fff',
-                    fontWeight: 700,
-                    fontSize: '0.7rem',
-                    height: 22,
-                    animation: 'pulse 1.5s ease-in-out infinite',
-                    '@keyframes pulse': {
-                      '0%, 100%': { opacity: 1 },
-                      '50%': { opacity: 0.6 },
-                    },
-                  }}
-                />
+                <Badge className="h-[22px] animate-pulse border-0 bg-red-500 text-[0.7rem] font-bold text-white">
+                  LIVE
+                </Badge>
               )}
-            </Typography>
-            <Typography variant="body2" sx={{ color: ADMIN_THEME.textSecondary }}>
+            </h2>
+            <p className="text-sm text-muted-foreground">
               จัดการไลฟ์สดขายของผ่าน OBS หรือ YouTube/Facebook Live
-            </Typography>
-          </Box>
-        </Box>
+            </p>
+          </div>
+        </div>
 
-        {/* GO LIVE button */}
         <Button
-          variant="contained"
           onClick={handleGoLive}
           disabled={saving || (!live.enabled && !live.streamUrl.trim())}
-          startIcon={live.enabled ? <Square size={16} /> : <Radio size={16} />}
-          sx={{
-            borderRadius: '14px',
-            px: 3,
-            py: 1.5,
-            fontWeight: 700,
-            fontSize: '0.9rem',
-            background: live.enabled
-              ? 'linear-gradient(135deg, #64748b, #475569)'
-              : 'linear-gradient(135deg, #ef4444, #dc2626)',
-            '&:hover': {
-              background: live.enabled
-                ? 'linear-gradient(135deg, #475569, #334155)'
-                : 'linear-gradient(135deg, #dc2626, #b91c1c)',
-            },
-            textTransform: 'none',
-          }}
+          className={cn(
+            'rounded-[14px] px-6 py-3 text-[0.9rem] font-bold',
+            live.enabled
+              ? 'bg-gradient-to-br from-slate-500 to-slate-600 hover:from-slate-600 hover:to-slate-700'
+              : 'bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700',
+          )}
         >
-          {saving ? <CircularProgress size={18} sx={{ color: '#fff' }} /> : live.enabled ? 'หยุดไลฟ์' : 'เริ่มไลฟ์สด'}
+          {saving ? (
+            <Loader2 className="size-[18px] animate-spin" />
+          ) : (
+            <>
+              {live.enabled ? <Square className="mr-2 size-4" /> : <Radio className="mr-2 size-4" />}
+              {live.enabled ? 'หยุดไลฟ์' : 'เริ่มไลฟ์สด'}
+            </>
+          )}
         </Button>
-      </Box>
+      </div>
 
       {/* Stream Configuration */}
-      <Card sx={glassCardSx}>
-        <Typography variant="subtitle1" sx={{ color: ADMIN_THEME.text, fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Settings size={18} /> ตั้งค่าสตรีม
-        </Typography>
-
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-          {/* Stream Type */}
-          <FormControl fullWidth size="small">
-            <InputLabel sx={{ color: ADMIN_THEME.textSecondary }}>ประเภทสตรีม</InputLabel>
+      <Card className={glassCardClass}>
+        <CardHeader className="p-0 pb-4">
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <Settings size={18} /> ตั้งค่าสตรีม
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-5 p-0">
+          <div className="space-y-2">
+            <Label>ประเภทสตรีม</Label>
             <Select
               value={live.streamType}
-              onChange={(e) => setLive({ ...live, streamType: e.target.value as typeof live.streamType })}
-              label="ประเภทสตรีม"
-              sx={selectSx}
+              onValueChange={(value) => setLive({ ...live, streamType: value as typeof live.streamType })}
             >
-              <MenuItem value="youtube">
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Play size={16} color="#ff0000" /> YouTube Live
-                </Box>
-              </MenuItem>
-              <MenuItem value="facebook">
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Video size={16} color="#1877f2" /> Facebook Live
-                </Box>
-              </MenuItem>
-              <MenuItem value="hls">
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <MonitorPlay size={16} color="#10b981" /> HLS Stream (OBS → RTMP Server)
-                </Box>
-              </MenuItem>
-              <MenuItem value="custom">
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Link size={16} color="#8b5cf6" /> Custom Embed URL
-                </Box>
-              </MenuItem>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="youtube">
+                  <span className="flex items-center gap-2">
+                    <Play size={16} color="#ff0000" /> YouTube Live
+                  </span>
+                </SelectItem>
+                <SelectItem value="facebook">
+                  <span className="flex items-center gap-2">
+                    <Video size={16} color="#1877f2" /> Facebook Live
+                  </span>
+                </SelectItem>
+                <SelectItem value="hls">
+                  <span className="flex items-center gap-2">
+                    <MonitorPlay size={16} color="#10b981" /> HLS Stream (OBS → RTMP Server)
+                  </span>
+                </SelectItem>
+                <SelectItem value="custom">
+                  <span className="flex items-center gap-2">
+                    <Link size={16} color="#8b5cf6" /> Custom Embed URL
+                  </span>
+                </SelectItem>
+              </SelectContent>
             </Select>
-          </FormControl>
+          </div>
 
-          {/* Stream URL */}
-          <TextField
-            fullWidth
-            size="small"
-            label={
-              live.streamType === 'youtube' ? 'YouTube Live URL' :
-              live.streamType === 'facebook' ? 'Facebook Live URL' :
-              live.streamType === 'hls' ? 'HLS Stream URL (.m3u8)' :
-              'Embed URL'
-            }
-            placeholder={
-              live.streamType === 'youtube' ? 'https://www.youtube.com/watch?v=... หรือ https://youtu.be/...' :
-              live.streamType === 'facebook' ? 'https://www.facebook.com/.../videos/...' :
-              live.streamType === 'hls' ? 'https://your-server.com/live/stream.m3u8' :
-              'https://...'
-            }
-            value={live.streamUrl}
-            onChange={(e) => setLive({ ...live, streamUrl: e.target.value })}
-            sx={inputSx}
-          />
+          <div className="space-y-2">
+            <Label htmlFor="stream-url">{streamUrlLabel}</Label>
+            <Input
+              id="stream-url"
+              placeholder={streamUrlPlaceholder}
+              value={live.streamUrl}
+              onChange={(e) => setLive({ ...live, streamUrl: e.target.value })}
+            />
+          </div>
 
-          {/* OBS Instructions */}
           {live.streamType === 'hls' && (
-            <Alert severity="info" sx={{ 
-              borderRadius: '12px', 
-              bgcolor: 'rgba(59,130,246,0.1)', 
-              color: '#93c5fd',
-              '& .MuiAlert-icon': { color: '#60a5fa' },
-            }}>
-              <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>วิธีใช้ OBS → HLS:</Typography>
-              <Typography variant="caption" component="div">
-                1. ตั้ง RTMP Server (เช่น nginx-rtmp หรือ Cloudflare Stream)<br/>
-                2. ใน OBS → Settings → Stream → Service: Custom → Server: rtmp://your-server/live<br/>
-                3. ใส่ Stream Key<br/>
+            <Alert className="rounded-xl border-blue-500/20 bg-blue-500/10 text-blue-300">
+              <Info className="text-blue-400" />
+              <AlertTitle className="font-semibold text-blue-300">วิธีใช้ OBS → HLS:</AlertTitle>
+              <AlertDescription className="text-xs text-blue-300/90">
+                1. ตั้ง RTMP Server (เช่น nginx-rtmp หรือ Cloudflare Stream)<br />
+                2. ใน OBS → Settings → Stream → Service: Custom → Server: rtmp://your-server/live<br />
+                3. ใส่ Stream Key<br />
                 4. ใส่ HLS URL ที่ได้จาก server ในช่องด้านบน
-              </Typography>
+              </AlertDescription>
             </Alert>
           )}
 
           {live.streamType === 'youtube' && (
-            <Alert severity="info" sx={{ 
-              borderRadius: '12px', 
-              bgcolor: 'rgba(239,68,68,0.1)', 
-              color: '#fca5a5',
-              '& .MuiAlert-icon': { color: '#f87171' },
-            }}>
-              <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>วิธีใช้ OBS → YouTube Live:</Typography>
-              <Typography variant="caption" component="div">
-                1. ไปที่ YouTube Studio → Go Live → Stream<br/>
-                2. คัดลอก Stream Key ไปใส่ใน OBS → Settings → Stream → YouTube<br/>
-                3. เริ่มสตรีมใน OBS แล้วคัดลอก Live URL มาใส่ในช่องด้านบน<br/>
+            <Alert className="rounded-xl border-red-500/20 bg-red-500/10 text-red-300">
+              <Info className="text-red-400" />
+              <AlertTitle className="font-semibold text-red-300">วิธีใช้ OBS → YouTube Live:</AlertTitle>
+              <AlertDescription className="text-xs text-red-300/90">
+                1. ไปที่ YouTube Studio → Go Live → Stream<br />
+                2. คัดลอก Stream Key ไปใส่ใน OBS → Settings → Stream → YouTube<br />
+                3. เริ่มสตรีมใน OBS แล้วคัดลอก Live URL มาใส่ในช่องด้านบน<br />
                 4. รองรับ: youtube.com/watch?v=xxx, youtu.be/xxx, youtube.com/live/xxx
-              </Typography>
+              </AlertDescription>
             </Alert>
           )}
 
-          {/* Title & Description */}
-          <TextField
-            fullWidth
-            size="small"
-            label="ชื่อไลฟ์"
-            placeholder="ไลฟ์สดขายของ SCC SHOP"
-            value={live.title}
-            onChange={(e) => setLive({ ...live, title: e.target.value })}
-            sx={inputSx}
-          />
+          <div className="space-y-2">
+            <Label htmlFor="live-title">ชื่อไลฟ์</Label>
+            <Input
+              id="live-title"
+              placeholder="ไลฟ์สดขายของ SCC SHOP"
+              value={live.title}
+              onChange={(e) => setLive({ ...live, title: e.target.value })}
+            />
+          </div>
 
-          <TextField
-            fullWidth
-            size="small"
-            label="คำอธิบาย (ไม่บังคับ)"
-            placeholder="ไลฟ์สดขายเสื้อรุ่นใหม่ ลดราคาพิเศษ!"
-            value={live.description}
-            onChange={(e) => setLive({ ...live, description: e.target.value })}
-            multiline
-            rows={2}
-            sx={inputSx}
-          />
+          <div className="space-y-2">
+            <Label htmlFor="live-description">คำอธิบาย (ไม่บังคับ)</Label>
+            <Textarea
+              id="live-description"
+              placeholder="ไลฟ์สดขายเสื้อรุ่นใหม่ ลดราคาพิเศษ!"
+              value={live.description}
+              onChange={(e) => setLive({ ...live, description: e.target.value })}
+              rows={2}
+            />
+          </div>
 
-          <TextField
-            fullWidth
-            size="small"
-            label="Thumbnail URL (ไม่บังคับ)"
-            placeholder="https://..."
-            value={live.thumbnailUrl}
-            onChange={(e) => setLive({ ...live, thumbnailUrl: e.target.value })}
-            sx={inputSx}
-          />
-        </Box>
+          <div className="space-y-2">
+            <Label htmlFor="thumbnail-url">Thumbnail URL (ไม่บังคับ)</Label>
+            <Input
+              id="thumbnail-url"
+              placeholder="https://..."
+              value={live.thumbnailUrl}
+              onChange={(e) => setLive({ ...live, thumbnailUrl: e.target.value })}
+            />
+          </div>
+        </CardContent>
       </Card>
 
       {/* Options */}
-      <Card sx={glassCardSx}>
-        <Typography variant="subtitle1" sx={{ color: ADMIN_THEME.text, fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Sparkles size={18} /> ตัวเลือก
-        </Typography>
-
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-          <Box>
-            <Typography variant="body2" sx={{ color: ADMIN_THEME.text, fontWeight: 500 }}>แสดง Popup อัตโนมัติ</Typography>
-            <Typography variant="caption" sx={{ color: ADMIN_THEME.muted }}>
+      <Card className={glassCardClass}>
+        <CardHeader className="p-0 pb-4">
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <Sparkles size={18} /> ตัวเลือก
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center justify-between p-0">
+          <div>
+            <p className="text-sm font-medium text-[var(--foreground)]">แสดง Popup อัตโนมัติ</p>
+            <p className="text-xs text-muted-foreground">
               แสดงหน้าต่างไลฟ์สดอัตโนมัติเมื่อผู้ใช้เข้าเว็บ
-            </Typography>
-          </Box>
+            </p>
+          </div>
           <Switch
             checked={live.autoPopup}
-            onChange={(e) => setLive({ ...live, autoPopup: e.target.checked })}
-            sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: '#6366f1' }, '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#6366f1' } }}
+            onCheckedChange={(checked) => setLive({ ...live, autoPopup: checked })}
           />
-        </Box>
+        </CardContent>
       </Card>
 
       {/* Preview */}
       {live.streamUrl && (
-        <Card sx={glassCardSx}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-            <Typography variant="subtitle1" sx={{ color: ADMIN_THEME.text, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Card className={glassCardClass}>
+          <div className="mb-4 flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
               <Eye size={18} /> ตัวอย่าง
-            </Typography>
+            </CardTitle>
             <Button
-              size="small"
+              variant="ghost"
+              size="sm"
               onClick={() => setShowPreview(!showPreview)}
-              sx={{ color: '#6366f1', textTransform: 'none', borderRadius: '10px' }}
+              className="rounded-[10px] text-indigo-500"
             >
               {showPreview ? 'ซ่อน' : 'แสดงตัวอย่าง'}
             </Button>
-          </Box>
+          </div>
 
           {showPreview && (
-            <Box sx={{ 
-              borderRadius: '12px', 
-              overflow: 'hidden', 
-              bgcolor: '#000',
-              aspectRatio: '16/9',
-              position: 'relative',
-            }}>
+            <div className="relative aspect-video overflow-hidden rounded-xl bg-black">
               {live.streamType === 'youtube' || live.streamType === 'facebook' ? (
                 <iframe
                   src={getStreamEmbedUrl(live.streamUrl, live.streamType)}
-                  style={{ width: '100%', height: '100%', border: 'none', position: 'absolute', inset: 0 }}
+                  className="absolute inset-0 size-full border-0"
                   allow="autoplay; encrypted-media; picture-in-picture"
                   allowFullScreen
                 />
               ) : live.streamType === 'hls' ? (
-                <Box sx={{ 
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                  height: '100%', color: ADMIN_THEME.textSecondary,
-                  flexDirection: 'column', gap: 1,
-                }}>
+                <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
                   <MonitorPlay size={48} />
-                  <Typography variant="body2">HLS Stream จะแสดงเมื่อเปิดไลฟ์จริง</Typography>
-                  <Typography variant="caption" sx={{ color: ADMIN_THEME.muted }}>
-                    {live.streamUrl}
-                  </Typography>
-                </Box>
+                  <p className="text-sm">HLS Stream จะแสดงเมื่อเปิดไลฟ์จริง</p>
+                  <p className="text-xs text-muted-foreground">{live.streamUrl}</p>
+                </div>
               ) : (
                 <iframe
                   src={live.streamUrl}
-                  style={{ width: '100%', height: '100%', border: 'none', position: 'absolute', inset: 0 }}
+                  className="absolute inset-0 size-full border-0"
                   allow="autoplay; encrypted-media"
                   allowFullScreen
                 />
               )}
 
-              {/* Live badge overlay */}
-              <Box sx={{
-                position: 'absolute',
-                top: 12,
-                left: 12,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1,
-              }}>
-                <Chip
-                  icon={<Box component="span" sx={{ display: 'flex', alignItems: 'center' }}>{streamTypeInfo.icon}</Box>}
-                  label={streamTypeInfo.label}
-                  size="small"
-                  sx={{
-                    bgcolor: `${streamTypeInfo.color}cc`,
-                    color: '#fff',
-                    fontWeight: 600,
-                    fontSize: '0.7rem',
-                    height: 24,
-                    '& .MuiChip-icon': { color: '#fff' },
-                  }}
-                />
-              </Box>
-            </Box>
+              <div className="absolute left-3 top-3 flex items-center gap-2">
+                <Badge
+                  className="h-6 gap-1 border-0 text-[0.7rem] font-semibold text-white"
+                  style={{ backgroundColor: `${streamTypeInfo.color}cc` }}
+                >
+                  {streamTypeInfo.icon}
+                  {streamTypeInfo.label}
+                </Badge>
+              </div>
+            </div>
           )}
         </Card>
       )}
 
       {/* Status Info */}
       {config.liveStream?.startedAt && config.liveStream?.enabled && (
-        <Card sx={{ ...glassCardSx, border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.05)' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Radio size={18} color="#ef4444" />
-            <Box>
-              <Typography variant="body2" sx={{ color: '#fca5a5', fontWeight: 600 }}>
-                กำลังไลฟ์สดอยู่
-              </Typography>
-              <Typography variant="caption" sx={{ color: ADMIN_THEME.muted, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <Clock size={12} /> เริ่มเมื่อ {new Date(config.liveStream.startedAt).toLocaleString('th-TH')}
+        <Card className={cn(glassCardClass, 'border-red-500/30 bg-red-500/5')}>
+          <div className="flex items-center gap-3">
+            <Radio size={18} className="text-red-500" />
+            <div>
+              <p className="text-sm font-semibold text-red-300">กำลังไลฟ์สดอยู่</p>
+              <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Clock size={12} />
+                เริ่มเมื่อ {new Date(config.liveStream.startedAt).toLocaleString('th-TH')}
                 {config.liveStream.updatedBy && ` • โดย ${config.liveStream.updatedBy}`}
-              </Typography>
-            </Box>
-          </Box>
+              </p>
+            </div>
+          </div>
         </Card>
       )}
 
       {/* Save Button */}
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+      <div className="mt-2 flex justify-end">
         <Button
-          variant="contained"
           onClick={handleSave}
           disabled={saving}
-          sx={{
-            borderRadius: '14px',
-            px: 4,
-            py: 1.5,
-            fontWeight: 600,
-            background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-            '&:hover': { background: 'linear-gradient(135deg, #4f46e5, #7c3aed)' },
-            textTransform: 'none',
-          }}
+          className="rounded-[14px] bg-gradient-to-br from-indigo-500 to-violet-500 px-8 py-3 font-semibold hover:from-indigo-600 hover:to-violet-600"
         >
-          {saving ? <CircularProgress size={18} sx={{ color: '#fff', mr: 1 }} /> : null}
+          {saving && <Loader2 className="mr-2 size-[18px] animate-spin" />}
           บันทึกการตั้งค่า
         </Button>
-      </Box>
-    </Box>
+      </div>
+    </div>
   );
 }

@@ -1,10 +1,12 @@
 'use client';
 
 import React from 'react';
-import { Box, Typography, TextField, Switch } from '@mui/material';
 import { Users, Shirt } from 'lucide-react';
 import type { ShirtNameConfig } from '@/lib/config';
-import { ADMIN_THEME, adminInputSx as inputSx } from '@/lib/adminTheme';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { cn } from '@/lib/utils';
 
 function ToggleRow({
   label,
@@ -18,22 +20,19 @@ function ToggleRow({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 0.5 }}>
-      <Box>
-        <Typography sx={{ fontSize: '0.9rem', fontWeight: 500, color: ADMIN_THEME.text }}>{label}</Typography>
+    <div className="flex items-center justify-between py-1">
+      <div>
+        <p className="text-[0.9rem] font-medium text-[var(--foreground)]">{label}</p>
         {description && (
-          <Typography sx={{ fontSize: '0.75rem', color: ADMIN_THEME.muted }}>{description}</Typography>
+          <p className="text-xs text-[var(--text-muted)]">{description}</p>
         )}
-      </Box>
+      </div>
       <Switch
         checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        sx={{
-          '& .MuiSwitch-switchBase.Mui-checked': { color: '#10b981' },
-          '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: '#10b981' },
-        }}
+        onCheckedChange={onChange}
+        className="data-[state=checked]:bg-emerald-500"
       />
-    </Box>
+    </div>
   );
 }
 
@@ -47,65 +46,60 @@ export default function ShirtNameConfigFields({ value, onChange, compact }: Shir
   const update = (patch: Partial<ShirtNameConfig>) => onChange({ ...value, ...patch });
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: compact ? 1.5 : 2 }}>
-      <Box sx={{ display: 'flex', gap: 1.5 }}>
-        <TextField
-          type="number"
-          label="ความยาวขั้นต่ำ"
-          value={value.minLength}
-          onChange={(e) => update({ minLength: Math.max(1, Number(e.target.value) || 1) })}
-          inputProps={{ min: 1, max: 50 }}
-          size="small"
-          sx={{ flex: 1, ...inputSx }}
-        />
-        <TextField
-          type="number"
-          label="ความยาวสูงสุด"
-          value={value.maxLength}
-          onChange={(e) => update({ maxLength: Math.max(value.minLength, Number(e.target.value) || 7) })}
-          inputProps={{ min: value.minLength, max: 50 }}
-          size="small"
-          sx={{ flex: 1, ...inputSx }}
-        />
-      </Box>
+    <div className={cn('flex flex-col', compact ? 'gap-3' : 'gap-4')}>
+      <div className="flex gap-3">
+        <div className="flex-1 space-y-1.5">
+          <Label htmlFor="shirt-min-length">ความยาวขั้นต่ำ</Label>
+          <Input
+            id="shirt-min-length"
+            type="number"
+            value={value.minLength}
+            onChange={(e) => update({ minLength: Math.max(1, Number(e.target.value) || 1) })}
+            min={1}
+            max={50}
+          />
+        </div>
+        <div className="flex-1 space-y-1.5">
+          <Label htmlFor="shirt-max-length">ความยาวสูงสุด</Label>
+          <Input
+            id="shirt-max-length"
+            type="number"
+            value={value.maxLength}
+            onChange={(e) => update({ maxLength: Math.max(value.minLength, Number(e.target.value) || 7) })}
+            min={value.minLength}
+            max={50}
+          />
+        </div>
+      </div>
 
-      <Box sx={{
-        p: 1.5,
-        borderRadius: '10px',
-        bgcolor: 'rgba(99,102,241,0.08)',
-        border: '1px solid rgba(99,102,241,0.2)',
-      }}>
-        <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#818cf8', mb: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+      <div className="rounded-[10px] border border-indigo-500/20 bg-indigo-500/[0.08] p-3">
+        <p className="mb-2 flex items-center gap-1 text-[0.8rem] font-bold text-indigo-400">
           <Users size={14} /> ภาษาที่อนุญาต
-        </Typography>
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+        </p>
+        <div className="flex flex-wrap gap-2">
           {[
             { key: 'allowThai' as const, label: 'ภาษาไทย', color: '#0071e3' },
             { key: 'allowEnglish' as const, label: 'English', color: '#10b981' },
           ].map((lang) => (
-            <Box
+            <button
               key={lang.key}
+              type="button"
               onClick={() => {
                 if (value[lang.key] && !(lang.key === 'allowThai' ? value.allowEnglish : value.allowThai)) return;
                 update({ [lang.key]: !value[lang.key] });
               }}
-              sx={{
-                px: 1.5,
-                py: 0.75,
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontSize: '0.8rem',
-                fontWeight: 600,
-                bgcolor: value[lang.key] ? `${lang.color}15` : ADMIN_THEME.glassSoft,
-                color: value[lang.key] ? lang.color : ADMIN_THEME.muted,
-                border: `1.5px solid ${value[lang.key] ? lang.color : ADMIN_THEME.border}`,
+              className="cursor-pointer rounded-lg border-[1.5px] px-3 py-1.5 text-[0.8rem] font-semibold transition-all"
+              style={{
+                backgroundColor: value[lang.key] ? `${lang.color}15` : 'var(--surface-2)',
+                color: value[lang.key] ? lang.color : 'var(--text-muted)',
+                borderColor: value[lang.key] ? lang.color : 'var(--glass-border)',
               }}
             >
               {lang.label}
-            </Box>
+            </button>
           ))}
-        </Box>
-      </Box>
+        </div>
+      </div>
 
       <ToggleRow
         label="แปลงเป็นตัวพิมพ์ใหญ่อัตโนมัติ"
@@ -122,35 +116,30 @@ export default function ShirtNameConfigFields({ value, onChange, compact }: Shir
       />
 
       {value.allowSpecialChars && (
-        <TextField
-          label="อักษรพิเศษที่อนุญาต"
-          value={value.allowedSpecialChars}
-          onChange={(e) => update({ allowedSpecialChars: e.target.value })}
-          placeholder=".-"
-          size="small"
-          fullWidth
-          sx={inputSx}
-        />
+        <div className="space-y-1.5">
+          <Label htmlFor="shirt-special-chars">อักษรพิเศษที่อนุญาต</Label>
+          <Input
+            id="shirt-special-chars"
+            value={value.allowedSpecialChars}
+            onChange={(e) => update({ allowedSpecialChars: e.target.value })}
+            placeholder=".-"
+          />
+        </div>
       )}
 
-      <Box sx={{
-        p: 1.25,
-        borderRadius: '10px',
-        bgcolor: 'rgba(16,185,129,0.08)',
-        border: '1px solid rgba(16,185,129,0.2)',
-      }}>
-        <Typography sx={{ fontSize: '0.72rem', color: '#10b981', fontWeight: 600, mb: 0.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+      <div className="rounded-[10px] border border-emerald-500/20 bg-emerald-500/[0.08] p-2.5">
+        <p className="mb-1 flex items-center gap-1 text-[0.72rem] font-semibold text-emerald-500">
           <Shirt size={13} /> ตัวอย่างที่ใช้ได้
-        </Typography>
-        <Typography sx={{ fontSize: '0.78rem', color: ADMIN_THEME.muted }}>
+        </p>
+        <p className="text-[0.78rem] text-[var(--text-muted)]">
           {[
             value.allowEnglish && (value.autoUppercase ? 'JOHN' : 'John'),
             value.allowThai && 'สมชาย',
             value.allowSpecialChars && (value.allowEnglish ? `O${value.allowedSpecialChars[0] || '.'}BRIEN` : `สม${value.allowedSpecialChars[0] || '.'}ชาย`),
           ].filter(Boolean).join(' / ')}
           {` (${value.minLength}-${value.maxLength} ตัว)`}
-        </Typography>
-      </Box>
-    </Box>
+        </p>
+      </div>
+    </div>
   );
 }
