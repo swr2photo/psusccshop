@@ -166,10 +166,11 @@ export async function POST(req: NextRequest) {
         'COMPLETED': 'เสร็จสิ้น',
         'CANCELLED': 'ยกเลิก',
       };
+      const details = `เปลี่ยนสถานะ ${ref}: ${previousStatus} → ${status} (${statusLabels[status] || status})`;
       await saveUserLogServer({
         email: authResult.email,
         action: 'admin_change_status',
-        details: `เปลี่ยนสถานะ ${ref}: ${previousStatus} → ${status} (${statusLabels[status] || status})`,
+        details,
         metadata: {
           ref,
           previousStatus,
@@ -177,10 +178,39 @@ export async function POST(req: NextRequest) {
           cancelReason: body.cancelReason,
           trackingNumber: body.trackingNumber,
           sendEmail,
+          subjectEmail: order?.customerEmail,
         },
         ip: clientIP,
         userAgent,
       });
+      const { writeAuditTrail, writeUserActivityLog } = await import('@/lib/audit');
+      await writeAuditTrail({
+        entityType: 'order',
+        entityId: ref,
+        action: 'admin_change_status',
+        performedBy: authResult.email,
+        changes: {
+          before: { status: previousStatus },
+          after: { status, trackingNumber: body.trackingNumber, cancelReason: body.cancelReason },
+          subjectEmail: order?.customerEmail,
+          summary: details,
+        },
+        request: req,
+      });
+      if (order?.customerEmail) {
+        await writeUserActivityLog({
+          email: order.customerEmail,
+          action: 'admin_change_status',
+          details,
+          metadata: {
+            adminEmail: authResult.email,
+            ref,
+            previousStatus,
+            newStatus: status,
+          },
+          request: req,
+        });
+      }
     }
     // Auto sync to Google Sheets
     triggerSheetSync().catch(() => {});

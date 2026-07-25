@@ -444,6 +444,11 @@ interface PublicOrder {
   discount?: number;
   notes?: string;
   verifiedAt?: string;
+  paymentVerified?: boolean;
+  paymentVerifiedAt?: string;
+  receiptIssuedAt?: string;
+  paymentGateway?: string;
+  refundStatus?: string | null;
   hasSlip?: boolean;
   // Tracking info for shipped orders
   trackingNumber?: string;
@@ -493,8 +498,13 @@ export function sanitizeOrderForUser(order: any): PublicOrder | null {
     baseAmount: order.baseAmount,
     discount: order.discount,
     notes: order.notes,
-    verifiedAt: order.verifiedAt,
-    hasSlip: !!(order.slip && order.slip.base64),
+    verifiedAt: order.verifiedAt || order.paymentVerifiedAt,
+    paymentVerified: order.paymentVerified === true || order.payment_verified === true,
+    paymentVerifiedAt: order.paymentVerifiedAt || order.payment_verified_at || order.verifiedAt,
+    receiptIssuedAt: order.receiptIssuedAt || order.receipt_issued_at,
+    paymentGateway: order.paymentGateway || order.payment_gateway,
+    refundStatus: order.refundStatus || order.refund_status || null,
+    hasSlip: !!(order.slip && (order.slip.base64 || order.slip.imageUrl)) || !!order.hasSlip,
     // Include tracking info for shipped orders
     trackingNumber: order.trackingNumber,
     shippingProvider: order.shippingProvider,

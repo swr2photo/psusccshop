@@ -5,7 +5,8 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { getRedisClient } from './redis';
 import { db } from './db';
-import { orders, config, carts, profiles, emailLogs, userLogs, dataRequests, keyValueStore, adminPermissions, securityAuditLog } from '../db/schema';
+import { orders, config, carts, profiles, emailLogs, userLogs, dataRequests, keyValueStore, adminPermissions, securityAuditLog, auditTrail } from '../db/schema';
+import { RETENTION_DAYS, retentionCutoff } from '@/lib/retention';
 import { eq, lt, lte, gt, gte, and, desc, inArray, like, or, count } from 'drizzle-orm';
 import { getCached, invalidateCacheKey, CACHE_TTL } from './server-cache';
 import { getConfigValueCached, invalidateConfigCache } from './config-db';
@@ -535,18 +536,12 @@ const USER_LOG_LIST_COLUMNS = {
   name: userLogs.name,
   action: userLogs.action,
   details: userLogs.details,
+  metadata: userLogs.metadata,
   ip: userLogs.ip,
   userAgent: userLogs.userAgent,
 } as const;
 
-const USER_LOG_ACTION_LIST_COLUMNS = {
-  id: userLogs.id,
-  createdAt: userLogs.createdAt,
-  email: userLogs.email,
-  name: userLogs.name,
-  action: userLogs.action,
-  details: userLogs.details,
-} as const;
+const USER_LOG_ACTION_LIST_COLUMNS = USER_LOG_LIST_COLUMNS;
 
 function transformDBOrderListRow(dbOrder: any): any {
   const legacy = transformDBOrderToLegacy({
@@ -577,7 +572,11 @@ function transformDBOrderToLegacy(dbOrder: any): any {
     notes: dbOrder.notes,
     slip: dbOrder.slipData,
     slipData: dbOrder.slipData,
+    paymentVerified: dbOrder.paymentVerified === true,
     paymentVerifiedAt: dbOrder.paymentVerifiedAt,
+    receiptIssuedAt: dbOrder.receiptIssuedAt,
+    paymentStatus: dbOrder.paymentStatus,
+    paymentGateway: dbOrder.paymentGateway,
     paymentMethod: dbOrder.paymentMethod,
     shippingOption: dbOrder.shippingOption,
     trackingNumber: dbOrder.trackingNumber,
@@ -1060,6 +1059,10 @@ export async function updateOrderByRef(ref: string, updates: Partial<any>): Prom
   if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
   if (updates.slipData !== undefined) dbUpdates.slipData = updates.slipData;
   if (updates.paymentVerifiedAt !== undefined) dbUpdates.paymentVerifiedAt = updates.paymentVerifiedAt;
+  if (updates.paymentVerified !== undefined) dbUpdates.paymentVerified = updates.paymentVerified;
+  if (updates.receiptIssuedAt !== undefined) dbUpdates.receiptIssuedAt = updates.receiptIssuedAt;
+  if (updates.paymentStatus !== undefined) dbUpdates.paymentStatus = updates.paymentStatus;
+  if (updates.paymentGateway !== undefined) dbUpdates.paymentGateway = updates.paymentGateway;
   if (updates.paymentMethod !== undefined) dbUpdates.paymentMethod = updates.paymentMethod;
   if (updates.shippingOption !== undefined) dbUpdates.shippingOption = updates.shippingOption;
   if (updates.shippingOptionId !== undefined) dbUpdates.shippingOption = updates.shippingOptionId;
@@ -1227,25 +1230,52 @@ export async function getSecurityAuditLogs(options: {
 }
 
 /**
- * Clean up old data for PDPA compliance
+ * Clean up old data for PDPA / legal retention.
+ * Commerce orders kept 2y; cancelled shorter; activity/security/audit 2y.
+ * @param retentionDays unused legacy arg — kept for call-site compat
  */
-export async function cleanupOldData(retentionDays: number = 365): Promise<{
+export async function cleanupOldData(_retentionDays: number = RETENTION_DAYS.COMMERCE): Promise<{
   deletedOrders: number;
+  deletedCancelledOrders: number;
   deletedLogs: number;
   deletedAudit: number;
+  deletedAuditTrail: number;
 }> {
-  const cutoffDate = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
-  
-  const [ordersResult, logsResult, auditResult] = await Promise.all([
-    db.delete(orders).where(lt(orders.createdAt, cutoffDate)).returning(),
-    db.delete(userLogs).where(lt(userLogs.createdAt, cutoffDate)).returning(),
-    db.delete(securityAuditLog).where(lt(securityAuditLog.createdAt, cutoffDate)).returning(),
+  const commerceCutoff = retentionCutoff(RETENTION_DAYS.COMMERCE);
+  const cancelledCutoff = retentionCutoff(RETENTION_DAYS.CANCELLED_ORDERS);
+  const activityCutoff = retentionCutoff(RETENTION_DAYS.USER_ACTIVITY);
+  const securityCutoff = retentionCutoff(RETENTION_DAYS.SECURITY);
+  const auditTrailCutoff = retentionCutoff(RETENTION_DAYS.AUDIT_TRAIL);
+
+  const [cancelledResult, oldOrdersResult, logsResult, auditResult, trailResult] = await Promise.all([
+    db
+      .delete(orders)
+      .where(and(eq(orders.status, 'CANCELLED'), lt(orders.createdAt, cancelledCutoff)))
+      .returning({ id: orders.id }),
+    db
+      .delete(orders)
+      .where(lt(orders.createdAt, commerceCutoff))
+      .returning({ id: orders.id }),
+    db
+      .delete(userLogs)
+      .where(lt(userLogs.createdAt, activityCutoff))
+      .returning({ id: userLogs.id }),
+    db
+      .delete(securityAuditLog)
+      .where(lt(securityAuditLog.createdAt, securityCutoff))
+      .returning({ id: securityAuditLog.id }),
+    db
+      .delete(auditTrail)
+      .where(lt(auditTrail.createdAt, auditTrailCutoff))
+      .returning({ id: auditTrail.id }),
   ]);
-  
+
   return {
-    deletedOrders: ordersResult.length,
+    deletedOrders: oldOrdersResult.length,
+    deletedCancelledOrders: cancelledResult.length,
     deletedLogs: logsResult.length,
     deletedAudit: auditResult.length,
+    deletedAuditTrail: trailResult.length,
   };
 }
 

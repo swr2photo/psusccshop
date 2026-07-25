@@ -254,6 +254,27 @@ export async function POST(req: NextRequest) {
       })
       .where(eq(ordersSchema.ref, ref));
 
+    const { writeAuditTrail, writeUserActivityLog } = await import('@/lib/audit');
+    await writeUserActivityLog({
+      email: authResult.email,
+      action: 'refund_request',
+      details: `ขอคืนเงินออเดอร์ ${ref} จำนวน ฿${refundAmount}`,
+      metadata: { ref, reason, amount: refundAmount, bankName },
+      request: req,
+    });
+    await writeAuditTrail({
+      entityType: 'refund',
+      entityId: ref,
+      action: 'refund_request',
+      performedBy: authResult.email,
+      changes: {
+        subjectEmail: authResult.email,
+        after: { status: 'REQUESTED', reason, amount: refundAmount, bankName },
+        summary: `ขอคืนเงิน ${ref}`,
+      },
+      request: req,
+    });
+
     return NextResponse.json({
       success: true,
       message: 'ส่งคำขอคืนเงินเรียบร้อยแล้ว รอการตรวจสอบจากแอดมิน',
@@ -316,9 +337,34 @@ export async function PUT(req: NextRequest) {
       .set(updateData)
       .where(eq(ordersSchema.ref, ref));
 
+    const { writeAuditTrail, writeUserActivityLog } = await import('@/lib/audit');
+    const customerEmail = order.customerEmail;
+    const refundDetail = `${action} คืนเงิน ${ref}: ${refundStatus} → ${newRefundStatus}`;
+    await writeAuditTrail({
+      entityType: 'refund',
+      entityId: ref,
+      action: `refund_${action}`,
+      performedBy: authResult.email,
+      changes: {
+        before: { refundStatus },
+        after: { refundStatus: newRefundStatus, orderStatus: newOrderStatus, adminNote },
+        subjectEmail: customerEmail,
+        summary: refundDetail,
+      },
+      request: req,
+    });
+    if (customerEmail) {
+      await writeUserActivityLog({
+        email: customerEmail,
+        action: `refund_${action}`,
+        details: refundDetail,
+        metadata: { adminEmail: authResult.email, ref, adminNote },
+        request: req,
+      });
+    }
+
     if (action === 'complete') triggerSheetSync().catch(() => {});
 
-    const customerEmail = order.customerEmail;
     if (customerEmail) {
       const pushMessages: Record<string, { title: string; body: string }> = {
         approve: { title: 'คำขอคืนเงินได้รับการอนุมัติ', body: `ออเดอร์ ${ref} ได้รับการอนุมัติแล้ว` },

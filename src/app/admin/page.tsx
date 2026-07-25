@@ -2947,6 +2947,18 @@ export default function AdminPage(): JSX.Element {
       });
       return next;
     });
+    // Durable legal audit (fire-and-forget) — replaces localStorage-only history
+    void apiFetch('/api/admin/audit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action,
+        detail,
+        entityType: 'system',
+        entityId: action,
+        metadata: { source: 'admin_ui' },
+      }),
+    }).catch(() => {});
   }, [session?.user?.email]);
 
   // 📥 Progressive admin data — merge each section as it arrives
@@ -7033,10 +7045,47 @@ export default function AdminPage(): JSX.Element {
 
   const LogsView = (): JSX.Element => {
     const [logFilter, setLogFilter] = useState<string>('ALL');
+    const [durableLogs, setDurableLogs] = useState<any[][]>([]);
+
+    useEffect(() => {
+      let cancelled = false;
+      (async () => {
+        try {
+          const res = await apiFetch('/api/admin/audit?limit=200');
+          const data = await res.json();
+          if (cancelled || !data?.logs) return;
+          const mapped = (data.logs as any[]).map((row) => [
+            row.timestamp,
+            row.performedBy || 'system',
+            row.action,
+            row.changes?.summary || `${row.entityType}/${row.entityId}`,
+            row.changes,
+            row.ipAddress,
+          ]);
+          setDurableLogs(mapped);
+        } catch {
+          /* keep session logs */
+        }
+      })();
+      return () => { cancelled = true; };
+    }, []);
+
+    const mergedLogs = (() => {
+      const seen = new Set<string>();
+      const out: any[][] = [];
+      for (const entry of [...durableLogs, ...logs]) {
+        const key = `${entry[0]}|${entry[1]}|${entry[2]}|${entry[3]}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(entry);
+      }
+      out.sort((a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime());
+      return out;
+    })();
 
     const filteredLogs = logFilter === 'ALL'
-      ? logs
-      : logs.filter(log => log[2] === logFilter);
+      ? mergedLogs
+      : mergedLogs.filter(log => log[2] === logFilter);
 
     const getActionTheme = (action: string) => {
       switch (action) {
@@ -7075,7 +7124,7 @@ export default function AdminPage(): JSX.Element {
               ประวัติระบบ
             </Typography>
             <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              {filteredLogs.length}/{logs.length} รายการ
+              {filteredLogs.length}/{mergedLogs.length} รายการ · เก็บถาวรใน audit_trail 2 ปี
             </Typography>
           </Box>
 
@@ -7097,7 +7146,7 @@ export default function AdminPage(): JSX.Element {
               { value: 'SYNC_FILEBASE', label: 'ซิงก์' },
             ].map(filter => {
               const isActive = logFilter === filter.value;
-              const count = filter.value === 'ALL' ? logs.length : logs.filter(l => l[2] === filter.value).length;
+              const count = filter.value === 'ALL' ? mergedLogs.length : mergedLogs.filter(l => l[2] === filter.value).length;
               return (
                 <Box
                   key={filter.value}

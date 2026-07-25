@@ -8,12 +8,19 @@ import { getSessionFromRequest } from '@/lib/session-from-request';
 import { db } from '@/lib/db';
 import { config } from '@/db/schema';
 import { CACHE_TTL } from '@/lib/server-cache';
-import { ShippingConfig, DEFAULT_SHIPPING_CONFIG } from '@/lib/shipping';
+import { ShippingConfig, DEFAULT_SHIPPING_CONFIG, toPublicShippingConfig } from '@/lib/shipping';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const CONFIG_KEY = 'shipping_config';
+
+function publicJson(cfg: ShippingConfig, cacheControl: string) {
+  return NextResponse.json(
+    { success: true, data: toPublicShippingConfig(cfg) },
+    { headers: { 'Cache-Control': cacheControl } },
+  );
+}
 
 // GET - Retrieve shipping options
 export async function GET(request: NextRequest) {
@@ -23,9 +30,7 @@ export async function GET(request: NextRequest) {
       CACHE_TTL.catalog,
     );
 
-    if (!shippingCfg) {
-      return NextResponse.json({ success: true, data: DEFAULT_SHIPPING_CONFIG });
-    }
+    const source = shippingCfg || DEFAULT_SHIPPING_CONFIG;
 
     let isAdminUser = false;
     const session = await getSessionFromRequest(request);
@@ -34,18 +39,11 @@ export async function GET(request: NextRequest) {
     }
 
     if (!isAdminUser) {
-      const publicConfig: ShippingConfig = {
-        ...shippingCfg,
-        options: shippingCfg.options.filter((opt) => opt.enabled),
-      };
-      return NextResponse.json(
-        { success: true, data: publicConfig },
-        { headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' } },
-      );
+      return publicJson(source, 'public, s-maxage=300, stale-while-revalidate=600');
     }
 
     return NextResponse.json(
-      { success: true, data: shippingCfg },
+      { success: true, data: source },
       { headers: { 'Cache-Control': 'private, no-cache' } },
     );
   } catch (error) {
@@ -53,10 +51,8 @@ export async function GET(request: NextRequest) {
       '[API] Get shipping options error, falling back to default:',
       formatDbError(error),
     );
-    return NextResponse.json(
-      { success: true, data: DEFAULT_SHIPPING_CONFIG },
-      { headers: { 'Cache-Control': 'no-store' } },
-    );
+    // Never leak full default (disabled carriers / track123 codes) on error.
+    return publicJson(DEFAULT_SHIPPING_CONFIG, 'no-store');
   }
 }
 

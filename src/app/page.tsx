@@ -10,6 +10,7 @@ import { Palette, MessageCircle as ChatIcon, Send as SendIcon, X as CloseIcon, B
 
 import ShirtChatBot from '@/components/ShirtChatBot';
 import { ProductDetailsDialog } from '@/components/ProductDetailsDialog';
+import MobileBottomNav from '@/components/MobileBottomNav';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -5332,127 +5333,14 @@ export default function HomePage() {
         )}
       </Dialog>
 
-      <Box
-        sx={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.96)' : 'rgba(255,255,255,0.94)',
-          borderTop: (theme) => `1px solid ${theme.palette.divider}`,
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
-          boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 -4px 24px rgba(0,0,0,0.5)' : '0 -2px 16px rgba(0,0,0,0.08)',
-          display: { xs: 'flex', md: 'none' },
-          justifyContent: 'space-around',
-          alignItems: 'flex-end',
-          py: 0.5,
-          px: 0.5,
-          touchAction: 'pan-y',
-          WebkitOverflowScrolling: 'touch',
-          paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))',
-          zIndex: 1100,
-          transform: hideNavBars ? 'translateY(120%)' : 'translateY(0)',
-          opacity: hideNavBars ? 0 : 1,
-          transition: 'transform 0.32s ease, opacity 0.28s ease',
-        }}
-      >
-        {bottomTabs.map((tab) => {
-          const isActive = tab.key === 'chat' ? chatbotOpen : activeTab === tab.key;
-
-          // Center chat button - prominent raised design
-          if (tab.center) {
-            return (
-              <Box
-                key={tab.key}
-                onClick={(e: React.MouseEvent<HTMLElement>) => setChatMenuAnchor(e.currentTarget)}
-                sx={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: 0.2,
-                  cursor: 'pointer',
-                  mt: -2.5,
-                  touchAction: 'manipulation',
-                  WebkitTapHighlightColor: 'transparent',
-                  userSelect: 'none',
-                }}
-              >
-                <Box
-                  sx={{
-                    width: 56,
-                    height: 56,
-                    borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #0071e3 0%, #bf5af2 100%)',
-                    display: 'grid',
-                    placeItems: 'center',
-                    color: 'white',
-                    boxShadow: '0 4px 16px rgba(0,113,227,0.4), 0 0 0 3px rgba(0,113,227,0.1)',
-                    willChange: 'transform',
-                    transition: 'transform 0.15s cubic-bezier(0.2, 0, 0, 1)',
-                    '&:active': {
-                      transform: 'scale(0.92)',
-                    },
-                  }}
-                >
-                  {tab.icon}
-                </Box>
-                <Typography sx={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--primary)', mt: 0.3 }}>
-                  {tab.label}
-                </Typography>
-              </Box>
-            );
-          }
-
-          // Regular nav tabs
-          return (
-            <IconButton
-              key={tab.key}
-              data-tab-key={tab.key}
-              onClick={() => handleTabChange(tab.key)}
-              sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: 0.2,
-                color: (theme) => isActive ? 'var(--primary)' : theme.palette.text.secondary,
-                borderRadius: '14px',
-                px: 1.8,
-                py: 0.6,
-                minWidth: 56,
-                background: (theme) => isActive
-                  ? (theme.palette.mode === 'dark' ? 'rgba(0,113,227,0.12)' : 'rgba(0,113,227,0.08)')
-                  : 'transparent',
-                border: 'none',
-                boxShadow: 'none',
-                transition: 'all 0.2s ease',
-                '&:hover': {
-                  background: (theme) => theme.palette.mode === 'dark' ? 'rgba(0,113,227,0.08)' : 'rgba(0,113,227,0.06)',
-                },
-                touchAction: 'manipulation',
-              }}
-            >
-              <Box sx={{
-                transition: 'transform 0.2s ease',
-                transform: isActive ? 'scale(1.1)' : 'scale(1)',
-              }}>
-                {tab.icon}
-              </Box>
-              <Typography
-                variant="caption"
-                sx={{
-                  fontSize: '0.62rem',
-                  fontWeight: isActive ? 800 : 500,
-                  color: (theme) => isActive ? 'var(--primary)' : theme.palette.text.secondary,
-                  lineHeight: 1.2,
-                }}
-              >
-                {tab.label}
-              </Typography>
-            </IconButton>
-          );
-        })}
-      </Box>
+      <MobileBottomNav
+        tabs={bottomTabs}
+        activeKey={activeTab}
+        chatActive={chatbotOpen}
+        hidden={hideNavBars}
+        onTabClick={handleTabChange}
+        onChatClick={(el) => setChatMenuAnchor(el)}
+      />
 
       {showRefreshDroplet && (
         <Box className="refresh-droplet">

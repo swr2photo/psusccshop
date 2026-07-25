@@ -501,7 +501,7 @@ export async function checkActiveThreats(): Promise<{
 
 // ==================== CLEANUP ====================
 
-export async function cleanupOldLogs(daysToKeep: number = 90): Promise<number> {
+export async function cleanupOldLogs(daysToKeep: number = 730): Promise<number> {
   try {
     const cutoffDate = new Date(Date.now() - daysToKeep * 24 * 60 * 60 * 1000);
     const result = await db.delete(securityAuditLog)

@@ -1166,7 +1166,7 @@ const inventory = {
 const invoice = {
   th: {
     title: 'ใบเสร็จ',
-    download: 'ดาวน์โหลดใบเสร็จ',
+    download: 'ดูใบเสร็จ',
     orderRef: 'เลขที่คำสั่งซื้อ',
     date: 'วันที่',
     customer: 'ลูกค้า',
@@ -1184,7 +1184,7 @@ const invoice = {
   },
   en: {
     title: 'Invoice',
-    download: 'Download Invoice',
+    download: 'View receipt',
     orderRef: 'Order Reference',
     date: 'Date',
     customer: 'Customer',

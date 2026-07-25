@@ -48,7 +48,7 @@ const THEME = {
 // ==================== BILINGUAL CONTENT ====================
 const CONTENT = {
   th: {
-    lastUpdated: '7 กุมภาพันธ์ 2569',
+    lastUpdated: '25 กรกฎาคม 2569',
     version: '3.0',
     backHome: 'กลับหน้าหลัก',
     title: 'นโยบายความเป็นส่วนตัว',
@@ -148,8 +148,9 @@ const CONTENT = {
         { type: 'ข้อความ Support Chat', duration: '1 ปี', note: 'หลังจากปิดการสนทนา' },
         { type: 'ข้อความ AI Chatbot', duration: 'ไม่เก็บในเซิร์ฟเวอร์', note: 'เก็บในเบราว์เซอร์เท่านั้น' },
         { type: 'ข้อมูลการคืนเงิน', duration: '2 ปี นับจากวันดำเนินการ', note: 'ตามข้อกำหนดทางบัญชี' },
-        { type: 'บันทึกกิจกรรมผู้ใช้', duration: '90 วัน', note: 'สำหรับการตรวจสอบ' },
-        { type: 'บันทึกความปลอดภัย', duration: '90 วัน', note: 'สำหรับการตรวจจับภัยคุกคาม' },
+        { type: 'บันทึกกิจกรรมผู้ใช้', duration: '2 ปี', note: 'สำหรับการตรวจสอบและ audit ตามกฏหมาย' },
+        { type: 'บันทึกความปลอดภัย', duration: '2 ปี', note: 'สำหรับการตรวจจับภัยคุกคามและสอบสวน' },
+        { type: 'Audit trail (before/after)', duration: '2 ปี', note: 'บันทึกการแก้ไขออเดอร์ สิทธิ์ การตั้งค่า' },
         { type: 'คุกกี้', duration: '1 ปี', note: 'หรือจนกว่าจะลบออก' },
         { type: 'บันทึกอีเมลที่ส่ง', duration: '1 ปี', note: 'เพื่อการตรวจสอบ' },
       ],
@@ -257,7 +258,7 @@ const CONTENT = {
     copyright: '© 2569 ชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ มหาวิทยาลัยสงขลานครินทร์ สงวนลิขสิทธิ์',
   },
   en: {
-    lastUpdated: 'February 7, 2026',
+    lastUpdated: 'July 25, 2026',
     version: '3.0',
     backHome: 'Back to Home',
     title: 'Privacy Policy',
@@ -357,8 +358,9 @@ const CONTENT = {
         { type: 'Support Chat Messages', duration: '1 year', note: 'After conversation closes' },
         { type: 'AI Chatbot Messages', duration: 'Not stored on server', note: 'Browser-only storage' },
         { type: 'Refund Data', duration: '2 years from processing', note: 'Per accounting requirements' },
-        { type: 'User Activity Logs', duration: '90 days', note: 'For auditing' },
-        { type: 'Security Logs', duration: '90 days', note: 'For threat detection' },
+        { type: 'User Activity Logs', duration: '2 years', note: 'For auditing and legal review' },
+        { type: 'Security Logs', duration: '2 years', note: 'For threat detection and investigation' },
+        { type: 'Audit trail (before/after)', duration: '2 years', note: 'Order, permission, and config changes' },
         { type: 'Cookies', duration: '1 year', note: 'Or until deleted' },
         { type: 'Email Send Logs', duration: '1 year', note: 'For auditing' },
       ],

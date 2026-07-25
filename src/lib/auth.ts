@@ -385,7 +385,7 @@ export const requireAdminWithPermission = async (
 export const requireAuth = async (
   req?: Request,
 ): Promise<{ isAuthenticated: true; email: string } | NextResponse> => {
-  const session = await resolveSession(req);
+  const session = await getSession(req);
   const email = session?.user?.email;
 
   if (!email) {

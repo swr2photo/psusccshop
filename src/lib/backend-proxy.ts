@@ -49,6 +49,7 @@ const ALWAYS_ON_VERCEL_PREFIXES = [
   '/api/payment/verify',
   '/api/payment/stripe',
   '/api/payment/config',
+  '/api/invoice',
 ];
 
 /** Full Option B cutover — auth + admin + session commerce stay on Vercel. */
@@ -67,7 +68,6 @@ const KEEP_SAFE_DEFAULT = [
   '/api/stock-alert',
   '/api/refund',
   '/api/privacy',
-  '/api/invoice',
   '/api/gas',
   '/api/pickup',
   '/api/reviews',

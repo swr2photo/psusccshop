@@ -41,15 +41,16 @@ export async function GET(req: NextRequest) {
     try {
       console.log('[Cron Cleanup] Cleaning old data (PDPA compliance)...');
       
-      // Delete cancelled orders older than 1 year
-      // Keep completed orders for 2 years
-      const dataCleanup = await cleanupOldData(365);
+      // Legal retention: commerce 2y, cancelled 1y, activity/security/audit 2y
+      const dataCleanup = await cleanupOldData();
       
       results.tasks.dataCleanup = {
         status: 'success',
         deletedOrders: dataCleanup.deletedOrders,
+        deletedCancelledOrders: dataCleanup.deletedCancelledOrders,
         deletedLogs: dataCleanup.deletedLogs,
         deletedAudit: dataCleanup.deletedAudit,
+        deletedAuditTrail: dataCleanup.deletedAuditTrail,
       };
       
       console.log(`[Cron Cleanup] Data cleanup: ${JSON.stringify(dataCleanup)}`);

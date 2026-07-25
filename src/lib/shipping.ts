@@ -249,6 +249,39 @@ const TRACK123_STATUS_THAI: Record<Track123Status, string> = {
 
 // ==================== DEFAULT CONFIG ====================
 
+/**
+ * Guest-safe shipping config: enabled options only, no admin/tracking internals.
+ */
+export function toPublicShippingConfig(cfg: ShippingConfig): ShippingConfig {
+  return {
+    showOptions: cfg.showOptions,
+    allowPickup: cfg.allowPickup,
+    ...(cfg.pickupLocation ? { pickupLocation: cfg.pickupLocation } : {}),
+    ...(cfg.pickupInstructions ? { pickupInstructions: cfg.pickupInstructions } : {}),
+    ...(cfg.defaultOptionId ? { defaultOptionId: cfg.defaultOptionId } : {}),
+    ...(typeof cfg.globalFreeShippingMinimum === 'number'
+      ? { globalFreeShippingMinimum: cfg.globalFreeShippingMinimum }
+      : {}),
+    options: (cfg.options || [])
+      .filter((opt) => opt.enabled)
+      .map((opt) => ({
+        id: opt.id,
+        provider: opt.provider,
+        name: opt.name,
+        ...(opt.nameEn ? { nameEn: opt.nameEn } : {}),
+        ...(opt.description ? { description: opt.description } : {}),
+        ...(opt.descriptionEn ? { descriptionEn: opt.descriptionEn } : {}),
+        baseFee: opt.baseFee ?? 0,
+        ...(typeof opt.perItemFee === 'number' ? { perItemFee: opt.perItemFee } : {}),
+        ...(typeof opt.freeShippingMinimum === 'number'
+          ? { freeShippingMinimum: opt.freeShippingMinimum }
+          : {}),
+        ...(opt.estimatedDays ? { estimatedDays: opt.estimatedDays } : {}),
+        enabled: true,
+      })),
+  };
+}
+
 export const DEFAULT_SHIPPING_CONFIG: ShippingConfig = {
   showOptions: true,
   allowPickup: true,

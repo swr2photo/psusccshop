@@ -181,11 +181,12 @@ async function POSTHandler(req: NextRequest) {
     if (config.announcement?.enabled) changes.push('ประกาศ');
     if (config.bankAccount?.accountNumber) changes.push('บัญชีธนาคาร');
     
+    const configDetails = `แก้ไขการตั้งค่าร้าน${changes.length ? ': ' + changes.join(', ') : ''}`;
     await saveUserLogServer({
       email: authResult.email,
       name: undefined,
       action: 'admin_config_change',
-      details: `แก้ไขการตั้งค่าร้าน${changes.length ? ': ' + changes.join(', ') : ''}`,
+      details: configDetails,
       metadata: {
         isOpen: config.isOpen,
         productCount: config.products?.length || 0,
@@ -194,6 +195,23 @@ async function POSTHandler(req: NextRequest) {
       },
       ip: clientIP,
       userAgent,
+    });
+    const { writeAuditTrail } = await import('@/lib/audit');
+    await writeAuditTrail({
+      entityType: 'config',
+      entityId: 'shop-settings',
+      action: 'admin_config_change',
+      performedBy: authResult.email,
+      changes: {
+        summary: configDetails,
+        after: {
+          isOpen: config.isOpen,
+          productCount: config.products?.length || 0,
+          announcementEnabled: config.announcement?.enabled,
+          paymentEnabled: config.paymentEnabled,
+        },
+      },
+      request: req,
     });
     
     return NextResponse.json(

@@ -66,17 +66,56 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     
+    const { writeAuditTrail, writeUserActivityLog } = await import('@/lib/audit');
+
     // Batch save: { permissions: { "email@example.com": { canManageOrders: true, ... } } }
     if (body.permissions && typeof body.permissions === 'object' && !body.email) {
+      const before = await getAllAdminPermissionsFromDB();
       const ok = await saveAllAdminPermissionsToDB(body.permissions);
       if (!ok) throw new Error('Failed to save permissions to database');
+      await writeAuditTrail({
+        entityType: 'permissions',
+        entityId: 'batch',
+        action: 'admin_permissions_batch',
+        performedBy: superCheck.email,
+        changes: { before, after: body.permissions, summary: 'บันทึกสิทธิ์แอดมินทั้งชุด' },
+        request: req,
+      });
+      await writeUserActivityLog({
+        email: superCheck.email,
+        action: 'admin_permissions_change',
+        details: `บันทึกสิทธิ์แอดมิน ${Object.keys(body.permissions).length} คน`,
+        metadata: { emails: Object.keys(body.permissions) },
+        request: req,
+      });
       return NextResponse.json({ status: 'success', message: 'Permissions saved' });
     }
 
     // Single save: { email: "...", permissions: { ... } }
     if (body.email && body.permissions) {
+      const before = await getAdminPermissionsFromDB(body.email);
       const ok = await saveAdminPermissionsToDB(body.email, body.permissions);
       if (!ok) throw new Error('Failed to save permissions to database');
+      await writeAuditTrail({
+        entityType: 'permissions',
+        entityId: String(body.email).toLowerCase(),
+        action: 'admin_permissions_update',
+        performedBy: superCheck.email,
+        changes: {
+          before,
+          after: body.permissions,
+          subjectEmail: body.email,
+          summary: `อัปเดตสิทธิ์ ${body.email}`,
+        },
+        request: req,
+      });
+      await writeUserActivityLog({
+        email: String(body.email).toLowerCase(),
+        action: 'admin_permissions_change',
+        details: `สิทธิ์ถูกแก้ไขโดย ${superCheck.email}`,
+        metadata: { before, after: body.permissions, adminEmail: superCheck.email },
+        request: req,
+      });
       return NextResponse.json({ status: 'success', message: 'Permissions saved' });
     }
 

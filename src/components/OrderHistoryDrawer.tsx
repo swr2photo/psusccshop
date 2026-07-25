@@ -165,6 +165,43 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
   const { success: toastSuccess, error: toastError } = useNotification();
   const { t, lang } = useTranslation();
   const isMobile = useMediaQuery('(max-width:640px)');
+  const [openingReceiptRef, setOpeningReceiptRef] = useState<string | null>(null);
+
+  const openReceipt = useCallback(async (ref: string) => {
+    setOpeningReceiptRef(ref);
+    try {
+      const res = await apiFetch(`/api/invoice?ref=${encodeURIComponent(ref)}&lang=${lang}`, {
+        credentials: 'same-origin',
+      });
+      if (!res.ok) {
+        let message = t.invoice?.download || 'ใบเสร็จ';
+        try {
+          const err = await res.json();
+          message = err.error || err.message || message;
+        } catch { /* html/text error */ }
+        toastError(
+          res.status === 401
+            ? (lang === 'en' ? 'Please sign in to view receipt' : 'กรุณาเข้าสู่ระบบเพื่อดูใบเสร็จ')
+            : (lang === 'en' ? `Cannot open receipt: ${message}` : `เปิดใบเสร็จไม่ได้: ${message}`),
+        );
+        return;
+      }
+      const html = await res.text();
+      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const win = window.open(url, '_blank', 'noopener,noreferrer');
+      if (!win) {
+        // Popup blocked — navigate same tab
+        window.location.href = `/api/invoice?ref=${encodeURIComponent(ref)}&lang=${lang}`;
+      } else {
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      }
+    } catch {
+      toastError(lang === 'en' ? 'Failed to open receipt' : 'เปิดใบเสร็จไม่สำเร็จ');
+    } finally {
+      setOpeningReceiptRef(null);
+    }
+  }, [lang, t.invoice?.download, toastError]);
 
   // Filter label map for translating static historyFilters
   const filterLabelMap: Record<string, string> = {
@@ -1194,18 +1231,34 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                           )}
                           {/* Invoice — only after payment confirmed */}
                           {canViewReceipt && (
-                            <IconButton
+                            <Button
                               size="small"
-                              onClick={() => window.open(`/api/invoice?ref=${order.ref}&lang=${lang}`, '_blank')}
+                              onClick={() => openReceipt(order.ref)}
+                              disabled={openingReceiptRef === order.ref}
                               sx={{
-                                width: 30, height: 30, bgcolor: 'rgba(0,113,227,0.08)',
-                                border: '1px solid rgba(0,113,227,0.2)', color: '#2997ff',
+                                px: 1.5,
+                                py: 0.6,
+                                borderRadius: '8px',
+                                bgcolor: 'rgba(0,113,227,0.08)',
+                                border: '1px solid rgba(0,113,227,0.2)',
+                                color: '#2997ff',
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                textTransform: 'none',
+                                minWidth: 'auto',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 0.5,
                                 '&:hover': { bgcolor: 'rgba(0,113,227,0.15)' },
                               }}
-                              title={t.invoice?.download || 'Invoice'}
                             >
-                              <FileText size={14} />
-                            </IconButton>
+                              {openingReceiptRef === order.ref ? (
+                                <CircularProgress size={12} sx={{ color: '#2997ff' }} />
+                              ) : (
+                                <FileText size={12} />
+                              )}
+                              {t.invoice?.download || (lang === 'en' ? 'View receipt' : 'ดูใบเสร็จ')}
+                            </Button>
                           )}
                         </Box>
                       </Box>

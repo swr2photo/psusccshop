@@ -185,6 +185,7 @@ const RECEIPT_BLOCKED_STATUSES = [
 
 const RECEIPT_PAID_STATUSES = [
   'PAID',
+  'PROCESSING',
   'READY',
   'SHIPPED',
   'COMPLETED',
@@ -198,10 +199,17 @@ export function isOrderPaidForReceipt(order: {
   status?: string;
   paymentVerified?: boolean;
   payment_verified?: boolean;
+  paymentVerifiedAt?: string | null;
+  payment_verified_at?: string | null;
+  receiptIssuedAt?: string | null;
+  receipt_issued_at?: string | null;
 }): boolean {
   const status = normalizeStatus(order.status || '');
   if ((RECEIPT_BLOCKED_STATUSES as readonly string[]).includes(status)) return false;
   if (order.paymentVerified === true || order.payment_verified === true) return true;
+  if (order.paymentVerifiedAt || order.payment_verified_at || order.receiptIssuedAt || order.receipt_issued_at) {
+    return true;
+  }
   return (RECEIPT_PAID_STATUSES as readonly string[]).includes(status);
 }
 
