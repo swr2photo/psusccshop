@@ -329,7 +329,14 @@ export async function saveShopConfig(
   config: any,
   adminEmail: string
 ): Promise<APIResponse> {
-  return fetchJson('/api/config', { method: 'POST', body: { config, adminEmail } });
+  const body = { config, adminEmail };
+  let res = await fetchJson('/api/config', { method: 'POST', body });
+  // Stale host-only cookie after Domain rollout — refresh once then retry
+  if (res.status === 'error' && (res as any).error?.status === 401) {
+    await syncAuthCookieQuiet();
+    res = await fetchJson('/api/config', { method: 'POST', body });
+  }
+  return res;
 }
 
 export async function updateOrderStatusAPI(

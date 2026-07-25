@@ -44,6 +44,8 @@ const ALWAYS_ON_VERCEL_PREFIXES = [
   '/api/profile',
   '/api/cart',
   '/api/orders',
+  // Admin config writes use requireAdmin(NextAuth) — must not hop to Workers
+  '/api/config',
   '/api/payment-info',
   '/api/payment/create-charge',
   '/api/payment/verify',
@@ -72,7 +74,6 @@ const KEEP_SAFE_DEFAULT = [
   '/api/gas',
   '/api/pickup',
   '/api/reviews',
-  '/api/config',
   '/api/live',
   '/api/inventory',
   '/api/chatbot',
