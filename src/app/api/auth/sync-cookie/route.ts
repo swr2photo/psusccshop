@@ -1,6 +1,6 @@
 /**
- * Re-issue session cookie with COOKIE_DOMAIN so api.psuscc.club can read JWT.
- * Vercel same-origin only — upgrades host-only cookies from before domain was configured.
+ * Re-issue session cookie with shared Domain + maxAge, and drop stale host-only
+ * duplicates so browsers don't send the wrong JWT to /api/*.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { encode, getToken } from 'next-auth/jwt';
@@ -10,6 +10,8 @@ import {
 } from '@/lib/nextauth-cookie-names';
 import { buildGetTokenReq } from '@/lib/session-from-request';
 import { getSharedCookieDomain } from '@/lib/cookie-domain';
+import { SESSION_MAX_AGE_SECONDS, getSessionTokenCookieOptions } from '@/lib/session-cookie';
+import { getStaleHostOnlyAuthCookieClearHeaders } from '@/lib/auth-cookies';
 
 const useSecureCookies = process.env.NODE_ENV === 'production';
 const sessionCookieName = getNextAuthSessionCookieName();
@@ -37,22 +39,30 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ status: 'error', message: 'no session' }, { status: 401 });
   }
 
-  if (!sharedCookieDomain) {
-    return NextResponse.json({ status: 'success', message: 'no domain sync needed' });
-  }
-
-  const sessionToken = await encode({ token, secret, maxAge: 30 * 24 * 60 * 60 });
-  const response = NextResponse.json({ status: 'success' });
-
-  response.cookies.set(sessionCookieName, sessionToken, {
-    httpOnly: true,
-    secure: useSecureCookies,
-    sameSite: 'lax',
-    path: '/',
-    domain: sharedCookieDomain,
-    maxAge: 30 * 24 * 60 * 60,
+  const sessionToken = await encode({
+    token,
+    secret,
+    maxAge: SESSION_MAX_AGE_SECONDS,
   });
 
-  // Do not clear host-only cookies here — can race with login and wipe the only valid session.
+  const response = NextResponse.json({
+    status: 'success',
+    domain: sharedCookieDomain || null,
+    maxAge: SESSION_MAX_AGE_SECONDS,
+  });
+
+  const opts = getSessionTokenCookieOptions();
+  response.cookies.set(sessionCookieName, sessionToken, opts);
+
+  // After a successful domain (or host) re-issue, clear stale host-only duplicates
+  // so the jar doesn't keep an older host-only JWT that some browsers prefer.
+  if (sharedCookieDomain) {
+    for (const clear of getStaleHostOnlyAuthCookieClearHeaders()) {
+      // Only clear session-token variants (keep callback/csrf host behavior intact)
+      if (!clear.includes('session-token')) continue;
+      response.headers.append('Set-Cookie', clear);
+    }
+  }
+
   return response;
 }

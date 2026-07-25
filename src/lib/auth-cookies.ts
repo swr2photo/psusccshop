@@ -8,8 +8,9 @@ import {
 } from '@/lib/nextauth-cookie-names';
 
 import { getSharedCookieDomain } from '@/lib/cookie-domain';
+import { useSecureAuthCookies } from '@/lib/session-cookie';
 
-const useSecureCookies = process.env.NODE_ENV === 'production';
+const useSecureCookies = useSecureAuthCookies();
 const sharedCookieDomain = getSharedCookieDomain();
 
 function buildClearCookie(name: string, options: { httpOnly?: boolean; domain?: string } = {}): string {

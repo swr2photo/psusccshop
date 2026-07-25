@@ -92,7 +92,23 @@ function ReceiptPageInner() {
       setLoading(false);
       return;
     }
-    void load();
+    let cancelled = false;
+    (async () => {
+      // Refresh Domain-scoped session cookie before invoice fetch (new tab / host-only leftovers)
+      try {
+        await fetch('/api/auth/sync-cookie', {
+          method: 'POST',
+          credentials: 'include',
+          cache: 'no-store',
+        });
+      } catch {
+        /* continue — invoice may still work */
+      }
+      if (!cancelled) void load();
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [status, load, copy.needLogin]);
 
   const callbackUrl =

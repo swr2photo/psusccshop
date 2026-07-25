@@ -109,17 +109,14 @@ const providerNameMap: Record<string, string> = {
 // ==================== AUTH OPTIONS ====================
 
 import { getSharedCookieDomain } from '@/lib/cookie-domain';
+import {
+  SESSION_MAX_AGE_SECONDS,
+  getCallbackUrlCookieOptions,
+  getCsrfCookieOptions,
+  getSessionTokenCookieOptions,
+} from '@/lib/session-cookie';
 
-const useSecureCookies = process.env.NODE_ENV === 'production';
 const sharedCookieDomain = getSharedCookieDomain();
-
-const sharedCookieOptions = {
-  httpOnly: true,
-  sameSite: 'lax' as const,
-  path: '/',
-  secure: useSecureCookies,
-  ...(sharedCookieDomain ? { domain: sharedCookieDomain } : {}),
-};
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -185,26 +182,23 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   pages: { signIn: '/', error: '/auth/error' },
-  session: { strategy: "jwt", maxAge: 30 * 24 * 60 * 60 },
-  ...(sharedCookieDomain
+  session: { strategy: 'jwt', maxAge: SESSION_MAX_AGE_SECONDS },
+  // Always set named cookies in production (Domain when available) so maxAge /
+  // SameSite/Secure stay aligned with sync-cookie + Workers JWT readers.
+  ...(process.env.NODE_ENV === 'production' || sharedCookieDomain
     ? {
         cookies: {
           sessionToken: {
             name: getNextAuthSessionCookieName(),
-            options: sharedCookieOptions,
+            options: getSessionTokenCookieOptions(),
           },
           callbackUrl: {
             name: getNextAuthCallbackCookieName(),
-            options: { ...sharedCookieOptions, httpOnly: false },
+            options: getCallbackUrlCookieOptions(),
           },
           csrfToken: {
             name: getNextAuthCsrfCookieName(),
-            options: {
-              httpOnly: true,
-              sameSite: 'lax' as const,
-              path: '/',
-              secure: useSecureCookies,
-            },
+            options: getCsrfCookieOptions(),
           },
         },
       }
