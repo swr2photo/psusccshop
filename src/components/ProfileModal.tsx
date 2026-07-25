@@ -2,7 +2,7 @@
 
 import { apiFetch } from '@/lib/api-client';
 import { useState, useEffect, useMemo, useCallback, useRef, type HTMLAttributes } from 'react';
-import { X, ShieldCheck, User, Phone, Instagram, AlertTriangle, MapPin, Check, Sparkles, UserCircle, CheckCircle2, AlertCircle, Search, Camera, ZoomIn, ZoomOut, RotateCw, Move, Plus, Trash2, Star, Edit } from 'lucide-react';
+import { X, ShieldCheck, User, Phone, Instagram, AlertTriangle, MapPin, Check, ArrowRight, UserCircle, CheckCircle2, AlertCircle, Search, Camera, ZoomIn, ZoomOut, RotateCw, Move, Plus, Trash2, Star, Pencil } from 'lucide-react';
 import {
   Drawer, Box, Typography, Button, IconButton, TextField, InputAdornment,
   Slide, Avatar, Autocomplete, CircularProgress, Paper, Dialog, Slider, Chip,
@@ -12,6 +12,31 @@ import PasskeyManager from '@/components/PasskeyManager';
 import { useThaiAddress, type AddressSelection } from '@/hooks/useThaiAddress';
 import { type NameValidationConfig, DEFAULT_NAME_VALIDATION } from '@/lib/config';
 import { useTranslation } from '@/hooks/useTranslation';
+import { Button as UiButton } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+
+/** Formal institutional UI tokens (shadcn-like, muted, lower radius). */
+const FORMAL = {
+  card: {
+    p: 2,
+    borderRadius: '8px',
+    bgcolor: 'var(--surface)',
+    border: '1px solid var(--glass-border)',
+  },
+  iconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: '6px',
+    bgcolor: 'var(--surface-2)',
+    border: '1px solid var(--glass-border)',
+    display: 'grid',
+    placeItems: 'center',
+    color: 'var(--foreground)',
+    flexShrink: 0,
+  },
+  mutedIcon: 'var(--text-muted)',
+} as const;
 
 // ============== ADDRESS TYPES ==============
 
@@ -49,16 +74,16 @@ interface InlineNotification {
 
 const NOTIFICATION_STYLES = {
   success: {
-    bg: 'linear-gradient(135deg, rgba(16, 185, 129, 0.95) 0%, rgba(5, 150, 105, 0.95) 100%)',
-    icon: <CheckCircle2 size={16} />,
+    bg: 'var(--foreground)',
+    icon: <CheckCircle2 size={16} strokeWidth={1.75} />,
   },
   error: {
-    bg: 'linear-gradient(135deg, rgba(239, 68, 68, 0.95) 0%, rgba(220, 38, 38, 0.95) 100%)',
-    icon: <AlertCircle size={16} />,
+    bg: 'var(--error)',
+    icon: <AlertCircle size={16} strokeWidth={1.75} />,
   },
   warning: {
-    bg: 'linear-gradient(135deg, rgba(245, 158, 11, 0.95) 0%, rgba(234, 88, 12, 0.95) 100%)',
-    icon: <AlertTriangle size={16} />,
+    bg: 'var(--text-muted)',
+    icon: <AlertTriangle size={16} strokeWidth={1.75} />,
   },
 };
 
@@ -703,21 +728,25 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
 
   const inputSx = {
     '& .MuiOutlinedInput-root': {
-      bgcolor: 'var(--surface)',
-      borderRadius: '14px',
+      bgcolor: 'var(--background)',
+      borderRadius: '6px',
       color: 'var(--foreground)',
-      fontSize: '0.95rem',
-      transition: 'all 0.2s ease',
+      fontSize: '0.875rem',
+      transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
       '& fieldset': { borderColor: 'var(--glass-border)', borderWidth: '1px' },
-      '&:hover fieldset': { borderColor: 'rgba(0,113,227,0.4)' },
-      '&.Mui-focused fieldset': { borderColor: 'var(--secondary)', borderWidth: '2px' },
-      '&.Mui-focused': { bgcolor: 'var(--surface)' },
+      '&:hover fieldset': { borderColor: 'var(--text-muted)' },
+      '&.Mui-focused fieldset': { borderColor: 'var(--foreground)', borderWidth: '1px' },
+      '&.Mui-focused': {
+        bgcolor: 'var(--background)',
+        boxShadow: '0 0 0 3px color-mix(in srgb, var(--foreground) 8%, transparent)',
+      },
       '& input::placeholder, & textarea::placeholder': { color: 'var(--text-muted)', opacity: 1 },
     },
-    '& .MuiInputLabel-root': { color: 'var(--text-muted)', fontSize: '0.9rem' },
-    '& .MuiInputLabel-root.Mui-focused': { color: 'var(--secondary)' },
+    '& .MuiInputLabel-root': { color: 'var(--text-muted)', fontSize: '0.875rem' },
+    '& .MuiInputLabel-root.Mui-focused': { color: 'var(--foreground)' },
     '& .MuiInputAdornment-root': { color: 'var(--text-muted)' },
-    '& .MuiFormHelperText-root': { color: 'var(--error)', fontSize: '0.75rem', mt: 0.5 },
+    '& .MuiFormHelperText-root': { color: 'var(--text-muted)', fontSize: '0.75rem', mt: 0.5 },
+    '& .MuiFormHelperText-root.Mui-error': { color: 'var(--error)' },
   };
 
   const autocompleteSx = {
@@ -750,17 +779,18 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
       sx={{ zIndex: 1400 }}
       PaperProps={{
         sx: {
-          height: isMobile ? { xs: '90vh', sm: '85vh' } : '100vh',
-          maxHeight: isMobile ? { xs: '95vh', sm: '90vh' } : '100vh',
-          width: isMobile ? '100%' : '480px',
-          borderTopLeftRadius: isMobile ? { xs: 20, sm: 24 } : { xs: 0, sm: 24 },
-          borderTopRightRadius: isMobile ? { xs: 20, sm: 24 } : 0,
-          borderBottomLeftRadius: isMobile ? 0 : { xs: 0, sm: 24 },
+          height: isMobile ? { xs: '92vh', sm: '88vh' } : '100vh',
+          maxHeight: isMobile ? { xs: '96vh', sm: '92vh' } : '100vh',
+          width: isMobile ? '100%' : '440px',
+          borderTopLeftRadius: isMobile ? '12px' : 0,
+          borderTopRightRadius: isMobile ? '12px' : 0,
+          borderBottomLeftRadius: 0,
           bgcolor: 'var(--background)',
           color: 'var(--foreground)',
           overflow: 'hidden',
+          borderLeft: isMobile ? 'none' : '1px solid var(--glass-border)',
           transform: isMobile && pmDragOffset > 0 ? `translateY(${pmDragOffset}px) !important` : undefined,
-          transition: pmIsDragging ? 'none !important' : 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1) !important',
+          transition: pmIsDragging ? 'none !important' : 'transform 0.25s ease !important',
         },
       }}
     >
@@ -785,24 +815,19 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                 color: 'white',
                 py: 1.5,
                 px: 2,
-                borderRadius: '14px',
-                boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+                borderRadius: '8px',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 1.5,
-                animation: 'notificationSlideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
-                '@keyframes notificationSlideUp': {
-                  '0%': { opacity: 0, transform: 'translateY(12px) scale(0.96)' },
-                  '100%': { opacity: 1, transform: 'translateY(0) scale(1)' },
-                },
               }}
             >
               <Box
                 sx={{
                   width: 28,
                   height: 28,
-                  borderRadius: '8px',
-                  bgcolor: 'rgba(255, 255, 255, 0.2)',
+                  borderRadius: '6px',
+                  bgcolor: 'rgba(255, 255, 255, 0.12)',
                   display: 'grid',
                   placeItems: 'center',
                   flexShrink: 0,
@@ -866,12 +891,10 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                 sx={{
                   width: 44,
                   height: 44,
-                  border: '2px solid',
-                  borderColor: customProfileImage ? 'rgba(16,185,129,0.4)' : 'rgba(0,113,227,0.3)',
-                  boxShadow: customProfileImage
-                    ? '0 4px 16px rgba(16,185,129,0.2)'
-                    : '0 4px 16px rgba(0,113,227,0.15)',
-                  transition: 'all 0.3s ease',
+                  borderRadius: '8px',
+                  border: '1px solid var(--glass-border)',
+                  bgcolor: 'var(--surface-2)',
+                  color: 'var(--text-muted)',
                 }}
               >
                 {!displayImage && <UserCircle size={22} />}
@@ -882,12 +905,12 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                 sx={{
                   position: 'absolute',
                   inset: 0,
-                  borderRadius: '50%',
-                  bgcolor: 'rgba(0,0,0,0.5)',
+                  borderRadius: '8px',
+                  bgcolor: 'rgba(0,0,0,0.55)',
                   display: 'grid',
                   placeItems: 'center',
                   opacity: 0,
-                  transition: 'opacity 0.2s ease',
+                  transition: 'opacity 0.15s ease',
                 }}
               >
                 {uploadingImage
@@ -897,51 +920,51 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
               </Box>
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--foreground)', lineHeight: 1.2 }}>
+              <Typography sx={{ fontSize: '0.95rem', fontWeight: 650, color: 'var(--foreground)', lineHeight: 1.25, letterSpacing: '-0.01em' }}>
                 {t.profile.contactInfo}
               </Typography>
-              <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {userEmail || t.profile.contactDesc}
               </Typography>
             </Box>
           </Box>
-          <IconButton
+          <UiButton
+            type="button"
+            variant="outline"
+            size="icon-sm"
             onClick={onClose}
-            size="small"
-            sx={{
-              bgcolor: 'var(--glass-bg)',
-              color: 'var(--text-muted)',
-              '&:hover': { bgcolor: 'var(--glass-bg)', color: 'var(--foreground)' },
-            }}
+            aria-label="Close"
+            className="border-[var(--glass-border)] bg-transparent text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
           >
-            <X size={20} />
-          </IconButton>
+            <X className="size-4" />
+          </UiButton>
         </Box>
 
-        {/* Category Tabs */}
-        <Box sx={{
-          display: 'flex',
-          gap: 1,
-          mt: 1.5,
-          overflowX: 'auto',
-          pb: 0.5,
-          mx: -2,
-          px: 2,
-          '&::-webkit-scrollbar': { display: 'none' },
-          scrollbarWidth: 'none',
-        }}>
+        {/* Segmented tabs — formal, not pills */}
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: userEmail ? '1fr 1fr 1fr' : '1fr 1fr',
+            gap: 0.5,
+            mt: 1.75,
+            p: 0.5,
+            borderRadius: '8px',
+            bgcolor: 'var(--surface-2)',
+            border: '1px solid var(--glass-border)',
+          }}
+        >
           {([
             {
               key: 'personal' as const,
               label: t.profile.tabPersonal,
-              icon: <User size={14} />,
+              icon: <User size={14} strokeWidth={1.75} />,
               complete: !!(formData.name && formData.phone && formData.instagram && pdpaAccepted),
               show: true,
             },
             {
               key: 'address' as const,
               label: t.profile.tabAddress,
-              icon: <MapPin size={14} />,
+              icon: <MapPin size={14} strokeWidth={1.75} />,
               complete: savedAddresses.length > 0,
               show: true,
               badge: savedAddresses.length || undefined,
@@ -949,7 +972,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
             {
               key: 'security' as const,
               label: t.profile.tabSecurity,
-              icon: <ShieldCheck size={14} />,
+              icon: <ShieldCheck size={14} strokeWidth={1.75} />,
               complete: false,
               show: !!userEmail,
             },
@@ -958,45 +981,24 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
             return (
               <Box
                 key={tab.key}
+                component="button"
+                type="button"
                 onClick={() => setActiveTab(tab.key)}
-                sx={{
-                  px: 1.8,
-                  py: 0.8,
-                  borderRadius: '20px',
-                  bgcolor: isActive ? 'rgba(0,113,227,0.15)' : 'var(--surface-2)',
-                  border: isActive ? '1px solid rgba(0,113,227,0.4)' : '1px solid var(--glass-border)',
-                  color: isActive ? 'var(--primary)' : 'var(--text-muted)',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  transition: 'all 0.2s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 0.7,
-                  '&:hover': {
-                    bgcolor: isActive ? 'rgba(0,113,227,0.2)' : 'var(--glass-bg)',
-                  },
-                }}
+                className={cn(
+                  'inline-flex items-center justify-center gap-1.5 rounded-md px-2 py-2 text-[0.72rem] font-medium transition-colors',
+                  isActive
+                    ? 'bg-[var(--background)] text-[var(--foreground)] shadow-sm border border-[var(--glass-border)]'
+                    : 'text-[var(--text-muted)] border border-transparent hover:text-[var(--foreground)]',
+                )}
               >
                 {tab.icon}
-                {tab.label}
-                {tab.badge !== undefined && (
-                  <Box sx={{
-                    px: 0.7,
-                    borderRadius: '8px',
-                    bgcolor: isActive ? 'rgba(0,113,227,0.3)' : 'var(--glass-bg)',
-                    fontSize: '0.68rem',
-                    fontWeight: 700,
-                    minWidth: 18,
-                    textAlign: 'center',
-                  }}>
+                <span className="truncate">{tab.label}</span>
+                {tab.badge !== undefined ? (
+                  <Badge variant="muted" className="min-w-5 justify-center px-1 py-0 text-[0.65rem]">
                     {tab.badge}
-                  </Box>
-                )}
-                {tab.complete && (
-                  <Check size={13} style={{ color: 'var(--success)' }} />
-                )}
+                  </Badge>
+                ) : null}
+                {tab.complete ? <Check size={12} strokeWidth={2} className="opacity-70" /> : null}
               </Box>
             );
           })}
@@ -1021,25 +1023,16 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
           {activeTab === 'personal' && (
           <>
           {/* ====== Name Card ====== */}
-          <Box sx={{
-            p: 2,
-            borderRadius: '16px',
-            bgcolor: 'var(--surface-2)',
-            border: '1px solid var(--glass-border)',
-          }}>
+          <Box sx={FORMAL.card}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
-              <Box sx={{
-                width: 32, height: 32, borderRadius: '8px',
-                background: 'linear-gradient(135deg, rgba(0,113,227,0.2) 0%, rgba(0,113,227,0.2) 100%)',
-                display: 'grid', placeItems: 'center',
-              }}>
-                <User size={16} style={{ color: 'var(--primary)' }} />
+              <Box sx={FORMAL.iconBox}>
+                <User size={15} strokeWidth={1.75} />
               </Box>
-              <Box>
-                <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography sx={{ fontSize: '0.85rem', fontWeight: 650, color: 'var(--foreground)' }}>
                   {t.profile.fullName}
                 </Typography>
-                <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                <Typography sx={{ fontSize: '0.68rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
                   {(() => {
                     const langs: string[] = [];
                     if (nameConfig.allowThai) langs.push(t.profile.langThai);
@@ -1051,12 +1044,9 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                   })()}
                 </Typography>
               </Box>
-              <Box sx={{
-                ml: 'auto', px: 1, py: 0.3, borderRadius: '6px',
-                bgcolor: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.2)',
-              }}>
-                <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--error)' }}>{t.common.required}</Typography>
-              </Box>
+              <Badge variant="outline" className="shrink-0 border-[var(--glass-border)] text-[var(--text-muted)]">
+                {t.common.required}
+              </Badge>
             </Box>
             <TextField
               fullWidth
@@ -1071,25 +1061,16 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
           </Box>
 
           {/* ====== Contact Card ====== */}
-          <Box sx={{
-            p: 2,
-            borderRadius: '16px',
-            bgcolor: 'var(--surface-2)',
-            border: '1px solid var(--glass-border)',
-          }}>
+          <Box sx={FORMAL.card}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
-              <Box sx={{
-                width: 32, height: 32, borderRadius: '8px',
-                background: 'linear-gradient(135deg, rgba(16,185,129,0.2) 0%, rgba(6,182,212,0.2) 100%)',
-                display: 'grid', placeItems: 'center',
-              }}>
-                <Phone size={16} style={{ color: 'var(--success)' }} />
+              <Box sx={FORMAL.iconBox}>
+                <Phone size={15} strokeWidth={1.75} />
               </Box>
-              <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>
+              <Typography sx={{ fontSize: '0.85rem', fontWeight: 650, color: 'var(--foreground)' }}>
                 {t.profile.contactSection}
               </Typography>
             </Box>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
               <TextField
                 fullWidth
                 placeholder={t.profile.phoneNumber}
@@ -1100,7 +1081,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <Phone size={16} style={{ color: 'var(--success)' }} />
+                      <Phone size={15} strokeWidth={1.75} style={{ color: FORMAL.mutedIcon }} />
                     </InputAdornment>
                   ),
                 }}
@@ -1116,7 +1097,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <Instagram size={16} style={{ color: '#ec4899' }} />
+                      <Instagram size={15} strokeWidth={1.75} style={{ color: FORMAL.mutedIcon }} />
                     </InputAdornment>
                   ),
                 }}
@@ -1130,23 +1111,14 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
           {/* ============ TAB: Shipping Addresses ============ */}
           {activeTab === 'address' && (
           /* ====== Address Card - Multi-Address Management ====== */
-          <Box sx={{
-            p: 2,
-            borderRadius: '16px',
-            bgcolor: 'var(--surface-2)',
-            border: '1px solid var(--glass-border)',
-          }}>
+          <Box sx={FORMAL.card}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <Box sx={{
-                  width: 32, height: 32, borderRadius: '8px',
-                  background: 'linear-gradient(135deg, rgba(245,158,11,0.2) 0%, rgba(234,88,12,0.2) 100%)',
-                  display: 'grid', placeItems: 'center',
-                }}>
-                  <MapPin size={16} style={{ color: 'var(--warning)' }} />
+                <Box sx={FORMAL.iconBox}>
+                  <MapPin size={15} strokeWidth={1.75} />
                 </Box>
                 <Box>
-                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 650, color: 'var(--foreground)' }}>
                     {t.profile.shippingAddress}
                   </Typography>
                   <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
@@ -1167,9 +1139,11 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                   sx={{
                     fontSize: '0.75rem',
                     textTransform: 'none',
-                    color: 'var(--primary)',
-                    borderRadius: '10px',
+                    color: 'var(--foreground)',
+                    borderRadius: '6px',
                     fontWeight: 600,
+                    border: '1px solid var(--glass-border)',
+                    px: 1.25,
                   }}
                 >
                   {t.profile.addAddress}
@@ -1185,10 +1159,9 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                     key={addr.id}
                     sx={{
                       p: 1.5,
-                      borderRadius: '12px',
-                      bgcolor: addr.isDefault ? 'rgba(0,113,227,0.08)' : 'var(--surface)',
-                      border: addr.isDefault ? '2px solid rgba(0,113,227,0.3)' : '1px solid var(--glass-border)',
-                      transition: 'all 0.2s ease',
+                      borderRadius: '8px',
+                      bgcolor: 'var(--background)',
+                      border: addr.isDefault ? '1px solid var(--foreground)' : '1px solid var(--glass-border)',
                     }}
                   >
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
@@ -1198,11 +1171,12 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                           size="small"
                           sx={{
                             fontSize: '0.7rem',
-                            fontWeight: 700,
+                            fontWeight: 600,
                             height: 22,
-                            bgcolor: addr.isDefault ? 'rgba(0,113,227,0.15)' : 'var(--glass-bg)',
-                            color: addr.isDefault ? 'var(--primary)' : 'var(--text-muted)',
-                            border: 'none',
+                            bgcolor: 'var(--surface-2)',
+                            color: 'var(--foreground)',
+                            border: '1px solid var(--glass-border)',
+                            borderRadius: '4px',
                           }}
                         />
                         {addr.isDefault && (
@@ -1212,12 +1186,13 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                             size="small"
                             sx={{
                               fontSize: '0.65rem',
-                              fontWeight: 700,
+                              fontWeight: 600,
                               height: 20,
-                              bgcolor: 'rgba(16,185,129,0.15)',
-                              color: 'var(--success)',
-                              border: 'none',
-                              '& .MuiChip-icon': { color: 'var(--success)', fontSize: 10 },
+                              bgcolor: 'transparent',
+                              color: 'var(--text-muted)',
+                              border: '1px solid var(--glass-border)',
+                              borderRadius: '4px',
+                              '& .MuiChip-icon': { color: 'var(--text-muted)', fontSize: 10 },
                             }}
                           />
                         )}
@@ -1225,17 +1200,17 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                       <Box sx={{ display: 'flex', gap: 0.5 }}>
                         {!addr.isDefault && (
                           <IconButton size="small" onClick={() => handleSetDefaultAddress(addr.id)} title={t.profile.setDefault}
-                            sx={{ color: 'var(--text-muted)', '&:hover': { color: 'var(--primary)' } }}>
-                            <Star size={14} />
+                            sx={{ color: 'var(--text-muted)', '&:hover': { color: 'var(--foreground)' } }}>
+                            <Star size={14} strokeWidth={1.75} />
                           </IconButton>
                         )}
                         <IconButton size="small" onClick={() => handleEditAddress(addr)} title={t.common.edit}
-                          sx={{ color: 'var(--text-muted)', '&:hover': { color: 'var(--primary)' } }}>
-                          <Edit size={14} />
+                          sx={{ color: 'var(--text-muted)', '&:hover': { color: 'var(--foreground)' } }}>
+                          <Pencil size={14} strokeWidth={1.75} />
                         </IconButton>
                         <IconButton size="small" onClick={() => handleDeleteAddress(addr.id)} title={t.common.delete}
-                          sx={{ color: 'var(--text-muted)', '&:hover': { color: '#ef4444' } }}>
-                          <Trash2 size={14} />
+                          sx={{ color: 'var(--text-muted)', '&:hover': { color: 'var(--error)' } }}>
+                          <Trash2 size={14} strokeWidth={1.75} />
                         </IconButton>
                       </Box>
                     </Box>
@@ -1259,7 +1234,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
-                        <MapPin size={16} style={{ color: 'var(--warning)' }} />
+                        <MapPin size={15} strokeWidth={1.75} style={{ color: FORMAL.mutedIcon }} />
                       </InputAdornment>
                     ),
                   }}
@@ -1276,24 +1251,16 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
-                        <Search size={16} style={{ color: 'var(--warning)' }} />
+                        <Search size={15} strokeWidth={1.75} style={{ color: FORMAL.mutedIcon }} />
                       </InputAdornment>
                     ),
                     endAdornment: addressFields.zipCode.length === 5 && addressFields.province ? (
                       <InputAdornment position="end">
-                        <Check size={16} style={{ color: 'var(--success)' }} />
+                        <Check size={15} strokeWidth={1.75} style={{ color: FORMAL.mutedIcon }} />
                       </InputAdornment>
                     ) : null,
                   }}
-                  sx={{
-                    ...inputSx,
-                    '& .MuiOutlinedInput-root': {
-                      ...inputSx['& .MuiOutlinedInput-root'],
-                      bgcolor: addressFields.zipCode.length === 5 && addressFields.province
-                        ? 'rgba(16,185,129,0.06)'
-                        : 'var(--surface)',
-                    },
-                  }}
+                  sx={inputSx}
                   inputProps={{ maxLength: 5, inputMode: 'numeric' }}
                 />
 
@@ -1373,11 +1340,11 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                 {(addressFields.province || addressFields.detail) && (
                   <Box sx={{
                     p: 1.5,
-                    borderRadius: '10px',
-                    bgcolor: 'rgba(0,113,227,0.06)',
-                    border: '1px solid rgba(0,113,227,0.15)',
+                    borderRadius: '6px',
+                    bgcolor: 'var(--surface-2)',
+                    border: '1px solid var(--glass-border)',
                   }}>
-                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--primary)', mb: 0.3 }}>
+                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', mb: 0.3 }}>
                       {t.profile.addressPreview}
                     </Typography>
                     <Typography sx={{ fontSize: '0.8rem', color: 'var(--foreground)', lineHeight: 1.5 }}>
@@ -1392,15 +1359,17 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                     fullWidth
                     onClick={handleSaveAddress}
                     variant="contained"
-                    startIcon={editingAddressId ? <Check size={16} /> : <Plus size={16} />}
+                    startIcon={editingAddressId ? <Check size={16} strokeWidth={1.75} /> : <Plus size={16} strokeWidth={1.75} />}
                     sx={{
-                      borderRadius: '12px',
+                      borderRadius: '6px',
                       textTransform: 'none',
-                      fontWeight: 700,
+                      fontWeight: 650,
                       fontSize: '0.85rem',
                       py: 1,
-                      background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
-                      boxShadow: '0 4px 16px rgba(0,113,227,0.25)',
+                      bgcolor: 'var(--foreground)',
+                      color: 'var(--background)',
+                      boxShadow: 'none',
+                      '&:hover': { bgcolor: 'var(--foreground)', opacity: 0.92, boxShadow: 'none' },
                     }}
                   >
                     {editingAddressId ? t.profile.updateAddress : t.profile.saveAddress}
@@ -1414,12 +1383,13 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
                         setAddressFields({ province: '', district: '', subDistrict: '', zipCode: '', detail: '' });
                       }}
                       sx={{
-                        borderRadius: '12px',
+                        borderRadius: '6px',
                         textTransform: 'none',
                         fontWeight: 600,
                         fontSize: '0.85rem',
                         py: 1,
                         color: 'var(--text-muted)',
+                        border: '1px solid var(--glass-border)',
                         minWidth: 80,
                       }}
                     >
@@ -1434,13 +1404,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
 
           {/* ============ TAB: Security ============ */}
           {activeTab === 'security' && userEmail && (
-            /* ====== Passkey Card ====== */
-            <Box sx={{
-              p: 2,
-              borderRadius: '16px',
-              bgcolor: 'var(--surface-2)',
-              border: '1px solid var(--glass-border)',
-            }}>
+            <Box sx={FORMAL.card}>
               <PasskeyManager userEmail={userEmail} />
             </Box>
           )}
@@ -1448,32 +1412,15 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
           {/* ====== PDPA Card (personal tab) ====== */}
           {activeTab === 'personal' && (
           <Box sx={{
-            p: 2,
-            borderRadius: '16px',
-            background: pdpaAccepted
-              ? 'linear-gradient(135deg, rgba(16,185,129,0.1) 0%, rgba(6,182,212,0.1) 100%)'
-              : 'var(--surface-2)',
-            border: pdpaAccepted
-              ? '2px solid rgba(16,185,129,0.3)'
-              : '1px solid var(--glass-border)',
-            transition: 'all 0.3s ease',
+            ...FORMAL.card,
+            borderColor: pdpaAccepted ? 'var(--foreground)' : 'var(--glass-border)',
           }}>
             <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, mb: 1.5 }}>
-              <Box sx={{
-                width: 36, height: 36, borderRadius: '10px',
-                background: pdpaAccepted
-                  ? 'linear-gradient(135deg, #34c759 0%, #34c759 100%)'
-                  : 'rgba(0,113,227,0.15)',
-                display: 'grid', placeItems: 'center', flexShrink: 0,
-                transition: 'all 0.3s ease',
-              }}>
-                {pdpaAccepted
-                  ? <Check size={18} style={{ color: 'white' }} />
-                  : <ShieldCheck size={18} style={{ color: 'var(--primary)' }} />
-                }
+              <Box sx={FORMAL.iconBox}>
+                <ShieldCheck size={16} strokeWidth={1.75} />
               </Box>
               <Box sx={{ flex: 1 }}>
-                <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: pdpaAccepted ? 'var(--success)' : 'var(--foreground)', mb: 0.3 }}>
+                <Typography sx={{ fontSize: '0.85rem', fontWeight: 650, color: 'var(--foreground)', mb: 0.3 }}>
                   {pdpaAccepted ? t.profile.pdpaAccepted : t.profile.privacyPolicy}
                 </Typography>
                 <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
@@ -1483,39 +1430,41 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
             </Box>
             <Box
               onClick={() => setPdpaAccepted(!pdpaAccepted)}
+              role="checkbox"
+              aria-checked={pdpaAccepted}
               sx={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: 1.5,
-                p: 1.2,
-                borderRadius: '10px',
-                bgcolor: pdpaAccepted ? 'rgba(16,185,129,0.15)' : 'var(--glass-bg)',
+                p: 1.25,
+                borderRadius: '6px',
+                bgcolor: 'var(--surface-2)',
+                border: '1px solid var(--glass-border)',
                 cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                '&:hover': { bgcolor: pdpaAccepted ? 'rgba(16,185,129,0.2)' : 'var(--glass-bg)' },
+                '&:hover': { bgcolor: 'var(--glass-bg)' },
               }}
             >
               <Box sx={{
-                width: 22, height: 22, borderRadius: '6px',
-                bgcolor: pdpaAccepted ? '#34c759' : 'var(--glass-bg)',
-                border: pdpaAccepted ? 'none' : '2px solid var(--glass-border)',
+                width: 18, height: 18, borderRadius: '4px',
+                bgcolor: pdpaAccepted ? 'var(--foreground)' : 'transparent',
+                border: pdpaAccepted ? 'none' : '1.5px solid var(--text-muted)',
                 display: 'grid', placeItems: 'center',
-                transition: 'all 0.2s ease',
+                flexShrink: 0,
               }}>
-                {pdpaAccepted && <Check size={12} style={{ color: 'white' }} />}
+                {pdpaAccepted && <Check size={12} strokeWidth={2.5} style={{ color: 'var(--background)' }} />}
               </Box>
-              <Typography sx={{ fontSize: '0.8rem', color: pdpaAccepted ? 'var(--success)' : 'var(--foreground)', fontWeight: 600 }}>
+              <Typography sx={{ fontSize: '0.8rem', color: 'var(--foreground)', fontWeight: 550 }}>
                 {t.profile.pdpaConsent}
               </Typography>
             </Box>
             {errors.pdpa && (
               <Box sx={{
                 display: 'flex', alignItems: 'center', gap: 1,
-                mt: 2, p: 1.5, borderRadius: '10px',
-                bgcolor: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)',
+                mt: 1.5, p: 1.25, borderRadius: '6px',
+                bgcolor: 'var(--surface-2)', border: '1px solid var(--glass-border)',
               }}>
-                <AlertTriangle size={16} style={{ color: 'var(--warning)' }} />
-                <Typography sx={{ fontSize: '0.8rem', color: 'var(--warning)' }}>{errors.pdpa}</Typography>
+                <AlertTriangle size={15} strokeWidth={1.75} style={{ color: FORMAL.mutedIcon }} />
+                <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{errors.pdpa}</Typography>
               </Box>
             )}
           </Box>
@@ -1525,51 +1474,36 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
 
       {/* Bottom Submit Button */}
       <Box sx={{
-        px: { xs: 2, sm: 3 },
+        px: { xs: 2, sm: 2.5 },
         py: 1.5,
         borderTop: '1px solid var(--glass-border)',
-        background: 'var(--glass-strong)',
-        backdropFilter: 'blur(20px)',
+        background: 'var(--background)',
         paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
       }}>
         <Box sx={{ maxWidth: 520, mx: 'auto' }}>
-          <Button
-            fullWidth
+          <UiButton
             type="submit"
             onClick={handleSubmit}
             disabled={!pdpaAccepted}
-            startIcon={isFormValid ? <Sparkles size={18} /> : <Check size={18} />}
-            sx={{
-              py: 1.5,
-              borderRadius: '14px',
-              background: isFormValid
-                ? 'linear-gradient(135deg, #34c759 0%, #34c759 100%)'
-                : pdpaAccepted
-                  ? 'linear-gradient(135deg, #0077ED 0%, #0071e3 100%)'
-                  : 'rgba(100,116,139,0.15)',
-              color: pdpaAccepted ? 'white' : 'var(--text-muted)',
-              fontSize: '0.95rem',
-              fontWeight: 700,
-              textTransform: 'none',
-              boxShadow: isFormValid ? '0 6px 24px rgba(16,185,129,0.3)' : 'none',
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                background: isFormValid
-                  ? 'linear-gradient(135deg, #34c759 0%, #047857 100%)'
-                  : pdpaAccepted
-                    ? 'linear-gradient(135deg, #bf5af2 0%, #1d4ed8 100%)'
-                    : 'rgba(100,116,139,0.2)',
-                transform: isFormValid ? 'translateY(-1px)' : 'none',
-                boxShadow: isFormValid ? '0 8px 32px rgba(16,185,129,0.35)' : 'none',
-              },
-              '&:disabled': {
-                background: 'rgba(100,116,139,0.15)',
-                color: 'var(--text-muted)',
-              },
-            }}
+            className={cn(
+              'h-11 w-full rounded-md text-sm font-semibold',
+              pdpaAccepted
+                ? 'bg-[var(--foreground)] text-[var(--background)] hover:bg-[var(--foreground)]/90'
+                : 'bg-[var(--surface-2)] text-[var(--text-muted)]',
+            )}
           >
-            {isFormValid ? t.profile.saveAndContinue : t.profile.fillAllInfo}
-          </Button>
+            {isFormValid ? (
+              <>
+                {t.profile.saveAndContinue}
+                <ArrowRight className="size-4" />
+              </>
+            ) : (
+              <>
+                <Check className="size-4" />
+                {t.profile.fillAllInfo}
+              </>
+            )}
+          </UiButton>
           {!pdpaAccepted && (
             <Typography sx={{ textAlign: 'center', fontSize: '0.7rem', color: 'var(--text-muted)', mt: 1 }}>
               {t.profile.pdpaRequired}
@@ -1588,9 +1522,10 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
         PaperProps={{
           sx: {
             bgcolor: 'var(--surface)',
-            borderRadius: '20px',
+            borderRadius: '10px',
             overflow: 'hidden',
             m: 1,
+            border: '1px solid var(--glass-border)',
           },
         }}
       >
@@ -1663,10 +1598,10 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
               max={3}
               step={0.05}
               sx={{
-                color: '#0071e3',
-                '& .MuiSlider-thumb': { width: 18, height: 18, bgcolor: 'var(--surface)', border: '2px solid #0071e3' },
-                '& .MuiSlider-track': { height: 4 },
-                '& .MuiSlider-rail': { height: 4, bgcolor: 'var(--glass-border)' },
+                color: 'var(--foreground)',
+                '& .MuiSlider-thumb': { width: 16, height: 16, bgcolor: 'var(--background)', border: '2px solid var(--foreground)' },
+                '& .MuiSlider-track': { height: 3 },
+                '& .MuiSlider-rail': { height: 3, bgcolor: 'var(--glass-border)' },
               }}
             />
             <ZoomIn size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
@@ -1682,10 +1617,10 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
               max={180}
               step={1}
               sx={{
-                color: '#8b5cf6',
-                '& .MuiSlider-thumb': { width: 18, height: 18, bgcolor: 'var(--surface)', border: '2px solid #8b5cf6' },
-                '& .MuiSlider-track': { height: 4 },
-                '& .MuiSlider-rail': { height: 4, bgcolor: 'var(--glass-border)' },
+                color: 'var(--foreground)',
+                '& .MuiSlider-thumb': { width: 16, height: 16, bgcolor: 'var(--background)', border: '2px solid var(--foreground)' },
+                '& .MuiSlider-track': { height: 3 },
+                '& .MuiSlider-rail': { height: 3, bgcolor: 'var(--glass-border)' },
               }}
             />
             <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', minWidth: 32, textAlign: 'right' }}>
@@ -1703,10 +1638,11 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
             fullWidth
             onClick={() => { setCropPreview(null); cropImageRef.current = null; }}
             sx={{
-              py: 1, borderRadius: '12px',
-              bgcolor: 'var(--glass-bg)', color: 'var(--foreground)',
+              py: 1, borderRadius: '6px',
+              bgcolor: 'transparent', color: 'var(--foreground)',
+              border: '1px solid var(--glass-border)',
               fontWeight: 600, fontSize: '0.85rem', textTransform: 'none',
-              '&:hover': { bgcolor: 'var(--glass-border)' },
+              '&:hover': { bgcolor: 'var(--surface-2)' },
             }}
           >
             {t.common.cancel}
@@ -1715,13 +1651,14 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
             fullWidth
             onClick={handleCropConfirm}
             disabled={uploadingImage}
-            startIcon={uploadingImage ? <CircularProgress size={16} sx={{ color: 'white' }} /> : <Check size={16} />}
+            startIcon={uploadingImage ? <CircularProgress size={16} sx={{ color: 'var(--background)' }} /> : <Check size={16} strokeWidth={1.75} />}
             sx={{
-              py: 1, borderRadius: '12px',
-              background: 'linear-gradient(135deg, #34c759 0%, #34c759 100%)',
-              color: 'white', fontWeight: 600, fontSize: '0.85rem', textTransform: 'none',
-              boxShadow: '0 4px 16px rgba(16,185,129,0.25)',
-              '&:hover': { background: 'linear-gradient(135deg, #34c759 0%, #047857 100%)' },
+              py: 1, borderRadius: '6px',
+              bgcolor: 'var(--foreground)',
+              color: 'var(--background)',
+              fontWeight: 650, fontSize: '0.85rem', textTransform: 'none',
+              boxShadow: 'none',
+              '&:hover': { bgcolor: 'var(--foreground)', opacity: 0.92, boxShadow: 'none' },
               '&:disabled': { opacity: 0.7 },
             }}
           >
