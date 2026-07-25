@@ -14,7 +14,62 @@ import { withDbRetry } from './db-query';
 
 // ==================== CONFIGURATION ====================
 
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const supabaseServiceKey =
+  process.env.SUPABASE_SERVICE_ROLE_KEY2 ||
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  '';
+
+function projectRefFromUrl(url: string): string | null {
+  try {
+    return new URL(url).hostname.split('.')[0] || null;
+  } catch {
+    return null;
+  }
+}
+
+function projectRefFromJwt(token: string): string | null {
+  try {
+    const part = token.split('.')[1];
+    if (!part) return null;
+    const json = Buffer.from(part.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString(
+      'utf8',
+    );
+    const payload = JSON.parse(json) as { ref?: string };
+    return typeof payload.ref === 'string' ? payload.ref : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Prefer URL2, but never pair a service-role JWT with a different project. */
+function resolveSupabaseStorageConfig(): { url: string; serviceKey: string } {
+  const serviceKey = supabaseServiceKey;
+  const candidates = [
+    process.env.NEXT_PUBLIC_SUPABASE_URL2,
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+  ].filter((u): u is string => Boolean(u?.trim()));
+
+  if (!serviceKey || candidates.length === 0) {
+    return { url: candidates[0] || '', serviceKey };
+  }
+
+  const keyRef = projectRefFromJwt(serviceKey);
+  if (keyRef) {
+    const matched = candidates.find((u) => projectRefFromUrl(u) === keyRef);
+    if (matched) return { url: matched, serviceKey };
+    // Prefer primary (URL2) URL but keep key — caller will get a clear signature error.
+    // Surface mismatch early instead of opaque Storage 500s.
+    const preferred = candidates[0];
+    const preferredRef = projectRefFromUrl(preferred);
+    if (preferredRef && preferredRef !== keyRef) {
+      throw new Error(
+        `Supabase project mismatch: SERVICE_ROLE_KEY is for "${keyRef}" but storage URL is "${preferredRef}". Update SUPABASE_SERVICE_ROLE_KEY (or KEY2) to the service_role key from project ${preferredRef}.`,
+      );
+    }
+  }
+
+  return { url: candidates[0], serviceKey };
+}
 
 function resolveSupabasePublicConfig() {
   return {
@@ -74,12 +129,19 @@ let _supabaseAdmin: SupabaseClient | null = null;
 
 export function getSupabaseAdmin(): SupabaseClient | null {
   if (_supabaseAdmin) return _supabaseAdmin;
-  const storageUrl = process.env.NEXT_PUBLIC_SUPABASE_URL2 || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-  if (!storageUrl || !supabaseServiceKey) {
+  let storageUrl = '';
+  let serviceKey = '';
+  try {
+    ({ url: storageUrl, serviceKey } = resolveSupabaseStorageConfig());
+  } catch (e) {
+    console.error('[supabase] Storage config error:', e instanceof Error ? e.message : e);
+    throw e;
+  }
+  if (!storageUrl || !serviceKey) {
     console.warn('[supabase] Missing NEXT_PUBLIC_SUPABASE_URL/URL2 or SERVICE_ROLE_KEY');
     return null;
   }
-  _supabaseAdmin = createClient(storageUrl, supabaseServiceKey, {
+  _supabaseAdmin = createClient(storageUrl, serviceKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
@@ -1306,8 +1368,8 @@ export async function uploadImageToStorage(
     );
   }
 
-  // supabase-js expects Blob/File/Uint8Array; plain Buffer can fail in some runtimes
-  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  // Always copy — Node Buffer is a Uint8Array subclass and can fail in supabase-js
+  const bytes = new Uint8Array(buffer);
 
   const { data, error } = await adminClient.storage
     .from(STORAGE_BUCKET)

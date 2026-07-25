@@ -156,8 +156,10 @@ export async function POST(req: NextRequest) {
     console.error('[upload] error', error);
     const raw = String(error?.message || 'Upload failed');
     const friendly =
-      /not configured|SERVICE_ROLE|Bucket not found|row-level security|JWT/i.test(raw)
-        ? 'อัปโหลดไม่สำเร็จ: ที่เก็บรูปยังตั้งค่าไม่ครบหรือไม่มีสิทธิ์เขียน กรุณาติดต่อแอดมิน'
+      /not configured|SERVICE_ROLE|project mismatch|signature verification|Bucket not found|row-level security|JWT/i.test(
+        raw,
+      )
+        ? 'อัปโหลดไม่สำเร็จ: ที่เก็บรูปตั้งค่าไม่ตรงโปรเจกต์ (SERVICE_ROLE_KEY) กรุณาติดต่อแอดมิน'
         : 'อัปโหลดไม่สำเร็จ กรุณาลองใหม่';
     return NextResponse.json({
       status: 'error',
