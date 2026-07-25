@@ -15,7 +15,7 @@ import { orders, paymentTransactions } from '@/db/schema';
 import { eq, and, desc, isNotNull } from 'drizzle-orm';
 import { requireAuth, isResourceOwner, isAdminEmailAsync } from '@/lib/auth';
 import {
-  createStripePaymentIntent,
+  createStripePaymentIntentDetailed,
   isStripeEnvConfigured,
 } from '@/lib/payment';
 import { getStripePromptPayEnabled } from '@/lib/payment-server';
@@ -94,7 +94,13 @@ export async function POST(req: NextRequest) {
         });
         if (res.ok) {
           const intent = await res.json();
-          if (intent.status !== 'canceled') {
+          // Only reuse intents that can still produce a PromptPay QR
+          const reusable =
+            intent.status === 'requires_payment_method' ||
+            intent.status === 'requires_confirmation' ||
+            intent.status === 'requires_action' ||
+            intent.status === 'succeeded';
+          if (intent.status !== 'canceled' && reusable) {
             console.log('[Stripe PromptPay] Reusing existing active PaymentIntent:', intent.id);
             
             // If the status has succeeded in Stripe, update the transaction and order immediately
@@ -167,18 +173,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create AND confirm server-side (Direct API flow) so the QR code data
-    // comes back in this response — the client renders it without needing
-    // stripe.confirmPromptPayPayment (which can hang in some browsers).
-    const intent = await createStripePaymentIntent({
+    // Create PaymentIntent WITHOUT confirm — server-side confirm+payment_method_data
+    // frequently returns payment_method_not_available for PromptPay. Client confirms
+    // via stripe.confirmPromptPayPayment(..., { handleActions: false }) to get the QR.
+    const created = await createStripePaymentIntentDetailed({
       amount: Math.round(amountTHB * 100), // satang
       currency: 'thb',
       paymentMethodTypes: ['promptpay'],
-      confirm: true,
-      paymentMethodData: {
-        type: 'promptpay',
-        billingEmail: order.customerEmail,
-      },
+      confirm: false,
       description: `Order ${ref}`,
       metadata: {
         orderId: ref,
@@ -186,14 +188,25 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    if (!intent) {
+    if (!created.ok) {
+      const unavailable =
+        created.code === 'payment_method_not_available' ||
+        created.declineCode === 'payment_method_not_available';
       return NextResponse.json(
-        { status: 'error', message: 'สร้างรายการชำระเงินไม่สำเร็จ กรุณาลองใหม่' },
-        { status: 502 }
+        {
+          status: 'error',
+          code: created.code || created.declineCode,
+          message: unavailable
+            ? 'พร้อมเพย์อัตโนมัติยังไม่พร้อมใช้งานตอนนี้ กรุณาเลือก “โอนเอง + แนบสลิป” หรือลองใหม่ภายหลัง'
+            : created.message || 'สร้างรายการชำระเงินไม่สำเร็จ กรุณาลองใหม่',
+        },
+        { status: unavailable ? 503 : 502 },
       );
     }
 
-    // Record the pending transaction (webhook flips it to paid)
+    const intent = created.intent;
+
+    // Record the pending transaction (webhook / poll flips it to paid)
     await db.insert(paymentTransactions).values({
       orderId: order.id,
       method: 'promptpay',
@@ -212,7 +225,7 @@ export async function POST(req: NextRequest) {
         amount: amountTHB,
         email: order.customerEmail,
         publishableKey: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
-        // QR code data from server-side confirm (render directly, no JS confirm needed)
+        // QR comes from client-side confirm (handleActions: false)
         qrCode: intent.nextAction?.promptpay_display_qr_code || null,
         intentStatus: intent.status,
       },

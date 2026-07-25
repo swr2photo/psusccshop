@@ -34,6 +34,26 @@ const SERVER_POLL_MS = 2000;
 // would otherwise create two PaymentIntents per modal open)
 const inflightCreate = new Map<string, Promise<any>>();
 
+async function readApiJson(res: Response): Promise<any> {
+  const text = await res.text();
+  const trimmed = text.trim();
+  if (!trimmed) {
+    throw new Error('empty response');
+  }
+  if (trimmed.startsWith('<')) {
+    throw new Error(
+      `เซิร์ฟเวอร์ตอบกลับผิดรูปแบบ (HTTP ${res.status}) กรุณาลองใหม่ หรือเลือกโอนเอง + แนบสลิป`,
+    );
+  }
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    throw new Error(
+      `ตอบกลับไม่ใช่ JSON (HTTP ${res.status}) กรุณาลองใหม่ หรือเลือกโอนเอง + แนบสลิป`,
+    );
+  }
+}
+
 async function createPromptPayIntent(orderRef: string): Promise<any> {
   const existing = inflightCreate.get(orderRef);
   if (existing) return existing;
@@ -41,10 +61,10 @@ async function createPromptPayIntent(orderRef: string): Promise<any> {
     try {
       const res = await apiFetch('/api/payment/stripe/promptpay', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({ ref: orderRef }),
       });
-      const json = await res.json();
+      const json = await readApiJson(res);
       return { ok: res.ok, json };
     } finally {
       // Allow a fresh intent on explicit retry once this settles
@@ -155,7 +175,17 @@ export default function StripePromptPay({
       console.log('[StripePromptPay] Confirm result:', paymentIntent?.status, error?.message || '');
 
       if (!mountedRef.current) return;
-      if (error) throw new Error(error.message || t.payment.stripeError);
+      if (error) {
+        const unavailable =
+          /payment_method_not_available/i.test(error.code || '') ||
+          /payment_method_not_available/i.test(error.message || '') ||
+          /not available/i.test(error.message || '');
+        throw new Error(
+          unavailable
+            ? 'พร้อมเพย์อัตโนมัติยังไม่พร้อมใช้งานตอนนี้ กรุณาเลือก “โอนเอง + แนบสลิป”'
+            : error.message || t.payment.stripeError,
+        );
+      }
 
       if (paymentIntent?.status === 'succeeded') {
         markSucceeded();
@@ -203,9 +233,9 @@ export default function StripePromptPay({
 
       const res = await apiFetch(
         `/api/payment/stripe/promptpay?ref=${encodeURIComponent(orderRef)}&intent=${encodeURIComponent(intentId)}`,
-        { credentials: 'same-origin' }
+        { credentials: 'same-origin', headers: { Accept: 'application/json' } }
       );
-      const json = await res.json();
+      const json = await readApiJson(res);
       if (json.status !== 'success') {
         throw new Error(json.message || 'poll failed');
       }

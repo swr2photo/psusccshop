@@ -613,34 +613,51 @@ export interface StripePaymentIntentResult {
   nextAction?: any;
 }
 
+export type StripePaymentIntentCreateResult =
+  | { ok: true; intent: StripePaymentIntentResult }
+  | {
+      ok: false;
+      message: string;
+      code?: string;
+      declineCode?: string;
+    };
+
 /**
- * Create Stripe PaymentIntent
+ * Create Stripe PaymentIntent.
+ * Prefer create-without-confirm for PromptPay, then confirm client-side
+ * (server confirm often returns payment_method_not_available).
  */
 export async function createStripePaymentIntent(
   params: StripePaymentIntentParams
 ): Promise<StripePaymentIntentResult | null> {
+  const result = await createStripePaymentIntentDetailed(params);
+  return result.ok ? result.intent : null;
+}
+
+export async function createStripePaymentIntentDetailed(
+  params: StripePaymentIntentParams
+): Promise<StripePaymentIntentCreateResult> {
   const secretKey = process.env.STRIPE_SECRET_KEY;
-  
+
   if (!secretKey) {
     console.error('[Payment] Stripe secret key not configured');
-    return null;
+    return { ok: false, message: 'Stripe is not configured', code: 'not_configured' };
   }
-  
+
   try {
     const body = new URLSearchParams({
       amount: params.amount.toString(),
       currency: params.currency || 'thb',
     });
-    
-    // Each payment method type must be appended as a separate array entry
+
     for (const type of params.paymentMethodTypes?.length ? params.paymentMethodTypes : ['card']) {
       body.append('payment_method_types[]', type);
     }
-    
+
     if (params.confirm) {
       body.append('confirm', 'true');
     }
-    
+
     if (params.paymentMethodData) {
       body.append('payment_method_data[type]', params.paymentMethodData.type);
       if (params.paymentMethodData.billingEmail) {
@@ -648,42 +665,61 @@ export async function createStripePaymentIntent(
         body.append('receipt_email', params.paymentMethodData.billingEmail);
       }
     }
-    
+
+    if (params.returnUrl) {
+      body.append('return_url', params.returnUrl);
+    }
+
     if (params.description) {
       body.append('description', params.description);
     }
-    
+
     if (params.metadata) {
       Object.entries(params.metadata).forEach(([key, value]) => {
         body.append(`metadata[${key}]`, String(value));
       });
     }
-    
+
     const res = await fetch('https://api.stripe.com/v1/payment_intents', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${secretKey}`,
+        Authorization: `Bearer ${secretKey}`,
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: body.toString(),
     });
-    
+
+    const data = await res.json().catch(() => ({} as any));
+
     if (!res.ok) {
-      const errorData = await res.json();
-      console.error('[Payment] Stripe PaymentIntent failed:', errorData);
-      return null;
+      console.error('[Payment] Stripe PaymentIntent failed:', data);
+      const err = data?.error || {};
+      return {
+        ok: false,
+        message:
+          err.message ||
+          'สร้างรายการชำระเงินไม่สำเร็จ กรุณาลองใหม่ หรือเลือกโอนเอง + แนบสลิป',
+        code: err.code,
+        declineCode: err.decline_code,
+      };
     }
-    
-    const data = await res.json();
+
     return {
-      clientSecret: data.client_secret,
-      id: data.id,
-      status: data.status,
-      nextAction: data.next_action || null,
+      ok: true,
+      intent: {
+        clientSecret: data.client_secret,
+        id: data.id,
+        status: data.status,
+        nextAction: data.next_action || null,
+      },
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error('[Payment] Stripe PaymentIntent error:', error);
-    return null;
+    return {
+      ok: false,
+      message: error?.message || 'Stripe request failed',
+      code: 'network_error',
+    };
   }
 }
 
