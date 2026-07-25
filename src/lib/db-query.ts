@@ -13,13 +13,24 @@ export function formatDbError(error: unknown): string {
   return String(error);
 }
 
+function isPoolExhaustedError(error: unknown): boolean {
+  const msg = formatDbError(error).toLowerCase();
+  return (
+    msg.includes('emaxconnsession') ||
+    msg.includes('max clients reached') ||
+    msg.includes('too many clients') ||
+    msg.includes('remaining connection slots') ||
+    msg.includes('maxclientsinsessionmode')
+  );
+}
+
 /** Run a DB query with timeout + retry (Workers and Vercel). */
 export async function withDbRetry<T>(
   label: string,
   fn: () => Promise<T>,
   options?: { maxAttempts?: number; timeoutMs?: number },
 ): Promise<T> {
-  const maxAttempts =
+  let maxAttempts =
     options?.maxAttempts ?? (isCloudflareWorkersRuntime() ? 3 : 2);
   const timeoutMs = options?.timeoutMs ?? 8_000;
 
@@ -31,9 +42,15 @@ export async function withDbRetry<T>(
         `[db-query] ${label} attempt ${attempt}/${maxAttempts}:`,
         formatDbError(error),
       );
+      if (isPoolExhaustedError(error) && maxAttempts < 4) {
+        maxAttempts = 4;
+      }
       if (attempt < maxAttempts) {
         await resetDbConnection();
-        await new Promise((resolve) => setTimeout(resolve, 150 * attempt));
+        const delayMs = isPoolExhaustedError(error)
+          ? 250 * attempt * attempt
+          : 150 * attempt;
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
         continue;
       }
       throw error;

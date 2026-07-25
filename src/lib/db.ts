@@ -51,8 +51,48 @@ function normalizeConnectionString(connectionString: string): string {
   return normalized;
 }
 
+/**
+ * Supabase session-mode pooler (port 5432) caps concurrent clients (~15 on free/pro).
+ * Vercel serverless + Workers exhaust that quickly → EMAXCONNSESSION → /api/cart 500.
+ * Prefer transaction mode (6543) unless DB_FORCE_SESSION_POOLER=1.
+ */
+function preferServerlessPooler(connectionString: string): string {
+  const forceSession =
+    process.env.DB_FORCE_SESSION_POOLER === '1' ||
+    process.env.DB_FORCE_SESSION_POOLER === 'true';
+  if (forceSession) return connectionString;
+
+  const isServerless =
+    process.env.VERCEL === '1' ||
+    process.env.LAMBDA === '1' ||
+    process.env.DB_USE_TRANSACTION_POOLER === '1' ||
+    process.env.DB_USE_TRANSACTION_POOLER === 'true';
+  if (!isServerless) return connectionString;
+
+  try {
+    const parsed = new URL(connectionString);
+    const isSupabasePooler = parsed.hostname.includes('pooler.supabase.com');
+    const port = parsed.port || '5432';
+    if (!isSupabasePooler || port === '6543') {
+      if (isSupabasePooler && port === '6543') {
+        parsed.searchParams.set('pgbouncer', 'true');
+      }
+      return parsed.toString();
+    }
+
+    parsed.port = '6543';
+    parsed.searchParams.set('pgbouncer', 'true');
+    console.warn(
+      '[db] Rewriting Supabase session pooler (:5432) → transaction mode (:6543) for serverless',
+    );
+    return parsed.toString();
+  } catch {
+    return connectionString;
+  }
+}
+
 function poolConfig(connectionString: string) {
-  const normalized = normalizeConnectionString(connectionString);
+  const normalized = preferServerlessPooler(normalizeConnectionString(connectionString));
   const useSsl =
     normalized.includes('supabase.co') ||
     process.env.DB_SSL === '1' ||
@@ -61,10 +101,11 @@ function poolConfig(connectionString: string) {
   if (
     process.env.VERCEL === '1' &&
     normalized.includes('db.') &&
-    normalized.includes('.supabase.co')
+    normalized.includes('.supabase.co') &&
+    !normalized.includes('pooler.supabase.com')
   ) {
     console.warn(
-      '[db] Direct Supabase host on Vercel may fail — use Session pooler URI in DATABASE_URL',
+      '[db] Direct Supabase host on Vercel may fail — use Transaction pooler URI (:6543) in DATABASE_URL',
     );
   }
 
@@ -77,9 +118,11 @@ function poolConfig(connectionString: string) {
     connectionString: normalized,
     max: maxConnections,
     min: 0,
-    idleTimeoutMillis: 10_000,
+    // Release idle clients quickly so session/transaction slots free up under burst load
+    idleTimeoutMillis: isServerless ? 1_000 : 10_000,
     connectionTimeoutMillis: 10_000,
-    keepAlive: true,
+    allowExitOnIdle: isServerless,
+    keepAlive: !isServerless,
     ...(useSsl ? { ssl: { rejectUnauthorized: false } } : {}),
   };
 }
