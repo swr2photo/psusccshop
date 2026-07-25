@@ -59,7 +59,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ status: 'success', data: { profile: merged } });
   } catch (error) {
     console.error('[Profile API] GET error:', error);
-    return NextResponse.json({ status: 'success', data: { profile: {} } });
+    // Never mask failures as empty profile — clients would wipe cached contact data
+    return NextResponse.json(
+      { status: 'error', message: 'Failed to load profile' },
+      { status: 500 },
+    );
   }
 }
 

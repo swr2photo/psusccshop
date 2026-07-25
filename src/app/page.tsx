@@ -833,6 +833,10 @@ export default function HomePage() {
   // gating "should we fetch?" on orderHistory.length caused the drawer to show
   // only those few local orders and never load the rest.
   const historyLoadedRef = useRef(false);
+  // Gate localStorage writes until we've tried to restore cached orderData
+  const orderDataHydratedRef = useRef(false);
+  // Soft-hold LoginScreen during brief session flicker after refresh
+  const [authSettled, setAuthSettled] = useState(false);
   // Stable handle to the latest loadOrderHistory for use inside effects
   const loadOrderHistoryRef = useRef<(opts?: { append?: boolean; silent?: boolean }) => void>(() => {});
   const [historyFilter, setHistoryFilter] = useState<'ALL' | 'WAITING_PAYMENT' | 'COMPLETED' | 'SHIPPED' | 'RECEIVED' | 'CANCELLED'>('ALL');
@@ -1176,67 +1180,78 @@ export default function HomePage() {
   }, [config?.products, loading, now]);
 
   useEffect(() => {
-    if (!session?.user?.email) return;
+    const email = session?.user?.email;
+    if (!email) return;
 
     setOrderData((prev) => ({
       ...prev,
-      email: session.user?.email || prev.email,
-      name: prev.name || session.user?.name || '',
+      email: email || prev.email,
+      name: prev.name || session?.user?.name || '',
     }));
 
+    let cancelled = false;
+
     const loadProfile = async () => {
-      const email = session.user?.email;
-      if (!email) return;
       try {
         const res = await getProfile(email);
+        if (cancelled) return;
         const profile = (res.data as any)?.profile || (res as any)?.profile;
-        if (res.status === 'success' && profile) {
-          const sanitizedProfile = {
-            name: typeof profile.name === 'string' ? profile.name.trim() : '',
-            phone: typeof profile.phone === 'string' ? onlyDigitsPhone(profile.phone) : '',
-            address: typeof profile.address === 'string' ? profile.address.trim() : '',
-            instagram: typeof profile.instagram === 'string' ? profile.instagram.trim() : '',
-            profileImage: typeof profile.profileImage === 'string' ? profile.profileImage : '',
-          };
-          setOrderData((prev) => ({ ...prev, ...sanitizedProfile, email: session.user?.email || prev.email }));
+        if (res.status !== 'success' || !profile || typeof profile !== 'object') return;
+        // Empty object from a bad response must not wipe cached contact fields
+        if (Object.keys(profile).length === 0) return;
 
-          // Load saved addresses
-          if (Array.isArray(profile.savedAddresses)) {
-            setSavedAddresses(profile.savedAddresses);
-          }
+        const nextName = typeof profile.name === 'string' ? profile.name.trim() : '';
+        const nextPhone = typeof profile.phone === 'string' ? onlyDigitsPhone(profile.phone) : '';
+        const nextAddress = typeof profile.address === 'string' ? profile.address.trim() : '';
+        const nextIg = typeof profile.instagram === 'string' ? profile.instagram.trim() : '';
+        const nextImage = typeof profile.profileImage === 'string' ? profile.profileImage : '';
 
-          // Load theme preference from DB
-          if (profile.theme && ['light', 'dark', 'system'].includes(profile.theme)) {
-            const { setMode, mode } = useThemeStore.getState();
-            if (mode !== profile.theme) {
-              setMode(profile.theme as ThemeMode);
-            }
-            // Initialize ref so the auto-save effect knows the baseline
-            prevThemeModeRef.current = profile.theme as ThemeMode;
-          } else {
-            // No theme in DB yet — set current mode as baseline
-            prevThemeModeRef.current = useThemeStore.getState().mode;
-          }
+        setOrderData((prev) => ({
+          ...prev,
+          email: email || prev.email,
+          name: nextName || prev.name,
+          phone: nextPhone || prev.phone,
+          address: nextAddress || prev.address,
+          instagram: nextIg || prev.instagram,
+          profileImage: nextImage || prev.profileImage,
+        }));
 
-          const alreadyComplete = isThaiText(sanitizedProfile.name) && !!sanitizedProfile.phone && !!sanitizedProfile.instagram;
-          if (!alreadyComplete) {
-            setShowProfileModal(true);
+        if (Array.isArray(profile.savedAddresses)) {
+          setSavedAddresses(profile.savedAddresses);
+        }
+
+        if (profile.theme && ['light', 'dark', 'system'].includes(profile.theme)) {
+          const { setMode, mode } = useThemeStore.getState();
+          if (mode !== profile.theme) {
+            setMode(profile.theme as ThemeMode);
           }
-          }
+          prevThemeModeRef.current = profile.theme as ThemeMode;
+        } else {
+          prevThemeModeRef.current = useThemeStore.getState().mode;
+        }
+
+        const alreadyComplete =
+          isThaiText(nextName) && !!nextPhone && !!nextIg;
+        // Only prompt when server returned real contact fields (avoid flash on empty/error)
+        if ((nextName || nextPhone || nextIg) && !alreadyComplete) {
+          setShowProfileModal(true);
+        }
       } catch (error) {
         console.error('Failed to load profile:', error);
       }
     };
 
     const loadCart = async () => {
-      const email = session.user?.email;
-      if (!email) return;
       try {
         const res = await getCart(email);
+        if (cancelled) return;
         const serverCart = (res.data as any)?.cart || (res as any)?.cart;
-        if (res.status === 'success' && Array.isArray(serverCart)) {
-          setCart(serverCart);
-        }
+        if (res.status !== 'success' || !Array.isArray(serverCart)) return;
+        // Don't wipe a non-empty local cart with an ambiguous empty server response
+        setCart((prev) => {
+          if (serverCart.length === 0 && prev.length > 0) return prev;
+          return serverCart;
+        });
       } catch (error) {
         console.error('Failed to load cart:', error);
       }
@@ -1244,7 +1259,10 @@ export default function HomePage() {
 
     loadProfile();
     loadCart();
-  }, [session]);
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.user?.email]);
 
   // Recalculate cart prices when events change (auto-revert discounts when event ends)
   useEffect(() => {
@@ -1313,15 +1331,32 @@ export default function HomePage() {
       const saved = window.localStorage.getItem('orderData');
       if (saved) {
         const parsed = JSON.parse(saved);
-        setOrderData((prev) => ({ ...prev, ...parsed }));
+        const hasContact =
+          Boolean(parsed?.name) ||
+          Boolean(parsed?.phone) ||
+          Boolean(parsed?.address) ||
+          Boolean(parsed?.instagram);
+        if (hasContact) {
+          setOrderData((prev) => ({ ...prev, ...parsed }));
+        }
       }
     } catch (error) {
       console.error('Failed to load saved order data', error);
+    } finally {
+      orderDataHydratedRef.current = true;
     }
   }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (!orderDataHydratedRef.current) return;
+    const hasContact =
+      Boolean(orderData.name) ||
+      Boolean(orderData.phone) ||
+      Boolean(orderData.address) ||
+      Boolean(orderData.instagram);
+    // Never persist an all-empty snapshot over a previously saved profile
+    if (!hasContact) return;
     try {
       window.localStorage.setItem('orderData', JSON.stringify(orderData));
     } catch (error) {
@@ -2390,60 +2425,59 @@ export default function HomePage() {
       const res = await getHistory(session.user.email, append ? historyCursor || undefined : undefined, pageSize);
 
       if (res.status === 'success') {
-        const rawHistory = res.data?.history || (res as any)?.history || [];
+        const rawHistory = res.data?.history ?? (res as any)?.history;
         const hasMore = Boolean(res.data?.hasMore);
         const nextCursor = res.data?.nextCursor || null;
-        if (Array.isArray(rawHistory)) {
-          // Normalize order data - calculate total from cart/items if not present
-          const history = rawHistory.map((order: any) => {
-            let total = order.total || order.totalAmount || order.amount || 0;
-            
-            // If total is 0 or missing, calculate from cart/items
-            if (!total || total === 0) {
-              const items = order.items || order.cart || [];
-              if (Array.isArray(items) && items.length > 0) {
-                total = items.reduce((sum: number, item: any) => {
-                  const price = item.unitPrice || item.subtotal || item.price || 0;
-                  const qty = item.qty || item.quantity || 1;
-                  return sum + (item.subtotal || (price * qty));
-                }, 0);
-              }
-            }
-            
-            return {
-              ...order,
-              total,
-              items: order.items || order.cart || [],
-            };
-          });
-          
-          // Deduplicate orders by ref
-          setOrderHistory((prev) => {
-            if (append) {
-              // When appending, only add orders not already present
-              const existingRefs = new Set(prev.map(o => o.ref));
-              const newOrders = history.filter((o: any) => !existingRefs.has(o.ref));
-              return [...prev, ...newOrders];
-            } else {
-              // When replacing, deduplicate the new list itself
-              const seen = new Set<string>();
-              return history.filter((o: any) => {
-                if (seen.has(o.ref)) return false;
-                seen.add(o.ref);
-                return true;
-              });
-            }
-          });
-          setHistoryHasMore(hasMore);
-          setHistoryCursor(nextCursor);
-          historyLoadedRef.current = true;
-        } else {
+        if (!Array.isArray(rawHistory)) {
           console.warn('History response missing array', { res });
-          if (!append) setOrderHistory([]);
-          setHistoryHasMore(false);
-          setHistoryCursor(null);
+          // Keep previous history; allow retry
+          return;
         }
+
+        // Normalize order data - calculate total from cart/items if not present
+        const history = rawHistory.map((order: any) => {
+          let total = order.total || order.totalAmount || order.amount || 0;
+
+          if (!total || total === 0) {
+            const items = order.items || order.cart || [];
+            if (Array.isArray(items) && items.length > 0) {
+              total = items.reduce((sum: number, item: any) => {
+                const price = item.unitPrice || item.subtotal || item.price || 0;
+                const qty = item.qty || item.quantity || 1;
+                return sum + (item.subtotal || (price * qty));
+              }, 0);
+            }
+          }
+
+          return {
+            ...order,
+            total,
+            items: order.items || order.cart || [],
+          };
+        });
+
+        setOrderHistory((prev) => {
+          if (append) {
+            const existingRefs = new Set(prev.map((o) => o.ref));
+            const newOrders = history.filter((o: any) => !existingRefs.has(o.ref));
+            return [...prev, ...newOrders];
+          }
+          // Don't replace a non-empty list with a suspicious empty success
+          if (!append && history.length === 0 && prev.length > 0) {
+            return prev;
+          }
+          const seen = new Set<string>();
+          return history.filter((o: any) => {
+            if (seen.has(o.ref)) return false;
+            seen.add(o.ref);
+            return true;
+          });
+        });
+        setHistoryHasMore(hasMore);
+        setHistoryCursor(nextCursor);
+        historyLoadedRef.current = true;
       }
+      // status !== success: keep previous history and allow retry
     } catch (error) {
       console.error('Failed to load history:', error);
       if (!silent) showToast('error', t.misc.cannotLoadHistory);
@@ -2770,7 +2804,18 @@ export default function HomePage() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
-  if (!mounted || loading || status === 'loading') {
+  useEffect(() => {
+    if (status === 'authenticated') {
+      setAuthSettled(true);
+      return;
+    }
+    if (status !== 'unauthenticated') return;
+    // Brief grace period — session can flicker unauthenticated right after refresh
+    const timer = setTimeout(() => setAuthSettled(true), 600);
+    return () => clearTimeout(timer);
+  }, [status]);
+
+  if (!mounted || loading || status === 'loading' || (status === 'unauthenticated' && !authSettled)) {
     return <LoadingScreen />;
   }
 

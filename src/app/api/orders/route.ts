@@ -103,9 +103,16 @@ export async function GET(req: NextRequest) {
     );
   } catch (error: any) {
     console.error('[Orders API] GET failed:', error?.message || error);
+    // Never mask failures as empty history — clients would wipe a previously loaded list
     return NextResponse.json(
-      { status: 'success', data: { history: [], hasMore: false, total: 0 } },
-      { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Content-Type': 'application/json; charset=utf-8' } },
+      { status: 'error', message: 'Failed to load orders', data: { history: null } },
+      {
+        status: 500,
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Content-Type': 'application/json; charset=utf-8',
+        },
+      },
     );
   }
 }

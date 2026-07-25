@@ -49,7 +49,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ status: 'success', data: { cart: data || [] } });
   } catch (error) {
     console.error('[Cart API] GET failed:', error);
-    return NextResponse.json({ status: 'success', data: { cart: [] } });
+    // Never mask failures as empty cart — clients would wipe a non-empty local cart
+    return NextResponse.json(
+      { status: 'error', message: 'Failed to load cart' },
+      { status: 500 },
+    );
   }
 }
 
