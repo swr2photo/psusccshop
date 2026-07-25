@@ -52,6 +52,9 @@ const ALWAYS_ON_VERCEL_PREFIXES = [
   '/api/invoice',
   '/api/support-chat',
   '/api/refund',
+  // Session-gated storage writes — Workers hop loses NextAuth request scope
+  '/api/upload',
+  '/api/push-subscription',
 ];
 
 /** Full Option B cutover — auth + session-bound routes stay on Vercel. */
@@ -63,8 +66,6 @@ const KEEP_WHEN_PROXY_ALL = ALWAYS_ON_VERCEL_PREFIXES;
  */
 const KEEP_SAFE_DEFAULT = [
   ...ALWAYS_ON_VERCEL_PREFIXES,
-  '/api/upload',
-  '/api/push-subscription',
   '/api/shipping',
   '/api/stock-alert',
   '/api/privacy',
