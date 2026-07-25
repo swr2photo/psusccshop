@@ -162,7 +162,12 @@ export default function StripePromptPay({
 
       const confirmPromise = stripe.confirmPromptPayPayment(
         clientSecret,
-        { payment_method: { billing_details: { email } } },
+        {
+          payment_method: {
+            type: 'promptpay',
+            billing_details: { email },
+          },
+        },
         { handleActions: false }
       );
       const result = await Promise.race([

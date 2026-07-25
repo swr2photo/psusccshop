@@ -40,6 +40,7 @@ export interface StripeJS {
     clientSecret: string,
     data?: {
       payment_method?: {
+        type?: 'promptpay';
         billing_details?: { email?: string; name?: string };
       };
       return_url?: string;
