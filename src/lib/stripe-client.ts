@@ -45,10 +45,10 @@ export interface StripeJS {
       return_url?: string;
     },
     options?: { handleActions?: boolean }
-  ): Promise<{ paymentIntent?: StripePaymentIntentResult; error?: { message?: string } }>;
+  ): Promise<{ paymentIntent?: StripePaymentIntentResult; error?: { message?: string; code?: string } }>;
   retrievePaymentIntent(
     clientSecret: string
-  ): Promise<{ paymentIntent?: StripePaymentIntentResult; error?: { message?: string } }>;
+  ): Promise<{ paymentIntent?: StripePaymentIntentResult; error?: { message?: string; code?: string } }>;
 }
 
 declare global {
