@@ -61,20 +61,16 @@ async function readTokenFromRequest(request: Request) {
   }
 
   const getTokenReq = buildGetTokenReq(request);
-  // NextRequest itself is accepted by getToken; try it first for chunk assembly
-  const reqCandidates: GetTokenReq[] = [getTokenReq];
-  const maybeNext = request as Request & { cookies?: { getAll?: () => unknown } };
-  if (typeof maybeNext.cookies?.getAll === 'function') {
-    reqCandidates.unshift(request as unknown as GetTokenReq);
-  }
 
-  for (const req of reqCandidates) {
-    for (const cookieName of getSessionCookieNamesForRead()) {
+  for (const cookieName of getSessionCookieNamesForRead()) {
+    try {
       const token = await getToken({
-        req,
+        req: getTokenReq,
         ...tokenOptions(cookieName),
       });
       if (token) return token;
+    } catch (error) {
+      console.error('[session] getToken failed for', cookieName, error);
     }
   }
   return null;

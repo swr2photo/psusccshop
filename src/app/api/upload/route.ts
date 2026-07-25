@@ -4,6 +4,9 @@ import { checkCombinedRateLimitAsync, RATE_LIMITS, getRateLimitHeaders } from '@
 import { putJson, uploadImageToStorage, isSupabaseStorageUrl } from '@/lib/supabase';
 import { validateImageBuffer, isAllowedPassThroughImageUrl } from '@/lib/upload-validation';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 // Helper to save user log server-side
 const userLogKey = (id: string) => `user-logs/${id}.json`;
 interface LogEntry {
@@ -151,9 +154,14 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('[upload] error', error);
+    const raw = String(error?.message || 'Upload failed');
+    const friendly =
+      /not configured|SERVICE_ROLE|Bucket not found|row-level security|JWT/i.test(raw)
+        ? 'อัปโหลดไม่สำเร็จ: ที่เก็บรูปยังตั้งค่าไม่ครบหรือไม่มีสิทธิ์เขียน กรุณาติดต่อแอดมิน'
+        : 'อัปโหลดไม่สำเร็จ กรุณาลองใหม่';
     return NextResponse.json({
       status: 'error',
-      message: process.env.NODE_ENV === 'production' ? 'Upload failed' : (error?.message || 'Upload failed'),
+      message: process.env.NODE_ENV === 'production' ? friendly : raw,
     }, { status: 500 });
   }
 }
@@ -231,8 +239,8 @@ export async function PUT(req: NextRequest) {
           continue;
         }
 
-        const fileName = generateFileName(filename || 'image.png');
         const contentType = validated.contentType;
+        const fileName = generateFileName(contentType);
 
         // Upload to Supabase Storage
         const { url, path } = await uploadImageToStorage(buffer, fileName, contentType);

@@ -1288,7 +1288,7 @@ const STORAGE_BUCKET = 'images';
  * Returns public URL that never expires
  */
 export async function uploadImageToStorage(
-  buffer: Buffer,
+  buffer: Buffer | Uint8Array,
   filename: string,
   contentType: string
 ): Promise<{ url: string; path: string }> {
@@ -1297,29 +1297,38 @@ export async function uploadImageToStorage(
   const ext = filename.split('.').pop()?.toLowerCase() || 'png';
   const uniqueName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
   const path = `${yearMonth}/${uniqueName}`;
-  
-  // Use admin client for secure server-side storage operations
-  const adminClient = getSupabaseAdmin() || supabase;
+
+  // Service role required — anon client hits RLS and surfaces as a vague 500
+  const adminClient = getSupabaseAdmin();
+  if (!adminClient) {
+    throw new Error(
+      'Storage is not configured (missing SUPABASE_SERVICE_ROLE_KEY or Supabase URL)',
+    );
+  }
+
+  // supabase-js expects Blob/File/Uint8Array; plain Buffer can fail in some runtimes
+  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+
   const { data, error } = await adminClient.storage
     .from(STORAGE_BUCKET)
-    .upload(path, buffer, {
+    .upload(path, bytes, {
       contentType,
       cacheControl: '31536000',
       upsert: false,
     });
-  
+
   if (error) {
-    console.error('[Supabase Storage] Upload error:', error);
+    console.error('[Supabase Storage] Upload error:', error.message, error);
     throw new Error(`Failed to upload image: ${error.message}`);
   }
-  
+
   const { data: urlData } = adminClient.storage
     .from(STORAGE_BUCKET)
     .getPublicUrl(path);
-  
+
   return {
     url: urlData.publicUrl,
-    path: data.path,
+    path: data?.path || path,
   };
 }
 
