@@ -308,6 +308,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    // Skip static assets + Sentry tunnel (avoids middleware overhead / accidental limits)
+    '/((?!_next/static|_next/image|favicon.ico|monitoring).*)',
   ],
 };

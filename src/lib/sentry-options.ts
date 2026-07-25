@@ -12,11 +12,12 @@ export const sentryRelease =
   process.env.NEXT_PUBLIC_BUILD_VERSION ||
   `psuscc-shop@${pkg.version}`;
 
-export const sentryTracesSampleRate = isDev ? 1.0 : 0.1;
+// Keep production volumes modest — /monitoring tunnel + Cloudflare can 429 when flooded
+export const sentryTracesSampleRate = isDev ? 1.0 : 0.05;
 
-export const sentryReplaySessionSampleRate = isDev ? 1.0 : 0.1;
+export const sentryReplaySessionSampleRate = isDev ? 0.2 : 0.02;
 
-export const sentryProfileSessionSampleRate = isDev ? 1.0 : 0.1;
+export const sentryProfileSessionSampleRate = isDev ? 0.2 : 0.05;
 
 export const sentryProfilingOptions = {
   profileSessionSampleRate: sentryProfileSessionSampleRate,

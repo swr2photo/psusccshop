@@ -15,7 +15,8 @@ if (dsn) {
     ...sentryProfilingOptions,
     tracesSampler: sentryTracesSampler,
     replaysSessionSampleRate: sentryReplaySessionSampleRate,
-    replaysOnErrorSampleRate: 1.0,
+    // Full 1.0 on every error floods /monitoring through Cloudflare → 429
+    replaysOnErrorSampleRate: process.env.NODE_ENV === 'development' ? 1.0 : 0.35,
     tracePropagationTargets: ['localhost', /^\//],
     integrations: [
       Sentry.browserTracingIntegration({

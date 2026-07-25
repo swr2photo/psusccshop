@@ -25,11 +25,27 @@ export const sentryIgnoredErrors: Array<string | RegExp> = [
   'ERR_STREAM_PREMATURE_CLOSE',
   /^aborted$/i,
   /socket hang up/i,
+  // Browser extension noise (not app bugs)
+  /message channel closed before a response was received/i,
+  /A listener indicated an asynchronous response by returning true/i,
+  /ResizeObserver loop/i,
 ];
 
 export function sentryBeforeSend(event: ErrorEvent, hint: EventHint): ErrorEvent | null {
   if (isBenignConnectionError(hint.originalException)) {
     return null;
   }
+
+  const message =
+    event.message ||
+    event.exception?.values?.map((v) => v.value).filter(Boolean).join(' ') ||
+    '';
+  if (
+    /message channel closed/i.test(message) ||
+    /asynchronous response by returning true/i.test(message)
+  ) {
+    return null;
+  }
+
   return event;
 }
