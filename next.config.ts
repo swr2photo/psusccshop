@@ -151,15 +151,17 @@ const nextConfig: NextConfig = {
           key: 'Document-Policy',
           value: 'js-profiling',
         },
-        // Cross-Origin Embedder Policy
+        // No COEP — `credentialless` blocks Stripe.js controller frames
+        // (js.stripe.com HTML has no CORP header) → PromptPay confirm hangs.
+        // We don't need cross-origin isolation (no SharedArrayBuffer).
         {
           key: 'Cross-Origin-Embedder-Policy',
-          value: 'credentialless',
+          value: 'unsafe-none',
         },
-        // Cross-Origin Opener Policy
+        // COOP: allow popups (OAuth/Stripe) while keeping our windows grouped
         {
           key: 'Cross-Origin-Opener-Policy',
-          value: 'same-origin',
+          value: 'same-origin-allow-popups',
         },
         // Cross-Origin Resource Policy
         {
