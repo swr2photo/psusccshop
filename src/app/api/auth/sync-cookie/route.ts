@@ -13,6 +13,9 @@ import { getSharedCookieDomain } from '@/lib/cookie-domain';
 import { SESSION_MAX_AGE_SECONDS, getSessionTokenCookieOptions } from '@/lib/session-cookie';
 import { getStaleHostOnlyAuthCookieClearHeaders } from '@/lib/auth-cookies';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 const useSecureCookies = process.env.NODE_ENV === 'production';
 const sessionCookieName = getNextAuthSessionCookieName();
 const sharedCookieDomain = getSharedCookieDomain();
@@ -26,12 +29,16 @@ export async function POST(req: NextRequest) {
   let token = null;
   const getTokenReq = buildGetTokenReq(req);
   for (const cookieName of getSessionCookieNamesForRead()) {
-    token = await getToken({
-      req: getTokenReq,
-      secret,
-      secureCookie: useSecureCookies,
-      cookieName,
-    });
+    try {
+      token = await getToken({
+        req: getTokenReq,
+        secret,
+        secureCookie: useSecureCookies,
+        cookieName,
+      });
+    } catch {
+      token = null;
+    }
     if (token) break;
   }
 
@@ -45,24 +52,23 @@ export async function POST(req: NextRequest) {
     maxAge: SESSION_MAX_AGE_SECONDS,
   });
 
+  // Build response with host-only clears FIRST, then set the canonical Domain cookie LAST
+  // so Max-Age=0 never races ahead of / overwrites the new session token.
   const response = NextResponse.json({
     status: 'success',
     domain: sharedCookieDomain || null,
     maxAge: SESSION_MAX_AGE_SECONDS,
   });
 
-  const opts = getSessionTokenCookieOptions();
-  response.cookies.set(sessionCookieName, sessionToken, opts);
-
-  // After a successful domain (or host) re-issue, clear stale host-only duplicates
-  // so the jar doesn't keep an older host-only JWT that some browsers prefer.
   if (sharedCookieDomain) {
     for (const clear of getStaleHostOnlyAuthCookieClearHeaders()) {
-      // Only clear session-token variants (keep callback/csrf host behavior intact)
       if (!clear.includes('session-token')) continue;
       response.headers.append('Set-Cookie', clear);
     }
   }
+
+  const opts = getSessionTokenCookieOptions();
+  response.cookies.set(sessionCookieName, sessionToken, opts);
 
   return response;
 }
