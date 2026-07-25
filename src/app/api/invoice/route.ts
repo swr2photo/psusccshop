@@ -35,14 +35,59 @@ async function resolveStripeReceiptUrl(order: Record<string, unknown>): Promise<
   }
 }
 
+function wantsHtml(request: NextRequest): boolean {
+  const mode = request.headers.get('sec-fetch-mode');
+  const dest = request.headers.get('sec-fetch-dest');
+  const accept = request.headers.get('accept') || '';
+  return mode === 'navigate' || dest === 'document' || accept.includes('text/html');
+}
+
+function htmlErrorPage(opts: {
+  title: string;
+  message: string;
+  receiptPath?: string;
+  lang: 'th' | 'en';
+}): string {
+  const loginHint =
+    opts.lang === 'en'
+      ? 'Sign in on the shop, then open the receipt again from Order History.'
+      : 'เข้าสู่ระบบที่หน้าร้าน แล้วเปิดใบเสร็จอีกครั้งจากประวัติคำสั่งซื้อ';
+  const receiptHref = opts.receiptPath || '/';
+  return `<!DOCTYPE html><html lang="${opts.lang}"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${opts.title}</title>
+<style>body{font-family:system-ui,sans-serif;display:grid;place-items:center;min-height:100vh;margin:0;background:#f4f4f5;color:#18181b}
+.card{background:#fff;border:1px solid #e4e4e7;border-radius:12px;padding:28px;max-width:420px;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.06)}
+a{display:inline-block;margin-top:14px;padding:10px 16px;border-radius:8px;background:#2563eb;color:#fff;text-decoration:none;font-weight:600}
+p{color:#52525b;line-height:1.5}</style></head><body><div class="card"><h1 style="font-size:1.15rem;margin:0 0 8px">${opts.title}</h1><p>${opts.message}</p><p style="font-size:.85rem">${loginHint}</p><a href="${receiptHref}">${opts.lang === 'en' ? 'Open receipt page' : 'เปิดหน้าใบเสร็จ'}</a></div></body></html>`;
+}
+
 // GET /api/invoice?ref=xxx&lang=th
 export async function GET(request: NextRequest) {
+  const langParam = (request.nextUrl.searchParams.get('lang') || 'th') as 'th' | 'en';
+  const refEarly = request.nextUrl.searchParams.get('ref') || '';
+  const asHtml = wantsHtml(request);
+
   const authResult = await requireAuth(request);
-  if (authResult instanceof NextResponse) return authResult;
+  if (authResult instanceof NextResponse) {
+    if (asHtml) {
+      const receiptPath = refEarly
+        ? `/receipt/${encodeURIComponent(refEarly)}?lang=${langParam}`
+        : '/';
+      return new NextResponse(
+        htmlErrorPage({
+          title: langParam === 'en' ? 'Receipt' : 'ใบเสร็จ',
+          message: langParam === 'en' ? 'Please sign in' : 'กรุณาเข้าสู่ระบบ',
+          receiptPath,
+          lang: langParam,
+        }),
+        { status: 401, headers: { 'Content-Type': 'text/html; charset=utf-8' } },
+      );
+    }
+    return authResult;
+  }
 
   try {
     const ref = request.nextUrl.searchParams.get('ref');
-    const lang = (request.nextUrl.searchParams.get('lang') || 'th') as 'th' | 'en';
+    const lang = langParam;
 
     if (!ref) {
       return NextResponse.json({ error: 'Missing order reference' }, { status: 400 });

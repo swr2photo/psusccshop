@@ -167,41 +167,17 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
   const isMobile = useMediaQuery('(max-width:640px)');
   const [openingReceiptRef, setOpeningReceiptRef] = useState<string | null>(null);
 
-  const openReceipt = useCallback(async (ref: string) => {
+  const openReceipt = useCallback((ref: string) => {
+    // Open dedicated receipt page (same-origin cookies) — never bare /api/invoice
+    // which shows raw JSON {"message":"กรุณาเข้าสู่ระบบ"} on auth miss / popup fallback.
+    const url = `/receipt/${encodeURIComponent(ref)}?lang=${lang}`;
     setOpeningReceiptRef(ref);
-    try {
-      const res = await apiFetch(`/api/invoice?ref=${encodeURIComponent(ref)}&lang=${lang}`, {
-        credentials: 'same-origin',
-      });
-      if (!res.ok) {
-        let message = t.invoice?.download || 'ใบเสร็จ';
-        try {
-          const err = await res.json();
-          message = err.error || err.message || message;
-        } catch { /* html/text error */ }
-        toastError(
-          res.status === 401
-            ? (lang === 'en' ? 'Please sign in to view receipt' : 'กรุณาเข้าสู่ระบบเพื่อดูใบเสร็จ')
-            : (lang === 'en' ? `Cannot open receipt: ${message}` : `เปิดใบเสร็จไม่ได้: ${message}`),
-        );
-        return;
-      }
-      const html = await res.text();
-      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const win = window.open(url, '_blank', 'noopener,noreferrer');
-      if (!win) {
-        // Popup blocked — navigate same tab
-        window.location.href = `/api/invoice?ref=${encodeURIComponent(ref)}&lang=${lang}`;
-      } else {
-        setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      }
-    } catch {
-      toastError(lang === 'en' ? 'Failed to open receipt' : 'เปิดใบเสร็จไม่สำเร็จ');
-    } finally {
-      setOpeningReceiptRef(null);
+    const win = window.open(url, '_blank', 'noopener,noreferrer');
+    if (!win) {
+      window.location.assign(url);
     }
-  }, [lang, t.invoice?.download, toastError]);
+    setOpeningReceiptRef(null);
+  }, [lang]);
 
   // Filter label map for translating static historyFilters
   const filterLabelMap: Record<string, string> = {
