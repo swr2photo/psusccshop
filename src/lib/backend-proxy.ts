@@ -50,9 +50,11 @@ const ALWAYS_ON_VERCEL_PREFIXES = [
   '/api/payment/stripe',
   '/api/payment/config',
   '/api/invoice',
+  '/api/support-chat',
+  '/api/refund',
 ];
 
-/** Full Option B cutover — auth + admin + session commerce stay on Vercel. */
+/** Full Option B cutover — auth + session-bound routes stay on Vercel. */
 const KEEP_WHEN_PROXY_ALL = ALWAYS_ON_VERCEL_PREFIXES;
 
 /**
@@ -63,10 +65,8 @@ const KEEP_SAFE_DEFAULT = [
   ...ALWAYS_ON_VERCEL_PREFIXES,
   '/api/upload',
   '/api/push-subscription',
-  '/api/support-chat',
   '/api/shipping',
   '/api/stock-alert',
-  '/api/refund',
   '/api/privacy',
   '/api/gas',
   '/api/pickup',

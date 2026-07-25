@@ -247,7 +247,33 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
     if (!session?.user?.email) return;
     
     try {
-      const res = await apiFetch('/api/support-chat');
+      const res = await apiFetch('/api/support-chat', { credentials: 'same-origin', cache: 'no-store' });
+      if (res.status === 401) {
+        // Session cookie not readable yet / proxied auth miss — quiet retry after sync
+        try {
+          await fetch('/api/auth/sync-cookie', { method: 'POST', credentials: 'include', cache: 'no-store' });
+          const retry = await apiFetch('/api/support-chat', { credentials: 'same-origin', cache: 'no-store' });
+          if (!retry.ok) return;
+          const retryData = await retry.json();
+          if (retryData.chat) {
+            const chatRes = await apiFetch(`/api/support-chat/${retryData.chat.id}${markRead ? '?markRead=true' : ''}`);
+            const chatData = await chatRes.json();
+            if (chatData.chat) {
+              setChat(chatData.chat);
+              if (chatData.chat.messages) setRealtimeMessages(chatData.chat.messages);
+              setUnreadCount(chatData.chat.customer_unread_count || 0);
+              setShowHistory(false);
+              setShowNewChat(false);
+            }
+          } else {
+            setChat(null);
+            setShowNewChat(true);
+          }
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
       const data = await res.json();
       
       if (data.chat) {
