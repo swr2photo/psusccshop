@@ -33,12 +33,14 @@ export function shouldProxyToBackend(): boolean {
 }
 
 /**
- * True NextAuth writers + session-bound commerce stay on Vercel.
- * Workers JWT auth is used for other proxied routes; cart/orders/profile
- * stay local so a secret/cookie mismatch cannot blank the storefront.
+ * True NextAuth writers + session-bound admin/commerce stay on Vercel.
+ * Workers JWT auth is used for other proxied routes; these stay local so a
+ * secret/cookie mismatch (or stale Workers auth) cannot 500 the UI.
  */
 const ALWAYS_ON_VERCEL_PREFIXES = [
   '/api/auth',
+  '/api/admin',
+  '/api/shops',
   '/api/profile',
   '/api/cart',
   '/api/orders',
@@ -49,7 +51,7 @@ const ALWAYS_ON_VERCEL_PREFIXES = [
   '/api/payment/config',
 ];
 
-/** Full Option B cutover — only auth + session commerce stay on Vercel. */
+/** Full Option B cutover — auth + admin + session commerce stay on Vercel. */
 const KEEP_WHEN_PROXY_ALL = ALWAYS_ON_VERCEL_PREFIXES;
 
 /**
@@ -58,7 +60,6 @@ const KEEP_WHEN_PROXY_ALL = ALWAYS_ON_VERCEL_PREFIXES;
  */
 const KEEP_SAFE_DEFAULT = [
   ...ALWAYS_ON_VERCEL_PREFIXES,
-  '/api/admin',
   '/api/upload',
   '/api/push-subscription',
   '/api/support-chat',
@@ -69,7 +70,6 @@ const KEEP_SAFE_DEFAULT = [
   '/api/invoice',
   '/api/gas',
   '/api/pickup',
-  '/api/shops',
   '/api/reviews',
   '/api/config',
   '/api/live',

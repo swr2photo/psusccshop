@@ -257,7 +257,8 @@ export const isCurrentUserAdmin = async (): Promise<boolean> => {
 export const requireAdmin = async (
   req?: Request,
 ): Promise<{ isAdmin: true; email: string } | NextResponse> => {
-  const session = await resolveSession(req);
+  // Use getSession (try/catch) — never let NextAuth headers() crash the route.
+  const session = await getSession(req);
   const email = session?.user?.email;
 
   if (!email) {
@@ -285,7 +286,7 @@ export const requireAdmin = async (
 export const requireSuperAdmin = async (
   req?: Request,
 ): Promise<{ isAdmin: true; email: string } | NextResponse> => {
-  const session = await resolveSession(req);
+  const session = await getSession(req);
   const email = session?.user?.email;
 
   if (!email) {
@@ -313,7 +314,7 @@ export const requireAdminWithPermission = async (
   permission: keyof AdminPermissions,
   req?: Request,
 ): Promise<{ isAdmin: true; email: string } | NextResponse> => {
-  const session = await resolveSession(req);
+  const session = await getSession(req);
   const email = session?.user?.email;
 
   if (!email) {
