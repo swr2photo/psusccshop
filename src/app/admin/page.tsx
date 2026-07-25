@@ -186,6 +186,7 @@ import LiveStreamSettings from '@/components/admin/LiveStreamSettings';
 import ShopManagement from '@/components/admin/ShopManagement';
 import { mapShopPermissionsToAdminPanel } from '@/lib/admin-permissions';
 import LanguageToggle from '@/components/LanguageToggle';
+import { useTranslation } from '@/hooks/useTranslation';
 
 // ============== TYPES ==============
 interface AdminDataResponse {
@@ -2709,6 +2710,7 @@ const AnnouncementsView = React.memo(function AnnouncementsView({
 export default function AdminPage(): JSX.Element {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const { t, lang } = useTranslation();
 
   // Tab-to-hash mapping for URL persistence
   const TAB_HASH_MAP: Record<number, string> = {
@@ -7627,7 +7629,7 @@ export default function AdminPage(): JSX.Element {
         </Box>
         
         <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-          กำลังตรวจสอบสิทธิ์...
+          {t.admin.checkingAccess}
         </Typography>
       </Box>
     );
@@ -7690,10 +7692,10 @@ export default function AdminPage(): JSX.Element {
               }}
             >
               {sectionsLoading.config && sectionsLoading.orders
-                ? 'กำลังโหลดตั้งค่าและออเดอร์...'
+                ? t.admin.loadingConfigOrders
                 : sectionsLoading.config
-                  ? 'กำลังโหลดตั้งค่า...'
-                  : 'กำลังโหลดออเดอร์...'}
+                  ? t.admin.loadingConfig
+                  : t.admin.loadingOrders}
             </Typography>
           )}
         </Box>
@@ -7742,10 +7744,10 @@ export default function AdminPage(): JSX.Element {
               </Box>
               <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
                 <Typography sx={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--foreground)', lineHeight: 1.2 }}>
-                  Admin Panel
+                  {t.admin.title}
                 </Typography>
                 <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                  PSUSCCSHOP
+                  {t.admin.brand}
                 </Typography>
               </Box>
             </Box>
@@ -7767,20 +7769,24 @@ export default function AdminPage(): JSX.Element {
               {saving ? (
                 <>
                   <CircularProgress size={12} thickness={6} sx={{ color: '#fbbf24' }} />
-                  <Typography sx={{ fontSize: '0.7rem', color: '#fbbf24', fontWeight: 600 }}>กำลังบันทึก...</Typography>
+                  <Typography sx={{ fontSize: '0.7rem', color: '#fbbf24', fontWeight: 600 }}>{t.admin.saving}</Typography>
                 </>
               ) : (
                 <>
                   <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#10b981' }} />
                   <Typography sx={{ fontSize: '0.7rem', color: '#34d399', fontWeight: 600 }}>
-                    {lastSavedTime ? lastSavedTime.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : 'พร้อม'}
+                    {lastSavedTime
+                      ? lastSavedTime.toLocaleTimeString(lang === 'en' ? 'en-US' : 'th-TH', { hour: '2-digit', minute: '2-digit' })
+                      : t.admin.ready}
                   </Typography>
                 </>
               )}
             </Box>
 
-            {/* Language Toggle */}
-            <LanguageToggle size="small" />
+            {/* Language Toggle — keep above overlays */}
+            <Box sx={{ position: 'relative', zIndex: 10, pointerEvents: 'auto' }}>
+              <LanguageToggle size="small" />
+            </Box>
 
             {/* User Menu */}
             <Box sx={{ 
@@ -7803,7 +7809,7 @@ export default function AdminPage(): JSX.Element {
                   {session?.user?.name?.split(' ')[0] || 'Admin'}
                 </Typography>
                 <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-                  Administrator
+                  {t.admin.role}
                 </Typography>
               </Box>
               <IconButton 
@@ -7971,46 +7977,46 @@ export default function AdminPage(): JSX.Element {
             {/* Categorized Navigation */}
             {([
               {
-                category: 'หลัก',
+                category: t.admin.catMain,
                 items: [
-                  { icon: <Dashboard size={18} />, label: 'แดชบอร์ด', idx: 0, color: '#a5b4fc', show: true },
-                  { icon: <ShoppingCart size={18} />, label: 'จัดการสินค้า', idx: 1, color: '#fbbf24', show: canManageProducts },
-                  { icon: <Receipt size={18} />, label: 'ออเดอร์', idx: 2, color: '#34d399', badge: pendingCount, show: canManageOrders },
+                  { icon: <Dashboard size={18} />, label: t.admin.navDashboard, idx: 0, color: '#a5b4fc', show: true },
+                  { icon: <ShoppingCart size={18} />, label: t.admin.navProducts, idx: 1, color: '#fbbf24', show: canManageProducts },
+                  { icon: <Receipt size={18} />, label: t.admin.navOrders, idx: 2, color: '#34d399', badge: pendingCount, show: canManageOrders },
                 ],
               },
               {
-                category: 'จัดการ',
+                category: t.admin.catManage,
                 items: [
-                  { icon: <QrCodeScanner size={18} />, label: 'รับสินค้า', idx: 3, color: '#06b6d4', show: canManagePickup },
-                  { icon: <LocalShipping size={18} />, label: 'ติดตามพัสดุ', idx: 12, color: '#fb923c', show: canManageTracking },
-                  { icon: <Refresh size={18} />, label: 'คืนเงิน', idx: 13, color: '#c084fc', show: canManageRefunds },
+                  { icon: <QrCodeScanner size={18} />, label: t.admin.navPickup, idx: 3, color: '#06b6d4', show: canManagePickup },
+                  { icon: <LocalShipping size={18} />, label: t.admin.navTracking, idx: 12, color: '#fb923c', show: canManageTracking },
+                  { icon: <Refresh size={18} />, label: t.admin.navRefunds, idx: 13, color: '#c084fc', show: canManageRefunds },
                 ],
               },
               {
-                category: 'สื่อสาร',
+                category: t.admin.catComms,
                 items: [
-                  { icon: <SupportAgent size={18} />, label: 'แชทสนับสนุน', idx: 4, color: '#ec4899', show: canManageSupport },
-                  { icon: <NotificationsActive size={18} />, label: 'ประกาศ', idx: 5, color: '#f472b6', show: canManageAnnouncement },
-                  { icon: <Send size={18} />, label: 'ส่งอีเมล', idx: 7, color: '#10b981', show: canSendEmail },
-                  { icon: <Sparkles size={18} />, label: 'อีเวนต์', idx: 14, color: '#fbbf24', show: canManageEvents },
-                  { icon: <Ticket size={18} />, label: 'โค้ดส่วนลด', idx: 15, color: '#34c759', show: canManagePromoCodes },
-                  { icon: <Radio size={18} />, label: 'ไลฟ์สด', idx: 16, color: '#ef4444', show: true },
+                  { icon: <SupportAgent size={18} />, label: t.admin.navSupport, idx: 4, color: '#ec4899', show: canManageSupport },
+                  { icon: <NotificationsActive size={18} />, label: t.admin.navAnnounce, idx: 5, color: '#f472b6', show: canManageAnnouncement },
+                  { icon: <Send size={18} />, label: t.admin.navEmail, idx: 7, color: '#10b981', show: canSendEmail },
+                  { icon: <Sparkles size={18} />, label: t.admin.navEvents, idx: 14, color: '#fbbf24', show: canManageEvents },
+                  { icon: <Ticket size={18} />, label: t.admin.navPromo, idx: 15, color: '#34c759', show: canManagePromoCodes },
+                  { icon: <Radio size={18} />, label: t.admin.navLive, idx: 16, color: '#ef4444', show: true },
                 ],
               },
               {
-                category: 'ตั้งค่า',
+                category: t.admin.catSettings,
                 items: [
-                  { icon: <Settings size={18} />, label: 'ตั้งค่าร้าน', idx: 6, color: '#60a5fa', show: canManageShop || canManageSheet || isSuperAdminUser },
-                  { icon: <LocalShipping size={18} />, label: 'ตั้งค่าจัดส่ง', idx: 10, color: '#a78bfa', show: canManageShipping },
-                  { icon: <AttachMoney size={18} />, label: 'ชำระเงิน', idx: 11, color: '#22d3ee', show: canManagePayment },
+                  { icon: <Settings size={18} />, label: t.admin.navShopSettings, idx: 6, color: '#60a5fa', show: canManageShop || canManageSheet || isSuperAdminUser },
+                  { icon: <LocalShipping size={18} />, label: t.admin.navShipping, idx: 10, color: '#a78bfa', show: canManageShipping },
+                  { icon: <AttachMoney size={18} />, label: t.admin.navPayment, idx: 11, color: '#22d3ee', show: canManagePayment },
                 ],
               },
               {
-                category: 'ตรวจสอบ',
+                category: t.admin.catAudit,
                 items: [
-                  { icon: <Groups size={18} />, label: 'ประวัติผู้ใช้', idx: 8, color: '#f97316', show: isSuperAdminUser },
-                  { icon: <Store size={18} />, label: 'ร้านค้าย่อย', idx: 17, color: '#c084fc', show: isSuperAdminUser },
-                  { icon: <History size={18} />, label: 'ประวัติระบบ', idx: 9, color: '#64748b', show: isSuperAdminUser },
+                  { icon: <Groups size={18} />, label: t.admin.navUserLogs, idx: 8, color: '#f97316', show: isSuperAdminUser },
+                  { icon: <Store size={18} />, label: t.admin.navShops, idx: 17, color: '#c084fc', show: isSuperAdminUser },
+                  { icon: <History size={18} />, label: t.admin.navSystemLogs, idx: 9, color: '#64748b', show: isSuperAdminUser },
                 ],
               },
             ] as { category: string; items: { icon: React.ReactNode; label: string; idx: number; color: string; badge?: number; show: boolean }[] }[])

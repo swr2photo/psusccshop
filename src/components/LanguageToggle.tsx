@@ -22,6 +22,15 @@ export default function LanguageToggle({ size = 'medium' }: LanguageToggleProps)
     setMounted(true);
   }, []);
 
+  useEffect(() => {
+    if (!mounted) return;
+    try {
+      document.documentElement.lang = language === 'th' ? 'th' : 'en';
+    } catch {
+      /* ignore */
+    }
+  }, [mounted, language]);
+
   const btnSize = size === 'small' ? 34 : 40;
   const isDark = mounted && resolvedMode === 'dark';
 
@@ -36,16 +45,25 @@ export default function LanguageToggle({ size = 'medium' }: LanguageToggleProps)
   }
 
   const handleToggle = (e: React.MouseEvent) => {
+    e.preventDefault();
     e.stopPropagation();
-    setLanguage(language === 'th' ? 'en' : 'th');
+    const next = language === 'th' ? 'en' : 'th';
+    setLanguage(next);
+    try {
+      document.documentElement.lang = next === 'th' ? 'th' : 'en';
+    } catch {
+      /* ignore */
+    }
   };
 
   return (
-    <div style={{ display: 'inline-block' }}>
+    <div style={{ display: 'inline-block', position: 'relative', zIndex: 2, pointerEvents: 'auto' }}>
       <button
         type="button"
         onClick={handleToggle}
+        onMouseDown={(e) => e.stopPropagation()}
         title={language === 'th' ? 'Switch to English' : 'เปลี่ยนเป็นภาษาไทย'}
+        aria-label={language === 'th' ? 'Switch to English' : 'เปลี่ยนเป็นภาษาไทย'}
         className="magic-lang-toggle"
         suppressHydrationWarning
         style={{
@@ -63,6 +81,8 @@ export default function LanguageToggle({ size = 'medium' }: LanguageToggleProps)
           cursor: 'pointer',
           overflow: 'hidden',
           position: 'relative',
+          zIndex: 2,
+          pointerEvents: 'auto',
           padding: 0,
           flexShrink: 0,
           userSelect: 'none',
