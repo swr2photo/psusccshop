@@ -2782,7 +2782,7 @@ export default function HomePage() {
   const hasEnabledAnnouncements = (announcements?.filter(a => a.enabled)?.length ?? 0) > 0;
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh', bgcolor: 'var(--background)', pb: { xs: 9, md: 0 } }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh', bgcolor: 'var(--background)', pb: { xs: 'calc(4.75rem + env(safe-area-inset-bottom))', md: 0 } }}>
       <AppBar
         position="sticky"
         elevation={0}
@@ -2799,19 +2799,106 @@ export default function HomePage() {
           top: 0,
           zIndex: 1200,
           overflow: 'visible',
+          pt: { xs: 'env(safe-area-inset-top)', md: 0 },
         }}
       >
-        <ProgressiveBlurChrome edge="bottom" fadeExtent={44}>
+        <ProgressiveBlurChrome
+          edge="bottom"
+          fadeExtent={56}
+          intensity="strong"
+          sx={{ display: { xs: 'block', md: 'none' } }}
+        >
+          <Toolbar
+            sx={{
+              minHeight: 52,
+              px: 1.25,
+              gap: 0.35,
+            }}
+          >
+            <BrandMark size={30} showText={false} />
+            <Typography
+              sx={{
+                fontWeight: 700,
+                fontSize: '1.05rem',
+                letterSpacing: '-0.02em',
+                color: 'var(--foreground)',
+                ml: 0.75,
+              }}
+            >
+              SCC Shop
+            </Typography>
+            <Box sx={{ flexGrow: 1 }} />
+            <IconButton
+              onClick={() => setShowSearchBar((v) => !v)}
+              sx={{
+                color: showSearchBar ? '#0071e3' : 'var(--foreground)',
+                bgcolor: showSearchBar ? 'rgba(0,113,227,0.12)' : 'transparent',
+                width: 36,
+                height: 36,
+              }}
+            >
+              <Badge badgeContent={activeFilterCount || undefined} color="warning" invisible={activeFilterCount === 0}>
+                <Search size={19} />
+              </Badge>
+            </IconButton>
+            {isLiveActive && (
+              <IconButton
+                onClick={openLiveStream}
+                sx={{
+                  color: '#fff',
+                  bgcolor: '#ff3b30',
+                  width: 32,
+                  height: 32,
+                  animation: 'navLivePulse 2s ease-in-out infinite',
+                  '@keyframes navLivePulse': {
+                    '0%, 100%': { boxShadow: '0 0 0 0 rgba(255,59,48,0.4)' },
+                    '50%': { boxShadow: '0 0 0 6px rgba(255,59,48,0)' },
+                  },
+                  '&:hover': { bgcolor: '#e0342b' },
+                }}
+              >
+                <Radio size={16} />
+              </IconButton>
+            )}
+            {session ? (
+              <Avatar
+                src={orderData.profileImage || session?.user?.image || ''}
+                sx={{
+                  width: 28,
+                  height: 28,
+                  cursor: 'pointer',
+                  ml: 0.25,
+                  boxShadow: (theme) =>
+                    theme.palette.mode === 'dark'
+                      ? '0 0 0 1px rgba(255,255,255,0.12)'
+                      : '0 0 0 1px rgba(0,0,0,0.06)',
+                }}
+                onClick={() => setSidebarOpen(true)}
+              />
+            ) : (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+                <LanguageToggle size="small" />
+                <ThemeToggle size="small" />
+              </Box>
+            )}
+          </Toolbar>
+        </ProgressiveBlurChrome>
+
+        <ProgressiveBlurChrome
+          edge="bottom"
+          fadeExtent={44}
+          sx={{ display: { xs: 'none', md: 'block' } }}
+        >
         <Toolbar
           sx={{
-            minHeight: { xs: 56, md: 60 },
-            px: { xs: 1.5, md: 2.5 },
+            minHeight: 60,
+            px: 2.5,
             gap: 0.5,
           }}
         >
           <BrandMark />
           <Box sx={{ flexGrow: 1 }} />
-          <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 0.5, mr: 1.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mr: 1.5 }}>
             <Button
               variant="text"
               startIcon={(
@@ -2845,43 +2932,9 @@ export default function HomePage() {
               {t.nav.search}
             </Button>
           </Box>
-          <IconButton
-            onClick={() => setShowSearchBar((v) => !v)}
-            sx={{
-              mr: 0.25,
-              display: { xs: 'flex', md: 'none' },
-              color: showSearchBar ? '#0071e3' : 'var(--foreground)',
-              bgcolor: showSearchBar ? 'rgba(0,113,227,0.12)' : 'transparent',
-              width: 38,
-              height: 38,
-            }}
-          >
-            <Search size={20} />
-          </IconButton>
-          {isLiveActive && (
-            <IconButton
-              onClick={openLiveStream}
-              sx={{
-                mr: 0.25,
-                display: { xs: 'flex', md: 'none' },
-                color: '#fff',
-                bgcolor: '#ff3b30',
-                width: 34,
-                height: 34,
-                animation: 'navLivePulse 2s ease-in-out infinite',
-                '@keyframes navLivePulse': {
-                  '0%, 100%': { boxShadow: '0 0 0 0 rgba(255,59,48,0.4)' },
-                  '50%': { boxShadow: '0 0 0 6px rgba(255,59,48,0)' },
-                },
-                '&:hover': { bgcolor: '#e0342b' },
-              }}
-            >
-              <Radio size={18} />
-            </IconButton>
-          )}
           <Box
             sx={{
-              display: { xs: 'none', md: 'flex' },
+              display: 'flex',
               alignItems: 'center',
               gap: 0.35,
               mr: 1.5,
@@ -3036,15 +3089,18 @@ export default function HomePage() {
             </Box>
           )}
         </Toolbar>
+        </ProgressiveBlurChrome>
         {showSearchBar && (
-          <Box sx={{ px: { xs: 1.5, md: 3 }, pb: 2, pt: 1 }}>
+          <Box sx={{ px: { xs: 1.25, md: 3 }, pb: 2, pt: 0.5, position: 'relative', zIndex: 2 }}>
             <Box sx={{
-              borderRadius: '20px',
-              bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(15,15,15,0.98)' : 'rgba(255,255,255,0.99)',
+              borderRadius: { xs: '18px', md: '20px' },
+              bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(15,15,15,0.92)' : 'rgba(255,255,255,0.92)',
               border: '1px solid',
               borderColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
               boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 8px 32px rgba(0,0,0,0.5)' : '0 8px 32px rgba(0,0,0,0.1)',
               overflow: 'hidden',
+              backdropFilter: 'blur(20px) saturate(1.4)',
+              WebkitBackdropFilter: 'blur(20px) saturate(1.4)',
             }}>
               {/* Search Input */}
               <Box sx={{ p: 2, pb: 1.5 }}>
@@ -3349,7 +3405,6 @@ export default function HomePage() {
             </Box>
           </Box>
         )}
-        </ProgressiveBlurChrome>
       </AppBar>
 
       {/* Shop Status Banner - Shows different states (not open, coming soon, order ended, etc.) */}

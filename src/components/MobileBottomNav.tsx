@@ -21,7 +21,7 @@ type MobileBottomNavProps = {
 };
 
 /**
- * Mobile-only bottom dock — Apple progressive blur fade, soft active capsule, raised chat FAB.
+ * Mobile full-bleed tab bar — Apple progressive blur fading upward into content.
  */
 export default function MobileBottomNav({
   tabs,
@@ -41,58 +41,39 @@ export default function MobileBottomNav({
         left: 0,
         right: 0,
         zIndex: 1100,
-        display: { xs: 'flex', md: 'none' },
-        justifyContent: 'center',
+        display: { xs: 'block', md: 'none' },
         pointerEvents: 'none',
-        transform: hidden ? 'translateY(120%)' : 'translateY(0)',
+        transform: hidden ? 'translateY(110%)' : 'translateY(0)',
         opacity: hidden ? 0 : 1,
-        transition: 'transform 0.38s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.28s ease',
+        transition: 'transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.28s ease',
       }}
     >
       <ProgressiveBlurChrome
         edge="top"
-        fadeExtent={48}
+        fadeExtent={64}
+        intensity="strong"
         sx={{
           width: '100%',
           pointerEvents: 'none',
-          pt: 2.5,
-          pb: 'max(0.35rem, env(safe-area-inset-bottom))',
-          px: 1.25,
+          pt: 3.5,
         }}
         contentSx={{
           pointerEvents: 'auto',
-          display: 'flex',
-          justifyContent: 'center',
+          px: 0.5,
+          pb: 'max(0.2rem, env(safe-area-inset-bottom))',
         }}
       >
         <Box
           sx={{
-            width: '100%',
-            maxWidth: 440,
             display: 'flex',
-            justifyContent: 'space-between',
             alignItems: 'flex-end',
-            gap: 0.25,
-            px: 0.65,
-            pt: 0.55,
-            pb: 0.45,
-            borderRadius: '980px',
-            bgcolor: (theme) =>
-              theme.palette.mode === 'dark'
-                ? 'rgba(22, 22, 24, 0.45)'
-                : 'rgba(255, 255, 255, 0.45)',
-            border: (theme) =>
-              `1px solid ${
-                theme.palette.mode === 'dark'
-                  ? 'rgba(255,255,255,0.1)'
-                  : 'rgba(0, 0, 0, 0.06)'
-              }`,
-            backdropFilter: 'blur(8px) saturate(1.2)',
-            WebkitBackdropFilter: 'blur(8px) saturate(1.2)',
-            boxShadow: (theme) =>
-              theme.palette.mode === 'dark'
-                ? '0 8px 32px rgba(0,0,0,0.4), inset 0 0.5px 0 rgba(255,255,255,0.08)'
-                : '0 8px 28px rgba(0,0,0,0.08), inset 0 0.5px 0 rgba(255,255,255,0.85)',
+            justifyContent: 'space-between',
+            gap: 0.15,
+            px: 0.35,
+            pt: 0.35,
+            pb: 0.25,
+            maxWidth: 520,
+            mx: 'auto',
           }}
         >
           {tabs.map((tab) => {
@@ -113,8 +94,8 @@ export default function MobileBottomNav({
                     flexDirection: 'column',
                     alignItems: 'center',
                     gap: 0.2,
-                    mt: -2.5,
-                    mx: 0.2,
+                    mt: -1.75,
+                    mx: 0.15,
                     border: 'none',
                     background: 'transparent',
                     cursor: 'pointer',
@@ -122,33 +103,33 @@ export default function MobileBottomNav({
                     WebkitTapHighlightColor: 'transparent',
                     userSelect: 'none',
                     p: 0,
+                    minWidth: 56,
                   }}
                 >
                   <Box
                     sx={{
-                      position: 'relative',
-                      width: 56,
-                      height: 56,
+                      width: 52,
+                      height: 52,
                       borderRadius: '50%',
                       background: 'linear-gradient(160deg, #0a84ff 0%, #0071e3 55%, #5e5ce6 100%)',
                       display: 'grid',
                       placeItems: 'center',
                       color: '#fff',
                       boxShadow:
-                        '0 8px 22px rgba(0,113,227,0.38), 0 0 0 3px rgba(0,113,227,0.12)',
+                        '0 6px 18px rgba(0,113,227,0.35), 0 0 0 3px rgba(255,255,255,0.35)',
                       transition: 'transform 0.18s cubic-bezier(0.22, 1, 0.36, 1)',
-                      '&:active': { transform: 'scale(0.93)' },
+                      '&:active': { transform: 'scale(0.94)' },
                     }}
                   >
                     {tab.icon}
                   </Box>
                   <Typography
                     sx={{
-                      fontSize: '0.6rem',
+                      fontSize: '0.58rem',
                       fontWeight: 700,
-                      letterSpacing: '-0.01em',
-                      color: 'var(--primary)',
-                      lineHeight: 1.15,
+                      letterSpacing: '-0.02em',
+                      color: isActive ? '#0071e3' : 'var(--primary)',
+                      lineHeight: 1.1,
                     }}
                   >
                     {tab.label}
@@ -172,41 +153,45 @@ export default function MobileBottomNav({
                   flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: 0.25,
+                  gap: 0.2,
                   minWidth: 0,
-                  minHeight: 50,
-                  px: 0.4,
-                  py: 0.45,
+                  minHeight: 48,
+                  px: 0.25,
+                  py: 0.4,
                   border: 'none',
-                  borderRadius: '980px',
+                  borderRadius: '14px',
                   cursor: 'pointer',
                   touchAction: 'manipulation',
                   WebkitTapHighlightColor: 'transparent',
                   userSelect: 'none',
                   position: 'relative',
-                  color: (theme) =>
-                    isActive ? 'var(--primary)' : theme.palette.text.secondary,
+                  color: isActive ? '#0071e3' : 'var(--text-muted)',
                   background: 'transparent',
                   transition: 'color 0.2s ease',
-                  '&:active': { transform: 'scale(0.96)' },
+                  '&:active': { transform: 'scale(0.96)', opacity: 0.85 },
                 }}
               >
+                {/* Soft active glow — no hard capsule card */}
                 <Box
                   aria-hidden
                   sx={{
                     position: 'absolute',
-                    inset: '3px 5px',
-                    borderRadius: '980px',
-                    bgcolor: (theme) =>
-                      isActive
-                        ? theme.palette.mode === 'dark'
-                          ? 'rgba(10,132,255,0.18)'
-                          : 'rgba(0,113,227,0.1)'
-                        : 'transparent',
-                    transform: isActive ? 'scale(1)' : 'scale(0.88)',
+                    top: 4,
+                    left: '50%',
+                    width: 28,
+                    height: 28,
+                    borderRadius: '50%',
+                    transform: isActive
+                      ? 'translateX(-50%) scale(1)'
+                      : 'translateX(-50%) scale(0.5)',
                     opacity: isActive ? 1 : 0,
+                    background: (theme) =>
+                      theme.palette.mode === 'dark'
+                        ? 'radial-gradient(circle, rgba(10,132,255,0.28) 0%, transparent 70%)'
+                        : 'radial-gradient(circle, rgba(0,113,227,0.18) 0%, transparent 70%)',
                     transition:
-                      'transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s ease',
+                      'transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s ease',
+                    pointerEvents: 'none',
                   }}
                 />
                 <Box
@@ -216,11 +201,11 @@ export default function MobileBottomNav({
                     display: 'grid',
                     placeItems: 'center',
                     transition: 'transform 0.24s cubic-bezier(0.22, 1, 0.36, 1)',
-                    transform: isActive ? 'translateY(-0.5px) scale(1.06)' : 'scale(1)',
+                    transform: isActive ? 'translateY(-1px) scale(1.08)' : 'scale(1)',
                     '& .MuiBadge-badge': {
-                      fontSize: '0.58rem',
-                      minWidth: 15,
-                      height: 15,
+                      fontSize: '0.56rem',
+                      minWidth: 14,
+                      height: 14,
                       fontWeight: 700,
                     },
                   }}
@@ -232,11 +217,11 @@ export default function MobileBottomNav({
                   sx={{
                     position: 'relative',
                     zIndex: 1,
-                    fontSize: '0.6rem',
+                    fontSize: '0.58rem',
                     fontWeight: isActive ? 700 : 500,
-                    letterSpacing: '-0.01em',
+                    letterSpacing: '-0.02em',
                     color: 'inherit',
-                    lineHeight: 1.15,
+                    lineHeight: 1.1,
                     maxWidth: '100%',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',

@@ -1306,9 +1306,12 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
     <Box sx={{ minHeight: '100vh', bgcolor: 'var(--background)', color: 'var(--foreground)' }}>
       {/* ==================== HEADER ==================== */}
       <Box sx={{ position: 'sticky', top: 0, zIndex: 100, bgcolor: 'transparent' }}>
-        <ProgressiveBlurChrome edge="bottom" fadeExtent={40}>
+        <ProgressiveBlurChrome edge="bottom" fadeExtent={52} intensity="strong">
         <Box sx={{
-          maxWidth: '1200px', mx: 'auto', px: 2, py: 1.5,
+          maxWidth: '1200px', mx: 'auto',
+          px: 2,
+          pt: { xs: 'max(0.75rem, env(safe-area-inset-top))', md: 1.5 },
+          pb: 1.5,
           display: 'flex', alignItems: 'center', gap: 2,
         }}>
           <Link href="/" style={{ textDecoration: 'none', color: 'inherit' }}>
