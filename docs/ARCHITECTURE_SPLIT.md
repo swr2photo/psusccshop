@@ -19,18 +19,14 @@ psusccshop/
 
 | อยู่ที่ | Routes |
 |--------|--------|
-| **Workers (api.psuscc.club)** | ทุก `/api/*` ยกเว้น `/api/auth/*` |
-| **Vercel (Next.js)** | `/api/auth/[...nextauth]`, passkey, sync-cookie, available-providers |
+| **Vercel (Next.js)** | ทุก route ที่ใช้ NextAuth / session (`SESSION_BOUND_API_PREFIXES` ใน `src/lib/backend-proxy.ts`) — admin, config, upload, cart, orders, payment*, support-chat, … |
+| **Workers (api.psuscc.club)** | allowlist เท่านั้นเมื่อ `API_PROXY_ALL=1`: health, time, image, cron, payment/webhook (+ public GETs ในโหมด A) |
 
-Production ใช้ same-origin `/api/*` + middleware proxy ไป Workers (`API_INTERNAL_URL` หรือ fallback `https://api.psuscc.club`) — browser ไม่ต้องยิง cross-origin
+Production ใช้ same-origin `/api/*` + middleware proxy → Workers — browser ไม่ต้องยิง cross-origin
 
-**เปิด Option B ทั้งก้อน:** หลัง `npm run deploy:api:cloudflare` สำเร็จ ตั้งบน Vercel:
+**`API_PROXY_ALL=1` (fail-closed):** proxy เฉพาะ `WORKERS_PROXY_ALLOWLIST` — อื่นๆ อยู่ Vercel เพื่อกัน 401 จาก session
 
-```env
-API_PROXY_ALL=1
-```
-
-ถ้ายังไม่ตั้ง = โหมดปลอดภัย (session/storefront อยู่ Vercel, proxy เฉพาะ webhook/cron + GET ที่ไม่ถูก keep)
+**ไม่ตั้ง `API_PROXY_ALL`:** โหมด A — session อยู่ Vercel, proxy GET สาธารณะ + webhook/cron
 
 Elysia ไม่ได้เขียน logic ใหม่ — ใช้ **next-bridge** เรียก handler เดิมจาก `src/app/api/**/route.ts`
 

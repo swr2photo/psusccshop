@@ -2,9 +2,12 @@
  * Proxy Next.js API routes to the Elysia/Workers backend.
  * Set API_INTERNAL_URL (server-only) e.g. http://localhost:3001
  *
- * Option B: set API_PROXY_ALL=1 on Vercel AFTER Workers is redeployed with
- * matching route handlers + NEXTAUTH_SECRET. Until then, keep hot/session
- * routes on Vercel (Option A) to avoid 401s from stale Workers bundles.
+ * Production always uses same-origin /api/*; middleware may forward to
+ * https://api.psuscc.club. Session/NextAuth routes MUST stay on Vercel —
+ * Workers auth is unreliable with Domain cookies + stale bundles.
+ *
+ * API_PROXY_ALL=1 → only PROXY_ALLOWLIST goes to Workers (safe default: rest on Vercel).
+ * Without it (Option A) → proxy public GETs + webhook/cron writes, keep session routes local.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -33,76 +36,105 @@ export function shouldProxyToBackend(): boolean {
 }
 
 /**
- * True NextAuth writers + session-bound admin/commerce stay on Vercel.
- * Workers JWT auth is used for other proxied routes; these stay local so a
- * secret/cookie mismatch (or stale Workers auth) cannot 500 the UI.
+ * Routes that read/write NextAuth session cookies.
+ * Never proxy these — Workers hop → 401/500 (กรุณาเข้าสู่ระบบ).
  */
-const ALWAYS_ON_VERCEL_PREFIXES = [
+export const SESSION_BOUND_API_PREFIXES = [
   '/api/auth',
   '/api/admin',
   '/api/shops',
   '/api/profile',
   '/api/cart',
   '/api/orders',
-  // Admin config writes use requireAdmin(NextAuth) — must not hop to Workers
   '/api/config',
+  '/api/upload',
+  '/api/push-subscription',
+  '/api/invoice',
+  '/api/support-chat',
+  '/api/refund',
   '/api/payment-info',
   '/api/payment/create-charge',
   '/api/payment/verify',
   '/api/payment/stripe',
   '/api/payment/config',
-  '/api/invoice',
-  '/api/support-chat',
-  '/api/refund',
-  // Session-gated storage writes — Workers hop loses NextAuth request scope
-  '/api/upload',
-  '/api/push-subscription',
-];
-
-/** Full Option B cutover — auth + session-bound routes stay on Vercel. */
-const KEEP_WHEN_PROXY_ALL = ALWAYS_ON_VERCEL_PREFIXES;
-
-/**
- * Safe default (Option A): session + storefront stay on Vercel.
- * Avoids Workers hop for hot paths and tolerates older Workers deploys.
- */
-const KEEP_SAFE_DEFAULT = [
-  ...ALWAYS_ON_VERCEL_PREFIXES,
   '/api/shipping',
   '/api/stock-alert',
   '/api/privacy',
   '/api/gas',
   '/api/pickup',
   '/api/reviews',
-  '/api/live',
   '/api/inventory',
+  '/api/live',
   '/api/chatbot',
+  '/api/promo',
+  '/api/slip',
+  '/api/auto-email',
+] as const;
+
+/**
+ * Stateless / public / cron routes safe on Workers when API_PROXY_ALL=1.
+ * Everything else stays on Vercel (fail-closed for session safety).
+ */
+export const WORKERS_PROXY_ALLOWLIST = [
+  '/api/health',
+  '/api/time',
   '/api/image',
-];
+  '/api/cron',
+  '/api/payment/webhook',
+  // Public catalog reads (also under /api/shops which is session-bound —
+  // session-bound wins; listed for documentation / future split)
+  '/api/shops/catalog',
+] as const;
+
+/**
+ * Option A (no API_PROXY_ALL): keep session + storefront on Vercel;
+ * proxy remaining public GETs to Workers.
+ */
+const KEEP_SAFE_DEFAULT = [
+  ...SESSION_BOUND_API_PREFIXES,
+  '/api/image',
+] as const;
 
 function isProxyAllEnabled(): boolean {
   return process.env.API_PROXY_ALL === '1' || process.env.API_PROXY_ALL === 'true';
 }
 
+/** Exact path or nested under prefix/ — avoids /api/config matching /api/configuration */
+function matchesPrefix(pathname: string, prefixes: readonly string[]): boolean {
+  return prefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
+
+/** True when this API path must be handled on Vercel (NextAuth / session). */
 export function shouldKeepApiOnVercel(pathname: string): boolean {
   if (!pathname.startsWith('/api/')) return false;
 
+  // Session-bound always stays local
+  if (matchesPrefix(pathname, SESSION_BOUND_API_PREFIXES)) return true;
+
   if (!isProxyAllEnabled()) {
+    // Option A: also keep storefront helpers that were historically local
+    if (matchesPrefix(pathname, KEEP_SAFE_DEFAULT)) return true;
+    // Webhook + cron intentionally leave Vercel even in Option A
     if (pathname.startsWith('/api/payment/webhook')) return false;
     if (pathname.startsWith('/api/cron')) return false;
   }
 
-  const prefixes = isProxyAllEnabled() ? KEEP_WHEN_PROXY_ALL : KEEP_SAFE_DEFAULT;
-  return prefixes.some((prefix) => pathname.startsWith(prefix));
+  return false;
 }
 
+/**
+ * Decide whether middleware / withBackendProxy should forward to Workers.
+ *
+ * API_PROXY_ALL=1: allowlist only (fail-closed).
+ * Otherwise: proxy GET/HEAD for non-kept paths + webhook/cron writes.
+ */
 export function shouldProxyApiRoute(pathname: string, method = 'GET'): boolean {
   if (!shouldProxyToBackend()) return false;
   if (!pathname.startsWith('/api/')) return false;
   if (shouldKeepApiOnVercel(pathname)) return false;
 
   if (isProxyAllEnabled()) {
-    return true;
+    return matchesPrefix(pathname, WORKERS_PROXY_ALLOWLIST);
   }
 
   // Option A: only proxy GET/HEAD (plus webhook/cron writes)
@@ -114,6 +146,16 @@ export function shouldProxyApiRoute(pathname: string, method = 'GET'): boolean {
     );
   }
   return true;
+}
+
+/** Dev/test helper — where a path would run under current env flags. */
+export function resolveApiRuntime(
+  pathname: string,
+  method = 'GET',
+): 'vercel' | 'workers' | 'local' {
+  if (!pathname.startsWith('/api/')) return 'local';
+  if (!shouldProxyToBackend()) return 'vercel';
+  return shouldProxyApiRoute(pathname, method) ? 'workers' : 'vercel';
 }
 
 function buildProxyRequestHeaders(request: NextRequest): Headers {
