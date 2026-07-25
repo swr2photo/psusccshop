@@ -5,6 +5,7 @@ import { getServerSession, Session } from 'next-auth';
 import { authOptions } from '@/lib/auth-options';
 import { getSessionFromRequest, getSessionFromAppRouter } from '@/lib/session-from-request';
 import { getCurrentRequest } from '@/lib/request-context';
+import { isCloudflareWorkersRuntime } from '@/lib/runtime-env';
 import { NextResponse } from 'next/server';
 import { getJson } from '@/lib/filebase';
 import { getAdminPermissionsFromDB } from '@/lib/supabase';
@@ -183,17 +184,43 @@ export const isAdminEmailAsync = async (email: string | null | undefined): Promi
  */
 async function resolveSession(req?: Request): Promise<Session | null> {
   if (req) {
-    const session = await getSessionFromRequest(req);
-    if (session) return session;
+    try {
+      const session = await getSessionFromRequest(req);
+      if (session) return session;
+    } catch (error) {
+      console.error('[auth] getSessionFromRequest(req) failed:', error);
+    }
   }
-  const request = getCurrentRequest();
-  if (request) {
-    const session = await getSessionFromRequest(request);
-    if (session) return session;
+
+  const alsRequest = getCurrentRequest();
+  if (alsRequest) {
+    try {
+      const session = await getSessionFromRequest(alsRequest);
+      if (session) return session;
+    } catch (error) {
+      console.error('[auth] getSessionFromRequest(ALS) failed:', error);
+    }
+    // Workers/Elysia bridge: request scope exists but no JWT — do NOT call
+    // getServerSession/headers() (throws "outside a request scope" → 500).
+    return null;
   }
-  const fromAppRouter = await getSessionFromAppRouter();
-  if (fromAppRouter) return fromAppRouter;
-  return getServerSession(authOptions);
+
+  if (isCloudflareWorkersRuntime()) {
+    return null;
+  }
+
+  try {
+    const fromAppRouter = await getSessionFromAppRouter();
+    if (fromAppRouter) return fromAppRouter;
+  } catch {
+    // ignore App Router cookie read failures
+  }
+
+  try {
+    return await getServerSession(authOptions);
+  } catch {
+    return null;
+  }
 }
 
 /**

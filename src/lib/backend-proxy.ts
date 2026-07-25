@@ -32,20 +32,32 @@ export function shouldProxyToBackend(): boolean {
   return Boolean(getBackendProxyUrl());
 }
 
-/** Full Option B cutover — only NextAuth writers stay on Vercel. */
-const KEEP_AUTH_ONLY = [
+/**
+ * True NextAuth writers + session-bound commerce stay on Vercel.
+ * Workers JWT auth is used for other proxied routes; cart/orders/profile
+ * stay local so a secret/cookie mismatch cannot blank the storefront.
+ */
+const ALWAYS_ON_VERCEL_PREFIXES = [
   '/api/auth',
+  '/api/profile',
+  '/api/cart',
+  '/api/orders',
+  '/api/payment-info',
+  '/api/payment/create-charge',
+  '/api/payment/verify',
+  '/api/payment/stripe',
+  '/api/payment/config',
 ];
+
+/** Full Option B cutover — only auth + session commerce stay on Vercel. */
+const KEEP_WHEN_PROXY_ALL = ALWAYS_ON_VERCEL_PREFIXES;
 
 /**
  * Safe default (Option A): session + storefront stay on Vercel.
  * Avoids Workers hop for hot paths and tolerates older Workers deploys.
  */
 const KEEP_SAFE_DEFAULT = [
-  '/api/auth',
-  '/api/profile',
-  '/api/cart',
-  '/api/orders',
+  ...ALWAYS_ON_VERCEL_PREFIXES,
   '/api/admin',
   '/api/upload',
   '/api/push-subscription',
@@ -57,11 +69,6 @@ const KEEP_SAFE_DEFAULT = [
   '/api/invoice',
   '/api/gas',
   '/api/pickup',
-  '/api/payment-info',
-  '/api/payment/create-charge',
-  '/api/payment/verify',
-  '/api/payment/stripe',
-  '/api/payment/config',
   '/api/shops',
   '/api/reviews',
   '/api/config',
@@ -83,7 +90,7 @@ export function shouldKeepApiOnVercel(pathname: string): boolean {
     if (pathname.startsWith('/api/cron')) return false;
   }
 
-  const prefixes = isProxyAllEnabled() ? KEEP_AUTH_ONLY : KEEP_SAFE_DEFAULT;
+  const prefixes = isProxyAllEnabled() ? KEEP_WHEN_PROXY_ALL : KEEP_SAFE_DEFAULT;
   return prefixes.some((prefix) => pathname.startsWith(prefix));
 }
 
