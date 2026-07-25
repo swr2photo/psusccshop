@@ -11,6 +11,7 @@ import { Palette, MessageCircle as ChatIcon, Send as SendIcon, X as CloseIcon, B
 import ShirtChatBot from '@/components/ShirtChatBot';
 import { ProductDetailsDialog } from '@/components/ProductDetailsDialog';
 import MobileBottomNav from '@/components/MobileBottomNav';
+import ProgressiveBlurChrome from '@/components/ui/ProgressiveBlurChrome';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -2786,38 +2787,59 @@ export default function HomePage() {
         position="sticky"
         elevation={0}
         sx={{
-          bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.65)' : 'rgba(255,255,255,0.75)',
-          borderBottom: (theme) => `1px solid ${theme.palette.mode === 'dark' ? 'var(--glass-bg)' : 'rgba(0,0,0,0.06)'}`,
-          backdropFilter: 'blur(14px)',
-          boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 18px 50px rgba(0,0,0,0.35)' : '0 4px 20px rgba(0,0,0,0.04)',
+          bgcolor: 'transparent',
+          backgroundImage: 'none',
+          boxShadow: 'none',
+          border: 'none',
           color: 'var(--foreground)',
           transform: hideNavBars ? 'translateY(-110%)' : 'translateY(0)',
           opacity: hideNavBars ? 0 : 1,
-          transition: 'transform 0.32s ease, opacity 0.28s ease',
+          transition: 'transform 0.38s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.28s ease',
           position: 'sticky',
           top: 0,
           zIndex: 1200,
+          overflow: 'visible',
         }}
       >
-        <Toolbar>
+        <ProgressiveBlurChrome edge="bottom" fadeExtent={44}>
+        <Toolbar
+          sx={{
+            minHeight: { xs: 56, md: 60 },
+            px: { xs: 1.5, md: 2.5 },
+            gap: 0.5,
+          }}
+        >
           <BrandMark />
           <Box sx={{ flexGrow: 1 }} />
-          <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 1, mr: 2 }}>
+          <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 0.5, mr: 1.5 }}>
             <Button
-              variant={showSearchBar ? 'contained' : 'outlined'}
+              variant="text"
               startIcon={(
                 <Badge badgeContent={activeFilterCount || undefined} color="warning" invisible={activeFilterCount === 0}>
-                  <Search size={18} />
+                  <Search size={17} />
                 </Badge>
               )}
               onClick={() => setShowSearchBar((v) => !v)}
               sx={{
-                color: (theme) => showSearchBar ? '#fff' : theme.palette.text.primary,
-                borderColor: (theme) => showSearchBar ? 'transparent' : theme.palette.divider,
-                background: (theme) => showSearchBar ? 'linear-gradient(135deg, #0071e3 0%, #64d2ff 100%)' : (theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.04)'),
+                color: showSearchBar ? '#0071e3' : 'var(--foreground)',
+                bgcolor: (theme) =>
+                  showSearchBar
+                    ? theme.palette.mode === 'dark'
+                      ? 'rgba(10,132,255,0.18)'
+                      : 'rgba(0,113,227,0.1)'
+                    : 'transparent',
                 textTransform: 'none',
-                fontWeight: 700,
-                borderRadius: 1.5,
+                fontWeight: 600,
+                fontSize: '0.875rem',
+                borderRadius: '980px',
+                px: 1.75,
+                py: 0.75,
+                minHeight: 36,
+                border: 'none',
+                '&:hover': {
+                  bgcolor: (theme) =>
+                    theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+                },
               }}
             >
               {t.nav.search}
@@ -2825,154 +2847,162 @@ export default function HomePage() {
           </Box>
           <IconButton
             onClick={() => setShowSearchBar((v) => !v)}
-            sx={{ mr: 1, display: { xs: 'flex', md: 'none' }, color: 'var(--foreground)', alignItems: 'center', gap: 0.5 }}
+            sx={{
+              mr: 0.25,
+              display: { xs: 'flex', md: 'none' },
+              color: showSearchBar ? '#0071e3' : 'var(--foreground)',
+              bgcolor: showSearchBar ? 'rgba(0,113,227,0.12)' : 'transparent',
+              width: 38,
+              height: 38,
+            }}
           >
-            <Search size={22} />
+            <Search size={20} />
           </IconButton>
           {isLiveActive && (
             <IconButton
               onClick={openLiveStream}
               sx={{
-                mr: 0.5,
+                mr: 0.25,
                 display: { xs: 'flex', md: 'none' },
                 color: '#fff',
-                bgcolor: '#ef4444',
+                bgcolor: '#ff3b30',
                 width: 34,
                 height: 34,
                 animation: 'navLivePulse 2s ease-in-out infinite',
                 '@keyframes navLivePulse': {
-                  '0%, 100%': { boxShadow: '0 0 0 0 rgba(239,68,68,0.4)' },
-                  '50%': { boxShadow: '0 0 0 6px rgba(239,68,68,0)' },
+                  '0%, 100%': { boxShadow: '0 0 0 0 rgba(255,59,48,0.4)' },
+                  '50%': { boxShadow: '0 0 0 6px rgba(255,59,48,0)' },
                 },
-                '&:hover': { bgcolor: '#dc2626' },
+                '&:hover': { bgcolor: '#e0342b' },
               }}
             >
               <Radio size={18} />
             </IconButton>
           )}
-          <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 1, mr: 2 }}>
-            <Button
-              variant="outlined"
-              startIcon={<Home size={18} />}
-              onClick={() => handleTabChange('home')}
-              sx={{
-                color: (theme) => activeTab === 'home' ? '#0071e3' : theme.palette.text.primary,
-                borderColor: (theme) => activeTab === 'home' ? 'rgba(0,113,227,0.6)' : theme.palette.divider,
-                backgroundColor: activeTab === 'home' ? 'rgba(0,113,227,0.12)' : 'transparent',
-                textTransform: 'none',
-                borderRadius: 2,
-                px: 1.5,
-                py: 0.5,
-                height: 40,
-                '&:hover': { borderColor: '#0071e3', backgroundColor: 'rgba(0,113,227,0.16)' },
-              }}
-            >
-              {t.nav.home}
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={(
-                <Badge
-                  badgeContent={pendingOrderCount > 0 ? pendingOrderCount : undefined}
-                  color="warning"
-                  max={99}
-                  invisible={pendingOrderCount === 0}
-                  sx={historyBadgeSx}
+          <Box
+            sx={{
+              display: { xs: 'none', md: 'flex' },
+              alignItems: 'center',
+              gap: 0.35,
+              mr: 1.5,
+              p: 0.35,
+              borderRadius: '980px',
+              bgcolor: (theme) =>
+                theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+            }}
+          >
+            {([
+              { key: 'home' as const, label: t.nav.home, icon: <Home size={16} /> },
+              {
+                key: 'history' as const,
+                label: t.nav.history,
+                icon: (
+                  <Badge
+                    badgeContent={pendingOrderCount > 0 ? pendingOrderCount : undefined}
+                    color="warning"
+                    max={99}
+                    invisible={pendingOrderCount === 0}
+                    sx={historyBadgeSx}
+                  >
+                    <History size={16} />
+                  </Badge>
+                ),
+              },
+              { key: 'profile' as const, label: t.nav.profile, icon: <User size={16} /> },
+              {
+                key: 'cart' as const,
+                label: t.nav.cart,
+                icon: (
+                  <Badge badgeContent={cart.length} color="error">
+                    <ShoppingCart size={16} />
+                  </Badge>
+                ),
+              },
+            ]).map((item) => {
+              const active = activeTab === item.key;
+              return (
+                <Button
+                  key={item.key}
+                  variant="text"
+                  startIcon={item.icon}
+                  onClick={() => handleTabChange(item.key)}
+                  sx={{
+                    color: active ? '#0071e3' : 'var(--foreground)',
+                    bgcolor: (theme) =>
+                      active
+                        ? theme.palette.mode === 'dark'
+                          ? 'rgba(255,255,255,0.12)'
+                          : 'rgba(255,255,255,0.92)'
+                        : 'transparent',
+                    boxShadow: active
+                      ? (theme) =>
+                          theme.palette.mode === 'dark'
+                            ? '0 1px 3px rgba(0,0,0,0.35)'
+                            : '0 1px 3px rgba(0,0,0,0.08)'
+                      : 'none',
+                    textTransform: 'none',
+                    fontWeight: active ? 700 : 500,
+                    fontSize: '0.8125rem',
+                    letterSpacing: '-0.01em',
+                    borderRadius: '980px',
+                    px: 1.5,
+                    py: 0.65,
+                    minHeight: 34,
+                    border: 'none',
+                    transition: 'background-color 0.22s ease, color 0.22s ease, box-shadow 0.22s ease',
+                    '&:hover': {
+                      bgcolor: (theme) =>
+                        active
+                          ? theme.palette.mode === 'dark'
+                            ? 'rgba(255,255,255,0.14)'
+                            : '#fff'
+                          : theme.palette.mode === 'dark'
+                            ? 'rgba(255,255,255,0.06)'
+                            : 'rgba(255,255,255,0.55)',
+                    },
+                  }}
                 >
-                  <History size={18} />
-                </Badge>
-              )}
-              onClick={() => handleTabChange('history')}
-              sx={{
-                color: (theme) => activeTab === 'history' ? '#0071e3' : theme.palette.text.primary,
-                borderColor: (theme) => activeTab === 'history' ? 'rgba(0,113,227,0.6)' : theme.palette.divider,
-                backgroundColor: activeTab === 'history' ? 'rgba(0,113,227,0.12)' : 'transparent',
-                textTransform: 'none',
-                borderRadius: 2,
-                px: 1.5,
-                py: 0.5,
-                height: 40,
-                '&:hover': { borderColor: '#0071e3', backgroundColor: 'rgba(0,113,227,0.16)' },
-              }}
-            >
-              {t.nav.history}
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={<User size={18} />}
-              onClick={() => handleTabChange('profile')}
-              sx={{
-                color: (theme) => activeTab === 'profile' ? '#0071e3' : theme.palette.text.primary,
-                borderColor: (theme) => activeTab === 'profile' ? 'rgba(0,113,227,0.6)' : theme.palette.divider,
-                backgroundColor: activeTab === 'profile' ? 'rgba(0,113,227,0.12)' : 'transparent',
-                textTransform: 'none',
-                borderRadius: 2,
-                px: 1.5,
-                py: 0.5,
-                height: 40,
-                '&:hover': { borderColor: '#0071e3', backgroundColor: 'rgba(0,113,227,0.16)' },
-              }}
-            >
-              {t.nav.profile}
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={(
-                <Badge badgeContent={cart.length} color="error">
-                  <ShoppingCart size={18} />
-                </Badge>
-              )}
-              onClick={() => handleTabChange('cart')}
-              sx={{
-                color: (theme) => activeTab === 'cart' ? '#0071e3' : theme.palette.text.primary,
-                borderColor: (theme) => activeTab === 'cart' ? 'rgba(0,113,227,0.6)' : theme.palette.divider,
-                backgroundColor: activeTab === 'cart' ? 'rgba(0,113,227,0.12)' : 'transparent',
-                textTransform: 'none',
-                borderRadius: 2,
-                px: 1.5,
-                py: 0.5,
-                height: 40,
-                '&:hover': { borderColor: '#0071e3', backgroundColor: 'rgba(0,113,227,0.16)' },
-              }}
-            >
-              {t.nav.cart}
-            </Button>
+                  {item.label}
+                </Button>
+              );
+            })}
             {isLiveActive && (
               <Button
-                variant="contained"
-                startIcon={<Radio size={18} />}
+                variant="text"
+                startIcon={<Radio size={16} />}
                 onClick={openLiveStream}
                 sx={{
-                  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
                   color: '#fff',
+                  bgcolor: '#ff3b30',
                   textTransform: 'none',
-                  borderRadius: 2,
+                  borderRadius: '980px',
                   px: 1.5,
-                  py: 0.5,
-                  height: 40,
+                  py: 0.65,
+                  minHeight: 34,
                   fontWeight: 700,
+                  fontSize: '0.8125rem',
                   position: 'relative',
                   overflow: 'visible',
                   animation: 'navLivePulse 2s ease-in-out infinite',
                   '@keyframes navLivePulse': {
-                    '0%, 100%': { boxShadow: '0 0 0 0 rgba(239,68,68,0.4)' },
-                    '50%': { boxShadow: '0 0 0 8px rgba(239,68,68,0)' },
+                    '0%, 100%': { boxShadow: '0 0 0 0 rgba(255,59,48,0.35)' },
+                    '50%': { boxShadow: '0 0 0 7px rgba(255,59,48,0)' },
                   },
-                  '&:hover': { background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)' },
+                  '&:hover': { bgcolor: '#e0342b' },
                   '&::before': {
                     content: '""',
-                    width: 8,
-                    height: 8,
+                    width: 7,
+                    height: 7,
                     borderRadius: '50%',
                     bgcolor: '#fff',
                     position: 'absolute',
-                    top: 6,
-                    right: 6,
+                    top: 7,
+                    right: 8,
                     animation: 'navLiveDot 1.5s ease-in-out infinite',
                   },
                   '@keyframes navLiveDot': {
                     '0%, 100%': { opacity: 1 },
-                    '50%': { opacity: 0.3 },
+                    '50%': { opacity: 0.35 },
                   },
                 }}
               >
@@ -2981,14 +3011,26 @@ export default function HomePage() {
             )}
           </Box>
           {session && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
               <LanguageToggle size="small" />
               <ThemeToggle size="small" />
-              <Avatar src={orderData.profileImage || session?.user?.image || ''} sx={{ width: 32, height: 32, cursor: 'pointer' }} onClick={() => setSidebarOpen(true)} />
+              <Avatar
+                src={orderData.profileImage || session?.user?.image || ''}
+                sx={{
+                  width: 30,
+                  height: 30,
+                  cursor: 'pointer',
+                  boxShadow: (theme) =>
+                    theme.palette.mode === 'dark'
+                      ? '0 0 0 1px rgba(255,255,255,0.12)'
+                      : '0 0 0 1px rgba(0,0,0,0.06)',
+                }}
+                onClick={() => setSidebarOpen(true)}
+              />
             </Box>
           )}
           {!session && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
               <LanguageToggle size="small" />
               <ThemeToggle size="small" />
             </Box>
@@ -3307,6 +3349,7 @@ export default function HomePage() {
             </Box>
           </Box>
         )}
+        </ProgressiveBlurChrome>
       </AppBar>
 
       {/* Shop Status Banner - Shows different states (not open, coming soon, order ended, etc.) */}

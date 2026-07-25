@@ -45,6 +45,7 @@ import AnnouncementBar from '@/components/AnnouncementBar';
 import EventBanner, { type ShopEvent } from '@/components/EventBanner';
 import Footer from '@/components/Footer';
 import SupportChatWidget from '@/components/SupportChatWidget';
+import ProgressiveBlurChrome from '@/components/ui/ProgressiveBlurChrome';
 import { useNotification } from '@/components/NotificationContext';
 import {
   getProductStatus, getShopStatus, SHOP_STATUS_CONFIG, ShopStatusBanner, type ShopStatusType,
@@ -1304,12 +1305,8 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'var(--background)', color: 'var(--foreground)' }}>
       {/* ==================== HEADER ==================== */}
-      <Box sx={{
-        position: 'sticky', top: 0, zIndex: 100,
-        backdropFilter: 'blur(20px)',
-        bgcolor: 'var(--glass-bg)',
-        borderBottom: '1px solid var(--glass-border)',
-      }}>
+      <Box sx={{ position: 'sticky', top: 0, zIndex: 100, bgcolor: 'transparent' }}>
+        <ProgressiveBlurChrome edge="bottom" fadeExtent={40}>
         <Box sx={{
           maxWidth: '1200px', mx: 'auto', px: 2, py: 1.5,
           display: 'flex', alignItems: 'center', gap: 2,
@@ -1420,6 +1417,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
             </Tooltip>
           )}
         </Box>
+        </ProgressiveBlurChrome>
       </Box>
 
       <ShopStatusBanner
