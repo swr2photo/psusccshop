@@ -30,10 +30,10 @@ function makeQueryClient() {
         // Retry with exponential backoff (max 2 retries)
         retry: 2,
         retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 15000),
-        // Only refetch stale data on window focus (not fresh data)
-        refetchOnWindowFocus: 'always',
-        // Refetch on reconnect
-        refetchOnReconnect: 'always',
+        // Respect staleTime — avoid focus storms on every tab switch
+        refetchOnWindowFocus: true,
+        refetchOnReconnect: true,
+        refetchIntervalInBackground: false,
         // Don't refetch on mount if data is still fresh
         refetchOnMount: false,
         // Structural sharing to minimize re-renders

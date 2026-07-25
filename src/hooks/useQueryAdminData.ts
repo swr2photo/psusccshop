@@ -50,7 +50,8 @@ export function useAdminDataQuery() {
     queryKey: queryKeys.admin.data(),
     queryFn: () => fetchJSON<AdminDataResponse>('/api/admin/data'),
     staleTime: 15 * 1000, // 15 seconds
-    refetchInterval: 30 * 1000, // Auto refresh every 30 seconds
+    refetchInterval: 30 * 1000,
+    refetchIntervalInBackground: false,
   });
 }
 

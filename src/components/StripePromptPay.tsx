@@ -245,13 +245,16 @@ export default function StripePromptPay({
     void pollServer();
     void pollClient();
 
-    const serverTimer = setInterval(() => void pollServer(), SERVER_POLL_MS);
-    const clientTimer = setInterval(() => void pollClient(), SERVER_POLL_MS);
+    const tick = () => {
+      if (document.visibilityState === 'hidden') return;
+      void pollServer();
+      void pollClient();
+    };
+    const serverTimer = setInterval(tick, SERVER_POLL_MS);
 
     return () => {
       cancelled = true;
       clearInterval(serverTimer);
-      clearInterval(clientTimer);
     };
   }, [phase, orderRef, markSucceeded, lang]);
 

@@ -242,70 +242,53 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
     }, 100);
   }, []);
 
-  // Fetch active chat
+  // Fetch active chat (single request: metadata + recent messages)
   const fetchActiveChat = useCallback(async (markRead = false) => {
     if (!session?.user?.email) return;
-    
-    try {
-      const res = await apiFetch('/api/support-chat', { credentials: 'same-origin', cache: 'no-store' });
-      if (res.status === 401) {
-        // Session cookie not readable yet / proxied auth miss — quiet retry after sync
-        try {
-          await fetch('/api/auth/sync-cookie', { method: 'POST', credentials: 'include', cache: 'no-store' });
-          const retry = await apiFetch('/api/support-chat', { credentials: 'same-origin', cache: 'no-store' });
-          if (!retry.ok) return;
-          const retryData = await retry.json();
-          if (retryData.chat) {
-            const chatRes = await apiFetch(`/api/support-chat/${retryData.chat.id}${markRead ? '?markRead=true' : ''}`);
-            const chatData = await chatRes.json();
-            if (chatData.chat) {
-              setChat(chatData.chat);
-              if (chatData.chat.messages) setRealtimeMessages(chatData.chat.messages);
-              setUnreadCount(chatData.chat.customer_unread_count || 0);
-              setShowHistory(false);
-              setShowNewChat(false);
-            }
-          } else {
-            setChat(null);
-            setShowNewChat(true);
-          }
-        } catch {
-          /* ignore */
-        }
-        return;
-      }
-      const data = await res.json();
-      
+
+    const activeUrl =
+      `/api/support-chat?withMessages=1${markRead ? '&markRead=true' : ''}`;
+
+    const applyActivePayload = (data: { chat?: ChatWithMessages | null }) => {
       if (data.chat) {
-        // Fetch full chat with messages (markRead only on first open, not polling)
-        const chatRes = await apiFetch(`/api/support-chat/${data.chat.id}${markRead ? '?markRead=true' : ''}`);
-        const chatData = await chatRes.json();
-        
-        if (chatData.chat) {
-          setChat(chatData.chat);
-          // Seed realtime messages from initial fetch
-          if (chatData.chat.messages) {
-            setRealtimeMessages(chatData.chat.messages);
-          }
-          setUnreadCount(chatData.chat.customer_unread_count || 0);
-          setShowHistory(false);
-          setShowNewChat(false);
-          
-          // Show rating dialog if chat is closed and not rated
-          if (chatData.chat.status === 'closed' && !chatData.chat.rating) {
-            setShowRating(true);
-          } else {
-            setShowRating(false);
-          }
+        setChat(data.chat);
+        if (data.chat.messages) {
+          setRealtimeMessages(data.chat.messages);
+        }
+        setUnreadCount(data.chat.customer_unread_count || 0);
+        setShowHistory(false);
+        setShowNewChat(false);
+        if (data.chat.status === 'closed' && !data.chat.rating) {
+          setShowRating(true);
+        } else {
+          setShowRating(false);
         }
       } else {
         setChat(null);
         setShowNewChat(true);
       }
+    };
+    
+    try {
+      const res = await apiFetch(activeUrl, { credentials: 'same-origin', cache: 'no-store' });
+      if (res.status === 401) {
+        // Session cookie not readable yet / proxied auth miss — quiet retry after sync
+        try {
+          await fetch('/api/auth/sync-cookie', { method: 'POST', credentials: 'include', cache: 'no-store' });
+          const retry = await apiFetch(activeUrl, { credentials: 'same-origin', cache: 'no-store' });
+          if (!retry.ok) return;
+          applyActivePayload(await retry.json());
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
+      if (!res.ok) return;
+      applyActivePayload(await res.json());
     } catch (error) {
       console.error('Error fetching chat:', error);
     }
-  }, [session?.user?.email]);
+  }, [session?.user?.email, setRealtimeMessages]);
 
   // Fetch chat history (all closed chats)
   const fetchChatHistory = useCallback(async () => {
@@ -455,21 +438,39 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
     return () => { cancelled = true; clearInterval(interval); };
   }, [open, chat?.id, chat?.status, showHistory, showNewChat, showRating, setRealtimeMessages, connectionState]);
 
-  // Refetch when user returns to the tab (missed events while backgrounded)
+  // Refetch when user returns to the tab (delta/ETag — avoid full history reload)
   useEffect(() => {
     if (!open || !chat?.id || showHistory || showNewChat || showRating) return;
 
-    const onVisible = () => {
+    const chatId = chat.id;
+    const onVisible = async () => {
       if (document.visibilityState !== 'visible') return;
-      apiFetch(`/api/support-chat/${chat.id}`)
-        .then((res) => res.json())
-        .then((data) => {
-          if (!data.chat?.messages) return;
-          const incoming = data.chat.messages as ChatMessage[];
-          setRealtimeMessages(incoming);
-          setChat((prev) => (prev ? { ...prev, ...data.chat, messages: incoming } : prev));
-        })
-        .catch(() => {});
+      try {
+        const result = await fetchChatSync<ChatWithMessages>(chatId, {
+          etag: chatEtagRef.current,
+          since: lastMessageAtRef.current,
+        });
+        if (result.kind === 'unchanged') return;
+        chatEtagRef.current = result.etag;
+
+        if (result.kind === 'delta') {
+          setChat((prev) => {
+            if (!prev || prev.id !== chatId) return prev;
+            const merged = mergeChatMessages(prev.messages, result.chat.messages || []);
+            setRealtimeMessages(merged);
+            lastMessageAtRef.current = merged[merged.length - 1]?.created_at ?? lastMessageAtRef.current;
+            return { ...prev, ...result.chat, messages: merged };
+          });
+          return;
+        }
+
+        const incoming = (result.chat.messages || []) as ChatMessage[];
+        setRealtimeMessages(incoming);
+        lastMessageAtRef.current = incoming[incoming.length - 1]?.created_at ?? null;
+        setChat((prev) => (prev ? { ...prev, ...result.chat, messages: incoming } : prev));
+      } catch {
+        /* ignore */
+      }
     };
 
     document.addEventListener('visibilitychange', onVisible);
@@ -519,26 +520,31 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
 
       // Existing active chat — initial message was not added by POST, send it now
       const isExistingChat = typeof data.message === 'string' && data.message.includes('กำลังดำเนินอยู่แล้ว');
+      let activeChat = data.chat as ChatWithMessages;
       if (isExistingChat) {
         const msgRes = await apiFetch(`/api/support-chat/${data.chat.id}/message`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: messageText }),
         });
+        const msgData = await msgRes.json().catch(() => ({}));
         if (!msgRes.ok) {
-          const msgData = await msgRes.json().catch(() => ({}));
           toastError(msgData.error || t.supportChat.sendFailed);
           return;
         }
+        if (msgData.message) {
+          const existingMsgs = activeChat.messages || [];
+          activeChat = {
+            ...activeChat,
+            messages: mergeChatMessages(existingMsgs, [msgData.message]),
+          };
+        }
       }
 
-      const chatRes = await apiFetch(`/api/support-chat/${data.chat.id}`);
-      const chatData = await chatRes.json();
-      
-      if (chatData.chat) {
-        setChat(chatData.chat);
-        if (chatData.chat.messages) {
-          setRealtimeMessages(chatData.chat.messages);
+      if (activeChat) {
+        setChat(activeChat);
+        if (activeChat.messages) {
+          setRealtimeMessages(activeChat.messages);
         }
         setShowNewChat(false);
         setShowRating(false);

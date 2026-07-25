@@ -9,16 +9,20 @@ import { db } from '@/lib/db';
 import { config } from '@/db/schema';
 import { CACHE_TTL } from '@/lib/server-cache';
 import { ShippingConfig, DEFAULT_SHIPPING_CONFIG, toPublicShippingConfig } from '@/lib/shipping';
-
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const CONFIG_KEY = 'shipping_config';
 
-function publicJson(cfg: ShippingConfig, cacheControl: string) {
+function publicJson(cfg: ShippingConfig, cacheControl: string, cdnMaxAge = 300) {
   return NextResponse.json(
     { success: true, data: toPublicShippingConfig(cfg) },
-    { headers: { 'Cache-Control': cacheControl } },
+    {
+      headers: {
+        'Cache-Control': cacheControl,
+        'CDN-Cache-Control': `public, max-age=${cdnMaxAge}`,
+      },
+    },
   );
 }
 

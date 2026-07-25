@@ -6,7 +6,9 @@ import { getSession } from '@/lib/auth';
 import { 
   createChatSession, 
   getCustomerActiveChat,
-  getCustomerChats
+  getCustomerChats,
+  getChatSessionWithMessages,
+  markMessagesAsRead,
 } from '@/lib/support-chat';
 import { getProfileName } from '@/lib/profile-utils';
 
@@ -33,6 +35,21 @@ export async function GET(request: NextRequest) {
     
     // Get active chat (pending or active)
     const activeChat = await getCustomerActiveChat(session.user.email);
+    if (!activeChat) {
+      return NextResponse.json({ chat: null });
+    }
+
+    const withMessages = searchParams.get('withMessages') === '1';
+    const shouldMarkRead = searchParams.get('markRead') === 'true';
+
+    if (withMessages) {
+      if (shouldMarkRead) {
+        await markMessagesAsRead(activeChat.id, 'customer');
+      }
+      const chat = await getChatSessionWithMessages(activeChat.id);
+      return NextResponse.json({ chat });
+    }
+
     return NextResponse.json({ chat: activeChat });
     
   } catch (error: any) {
@@ -56,8 +73,9 @@ export async function POST(request: NextRequest) {
     // Check if customer already has an active chat
     const existingChat = await getCustomerActiveChat(session.user.email);
     if (existingChat) {
+      const chat = await getChatSessionWithMessages(existingChat.id);
       return NextResponse.json({ 
-        chat: existingChat,
+        chat: chat || existingChat,
         message: 'คุณมีการสนทนาที่กำลังดำเนินอยู่แล้ว'
       });
     }
@@ -76,7 +94,7 @@ export async function POST(request: NextRequest) {
     const profileName = await getProfileName(session.user.email);
     const customerName = profileName || session.user.name || 'ลูกค้า';
     
-    const chat = await createChatSession(
+    const created = await createChatSession(
       session.user.email,
       customerName,
       subject?.trim() || 'สอบถามข้อมูล',
@@ -85,6 +103,7 @@ export async function POST(request: NextRequest) {
       shopId || undefined,
       shopName || undefined
     );
+    const chat = (await getChatSessionWithMessages(created.id)) || created;
     
     return NextResponse.json({ 
       chat,

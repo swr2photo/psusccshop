@@ -67,7 +67,8 @@ export function getChatPollIntervalMs(connectionState: string, role: 'messages' 
 
   const connected = connectionState === 'connected';
   if (role === 'typing') {
-    return connected ? 15_000 : 4000;
+    return connected ? 15_000 : 3000;
   }
-  return connected ? 45_000 : 8000;
+  // Faster safety-net when Realtime is down so missed events surface quickly
+  return connected ? 45_000 : 5000;
 }

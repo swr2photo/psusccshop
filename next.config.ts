@@ -238,7 +238,12 @@ const nextConfig: NextConfig = {
       headers: [
         {
           key: 'Cache-Control',
-          value: 'public, s-maxage=60, stale-while-revalidate=300',
+          // Match route handler (realtime freshness); do not override with a longer s-maxage
+          value: 'public, max-age=0, s-maxage=10, stale-while-revalidate=30',
+        },
+        {
+          key: 'CDN-Cache-Control',
+          value: 'public, max-age=10',
         },
       ],
     },

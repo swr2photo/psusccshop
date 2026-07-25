@@ -81,8 +81,8 @@ export function SWRProvider({ children }: SWRProviderProps) {
         // Performance: increase dedup interval (prevent duplicate requests within 10s)
         dedupingInterval: 10000,
         
-        // Performance: throttle focus revalidation (min 10s between focus events)
-        focusThrottleInterval: 10000,
+        // Performance: throttle focus revalidation (min 15s between focus requests)
+        focusThrottleInterval: 15000,
         
         // Error retry with exponential backoff
         errorRetryCount: 3,

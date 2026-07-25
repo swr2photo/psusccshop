@@ -622,12 +622,18 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
     };
   }, [shopSlug, queryClient, initialShop.id]);
 
-  // Refetch shop status when user returns to the tab (same as main shop)
+  // Soft refetch when returning to the tab (deduped; respects query staleTime)
   useEffect(() => {
+    let lastAt = 0;
     const onVisible = () => {
-      if (document.visibilityState === 'visible') {
-        queryClient.invalidateQueries({ queryKey: [...queryKeys.shop.all, 'public', initialShop.id] });
-      }
+      if (document.visibilityState !== 'visible') return;
+      const now = Date.now();
+      if (now - lastAt < 30_000) return;
+      lastAt = now;
+      void queryClient.refetchQueries({
+        queryKey: [...queryKeys.shop.all, 'public', initialShop.id],
+        type: 'active',
+      });
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);

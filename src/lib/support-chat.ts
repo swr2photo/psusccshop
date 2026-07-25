@@ -145,19 +145,28 @@ export async function getChatSession(sessionId: string): Promise<ChatSession | n
   return data[0] ? toChat(data[0]) : null;
 }
 
+/** Default window for full history fetches (keeps open/sync payloads small). */
+export const CHAT_MESSAGE_PAGE_SIZE = 100;
+
 /**
- * Get chat session with messages
+ * Get chat session with messages (most recent `limit` by default).
  */
-export async function getChatSessionWithMessages(sessionId: string): Promise<ChatSessionWithMessages | null> {
+export async function getChatSessionWithMessages(
+  sessionId: string,
+  limit = CHAT_MESSAGE_PAGE_SIZE
+): Promise<ChatSessionWithMessages | null> {
   const chatRows = await db.select().from(supportChats).where(eq(supportChats.id, sessionId)).limit(1);
   const chat = chatRows[0];
   if (!chat) return null;
-  
-  const msgRowsSorted = await db.select()
+
+  // Fetch newest first, then reverse for chronological UI order
+  const msgRowsNewestFirst = await db.select()
     .from(supportMessages)
     .where(eq(supportMessages.sessionId, sessionId))
-    .orderBy(supportMessages.createdAt);
-  
+    .orderBy(desc(supportMessages.createdAt))
+    .limit(Math.max(1, limit));
+  const msgRowsSorted = msgRowsNewestFirst.reverse();
+
   return {
     ...toChat(chat),
     messages: msgRowsSorted.map(toMsg),
@@ -378,12 +387,18 @@ export async function getChatMessages(
 }
 
 /**
- * Mark messages as read
+ * Mark messages as read (no-op when unread counter is already 0).
  */
 export async function markMessagesAsRead(
   sessionId: string, 
   reader: 'customer' | 'admin'
 ): Promise<void> {
+  const session = await getChatSession(sessionId);
+  if (!session) return;
+
+  const unread = reader === 'customer' ? session.customer_unread_count : session.unread_count;
+  if (unread <= 0) return;
+
   const senderToMark = reader === 'customer' ? 'admin' : 'customer';
   
   await db.update(supportMessages)

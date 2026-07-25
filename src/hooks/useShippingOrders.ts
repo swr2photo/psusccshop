@@ -15,6 +15,7 @@ import { useCallback, useMemo } from 'react';
 import { fetcher } from './useSWRConfig';
 import { apiFetch } from '@/lib/api-client';
 import { ADMIN_CACHE_KEYS, invalidateAdminData } from './useAdminData';
+import { visibleRefreshInterval } from '@/lib/visible-refresh';
 
 // ============== TYPES ==============
 
@@ -44,7 +45,8 @@ export function useShippingOrders(selectedShopId?: string) {
     {
       revalidateOnFocus: true,
       dedupingInterval: 5000,
-      refreshInterval: 30000, // 30 seconds
+      focusThrottleInterval: 15_000,
+      refreshInterval: visibleRefreshInterval(30_000),
     }
   );
 

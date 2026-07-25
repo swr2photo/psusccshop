@@ -40,19 +40,26 @@ export async function GET(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const etag = buildChatEtag(chatSession);
-    const ifNoneMatch = request.headers.get('if-none-match');
-    if (ifNoneMatch && ifNoneMatch === etag) {
-      return new NextResponse(null, { status: 304, headers: { ETag: etag } });
-    }
-
     const { searchParams } = new URL(request.url);
     const shouldMarkRead = searchParams.get('markRead') === 'true';
     const sinceParam = searchParams.get('since');
 
+    // ETag check before markRead so idle polls stay cheap (304)
+    let sessionForResponse = chatSession;
+    let etag = buildChatEtag(sessionForResponse);
+    const ifNoneMatch = request.headers.get('if-none-match');
+    if (!shouldMarkRead && ifNoneMatch && ifNoneMatch === etag) {
+      return new NextResponse(null, { status: 304, headers: { ETag: etag } });
+    }
+
     if (shouldMarkRead) {
       const reader = isOwner ? 'customer' : 'admin';
       await markMessagesAsRead(sessionId, reader);
+      const refreshed = await getChatSession(sessionId);
+      if (refreshed) {
+        sessionForResponse = refreshed;
+        etag = buildChatEtag(sessionForResponse);
+      }
     }
 
     if (sinceParam) {
@@ -61,7 +68,7 @@ export async function GET(request: NextRequest, { params }: Params) {
         const deltaMessages = await getMessagesSince(sessionId, sinceDate);
         return NextResponse.json(
           {
-            chat: { ...chatSession, messages: deltaMessages },
+            chat: { ...sessionForResponse, messages: deltaMessages },
             sync: 'delta',
           },
           { headers: { ETag: etag } }

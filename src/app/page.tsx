@@ -736,6 +736,9 @@ export default function HomePage() {
   const [configRealtimeOk, setConfigRealtimeOk] = useState(false);
   const configFetchInFlight = useRef(false);
   const configPollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastConfigRefreshAt = useRef(0);
+  const shippingFetchInFlight = useRef(false);
+  const lastShippingRefreshAt = useRef(0);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [navHandedness, setNavHandedness] = useState<'right' | 'left'>(() => {
@@ -1047,10 +1050,33 @@ export default function HomePage() {
     Object.values(cartHoldTimers.current).forEach((t) => t && clearInterval(t));
   }, []);
 
+  const refreshShippingConfig = useCallback(async (force = false) => {
+    if (shippingFetchInFlight.current) return;
+    if (!force && Date.now() - lastShippingRefreshAt.current < 5 * 60 * 1000) return;
+    shippingFetchInFlight.current = true;
+    try {
+      const shippingRes = await apiFetch('/api/shipping/options');
+      if (!shippingRes.ok) return;
+      const shippingData = await shippingRes.json();
+      const next =
+        (shippingData?.data as ShippingConfig | undefined) ||
+        (shippingData?.success === undefined ? (shippingData as ShippingConfig) : null);
+      if (next) {
+        setShippingConfig(next);
+        lastShippingRefreshAt.current = Date.now();
+      }
+    } catch (shippingErr) {
+      console.error('Failed to load shipping config:', shippingErr);
+    } finally {
+      shippingFetchInFlight.current = false;
+    }
+  }, []);
+
   const refreshConfig = useCallback(async (fresh = false) => {
     // fresh = realtime signaled a change: bypass the in-flight guard and all
     // caches so we never miss the update
     if (configFetchInFlight.current && !fresh) return;
+    if (!fresh && Date.now() - lastConfigRefreshAt.current < 8_000) return;
     configFetchInFlight.current = true;
     try {
       const res = await getPublicConfig(fresh);
@@ -1082,22 +1108,12 @@ export default function HomePage() {
           const shopStatus = getShopStatus(cfg.isOpen, cfg.closeDate, cfg.openDate);
           const actuallyOpen = shopStatus === 'OPEN';
           setIsShopOpen(prev => prev === actuallyOpen ? prev : actuallyOpen);
+          lastConfigRefreshAt.current = Date.now();
         } else {
           console.warn('No config returned from getPublicConfig');
         }
       } else {
         console.error('Failed to load config:', res.message || res.error);
-      }
-      
-      // Fetch shipping config for cart display
-      try {
-        const shippingRes = await apiFetch('/api/shipping/options');
-        if (shippingRes.ok) {
-          const shippingData = await shippingRes.json();
-          setShippingConfig(shippingData);
-        }
-      } catch (shippingErr) {
-        console.error('Failed to load shipping config:', shippingErr);
       }
     } catch (error) {
       console.error('Failed to load config:', error);
@@ -1128,7 +1144,7 @@ export default function HomePage() {
           }
         }
 
-        await refreshConfig();
+        await Promise.all([refreshConfig(), refreshShippingConfig(true)]);
       } catch (error) {
         console.error('Failed to load config:', error);
       } finally {
@@ -1137,7 +1153,7 @@ export default function HomePage() {
     };
 
     loadConfig();
-  }, [refreshConfig]);
+  }, [refreshConfig, refreshShippingConfig]);
 
   // Auto-open product from URL query param (?p=id or legacy ?product=slug-or-id)
   useEffect(() => {
@@ -1594,27 +1610,22 @@ export default function HomePage() {
     }
   }, [realtimeConnected]);
 
-  // Fallback: Refresh on visibility change (in case realtime disconnects)
-
-  // --- Chatbot button ---
-  // Render at the end of the page
+  // Single visibility listener (avoid focus + visibility double-fetch)
   useEffect(() => {
     const handleVisibility = () => {
-      // Always refresh when the tab becomes visible again — realtime events
-      // may have been missed while the socket was suspended in background
-      if (!document.hidden) {
-        refreshConfig();
-      }
+      if (document.visibilityState !== 'visible') return;
+      refreshConfig();
     };
-
-    window.addEventListener('focus', handleVisibility);
     document.addEventListener('visibilitychange', handleVisibility);
-
-    return () => {
-      window.removeEventListener('focus', handleVisibility);
-      document.removeEventListener('visibilitychange', handleVisibility);
-    };
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, [refreshConfig]);
+
+  // Refresh shipping when cart opens (not on every config poll)
+  useEffect(() => {
+    if (showCart) {
+      void refreshShippingConfig(false);
+    }
+  }, [showCart, refreshShippingConfig]);
 
   // Fallback polling only when the CONFIG realtime channel is unhealthy
   // (previously gated on the orders channel, which stayed "connected" even
@@ -1632,6 +1643,7 @@ export default function HomePage() {
     // Fallback polling when config realtime is not available
     const intervalMs = 60_000; // 60s fallback when config realtime is down
     configPollTimer.current = setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
       refreshConfig();
     }, intervalMs);
 

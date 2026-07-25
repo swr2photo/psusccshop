@@ -223,24 +223,21 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
       const url = new URL(window.location.href);
       url.searchParams.delete('chatId');
       window.history.replaceState({}, '', url.pathname + url.search + url.hash);
-      // Fetch and open the specific chat
+      // Fetch and open the specific chat (single request seeds Realtime messages)
       fetchChatDetails(chatIdParam, true).then(() => {
-        // After fetching, also seed realtime
-        apiFetch('/api/support-chat/' + chatIdParam + '?markRead=true')
-          .then(res => res.json())
-          .then(data => { if (data.chat) setRealtimeMessages(data.chat.messages || []); })
-          .catch(() => {});
+        /* selectedChat + messages applied inside fetchChatDetails */
       });
       if (isMobile) setMobileShowChat(true);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fetchChats = useCallback(async () => {
+  const fetchChats = useCallback(async (opts?: { includeStats?: boolean }) => {
     try {
       const filter = ['all', 'pending', 'my', 'closed'][tabValue];
       const shopParam = selectedShopId ? `&shopId=${encodeURIComponent(selectedShopId)}` : '';
-      const res = await apiFetch('/api/admin/support-chat?filter=' + filter + shopParam);
+      const statsParam = opts?.includeStats === false ? '&stats=0' : '';
+      const res = await apiFetch('/api/admin/support-chat?filter=' + filter + shopParam + statsParam);
       const data = await res.json();
       if (data.chats) setChats(data.chats);
       if (data.stats) setStats(data.stats);
@@ -254,15 +251,18 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
       const url = '/api/support-chat/' + chatId + (markRead ? '?markRead=true' : '');
       const res = await apiFetch(url);
       const data = await res.json();
-      if (data.chat) setSelectedChat(data.chat);
+      if (data.chat) {
+        setSelectedChat(data.chat);
+        if (data.chat.messages) setRealtimeMessages(data.chat.messages || []);
+      }
     } catch (error) {
       console.error('Error fetching chat details:', error);
     }
-  }, []);
+  }, [setRealtimeMessages]);
 
   useEffect(() => {
     setLoading(true);
-    fetchChats().finally(() => setLoading(false));
+    fetchChats({ includeStats: true }).finally(() => setLoading(false));
   }, [fetchChats]);
 
   // Sync realtime messages into selectedChat state
@@ -297,24 +297,30 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     }
   }, [realtimeSessions]);
 
-  // Mark messages as read when viewing a chat  
+  // Mark as read once when selecting a chat (not on every new message)
   useEffect(() => {
-    if (selectedChat?.id) {
-      apiFetch('/api/support-chat/' + selectedChat.id + '/read', { method: 'POST' }).catch(() => {});
+    if (!selectedChat?.id) return;
+    if ((selectedChat.unread_count || 0) <= 0) {
       broadcastRead();
+      return;
     }
-  }, [selectedChat?.id, selectedChat?.messages?.length, broadcastRead]);
+    apiFetch('/api/support-chat/' + selectedChat.id + '/read', { method: 'POST' }).catch(() => {});
+    broadcastRead();
+  }, [selectedChat?.id, broadcastRead]);
 
-  // Sidebar list polling — slower when Realtime is healthy
+  // Sidebar list polling — skip expensive stats on background polls
   useEffect(() => {
     const isRealtimeUp = connectionState === 'connected' && listConnectionState === 'connected';
     const pollInterval = isRealtimeUp ? 60_000 : 8000;
 
     let cancelled = false;
+    let tick = 0;
     const poll = async () => {
-      if (cancelled) return;
+      if (cancelled || document.visibilityState === 'hidden') return;
       try {
-        await fetchChats();
+        tick += 1;
+        // Refresh stats every ~5th poll to keep badges fresh without 4 extra queries each time
+        await fetchChats({ includeStats: tick % 5 === 0 });
       } catch {}
     };
     const interval = setInterval(poll, pollInterval);
@@ -354,7 +360,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
             lastMessageAtRef.current = merged[merged.length - 1]?.created_at ?? lastMessageAtRef.current;
             return { ...prev, ...result.chat, messages: merged };
           });
-          if (didUpdate) {
+          if (didUpdate && (result.chat.unread_count || 0) > 0) {
             apiFetch('/api/support-chat/' + chatId + '/read', { method: 'POST' }).catch(() => {});
           }
           return;
@@ -373,7 +379,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
           lastMessageAtRef.current = incoming[incoming.length - 1]?.created_at ?? null;
           return { ...result.chat, messages: incoming };
         });
-        if (didUpdate) {
+        if (didUpdate && (result.chat.unread_count || 0) > 0) {
           apiFetch('/api/support-chat/' + chatId + '/read', { method: 'POST' }).catch(() => {});
         }
       } catch {}
@@ -387,20 +393,39 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     return () => { cancelled = true; clearInterval(interval); };
   }, [selectedChat?.id, selectedChat?.status, setRealtimeMessages, connectionState]);
 
-  // Refetch active chat when admin returns to the tab
+  // Refetch active chat when admin returns to the tab (delta/ETag)
   useEffect(() => {
     if (!selectedChat?.id) return;
 
-    const onVisible = () => {
+    const chatId = selectedChat.id;
+    const onVisible = async () => {
       if (document.visibilityState !== 'visible') return;
-      apiFetch('/api/support-chat/' + selectedChat.id)
-        .then((res) => res.json())
-        .then((data) => {
-          if (!data.chat?.messages) return;
-          setSelectedChat(data.chat);
-          setRealtimeMessages(data.chat.messages || []);
-        })
-        .catch(() => {});
+      try {
+        const result = await fetchChatSync<ChatWithMessages>(chatId, {
+          etag: chatEtagRef.current,
+          since: lastMessageAtRef.current,
+        });
+        if (result.kind === 'unchanged') return;
+        chatEtagRef.current = result.etag;
+
+        if (result.kind === 'delta') {
+          setSelectedChat((prev) => {
+            if (!prev || prev.id !== chatId) return prev;
+            const merged = mergeChatMessages(prev.messages, result.chat.messages || []);
+            setRealtimeMessages(merged);
+            lastMessageAtRef.current = merged[merged.length - 1]?.created_at ?? lastMessageAtRef.current;
+            return { ...prev, ...result.chat, messages: merged };
+          });
+          return;
+        }
+
+        setSelectedChat(result.chat);
+        setRealtimeMessages(result.chat.messages || []);
+        lastMessageAtRef.current =
+          result.chat.messages?.[result.chat.messages.length - 1]?.created_at ?? null;
+      } catch {
+        /* ignore */
+      }
     };
 
     document.addEventListener('visibilitychange', onVisible);

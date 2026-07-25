@@ -136,7 +136,10 @@ export function useAdminDataSWR(options: UseAdminDataSWROptions) {
     adminFetcher,
     {
       ...swrOptions,
-      refreshInterval: realtimeConnected ? 120_000 : 60_000,
+      refreshInterval: () => {
+        if (typeof document !== 'undefined' && document.hidden) return 0;
+        return realtimeConnected ? 120_000 : 60_000;
+      },
       fallbackData: (() => {
         const cached = readLocalCache();
         if (!cached?.config) return undefined;
@@ -157,7 +160,10 @@ export function useAdminDataSWR(options: UseAdminDataSWROptions) {
     {
       ...swrOptions,
       keepPreviousData: !isShopScoped,
-      refreshInterval: realtimeConnected ? 120_000 : 15_000,
+      refreshInterval: () => {
+        if (typeof document !== 'undefined' && document.hidden) return 0;
+        return realtimeConnected ? 120_000 : 15_000;
+      },
       fallbackData: (() => {
         if (isShopScoped) return undefined;
         const cached = readLocalCache();

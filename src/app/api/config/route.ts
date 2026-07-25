@@ -94,10 +94,9 @@ async function GETHandler() {
     {
       headers: {
         'Content-Type': 'application/json; charset=utf-8',
-        // Short CDN cache: realtime-triggered refetches use a cache-busting
-        // query param, but normal polling/visibility refetches should not see
-        // data older than ~10s after an admin change.
-        'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=30',
+        // Align with next.config + API_CDN_HEADERS.config (edge ~10s)
+        'Cache-Control': 'public, max-age=0, s-maxage=10, stale-while-revalidate=30',
+        'CDN-Cache-Control': 'public, max-age=10',
       },
     }
   );

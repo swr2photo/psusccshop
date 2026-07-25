@@ -225,11 +225,12 @@ export function usePublicShopQuery(shopId: string | undefined, initialShopData?:
     queryKey: [...queryKeys.shop.all, 'public', shopId || ''],
     queryFn: () => fetchJSON<{ status: string; shop?: any }>(`/api/shops/${shopId}/public`),
     enabled: !!shopId,
-    staleTime: 0,
-    refetchInterval: 30 * 1000,
-    refetchOnWindowFocus: 'always',
-    refetchOnMount: 'always',
-    // placeholderData shows server snapshot immediately, then always refetches fresh data
+    // Realtime patches keep the storefront fresh; HTTP is a safety net
+    staleTime: 45 * 1000,
+    refetchInterval: 60 * 1000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
     placeholderData: initialShopData ? { status: 'success', shop: initialShopData } : undefined,
   });
 }

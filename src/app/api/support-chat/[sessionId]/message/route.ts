@@ -34,15 +34,6 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'Chat not found' }, { status: 404 });
     }
     
-    // Debug logging
-    console.log('[support-chat/message] Debug:', {
-      sessionId,
-      userEmail: session.user.email,
-      chatStatus: chat.status,
-      chatOwner: chat.customer_email,
-      chatAdmin: chat.admin_email,
-    });
-    
     // Check if chat is still open
     if (chat.status === 'closed') {
       return NextResponse.json(
@@ -54,8 +45,6 @@ export async function POST(request: NextRequest, { params }: Params) {
     // Check authorization
     const isAdminUser = await isAdminEmailAsync(session.user.email);
     const isOwner = isResourceOwner(chat.customer_email, session.user.email);
-    
-    console.log('[support-chat/message] Auth check:', { isAdminUser, isOwner });
     
     // Owner can always send messages (even if they are also admin)
     if (isOwner) {
@@ -70,7 +59,6 @@ export async function POST(request: NextRequest, { params }: Params) {
     } else if (isAdminUser) {
       // Admin (not owner) - check if they are assigned to this chat
       if (chat.status === 'active' && chat.admin_email && chat.admin_email !== session.user.email) {
-        console.log('[support-chat/message] Forbidden: admin not assigned');
         return NextResponse.json(
           { error: 'คุณไม่ได้รับมอบหมายให้ดูแลการสนทนานี้' },
           { status: 403 }
@@ -79,7 +67,6 @@ export async function POST(request: NextRequest, { params }: Params) {
       // Admin is assigned or chat is pending, continue to send message
     } else {
       // Not owner and not admin
-      console.log('[support-chat/message] Forbidden: not admin and not owner');
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
     
@@ -96,9 +83,15 @@ export async function POST(request: NextRequest, { params }: Params) {
     // Determine sender type - owner is always 'customer', even if they are also admin
     const sender = isOwner ? 'customer' : 'admin';
     
-    // Use profile Thai name if available, fallback to OAuth name
-    const profileName = await getProfileName(session.user.email);
-    const displayName = profileName || session.user.name || (sender === 'admin' ? 'แอดมิน' : 'ลูกค้า');
+    // Prefer names already on the session to avoid a profile DB round-trip on every send
+    let displayName =
+      (sender === 'customer' ? chat.customer_name : chat.admin_name) ||
+      session.user.name ||
+      (sender === 'admin' ? 'แอดมิน' : 'ลูกค้า');
+    if (!chat.customer_name && !chat.admin_name && !session.user.name) {
+      const profileName = await getProfileName(session.user.email);
+      if (profileName) displayName = profileName;
+    }
     
     const newMessage = await addChatMessage(
       sessionId,

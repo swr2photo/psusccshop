@@ -5,7 +5,7 @@ import { db } from '@/lib/db';
 import { inventory } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { requireAdmin, isAdminEmailAsync, getSession } from '@/lib/auth';
-import { API_CACHE } from '@/lib/api-helpers';
+import { API_CACHE, API_CDN_HEADERS } from '@/lib/api-helpers';
 import { getCached, invalidateCachePrefix, CACHE_TTL } from '@/lib/server-cache';
 import { groupInventoryRows, toPublicInventory } from '@/lib/inventory-public';
 
@@ -53,7 +53,12 @@ async function GETHandler(request: NextRequest) {
 
     return NextResponse.json(
       { inventory: payload, view: adminView ? 'admin' : 'public' },
-      { headers: { 'Cache-Control': API_CACHE.short } }
+      {
+        headers: {
+          'Cache-Control': adminView ? API_CACHE.private : API_CACHE.short,
+          ...(adminView ? {} : API_CDN_HEADERS.short),
+        },
+      }
     );
   } catch (error: any) {
     console.error('GET /api/inventory error:', error);

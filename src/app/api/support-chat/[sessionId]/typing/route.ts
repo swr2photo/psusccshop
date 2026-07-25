@@ -28,9 +28,8 @@ export async function POST(request: NextRequest, { params }: Params) {
     const { isTyping } = await request.json();
     const isAdmin = await isAdminEmailAsync(session.user.email);
     
-    const updateData: any = {
-      updatedAt: new Date(),
-    };
+    // Do not bump updatedAt — typing must not invalidate chat ETags / force full syncs
+    const updateData: Record<string, unknown> = {};
     if (isAdmin) {
       updateData.adminTyping = isTyping;
       updateData.adminTypingAt = isTyping ? new Date() : null;

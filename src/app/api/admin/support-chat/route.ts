@@ -51,7 +51,11 @@ export async function GET(request: NextRequest) {
     const filter = searchParams.get('filter') as ChatStatus | 'all' | 'my' | null;
     const shopId = searchParams.get('shopId');
     
-    const shopEmails = shopId ? await getShopCustomerEmails(shopId) : null;
+    const includeStats = searchParams.get('stats') !== '0';
+    const shopEmailsPromise = shopId ? getShopCustomerEmails(shopId) : Promise.resolve(null);
+    const statsPromise = includeStats ? getChatStatistics() : Promise.resolve(null);
+
+    const shopEmails = await shopEmailsPromise;
     const filterByShop = (list: ChatSession[]) => {
       if (!shopId) return list;
       return list.filter(c => {
@@ -76,13 +80,13 @@ export async function GET(request: NextRequest) {
       case 'closed':
         chats = filterByShop(await getAllChats('closed', 50));
         break;
-      default:
-        const pending = await getPendingChats();
-        const active = await getActiveChats();
+      default: {
+        const [pending, active] = await Promise.all([getPendingChats(), getActiveChats()]);
         chats = filterByShop([...pending, ...active]);
+      }
     }
     
-    const stats = await getChatStatistics();
+    const stats = await statsPromise;
     
     if (shopEmails && stats) {
       const filteredStats = {

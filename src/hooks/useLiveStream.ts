@@ -10,6 +10,7 @@ import {
   saveLiveSessionCache,
   type LiveStreamData,
 } from '@/lib/live-stream';
+import { isDocumentHidden } from '@/lib/visible-refresh';
 
 const LIVE_POLL_ACTIVE_MS = 30_000;
 const LIVE_POLL_IDLE_MS = 120_000;
@@ -17,7 +18,7 @@ const LIVE_POLL_IDLE_MS = 120_000;
 type LiveApiResponse = { live: LiveStreamData | null };
 
 function getRefreshInterval(data: LiveApiResponse | undefined): number {
-  if (typeof document !== 'undefined' && document.hidden) return 0;
+  if (isDocumentHidden()) return 0;
   return isLiveStreamActive(data?.live) ? LIVE_POLL_ACTIVE_MS : LIVE_POLL_IDLE_MS;
 }
 

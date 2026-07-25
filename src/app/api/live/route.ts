@@ -36,7 +36,8 @@ async function getLiveResponseBody(): Promise<{ live: LiveStreamData | null }> {
 }
 
 const LIVE_CACHE_HEADERS = {
-  'Cache-Control': 'public, s-maxage=15, stale-while-revalidate=45',
+  'Cache-Control': 'public, max-age=0, s-maxage=15, stale-while-revalidate=45',
+  'CDN-Cache-Control': 'public, max-age=15',
 };
 
 // GET — Public: Get current live stream status

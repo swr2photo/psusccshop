@@ -5,6 +5,9 @@ import { useCallback, useEffect, useRef } from 'react';
 import { shouldSyncAuthCookieInBrowser } from '@/lib/cookie-domain';
 
 const SYNC_KEY = 'scc_auth_cookie_synced_v2';
+const SYNC_AT_KEY = 'scc_auth_cookie_synced_at_v2';
+/** Min gap between visibility/focus forced syncs (mount sync is separate). */
+const FORCE_SYNC_MIN_MS = 5 * 60 * 1000;
 
 /**
  * Keep NextAuth session cookie on shared Domain (.psuscc.club) with full maxAge.
@@ -19,6 +22,13 @@ export function AuthCookieSync() {
     if (!force) {
       try {
         if (sessionStorage.getItem(SYNC_KEY) === '1') return;
+      } catch {
+        /* private mode */
+      }
+    } else {
+      try {
+        const last = Number(sessionStorage.getItem(SYNC_AT_KEY) || '0');
+        if (last && Date.now() - last < FORCE_SYNC_MIN_MS) return;
       } catch {
         /* private mode */
       }
@@ -38,6 +48,7 @@ export function AuthCookieSync() {
         if (res.ok) {
           try {
             sessionStorage.setItem(SYNC_KEY, '1');
+            sessionStorage.setItem(SYNC_AT_KEY, String(Date.now()));
           } catch {
             /* ignore */
           }
@@ -56,6 +67,7 @@ export function AuthCookieSync() {
     if (status !== 'authenticated') {
       try {
         sessionStorage.removeItem(SYNC_KEY);
+        sessionStorage.removeItem(SYNC_AT_KEY);
       } catch {
         /* ignore */
       }
@@ -70,11 +82,10 @@ export function AuthCookieSync() {
     const onVisible = () => {
       if (document.visibilityState === 'visible') void syncCookie(true);
     };
+    // visibilitychange alone covers tab return; skip duplicate focus storms
     document.addEventListener('visibilitychange', onVisible);
-    window.addEventListener('focus', onVisible);
     return () => {
       document.removeEventListener('visibilitychange', onVisible);
-      window.removeEventListener('focus', onVisible);
     };
   }, [status, syncCookie]);
 
