@@ -52,10 +52,15 @@ export async function GET(request: NextRequest) {
     const shopId = searchParams.get('shopId');
     
     const includeStats = searchParams.get('stats') !== '0';
-    const shopEmailsPromise = shopId ? getShopCustomerEmails(shopId) : Promise.resolve(null);
-    const statsPromise = includeStats ? getChatStatistics() : Promise.resolve(null);
+    let shopEmails: Set<string> | null = null;
+    if (shopId) {
+      try {
+        shopEmails = await getShopCustomerEmails(shopId);
+      } catch (e) {
+        console.error('[admin/support-chat] shop email filter failed:', e);
+      }
+    }
 
-    const shopEmails = await shopEmailsPromise;
     const filterByShop = (list: ChatSession[]) => {
       if (!shopId) return list;
       return list.filter(c => {
@@ -65,7 +70,7 @@ export async function GET(request: NextRequest) {
       });
     };
     
-    let chats;
+    let chats: ChatSession[] = [];
     
     switch (filter) {
       case 'pending':
@@ -86,7 +91,14 @@ export async function GET(request: NextRequest) {
       }
     }
     
-    const stats = await statsPromise;
+    let stats = null;
+    if (includeStats) {
+      try {
+        stats = await getChatStatistics();
+      } catch (e) {
+        console.error('[admin/support-chat] stats failed:', e);
+      }
+    }
     
     if (shopEmails && stats) {
       const filteredStats = {

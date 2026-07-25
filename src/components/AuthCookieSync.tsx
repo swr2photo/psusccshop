@@ -4,8 +4,9 @@ import { useSession } from 'next-auth/react';
 import { useCallback, useEffect, useRef } from 'react';
 import { shouldSyncAuthCookieInBrowser } from '@/lib/cookie-domain';
 
-const SYNC_KEY = 'scc_auth_cookie_synced_v2';
-const SYNC_AT_KEY = 'scc_auth_cookie_synced_at_v2';
+// v3: re-sync after chunked slim-token fix (v2 could wipe oversized JWTs → 401s)
+const SYNC_KEY = 'scc_auth_cookie_synced_v3';
+const SYNC_AT_KEY = 'scc_auth_cookie_synced_at_v3';
 
 /**
  * Keep NextAuth session cookie on shared Domain (.psuscc.club) with full maxAge.
