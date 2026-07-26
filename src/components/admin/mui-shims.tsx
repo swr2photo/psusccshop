@@ -545,7 +545,7 @@ export function Dialog({
   return (
     <UiDialog open={!!open} onOpenChange={(v) => { if (!v) onClose?.(); }}>
       <UiDialogContent
-        className={cn('gap-0 p-0 overflow-hidden', fullWidth !== false && widthClass)}
+        className={cn('gap-0 p-0 overflow-visible', fullWidth !== false && widthClass)}
         style={sxToStyle(PaperProps?.sx)}
       >
         {children}

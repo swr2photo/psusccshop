@@ -3259,10 +3259,12 @@ export default function AdminPage(): JSX.Element {
     return filtered;
   }, [selectedProductIdForOrders, orderFilterStatus, searchTerm, shopOrders]);
 
-  const OrdersView = () => {
-    if (selectedProductIdForOrders === null) {
-      const activeProducts = config.products || [];
-      return (
+  // JSX variable (not nested component) so parent re-renders do not remount and swallow clicks
+  const activeProductsForOrders = config.products || [];
+  const ordersViewElement =
+    activeTab !== 2 || !canManageOrders
+      ? null
+      : selectedProductIdForOrders === null ? (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, height: '100%', py: 1 }}>
           {/* Header */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
@@ -3331,7 +3333,7 @@ export default function AdminPage(): JSX.Element {
             </Card>
 
             {/* Product Cards */}
-            {activeProducts.map((p) => {
+            {activeProductsForOrders.map((p) => {
               const productOrdersCount = shopOrders.filter((o) => orderContainsProduct(o, p.id)).length;
               const coverImg = p.coverImage || p.images?.[0];
 
@@ -3393,10 +3395,7 @@ export default function AdminPage(): JSX.Element {
             })}
           </Box>
         </Box>
-      );
-    }
-
-    return (
+      ) : (
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, height: '100%' }}>
         {/* Sticky Header + Search */}
         <Box sx={{ 
@@ -4190,8 +4189,7 @@ export default function AdminPage(): JSX.Element {
           )}
         </Box>
       </Box>
-    );
-  };
+  );
 
   // Order Editor Dialog - rendered as JSX variable (not as component) to prevent remounting
   const orderEditorDialogElement = (
@@ -5525,7 +5523,7 @@ export default function AdminPage(): JSX.Element {
               <NoPermissionView permission="จัดการสินค้า" />
             )
           )}
-          {activeTab === 2 && (canManageOrders ? <OrdersView /> : <NoPermissionView permission="จัดการออเดอร์" />)}
+          {activeTab === 2 && (canManageOrders ? ordersViewElement : <NoPermissionView permission="จัดการออเดอร์" />)}
           {activeTab === 3 && (canManagePickup ? <PickupView /> : <NoPermissionView permission="จัดการรับสินค้า" />)}
           {activeTab === 4 && (canManageSupport ? <SupportChatPanel selectedShopId={isShopMode ? selectedShopId : undefined} /> : <NoPermissionView permission="แชทสนับสนุน" />)}
           {activeTab === 5 && (
