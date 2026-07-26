@@ -3,7 +3,13 @@ let timeOffset = 0; // ms difference: serverTime - clientTime
 let isInitialized = false;
 let syncPromise: Promise<void> | null = null;
 
+function isBrowser(): boolean {
+  return typeof window !== 'undefined';
+}
+
 export async function initServerTimeSync(): Promise<void> {
+  // Relative `/api/time` is invalid in Node during SSG/SSR — browser only
+  if (!isBrowser()) return;
   if (isInitialized) return;
   if (syncPromise) return syncPromise;
 
@@ -12,7 +18,7 @@ export async function initServerTimeSync(): Promise<void> {
       const start = Date.now();
       const res = await fetch('/api/time');
       const end = Date.now();
-      
+
       if (res.ok) {
         const data = await res.json();
         const serverTime = new Date(data.timestamp).getTime();
@@ -35,8 +41,8 @@ export async function initServerTimeSync(): Promise<void> {
 
 // Get the current synced date/time
 export function getSyncedDate(): Date {
-  // If not sync'd yet, trigger sync in the background
-  if (!isInitialized) {
+  // If not sync'd yet, trigger sync in the background (client only)
+  if (!isInitialized && isBrowser()) {
     void initServerTimeSync();
   }
   return new Date(Date.now() + timeOffset);

@@ -370,6 +370,15 @@ if (process.env.NODE_ENV === 'production') {
   process.env.NEXT_PUBLIC_DEBUG = 'false';
 }
 
+// Build-time sourcemap/release upload needs a valid org token.
+// Opt in with SENTRY_UPLOAD_SOURCEMAPS=1 after confirming SENTRY_AUTH_TOKEN works
+// (invalid tokens cause noisy 401s: "Invalid org token").
+const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN?.trim();
+const enableSentryBuildUpload =
+  !isWorkersBuild &&
+  process.env.SENTRY_UPLOAD_SOURCEMAPS === '1' &&
+  Boolean(sentryAuthToken);
+
 export default withSentryConfig(nextConfig, {
   // For all available options, see:
   // https://www.npmjs.com/package/@sentry/webpack-plugin#options
@@ -378,7 +387,7 @@ export default withSentryConfig(nextConfig, {
 
   project: "psuscc-shop",
 
-  authToken: process.env.SENTRY_AUTH_TOKEN,
+  authToken: enableSentryBuildUpload ? sentryAuthToken : undefined,
 
   // Only print logs for uploading source maps in CI
   silent: !process.env.CI,
@@ -387,8 +396,23 @@ export default withSentryConfig(nextConfig, {
   // https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/
 
   // Skip heavy source-map upload on Cloudflare Workers Builds (saves RAM)
-  widenClientFileUpload: !isWorkersBuild,
-  ...(isWorkersBuild ? { sourcemaps: { disable: true } } : {}),
+  // and whenever upload is not explicitly enabled / token missing
+  widenClientFileUpload: enableSentryBuildUpload,
+  sourcemaps: {
+    disable: !enableSentryBuildUpload,
+  },
+  release: {
+    create: enableSentryBuildUpload,
+    finalize: enableSentryBuildUpload,
+  },
+
+  // Avoid Sentry CLI telemetry noise during CI
+  telemetry: false,
+
+  // Never fail the Next.js build if a future upload attempt errors
+  errorHandler: (err) => {
+    console.warn(`[Sentry] Build plugin error (non-fatal): ${err.message}`);
+  },
 
   // Route browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers.
   // This can increase your server load as well as your hosting bill.

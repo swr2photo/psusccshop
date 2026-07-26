@@ -6,9 +6,12 @@ SENTRY_DSN=https://examplePublicKey@o0.ingest.sentry.io/0
 
 # Source maps (https://sentry.io/settings/auth-tokens/) — scopes: project:releases, org:read
 # Can also live in .env.sentry-build-plugin (gitignored via .env*)
+# Create a fresh org token if build logs show "Invalid org token" (401).
 SENTRY_AUTH_TOKEN=sntrys_eyJ...
 SENTRY_ORG=doralaikon
 SENTRY_PROJECT=psuscc-shop
+# Required to upload sourcemaps/releases during `next build` (skipped otherwise)
+SENTRY_UPLOAD_SOURCEMAPS=1
 
 # Optional
 # SENTRY_ENVIRONMENT=production
