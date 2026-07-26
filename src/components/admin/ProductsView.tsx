@@ -148,18 +148,6 @@ function sanitizeInput(str?: string): string {
   return str.trim();
 }
 
-function useIsMobile(breakpoint = 600): boolean {
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia(`(max-width: ${breakpoint}px)`);
-    const update = () => setIsMobile(mq.matches);
-    update();
-    mq.addEventListener('change', update);
-    return () => mq.removeEventListener('change', update);
-  }, [breakpoint]);
-  return isMobile;
-}
-
 const isProductOpen = (product: Product): { isOpen: boolean; status: 'upcoming' | 'active' | 'ended' | 'always' } => {
   const now = new Date();
   const start = product.startDate ? new Date(product.startDate) : null;
@@ -192,7 +180,7 @@ export interface ProductsViewProps {
   setSearchTerm: (term: string) => void;
   saveFullConfig: (config: ShopConfig) => void;
   showToast: (type: 'success' | 'error' | 'info' | 'warning', message: string) => void;
-  addLog: (action: string, detail: string, overrides?: { config?: ShopConfig; orders?: any[] }) => void;
+  addLog: (action: string, detail: string, overrides?: { config?: ShopConfig; orders?: AdminOrder[] }) => void;
   saving: boolean;
 }
 
@@ -503,7 +491,6 @@ const ProductEditDialog = ({
   const MAX_IMAGE_SIZE = 3 * 1024 * 1024;
 
   const productAny = product as Product & Record<string, unknown>;
-  const isMobileDevice = useIsMobile(600);
 
   const needsVariants = () => {
     const category = productAny.category as string | undefined;
@@ -725,12 +712,12 @@ const ProductEditDialog = ({
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
         className={cn(
-          'flex max-h-[95vh] flex-col gap-0 overflow-hidden border-[var(--glass-border)] bg-[var(--background)] p-0 text-[var(--foreground)]',
-          isMobileDevice ? 'h-full max-w-full rounded-none' : 'max-w-4xl rounded-2xl'
+          'fixed inset-0 top-0 left-0 flex h-dvh max-h-dvh w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-0 bg-[var(--background)] p-0 text-[var(--foreground)] shadow-none',
+          'data-[state=open]:zoom-in-100 data-[state=closed]:zoom-out-100'
         )}
       >
-        <div className="relative shrink-0 border-b border-[var(--glass-border)] bg-gradient-to-br from-indigo-500 to-violet-500 px-5 py-4 sm:px-6">
-          <DialogTitle className="pr-10 text-left text-lg font-bold text-white">
+        <div className="relative shrink-0 border-b border-[var(--glass-border)] bg-gradient-to-br from-indigo-500 to-violet-500 px-5 py-4 sm:px-8">
+          <DialogTitle className="pr-10 text-left text-lg font-bold text-white sm:text-xl">
             {isNew ? 'สินค้าใหม่' : 'แก้ไขสินค้า'}
           </DialogTitle>
           <p className="mt-0.5 text-sm text-white/80">
@@ -739,7 +726,7 @@ const ProductEditDialog = ({
           <button
             type="button"
             onClick={onClose}
-            className="absolute right-3 top-3 rounded-lg p-1.5 text-white/90 hover:bg-white/15"
+            className="absolute right-3 top-3 rounded-lg p-1.5 text-white/90 hover:bg-white/15 sm:right-5 sm:top-4"
             aria-label="ปิด"
           >
             <Close size={20} />
@@ -747,7 +734,7 @@ const ProductEditDialog = ({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="grid gap-5 p-4 sm:p-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(260px,0.9fr)]">
+          <div className="mx-auto grid w-full max-w-7xl gap-5 p-4 sm:p-6 lg:grid-cols-[minmax(0,1.7fr)_minmax(300px,0.9fr)] lg:gap-8 lg:p-8">
             <div className="flex min-w-0 flex-col gap-5">
               <section className={sectionClass}>
                 <p className="text-sm font-bold">ข้อมูลพื้นฐาน</p>
@@ -1740,7 +1727,7 @@ const ProductEditDialog = ({
           </div>
         </div>
 
-        <DialogFooter className="shrink-0 gap-2 border-t border-[var(--glass-border)] bg-[var(--background)] p-4 sm:justify-end">
+        <DialogFooter className="shrink-0 gap-2 border-t border-[var(--glass-border)] bg-[var(--background)] px-4 py-4 sm:justify-end sm:px-8">
           <Button variant="outline" onClick={onClose} className="border-[var(--glass-border)]">
             ยกเลิก
           </Button>
