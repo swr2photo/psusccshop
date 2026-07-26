@@ -39,6 +39,13 @@ if (dsn) {
       }),
     ],
   });
+
+  // Verify Sentry custom metrics operational
+  try {
+    Sentry.metrics.count('test_metric', 1);
+  } catch (err) {
+    console.warn('[Sentry Metrics] Test metric emit warning:', err);
+  }
 }
 
 export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;

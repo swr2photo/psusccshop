@@ -32,6 +32,7 @@ const ADMIN_EMAILS_RAW = [
 ];
 
 export const ADMIN_EMAILS = [...new Set(ADMIN_EMAILS_RAW.map((e) => e.trim().toLowerCase()).filter(Boolean))];
+const ADMIN_EMAILS_SET = new Set(ADMIN_EMAILS);
 
 // Config key for shop settings
 const CONFIG_KEY = 'config/shop-settings.json';
@@ -41,7 +42,8 @@ const CONFIG_KEY = 'config/shop-settings.json';
  */
 export const isSuperAdminEmail = (email: string | null | undefined): boolean => {
   if (!email) return false;
-  return email.trim().toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
+  if (!SUPER_ADMIN_EMAIL) return false;
+  return email.trim().toLowerCase() === SUPER_ADMIN_EMAIL;
 };
 
 // Cache dynamic admin emails from Filebase (expensive S3 call) — TTL 30 seconds
@@ -133,7 +135,7 @@ const getAdminPermissions = async (email: string): Promise<AdminPermissions> => 
 export const isAdminEmail = (email: string | null | undefined): boolean => {
   if (!email) return false;
   const normalized = email.trim().toLowerCase();
-  return ADMIN_EMAILS.includes(normalized);
+  return ADMIN_EMAILS_SET.has(normalized);
 };
 
 /**
@@ -142,7 +144,7 @@ export const isAdminEmail = (email: string | null | undefined): boolean => {
 export const isGlobalAdminEmailAsync = async (email: string | null | undefined): Promise<boolean> => {
   if (!email) return false;
   const normalized = email.trim().toLowerCase();
-  if (ADMIN_EMAILS.includes(normalized)) return true;
+  if (ADMIN_EMAILS_SET.has(normalized)) return true;
   const dynamicAdmins = await getDynamicAdminEmails();
   return dynamicAdmins.includes(normalized);
 };

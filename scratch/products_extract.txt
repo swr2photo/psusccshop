@@ -1,0 +1,1975 @@
+const isProductOpen = (product: any): { isOpen: boolean; status: 'upcoming' | 'active' | 'ended' | 'always' } => {
+  const now = new Date();
+  const start = product.startDate ? new Date(product.startDate) : null;
+  const end = product.endDate ? new Date(product.endDate) : null;
+  
+  // No dates set = always open (if isActive)
+  if (!start && !end) return { isOpen: product.isActive, status: 'always' };
+  
+  // Has start date but not reached yet
+  if (start && now < start) return { isOpen: false, status: 'upcoming' };
+  
+  // Has end date and already passed
+  if (end && now > end) return { isOpen: false, status: 'ended' };
+  
+  // Within date range (or no constraints violated)
+  return { isOpen: product.isActive, status: 'active' };
+};
+
+// Format date/time for display
+const formatDateTime = (dateStr: string | undefined): string => {
+  if (!dateStr) return '-';
+  const date = new Date(dateStr);
+  return date.toLocaleString('th-TH', { 
+    day: '2-digit', 
+    month: 'short', 
+    year: 'numeric',
+    hour: '2-digit', 
+    minute: '2-digit' 
+  });
+};
+
+const ProductCardItem = ({ product, onEdit, onDelete, onToggle, onPickupSetting }: { product: any; onEdit: () => void; onDelete: () => void; onToggle?: () => void; onPickupSetting?: () => void }): JSX.Element => {
+  const { isOpen, status } = isProductOpen(product);
+  
+  const statusConfig = {
+    upcoming: { label: 'รอเปิด', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)', icon: <AccessTime size={12} /> },
+    active: { label: 'กำลังขาย', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)', icon: <FiberManualRecord size={10} color="#22c55e" /> },
+    ended: { label: 'หมดเวลา', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)', icon: <FiberManualRecord size={10} color="#ef4444" /> },
+    always: { label: product.isActive ? 'เปิดขาย' : 'ปิดขาย', color: product.isActive ? '#10b981' : '#64748b', bg: product.isActive ? 'rgba(16, 185, 129, 0.15)' : 'rgba(100, 116, 139, 0.15)', icon: product.isActive ? <Check size={12} /> : <Close size={12} /> },
+  };
+  
+  const currentStatus = statusConfig[status];
+  
+  return (
+    <Card sx={{ ...glassCardSx, height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <Box
+        sx={{
+          height: 150,
+          bgcolor: ADMIN_THEME.glassSoft,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          position: 'relative',
+          overflow: 'hidden',
+          background: product.coverImage ? `url(${product.coverImage})` : (product.images?.[0] ? `url(${product.images[0]})` : ADMIN_THEME.gradient),
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          borderBottom: `1px solid ${ADMIN_THEME.border}`
+        }}
+      >
+        {/* Status Badge */}
+        <Box sx={{
+          position: 'absolute',
+          top: 8,
+          left: 8,
+          px: 1.5,
+          py: 0.5,
+          borderRadius: '8px',
+          bgcolor: currentStatus.bg,
+          border: `1px solid ${currentStatus.color}40`,
+          backdropFilter: 'blur(8px)',
+        }}>
+          <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: currentStatus.color, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            {currentStatus.icon} {currentStatus.label}
+          </Typography>
+        </Box>
+        
+        {/* Date Range Badge */}
+        {(product.startDate || product.endDate) && (
+          <Box sx={{
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            px: 1,
+            py: 0.5,
+            borderRadius: '6px',
+            bgcolor: 'rgba(0,0,0,0.6)',
+            backdropFilter: 'blur(8px)',
+          }}>
+            <Typography sx={{ fontSize: '0.65rem', color: 'var(--foreground)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <CalendarToday size={12} /> {product.startDate ? formatDateTime(product.startDate).split(' ')[0] : '...'} - {product.endDate ? formatDateTime(product.endDate).split(' ')[0] : '...'}
+            </Typography>
+          </Box>
+        )}
+        
+        {!isOpen && (
+          <Box sx={{
+            position: 'absolute',
+            inset: 0,
+            bgcolor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            <Typography sx={{ 
+              color: status === 'upcoming' ? '#f59e0b' : '#ff6b6b', 
+              fontWeight: 'bold',
+              fontSize: '0.9rem',
+              textTransform: 'uppercase',
+            }}>
+              {status === 'upcoming' ? 'Coming Soon' : status === 'ended' ? 'Ended' : 'Inactive'}
+            </Typography>
+          </Box>
+        )}
+      </Box>
+      <CardContent sx={{ flex: 1 }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1, color: ADMIN_THEME.text }}>
+          {product.name}
+        </Typography>
+        <Typography variant="caption" display="block" sx={{ mb: 2, color: ADMIN_THEME.muted }}>
+          {product.type}
+        </Typography>
+        <Typography variant="h6" color="success.main" sx={{ fontWeight: 'bold', mb: 2 }}>
+          ฿{product.basePrice}
+        </Typography>
+        <Stack direction="column" spacing={1}>
+          <Button
+            size="small"
+            variant="outlined"
+            color="primary"
+            onClick={onEdit}
+            fullWidth
+            startIcon={<EditIconMUI />}
+            sx={{ borderColor: ADMIN_THEME.border, color: ADMIN_THEME.text, '&:hover': { borderColor: '#6366f1', background: 'rgba(99,102,241,0.08)' } }}
+          >
+            แก้ไข
+          </Button>
+          <Button
+            size="small"
+            variant="outlined"
+            color="error"
+            onClick={onDelete}
+            fullWidth
+            startIcon={<Delete />}
+            sx={{ borderColor: 'rgba(239,68,68,0.45)' }}
+          >
+            ลบ
+          </Button>
+        </Stack>
+        {/* Quick Toggle Switch */}
+        {onToggle && (
+          <Box sx={{ mt: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: `1px solid ${ADMIN_THEME.border}` }}>
+            <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: ADMIN_THEME.textSecondary }}>
+              เปิด/ปิดขาย
+            </Typography>
+            <Switch
+              size="small"
+              checked={product.isActive}
+              onChange={onToggle}
+              color={product.isActive ? 'success' : 'default'}
+            />
+          </Box>
+        )}
+        {/* Pickup Setting Button */}
+        {onPickupSetting && (
+          <Button
+            size="small"
+            variant="outlined"
+            fullWidth
+            onClick={onPickupSetting}
+            startIcon={<LocalMall size={16} />}
+            sx={{ 
+              mt: 1, 
+              borderColor: product.pickup?.enabled ? '#10b981' : ADMIN_THEME.border, 
+              color: product.pickup?.enabled ? '#10b981' : ADMIN_THEME.textSecondary,
+              bgcolor: product.pickup?.enabled ? 'rgba(16,185,129,0.08)' : 'transparent',
+              fontSize: '0.75rem',
+              py: 0.5,
+              '&:hover': { 
+                borderColor: '#06b6d4', 
+                bgcolor: 'rgba(6,182,212,0.08)' 
+              } 
+            }}
+          >
+            {product.pickup?.enabled ? '✓ รับสินค้า' : 'ตั้งค่ารับสินค้า'}
+          </Button>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+
+type ProductsViewProps = {
+  config: ShopConfig;
+  searchTerm: string;
+  setSearchTerm: (term: string) => void;
+  saveFullConfig: (config: ShopConfig) => void;
+  showToast: (type: 'success' | 'error' | 'info' | 'warning', message: string) => void;
+  addLog: (action: string, detail: string, overrides?: { config?: ShopConfig; orders?: AdminOrder[] }) => void;
+  saving: boolean;
+};
+
+function ProductsView({ config, searchTerm, setSearchTerm, saveFullConfig, showToast, addLog, saving }: ProductsViewProps): JSX.Element {
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [pickupSettingProduct, setPickupSettingProduct] = useState<Product | null>(null);
+  const [pickupSaving, setPickupSaving] = useState(false);
+  const { confirm, ConfirmDialog: ProductConfirmDialog } = useConfirmDialog();
+
+  const filteredProducts = useMemo(() => {
+    const term = searchTerm.toLowerCase();
+    return config.products.filter((p) =>
+      p.name.toLowerCase().includes(term) ||
+      p.id.toLowerCase().includes(term)
+    );
+  }, [searchTerm, config.products]);
+
+  const createNewProduct = () => {
+    const now = new Date().toISOString();
+    const newP: Product = {
+      id: `prod_${Date.now()}`,
+      name: 'New Product',
+      description: '',
+      type: 'CREW',
+      images: [],
+      coverImage: '',
+      basePrice: 0,
+      sizePricing: {},
+      patterns: [],
+      startDate: '',
+      endDate: '',
+      isActive: true,
+      options: { hasCustomName: false, hasCustomNumber: false, hasLongSleeve: false, longSleevePrice: 50 },
+      customTags: [],
+      createdAt: now,
+      updatedAt: now,
+    };
+    setEditingProduct(newP);
+  };
+
+  const handleDelete = async (id: string) => {
+    const ok = await confirm({
+      title: 'Delete Product?',
+      message: 'This action cannot be undone',
+      variant: 'warning',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      destructive: true,
+    });
+    if (ok) {
+      const newProducts = config.products.filter((p) => p.id !== id);
+      saveFullConfig({ ...config, products: newProducts });
+      showToast('success', 'Product deleted');
+    }
+  };
+
+  const handleToggleActive = (id: string) => {
+    const newProducts = config.products.map((p) =>
+      p.id === id ? { ...p, isActive: !p.isActive } : p
+    );
+    saveFullConfig({ ...config, products: newProducts });
+    const target = newProducts.find((p) => p.id === id);
+    showToast('success', target?.isActive ? 'เปิดขายสินค้าแล้ว' : 'ปิดขายสินค้าแล้ว');
+  };
+
+  const handleSaveEdit = async (mode?: 'publish' | 'draft') => {
+    if (!editingProduct) return;
+
+    const nextProduct = { 
+      ...editingProduct,
+      name: sanitizeInput(editingProduct.name),
+      description: sanitizeInput(editingProduct.description || ''),
+    };
+    if (mode === 'publish') {
+      nextProduct.isActive = true;
+    } else if (mode === 'draft') {
+      nextProduct.isActive = false;
+    }
+
+    if (!nextProduct.name.trim()) {
+      return;
+    }
+    if (!validatePrice(nextProduct.basePrice)) {
+      return;
+    }
+
+    const invalidSizePrice = Object.values(nextProduct.sizePricing || {}).some((p) => !validatePrice(Number(p)));
+    if (invalidSizePrice) {
+      return;
+    }
+
+    const idx = config.products.findIndex((p) => p.id === nextProduct.id);
+    const newProducts = [...config.products];
+
+    const now = new Date().toISOString();
+    if (idx >= 0) {
+      newProducts[idx] = { ...nextProduct, updatedAt: now };
+    } else {
+      newProducts.unshift({
+        ...nextProduct,
+        createdAt: nextProduct.createdAt || now,
+        updatedAt: now,
+      });
+    }
+
+    // Save and close popup immediately for better UX
+    setEditingProduct(null);
+    addLog(idx >= 0 ? 'EDIT_PRODUCT' : 'CREATE_PRODUCT', nextProduct.id, { config: { ...config, products: newProducts } });
+    // Fire and forget for speed, no await
+    saveFullConfig({ ...config, products: newProducts });
+  };
+
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, height: '100%' }}>
+      <ProductConfirmDialog />
+      {/* Sticky Header */}
+      <Box sx={{ 
+        position: 'sticky',
+        top: 0,
+        zIndex: 10,
+        bgcolor: ADMIN_THEME.bg,
+        pb: 1.5,
+        mx: { xs: -2, md: -3 },
+        px: { xs: 2, md: 3 },
+        pt: { xs: 0.5, md: 0 },
+      }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5, mb: 1.5 }}>
+          <Typography sx={{ fontSize: { xs: '1.1rem', md: '1.4rem' }, fontWeight: 800, color: 'var(--foreground)' }}>
+            สินค้า ({filteredProducts.length}/{config.products.length})
+          </Typography>
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<Add size={18} />}
+            onClick={createNewProduct}
+            sx={{ ...gradientButtonSx, px: 2, py: 0.8, fontSize: '0.85rem' }}
+          >
+            เพิ่มสินค้า
+          </Button>
+        </Box>
+
+        <TextField
+          placeholder="ค้นหาชื่อหรือ ID..."
+          variant="outlined"
+          fullWidth
+          size="small"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          sx={{
+            ...inputSx,
+            '& .MuiOutlinedInput-root': {
+              ...inputSx['& .MuiOutlinedInput-root'],
+              borderRadius: '12px',
+              py: 0.3,
+            },
+          }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Search size={20} color="#64748b" />
+              </InputAdornment>
+            ),
+            endAdornment: searchTerm ? (
+              <InputAdornment position="end">
+                <IconButton size="small" onClick={() => setSearchTerm('')} sx={{ color: 'var(--text-muted)' }}>
+                  <Clear size={18} />
+                </IconButton>
+              </InputAdornment>
+            ) : null,
+          }}
+        />
+      </Box>
+
+      {filteredProducts.length === 0 ? (
+        <Box sx={{ textAlign: 'center', py: 4 }}>
+          <History size={48} color="text.secondary" style={{ marginBottom: 8 }} />
+          <Typography sx={{ color: ADMIN_THEME.muted }}>No logs found</Typography>
+        </Box>
+      ) : (
+        <Box sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: 'repeat(3, 1fr)', lg: 'repeat(4, 1fr)' },
+          gap: 2
+        }}>
+          {filteredProducts.map((p) => (
+            <ProductCardItem
+              key={p.id}
+              product={p}
+              onEdit={() => setEditingProduct(p)}
+              onDelete={() => handleDelete(p.id)}
+              onToggle={() => handleToggleActive(p.id)}
+              onPickupSetting={() => setPickupSettingProduct(p)}
+            />
+          ))}
+        </Box>
+      )}
+
+      {editingProduct && (
+        <ProductEditDialog
+          product={editingProduct}
+          onClose={() => setEditingProduct(null)}
+          onChange={setEditingProduct}
+          onSave={handleSaveEdit}
+          isSaving={saving}
+          showToast={showToast}
+        />
+      )}
+
+      {/* Pickup Settings Dialog */}
+      {pickupSettingProduct && (
+        <ProductPickupDialog
+          product={pickupSettingProduct}
+          onClose={() => setPickupSettingProduct(null)}
+          saving={pickupSaving}
+          onSave={async (pickup, autoUpdateOrders) => {
+            setPickupSaving(true);
+            try {
+              // Call API to enable pickup and auto-update orders
+              const res = await apiFetch('/api/pickup/enable', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  productId: pickupSettingProduct.id,
+                  pickup,
+                  autoUpdateOrders,
+                }),
+              });
+              
+              const data = await res.json();
+              if (!res.ok) throw new Error(data.error || 'Failed to update');
+              
+              // Update local config
+              const newProducts = config.products.map((p) =>
+                p.id === pickupSettingProduct.id ? { ...p, pickup } : p
+              );
+              saveFullConfig({ ...config, products: newProducts });
+              
+              if (data.updatedCount > 0) {
+                showToast('success', `เปิดรับสินค้าแล้ว และอัปเดต ${data.updatedCount} ออเดอร์เป็น "พร้อมรับ"`);
+              } else {
+                showToast('success', pickup.enabled ? 'เปิดรับสินค้าแล้ว' : 'ปิดรับสินค้าแล้ว');
+              }
+              
+              setPickupSettingProduct(null);
+            } catch (err: any) {
+              showToast('error', err.message || 'เกิดข้อผิดพลาด');
+            } finally {
+              setPickupSaving(false);
+            }
+          }}
+        />
+      )}
+    </Box>
+  );
+}
+
+// ============== PRODUCT PICKUP SETTINGS DIALOG ==============
+interface ProductPickupSettings {
+  enabled: boolean;
+  location?: string;
+  startDate?: string;
+  endDate?: string;
+  notes?: string;
+  updatedBy?: string;
+  updatedAt?: string;
+}
+
+const ProductPickupDialog = ({ 
+  product, 
+  onClose, 
+  saving, 
+  onSave 
+}: { 
+  product: Product; 
+  onClose: () => void; 
+  saving: boolean;
+  onSave: (pickup: ProductPickupSettings, autoUpdateOrders: boolean) => Promise<void>;
+}): JSX.Element => {
+  const [pickup, setPickup] = useState<ProductPickupSettings>({
+    enabled: product.pickup?.enabled || false,
+    location: product.pickup?.location || '',
+    startDate: product.pickup?.startDate || '',
+    endDate: product.pickup?.endDate || '',
+    notes: product.pickup?.notes || '',
+  });
+  const [autoUpdateOrders, setAutoUpdateOrders] = useState(true);
+
+  const handleSave = () => {
+    onSave(pickup, autoUpdateOrders);
+  };
+
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      maxWidth="sm"
+      fullWidth
+      PaperProps={{
+        sx: {
+          ...glassCardSx,
+          borderRadius: '16px',
+          m: 2,
+          maxHeight: '90vh',
+        },
+      }}
+    >
+      <DialogTitle sx={{ 
+        borderBottom: `1px solid ${ADMIN_THEME.border}`,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1.5,
+        pb: 2,
+      }}>
+        <LocalMall color="#06b6d4" />
+        <Box>
+          <Typography sx={{ fontWeight: 700, color: ADMIN_THEME.text }}>
+            ตั้งค่ารับสินค้า
+          </Typography>
+          <Typography sx={{ fontSize: '0.8rem', color: ADMIN_THEME.muted }}>
+            {product.name}
+          </Typography>
+        </Box>
+      </DialogTitle>
+      
+      <DialogContent sx={{ py: 3 }}>
+        {/* Enable Toggle */}
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between',
+          p: 2,
+          mb: 2,
+          borderRadius: '12px',
+          bgcolor: pickup.enabled ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.03)',
+          border: `1px solid ${pickup.enabled ? 'rgba(16,185,129,0.3)' : ADMIN_THEME.border}`,
+        }}>
+          <Box>
+            <Typography sx={{ fontWeight: 600, color: ADMIN_THEME.text }}>
+              เปิดรับสินค้า
+            </Typography>
+            <Typography sx={{ fontSize: '0.8rem', color: ADMIN_THEME.muted }}>
+              {pickup.enabled ? 'ลูกค้าสามารถมารับสินค้าได้' : 'ยังไม่เปิดรับสินค้า'}
+            </Typography>
+          </Box>
+          <Switch
+            checked={pickup.enabled}
+            onChange={(e) => setPickup({ ...pickup, enabled: e.target.checked })}
+            color="success"
+          />
+        </Box>
+
+        {pickup.enabled && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+            {/* Location */}
+            <Box>
+              <Typography sx={{ fontSize: '0.85rem', color: '#06b6d4', mb: 1, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Crosshair size={14} /> สถานที่รับสินค้า
+              </Typography>
+              <TextField
+                placeholder="เช่น: ห้อง 123 ตึก A คณะวิศวกรรมศาสตร์"
+                value={pickup.location}
+                onChange={(e) => setPickup({ ...pickup, location: e.target.value })}
+                fullWidth
+                sx={inputSx}
+              />
+            </Box>
+
+            {/* Date Range */}
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
+              <Box>
+                <Typography sx={{ fontSize: '0.85rem', color: '#06b6d4', mb: 1, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <CalendarDays size={14} /> วันเริ่มรับสินค้า
+                </Typography>
+                <TextField
+                  type="datetime-local"
+                  value={pickup.startDate}
+                  onChange={(e) => setPickup({ ...pickup, startDate: e.target.value })}
+                  fullWidth
+                  sx={inputSx}
+                />
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: '0.85rem', color: '#06b6d4', mb: 1, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <CalendarDays size={14} /> วันสิ้นสุดรับสินค้า
+                </Typography>
+                <TextField
+                  type="datetime-local"
+                  value={pickup.endDate}
+                  onChange={(e) => setPickup({ ...pickup, endDate: e.target.value })}
+                  fullWidth
+                  sx={inputSx}
+                />
+              </Box>
+            </Box>
+
+            {/* Notes */}
+            <Box>
+              <Typography sx={{ fontSize: '0.85rem', color: '#06b6d4', mb: 1, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <StickyNote size={14} /> หมายเหตุเพิ่มเติม
+              </Typography>
+              <TextField
+                placeholder="เช่น: กรุณานำบัตรนักศึกษามาด้วย"
+                value={pickup.notes}
+                onChange={(e) => setPickup({ ...pickup, notes: e.target.value })}
+                fullWidth
+                multiline
+                rows={2}
+                sx={inputSx}
+              />
+            </Box>
+
+            {/* Auto Update Orders */}
+            <Box sx={{ 
+              p: 2, 
+              borderRadius: '12px', 
+              bgcolor: 'rgba(99,102,241,0.1)',
+              border: '1px solid rgba(99,102,241,0.2)',
+            }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={autoUpdateOrders}
+                    onChange={(e) => setAutoUpdateOrders(e.target.checked)}
+                    sx={{ color: '#6366f1', '&.Mui-checked': { color: '#6366f1' } }}
+                  />
+                }
+                label={
+                  <Box>
+                    <Typography sx={{ fontWeight: 600, color: ADMIN_THEME.text, fontSize: '0.9rem' }}>
+                      อัปเดตออเดอร์ที่จ่ายแล้วเป็น "พร้อมรับ" อัตโนมัติ
+                    </Typography>
+                    <Typography sx={{ fontSize: '0.75rem', color: ADMIN_THEME.muted }}>
+                      ออเดอร์สถานะ PAID ที่มีสินค้านี้จะเปลี่ยนเป็น READY ทันที
+                    </Typography>
+                  </Box>
+                }
+              />
+            </Box>
+          </Box>
+        )}
+      </DialogContent>
+
+      <DialogActions sx={{ 
+        borderTop: `1px solid ${ADMIN_THEME.border}`,
+        px: 3,
+        py: 2,
+        gap: 1,
+      }}>
+        <Button 
+          onClick={onClose}
+          sx={{ color: ADMIN_THEME.muted }}
+        >
+          ยกเลิก
+        </Button>
+        <Button
+          onClick={handleSave}
+          disabled={saving}
+          variant="contained"
+          startIcon={saving ? <CircularProgress size={16} /> : <Save />}
+          sx={{ ...gradientButtonSx }}
+        >
+          {saving ? 'กำลังบันทึก...' : 'บันทึก'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
+const ProductEditDialog = ({ product, onClose, onChange, onSave, isSaving, showToast }: any): JSX.Element => {
+  const [newSizeKey, setNewSizeKey] = useState('');
+  const [newSizePrice, setNewSizePrice] = useState<number | ''>('');
+  const [coverUploadLoading, setCoverUploadLoading] = useState(false);
+  // Variants state for non-apparel products
+  const [newVariantName, setNewVariantName] = useState('');
+  const [newVariantPrice, setNewVariantPrice] = useState<number | ''>('');
+  const [newVariantStock, setNewVariantStock] = useState<number | ''>('');
+  const [newPatternName, setNewPatternName] = useState('');
+  const [newPatternImage, setNewPatternImage] = useState('');
+  const MAX_IMAGE_SIZE = 3 * 1024 * 1024; // ~3MB
+  
+  // Helper: Check if product needs variants instead of sizes
+  const needsVariants = () => {
+    const category = (product as any).category;
+    return category && category !== 'APPAREL';
+  };
+  
+  // Variant handlers
+  const handleAddVariant = () => {
+    if (!newVariantName.trim()) return;
+    const newVariant = {
+      id: `var_${Date.now()}`,
+      name: newVariantName.trim(),
+      price: typeof newVariantPrice === 'number' ? newVariantPrice : product.basePrice || 0,
+      stock: typeof newVariantStock === 'number' ? newVariantStock : null,
+      isActive: true,
+    };
+    const variants = [...((product as any).variants || []), newVariant];
+    onChange({ ...product, variants } as any);
+    setNewVariantName('');
+    setNewVariantPrice('');
+    setNewVariantStock('');
+  };
+  
+  const handleUpdateVariant = (variantId: string, field: string, value: any) => {
+    const variants = ((product as any).variants || []).map((v: any) =>
+      v.id === variantId ? { ...v, [field]: value } : v
+    );
+    onChange({ ...product, variants } as any);
+  };
+  
+  const handleRemoveVariant = (variantId: string) => {
+    const variants = ((product as any).variants || []).filter((v: any) => v.id !== variantId);
+    onChange({ ...product, variants } as any);
+  };
+
+  const handleDialogClose = (_event?: unknown, reason?: 'backdropClick' | 'escapeKeyDown') => {
+    if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
+    onClose();
+  };
+
+  useEffect(() => {
+    if (product && !product.coverImage && Array.isArray(product.images) && product.images.length > 0) {
+      onChange({ ...product, coverImage: product.images[0] });
+    }
+  }, [product, onChange]);
+
+  const filterValidFiles = (files: FileList | null) => {
+    if (!files) return [];
+    return Array.from(files).filter((file) => file.type.startsWith('image/') && file.size <= MAX_IMAGE_SIZE);
+  };
+
+  const readFileAsDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  const handleAddPattern = () => {
+    if (!newPatternName.trim()) return;
+    const names = newPatternName
+      .split(/[\n,;]+/)
+      .map((name) => name.trim())
+      .filter((name) => name.length > 0);
+    if (names.length === 0) return;
+
+    const newPatterns = names.map((name, index) => ({
+      id: `pat_${Date.now()}_${index}_${Math.random().toString(36).slice(2, 6)}`,
+      name,
+      image: index === 0 && newPatternImage ? newPatternImage : undefined,
+      isActive: true,
+    }));
+
+    const patterns = [...((product as any).patterns || []), ...newPatterns];
+    onChange({ ...product, patterns } as any);
+    setNewPatternName('');
+    setNewPatternImage('');
+    if (names.length > 1) {
+      showToast?.('success', `เพิ่มสำเร็จ ${names.length} ลาย`);
+    }
+  };
+
+  const handleUpdatePattern = (patternId: string, field: string, value: any) => {
+    const patterns = ((product as any).patterns || []).map((p: any) =>
+      p.id === patternId ? { ...p, [field]: value } : p
+    );
+    onChange({ ...product, patterns } as any);
+  };
+
+  const handleRemovePattern = (patternId: string) => {
+    const removed = ((product as any).patterns || []).find((p: any) => p.id === patternId);
+    const patterns = ((product as any).patterns || []).filter((p: any) => p.id !== patternId);
+    const nextCover =
+      removed?.image && removed.image === product.coverImage
+        ? ((product.images || []).find((img: string) => img !== removed.image) || '')
+        : product.coverImage;
+    onChange({ ...product, patterns, coverImage: nextCover } as any);
+  };
+
+  const handlePatternImageUpload = async (patternId: string, files: FileList | null) => {
+    const validFiles = filterValidFiles(files);
+    if (validFiles.length === 0) return;
+    const dataUrl = await readFileAsDataUrl(validFiles[0]);
+    handleUpdatePattern(patternId, 'image', dataUrl);
+  };
+
+  const handleNewPatternImageUpload = async (files: FileList | null) => {
+    const validFiles = filterValidFiles(files);
+    if (validFiles.length === 0) return;
+
+    if (validFiles.length === 1) {
+      const dataUrl = await readFileAsDataUrl(validFiles[0]);
+      setNewPatternImage(dataUrl);
+    } else {
+      const newPatterns = await Promise.all(
+        validFiles.map(async (file, index) => {
+          const dataUrl = await readFileAsDataUrl(file);
+          const name = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+          return {
+            id: `pat_${Date.now()}_${index}_${Math.random().toString(36).slice(2, 6)}`,
+            name: name.trim(),
+            image: dataUrl,
+            isActive: true,
+          };
+        })
+      );
+      const patterns = [...((product as any).patterns || []), ...newPatterns];
+      onChange({ ...product, patterns } as any);
+      showToast?.('success', `เพิ่มสำเร็จ ${newPatterns.length} ลายจากไฟล์ภาพ`);
+    }
+  };
+
+  const handleSizePriceChange = (size: string, price: number) => {
+    if (!size || Number.isNaN(price)) return;
+    const next = { ...(product.sizePricing || {}) };
+    next[size] = Math.max(0, price);
+    onChange({ ...product, sizePricing: next });
+  };
+
+  const handleRemoveSize = (size: string) => {
+    const next = { ...(product.sizePricing || {}) };
+    delete next[size];
+    onChange({ ...product, sizePricing: next });
+  };
+
+  const handleAddSize = () => {
+    const key = newSizeKey.trim();
+    if (!key) return;
+    const priceNumber = typeof newSizePrice === 'number' ? newSizePrice : product.basePrice || 0;
+    handleSizePriceChange(key, priceNumber);
+    setNewSizeKey('');
+    setNewSizePrice('');
+  };
+
+  const handleImagesUpload = async (files: FileList | null) => {
+    const validFiles = filterValidFiles(files);
+    if (validFiles.length === 0) return;
+    const readers = validFiles.map((file) => new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    }));
+
+    const dataUrls = await Promise.all(readers);
+    const merged = [...(product.images || []), ...dataUrls];
+    const nextCover = product.coverImage || merged[0] || '';
+    onChange({ ...product, images: merged, coverImage: nextCover });
+  };
+
+  const handleRemoveImage = (imgUrl: string) => {
+    const nextImages = (product.images || []).filter((img: string) => img !== imgUrl);
+    const nextCover = imgUrl === product.coverImage ? (nextImages[0] || '') : (product.coverImage || '');
+    onChange({ ...product, images: nextImages, coverImage: nextCover });
+  };
+
+  const handleSetCover = (img: string) => {
+    if (!img) return;
+    const images = product.images || [];
+    const nextImages = images.includes(img) ? images : [img, ...images];
+    onChange({ ...product, coverImage: img, images: nextImages });
+  };
+
+  const handleCoverUpload = async (files: FileList | null) => {
+    const validFiles = filterValidFiles(files);
+    if (validFiles.length === 0) return;
+    setCoverUploadLoading(true);
+    try {
+      const file = validFiles[0];
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const merged = [...(product.images || []), dataUrl];
+      onChange({ ...product, images: merged, coverImage: dataUrl });
+    } finally {
+      setCoverUploadLoading(false);
+    }
+  };
+
+  const isMobileDevice = useMediaQuery('(max-width: 600px)');
+
+  return (
+    <Dialog
+      open={!!product}
+      onClose={handleDialogClose}
+      maxWidth="md"
+      fullWidth
+      fullScreen={isMobileDevice}
+      disableEscapeKeyDown
+      PaperProps={{ 
+        sx: { 
+          ...glassCardSx, 
+          background: 'var(--glass-strong)', 
+          borderColor: ADMIN_THEME.border,
+          borderRadius: isMobileDevice ? 0 : undefined,
+        } 
+      }}
+    >
+      <DialogTitle sx={{ background: ADMIN_THEME.gradient, color: '#fff', fontWeight: 'bold', pb: 2 }}>
+        {product.id.startsWith('prod_') ? 'New' : 'Edit'} Product
+      </DialogTitle>
+      <IconButton
+        onClick={onClose}
+        sx={{ position: 'absolute', right: 8, top: 8, color: '#fff' }}
+      >
+        <Close />
+      </IconButton>
+      <DialogContent sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '2fr 1fr' }, gap: 2, pt: 2 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <TextField
+          label="Product Name"
+          value={product.name}
+          onChange={(e) => onChange({...product, name: e.target.value})}
+          fullWidth
+          sx={inputSx}
+        />
+
+        <TextField
+          label="Slug (ลิงก์สินค้า)"
+          value={(product as any).slug || ''}
+          onChange={(e) => onChange({...product, slug: e.target.value.replace(/[^a-zA-Z0-9\u0E00-\u0E7F\s-]/g, '').replace(/\s+/g, '-').toLowerCase()} as any)}
+          fullWidth
+          placeholder={product.name.replace(/[^\u0E00-\u0E7Fa-zA-Z0-9\s-]/g, '').replace(/\s+/g, '-').toLowerCase() || 'auto-generated'}
+          helperText={`ลิงก์: ${typeof window !== 'undefined' ? window.location.origin : ''}/?p=${product.id}`}
+          sx={inputSx}
+        />
+
+        {/* Category Selection */}
+        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+          <Autocomplete
+            freeSolo
+            options={PRODUCT_CATEGORIES as unknown as string[]}
+            value={(product as any).category || 'OTHER'}
+            onChange={(_e, newValue) => {
+              const newCategory = newValue || 'OTHER';
+              const subTypes = PRODUCT_SUBTYPES[newCategory] || ['OTHER'];
+              onChange({
+                ...product, 
+                category: newCategory,
+                subType: subTypes[0] || 'OTHER',
+                // Legacy type compatibility
+                type: newCategory === 'APPAREL' ? (product.type || 'CREW') : 'OTHER',
+              } as any);
+            }}
+            onInputChange={(_e, newInputValue) => {
+              if (newInputValue && !PRODUCT_CATEGORIES.includes(newInputValue as any)) {
+                onChange({
+                  ...product, 
+                  category: newInputValue,
+                  type: 'OTHER',
+                } as any);
+              }
+            }}
+            getOptionLabel={(option) => {
+              const label = CATEGORY_LABELS[option] || option;
+              return label;
+            }}
+            renderOption={({ key, ...props }, option) => (
+              <li key={key} {...props} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {CATEGORY_ICON_COMPONENTS[option] || <Inventory size={16} />} {CATEGORY_LABELS[option] || option}
+              </li>
+            )}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="หมวดหมู่"
+                placeholder="เลือกหรือพิมพ์เอง"
+                sx={inputSx}
+              />
+            )}
+            sx={{ '& .MuiOutlinedInput-root': inputSx['& .MuiOutlinedInput-root'] }}
+          />
+
+          <Autocomplete
+            freeSolo
+            options={[
+              ...(PRODUCT_SUBTYPES[(product as any).category || 'OTHER'] || ['OTHER']),
+              // Add common custom options
+              'ของขวัญ', 'ชุดกีฬา', 'อุปกรณ์', 'เครื่องเขียน', 'กระเป๋า', 'รองเท้า', 'หมวก', 'ผ้าพันคอ'
+            ]}
+            value={(product as any).subType || product.type || 'OTHER'}
+            onChange={(_e, newValue) => {
+              const newSubType = newValue || 'OTHER';
+              onChange({
+                ...product, 
+                subType: newSubType,
+                // Legacy type compatibility - keep JERSEY/CREW/OTHER
+                type: ['JERSEY', 'CREW'].includes(newSubType) ? newSubType : 'OTHER',
+              } as any);
+            }}
+            onInputChange={(_e, newInputValue) => {
+              if (newInputValue) {
+                onChange({
+                  ...product, 
+                  subType: newInputValue,
+                  type: ['JERSEY', 'CREW'].includes(newInputValue) ? newInputValue : 'OTHER',
+                } as any);
+              }
+            }}
+            getOptionLabel={(option) => SUBTYPE_LABELS[option] || option}
+            renderOption={({ key, ...props }, option) => (
+              <li key={key} {...props}>
+                {SUBTYPE_LABELS[option] || option}
+              </li>
+            )}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="ประเภทย่อย"
+                placeholder="เลือกหรือพิมพ์เอง"
+                sx={inputSx}
+                helperText="พิมพ์ชื่อประเภทเองได้"
+              />
+            )}
+            sx={{ '& .MuiOutlinedInput-root': inputSx['& .MuiOutlinedInput-root'] }}
+          />
+        </Box>
+
+        {/* Legacy type for backward compatibility (hidden) */}
+        <input type="hidden" value={product.type} />
+
+        <TextField
+          label="Description (รองรับการเว้นบรรทัด)"
+          multiline
+          rows={4}
+          value={product.description}
+          onChange={(e) => onChange({...product, description: e.target.value})}
+          fullWidth
+          sx={inputSx}
+          placeholder="เช่น:
+เสื้อ Jersey รุ่นใหม่
+เนื้อผ้า: Cool Elite
+ดีไซน์: แขนสั้นและยาว"
+          helperText="กด Enter เพื่อเว้นบรรทัดใหม่"
+        />
+
+        {/* Camp/Event specific fields */}
+        {((product as any).category === 'CAMP_FEE' || (product as any).subType === 'CAMP_REGISTRATION') && (
+          <Box sx={{ bgcolor: 'rgba(245,158,11,0.1)', p: 2, borderRadius: 1, border: '1px solid rgba(245,158,11,0.3)', display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: '#fbbf24', display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Tent size={16} /> ข้อมูลค่าย
+            </Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+              <TextField
+                label="ชื่อค่าย"
+                value={(product as any).campInfo?.campName || ''}
+                onChange={(e) => onChange({...product, campInfo: { ...(product as any).campInfo, campName: e.target.value }} as any)}
+                fullWidth
+                sx={inputSx}
+              />
+              <TextField
+                label="วันที่จัดค่าย"
+                type="date"
+                value={(product as any).campInfo?.campDate || ''}
+                onChange={(e) => onChange({...product, campInfo: { ...(product as any).campInfo, campDate: e.target.value }} as any)}
+                fullWidth
+                sx={inputSx}
+                InputLabelProps={{ shrink: true }}
+              />
+              <TextField
+                label="สถานที่"
+                value={(product as any).campInfo?.location || ''}
+                onChange={(e) => onChange({...product, campInfo: { ...(product as any).campInfo, location: e.target.value }} as any)}
+                fullWidth
+                sx={inputSx}
+              />
+              <TextField
+                label="ผู้จัด"
+                value={(product as any).campInfo?.organizer || ''}
+                onChange={(e) => onChange({...product, campInfo: { ...(product as any).campInfo, organizer: e.target.value }} as any)}
+                fullWidth
+                sx={inputSx}
+              />
+              <TextField
+                label="จำนวนรับสูงสุด"
+                type="number"
+                value={(product as any).campInfo?.maxParticipants || ''}
+                onChange={(e) => onChange({...product, campInfo: { ...(product as any).campInfo, maxParticipants: Number(e.target.value) || 0 }} as any)}
+                fullWidth
+                sx={inputSx}
+              />
+              <TextField
+                label="เงื่อนไข/ข้อกำหนด"
+                value={(product as any).campInfo?.requirements || ''}
+                onChange={(e) => onChange({...product, campInfo: { ...(product as any).campInfo, requirements: e.target.value }} as any)}
+                fullWidth
+                sx={inputSx}
+                multiline
+                rows={2}
+              />
+            </Box>
+          </Box>
+        )}
+
+        {((product as any).category === 'EVENT' || (product as any).subType === 'EVENT_TICKET') && (
+          <Box sx={{ bgcolor: 'rgba(236,72,153,0.1)', p: 2, borderRadius: 1, border: '1px solid rgba(236,72,153,0.3)', display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: '#f472b6', display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Ticket size={16} /> ข้อมูลอีเวนต์
+            </Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+              <TextField
+                label="ชื่ออีเวนต์"
+                value={(product as any).eventInfo?.eventName || ''}
+                onChange={(e) => onChange({...product, eventInfo: { ...(product as any).eventInfo, eventName: e.target.value }} as any)}
+                fullWidth
+                sx={inputSx}
+              />
+              <TextField
+                label="วันที่จัดงาน"
+                type="datetime-local"
+                value={(product as any).eventInfo?.eventDate || ''}
+                onChange={(e) => onChange({...product, eventInfo: { ...(product as any).eventInfo, eventDate: e.target.value }} as any)}
+                fullWidth
+                sx={inputSx}
+                InputLabelProps={{ shrink: true }}
+              />
+              <TextField
+                label="สถานที่"
+                value={(product as any).eventInfo?.venue || ''}
+                onChange={(e) => onChange({...product, eventInfo: { ...(product as any).eventInfo, venue: e.target.value }} as any)}
+                fullWidth
+                sx={inputSx}
+              />
+              <TextField
+                label="ผู้จัด"
+                value={(product as any).eventInfo?.organizer || ''}
+                onChange={(e) => onChange({...product, eventInfo: { ...(product as any).eventInfo, organizer: e.target.value }} as any)}
+                fullWidth
+                sx={inputSx}
+              />
+            </Box>
+          </Box>
+        )}
+
+        {/* Product options - only for APPAREL */}
+        {((product as any).category === 'APPAREL' || !((product as any).category)) && (
+          <Box sx={{ bgcolor: ADMIN_THEME.glassSoft, p: 2, borderRadius: 1, border: `1px solid ${ADMIN_THEME.border}`, display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: ADMIN_THEME.text, mb: 0.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Settings size={16} /> ตัวเลือกเสื้อ
+            </Typography>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={product.options?.requiresSize !== false}
+                  onChange={(e) => onChange({...product, options: { ...product.options, requiresSize: e.target.checked }} as any)}
+                />
+              }
+              label="ต้องเลือกไซส์"
+              sx={{ color: ADMIN_THEME.text }}
+            />
+          </Box>
+        )}
+
+        {/* Stock management */}
+        <Box sx={{ bgcolor: ADMIN_THEME.glassSoft, p: 2, borderRadius: 1, border: `1px solid ${ADMIN_THEME.border}`, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: ADMIN_THEME.text, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Inventory size={16} /> จำนวนสินค้า
+          </Typography>
+          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+            <TextField
+              label="จำนวนในสต็อก (ปล่อยว่าง = ไม่จำกัด)"
+              type="number"
+              value={(product as any).stock ?? ''}
+              onChange={(e) => onChange({...product, stock: e.target.value === '' ? null : Number(e.target.value)} as any)}
+              fullWidth
+              inputProps={{ min: 0 }}
+              sx={inputSx}
+            />
+            <TextField
+              label="จำนวนสูงสุดต่อออเดอร์"
+              type="number"
+              value={(product as any).maxPerOrder || ''}
+              onChange={(e) => onChange({...product, maxPerOrder: e.target.value === '' ? null : Number(e.target.value)} as any)}
+              fullWidth
+              inputProps={{ min: 1 }}
+              sx={inputSx}
+            />
+          </Box>
+        </Box>
+
+        <TextField
+          label="Base Price (฿)"
+          type="number"
+          value={product.basePrice}
+          onChange={(e) => onChange({...product, basePrice: Number(e.target.value)})}
+          fullWidth
+          inputProps={{ min: 0, max: 999999 }}
+          sx={inputSx}
+        />
+
+        {/* Size pricing - only show for APPAREL */}
+        {((product as any).category === 'APPAREL' || !((product as any).category)) && (product as any).options?.requiresSize !== false && (
+        <Box sx={{ bgcolor: ADMIN_THEME.glassSoft, p: 2, borderRadius: 1, border: `1px solid ${ADMIN_THEME.border}`, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: ADMIN_THEME.text }}>ราคาต่อไซส์</Typography>
+            <Typography variant="caption" sx={{ color: ADMIN_THEME.muted }}>ปล่อยว่างจะใช้ราคา base</Typography>
+          </Box>
+
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+            {SIZES.map((size) => (
+              <Chip
+                key={size}
+                label={product.sizePricing?.[size] ? `${size}: ${product.sizePricing[size].toLocaleString()}฿` : `ตั้งราคา ${size}`}
+                onClick={() => handleSizePriceChange(size, product.basePrice || 0)}
+                sx={{
+                  bgcolor: product.sizePricing?.[size] ? 'rgba(99,102,241,0.18)' : ADMIN_THEME.glass,
+                  border: `1px solid ${ADMIN_THEME.border}`,
+                  color: ADMIN_THEME.text,
+                  fontWeight: 700,
+                }}
+              />
+            ))}
+          </Box>
+
+          {Object.entries(product.sizePricing || {}).length > 0 && (
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 1 }}>
+              {Object.entries(product.sizePricing || {}).map(([size, price]) => (
+                <Box key={size} sx={{ display: 'contents' }}>
+                  <TextField
+                    label={`ไซส์ ${size}`}
+                    type="number"
+                    value={price}
+                    onChange={(e) => handleSizePriceChange(size, Number(e.target.value))}
+                    inputProps={{ min: 0, max: 999999 }}
+                    sx={{ ...inputSx, '& .MuiOutlinedInput-root': { ...inputSx['& .MuiOutlinedInput-root'], minHeight: 52 } }}
+                  />
+                  <IconButton onClick={() => handleRemoveSize(size)} sx={{ color: '#f87171' }} aria-label={`remove-size-${size}`}>
+                    <Delete />
+                  </IconButton>
+                </Box>
+              ))}
+            </Box>
+          )}
+
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr auto' }, gap: 1 }}>
+            <TextField
+              label="เพิ่มไซส์ใหม่"
+              value={newSizeKey}
+              onChange={(e) => setNewSizeKey(e.target.value.trimStart())}
+              sx={inputSx}
+            />
+            <TextField
+              label="ราคา (฿)"
+              type="number"
+              value={newSizePrice}
+              onChange={(e) => setNewSizePrice(e.target.value === '' ? '' : Number(e.target.value))}
+              inputProps={{ min: 0, max: 999999 }}
+              sx={inputSx}
+            />
+            <Button onClick={handleAddSize} variant="contained" sx={gradientButtonSx} startIcon={<Add size={20} />}>เพิ่มไซส์</Button>
+          </Box>
+        </Box>
+        )}
+
+        {/* Variants Section - for non-APPAREL products */}
+        {needsVariants() && (
+          <Box sx={{ bgcolor: 'rgba(139,92,246,0.1)', p: 2, borderRadius: 1, border: '1px solid rgba(139,92,246,0.3)', display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: '#a78bfa', display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Palette size={16} /> ตัวเลือกสินค้า (Variants)
+              </Typography>
+              <Typography variant="caption" sx={{ color: ADMIN_THEME.muted }}>
+                สำหรับสินค้าที่มีหลายแบบ/ราคา
+              </Typography>
+            </Box>
+            
+            <Typography variant="caption" sx={{ color: ADMIN_THEME.muted, mb: 1 }}>
+              เพิ่มตัวเลือกเช่น ขนาด S/M/L, สีต่างๆ, รุ่นต่างๆ พร้อมกำหนดราคาและจำนวนแยกได้
+            </Typography>
+
+            {/* Existing Variants List */}
+            {((product as any).variants || []).length > 0 && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {((product as any).variants || []).map((variant: any) => (
+                  <Box key={variant.id} sx={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: { xs: '1fr', sm: '2fr 1fr 1fr auto' }, 
+                    gap: 1, 
+                    alignItems: 'center',
+                    p: 1.5,
+                    bgcolor: 'var(--glass-bg)',
+                    borderRadius: 1,
+                    border: `1px solid ${ADMIN_THEME.border}`,
+                  }}>
+                    <TextField
+                      label="ชื่อตัวเลือก"
+                      value={variant.name}
+                      onChange={(e) => handleUpdateVariant(variant.id, 'name', e.target.value)}
+                      size="small"
+                      sx={inputSx}
+                    />
+                    <TextField
+                      label="ราคา (฿)"
+                      type="number"
+                      value={variant.price}
+                      onChange={(e) => handleUpdateVariant(variant.id, 'price', Number(e.target.value))}
+                      size="small"
+                      inputProps={{ min: 0 }}
+                      sx={inputSx}
+                    />
+                    <TextField
+                      label="จำนวน"
+                      type="number"
+                      value={variant.stock ?? ''}
+                      onChange={(e) => handleUpdateVariant(variant.id, 'stock', e.target.value === '' ? null : Number(e.target.value))}
+                      size="small"
+                      inputProps={{ min: 0 }}
+                      placeholder="ไม่จำกัด"
+                      sx={inputSx}
+                    />
+                    <Box sx={{ display: 'flex', gap: 0.5 }}>
+                      <IconButton 
+                        size="small"
+                        onClick={() => handleUpdateVariant(variant.id, 'isActive', !variant.isActive)}
+                        sx={{ color: variant.isActive ? '#22c55e' : '#64748b' }}
+                      >
+                        {variant.isActive ? <Visibility size={20} /> : <VisibilityOff size={20} />}
+                      </IconButton>
+                      <IconButton 
+                        size="small"
+                        onClick={() => handleRemoveVariant(variant.id)} 
+                        sx={{ color: '#f87171' }}
+                      >
+                        <Delete size={20} />
+                      </IconButton>
+                    </Box>
+                  </Box>
+                ))}
+              </Box>
+            )}
+
+            {/* Add New Variant */}
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '2fr 1fr 1fr auto' }, gap: 1, mt: 1 }}>
+              <TextField
+                label="ชื่อตัวเลือกใหม่"
+                value={newVariantName}
+                onChange={(e) => setNewVariantName(e.target.value)}
+                size="small"
+                placeholder="เช่น ขนาด S, สีแดง, รุ่น A"
+                sx={inputSx}
+              />
+              <TextField
+                label="ราคา (฿)"
+                type="number"
+                value={newVariantPrice}
+                onChange={(e) => setNewVariantPrice(e.target.value === '' ? '' : Number(e.target.value))}
+                size="small"
+                inputProps={{ min: 0 }}
+                placeholder={`${product.basePrice || 0}`}
+                sx={inputSx}
+              />
+              <TextField
+                label="จำนวน"
+                type="number"
+                value={newVariantStock}
+                onChange={(e) => setNewVariantStock(e.target.value === '' ? '' : Number(e.target.value))}
+                size="small"
+                inputProps={{ min: 0 }}
+                placeholder="ไม่จำกัด"
+                sx={inputSx}
+              />
+              <Button 
+                onClick={handleAddVariant} 
+                variant="contained" 
+                size="small"
+                startIcon={<Add />}
+                sx={{ 
+                  background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
+                  minWidth: 100,
+                }}
+              >
+                เพิ่ม
+              </Button>
+            </Box>
+
+            {/* Quick Add Common Variants */}
+            <Box sx={{ mt: 1 }}>
+              <Typography variant="caption" sx={{ color: ADMIN_THEME.muted, mb: 1, display: 'block' }}>
+                เพิ่มตัวเลือกด่วน:
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                {[
+                  { name: 'ขนาด S', price: product.basePrice },
+                  { name: 'ขนาด M', price: product.basePrice },
+                  { name: 'ขนาด L', price: product.basePrice },
+                  { name: 'สีดำ', price: product.basePrice },
+                  { name: 'สีขาว', price: product.basePrice },
+                  { name: 'ปกติ', price: product.basePrice },
+                  { name: 'พิเศษ', price: Math.round((product.basePrice || 0) * 1.2) },
+                ].map((preset) => {
+                  const exists = ((product as any).variants || []).some((v: any) => v.name === preset.name);
+                  return (
+                    <Chip
+                      key={preset.name}
+                      label={preset.name}
+                      size="small"
+                      onClick={() => {
+                        if (exists) return;
+                        const newVariant = {
+                          id: `var_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                          name: preset.name,
+                          price: preset.price || 0,
+                          stock: null,
+                          isActive: true,
+                        };
+                        onChange({ ...product, variants: [...((product as any).variants || []), newVariant] } as any);
+                      }}
+                      sx={{
+                        cursor: exists ? 'default' : 'pointer',
+                        bgcolor: exists ? 'rgba(139,92,246,0.3)' : 'transparent',
+                        color: '#a78bfa',
+                        border: '1px dashed rgba(139,92,246,0.5)',
+                        opacity: exists ? 0.5 : 1,
+                        '&:hover': { bgcolor: exists ? undefined : 'rgba(139,92,246,0.15)' },
+                      }}
+                    />
+                  );
+                })}
+              </Box>
+            </Box>
+          </Box>
+        )}
+
+        {/* Schedule Section */}
+        <Box sx={{ bgcolor: ADMIN_THEME.glassSoft, p: 2, borderRadius: 1, border: `1px solid ${ADMIN_THEME.border}`, display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{
+              width: 36,
+              height: 36,
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              <DateRange size={20} color="#fff" />
+            </Box>
+            <Box>
+              <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: ADMIN_THEME.text }}>กำหนดเวลาขาย</Typography>
+              <Typography sx={{ fontSize: '0.75rem', color: ADMIN_THEME.muted }}>ตั้งเวลาเปิด-ปิดขายอัตโนมัติ</Typography>
+            </Box>
+          </Box>
+
+          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+            <Box>
+              <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)', mb: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <FiberManualRecord size={10} color="#22c55e" /> เปิดขายเมื่อ
+              </Typography>
+              <TextField
+                type="datetime-local"
+                value={toDateTimeLocal(product.startDate)}
+                onChange={(e) => onChange({...product, startDate: e.target.value})}
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+                sx={{
+                  ...inputSx,
+                  '& .MuiOutlinedInput-root': {
+                    ...inputSx['& .MuiOutlinedInput-root'],
+                    borderRadius: '10px',
+                  },
+                }}
+              />
+              {product.startDate && (
+                <Button 
+                  size="small" 
+                  onClick={() => onChange({...product, startDate: ''})}
+                  sx={{ mt: 0.5, color: 'var(--text-muted)', textTransform: 'none', fontSize: '0.7rem' }}
+                >
+                  ✕ ล้างวันเริ่ม
+                </Button>
+              )}
+            </Box>
+            <Box>
+              <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)', mb: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <FiberManualRecord size={10} color="#ef4444" /> ปิดขายเมื่อ
+              </Typography>
+              <TextField
+                type="datetime-local"
+                value={toDateTimeLocal(product.endDate)}
+                onChange={(e) => onChange({...product, endDate: e.target.value})}
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+                sx={{
+                  ...inputSx,
+                  '& .MuiOutlinedInput-root': {
+                    ...inputSx['& .MuiOutlinedInput-root'],
+                    borderRadius: '10px',
+                  },
+                }}
+              />
+              {product.endDate && (
+                <Button 
+                  size="small" 
+                  onClick={() => onChange({...product, endDate: ''})}
+                  sx={{ mt: 0.5, color: 'var(--text-muted)', textTransform: 'none', fontSize: '0.7rem' }}
+                >
+                  ✕ ล้างวันสิ้นสุด
+                </Button>
+              )}
+            </Box>
+          </Box>
+
+          {/* Status Preview */}
+          {(() => {
+            const { status } = isProductOpen(product);
+            const statusInfo: Record<string, { icon: React.ReactNode, text: string, color: string }> = {
+              upcoming: { icon: <AccessTime size={16} />, text: 'สินค้าจะเปิดขายเมื่อถึงเวลาที่กำหนด', color: '#f59e0b' },
+              active: { icon: <FiberManualRecord size={12} color="#22c55e" />, text: 'สินค้ากำลังเปิดขายอยู่', color: '#10b981' },
+              ended: { icon: <FiberManualRecord size={12} color="#ef4444" />, text: 'หมดเวลาขายแล้ว', color: '#ef4444' },
+              always: { icon: <DateRange size={16} />, text: 'ไม่มีกำหนดเวลา (เปิดตลอด)', color: 'var(--text-muted)' },
+            };
+            const info = statusInfo[status];
+            return (
+              <Box sx={{
+                mt: 1,
+                p: 1.5,
+                borderRadius: '10px',
+                bgcolor: `${info.color}15`,
+                border: `1px solid ${info.color}30`,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+              }}>
+                <Box sx={{ color: info.color, display: 'flex', alignItems: 'center' }}>{info.icon}</Box>
+                <Typography sx={{ fontSize: '0.85rem', color: info.color, fontWeight: 500 }}>
+                  {info.text}
+                </Typography>
+              </Box>
+            );
+          })()}
+        </Box>
+
+        <Box sx={{ bgcolor: ADMIN_THEME.glassSoft, p: 2, borderRadius: 1, border: `1px solid ${ADMIN_THEME.border}`, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: ADMIN_THEME.text }}>รูปภาพสินค้า</Typography>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button variant="outlined" component="label" sx={{ borderColor: ADMIN_THEME.border, color: ADMIN_THEME.text }}>
+                เพิ่มหลายรูป
+                <input hidden accept="image/*" multiple type="file" onChange={(e) => handleImagesUpload(e.target.files)} />
+              </Button>
+              <Button variant="contained" component="label" disabled={coverUploadLoading} sx={{ background: ADMIN_THEME.gradient, color: '#fff' }}>
+                ตั้งรูปปก
+                <input hidden accept="image/*" type="file" onChange={(e) => handleCoverUpload(e.target.files)} />
+              </Button>
+            </Box>
+          </Box>
+
+          <Typography variant="caption" sx={{ color: ADMIN_THEME.muted }}>
+            รองรับหลายไฟล์ บันทึกเป็น Data URL · ตั้งปกได้จากรูปสินค้าหรือรูปลายเสื้อด้านล่าง
+          </Typography>
+
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)' }, gap: 1.5 }}>
+            {(() => {
+              const images = product.images || [];
+              const coverImage = product.coverImage;
+              // รวมรูปปกจากลายเสื้อ (อาจไม่อยู่ใน images) และเรียงให้ cover ขึ้นก่อน
+              const merged = coverImage && !images.includes(coverImage)
+                ? [coverImage, ...images]
+                : images;
+              const sortedImages = coverImage
+                ? [coverImage, ...merged.filter((img: string) => img !== coverImage)]
+                : merged;
+              return sortedImages;
+            })().map((img: string, idx: number) => {
+              const isCover = product.coverImage === img;
+              return (
+                <Box key={idx} sx={{ position: 'relative', borderRadius: 1.5, overflow: 'hidden', border: `1px solid ${isCover ? '#6366f1' : ADMIN_THEME.border}`, boxShadow: isCover ? '0 0 0 2px rgba(99,102,241,0.35)' : 'none' }}>
+                  {isCover && (
+                    <Chip label="รูปปก" size="small" sx={{ position: 'absolute', top: 6, left: 6, bgcolor: '#6366f1', color: '#fff', zIndex: 1 }} />
+                  )}
+                  <Box component="img" src={img} alt={`product-${idx}`} sx={{ width: '100%', height: 140, objectFit: 'cover', display: 'block' }} />
+                  <Box sx={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', gap: 0.5, p: 1 }}>
+                    <Button size="small" variant="contained" onClick={() => handleSetCover(img)} sx={{ background: 'rgba(99,102,241,0.9)', color: '#fff', textTransform: 'none' }}>
+                      ตั้งเป็นปก
+                    </Button>
+                    <Button size="small" variant="outlined" onClick={() => handleRemoveImage(img)} sx={{ color: '#fff', borderColor: 'var(--glass-border)', textTransform: 'none' }}>
+                      ลบรูป
+                    </Button>
+                  </Box>
+                </Box>
+              );
+            })}
+          </Box>
+        </Box>
+
+        {(((product as any).category || (product.type === 'OTHER' ? 'OTHER' : 'APPAREL')) === 'APPAREL') && (
+          <Box sx={{ bgcolor: 'rgba(14,165,233,0.08)', p: 2, borderRadius: 1, border: '1px solid rgba(14,165,233,0.3)', display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Palette size={16} /> ลายเสื้อ (Patterns)
+              </Typography>
+              <Typography variant="caption" sx={{ color: ADMIN_THEME.muted }}>
+                เลือกลายและแนบรูปลายเสื้อได้
+              </Typography>
+            </Box>
+
+            {(((product as any).patterns || []) as any[]).length === 0 ? (
+              <Typography variant="caption" sx={{ color: ADMIN_THEME.muted, fontStyle: 'italic' }}>
+                ยังไม่มีลายสินค้า
+              </Typography>
+            ) : (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {(((product as any).patterns || []) as any[]).map((pattern: any) => {
+                  const isActive = pattern.isActive !== false;
+                  const isPatternCover = Boolean(pattern.image && product.coverImage === pattern.image);
+                  return (
+                    <Box
+                      key={pattern.id}
+                      sx={{
+                        display: 'grid',
+                        gridTemplateColumns: { xs: '1fr', sm: '140px 1fr auto' },
+                        gap: 1,
+                        alignItems: 'center',
+                        p: 1.2,
+                        bgcolor: 'var(--glass-bg)',
+                        borderRadius: 1,
+                        border: `1px solid ${isPatternCover ? '#6366f1' : ADMIN_THEME.border}`,
+                        boxShadow: isPatternCover ? '0 0 0 2px rgba(99,102,241,0.35)' : 'none',
+                      }}
+                    >
+                      <Box sx={{
+                        width: '100%',
+                        height: 90,
+                        borderRadius: 1,
+                        overflow: 'hidden',
+                        border: `1px solid ${ADMIN_THEME.border}`,
+                        bgcolor: 'rgba(15,23,42,0.4)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        position: 'relative',
+                      }}>
+                        {isPatternCover && (
+                          <Chip label="รูปปก" size="small" sx={{ position: 'absolute', top: 4, left: 4, bgcolor: '#6366f1', color: '#fff', zIndex: 1, height: 20, fontSize: '0.65rem' }} />
+                        )}
+                        {pattern.image ? (
+                          <Box component="img" src={pattern.image} alt={pattern.name} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <ImageIcon size={20} color={ADMIN_THEME.muted} />
+                        )}
+                      </Box>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        <TextField
+                          label="ชื่อลาย"
+                          size="small"
+                          value={pattern.name}
+                          onChange={(e) => handleUpdatePattern(pattern.id, 'name', e.target.value)}
+                          sx={inputSx}
+                        />
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                          <Button variant="outlined" component="label" size="small" sx={{ borderColor: ADMIN_THEME.border, color: ADMIN_THEME.text, textTransform: 'none' }}>
+                            แนบ/เปลี่ยนรูปลาย
+                            <input hidden accept="image/*" type="file" onChange={(e) => handlePatternImageUpload(pattern.id, e.target.files)} />
+                          </Button>
+                          {pattern.image && (
+                            <Button
+                              size="small"
+                              variant="contained"
+                              disabled={isPatternCover}
+                              onClick={() => handleSetCover(pattern.image)}
+                              sx={{ background: 'rgba(99,102,241,0.9)', color: '#fff', textTransform: 'none' }}
+                            >
+                              {isPatternCover ? 'เป็นปกแล้ว' : 'ตั้งเป็นปก'}
+                            </Button>
+                          )}
+                        </Box>
+                      </Box>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleUpdatePattern(pattern.id, 'isActive', !isActive)}
+                          sx={{ color: isActive ? '#22c55e' : '#64748b' }}
+                        >
+                          {isActive ? <Visibility size={20} /> : <VisibilityOff size={20} />}
+                        </IconButton>
+                        <IconButton size="small" onClick={() => handleRemovePattern(pattern.id)} sx={{ color: '#f87171' }}>
+                          <Delete size={20} />
+                        </IconButton>
+                      </Box>
+                    </Box>
+                  );
+                })}
+              </Box>
+            )}
+
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '2fr 1fr auto' }, gap: 1, alignItems: 'center', mt: 0.5 }}>
+              <TextField
+                label="ชื่อลายใหม่ (คั่นด้วยเครื่องหมายจุลภาค , เพื่อเพิ่มหลายลาย)"
+                value={newPatternName}
+                onChange={(e) => setNewPatternName(e.target.value)}
+                size="small"
+                placeholder="เช่น ลาย A, ลาย B, ลาย C"
+                sx={inputSx}
+              />
+              <Button
+                variant="outlined"
+                component="label"
+                size="small"
+                sx={{ borderColor: ADMIN_THEME.border, color: ADMIN_THEME.text, textTransform: 'none' }}
+              >
+                แนบรูปลาย (เลือกหลายไฟล์ได้)
+                <input hidden accept="image/*" type="file" multiple onChange={(e) => handleNewPatternImageUpload(e.target.files)} />
+              </Button>
+              <Button
+                onClick={handleAddPattern}
+                variant="contained"
+                size="small"
+                startIcon={<Add size={18} />}
+                sx={{ background: 'linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%)' }}
+              >
+                เพิ่มลาย
+              </Button>
+            </Box>
+
+            {newPatternImage && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box
+                  component="img"
+                  src={newPatternImage}
+                  alt="new-pattern"
+                  sx={{ width: 90, height: 60, objectFit: 'cover', borderRadius: 1, border: `1px solid ${ADMIN_THEME.border}` }}
+                />
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => setNewPatternImage('')}
+                  sx={{ borderColor: ADMIN_THEME.border, color: ADMIN_THEME.text, textTransform: 'none' }}
+                >
+                  ลบรูปลาย
+                </Button>
+              </Box>
+            )}
+          </Box>
+        )}
+
+        <Box sx={{ bgcolor: ADMIN_THEME.glassSoft, p: 2, borderRadius: 1, border: `1px solid ${ADMIN_THEME.border}` }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 2, color: ADMIN_THEME.text }}>Product Options</Typography>
+          {[
+            { key: 'hasCustomName', label: 'Allow Custom Name' },
+            { key: 'hasCustomNumber', label: 'Allow Custom Number' },
+            { key: 'hasLongSleeve', label: 'Offer Long Sleeve' }
+          ].map(opt => (
+            <FormControlLabel
+              key={opt.key}
+              control={
+                <Checkbox
+                  checked={Boolean((product.options as any)?.[opt.key])}
+                  onChange={(e) => onChange({
+                    ...product,
+                    options: {...(product.options || { hasCustomName: false, hasCustomNumber: false, hasLongSleeve: false, longSleevePrice: 50 }), [opt.key]: e.target.checked}
+                  })}
+                />
+              }
+              label={opt.label}
+              sx={{ color: ADMIN_THEME.text }}
+            />
+          ))}
+          
+          {/* Long Sleeve Price Input - แสดงเมื่อเปิดใช้ hasLongSleeve */}
+          {product.options?.hasLongSleeve && (
+            <Box sx={{ mt: 1.5, ml: 4 }}>
+              <TextField
+                label="ราคาเพิ่มแขนยาว (฿)"
+                type="number"
+                value={product.options?.longSleevePrice ?? 50}
+                onChange={(e) => onChange({
+                  ...product,
+                  options: { ...product.options, longSleevePrice: Math.max(0, Number(e.target.value)) }
+                })}
+                inputProps={{ min: 0, max: 999999 }}
+                size="small"
+                sx={{ ...inputSx, width: 180 }}
+                helperText="ราคาที่จะบวกเพิ่มเมื่อเลือกแขนยาว"
+              />
+            </Box>
+          )}
+
+          {product.options?.hasCustomName && (
+            <Box sx={{ mt: 2, pt: 2, borderTop: `1px solid ${ADMIN_THEME.border}` }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1.5, color: ADMIN_THEME.text, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Shirt size={18} />
+                ตั้งค่าชื่อบนเสื้อ (เฉพาะสินค้านี้)
+              </Typography>
+              <ShirtNameConfigFields
+                compact
+                value={getProductShirtNameConfig(product)}
+                onChange={(shirtNameConfig) => onChange({ ...product, shirtNameConfig })}
+              />
+            </Box>
+          )}
+        </Box>
+
+        {/* Custom Tags Section */}
+        <Box sx={{ bgcolor: ADMIN_THEME.glassSoft, p: 2, borderRadius: 1, border: `1px solid ${ADMIN_THEME.border}` }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1.5, color: ADMIN_THEME.text, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <LocalOffer size={20} />
+            แท้กสินค้า (Custom Tags)
+          </Typography>
+          <Typography variant="caption" sx={{ color: ADMIN_THEME.muted, display: 'block', mb: 2 }}>
+            ตั้งค่าแท้กที่จะแสดงบนการ์ดสินค้า หากไม่ตั้งค่าจะใช้แท้กอัตโนมัติจาก options
+          </Typography>
+          
+          {/* Tag List */}
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+            {((product.customTags || []) as Array<{ text: string; color: string; bgColor?: string }>).map((tag, idx) => (
+              <Chip
+                key={idx}
+                label={tag.text}
+                onDelete={() => {
+                  const newTags = [...(product.customTags || [])];
+                  newTags.splice(idx, 1);
+                  onChange({ ...product, customTags: newTags });
+                }}
+                sx={{
+                  bgcolor: tag.bgColor || `${tag.color}20`,
+                  color: tag.color,
+                  border: `1px solid ${tag.color}40`,
+                  '& .MuiChip-deleteIcon': { color: tag.color },
+                }}
+              />
+            ))}
+            {(!product.customTags || product.customTags.length === 0) && (
+              <Typography variant="caption" sx={{ color: ADMIN_THEME.muted, fontStyle: 'italic' }}>
+                ยังไม่มีแท้ก (ใช้แท้กอัตโนมัติ)
+              </Typography>
+            )}
+          </Box>
+
+          {/* Add New Tag */}
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+            <TextField
+              label="ข้อความแท้ก"
+              size="small"
+              placeholder="เช่น สินค้ามาใหม่"
+              sx={{ ...inputSx, flex: 1, minWidth: 150 }}
+              inputProps={{ id: 'new-tag-text' }}
+            />
+            <TextField
+              label="สี"
+              size="small"
+              type="color"
+              defaultValue="#10b981"
+              sx={{ ...inputSx, width: 80 }}
+              inputProps={{ id: 'new-tag-color' }}
+            />
+            <Button
+              variant="contained"
+              size="small"
+              onClick={() => {
+                const textEl = document.getElementById('new-tag-text') as HTMLInputElement;
+                const colorEl = document.getElementById('new-tag-color') as HTMLInputElement;
+                if (textEl?.value?.trim()) {
+                  const newTag = {
+                    text: textEl.value.trim(),
+                    color: colorEl?.value || '#10b981',
+                    bgColor: `${colorEl?.value || '#10b981'}20`,
+                  };
+                  onChange({
+                    ...product,
+                    customTags: [...(product.customTags || []), newTag]
+                  });
+                  textEl.value = '';
+                }
+              }}
+              sx={{ bgcolor: ADMIN_THEME.primary, minWidth: 80 }}
+            >
+              เพิ่ม
+            </Button>
+          </Box>
+          
+          {/* Quick Add Preset Tags */}
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="caption" sx={{ color: ADMIN_THEME.muted, mb: 1, display: 'block' }}>
+              แท้กยอดนิยม:
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+              {[
+                { text: 'สินค้ามาใหม่', color: '#f59e0b' },
+                { text: 'ขายดี', color: '#ef4444' },
+                { text: 'Limited', color: '#8b5cf6' },
+                { text: 'Pre-order', color: '#3b82f6' },
+                { text: 'พร้อมส่ง', color: '#10b981' },
+              ].map((preset) => {
+                const isAdded = ((product.customTags || []) as Array<{ text: string }>).some(t => t.text === preset.text);
+                return (
+                <Chip
+                  key={preset.text}
+                  label={preset.text}
+                  size="small"
+                  onClick={() => {
+                    if (isAdded) return;
+                    onChange({
+                      ...product,
+                      customTags: [...(product.customTags || []), { ...preset, bgColor: `${preset.color}20` }]
+                    });
+                  }}
+                  sx={{
+                    cursor: 'pointer',
+                    bgcolor: isAdded ? `${preset.color}30` : 'transparent',
+                    color: preset.color,
+                    border: `1px dashed ${preset.color}60`,
+                    '&:hover': { bgcolor: `${preset.color}20` },
+                  }}
+                />
+              );})}
+            </Box>
+          </Box>
+        </Box>
+
+        <FormControlLabel
+          control={
+            <Switch
+              checked={product.isActive}
+              onChange={(e) => onChange({...product, isActive: e.target.checked})}
+            />
+          }
+          label={product.isActive ? 'Active' : 'Inactive'}
+          sx={{ color: ADMIN_THEME.text }}
+        />
+        </Box>
+
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: ADMIN_THEME.text }}>Preview</Typography>
+          <Card sx={{ ...glassCardSx, p: 0, overflow: 'hidden' }}>
+            <Box sx={{ height: 180, background: product.coverImage || (product.images?.[0] || '') ? `url(${product.coverImage || product.images?.[0]})` : ADMIN_THEME.gradient, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+            <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>{product.name || 'ชื่อสินค้า'}</Typography>
+              <Typography variant="caption" sx={{ color: ADMIN_THEME.muted }}>{product.type}</Typography>
+              <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#10b981' }}>฿{product.basePrice || 0}</Typography>
+              <Stack direction="row" spacing={1} flexWrap="wrap">
+                {(product.images || []).slice(0, 3).map((img: string | undefined, idx: number) => (
+                  <Chip key={img || idx} label={`รูป ${idx + 1}`} size="small" />
+                ))}
+              </Stack>
+              {Object.keys(product.sizePricing || {}).length > 0 && (
+                <Stack direction="row" spacing={1} flexWrap="wrap">
+                  {Object.entries(product.sizePricing || {})
+                    .slice(0, 5)
+                    .map((entry: [string, unknown]) => {
+                      const [size, raw] = entry;
+                      const price = Number(raw) || 0;
+                      return <Chip key={size} label={`${size}: ฿${price}`} size="small" />;
+                    })}
+                </Stack>
+              )}
+              <Chip label={product.isActive ? 'Published' : 'Draft'} color={product.isActive ? 'success' : 'default'} size="small" />
+            </CardContent>
+          </Card>
+        </Box>
+      </DialogContent>
+      <DialogActions sx={{ p: 2, gap: 1, borderTop: `1px solid ${ADMIN_THEME.border}` }}>
+        <Button onClick={onClose} variant="outlined" sx={{ borderColor: ADMIN_THEME.border, color: ADMIN_THEME.text, '&:hover': { borderColor: '#6366f1' } }}>Cancel</Button>
+        <Button
+          onClick={() => onSave('draft')}
+          variant="outlined"
+          disabled={isSaving}
+          sx={{ borderColor: ADMIN_THEME.border, color: ADMIN_THEME.text }}
+        >
+          {isSaving ? 'Saving...' : 'Save as Draft'}
+        </Button>
+        <Button
+          onClick={() => onSave('publish')}
+          variant="contained"
+          disabled={isSaving}
+          sx={gradientButtonSx}
+        >
+          {isSaving ? 'Saving...' : 'Save & Publish'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+};

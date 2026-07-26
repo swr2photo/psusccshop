@@ -33,7 +33,14 @@ const securityHeaders = {
 
 const ipRequestCounts = new Map<string, { count: number; resetTime: number }>();
 
-function checkMiddlewareRateLimit(ip: string, limit: number, windowSeconds: number): boolean {
+interface MiddlewareRateLimitResult {
+  allowed: boolean;
+  limit: number;
+  remaining: number;
+  resetTime: number;
+}
+
+function checkMiddlewareRateLimit(ip: string, limit: number, windowSeconds: number): MiddlewareRateLimitResult {
   const now = Date.now();
   const windowMs = windowSeconds * 1000;
 
@@ -55,7 +62,15 @@ function checkMiddlewareRateLimit(ip: string, limit: number, windowSeconds: numb
     }
   }
 
-  return entry.count <= limit;
+  const remaining = Math.max(0, limit - entry.count);
+  const allowed = entry.count <= limit;
+
+  return {
+    allowed,
+    limit,
+    remaining,
+    resetTime: entry.resetTime,
+  };
 }
 
 function getIP(request: NextRequest): string {
@@ -266,7 +281,9 @@ export async function middleware(request: NextRequest) {
 
   const windowSeconds = 60;
 
-  if (!checkMiddlewareRateLimit(`${ip}:${rateLimitKey}`, rateLimit, windowSeconds)) {
+  const rlResult = checkMiddlewareRateLimit(`${ip}:${rateLimitKey}`, rateLimit, windowSeconds);
+
+  if (!rlResult.allowed) {
     console.warn(`[Security] Rate limit exceeded: ${ip} on ${pathname} (${rateLimitKey})`);
     return new NextResponse(
       JSON.stringify({ status: 'error', message: 'Too many requests. Please try again later.' }),
@@ -275,6 +292,9 @@ export async function middleware(request: NextRequest) {
         headers: {
           'Content-Type': 'application/json',
           'Retry-After': String(windowSeconds),
+          'X-RateLimit-Limit': String(rlResult.limit),
+          'X-RateLimit-Remaining': String(rlResult.remaining),
+          'X-RateLimit-Reset': String(Math.floor(rlResult.resetTime / 1000)),
           ...securityHeaders,
         },
       }
@@ -286,6 +306,9 @@ export async function middleware(request: NextRequest) {
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('X-Frame-Options', 'DENY');
   response.headers.set('X-XSS-Protection', '1; mode=block');
+  response.headers.set('X-RateLimit-Limit', String(rlResult.limit));
+  response.headers.set('X-RateLimit-Remaining', String(rlResult.remaining));
+  response.headers.set('X-RateLimit-Reset', String(Math.floor(rlResult.resetTime / 1000)));
 
   const isCacheableApi = isCacheableApiPath(pathname);
   if (pathname.startsWith('/api/') && !isCacheableApi) {

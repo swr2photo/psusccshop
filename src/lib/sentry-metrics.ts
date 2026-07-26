@@ -1,46 +1,61 @@
+// src/lib/sentry-metrics.ts
+// Helper utilities for Sentry Custom Metrics (supported in @sentry/nextjs >= 10.25.0)
+
 import * as Sentry from '@sentry/nextjs';
 
-function hasSentryDsn(): boolean {
-  return Boolean(process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN);
+export interface MetricTags {
+  [key: string]: string | number | boolean;
 }
 
-export function recordOrderCreated(
-  status: 'success' | 'failed',
-  latencyMs?: number,
-): void {
-  if (!hasSentryDsn()) return;
-
-  Sentry.metrics.count('orders_created', 1, { attributes: { status } });
-
-  if (latencyMs !== undefined) {
-    Sentry.metrics.distribution('orders_latency', latencyMs, {
-      unit: 'millisecond',
-      attributes: { status },
-    });
+/**
+ * Increment a counter metric in Sentry
+ * Example: recordMetricCount('order_checkout_success', 1, { shop: 'psuscc' })
+ */
+export function recordMetricCount(name: string, value = 1, tags?: MetricTags): void {
+  try {
+    Sentry.metrics.count(name, value, { tags });
+  } catch (error) {
+    console.warn('[Sentry Metrics] Failed to record count metric:', error);
   }
 }
 
-export function recordCronRun(
-  job: string,
-  status: 'success' | 'failed',
+/**
+ * Record a distribution metric (e.g. latency, response times, item counts)
+ * Example: recordMetricDistribution('api_response_time', 120, 'millisecond')
+ */
+export function recordMetricDistribution(
+  name: string,
+  value: number,
+  unit?: string,
+  tags?: MetricTags,
 ): void {
-  if (!hasSentryDsn()) return;
-
-  Sentry.metrics.count('cron_run', 1, {
-    attributes: { job, status },
-  });
+  try {
+    Sentry.metrics.distribution(name, value, { unit, tags });
+  } catch (error) {
+    console.warn('[Sentry Metrics] Failed to record distribution metric:', error);
+  }
 }
 
-export function recordChatbotRequest(status: 'success' | 'error' | 'rate_limit'): void {
-  if (!hasSentryDsn()) return;
-
-  Sentry.metrics.count('chatbot_requests', 1, {
-    attributes: { status },
-  });
+/**
+ * Record a gauge metric (current value, e.g. active cart size, queue length)
+ * Example: recordMetricGauge('cart_items_count', 3)
+ */
+export function recordMetricGauge(
+  name: string,
+  value: number,
+  unit?: string,
+  tags?: MetricTags,
+): void {
+  try {
+    Sentry.metrics.gauge(name, value, { unit, tags });
+  } catch (error) {
+    console.warn('[Sentry Metrics] Failed to record gauge metric:', error);
+  }
 }
 
-/** Dev verification — call once to confirm metrics reach Sentry. */
+/**
+ * Send a verification test metric to confirm Sentry Metrics are operational
+ */
 export function recordTestMetric(): void {
-  if (!hasSentryDsn()) return;
-  Sentry.metrics.count('test_metric', 1);
+  recordMetricCount('test_metric', 1, { environment: process.env.NODE_ENV || 'development' });
 }

@@ -1,0 +1,23 @@
+HTTP/1.1 200 OK
+Date: Fri, 24 Jul 2026 08:31:53 GMT
+Content-Type: application/json
+Content-Length: 31
+Connection: keep-alive
+CF-Ray: a201922fece94d8c-SIN
+CF-Cache-Status: HIT
+Accept-Ranges: bytes
+Age: 4
+Cache-Control: public, max-age=14400, s-maxage=120, stale-while-revalidate=300
+Last-Modified: Fri, 24 Jul 2026 08:31:48 GMT
+Server: cloudflare
+Vary: Origin
+CDN-Cache-Control: public, max-age=120
+X-Edge-Cache: HIT
+access-control-allow-credentials: true
+access-control-allow-headers: Content-Type, Authorization, Cookie, X-Requested-With
+access-control-allow-methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+access-control-expose-headers: accept, accept-encoding, cf-connecting-ip, cf-ipcountry, cf-ray, cf-visitor, connection, host, user-agent, x-forwarded-proto, x-real-ip
+Report-To: {"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=FM7l9dLPLtetPHLK18Kav7jwLmBqFj3O4PWdsfv0g7VHq8GT9THAEpVxCDu3P3O%2FC6NiAUayZ%2FNom6dYzKP84zw6zOckvGzmS7Ig%2BPQgTuLZ3S3HAs5w%2B9U4AzuZP1WQFSg%3D"}]}
+Nel: {"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}
+alt-svc: h3=":443"; ma=86400
+

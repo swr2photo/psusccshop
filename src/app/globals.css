@@ -1589,3 +1589,35 @@ textarea::placeholder {
     backdrop-filter: blur(4px) !important;
   }
 }
+
+/* ==================== MOBILE & TOUCH OPTIMIZATIONS ==================== */
+
+/* Safe area padding utilities for iOS Notch & Gesture bar */
+.pb-safe {
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+
+.pt-safe {
+  padding-top: max(16px, env(safe-area-inset-top));
+}
+
+.mb-safe {
+  margin-bottom: max(16px, env(safe-area-inset-bottom));
+}
+
+/* Apple Human Interface minimum recommended touch target (44px x 44px) */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Smooth horizontal scroll for mobile filters and tables */
+.mobile-scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory;
+}
+
+.mobile-scroll-x > * {
+  scroll-snap-align: start;
+}
