@@ -3,34 +3,27 @@
 
 import * as Sentry from '@sentry/nextjs';
 
-export interface MetricTags {
-  [key: string]: string | number | boolean;
-}
-
 /**
  * Increment a counter metric in Sentry
- * Example: recordMetricCount('order_checkout_success', 1, { shop: 'psuscc' })
  */
-export function recordMetricCount(name: string, value = 1, tags?: MetricTags): void {
+export function recordMetricCount(name: string, value = 1): void {
   try {
-    Sentry.metrics.count(name, value, { tags });
+    Sentry.metrics.count(name, value);
   } catch (error) {
     console.warn('[Sentry Metrics] Failed to record count metric:', error);
   }
 }
 
 /**
- * Record a distribution metric (e.g. latency, response times, item counts)
- * Example: recordMetricDistribution('api_response_time', 120, 'millisecond')
+ * Record a distribution metric (e.g. latency, response times)
  */
 export function recordMetricDistribution(
   name: string,
   value: number,
   unit?: string,
-  tags?: MetricTags,
 ): void {
   try {
-    Sentry.metrics.distribution(name, value, { unit, tags });
+    Sentry.metrics.distribution(name, value, { unit });
   } catch (error) {
     console.warn('[Sentry Metrics] Failed to record distribution metric:', error);
   }
@@ -38,16 +31,14 @@ export function recordMetricDistribution(
 
 /**
  * Record a gauge metric (current value, e.g. active cart size, queue length)
- * Example: recordMetricGauge('cart_items_count', 3)
  */
 export function recordMetricGauge(
   name: string,
   value: number,
   unit?: string,
-  tags?: MetricTags,
 ): void {
   try {
-    Sentry.metrics.gauge(name, value, { unit, tags });
+    Sentry.metrics.gauge(name, value, { unit });
   } catch (error) {
     console.warn('[Sentry Metrics] Failed to record gauge metric:', error);
   }
@@ -57,5 +48,45 @@ export function recordMetricGauge(
  * Send a verification test metric to confirm Sentry Metrics are operational
  */
 export function recordTestMetric(): void {
-  recordMetricCount('test_metric', 1, { environment: process.env.NODE_ENV || 'development' });
+  recordMetricCount('test_metric');
+}
+
+// ============== Domain-Specific Metric Helpers ==============
+
+/**
+ * Record chatbot request metric with outcome
+ */
+export function recordChatbotRequest(outcome: 'success' | 'error' | 'rate_limit'): void {
+  try {
+    Sentry.metrics.count('chatbot_request', 1);
+    Sentry.metrics.count(`chatbot_request_${outcome}`, 1);
+  } catch (error) {
+    console.warn('[Sentry Metrics] Failed to record chatbot metric:', error);
+  }
+}
+
+/**
+ * Record cron job execution metric
+ */
+export function recordCronRun(jobName: string, outcome: 'success' | 'failed'): void {
+  try {
+    Sentry.metrics.count(`cron_run_${outcome}`, 1);
+    Sentry.metrics.count(`cron_run_${jobName}_${outcome}`, 1);
+  } catch (error) {
+    console.warn('[Sentry Metrics] Failed to record cron metric:', error);
+  }
+}
+
+/**
+ * Record order creation metric with duration
+ */
+export function recordOrderCreated(outcome: 'success' | 'failed', durationMs?: number): void {
+  try {
+    Sentry.metrics.count(`order_created_${outcome}`, 1);
+    if (durationMs !== undefined) {
+      Sentry.metrics.distribution('order_creation_duration', durationMs, { unit: 'millisecond' });
+    }
+  } catch (error) {
+    console.warn('[Sentry Metrics] Failed to record order metric:', error);
+  }
 }
