@@ -708,13 +708,11 @@ const ProductEditDialog = ({
   return (
     <Dialog open={!!product} onOpenChange={() => {}}>
       <DialogContent
+        fullscreen
         showCloseButton={false}
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
-        className={cn(
-          'fixed inset-0 top-0 left-0 flex h-dvh max-h-dvh w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-0 bg-[var(--background)] p-0 text-[var(--foreground)] shadow-none',
-          'data-[state=open]:zoom-in-100 data-[state=closed]:zoom-out-100'
-        )}
+        className="gap-0 bg-[var(--background)] text-[var(--foreground)]"
       >
         <div className="relative shrink-0 border-b border-[var(--glass-border)] bg-gradient-to-br from-indigo-500 to-violet-500 px-5 py-4 sm:px-8">
           <DialogTitle className="pr-10 text-left text-lg font-bold text-white sm:text-xl">
