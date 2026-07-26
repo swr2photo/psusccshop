@@ -66,7 +66,7 @@ export const adminGlassCardSx = {
   boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
   backdropFilter: 'blur(20px)',
   color: ADMIN_THEME.text,
-  overflow: 'hidden',
+  // Keep overflow visible so MUI Select menus / datetime-local pickers are not clipped
 };
 
 export const adminCardSx = {

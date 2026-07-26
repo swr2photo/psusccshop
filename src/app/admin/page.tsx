@@ -3642,7 +3642,6 @@ export default function AdminPage(): JSX.Element {
                 sx={{
                   ...glassCardSx,
                   p: 0,
-                  overflow: 'hidden',
                   transition: 'all 0.2s ease',
                   opacity: isProcessing ? 0.6 : 1,
                   border: isSelected ? '2px solid rgba(99,102,241,0.6)' : `1px solid ${ADMIN_THEME.border}`,
@@ -4207,7 +4206,7 @@ export default function AdminPage(): JSX.Element {
           backgroundImage: 'linear-gradient(135deg, rgba(139, 92, 246, 0.03) 0%, rgba(16, 185, 129, 0.03) 100%)',
           border: '1px solid var(--glass-border)',
           borderRadius: '20px',
-          overflow: 'hidden',
+          overflow: 'visible',
         }
       }}
     >

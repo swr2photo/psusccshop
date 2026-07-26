@@ -187,8 +187,11 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
   }, []);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastMessageCountRef = useRef(0);
+  const lastScrolledMessageIdRef = useRef<string | null>(null);
+  const isUserScrollingRef = useRef(false);
 
   // Fetch admin display name from chat settings
   useEffect(() => {
@@ -235,11 +238,14 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
     lastMessageCountRef.current = currentCount;
   }, [chat?.messages, chat?.id, open]);
 
-  // Scroll to bottom of messages
-  const scrollToBottom = useCallback(() => {
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
+  // Scroll only the chat message pane (never the page behind the widget)
+  const scrollToBottom = useCallback((force = false) => {
+    if (!force && isUserScrollingRef.current) return;
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight;
+    });
   }, []);
 
   // Fetch active chat (single request: metadata + recent messages)
@@ -477,12 +483,20 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, [open, chat?.id, showHistory, showNewChat, showRating, setRealtimeMessages]);
 
-  // Scroll to bottom when messages change
+  // Scroll when a new message arrives (by id/length — not every array identity change)
+  const lastMessageId = chat?.messages?.length
+    ? chat.messages[chat.messages.length - 1]?.id ?? null
+    : null;
   useEffect(() => {
-    if (open && chat?.messages) {
-      scrollToBottom();
+    if (!open) {
+      lastScrolledMessageIdRef.current = null;
+      return;
     }
-  }, [chat?.messages, open, scrollToBottom]);
+    if (!lastMessageId) return;
+    if (lastMessageId === lastScrolledMessageIdRef.current) return;
+    lastScrolledMessageIdRef.current = lastMessageId;
+    scrollToBottom();
+  }, [chat?.messages?.length, lastMessageId, open, scrollToBottom]);
 
   // Initial fetch when widget opens
   useEffect(() => {
@@ -622,6 +636,8 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
         // Optimistic UI: show image message instantly
         const tempId = `temp_img_${Date.now()}`;
         addOptimisticMessage(tempId, msgContent, session?.user?.name || undefined, session?.user?.image || undefined);
+        isUserScrollingRef.current = false;
+        scrollToBottom(true);
         
         const res = await apiFetch(`/api/support-chat/${chat.id}/message`, {
           method: 'POST',
@@ -679,6 +695,8 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
       addOptimisticMessage(tempId, finalMessage, session?.user?.name || undefined, session?.user?.image || undefined);
       setMessage('');
       setReplyToMessage(null);
+      isUserScrollingRef.current = false;
+      scrollToBottom(true);
       
       // Stop typing indicator
       rtSendTyping(false);
@@ -2084,6 +2102,12 @@ ${getStatusLabel(order.status)}
                 
                 {/* Messages Area */}
                 <Box
+                  ref={messagesContainerRef}
+                  onScroll={(e) => {
+                    const el = e.currentTarget;
+                    isUserScrollingRef.current =
+                      el.scrollHeight - el.scrollTop - el.clientHeight > 100;
+                  }}
                   sx={{
                     flex: 1,
                     overflowY: 'auto',

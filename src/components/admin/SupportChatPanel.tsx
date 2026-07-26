@@ -165,6 +165,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
   });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const chatEtagRef = useRef<string | null>(null);
@@ -218,7 +219,11 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
 
   const scrollToBottom = useCallback((force = false) => {
     if (!isUserScrollingRef.current || force) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      const el = messagesContainerRef.current;
+      if (!el) return;
+      requestAnimationFrame(() => {
+        el.scrollTop = el.scrollHeight;
+      });
     }
   }, []);
 
@@ -1246,6 +1251,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
               </div>
 
               <div
+                ref={messagesContainerRef}
                 className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto bg-[var(--surface)] p-4"
                 onScroll={(e) => {
                   const el = e.target as HTMLDivElement;
