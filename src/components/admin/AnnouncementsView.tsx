@@ -59,7 +59,8 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 const glassCardClass =
-  'overflow-hidden rounded-[20px] border border-[var(--glass-border)] bg-[var(--glass-bg)] text-[var(--foreground)] shadow-[0_8px_32px_rgba(0,0,0,0.12)] backdrop-blur-[20px]';
+  // overflow-visible so native datetime-local / select menus are not clipped
+  'rounded-[20px] border border-[var(--glass-border)] bg-[var(--glass-bg)] text-[var(--foreground)] shadow-[0_8px_32px_rgba(0,0,0,0.12)] backdrop-blur-[20px]';
 
 const gradientBtnClass =
   'rounded-[10px] bg-gradient-to-br from-indigo-500 to-violet-500 font-bold text-white shadow-[0_4px_15px_rgba(139,92,246,0.3)] hover:opacity-90 disabled:opacity-50';
@@ -155,7 +156,7 @@ function ProductPicker({
   }, [products, search]);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover modal={false} open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           type="button"

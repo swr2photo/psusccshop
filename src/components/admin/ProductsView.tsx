@@ -119,7 +119,8 @@ const CATEGORY_ICON_COMPONENTS: Record<string, React.ReactNode> = {
 };
 
 const glassCardClass =
-  'overflow-hidden rounded-[20px] border border-[var(--glass-border)] bg-[var(--glass-bg)] text-[var(--foreground)] shadow-[0_8px_32px_rgba(0,0,0,0.12)] backdrop-blur-[20px]';
+  // overflow-visible so native datetime-local / select menus are not clipped
+  'rounded-[20px] border border-[var(--glass-border)] bg-[var(--glass-bg)] text-[var(--foreground)] shadow-[0_8px_32px_rgba(0,0,0,0.12)] backdrop-blur-[20px]';
 
 const gradientBtnClass =
   'rounded-[10px] bg-gradient-to-br from-indigo-500 to-violet-500 font-bold text-white shadow-[0_4px_15px_rgba(139,92,246,0.3)] hover:opacity-90';
@@ -351,7 +352,8 @@ const ProductPickupDialog = ({
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto rounded-2xl border-[var(--glass-border)] bg-[var(--glass-bg)] text-[var(--foreground)]">
+      <DialogContent className="flex max-h-[90vh] max-w-lg flex-col gap-0 overflow-hidden rounded-2xl border-[var(--glass-border)] bg-[var(--glass-bg)] p-0 text-[var(--foreground)]">
+        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-visible p-6">
         <DialogHeader className="border-b border-[var(--glass-border)] pb-4">
           <DialogTitle className="flex items-center gap-3 text-left">
             <LocalMall className="text-cyan-400" />
@@ -457,8 +459,9 @@ const ProductPickupDialog = ({
             </div>
           )}
         </div>
+        </div>
 
-        <DialogFooter className="gap-2 border-t border-[var(--glass-border)] pt-4">
+        <DialogFooter className="gap-2 border-t border-[var(--glass-border)] p-6 pt-4">
           <Button variant="ghost" onClick={onClose} className="text-[var(--text-muted)]">
             ยกเลิก
           </Button>
@@ -696,11 +699,11 @@ const ProductEditDialog = ({
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
         className={cn(
-          'max-h-[95vh] overflow-y-auto border-[var(--glass-border)] bg-[var(--glass-strong)] p-0 text-[var(--foreground)]',
+          'flex max-h-[95vh] flex-col gap-0 overflow-hidden border-[var(--glass-border)] bg-[var(--glass-strong)] p-0 text-[var(--foreground)]',
           isMobileDevice ? 'h-full max-w-full rounded-none' : 'max-w-3xl rounded-2xl'
         )}
       >
-        <div className="relative bg-gradient-to-br from-indigo-500 to-violet-500 px-6 py-4">
+        <div className="relative shrink-0 bg-gradient-to-br from-indigo-500 to-violet-500 px-6 py-4">
           <DialogTitle className="text-left font-bold text-white">
             {product.id.startsWith('prod_') ? 'New' : 'Edit'} Product
           </DialogTitle>
@@ -709,6 +712,7 @@ const ProductEditDialog = ({
           </button>
         </div>
 
+        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-visible">
         <div className="grid gap-4 p-4 md:grid-cols-[2fr_1fr]">
           <div className="flex flex-col gap-4">
             <div className="space-y-1.5">
@@ -1298,6 +1302,7 @@ const ProductEditDialog = ({
               </CardContent>
             </Card>
           </div>
+        </div>
         </div>
 
         <DialogFooter className="gap-2 border-t border-[var(--glass-border)] p-4">

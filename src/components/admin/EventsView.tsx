@@ -35,6 +35,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -101,7 +106,6 @@ function ProductSearchSelect({
 }) {
   const [query, setQuery] = React.useState('');
   const [open, setOpen] = React.useState(false);
-  const containerRef = React.useRef<HTMLDivElement>(null);
 
   const selected = products.find((p) => p.id === value) ?? null;
 
@@ -113,16 +117,6 @@ function ProductSearchSelect({
     }
   }, [selected, value]);
 
-  React.useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return products;
@@ -130,58 +124,64 @@ function ProductSearchSelect({
   }, [products, query]);
 
   return (
-    <div ref={containerRef} className="relative">
-      <Input
-        value={query}
-        onChange={(e) => {
-          setQuery(e.target.value);
-          setOpen(true);
-          if (!e.target.value.trim()) onChange('');
-        }}
-        onFocus={() => setOpen(true)}
-        placeholder="ค้นหาสินค้า..."
-        className="rounded-xl bg-[var(--surface)]"
-      />
-      {open && (
-        <div className="absolute z-50 mt-1 max-h-48 w-full overflow-y-auto rounded-xl border border-[var(--glass-border)] bg-[var(--surface-2)] shadow-lg">
-          {filtered.length === 0 ? (
-            <p className="px-3 py-2 text-sm text-[var(--text-muted)]">ไม่พบสินค้า</p>
-          ) : (
-            filtered.map((option) => {
-              const imageUrl = option.coverImage || option.images?.[0];
-              return (
-                <button
-                  key={option.id}
-                  type="button"
-                  className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-[var(--glass-bg)]"
-                  onClick={() => {
-                    onChange(option.id);
-                    setQuery(option.name || '');
-                    setOpen(false);
-                  }}
-                >
-                  {imageUrl && (
-                    <img
-                      src={imageUrl}
-                      alt=""
-                      className="size-9 shrink-0 rounded-lg object-cover"
-                    />
-                  )}
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-[var(--foreground)]">
-                      {option.name}
-                    </p>
-                    <p className="text-xs text-[var(--text-muted)]">
-                      ฿{option.basePrice?.toLocaleString()}
-                    </p>
-                  </div>
-                </button>
-              );
-            })
-          )}
+    <Popover modal={false} open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <div>
+          <Input
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setOpen(true);
+              if (!e.target.value.trim()) onChange('');
+            }}
+            onFocus={() => setOpen(true)}
+            placeholder="ค้นหาสินค้า..."
+            className="rounded-xl bg-[var(--surface)]"
+          />
         </div>
-      )}
-    </div>
+      </PopoverTrigger>
+      <PopoverContent
+        className="max-h-48 w-[var(--radix-popover-trigger-width)] overflow-y-auto p-1"
+        align="start"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
+        {filtered.length === 0 ? (
+          <p className="px-3 py-2 text-sm text-[var(--text-muted)]">ไม่พบสินค้า</p>
+        ) : (
+          filtered.map((option) => {
+            const imageUrl = option.coverImage || option.images?.[0];
+            return (
+              <button
+                key={option.id}
+                type="button"
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-[var(--glass-bg)]"
+                onClick={() => {
+                  onChange(option.id);
+                  setQuery(option.name || '');
+                  setOpen(false);
+                }}
+              >
+                {imageUrl && (
+                  <img
+                    src={imageUrl}
+                    alt=""
+                    className="size-9 shrink-0 rounded-lg object-cover"
+                  />
+                )}
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-[var(--foreground)]">
+                    {option.name}
+                  </p>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    ฿{option.basePrice?.toLocaleString()}
+                  </p>
+                </div>
+              </button>
+            );
+          })
+        )}
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -555,10 +555,11 @@ export const EventsView = React.memo(function EventsView({
         >
           <DialogContent
             showCloseButton={false}
-            className="max-h-[90vh] overflow-y-auto border-[var(--glass-border)] bg-[var(--surface)] sm:max-w-lg"
+            className="flex max-h-[90vh] flex-col gap-0 overflow-hidden border-[var(--glass-border)] bg-[var(--surface)] p-0 sm:max-w-lg"
           >
             {editingEvent && (
               <>
+                <div className="min-h-0 flex-1 overflow-y-auto overflow-x-visible p-6">
                 <DialogHeader className="border-b border-[var(--glass-border)] pb-4">
                   <div className="flex items-center gap-3">
                     <div className="grid size-10 place-items-center rounded-xl bg-gradient-to-br from-amber-400 to-amber-500">
@@ -946,8 +947,9 @@ export const EventsView = React.memo(function EventsView({
                     />
                   </div>
                 </div>
+                </div>
 
-                <DialogFooter className="gap-2 border-t border-[var(--glass-border)] pt-4">
+                <DialogFooter className="gap-2 border-t border-[var(--glass-border)] p-6 pt-4">
                   <Button
                     variant="ghost"
                     onClick={() => setEditingEvent(null)}

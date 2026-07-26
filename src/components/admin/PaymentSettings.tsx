@@ -58,7 +58,7 @@ import {
 import { cn } from '@/lib/utils';
 
 const glassCardClass =
-  'overflow-hidden rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)] text-[var(--foreground)] shadow-sm';
+  'rounded-xl border border-[var(--glass-border)] bg-[var(--glass-bg)] text-[var(--foreground)] shadow-sm';
 
 const gradientBtnClass =
   'rounded-[10px] bg-gradient-to-br from-indigo-500 to-violet-500 font-bold text-white shadow-[0_4px_15px_rgba(139,92,246,0.3)] hover:opacity-90';
