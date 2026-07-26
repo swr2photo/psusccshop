@@ -172,15 +172,13 @@ const formatDateTime = (dateStr: string | undefined): string => {
 };
 
 // ============== TYPES ==============
-type AdminOrder = Record<string, unknown>;
-
 export interface ProductsViewProps {
   config: ShopConfig;
   searchTerm: string;
   setSearchTerm: (term: string) => void;
   saveFullConfig: (config: ShopConfig) => void;
   showToast: (type: 'success' | 'error' | 'info' | 'warning', message: string) => void;
-  addLog: (action: string, detail: string, overrides?: { config?: ShopConfig; orders?: AdminOrder[] }) => void;
+  addLog: (action: string, detail: string, overrides?: { config?: ShopConfig }) => void;
   saving: boolean;
 }
 
