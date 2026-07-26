@@ -26,6 +26,7 @@
     "deploy:cloudflare": "NODE_OPTIONS=--max-old-space-size=6144 opennextjs-cloudflare build && wrangler deploy",
     "start": "next start",
     "lint": "eslint",
+    "check:node-ready": "node scripts/check-node-migration-readiness.mjs",
     "migrate:images": "npx tsx scripts/migrate-image-urls.ts",
     "cron": "tsx scripts/cron-worker.ts",
     "cron:dev": "tsx watch scripts/cron-worker.ts"
@@ -78,7 +79,7 @@
   "devDependencies": {
     "@opennextjs/cloudflare": "^1.19.11",
     "@tailwindcss/postcss": "^4",
-    "@types/node": "^22",
+    "@types/node": "^24.13.3",
     "@types/node-cron": "^3.0.11",
     "@types/pg": "^8.16.0",
     "@types/react": "^19",

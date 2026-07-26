@@ -1,7 +1,7 @@
 # Railway Cron Worker
 # ใช้สำหรับรัน cron jobs บน Railway แทน Vercel Cron
 
-FROM node:20-alpine
+FROM node:24-alpine
 
 WORKDIR /app
 

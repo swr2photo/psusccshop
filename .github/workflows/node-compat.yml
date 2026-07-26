@@ -1,0 +1,93 @@
+# Node compatibility matrix — lint + build on Node 24 (prod) and 26 (prep).
+# Does not deploy. Keep package.json engines on 24.x until Vercel supports 26.x.
+#
+# Local Node 26 smoke:
+#   nvm install 26 && nvm use 26
+#   npm ci
+#   NODE_OPTIONS=--trace-warnings npm run build
+# Re-verify native: @sentry/profiling-node
+
+name: Node Compat
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - 'src/**'
+      - 'next.config.ts'
+      - 'scripts/check-node-migration-readiness.mjs'
+      - '.github/workflows/node-compat.yml'
+      - 'Dockerfile'
+      - 'Dockerfile.cron'
+      - 'nixpacks.toml'
+      - '.nvmrc'
+      - '.node-version'
+  pull_request:
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - 'src/**'
+      - 'next.config.ts'
+      - 'scripts/check-node-migration-readiness.mjs'
+      - '.github/workflows/node-compat.yml'
+      - 'Dockerfile'
+      - 'Dockerfile.cron'
+      - 'nixpacks.toml'
+      - '.nvmrc'
+      - '.node-version'
+  workflow_dispatch:
+
+jobs:
+  readiness:
+    name: Migration readiness scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: node scripts/check-node-migration-readiness.mjs
+
+  build:
+    name: Lint & build (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['24', '26']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Show runtime
+        run: node -v && npm -v
+
+      - name: Lint
+        run: npm run lint
+        continue-on-error: ${{ matrix.node == '26' }}
+
+      - name: Build
+        env:
+          NODE_OPTIONS: --trace-warnings --max-old-space-size=6144
+          NEXT_TELEMETRY_DISABLED: '1'
+          # Placeholders so Next/Sentry modules can resolve at build time
+          NEXTAUTH_SECRET: ci-node-compat-secret-min-32-chars-long
+          NEXTAUTH_URL: http://localhost:3000
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+          NEXT_PUBLIC_SUPABASE_URL2: https://ci-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY2: ci-placeholder-anon-key
+          SENTRY_UPLOAD_SOURCEMAPS: '0'
+        run: npm run build
+        continue-on-error: ${{ matrix.node == '26' }}
