@@ -427,6 +427,9 @@ export function Select({
   sx,
   disabled,
   className,
+  MenuProps: _MenuProps,
+  size: _size,
+  displayEmpty: _displayEmpty,
 }: {
   value?: string;
   onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void;
@@ -437,6 +440,8 @@ export function Select({
   displayEmpty?: boolean;
   disabled?: boolean;
   className?: string;
+  /** MUI-compat; native <select> ignores menu paper props */
+  MenuProps?: unknown;
 }) {
   return (
     <select
