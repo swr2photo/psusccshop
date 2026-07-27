@@ -76,26 +76,130 @@ async function syncAuthCookieQuiet(): Promise<void> {
 }
 
 /**
+ * XHR upload with upload progress + AbortSignal (fetch cannot report body send %).
+ */
+function xhrJsonUpload(
+  path: string,
+  body: unknown,
+  options?: {
+    onProgress?: (percent: number) => void;
+    signal?: AbortSignal;
+  }
+): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    if (options?.signal?.aborted) {
+      reject(new DOMException('Aborted', 'AbortError'));
+      return;
+    }
+
+    const xhr = new XMLHttpRequest();
+    const url = apiUrl(path);
+    xhr.open('POST', url);
+    xhr.withCredentials = true;
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.responseType = 'text';
+
+    const onAbort = () => {
+      xhr.abort();
+      reject(new DOMException('Aborted', 'AbortError'));
+    };
+    options?.signal?.addEventListener('abort', onAbort, { once: true });
+
+    xhr.upload.onprogress = (ev) => {
+      if (!ev.lengthComputable || !options?.onProgress) return;
+      const pct = Math.max(0, Math.min(99, Math.round((ev.loaded / ev.total) * 100)));
+      options.onProgress(pct);
+    };
+
+    xhr.onload = () => {
+      options?.signal?.removeEventListener('abort', onAbort);
+      options?.onProgress?.(100);
+      resolve(
+        new Response(xhr.responseText, {
+          status: xhr.status,
+          statusText: xhr.statusText,
+          headers: { 'Content-Type': xhr.getResponseHeader('Content-Type') || 'application/json' },
+        })
+      );
+    };
+
+    xhr.onerror = () => {
+      options?.signal?.removeEventListener('abort', onAbort);
+      reject(new TypeError('Network request failed'));
+    };
+
+    xhr.onabort = () => {
+      options?.signal?.removeEventListener('abort', onAbort);
+      reject(new DOMException('Aborted', 'AbortError'));
+    };
+
+    options?.onProgress?.(0);
+    xhr.send(JSON.stringify(body));
+  });
+}
+
+/**
  * Upload image JSON payload. Retries once after cookie sync on 401
  * (stale host-only session tokens after Domain=.psuscc.club rollout).
  */
-export async function uploadImageApi(body: {
-  base64: string;
-  filename?: string;
-  mime?: string;
-}): Promise<Response> {
-  const init: RequestInit = {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-    credentials: 'same-origin',
-    cache: 'no-store',
-  };
+export async function uploadImageApi(
+  body: {
+    base64: string;
+    filename?: string;
+    mime?: string;
+  },
+  options?: {
+    onProgress?: (percent: number) => void;
+    signal?: AbortSignal;
+  }
+): Promise<Response> {
+  const run = () =>
+    options?.onProgress || options?.signal
+      ? xhrJsonUpload('/api/upload', body, options)
+      : apiFetch('/api/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          credentials: 'same-origin',
+          cache: 'no-store',
+          signal: options?.signal,
+        });
 
-  let res = await apiFetch('/api/upload', init);
+  let res = await run();
   if (res.status === 401) {
     await syncAuthCookieQuiet();
-    res = await apiFetch('/api/upload', init);
+    res = await run();
+  }
+  return res;
+}
+
+export async function uploadAudioApi(
+  body: {
+    base64: string;
+    mime?: string;
+    duration?: number;
+  },
+  options?: {
+    onProgress?: (percent: number) => void;
+    signal?: AbortSignal;
+  }
+): Promise<Response> {
+  const run = () =>
+    options?.onProgress || options?.signal
+      ? xhrJsonUpload('/api/upload/audio', body, options)
+      : apiFetch('/api/upload/audio', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          credentials: 'same-origin',
+          cache: 'no-store',
+          signal: options?.signal,
+        });
+
+  let res = await run();
+  if (res.status === 401) {
+    await syncAuthCookieQuiet();
+    res = await run();
   }
   return res;
 }
@@ -278,6 +382,7 @@ export async function saveProfile(
     instagram?: string;
     profileImage?: string;
     theme?: string;
+    marketingConsent?: boolean;
     savedAddresses?: Array<{ id: string; label: string; address: string; isDefault: boolean }>;
   }
 ): Promise<APIResponse> {

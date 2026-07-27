@@ -276,7 +276,7 @@ function OptimizedImageComponent({
     );
   }
 
-  // Error state with retry option
+  // Error state — quiet brand placeholder (stable height, no loud error chrome)
   if (error) {
     return (
       <Box
@@ -293,32 +293,37 @@ function OptimizedImageComponent({
           alignItems: 'center',
           justifyContent: 'center',
           gap: 1,
-          bgcolor: 'var(--glass-bg)',
-          color: '#86868b',
-          fontSize: '0.75rem',
+          bgcolor: 'var(--surface-2)',
+          color: 'var(--text-muted)',
+          fontSize: '0.7rem',
           cursor: 'pointer',
-          transition: 'all 0.2s ease',
+          transition: 'background-color 0.2s ease',
           '&:hover': {
-            bgcolor: 'var(--glass-strong)',
-            color: 'var(--text-muted)',
+            bgcolor: 'var(--surface-3)',
           },
         }}
+        title={t.misc.tapToRetry}
       >
-        <Box sx={{ 
-          fontSize: '1.5rem', 
-          opacity: 0.6,
-          animation: 'shake 0.5s ease-in-out',
-          '@keyframes shake': {
-            '0%, 100%': { transform: 'translateX(0)' },
-            '25%': { transform: 'translateX(-2px)' },
-            '75%': { transform: 'translateX(2px)' },
-          },
-        }}>
-          
-        </Box>
-        <Box sx={{ textAlign: 'center', px: 1 }}>
+        <Box
+          component="img"
+          src="/favicon.png"
+          alt=""
+          sx={{
+            width: 44,
+            height: 44,
+            objectFit: 'contain',
+            opacity: 0.35,
+            filter: 'grayscale(1)',
+            userSelect: 'none',
+            pointerEvents: 'none',
+          }}
+        />
+        <Box sx={{ textAlign: 'center', px: 1.5, opacity: 0.7 }}>
           {t.misc.loadImageFailed}
-          <Box component="span" sx={{ display: 'block', fontSize: '0.65rem', color: '#0071e3', mt: 0.5 }}>
+          <Box
+            component="span"
+            sx={{ display: 'block', fontSize: '0.62rem', color: 'var(--text-muted)', mt: 0.4, opacity: 0.85 }}
+          >
             {t.misc.tapToRetry}
           </Box>
         </Box>

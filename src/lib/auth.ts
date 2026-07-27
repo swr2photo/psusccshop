@@ -91,6 +91,12 @@ const getDynamicAdminEmails = async (): Promise<string[]> => {
   }
 };
 
+/** Global assignable admins (env + config) — for chat transfer / routing UI */
+export async function listAssignableAdminEmails(): Promise<string[]> {
+  const dynamic = await getDynamicAdminEmails();
+  return [...new Set([...ADMIN_EMAILS, ...dynamic].map((e) => e.trim().toLowerCase()).filter(Boolean))];
+}
+
 /**
  * Get admin permissions - tries DB first, falls back to config JSON
  */

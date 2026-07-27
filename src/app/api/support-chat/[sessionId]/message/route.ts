@@ -131,7 +131,7 @@ export async function POST(request: NextRequest, { params }: Params) {
           title: `ข้อความใหม่จาก ${displayName}`,
           body: message.trim().substring(0, 200),
           icon: '/favicon.png',
-          url: '/admin',
+          url: '/admin/support',
           tag: `chat-admin-${sessionId}`,
           chatId: sessionId,
         }).catch(err => console.error('[support-chat/message] Admin push failed:', err));
@@ -142,7 +142,7 @@ export async function POST(request: NextRequest, { params }: Params) {
             title: `แชทใหม่จาก ${displayName}`,
             body: message.trim().substring(0, 200),
             icon: '/favicon.png',
-            url: '/admin',
+            url: '/admin/support',
             tag: `chat-new-${sessionId}`,
             chatId: sessionId,
           }).catch(err => console.error('[support-chat/message] Admin push (all) failed:', err));

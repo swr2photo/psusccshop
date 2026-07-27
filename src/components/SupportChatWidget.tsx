@@ -1,6 +1,6 @@
 'use client';
 
-import { apiFetch, uploadImageApi } from '@/lib/api-client';
+import { apiFetch, uploadImageApi, uploadAudioApi } from '@/lib/api-client';
 // src/components/SupportChatWidget.tsx
 // Customer Support Chat Widget - Floating chat button with chatbot option
 
@@ -26,13 +26,40 @@ import {
   ListItemIcon,
   ListItemText,
 } from '@mui/material';
-import { Headphones as SupportAgentIcon, X as CloseIcon, Send as SendIcon, Clock as TimeIcon, CheckCircle2 as CheckCircleIcon, Star as StarIcon, Image as ImageIcon, Bot as ChatbotIcon, Check as DoneIcon, CheckCheck as DoneAllIcon, MessageCircle as ChatIcon, History as HistoryIcon, ArrowLeft as ArrowBackIcon, Plus as AddIcon, MoreVertical as MoreVertIcon, Trash2 as DeleteIcon, Reply as ReplyIcon, ZoomIn as ZoomInIcon, ZoomOut as ZoomOutIcon, Receipt as ReceiptIcon, ShoppingBag as ShoppingBagIcon, Bell as BellIcon, BellOff as BellOffIcon } from 'lucide-react';
+import { Headphones as SupportAgentIcon, X as CloseIcon, Send as SendIcon, Clock as TimeIcon, CheckCircle2 as CheckCircleIcon, Star as StarIcon, Bot as ChatbotIcon, Check as DoneIcon, CheckCheck as DoneAllIcon, MessageCircle as ChatIcon, History as HistoryIcon, ArrowLeft as ArrowBackIcon, Plus as AddIcon, MoreVertical as MoreVertIcon, Trash2 as DeleteIcon, Reply as ReplyIcon, Receipt as ReceiptIcon, ShoppingBag as ShoppingBagIcon, Bell as BellIcon, BellOff as BellOffIcon } from 'lucide-react';
 import { useNotification } from './NotificationContext';
 import { usePushNotification } from '@/hooks/usePushNotification';
 import { useRealtimeChat } from '@/hooks/useRealtimeChat';
 import { useTranslation } from '@/hooks/useTranslation';
 import { chatMessagesChanged, getDbTypingFromSession } from '@/lib/support-chat-typing';
-import { fetchChatSync, mergeChatMessages, getChatPollIntervalMs } from '@/lib/support-chat-sync';
+import { fetchChatSync, mergeChatMessages, mergeNewestWindow, fetchOlderChatMessages, getChatPollIntervalMs } from '@/lib/support-chat-sync';
+import { formatStickerMessage } from '@/lib/chat-stickers';
+import { formatVoiceMessage, VOICE_DATA_URL_FALLBACK_MAX } from '@/lib/chat-voice';
+import { parseChatMessage } from '@/lib/chat-message';
+import { cn } from '@/lib/utils';
+import {
+  Message,
+  MessageAvatar,
+  MessageContent,
+  MessageFooter,
+} from '@/components/ui/message';
+import { Bubble, BubbleContent } from '@/components/ui/bubble';
+import { ChatImage } from '@/components/ui/chat-image';
+import { ChatComposer } from '@/components/ui/chat-composer';
+import { ChatSystemMarker } from '@/components/ui/chat-system-marker';
+import { VoiceMessage } from '@/components/ui/voice-message';
+import {
+  MessageScrollerProvider,
+  MessageScroller,
+  MessageScrollerViewport,
+  MessageScrollerContent,
+  MessageScrollerItem,
+  MessageScrollerButton,
+  MessageScrollerApiBridge,
+  MessageScrollerLoadOlder,
+  useMessageScroller,
+} from '@/components/ui/message-scroller';
+import { Skeleton } from '@/components/ui/skeleton';
 
 // ชื่อแอดมินเริ่มต้น (ดึงจากตั้งค่าแชท)
 const DEFAULT_ADMIN_NAME = 'ทีมงาน PSU SCC';
@@ -95,6 +122,8 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [chat, setChat] = useState<ChatWithMessages | null>(null);
+  const [hasMoreOlder, setHasMoreOlder] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatSession[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [message, setMessage] = useState('');
@@ -105,11 +134,13 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
   const [ratingComment, setRatingComment] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadLabel, setUploadLabel] = useState('กำลังอัปโหลดรูปภาพ...');
+  const [uploadFileCount, setUploadFileCount] = useState(1);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [messageMenuAnchor, setMessageMenuAnchor] = useState<null | HTMLElement>(null);
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const [unsending, setUnsending] = useState(false);
-  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [replyToMessage, setReplyToMessage] = useState<{ id: string; text: string; sender: string } | null>(null);
   const [orderHistory, setOrderHistory] = useState<any[]>([]);
   const [showOrderPicker, setShowOrderPicker] = useState(false);
@@ -119,6 +150,11 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
   const [fallbackTyping, setFallbackTyping] = useState(false);
   const chatEtagRef = useRef<string | null>(null);
   const lastMessageAtRef = useRef<string | null>(null);
+  const loadingOlderRef = useRef(false);
+  const hasMoreOlderRef = useRef(false);
+  const chatRef = useRef<ChatWithMessages | null>(null);
+  chatRef.current = chat;
+  hasMoreOlderRef.current = hasMoreOlder;
   const displayAdminName = adminDisplayName === DEFAULT_ADMIN_NAME ? t.supportChat.adminName : adminDisplayName;
   
   // === Supabase Realtime: live messages, typing, read receipts ===
@@ -186,12 +222,11 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
     );
   }, []);
   
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const scrollApiRef = useRef<ReturnType<typeof useMessageScroller> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadAbortRef = useRef<AbortController | null>(null);
   const lastMessageCountRef = useRef(0);
   const lastScrolledMessageIdRef = useRef<string | null>(null);
-  const isUserScrollingRef = useRef(false);
 
   // Fetch admin display name from chat settings
   useEffect(() => {
@@ -240,12 +275,8 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
 
   // Scroll only the chat message pane (never the page behind the widget)
   const scrollToBottom = useCallback((force = false) => {
-    if (!force && isUserScrollingRef.current) return;
-    const el = messagesContainerRef.current;
-    if (!el) return;
-    requestAnimationFrame(() => {
-      el.scrollTop = el.scrollHeight;
-    });
+    if (!force) return;
+    scrollApiRef.current?.scrollToEnd({ behavior: 'smooth' });
   }, []);
 
   // Fetch active chat (single request: metadata + recent messages)
@@ -255,12 +286,13 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
     const activeUrl =
       `/api/support-chat?withMessages=1${markRead ? '&markRead=true' : ''}`;
 
-    const applyActivePayload = (data: { chat?: ChatWithMessages | null }) => {
+    const applyActivePayload = (data: { chat?: ChatWithMessages | null; hasMore?: boolean }) => {
       if (data.chat) {
         setChat(data.chat);
         if (data.chat.messages) {
           setRealtimeMessages(data.chat.messages);
         }
+        setHasMoreOlder(Boolean(data.hasMore));
         setUnreadCount(data.chat.customer_unread_count || 0);
         setShowHistory(false);
         setShowNewChat(false);
@@ -271,6 +303,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
         }
       } else {
         setChat(null);
+        setHasMoreOlder(false);
         setShowNewChat(true);
       }
     };
@@ -314,18 +347,50 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
   // View a specific chat from history
   const viewChatHistory = useCallback(async (chatId: string) => {
     try {
-      const res = await apiFetch(`/api/support-chat/${chatId}`);
+      const res = await apiFetch(`/api/support-chat/${chatId}?limit=30`);
       const data = await res.json();
       if (data.chat) {
         setChat(data.chat);
         if (data.chat.messages) {
           setRealtimeMessages(data.chat.messages);
         }
+        setHasMoreOlder(Boolean(data.hasMore));
         setShowHistory(false);
         setShowNewChat(false);
       }
     } catch (error) {
       console.error('Error viewing chat:', error);
+    }
+  }, [setRealtimeMessages]);
+
+  const loadOlderMessages = useCallback(async () => {
+    const current = chatRef.current;
+    if (!current?.id || loadingOlderRef.current || !hasMoreOlderRef.current) return;
+    const oldest = current.messages?.[0];
+    if (!oldest) return;
+
+    loadingOlderRef.current = true;
+    setLoadingOlder(true);
+    try {
+      const page = await fetchOlderChatMessages<ChatMessage>(current.id, {
+        before: oldest.created_at,
+        beforeId: oldest.id,
+        limit: 30,
+      });
+      if (page.messages.length) {
+        setChat((prev) => {
+          if (!prev || prev.id !== current.id) return prev;
+          const merged = mergeChatMessages(page.messages, prev.messages);
+          setRealtimeMessages(merged);
+          return { ...prev, messages: merged };
+        });
+      }
+      setHasMoreOlder(page.hasMore);
+    } catch (error) {
+      console.error('Error loading older messages:', error);
+    } finally {
+      loadingOlderRef.current = false;
+      setLoadingOlder(false);
     }
   }, [setRealtimeMessages]);
 
@@ -425,14 +490,18 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
         const incoming = (result.chat.messages || []) as ChatMessage[];
         setChat((prev) => {
           if (!prev || prev.id !== chatId) return prev;
+          const merged = mergeNewestWindow(prev.messages, incoming);
           const changed =
-            chatMessagesChanged(prev.messages, incoming) ||
+            chatMessagesChanged(prev.messages, merged) ||
             result.chat.status !== prev.status;
           if (!changed) return prev;
-          setRealtimeMessages(incoming);
-          lastMessageAtRef.current = incoming[incoming.length - 1]?.created_at ?? null;
-          return { ...prev, ...result.chat, messages: incoming };
+          setRealtimeMessages(merged);
+          lastMessageAtRef.current = merged[merged.length - 1]?.created_at ?? null;
+          return { ...prev, ...result.chat, messages: merged };
         });
+        if (typeof result.hasMore === 'boolean' && !hasMoreOlderRef.current) {
+          setHasMoreOlder(result.hasMore);
+        }
       } catch {}
     };
 
@@ -471,9 +540,16 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
         }
 
         const incoming = (result.chat.messages || []) as ChatMessage[];
-        setRealtimeMessages(incoming);
-        lastMessageAtRef.current = incoming[incoming.length - 1]?.created_at ?? null;
-        setChat((prev) => (prev ? { ...prev, ...result.chat, messages: incoming } : prev));
+        setChat((prev) => {
+          if (!prev || prev.id !== chatId) return prev;
+          const merged = mergeNewestWindow(prev.messages, incoming);
+          setRealtimeMessages(merged);
+          lastMessageAtRef.current = merged[merged.length - 1]?.created_at ?? null;
+          return { ...prev, ...result.chat, messages: merged };
+        });
+        if (typeof result.hasMore === 'boolean' && !hasMoreOlderRef.current) {
+          setHasMoreOlder(result.hasMore);
+        }
       } catch {
         /* ignore */
       }
@@ -493,10 +569,9 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
       return;
     }
     if (!lastMessageId) return;
-    if (lastMessageId === lastScrolledMessageIdRef.current) return;
     lastScrolledMessageIdRef.current = lastMessageId;
-    scrollToBottom();
-  }, [chat?.messages?.length, lastMessageId, open, scrollToBottom]);
+    // MessageScroller autoScroll follows when at the live edge; do not force jump
+  }, [chat?.messages?.length, lastMessageId, open]);
 
   // Initial fetch when widget opens
   useEffect(() => {
@@ -600,23 +675,190 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
     reader.readAsDataURL(file);
   };
 
+  const beginUpload = (label: string, fileCount = 1) => {
+    uploadAbortRef.current?.abort();
+    const controller = new AbortController();
+    uploadAbortRef.current = controller;
+    setUploadingImage(true);
+    setUploadProgress(0);
+    setUploadLabel(label);
+    setUploadFileCount(fileCount);
+    return controller;
+  };
+
+  const endUpload = () => {
+    uploadAbortRef.current = null;
+    setUploadingImage(false);
+    setUploadProgress(0);
+  };
+
+  const cancelUpload = useCallback(() => {
+    uploadAbortRef.current?.abort();
+    uploadAbortRef.current = null;
+    setUploadingImage(false);
+    setUploadProgress(0);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }, []);
+
+  const handleSendSticker = async (src: string) => {
+    if (!chat || sending || uploadingImage) return;
+
+    if (src.startsWith('/chat-stickers/')) {
+      const msgContent = formatStickerMessage(src);
+      const tempId = `temp_sticker_${Date.now()}`;
+      addOptimisticMessage(tempId, msgContent, session?.user?.name || undefined, session?.user?.image || undefined);
+      scrollToBottom(true);
+      setSending(true);
+      try {
+        const res = await apiFetch(`/api/support-chat/${chat.id}/message`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: msgContent }),
+        });
+        const data = await res.json();
+        if (data.success && data.message) resolveOptimistic(tempId, data.message);
+        else {
+          resolveOptimistic(tempId, null);
+          toastError(data?.error || t.supportChat.sendFailed);
+        }
+      } catch {
+        resolveOptimistic(tempId, null);
+        toastError(t.supportChat.sendFailed);
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
+
+    if (src.startsWith('data:')) {
+      const controller = beginUpload(
+        lang === 'en' ? 'Uploading sticker...' : 'กำลังอัปโหลดสติกเกอร์...',
+        1
+      );
+      try {
+        const mimeMatch = src.match(/data:([^;]+);/);
+        const mime = mimeMatch ? mimeMatch[1] : 'image/gif';
+        const ext = mime.includes('webp') ? 'webp' : 'gif';
+        const uploadRes = await uploadImageApi(
+          {
+            base64: src,
+            filename: `sticker_${Date.now()}.${ext}`,
+            mime,
+          },
+          { signal: controller.signal, onProgress: setUploadProgress }
+        );
+        if (!uploadRes.ok) throw new Error(t.supportChat.imageUploadFailed);
+        const uploadData = await uploadRes.json();
+        if (uploadData.status !== 'success' || !uploadData.data?.url) {
+          throw new Error(t.supportChat.imageUploadFailed);
+        }
+        setUploadProgress(100);
+        const msgContent = formatStickerMessage(uploadData.data.url);
+        const tempId = `temp_sticker_${Date.now()}`;
+        addOptimisticMessage(tempId, msgContent, session?.user?.name || undefined, session?.user?.image || undefined);
+        scrollToBottom(true);
+        const res = await apiFetch(`/api/support-chat/${chat.id}/message`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: msgContent }),
+        });
+        const data = await res.json();
+        if (data.success && data.message) resolveOptimistic(tempId, data.message);
+        else {
+          resolveOptimistic(tempId, null);
+          toastError(data?.error || t.supportChat.sendFailed);
+        }
+      } catch (error: any) {
+        if (error?.name !== 'AbortError') {
+          toastError(error?.message || t.supportChat.imageUploadFailed);
+        }
+      } finally {
+        endUpload();
+      }
+    }
+  };
+
+  const handleSendVoice = async (payload: { base64: string; mime: string; duration: number }) => {
+    if (!chat || sending || uploadingImage) return;
+    const controller = beginUpload(
+      lang === 'en' ? 'Uploading voice...' : 'กำลังอัปโหลดเสียง...',
+      1
+    );
+    try {
+      let voiceUrl: string | null = null;
+      let voiceDuration = Math.max(1, Math.round(payload.duration || 1));
+
+      const uploadRes = await uploadAudioApi(
+        {
+          base64: payload.base64,
+          mime: payload.mime,
+          duration: voiceDuration,
+        },
+        { signal: controller.signal, onProgress: setUploadProgress }
+      );
+      const uploadData = await uploadRes.json().catch(() => null);
+      if (uploadRes.ok && uploadData?.status === 'success' && uploadData?.data?.url) {
+        voiceUrl = uploadData.data.url;
+        if (uploadData.data.duration) voiceDuration = uploadData.data.duration;
+      } else if (payload.base64.length <= VOICE_DATA_URL_FALLBACK_MAX) {
+        voiceUrl = payload.base64;
+      }
+
+      if (!voiceUrl) {
+        throw new Error(t.supportChat.sendFailed);
+      }
+
+      setUploadProgress(100);
+      const msgContent = formatVoiceMessage(voiceUrl, voiceDuration);
+      const tempId = `temp_voice_${Date.now()}`;
+      addOptimisticMessage(tempId, msgContent, session?.user?.name || undefined, session?.user?.image || undefined);
+      scrollToBottom(true);
+      const res = await apiFetch(`/api/support-chat/${chat.id}/message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: msgContent }),
+      });
+      const data = await res.json();
+      if (data.success && data.message) resolveOptimistic(tempId, data.message);
+      else {
+        resolveOptimistic(tempId, null);
+        toastError(data?.error || t.supportChat.sendFailed);
+      }
+    } catch (error: any) {
+      if (error?.name !== 'AbortError') {
+        toastError(error?.message || t.supportChat.sendFailed);
+      }
+    } finally {
+      endUpload();
+    }
+  };
+
   // Upload image and send message
   const handleSendWithImage = async () => {
-    if (!previewImage || !chat) return;
+    if (!previewImage || !chat || uploadingImage) return;
 
-    setUploadingImage(true);
+    const caption = message.trim();
+    const imageData = previewImage;
+    const controller = beginUpload(
+      lang === 'en' ? 'Uploading image...' : 'กำลังอัปโหลดรูปภาพ...',
+      1
+    );
+    setPreviewImage(null);
+    setMessage('');
+
     try {
-      // Determine mime type from base64
-      const mimeMatch = previewImage.match(/data:([^;]+);/);
+      const mimeMatch = imageData.match(/data:([^;]+);/);
       const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
       const ext = mime.split('/')[1] || 'jpg';
-      
-      // Upload image first
-        const uploadRes = await uploadImageApi({
-          base64: previewImage,
+
+      const uploadRes = await uploadImageApi(
+        {
+          base64: imageData,
           filename: `chat_${Date.now()}.${ext}`,
           mime: mime,
-        });
+        },
+        { signal: controller.signal, onProgress: setUploadProgress }
+      );
 
       if (!uploadRes.ok) {
         throw new Error(`${t.supportChat.imageUploadFailed} (HTTP ${uploadRes.status})`);
@@ -627,41 +869,38 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
       } catch {
         throw new Error(t.supportChat.sendFailed);
       }
-      
+
       if (uploadData.status === 'success' && uploadData.data?.url) {
-        // Send message with image
+        setUploadProgress(100);
         const imageUrl = uploadData.data.url;
-        const msgContent = message.trim() ? `${message.trim()}\n[รูปภาพ: ${imageUrl}]` : `[รูปภาพ: ${imageUrl}]`;
-        
-        // Optimistic UI: show image message instantly
+        const msgContent = caption ? `${caption}\n[รูปภาพ: ${imageUrl}]` : `[รูปภาพ: ${imageUrl}]`;
+
         const tempId = `temp_img_${Date.now()}`;
         addOptimisticMessage(tempId, msgContent, session?.user?.name || undefined, session?.user?.image || undefined);
-        isUserScrollingRef.current = false;
         scrollToBottom(true);
-        
+
         const res = await apiFetch(`/api/support-chat/${chat.id}/message`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: msgContent }),
         });
-        
+
         const data = await res.json();
         if (data.success && data.message) {
           resolveOptimistic(tempId, data.message);
         } else {
           resolveOptimistic(tempId, null);
         }
-
-        setMessage('');
-        setPreviewImage(null);
       } else {
         throw new Error(uploadData.message || t.supportChat.imageUploadFailed);
       }
     } catch (error: any) {
-      console.error('Error uploading image:', error);
-      toastError(error?.message || t.supportChat.imageUploadFailed);
+      if (error?.name !== 'AbortError') {
+        console.error('Error uploading image:', error);
+        toastError(error?.message || t.supportChat.imageUploadFailed);
+      }
     } finally {
-      setUploadingImage(false);
+      endUpload();
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -695,7 +934,6 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
       addOptimisticMessage(tempId, finalMessage, session?.user?.name || undefined, session?.user?.image || undefined);
       setMessage('');
       setReplyToMessage(null);
-      isUserScrollingRef.current = false;
       scrollToBottom(true);
       
       // Stop typing indicator
@@ -726,7 +964,11 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
 
   // Handle reply to message
   const handleReplyToMessage = (msg: ChatMessage) => {
-    const previewText = msg.message.replace(/\[รูปภาพ: [^\]]+\]/g, `[${t.supportChat.image}]`).trim() || `[${t.supportChat.image}]`;
+    const previewText = msg.message
+      .replace(/\[เสียง: [^\]]+\]/g, '[ข้อความเสียง]')
+      .replace(/\[สติกเกอร์: [^\]]+\]/g, `[${t.supportChat.image}]`)
+      .replace(/\[รูปภาพ: [^\]]+\]/g, `[${t.supportChat.image}]`)
+      .trim() || `[${t.supportChat.image}]`;
     setReplyToMessage({
       id: msg.id,
       text: previewText,
@@ -898,42 +1140,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
     return date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
   };
 
-  // Format time ago (e.g., "5 นาทีที่แล้ว")
-  const formatTimeAgo = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-    
-    if (diffMins < 1) return t.supportChat.justNow;
-    if (diffMins < 60) return `${diffMins} ${t.supportChat.minutesAgo}`;
-    if (diffHours < 24) return `${diffHours} ${t.supportChat.hoursAgo}`;
-    return `${diffDays} ${t.supportChat.daysAgo}`;
-  };
-
-  // Parse message to extract image URL and order ref
-  const parseMessage = (msg: string) => {
-    // Support both full URLs and /api/image/ paths
-    const imageMatch = msg.match(/\[รูปภาพ: (\/api\/image\/[^\]]+|https?:\/\/[^\]]+)\]/);
-    const orderMatch = msg.match(/\[ORDER_REF:([^\]]+)\]/);
-    
-    let text = msg;
-    let imageUrl = null;
-    let orderRef = null;
-    
-    if (imageMatch) {
-      imageUrl = imageMatch[1];
-      text = text.replace(imageMatch[0], '').trim();
-    }
-    if (orderMatch) {
-      orderRef = orderMatch[1];
-      text = text.replace(orderMatch[0], '').trim();
-    }
-    
-    return { text, imageUrl, orderRef };
-  };
+  const parseMessage = parseChatMessage;
 
   // Get user avatar
   const getUserAvatar = () => session?.user?.image || null;
@@ -1276,101 +1483,6 @@ ${getStatusLabel(order.status)}
         )}
       </Menu>
 
-      {/* Image Lightbox - Enhanced Fullscreen */}
-      {lightboxImage && (
-        <Box
-          onClick={() => setLightboxImage(null)}
-          sx={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 9999,
-            bgcolor: 'rgba(0,0,0,0.95)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'zoom-out',
-            animation: 'fadeIn 0.2s ease',
-            '@keyframes fadeIn': {
-              '0%': { opacity: 0 },
-              '100%': { opacity: 1 },
-            },
-          }}
-        >
-          {/* Close button */}
-          <IconButton
-            onClick={() => setLightboxImage(null)}
-            sx={{
-              position: 'absolute',
-              top: 16,
-              right: 16,
-              color: 'white',
-              bgcolor: 'var(--glass-bg)',
-              backdropFilter: 'blur(8px)',
-              '&:hover': { bgcolor: 'var(--glass-bg)' },
-              zIndex: 10,
-            }}
-          >
-            <CloseIcon size={24} />
-          </IconButton>
-          
-          {/* Zoom controls */}
-          <Box sx={{
-            position: 'absolute',
-            bottom: 80,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            display: 'flex',
-            gap: 1,
-            bgcolor: 'var(--glass-bg)',
-            backdropFilter: 'blur(8px)',
-            borderRadius: 3,
-            p: 0.5,
-            zIndex: 10,
-          }}>
-            <IconButton
-              onClick={(e) => { e.stopPropagation(); window.open(lightboxImage, '_blank'); }}
-              sx={{ color: 'white', '&:hover': { bgcolor: 'var(--glass-bg)' } }}
-              title="เปิดในแท็บใหม่"
-            >
-              <ZoomInIcon size={24} />
-            </IconButton>
-          </Box>
-          
-          {/* Image */}
-          <Box
-            component="img"
-            src={lightboxImage}
-            alt={t.supportChat.image}
-            onClick={(e) => e.stopPropagation()}
-            sx={{
-              maxWidth: '95vw',
-              maxHeight: '90vh',
-              objectFit: 'contain',
-              borderRadius: 2,
-              cursor: 'default',
-              boxShadow: '0 25px 50px rgba(0,0,0,0.5)',
-              animation: 'scaleIn 0.2s ease',
-              '@keyframes scaleIn': {
-                '0%': { transform: 'scale(0.9)', opacity: 0 },
-                '100%': { transform: 'scale(1)', opacity: 1 },
-              },
-            }}
-          />
-          <Typography
-            sx={{
-              position: 'absolute',
-              bottom: 24,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              color: 'var(--text-muted)',
-              fontSize: '0.8rem',
-            }}
-          >
-            {t.common.close}
-          </Typography>
-        </Box>
-      )}
-
       {/* Order Picker Dialog */}
       {showOrderPicker && (
         <Box
@@ -1422,9 +1534,19 @@ ${getStatusLabel(order.status)}
             {/* Order List */}
             <Box sx={{ flex: 1, overflowY: 'auto', p: 1 }}>
               {loadingOrders ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                  <CircularProgress size={32} sx={{ color: 'var(--primary)' }} />
-                </Box>
+                <div className="space-y-2 p-2">
+                  {[0, 1, 2, 3].map((i) => (
+                    <div key={i} className="rounded-xl border border-[var(--glass-border)] bg-[var(--surface-2)] p-3">
+                      <div className="flex items-center gap-3">
+                        <Skeleton className="size-9 shrink-0 rounded-lg" />
+                        <div className="min-w-0 flex-1 space-y-2">
+                          <Skeleton className="h-4 w-32" />
+                          <Skeleton className="h-3 w-24" />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               ) : orderHistory.length === 0 ? (
                 <Box sx={{ textAlign: 'center', py: 4 }}>
                   <ShoppingBagIcon size={48} color="#86868b" style={{ marginBottom: 8 }} />
@@ -1518,8 +1640,9 @@ ${getStatusLabel(order.status)}
           {/* Header */}
           <Box
             sx={{
-              background: 'linear-gradient(135deg, #0071e3 0%, #1d4ed8 100%)',
-              color: 'white',
+              bgcolor: '#18181b',
+              color: 'rgba(255,255,255,0.92)',
+              borderBottom: '1px solid rgba(255,255,255,0.08)',
               px: 2,
               py: 1.5,
               display: 'flex',
@@ -1531,7 +1654,7 @@ ${getStatusLabel(order.status)}
             {showHistory && (
               <IconButton
                 onClick={() => { setShowHistory(false); fetchActiveChat(); }}
-                sx={{ color: 'white', mr: -0.5 }}
+                sx={{ color: 'rgba(255,255,255,0.85)', mr: -0.5 }}
                 size="small"
               >
                 <ArrowBackIcon size={24} />
@@ -1539,13 +1662,13 @@ ${getStatusLabel(order.status)}
             )}
             <Avatar 
               src="/favicon.png" 
-              sx={{ bgcolor: 'var(--glass-bg)', width: 40, height: 40 }}
+              sx={{ bgcolor: 'rgba(255,255,255,0.08)', width: 40, height: 40, border: '1px solid rgba(255,255,255,0.1)' }}
             />
             <Box sx={{ flex: 1 }}>
-              <Typography sx={{ fontWeight: 700, fontSize: '1rem' }}>
+              <Typography sx={{ fontWeight: 700, fontSize: '1rem', color: 'rgba(255,255,255,0.95)' }}>
                 {showHistory ? t.supportChat.recentChats : displayAdminName}
               </Typography>
-              <Typography sx={{ fontSize: '0.75rem', opacity: 0.9, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Typography sx={{ fontSize: '0.75rem', opacity: 0.75, display: 'flex', alignItems: 'center', gap: 0.5, color: 'rgba(255,255,255,0.7)' }}>
                 {/* Realtime connection indicator */}
                 {chat && !showHistory && (
                   <Box
@@ -1559,7 +1682,7 @@ ${getStatusLabel(order.status)}
                       bgcolor: connectionState === 'connected' ? '#30d158'
                         : connectionState === 'connecting' ? '#ff9f0a'
                         : '#ff453a',
-                      boxShadow: connectionState === 'connected' ? '0 0 4px #30d158' : 'none',
+                      boxShadow: connectionState === 'connected' ? '0 0 6px rgba(48,209,88,0.7)' : 'none',
                       animation: connectionState === 'connecting' ? 'pulse 1.2s ease-in-out infinite' : 'none',
                       '@keyframes pulse': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.3 } },
                     }}
@@ -1581,7 +1704,7 @@ ${getStatusLabel(order.status)}
             {!showHistory && (
               <IconButton
                 onClick={() => { fetchChatHistory(); setShowHistory(true); }}
-                sx={{ color: 'white' }}
+                sx={{ color: 'rgba(255,255,255,0.75)' }}
                 title={t.supportChat.recentChats}
               >
                 <HistoryIcon size={24} />
@@ -1601,7 +1724,7 @@ ${getStatusLabel(order.status)}
                   }
                 }}
                 disabled={pushLoading}
-                sx={{ color: 'white', opacity: pushSubscribed ? 1 : 0.6 }}
+                sx={{ color: 'rgba(255,255,255,0.75)', opacity: pushSubscribed ? 1 : 0.55 }}
                 title={pushSubscribed ? t.common.close : t.notification.enableNotification}
               >
                 {pushSubscribed ? <BellIcon size={20} /> : <BellOffIcon size={20} />}
@@ -1609,7 +1732,7 @@ ${getStatusLabel(order.status)}
             )}
             <IconButton
               onClick={() => setOpen(false)}
-              sx={{ color: 'white' }}
+              sx={{ color: 'rgba(255,255,255,0.75)' }}
             >
               <CloseIcon size={24} />
             </IconButton>
@@ -1618,8 +1741,30 @@ ${getStatusLabel(order.status)}
           {/* Content */}
           <Box sx={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
             {loading ? (
-              <Box sx={{ flex: 1, display: 'grid', placeItems: 'center' }}>
-                <CircularProgress sx={{ color: 'var(--primary)' }} />
+              <Box sx={{ flex: 1, overflow: 'hidden', p: 2 }}>
+                <div className="mb-4 flex flex-col gap-3">
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <div key={i} className="flex items-start gap-3">
+                      <Skeleton className="size-10 shrink-0 rounded-full" />
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <Skeleton className="h-4 w-28" />
+                        <Skeleton className="h-3 w-[75%]" />
+                        <Skeleton className="h-2.5 w-16" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-6 space-y-3">
+                  {[0, 1, 2].map((i) => (
+                    <div
+                      key={i}
+                      className={cn('flex items-end gap-2', i % 2 ? 'flex-row-reverse' : 'flex-row')}
+                    >
+                      <Skeleton className="size-7 rounded-full" />
+                      <Skeleton className={cn('h-14 rounded-2xl', i === 1 ? 'w-52' : 'w-40')} />
+                    </div>
+                  ))}
+                </div>
               </Box>
             ) : showHistory ? (
               /* History View */
@@ -2100,294 +2245,260 @@ ${getStatusLabel(order.status)}
                   </Box>
                 )}
                 
-                {/* Messages Area */}
-                <Box
-                  ref={messagesContainerRef}
-                  onScroll={(e) => {
-                    const el = e.currentTarget;
-                    isUserScrollingRef.current =
-                      el.scrollHeight - el.scrollTop - el.clientHeight > 100;
-                  }}
-                  sx={{
-                    flex: 1,
-                    overflowY: 'auto',
-                    p: 2,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 0.5,
-                    bgcolor: 'var(--surface-2)',
-                    minHeight: 0,
-                  }}
+                {/* Messages Area — MessageScroller (follow live edge, hold when reading) */}
+                <MessageScrollerProvider
+                  key={chat.id}
+                  autoScroll
+                  defaultScrollPosition="last-anchor"
+                  scrollPreviousItemPeek={40}
                 >
+                  <MessageScrollerApiBridge apiRef={scrollApiRef} />
+                  <MessageScroller className="min-h-0 flex-1 bg-[var(--surface-2)]">
+                    <MessageScrollerViewport>
+                      <MessageScrollerContent className="gap-1 p-4">
+                  <MessageScrollerItem messageId="__load_older__">
+                    <MessageScrollerLoadOlder
+                      hasMore={hasMoreOlder}
+                      loading={loadingOlder}
+                      onLoadMore={loadOlderMessages}
+                    />
+                  </MessageScrollerItem>
                   {(chat.messages || []).filter(msg => !msg.is_unsent).map((msg, index, filteredMessages) => {
-                    const { text, imageUrl, orderRef } = parseMessage(msg.message);
-                    const isImageOnly = Boolean(imageUrl && !text && !orderRef);
+                    if (
+                      (msg as ChatMessage & { _optimistic?: boolean })._optimistic &&
+                      typeof msg.message === 'string' &&
+                      msg.message.includes('[กำลังอัปโหลด')
+                    ) {
+                      return null;
+                    }
+                    const { text, imageUrl, orderRef, animated, voiceUrl, voiceDuration, voiceBroken } = parseMessage(msg.message);
+                    const isImageOnly = Boolean(imageUrl && !text && !orderRef && !voiceUrl && !voiceBroken);
+                    const isVoiceOnly = Boolean(voiceUrl && !text && !orderRef && !imageUrl);
+                    const isVoiceBrokenOnly = Boolean(voiceBroken && !text && !orderRef && !imageUrl && !voiceUrl);
                     const showTime = isLastInGroup(filteredMessages, index);
                     const canUnsend = msg.sender === 'customer' && chat.status !== 'closed';
-                    // Check if this is the last customer message (for showing read receipt)
-                    const isLastCustomerMessage = msg.sender === 'customer' && 
+                    const isLastCustomerMessage = msg.sender === 'customer' &&
                       index === filteredMessages.map(m => m.sender).lastIndexOf('customer');
-                    
+                    const align = msg.sender === 'customer' ? 'end' : 'start';
+                    const bubbleVariant = (msg as any)._failed
+                      ? 'destructive'
+                      : msg.sender === 'customer'
+                        ? 'default'
+                        : 'secondary';
+
+                    if (msg.sender === 'system') {
+                      return (
+                        <MessageScrollerItem key={msg.id} messageId={msg.id}>
+                          <ChatSystemMarker>{msg.message}</ChatSystemMarker>
+                        </MessageScrollerItem>
+                      );
+                    }
+
                     return (
-                      <Box
-                        key={msg.id}
-                        sx={{
-                          display: 'flex',
-                          justifyContent: msg.sender === 'customer' ? 'flex-end' 
-                            : msg.sender === 'system' ? 'center' : 'flex-start',
-                          mb: showTime ? 1 : 0,
-                        }}
+                      <MessageScrollerItem
+                        key={`${msg.id}-${index}`}
+                        messageId={msg.id}
+                        scrollAnchor={msg.sender === 'customer'}
                       >
-                        {msg.sender === 'system' ? (
-                          <Chip
-                            size="small"
-                            label={msg.message}
-                            sx={{
-                              bgcolor: 'rgba(0,0,0,0.08)',
-                              color: 'var(--text-muted)',
-                              fontSize: '0.75rem',
-                            }}
-                          />
-                        ) : (
-                          <Box
-                            sx={{
-                              maxWidth: '85%',
-                              display: 'flex',
-                              flexDirection: msg.sender === 'customer' ? 'row-reverse' : 'row',
-                              alignItems: 'flex-end',
-                              gap: 0.75,
-                            }}
-                          >
-                            {/* Avatar - only show on last message of group */}
-                            {msg.sender === 'admin' && showTime && (
-                              <Avatar 
-                                src={msg.sender_avatar || undefined}
-                                sx={{ width: 28, height: 28, bgcolor: 'var(--primary)', flexShrink: 0 }}
-                              >
-                                {!msg.sender_avatar && <SupportAgentIcon size={16} />}
-                              </Avatar>
-                            )}
-                            {msg.sender === 'admin' && !showTime && (
-                              <Box sx={{ width: 28 }} />
-                            )}
-                            {msg.sender === 'customer' && showTime && (
-                              <Avatar 
-                                src={getUserAvatar() || msg.sender_avatar || undefined} 
-                                sx={{ width: 28, height: 28, bgcolor: 'var(--success)', flexShrink: 0 }}
-                              >
-                                {!getUserAvatar() && !msg.sender_avatar && (
-                                  session?.user?.name?.charAt(0)?.toUpperCase() || 'U'
-                                )}
-                              </Avatar>
-                            )}
-                            {msg.sender === 'customer' && !showTime && (
-                              <Box sx={{ width: 28 }} />
-                            )}
-                            
-                            <Box sx={{ position: 'relative' }}>
-                              {isImageOnly ? (
-                                <Box
-                                  component="img"
-                                  src={imageUrl!}
-                                  alt={t.supportChat.image}
-                                  loading="lazy"
-                                  onContextMenu={canUnsend ? (e) => handleMessageMenu(e, msg.id) : undefined}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (canUnsend && e.detail === 2) {
-                                      handleMessageMenu(e, msg.id);
-                                      return;
-                                    }
-                                    setLightboxImage(imageUrl!);
-                                  }}
-                                  sx={{
-                                    display: 'block',
-                                    maxWidth: { xs: 220, sm: 280 },
-                                    maxHeight: { xs: 280, sm: 360 },
-                                    width: 'auto',
-                                    height: 'auto',
-                                    objectFit: 'contain',
-                                    borderRadius: '14px',
-                                    cursor: 'zoom-in',
-                                    boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
-                                    opacity: (msg as any)._optimistic ? 0.6 : 1,
-                                    transition: 'transform 0.2s ease, opacity 0.15s ease',
-                                    '&:hover': { opacity: 0.92 },
-                                  }}
-                                />
-                              ) : (
-                                <Paper
-                                  elevation={0}
-                                  onContextMenu={canUnsend ? (e) => handleMessageMenu(e, msg.id) : undefined}
-                                  onClick={canUnsend ? (e) => {
-                                    if (e.detail === 2) {
-                                      handleMessageMenu(e, msg.id);
-                                    }
-                                  } : undefined}
-                                  sx={{
-                                    px: 1.5,
-                                    py: 0.75,
-                                    bgcolor: (msg as any)._failed ? '#ff453a' : msg.sender === 'customer' ? '#0071e3' : 'var(--surface)',
-                                    color: msg.sender === 'customer' ? '#ffffff' : 'var(--foreground)',
-                                    borderRadius: '18px',
-                                    borderBottomRightRadius: msg.sender === 'customer' ? '6px' : '18px',
-                                    borderBottomLeftRadius: msg.sender === 'admin' ? '6px' : '18px',
-                                    boxShadow: msg.sender === 'admin' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                                    cursor: canUnsend ? 'pointer' : 'default',
-                                    opacity: (msg as any)._optimistic ? 0.6 : 1,
-                                    transition: 'all 0.15s ease',
-                                    '&:hover': canUnsend ? { opacity: 0.9 } : {},
-                                    '&:active': canUnsend ? { transform: 'scale(0.98)' } : {},
-                                  }}
-                                >
-                                  {text && (
-                                    <Typography sx={{ fontSize: '0.9rem', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>
-                                      {text}
-                                    </Typography>
-                                  )}
-                                  {orderRef && (
-                                    <Box
-                                      sx={{
-                                        mt: text ? 0.75 : 0,
-                                        p: 1.5,
-                                        bgcolor: msg.sender === 'customer' ? 'var(--glass-bg)' : 'var(--surface-2)',
-                                        borderRadius: 1.5,
-                                        border: '1px solid',
-                                        borderColor: 'var(--glass-border)',
-                                      }}
-                                    >
-                                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                        <Box sx={{
-                                          width: 32,
-                                          height: 32,
-                                          borderRadius: 1,
-                                          bgcolor: '#0071e3',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                        }}>
-                                          <ReceiptIcon size={18} color="white" />
-                                        </Box>
-                                        <Box sx={{ flex: 1, minWidth: 0 }}>
-                                          <Typography sx={{ 
-                                            fontSize: '0.8rem', 
-                                            fontWeight: 600,
-                                            color: msg.sender === 'customer' ? 'white' : 'var(--foreground)',
-                                          }}>
-                                            {t.supportChat.orderRef} #{orderRef}
-                                          </Typography>
-                                          <Typography sx={{ 
-                                            fontSize: '0.7rem',
-                                            color: msg.sender === 'customer' ? 'rgba(255,255,255,0.8)' : 'var(--text-muted)',
-                                          }}>
-                                            คลิกเพื่อดูรายละเอียด
-                                          </Typography>
-                                        </Box>
-                                      </Box>
-                                    </Box>
-                                  )}
-                                  {imageUrl && (
-                                    <Box
-                                      component="img"
-                                      src={imageUrl}
-                                      alt={t.supportChat.image}
-                                      loading="lazy"
-                                      sx={{
-                                        width: '100%',
-                                        maxWidth: { xs: 200, sm: 250 },
-                                        height: 'auto',
-                                        maxHeight: { xs: 180, sm: 220 },
-                                        objectFit: 'cover',
-                                        borderRadius: 1.5,
-                                        mt: text || orderRef ? 0.75 : 0,
-                                        cursor: 'zoom-in',
-                                        transition: 'transform 0.2s ease',
-                                        '&:hover': { opacity: 0.9, transform: 'scale(1.02)' },
-                                      }}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setLightboxImage(imageUrl);
-                                      }}
-                                    />
-                                  )}
-                                </Paper>
+                      <Message
+                        align={align}
+                        className={cn(showTime ? 'mb-2' : 'mb-0')}
+                      >
+                        <MessageAvatar className={!showTime ? 'invisible' : undefined}>
+                          {msg.sender === 'admin' ? (
+                            <Avatar
+                              src={msg.sender_avatar || undefined}
+                              sx={{ width: 28, height: 28, bgcolor: 'var(--primary)' }}
+                            >
+                              {!msg.sender_avatar && <SupportAgentIcon size={16} />}
+                            </Avatar>
+                          ) : (
+                            <Avatar
+                              src={getUserAvatar() || msg.sender_avatar || undefined}
+                              sx={{ width: 28, height: 28, bgcolor: 'var(--success)' }}
+                            >
+                              {!getUserAvatar() && !msg.sender_avatar && (
+                                session?.user?.name?.charAt(0)?.toUpperCase() || 'U'
                               )}
-                              
-                              {/* Time & Read Receipt - IG Style (only on last message of group) */}
-                              {showTime && (
-                                <Box sx={{ 
-                                  display: 'flex', 
-                                  alignItems: 'center', 
-                                  gap: 0.5, 
-                                  mt: 0.25,
-                                  justifyContent: msg.sender === 'customer' ? 'flex-end' : 'flex-start',
-                                }}>
-                                  <Typography
+                            </Avatar>
+                          )}
+                        </MessageAvatar>
+                        <MessageContent>
+                          {isVoiceOnly ? (
+                            <VoiceMessage
+                              src={voiceUrl!}
+                              duration={voiceDuration}
+                              className={cn((msg as any)._optimistic && 'opacity-60')}
+                            />
+                          ) : isVoiceBrokenOnly ? (
+                            <Bubble variant={bubbleVariant} align={align}>
+                              <BubbleContent>
+                                <Typography sx={{ fontSize: '0.85rem', opacity: 0.85 }}>
+                                  ข้อความเสียงไม่สมบูรณ์ กรุณาส่งใหม่
+                                </Typography>
+                              </BubbleContent>
+                            </Bubble>
+                          ) : isImageOnly ? (
+                            <ChatImage
+                              src={imageUrl!}
+                              alt={t.supportChat.image}
+                              animated={animated}
+                              objectFit="contain"
+                              maxWidth={280}
+                              maxHeight={360}
+                              className={cn(
+                                'rounded-[14px] shadow-md',
+                                (msg as any)._optimistic && 'opacity-60'
+                              )}
+                              onContextMenu={canUnsend ? (e) => handleMessageMenu(e as React.MouseEvent<HTMLElement>, msg.id) : undefined}
+                            />
+                          ) : (
+                            <Bubble
+                              variant={bubbleVariant}
+                              align={align}
+                              className={cn(
+                                (msg as any)._optimistic && 'opacity-60',
+                                canUnsend && 'cursor-pointer',
+                              )}
+                              onContextMenu={canUnsend ? (e) => handleMessageMenu(e as any, msg.id) : undefined}
+                              onClick={canUnsend ? (e) => {
+                                if ((e as any).detail === 2) handleMessageMenu(e as any, msg.id);
+                              } : undefined}
+                            >
+                              <BubbleContent>
+                                {text && (
+                                  <Typography sx={{ fontSize: '0.9rem', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>
+                                    {text}
+                                  </Typography>
+                                )}
+                                {voiceUrl && (
+                                  <VoiceMessage
+                                    src={voiceUrl}
+                                    duration={voiceDuration}
+                                    className={cn((text || orderRef) && 'mt-1.5')}
+                                  />
+                                )}
+                                {orderRef && (
+                                  <Box
                                     sx={{
-                                      fontSize: '0.65rem',
-                                      color: 'var(--text-muted)',
+                                      mt: text ? 0.75 : 0,
+                                      p: 1.5,
+                                      bgcolor: msg.sender === 'customer' ? 'rgba(255,255,255,0.15)' : 'var(--surface-2)',
+                                      borderRadius: 1.5,
+                                      border: '1px solid',
+                                      borderColor: 'var(--glass-border)',
                                     }}
                                   >
-                                    {formatTime(msg.created_at)}
-                                  </Typography>
-                                  {/* Read receipts only for the last customer message */}
-                                  {isLastCustomerMessage && chat.status === 'active' && (
-                                    <>
-                                      {msg.is_read 
-                                        ? <DoneAllIcon size={12} color="#30d158" />
-                                        : <DoneIcon size={12} color="#86868b" />
-                                      }
-                                      {msg.is_read && msg.read_at && (
-                                        <Typography sx={{ fontSize: '0.6rem', color: '#30d158', ml: 0.25 }}>
-                                          {t.supportChat.readAll} {formatTimeAgo(msg.read_at)}
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                      <Box sx={{
+                                        width: 32,
+                                        height: 32,
+                                        borderRadius: 1,
+                                        bgcolor: '#0071e3',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                      }}>
+                                        <ReceiptIcon size={18} color="white" />
+                                      </Box>
+                                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 600 }}>
+                                          {t.supportChat.orderRef} #{orderRef}
                                         </Typography>
-                                      )}
-                                    </>
+                                        <Typography sx={{ fontSize: '0.7rem', opacity: 0.8 }}>
+                                          คลิกเพื่อดูรายละเอียด
+                                        </Typography>
+                                      </Box>
+                                    </Box>
+                                  </Box>
+                                )}
+                                {imageUrl && (
+                                  <ChatImage
+                                    src={imageUrl}
+                                    alt={t.supportChat.image}
+                                    animated={animated}
+                                    objectFit="cover"
+                                    maxWidth={250}
+                                    maxHeight={220}
+                                    className={cn(
+                                      'rounded-xl',
+                                      (text || orderRef) && 'mt-1.5'
+                                    )}
+                                  />
+                                )}
+                              </BubbleContent>
+                            </Bubble>
+                          )}
+
+                          {showTime && (
+                            <MessageFooter className="text-[0.65rem] text-muted-foreground">
+                              <span className="tabular-nums">{formatTime(msg.created_at)}</span>
+                              {isLastCustomerMessage && chat.status === 'active' && (
+                                <>
+                                  {msg.is_read
+                                    ? <DoneAllIcon size={12} color="#30d158" />
+                                    : <DoneIcon size={12} color="#86868b" />
+                                  }
+                                  {msg.is_read && msg.read_at && (
+                                    <span className="text-[0.6rem] text-[#30d158] tabular-nums">
+                                      {t.supportChat.readAll} {formatTime(msg.read_at)}
+                                    </span>
                                   )}
-                                </Box>
+                                </>
                               )}
-                            </Box>
-                          </Box>
-                        )}
-                      </Box>
+                            </MessageFooter>
+                          )}
+                        </MessageContent>
+                      </Message>
+                      </MessageScrollerItem>
                     );
                   })}
                   
                   {/* Typing Indicator */}
                   {adminTyping && (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Avatar sx={{ width: 32, height: 32, bgcolor: '#0071e3' }}>
-                        <SupportAgentIcon size={18} />
-                      </Avatar>
-                      <Paper sx={{ px: 2, py: 1, bgcolor: 'var(--surface)', borderRadius: 2 }}>
-                        <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', mb: 0.5 }}>
-                          {typingDisplay || `${chat?.admin_name || displayAdminName} กำลังพิมพ์...`}
-                        </Typography>
-                        <Box sx={{ display: 'flex', gap: 0.5 }}>
-                          {[0, 1, 2].map((i) => (
-                            <Box
-                              key={i}
-                              sx={{
-                                width: 6,
-                                height: 6,
-                                borderRadius: '50%',
-                                bgcolor: 'var(--text-muted)',
-                                animation: 'typing 1.4s infinite ease-in-out',
-                                animationDelay: `${i * 0.2}s`,
-                                '@keyframes typing': {
-                                  '0%, 60%, 100%': { transform: 'translateY(0)' },
-                                  '30%': { transform: 'translateY(-4px)' },
-                                },
-                              }}
-                            />
-                          ))}
-                        </Box>
-                      </Paper>
-                    </Box>
+                    <MessageScrollerItem messageId="__typing__">
+                    <Message align="start">
+                      <MessageAvatar>
+                        <Avatar sx={{ width: 32, height: 32, bgcolor: '#0071e3' }}>
+                          <SupportAgentIcon size={18} />
+                        </Avatar>
+                      </MessageAvatar>
+                      <MessageContent>
+                        <Bubble variant="secondary" align="start">
+                          <BubbleContent>
+                            <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', mb: 0.5 }}>
+                              {typingDisplay || `${chat?.admin_name || displayAdminName} กำลังพิมพ์...`}
+                            </Typography>
+                            <Box sx={{ display: 'flex', gap: 0.5 }}>
+                              {[0, 1, 2].map((i) => (
+                                <Box
+                                  key={i}
+                                  sx={{
+                                    width: 6,
+                                    height: 6,
+                                    borderRadius: '50%',
+                                    bgcolor: 'var(--text-muted)',
+                                    animation: 'typing 1.4s infinite ease-in-out',
+                                    animationDelay: `${i * 0.2}s`,
+                                    '@keyframes typing': {
+                                      '0%, 60%, 100%': { transform: 'translateY(0)' },
+                                      '30%': { transform: 'translateY(-4px)' },
+                                    },
+                                  }}
+                                />
+                              ))}
+                            </Box>
+                          </BubbleContent>
+                        </Bubble>
+                      </MessageContent>
+                    </Message>
+                    </MessageScrollerItem>
                   )}
-                  
-                  <div ref={messagesEndRef} />
-                </Box>
+                      </MessageScrollerContent>
+                    </MessageScrollerViewport>
+                    <MessageScrollerButton />
+                  </MessageScroller>
+                </MessageScrollerProvider>
 
                 {/* Image Preview */}
                 {previewImage && (
@@ -2480,123 +2591,42 @@ ${getStatusLabel(order.status)}
                       </Box>
                     )}
                     
-                    {/* Input Area */}
+                    {/* Input Area — IG-style pill composer */}
                     <Box
                       className="mobile-chat-input-bar"
                       sx={{
-                        p: 1.5,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 1,
                         flexShrink: 0,
+                        bgcolor: 'var(--surface)',
+                        borderTop: '1px solid var(--glass-border)',
                       }}
                     >
-                    <IconButton
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploadingImage}
-                      sx={{ 
-                        color: '#0071e3',
-                        bgcolor: 'rgba(0,113,227, 0.08)',
-                        '&:hover': { 
-                          bgcolor: 'rgba(0,113,227, 0.15)',
-                          transform: 'scale(1.05)',
-                        },
-                        transition: 'all 0.2s',
-                      }}
-                    >
-                      <ImageIcon size={24} />
-                    </IconButton>
-                    
-                    {/* Order Attach Button */}
-                    <IconButton
-                      onClick={() => {
-                        fetchOrderHistory();
-                        setShowOrderPicker(true);
-                      }}
-                      sx={{ 
-                        color: '#30d158',
-                        bgcolor: 'rgba(34, 197, 94, 0.08)',
-                        '&:hover': { 
-                          bgcolor: 'rgba(34, 197, 94, 0.15)',
-                          transform: 'scale(1.05)',
-                        },
-                        transition: 'all 0.2s',
-                      }}
-                      title={t.supportChat.orderRef}
-                    >
-                      <ReceiptIcon size={24} />
-                    </IconButton>
-                    
-                    <TextField
-                      fullWidth
-                      size="small"
-                      multiline
-                      maxRows={4}
-                      placeholder={t.supportChat.typeMessage}
-                      value={message}
-                      onChange={(e) => {
-                        setMessage(e.target.value);
-                        sendTypingIndicator();
-                      }}
-                      onKeyDown={(e) => {
-                        // On mobile/touch devices: Enter = new line, use send button to send
-                        // On desktop: Enter = send, Shift+Enter = new line
-                        if (e.key === 'Enter' && !e.shiftKey && !isTouchDevice) {
-                          e.preventDefault();
-                          handleSendMessage();
+                      <ChatComposer
+                        value={message}
+                        onChange={(v) => {
+                          setMessage(v);
+                          sendTypingIndicator();
+                        }}
+                        onSend={handleSendMessage}
+                        onAttachImage={() => {
+                          if (uploadingImage) return;
+                          fileInputRef.current?.click();
+                        }}
+                        placeholder={t.supportChat.typeMessage}
+                        disabled={sending}
+                        sending={sending}
+                        hasAttachment={Boolean(previewImage)}
+                        isTouchDevice={isTouchDevice}
+                        upload={
+                          uploadingImage
+                            ? {
+                                progress: uploadProgress,
+                                fileCount: uploadFileCount,
+                                label: uploadLabel,
+                                onCancel: cancelUpload,
+                              }
+                            : null
                         }
-                      }}
-                      disabled={sending || uploadingImage}
-                      sx={{
-                        '& .MuiOutlinedInput-root': {
-                          borderRadius: 3,
-                          bgcolor: 'var(--surface-2)',
-                          border: '1px solid transparent',
-                          transition: 'all 0.2s',
-                          '&:hover': { 
-                            bgcolor: 'var(--glass-bg)',
-                            border: '1px solid var(--glass-border)',
-                          },
-                          '&.Mui-focused': { 
-                            bgcolor: 'var(--surface)',
-                            border: '1px solid var(--primary)',
-                            boxShadow: '0 0 0 3px rgba(0,113,227, 0.1)',
-                          },
-                          '& fieldset': { border: 'none' },
-                        },
-                        '& .MuiInputBase-input': {
-                          color: 'var(--foreground)',
-                          fontSize: '16px',
-                          '&::placeholder': { color: 'var(--text-muted)', opacity: 1 },
-                        },
-                      }}
-                    />
-                    <IconButton
-                      onClick={handleSendMessage}
-                      disabled={(!message.trim() && !previewImage) || sending || uploadingImage}
-                      sx={{
-                        background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
-                        color: 'white',
-                        boxShadow: '0 4px 12px rgba(0,113,227, 0.3)',
-                        '&:hover': { 
-                          background: 'linear-gradient(135deg, #1d4ed8 0%, #bf5af2 100%)',
-                          transform: 'scale(1.05)',
-                          boxShadow: '0 6px 16px rgba(0,113,227, 0.4)',
-                        },
-                        transition: 'all 0.2s',
-                        '&.Mui-disabled': { 
-                          background: 'var(--surface-2)', 
-                          color: 'var(--text-muted)',
-                          boxShadow: 'none',
-                        },
-                      }}
-                    >
-                      {sending || uploadingImage ? (
-                        <CircularProgress size={20} sx={{ color: 'inherit' }} />
-                      ) : (
-                        <SendIcon size={24} />
-                      )}
-                    </IconButton>
+                      />
                     </Box>
                   </Box>
                 ) : (

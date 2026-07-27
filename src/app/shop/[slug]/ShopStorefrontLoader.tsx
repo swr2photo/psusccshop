@@ -1,91 +1,56 @@
-// Lightweight SSR-safe placeholder while ShopStorefront loads (no MUI / Emotion)
+// Lightweight SSR-safe storefront shell while ShopStorefront hydrates
 export default function ShopStorefrontLoader() {
   return (
     <div
-      style={{
-        minHeight: '100vh',
-        background: 'var(--background, #fff)',
-        color: 'var(--foreground, #1d1d1f)',
-      }}
+      className="flex min-h-dvh flex-col bg-[var(--background,#fff)] text-[var(--foreground,#1d1d1f)]"
       aria-busy="true"
       aria-label="Loading shop"
     >
-      <div
-        style={{
-          height: 56,
-          borderBottom: '1px solid var(--glass-border, rgba(0,0,0,0.08))',
-          display: 'flex',
-          alignItems: 'center',
-          padding: '0 16px',
-          gap: 12,
-        }}
+      <header
+        className="sticky top-0 z-20 border-b border-[var(--glass-border,rgba(0,0,0,0.08))] bg-[var(--background,#fff)]/90"
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
-        <div
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: '50%',
-            background: 'var(--surface, #f5f5f7)',
-          }}
-        />
-        <div style={{ flex: 1 }}>
-          <div
-            style={{
-              width: 140,
-              height: 14,
-              borderRadius: 8,
-              background: 'var(--surface, #f5f5f7)',
-              marginBottom: 6,
-            }}
-          />
-          <div
-            style={{
-              width: 90,
-              height: 10,
-              borderRadius: 6,
-              background: 'var(--surface, #f5f5f7)',
-            }}
-          />
+        <div className="mx-auto flex h-[52px] max-w-6xl items-center gap-3 px-3.5 md:h-[60px] md:px-6">
+          <div className="skeleton size-9 shrink-0 rounded-full" />
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <div className="skeleton h-3.5 w-36 max-w-[40%]" />
+            <div className="skeleton h-2.5 w-24 max-w-[28%]" />
+          </div>
+          <div className="skeleton size-8 rounded-full" />
+          <div className="skeleton size-8 rounded-full" />
         </div>
-      </div>
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: 24 }}>
-        <div
-          style={{
-            width: '100%',
-            height: 200,
-            borderRadius: 16,
-            background: 'var(--surface, #f5f5f7)',
-            marginBottom: 24,
-          }}
-        />
-        <div
-          style={{
-            width: '100%',
-            height: 40,
-            borderRadius: 12,
-            background: 'var(--surface, #f5f5f7)',
-            marginBottom: 16,
-          }}
-        />
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
-            gap: 16,
-          }}
-        >
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={i}
-              style={{
-                height: 220,
-                borderRadius: 16,
-                background: 'var(--surface, #f5f5f7)',
-              }}
-            />
+      </header>
+
+      <main className="mx-auto w-full max-w-6xl flex-1 px-0 pb-8 pt-3 sm:px-4 sm:pt-5">
+        <div className="skeleton mb-4 h-40 w-full rounded-none sm:mb-5 sm:h-52 sm:rounded-2xl" />
+        <div className="mb-4 flex gap-2 overflow-hidden px-3.5 sm:px-0">
+          {[72, 88, 64, 96].map((w, i) => (
+            <div key={i} className="skeleton h-8 shrink-0 rounded-full" style={{ width: w }} />
           ))}
         </div>
-      </div>
+        <div className="mb-3 space-y-1.5 px-3.5 sm:px-0">
+          <div className="skeleton h-5 w-40 max-w-[50%]" />
+          <div className="skeleton h-3 w-24 max-w-[30%]" />
+        </div>
+        <div className="grid grid-cols-2 gap-3 px-3.5 sm:grid-cols-3 sm:gap-4 sm:px-0 lg:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div
+              key={i}
+              className="overflow-hidden rounded-2xl border border-[var(--glass-border,rgba(0,0,0,0.08))] bg-[var(--surface,#f5f5f7)]"
+            >
+              <div className="skeleton aspect-square w-full rounded-none" />
+              <div className="space-y-2 p-3">
+                <div className="skeleton h-4 w-[70%]" />
+                <div className="skeleton h-3 w-[40%]" />
+                <div className="mt-1 flex justify-between gap-2">
+                  <div className="skeleton h-6 w-14 rounded-lg" />
+                  <div className="skeleton h-8 w-16 rounded-lg" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </main>
     </div>
   );
 }

@@ -12,6 +12,8 @@
 
 import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import { createClient, RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
+import { preferCompleteMessage } from '@/lib/chat-message';
+import { dedupeNearIdenticalMessages } from '@/lib/support-chat-sync';
 
 // ==================== CONFIG ====================
 
@@ -168,14 +170,34 @@ export function useRealtimeChat(sessionId: string | null, userEmail: string | nu
     return msg;
   }, [sessionId, userEmail, role]);
 
-  // Replace optimistic with real message
+  // Replace optimistic with real message (dedupe if realtime already inserted it)
   const resolveOptimistic = useCallback((tempId: string, realMsg: RealtimeChatMessage | null) => {
     setMessages(prev => {
       if (realMsg) {
-        return prev.map(m => m.id === tempId ? { ...realMsg, _optimistic: false } : m);
+        const existingSameId = prev.find((m) => m.id === realMsg.id);
+        const mergedMessage = preferCompleteMessage(
+          existingSameId?.message || '',
+          realMsg.message || ''
+        );
+        const withoutTempAndDup = prev.filter(
+          (m) => m.id !== tempId && m.id !== realMsg.id
+        );
+        return dedupeNearIdenticalMessages([
+          ...withoutTempAndDup,
+          { ...realMsg, message: mergedMessage, _optimistic: false },
+        ]);
       }
-      // Mark as failed
       return prev.map(m => m.id === tempId ? { ...m, _failed: true, _optimistic: false } : m);
+    });
+  }, []);
+
+  /** Public setter — always collapse near-duplicate bubbles after updates. */
+  const setMessagesDeduped = useCallback((
+    next: RealtimeChatMessage[] | ((prev: RealtimeChatMessage[]) => RealtimeChatMessage[])
+  ) => {
+    setMessages((prev) => {
+      const resolved = typeof next === 'function' ? next(prev) : next;
+      return dedupeNearIdenticalMessages(resolved);
     });
   }, []);
 
@@ -241,13 +263,27 @@ export function useRealtimeChat(sessionId: string | null, userEmail: string | nu
         const newMsg = normalizeRealtimeMessage(payload.new as Record<string, unknown>);
         setMessages(prev => {
           // Deduplicate — replace optimistic msg or skip if already exists
-          const existsIdx = prev.findIndex(m => m.id === newMsg.id || (m._optimistic && m.message === newMsg.message && m.sender_email === newMsg.sender_email));
+          const existsIdx = prev.findIndex((m) =>
+            m.id === newMsg.id ||
+            (m._optimistic && m.message === newMsg.message && m.sender_email === newMsg.sender_email) ||
+            (m._optimistic &&
+              m.sender_email === newMsg.sender_email &&
+              typeof m.message === 'string' &&
+              m.message.startsWith('[กำลังอัปโหลด') &&
+              (newMsg.message?.startsWith('[เสียง:') || newMsg.message?.startsWith('[รูปภาพ:') || newMsg.message?.startsWith('[สติกเกอร์:')))
+          );
           if (existsIdx >= 0) {
             const updated = [...prev];
-            updated[existsIdx] = { ...newMsg, _optimistic: false };
-            return updated;
+            const prevMsg = updated[existsIdx];
+            const mergedMessage = preferCompleteMessage(prevMsg.message || '', newMsg.message || '');
+            updated[existsIdx] = {
+              ...newMsg,
+              message: mergedMessage,
+              _optimistic: false,
+            };
+            return dedupeNearIdenticalMessages(updated);
           }
-          return [...prev, newMsg];
+          return dedupeNearIdenticalMessages([...prev, newMsg]);
         });
         lastMessageTimestampRef.current = newMsg.created_at;
       }
@@ -260,7 +296,14 @@ export function useRealtimeChat(sessionId: string | null, userEmail: string | nu
       (payload) => {
         if (!mountedRef.current) return;
         const updated = normalizeRealtimeMessage(payload.new as Record<string, unknown>);
-        setMessages(prev => prev.map(m => m.id === updated.id ? { ...updated, _optimistic: false } : m));
+        setMessages(prev => prev.map(m => {
+          if (m.id !== updated.id) return m;
+          return {
+            ...updated,
+            message: preferCompleteMessage(m.message || '', updated.message || ''),
+            _optimistic: false,
+          };
+        }));
       }
     );
 
@@ -404,7 +447,7 @@ export function useRealtimeChat(sessionId: string | null, userEmail: string | nu
 
   return {
     messages,
-    setMessages,
+    setMessages: setMessagesDeduped,
     session,
     setSession,
     connectionState,

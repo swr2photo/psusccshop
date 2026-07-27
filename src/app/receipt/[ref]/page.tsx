@@ -123,9 +123,23 @@ function ReceiptPageInner() {
         bgcolor: '#f4f4f5',
         display: 'flex',
         flexDirection: 'column',
+        '@media print': {
+          bgcolor: '#fff',
+          minHeight: 0,
+          '& .receipt-chrome': { display: 'none !important' },
+          '& .receipt-stage': { p: 0, display: 'block' },
+          '& .receipt-frame': {
+            border: 'none !important',
+            boxShadow: 'none !important',
+            width: '100% !important',
+            maxWidth: 'none !important',
+            height: '100vh !important',
+          },
+        },
       }}
     >
       <Box
+        className="receipt-chrome no-print"
         sx={{
           position: 'sticky',
           top: 0,
@@ -138,6 +152,7 @@ function ReceiptPageInner() {
           bgcolor: 'rgba(255,255,255,0.92)',
           borderBottom: '1px solid #e4e4e7',
           backdropFilter: 'blur(8px)',
+          '@media print': { display: 'none !important' },
         }}
       >
         <Typography sx={{ fontWeight: 700, flex: 1, fontSize: '0.95rem' }}>{copy.title}</Typography>
@@ -163,14 +178,15 @@ function ReceiptPageInner() {
         </Button>
       </Box>
 
-      <Box sx={{ flex: 1, display: 'grid', placeItems: 'center', p: 2 }}>
+      <Box className="receipt-stage" sx={{ flex: 1, display: 'grid', placeItems: 'center', p: 2 }}>
         {loading || status === 'loading' ? (
-          <Box sx={{ textAlign: 'center' }}>
+          <Box className="receipt-chrome" sx={{ textAlign: 'center' }}>
             <CircularProgress size={32} />
             <Typography sx={{ mt: 1.5, color: '#71717a', fontSize: '0.85rem' }}>{copy.loading}</Typography>
           </Box>
         ) : error ? (
           <Box
+            className="receipt-chrome"
             sx={{
               maxWidth: 420,
               width: '100%',
@@ -201,6 +217,7 @@ function ReceiptPageInner() {
           <Box
             component="iframe"
             id="receipt-frame"
+            className="receipt-frame"
             title={copy.title}
             srcDoc={html}
             sandbox="allow-same-origin allow-modals allow-popups allow-scripts"
@@ -208,10 +225,10 @@ function ReceiptPageInner() {
               width: '100%',
               maxWidth: 860,
               height: 'calc(100dvh - 72px)',
-              border: '1px solid #e4e4e7',
-              borderRadius: 2,
-              bgcolor: '#fff',
-              boxShadow: '0 8px 30px rgba(0,0,0,0.06)',
+              border: '1px solid #94a3b8',
+              borderRadius: 0.5,
+              bgcolor: '#e5e7eb',
+              boxShadow: '0 8px 30px rgba(0,0,0,0.08)',
             }}
           />
         ) : null}

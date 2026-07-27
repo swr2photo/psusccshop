@@ -3,32 +3,14 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdminEmailAsync, getSession } from '@/lib/auth';
-import { db } from '@/lib/db';
-import { config } from '@/db/schema';
-import { eq } from 'drizzle-orm';
-import { invalidatePublicChatSettingsCache } from '@/lib/support-chat-settings-cache';
+import {
+  getStoredSupportChatSettings,
+  saveStoredSupportChatSettings,
+} from '@/lib/support-chat-settings-db';
+import { normalizeSupportChatSettings } from '@/lib/support-chat-settings';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-const DEFAULT_SETTINGS = {
-  admin_display_name: 'ทีมงาน PSU SCC',
-  auto_reply_enabled: true,
-  auto_reply_message: 'ขอบคุณที่ติดต่อมา ทีมงานจะตอบกลับโดยเร็วที่สุดค่ะ',
-  working_hours_enabled: false,
-  working_hours_start: '09:00',
-  working_hours_end: '18:00',
-  working_hours_message: 'ขณะนี้อยู่นอกเวลาทำการ กรุณาทิ้งข้อความไว้ ทีมงานจะตอบกลับในวันทำการถัดไป',
-  quick_replies: [
-    'สวัสดีค่ะ มีอะไรให้ช่วยเหลือคะ?',
-    'รอสักครู่นะคะ กำลังตรวจสอบให้',
-    'ขอบคุณที่รอค่ะ',
-    'มีคำถามเพิ่มเติมไหมคะ?',
-    'ยินดีให้บริการค่ะ',
-  ],
-  notification_sound: true,
-  notification_desktop: true,
-};
 
 // GET: Get chat settings
 export async function GET(request: NextRequest) {
@@ -37,18 +19,9 @@ export async function GET(request: NextRequest) {
     if (!session?.user?.email || !(await isAdminEmailAsync(session.user.email))) {
       return NextResponse.json('Unauthorized', { status: 401 });
     }
-    
-    const dataResults = await db.select()
-      .from(config)
-      .where(eq(config.key, 'support_chat_settings'))
-      .limit(1);
-      
-    const data = dataResults[0];
-    
-    return NextResponse.json({ 
-      settings: (data?.value as any) || DEFAULT_SETTINGS 
-    });
-    
+
+    const settings = await getStoredSupportChatSettings();
+    return NextResponse.json({ settings });
   } catch (error: any) {
     console.error('[support-chat/settings] GET error:', error);
     return NextResponse.json(
@@ -65,21 +38,10 @@ export async function POST(request: NextRequest) {
     if (!session?.user?.email || !(await isAdminEmailAsync(session.user.email))) {
       return NextResponse.json('Unauthorized', { status: 401 });
     }
-    
-    const settings = await request.json();
-    const merged = { ...DEFAULT_SETTINGS, ...settings };
-    
-    await db.insert(config)
-      .values({ key: 'support_chat_settings', value: merged })
-      .onConflictDoUpdate({
-        target: config.key,
-        set: { value: merged, updatedAt: new Date() },
-      });
 
-    invalidatePublicChatSettingsCache();
-    
-    return NextResponse.json({ success: true, settings: merged });
-    
+    const body = await request.json();
+    const settings = await saveStoredSupportChatSettings(normalizeSupportChatSettings(body));
+    return NextResponse.json({ success: true, settings });
   } catch (error: any) {
     console.error('[support-chat/settings] POST error:', error);
     return NextResponse.json(

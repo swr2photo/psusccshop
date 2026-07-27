@@ -497,47 +497,40 @@ export const EventsView = React.memo(function EventsView({
                       </div>
 
                       <div className="flex shrink-0 gap-1 self-end sm:self-start">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              onClick={() => handleToggle(event)}
-                              className={event.enabled ? 'text-emerald-500' : 'text-[var(--text-muted)]'}
-                            >
-                              {event.enabled ? <ToggleOn size={18} /> : <ToggleOff size={18} />}
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            {event.enabled ? 'ปิดอีเวนต์' : 'เปิดอีเวนต์'}
-                          </TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              onClick={() => setEditingEvent({ ...event })}
-                              className="text-[var(--text-muted)] hover:text-[#0071e3]"
-                            >
-                              <Edit size={16} />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>แก้ไข</TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              onClick={() => handleDelete(event)}
-                              className="text-[var(--text-muted)] hover:text-red-500"
-                            >
-                              <Delete size={16} />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>ลบ</TooltipContent>
-                        </Tooltip>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className={cn(
+                            'h-8 gap-1 border-slate-500/30 px-2 text-xs',
+                            event.enabled
+                              ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'
+                              : 'bg-slate-500/10 text-slate-400 hover:bg-slate-500/20'
+                          )}
+                          onClick={() => handleToggle(event)}
+                        >
+                          {event.enabled ? <ToggleOn className="size-4" /> : <ToggleOff className="size-4" />}
+                          <span>{event.enabled ? 'เปิดอยู่' : 'ปิดอยู่'}</span>
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 gap-1 border-blue-500/30 bg-blue-500/10 px-2.5 text-xs text-blue-400 hover:bg-blue-500/20"
+                          onClick={() => setEditingEvent({ ...event })}
+                        >
+                          <Edit size={14} />
+                          <span>แก้ไข</span>
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 gap-1 border-red-500/30 bg-red-500/10 px-2.5 text-xs text-red-400 hover:bg-red-500/20 hover:text-red-300"
+                          onClick={() => handleDelete(event)}
+                        >
+                          <Delete size={14} />
+                          <span>ลบ</span>
+                        </Button>
                       </div>
                     </div>
                   </div>

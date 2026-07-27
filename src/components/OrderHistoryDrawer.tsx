@@ -1,10 +1,11 @@
 'use client';
 
-import { apiFetch } from '@/lib/api-client';
+import { apiFetch, uploadImageApi } from '@/lib/api-client';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Box,
   Button,
+  Checkbox,
   CircularProgress,
   Chip,
   Dialog,
@@ -21,6 +22,7 @@ import {
   useMediaQuery,
 } from '@mui/material';
 import {
+  Camera,
   CheckCircle,
   ChevronDown,
   ChevronUp,
@@ -28,6 +30,7 @@ import {
   CreditCard,
   Expand,
   ExternalLink,
+  Info,
   MapPin,
   Package,
   FileText,
@@ -37,10 +40,14 @@ import {
   X,
   XCircle,
 } from 'lucide-react';
+import {
+  refundLineAmount,
+  type RefundPayoutMethod,
+  type RefundSelectedItem,
+} from '@/lib/refund-details';
 import { 
   normalizeStatus, 
   getStatusLabel, 
-  getStatusColor, 
   getStatusCategory,
   PAYABLE_STATUSES,
   CANCELABLE_STATUSES,
@@ -48,12 +55,20 @@ import {
   isOrderPaidForReceipt,
   type OrderHistory,
 } from '@/lib/shop-constants';
-import { ShopConfig, getProductName } from '@/lib/config';
+import { ShopConfig, getProductName, type Product } from '@/lib/config';
 import { SHIPPING_PROVIDERS, getTrackingUrl, getTrack123Url, type ShippingProvider } from '@/lib/shipping';
 import TrackingTimeline from './TrackingTimeline';
 import { useNotification } from './NotificationContext';
 import { CountdownBadge, isOrderExpired } from './OrderCountdown';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useCartStore } from '@/store/cartStore';
+import type { CartItem } from '@/store/cartStore';
+import {
+  evaluateReorderItem,
+  pickPrimaryReorderBlockReason,
+  reorderBlockLabel,
+  type ReorderBlockReason,
+} from '@/lib/reorder-availability';
 
 interface HistoryFilter {
   key: string;
@@ -79,16 +94,54 @@ interface OrderHistoryDrawerProps {
   config: ShopConfig | null;
   onImageClick?: (image: string) => void;
   onRefundRequested?: (ref: string) => void;
+  /** Close drawer and scroll/focus the storefront shop section */
+  onBrowseShop?: () => void;
 }
 
 const historyFilters: HistoryFilter[] = [
   { key: 'ALL', label: 'ทั้งหมด' },
   { key: 'WAITING_PAYMENT', label: 'รอชำระ' },
-  { key: 'COMPLETED', label: 'สำเร็จ' },
   { key: 'SHIPPED', label: 'กำลังจัดส่ง' },
   { key: 'RECEIVED', label: 'รับแล้ว' },
+  { key: 'COMPLETED', label: 'สำเร็จ' },
   { key: 'CANCELLED', label: 'ยกเลิก' },
 ];
+
+/** Soft status badge — avoid loud red on cancelled / flashy blue pills */
+function softStatusTone(category: string): { bg: string; color: string; border: string; bar: string } {
+  switch (category) {
+    case 'WAITING_PAYMENT':
+      return {
+        bg: 'rgba(245,158,11,0.12)',
+        color: '#d97706',
+        border: 'rgba(245,158,11,0.28)',
+        bar: '#f59e0b',
+      };
+    case 'SHIPPED':
+    case 'RECEIVED':
+    case 'COMPLETED':
+      return {
+        bg: 'rgba(16,185,129,0.12)',
+        color: '#059669',
+        border: 'rgba(16,185,129,0.28)',
+        bar: '#10b981',
+      };
+    case 'CANCELLED':
+      return {
+        bg: 'rgba(148,163,184,0.12)',
+        color: '#94a3b8',
+        border: 'rgba(148,163,184,0.28)',
+        bar: '#94a3b8',
+      };
+    default:
+      return {
+        bg: 'rgba(100,116,139,0.1)',
+        color: 'var(--text-muted)',
+        border: 'var(--glass-border)',
+        bar: '#64748b',
+      };
+  }
+}
 
 // Number of orders rendered per chunk (progressive rendering)
 const ORDERS_PER_CHUNK = 10;
@@ -160,10 +213,12 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
     config,
     onImageClick,
     onRefundRequested,
+    onBrowseShop,
   } = props;
 
-  const { success: toastSuccess, error: toastError } = useNotification();
+  const { success: toastSuccess, error: toastError, warning: toastWarning } = useNotification();
   const { t, lang } = useTranslation();
+  const addToCart = useCartStore((s) => s.addToCart);
   const isMobile = useMediaQuery('(max-width:640px)');
   const [openingReceiptRef, setOpeningReceiptRef] = useState<string | null>(null);
 
@@ -178,6 +233,105 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
     }
     setOpeningReceiptRef(null);
   }, [lang]);
+
+  const getOrderReorderMeta = useCallback((order: OrderHistory) => {
+    const items = order.items || order.cart || [];
+    const evals = items.map((item) =>
+      evaluateReorderItem(item as Record<string, unknown>, config?.products as Product[] | undefined, lang)
+    );
+    const available = evals.filter((e) => e.ok);
+    const blocked = evals.filter((e) => !e.ok);
+    const primaryReason = pickPrimaryReorderBlockReason(
+      blocked.map((b) => b.reason).filter(Boolean) as ReorderBlockReason[]
+    );
+    return {
+      evals,
+      available,
+      blocked,
+      canAddAny: available.length > 0,
+      allBlocked: items.length > 0 && available.length === 0,
+      primaryReason,
+      buttonLabel: available.length > 0
+        ? t.orderHistory.reorder
+        : reorderBlockLabel(primaryReason, lang),
+    };
+  }, [config?.products, lang, t.orderHistory.reorder]);
+
+  const handleReorder = useCallback((order: OrderHistory) => {
+    const items = order.items || order.cart || [];
+    const evals = items.map((item) =>
+      evaluateReorderItem(item as Record<string, unknown>, config?.products as Product[] | undefined, lang)
+    );
+
+    let added = 0;
+    const skippedNames: string[] = [];
+
+    items.forEach((item, index) => {
+      const verdict = evals[index];
+      if (!verdict?.ok || !verdict.product) {
+        if (verdict?.name) skippedNames.push(verdict.name);
+        return;
+      }
+
+      const productInfo = verdict.product;
+      const qty = verdict.qty;
+      const unitPrice =
+        item.unitPrice ??
+        (item.subtotal && qty ? item.subtotal / qty : undefined) ??
+        productInfo.basePrice ??
+        0;
+      const cartItem: CartItem = {
+        id: productInfo.id,
+        productId: productInfo.id,
+        name: verdict.name,
+        type: (productInfo as { type?: CartItem['type'] }).type || 'OTHER',
+        category: productInfo.category,
+        price: unitPrice,
+        qty,
+        size: item.size || 'Free Size',
+        customName: item.customName || item.options?.customName,
+        customNumber: item.customNumber || item.options?.customNumber,
+        sleeve: item.isLongSleeve || item.options?.isLongSleeve ? 'LONG' : undefined,
+        total: item.subtotal ?? unitPrice * qty,
+      };
+      addToCart(cartItem);
+      added += 1;
+    });
+
+    if (added === 0) {
+      toastError(t.orderHistory.reorderFailed);
+      return;
+    }
+
+    toastSuccess(`${t.orderHistory.reorderAdded} (${added})`);
+    if (skippedNames.length > 0) {
+      const preview = skippedNames.slice(0, 2).join(', ');
+      const more = skippedNames.length > 2 ? ` +${skippedNames.length - 2}` : '';
+      toastWarning(
+        t.orderHistory.reorderSkipped,
+        `${preview}${more} — ${t.orderHistory.reorderSkippedItem}`
+      );
+    }
+    onClose();
+  }, [addToCart, config?.products, lang, onClose, t.orderHistory, toastError, toastSuccess, toastWarning]);
+
+  const openTracking = useCallback((order: OrderHistory) => {
+    if (order.trackingNumber) {
+      const provider = (order.shippingProvider || 'custom') as ShippingProvider;
+      const url =
+        getTrackingUrl(provider, order.trackingNumber) ||
+        getTrack123Url(order.trackingNumber);
+      if (url) {
+        window.open(url, '_blank', 'noopener,noreferrer');
+        return;
+      }
+    }
+    setExpandedOrders((prev) => {
+      const next = new Set(prev);
+      next.add(order.ref);
+      return next;
+    });
+  }, []);
 
   // Filter label map for translating static historyFilters
   const filterLabelMap: Record<string, string> = {
@@ -204,14 +358,19 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
   const [refundDialogOpen, setRefundDialogOpen] = React.useState(false);
   const [refundOrderRef, setRefundOrderRef] = React.useState('');
   const [refundOrderTotal, setRefundOrderTotal] = React.useState(0);
+  const [refundOrderItems, setRefundOrderItems] = React.useState<OrderHistory['items']>([]);
+  const [refundSelectedIndexes, setRefundSelectedIndexes] = React.useState<Set<number>>(new Set());
   const [refundReason, setRefundReason] = React.useState('');
   const [refundDetails, setRefundDetails] = React.useState('');
+  const [refundPayoutMethod, setRefundPayoutMethod] = React.useState<RefundPayoutMethod>('promptpay');
   const [refundBankName, setRefundBankName] = React.useState('');
   const [refundBankAccount, setRefundBankAccount] = React.useState('');
   const [refundAccountName, setRefundAccountName] = React.useState('');
-  const [refundAmount, setRefundAmount] = React.useState('');
+  const [refundEvidenceUrls, setRefundEvidenceUrls] = React.useState<string[]>([]);
+  const [refundEvidenceUploading, setRefundEvidenceUploading] = React.useState(false);
   const [refundSubmitting, setRefundSubmitting] = React.useState(false);
   const [requestedRefundRefs, setRequestedRefundRefs] = React.useState<Set<string>>(new Set());
+  const refundEvidenceInputRef = React.useRef<HTMLInputElement>(null);
   const refundReasons = React.useMemo(() => [
     t.orderHistory.reason_damaged,
     t.orderHistory.reason_wrong,
@@ -219,23 +378,139 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
     t.orderHistory.reason_changed,
     t.orderHistory.reason_other,
   ], [t]);
-  const refundBanks = React.useMemo(() => [...t.bankNames], [t]);
   const promptPayLabel = t.bankNames[12];
+  const refundBanks = React.useMemo(
+    () => t.bankNames.filter((b) => b !== promptPayLabel),
+    [t, promptPayLabel]
+  );
 
-  const openRefundDialog = (ref: string, total: number) => {
-    setRefundOrderRef(ref);
+  const refundComputedAmount = React.useMemo(() => {
+    const items = refundOrderItems || [];
+    if (items.length === 0) return refundOrderTotal;
+    const selected = items.filter((_, i) => refundSelectedIndexes.has(i));
+    if (selected.length === 0) return 0;
+    const itemsSum = selected.reduce(
+      (sum, item) => sum + refundLineAmount(item as Record<string, unknown>),
+      0
+    );
+    const allSelected = selected.length === items.length;
+    if (allSelected && refundOrderTotal > 0) return refundOrderTotal;
+    return Math.min(itemsSum, refundOrderTotal || itemsSum);
+  }, [refundOrderItems, refundSelectedIndexes, refundOrderTotal]);
+
+  const refundSelectedPayload = React.useMemo((): RefundSelectedItem[] => {
+    const items = refundOrderItems || [];
+    return items
+      .map((item, index) => {
+        if (!refundSelectedIndexes.has(index)) return null;
+        const productInfo = item.productId
+          ? config?.products?.find((p) => p.id === item.productId)
+          : null;
+        const name =
+          (productInfo ? getProductName(productInfo, lang) : null) ||
+          item.name ||
+          item.productName ||
+          t.orderHistory.unknownProduct;
+        return {
+          index,
+          name,
+          size: item.size || undefined,
+          qty: Math.max(1, Number(item.qty ?? item.quantity ?? 1) || 1),
+          amount: refundLineAmount(item as Record<string, unknown>),
+        };
+      })
+      .filter(Boolean) as RefundSelectedItem[];
+  }, [refundOrderItems, refundSelectedIndexes, config?.products, lang, t.orderHistory.unknownProduct]);
+
+  const openRefundDialog = (order: OrderHistory) => {
+    const items = order.items || order.cart || [];
+    const total = order.total || 0;
+    setRefundOrderRef(order.ref);
     setRefundOrderTotal(total);
-    setRefundAmount(String(total));
+    setRefundOrderItems(items);
+    setRefundSelectedIndexes(new Set(items.map((_, i) => i)));
     setRefundReason('');
     setRefundDetails('');
+    setRefundPayoutMethod('promptpay');
     setRefundBankName('');
     setRefundBankAccount('');
     setRefundAccountName('');
+    setRefundEvidenceUrls([]);
     setRefundDialogOpen(true);
   };
 
+  const toggleRefundItem = (index: number) => {
+    setRefundSelectedIndexes((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        if (next.size <= 1) return prev;
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
+  };
+
+  const handleRefundEvidenceSelect = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const remaining = 3 - refundEvidenceUrls.length;
+    if (remaining <= 0) {
+      toastError(t.orderHistory.evidenceMax);
+      return;
+    }
+    const picked = Array.from(files).slice(0, remaining);
+    setRefundEvidenceUploading(true);
+    try {
+      const uploaded: string[] = [];
+      for (const file of picked) {
+        if (!file.type.startsWith('image/')) continue;
+        if (file.size > 5 * 1024 * 1024) {
+          toastError(t.orderHistory.evidenceTooLarge);
+          continue;
+        }
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result || ''));
+          reader.onerror = () => reject(new Error('read failed'));
+          reader.readAsDataURL(file);
+        });
+        const res = await uploadImageApi({
+          base64,
+          filename: file.name,
+          mime: file.type,
+        });
+        const json = await res.json();
+        if (json.status === 'success' && json.data?.url) {
+          uploaded.push(json.data.url);
+        } else {
+          toastError(json.message || t.orderHistory.evidenceUploadFailed);
+        }
+      }
+      if (uploaded.length > 0) {
+        setRefundEvidenceUrls((prev) => [...prev, ...uploaded].slice(0, 3));
+      }
+    } catch {
+      toastError(t.orderHistory.evidenceUploadFailed);
+    } finally {
+      setRefundEvidenceUploading(false);
+      if (refundEvidenceInputRef.current) refundEvidenceInputRef.current.value = '';
+    }
+  };
+
   const handleSubmitRefund = async () => {
-    if (!refundReason || !refundBankName || !refundBankAccount || !refundAccountName) return;
+    const accountOk = Boolean(refundBankAccount.trim() && refundAccountName.trim());
+    const bankOk = refundPayoutMethod === 'promptpay' || Boolean(refundBankName);
+    if (!refundReason || !accountOk || !bankOk || refundSelectedPayload.length === 0 || refundComputedAmount <= 0) {
+      return;
+    }
+    if (refundPayoutMethod === 'promptpay') {
+      const digits = refundBankAccount.replace(/\D/g, '');
+      if (digits.length < 10 || digits.length > 13) {
+        toastError(t.orderHistory.promptPayInvalid);
+        return;
+      }
+    }
     setRefundSubmitting(true);
     try {
       const res = await apiFetch('/api/refund', {
@@ -245,17 +520,20 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
           ref: refundOrderRef,
           reason: refundReason,
           details: refundDetails,
-          bankName: refundBankName,
-          bankAccount: refundBankAccount,
-          accountName: refundAccountName,
-          amount: Number(refundAmount) || refundOrderTotal,
+          bankName: refundPayoutMethod === 'promptpay' ? promptPayLabel : refundBankName,
+          bankAccount: refundBankAccount.replace(/\D/g, ''),
+          accountName: refundAccountName.trim(),
+          amount: refundComputedAmount,
+          payoutMethod: refundPayoutMethod,
+          evidenceUrls: refundEvidenceUrls,
+          items: refundSelectedPayload,
         }),
       });
       const data = await res.json();
       if (res.ok && data.success) {
         setRefundDialogOpen(false);
         toastSuccess(t.orderHistory.refundSuccess);
-        setRequestedRefundRefs(prev => {
+        setRequestedRefundRefs((prev) => {
           const next = new Set(prev);
           next.add(refundOrderRef);
           return next;
@@ -272,6 +550,14 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
       setRefundSubmitting(false);
     }
   };
+
+  const refundFormValid =
+    Boolean(refundReason) &&
+    Boolean(refundBankAccount.trim()) &&
+    Boolean(refundAccountName.trim()) &&
+    (refundPayoutMethod === 'promptpay' || Boolean(refundBankName)) &&
+    refundSelectedPayload.length > 0 &&
+    refundComputedAmount > 0;
 
   // Filter counts
   const filterCounts = React.useMemo(() => {
@@ -437,57 +723,72 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
           </IconButton>
         </Box>
 
-        {/* Filter Tabs */}
-        <Box sx={{
-          display: 'flex',
-          gap: 1,
-          overflowX: 'auto',
-          pb: 0.5,
-          mx: -2,
-          px: 2,
-          '&::-webkit-scrollbar': { display: 'none' },
-          scrollbarWidth: 'none',
-        }}>
+        {/* Filter Tabs — muted segmented control */}
+        <Box
+          sx={{
+            display: 'flex',
+            gap: 0.4,
+            p: 0.45,
+            borderRadius: '14px',
+            bgcolor: 'var(--surface)',
+            border: '1px solid var(--glass-border)',
+            overflowX: 'auto',
+            '&::-webkit-scrollbar': { display: 'none' },
+            scrollbarWidth: 'none',
+          }}
+        >
           {historyFilters.map((filter) => {
             const isActive = historyFilter === filter.key;
             const count = filterCounts[filter.key] ?? 0;
+            const isCancelled = filter.key === 'CANCELLED';
+            const showCount = filter.key === 'ALL' || count > 0;
             return (
               <Box
                 key={filter.key}
                 onClick={() => onFilterChange(filter.key as any)}
                 sx={{
-                  px: 2,
-                  py: 0.8,
-                  borderRadius: '20px',
-                  bgcolor: isActive ? 'rgba(0,113,227,0.15)' : 'var(--surface-2)',
-                  border: isActive ? '1px solid rgba(0,113,227,0.4)' : '1px solid var(--glass-border)',
-                  color: isActive ? 'var(--primary)' : 'var(--text-muted)',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
+                  px: 1.4,
+                  py: 0.7,
+                  borderRadius: '10px',
+                  bgcolor: isActive ? 'var(--surface-2)' : 'transparent',
+                  border: isActive ? '1px solid var(--glass-border)' : '1px solid transparent',
+                  boxShadow: isActive ? '0 1px 2px rgba(0,0,0,0.04)' : 'none',
+                  color: isActive
+                    ? 'var(--foreground)'
+                    : isCancelled
+                      ? 'rgba(148,163,184,0.85)'
+                      : 'var(--text-muted)',
+                  fontSize: '0.78rem',
+                  fontWeight: isActive ? 700 : 500,
                   cursor: 'pointer',
                   whiteSpace: 'nowrap',
-                  transition: 'all 0.2s ease',
+                  transition: 'all 0.15s ease',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 0.8,
+                  gap: 0.6,
+                  flexShrink: 0,
                   '&:hover': {
-                    bgcolor: isActive ? 'rgba(0,113,227,0.2)' : 'var(--glass-bg)',
+                    color: 'var(--foreground)',
+                    bgcolor: isActive ? 'var(--surface-2)' : 'rgba(100,116,139,0.06)',
                   },
                 }}
               >
                 {filterLabelMap[filter.key] || filter.label}
-                <Box sx={{
-                  px: 0.8,
-                  py: 0.1,
-                  borderRadius: '8px',
-                  bgcolor: isActive ? 'rgba(0,113,227,0.3)' : 'var(--glass-bg)',
-                  fontSize: '0.7rem',
-                  fontWeight: 700,
-                  minWidth: 20,
-                  textAlign: 'center',
-                }}>
-                  {count}
-                </Box>
+                {showCount && (
+                  <Box
+                    component="span"
+                    sx={{
+                      fontSize: '0.68rem',
+                      fontWeight: 600,
+                      opacity: isCancelled && !isActive ? 0.55 : isActive ? 0.85 : 0.65,
+                      color: 'inherit',
+                      minWidth: 14,
+                      textAlign: 'center',
+                    }}
+                  >
+                    {count}
+                  </Box>
+                )}
               </Box>
             );
           })}
@@ -505,21 +806,44 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
         {loadingHistory ? (
           <OrderListSkeleton count={5} />
         ) : filteredOrders.length === 0 ? (
-          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 8, gap: 2 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 8, gap: 2, px: 2 }}>
             <Box sx={{
-              width: 80,
-              height: 80,
-              borderRadius: '50%',
-              bgcolor: 'rgba(100,116,139,0.1)',
+              width: 88,
+              height: 88,
+              borderRadius: '22px',
+              bgcolor: 'rgba(100,116,139,0.08)',
+              border: '1px dashed var(--glass-border)',
               display: 'grid',
               placeItems: 'center',
             }}>
-              <Package size={36} style={{ color: 'var(--text-muted)' }} />
+              <Package size={36} style={{ color: 'var(--text-muted)', opacity: 0.7 }} />
             </Box>
-            <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>{t.orderHistory.empty}</Typography>
-            <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+            <Typography sx={{ color: 'var(--foreground)', fontSize: '0.98rem', fontWeight: 700, textAlign: 'center' }}>
+              {t.orderHistory.empty}
+            </Typography>
+            <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.82rem', textAlign: 'center' }}>
               {historyFilter === 'ALL' ? t.orderHistory.noOrders : t.orderHistory.tryFilter}
             </Typography>
+            <Button
+              onClick={() => {
+                onClose();
+                onBrowseShop?.();
+              }}
+              startIcon={<ShoppingBag size={16} />}
+              sx={{
+                mt: 1,
+                px: 2.5,
+                py: 1,
+                borderRadius: '12px',
+                textTransform: 'none',
+                fontWeight: 700,
+                bgcolor: 'var(--foreground)',
+                color: 'var(--background)',
+                '&:hover': { opacity: 0.9, bgcolor: 'var(--foreground)' },
+              }}
+            >
+              {t.orderHistory.goShop}
+            </Button>
           </Box>
         ) : (
           <Box sx={{
@@ -533,7 +857,6 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
             {visibleOrders.map((order, idx) => {
               const statusKey = normalizeStatus(order.status);
               const statusLabel = getStatusLabel(statusKey, lang);
-              const statusColor = getStatusColor(statusKey);
               const canCancel = CANCELABLE_STATUSES.includes(statusKey);
               const canPay = isShopOpen && PAYABLE_STATUSES.includes(statusKey);
               const orderDateStr = order.receiptIssuedAt || order.paymentVerifiedAt || order.date;
@@ -544,15 +867,45 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
               const hasRequestedRefund = !!tempRefundStatus;
               const canViewReceipt = isOrderPaidForReceipt(order);
               const category = getStatusCategory(statusKey);
+              const statusTone = softStatusTone(category);
               const isExpanded = expandedOrders.has(order.ref);
               const orderItems = order.items || order.cart || [];
               const totalItems = orderItems.reduce((sum: number, item: any) => sum + (item.qty || item.quantity || 1), 0);
-              const firstProductImage = (() => {
-                const firstItem = orderItems[0];
-                if (!firstItem) return null;
-                const productInfo = config?.products?.find((p) => p.id === firstItem.productId);
-                return productInfo?.coverImage || productInfo?.images?.[0] || null;
-              })();
+              const firstItem = orderItems[0];
+              const firstProductInfo = firstItem
+                ? config?.products?.find((p) => p.id === firstItem.productId)
+                : null;
+              const firstProductImage =
+                firstProductInfo?.coverImage || firstProductInfo?.images?.[0] || null;
+              const firstItemName =
+                (firstProductInfo ? getProductName(firstProductInfo, lang) : null) ||
+                firstItem?.name ||
+                firstItem?.productName ||
+                firstProductInfo?.name ||
+                t.orderHistory.unknownProduct;
+              const firstItemQty = firstItem?.qty || firstItem?.quantity || 1;
+              const firstItemOption = firstItem?.size
+                ? `${firstItem.size} × ${firstItemQty}`
+                : `${firstItemQty} ${t.common.pieces}`;
+              const firstItemPrice =
+                firstItem?.subtotal ??
+                (firstItem?.unitPrice ? firstItem.unitPrice * firstItemQty : undefined) ??
+                order.total;
+              const canReorderCategory =
+                category === 'CANCELLED' ||
+                category === 'RECEIVED' ||
+                category === 'COMPLETED' ||
+                category === 'SHIPPED';
+              const reorderMeta = canReorderCategory ? getOrderReorderMeta(order) : null;
+              const canReorder = Boolean(canReorderCategory);
+              const canTrack =
+                Boolean(order.trackingNumber) ||
+                category === 'SHIPPED' ||
+                (['READY', 'PAID'].includes(statusKey) &&
+                  ((order.shippingOption &&
+                    order.shippingOption !== 'pickup' &&
+                    !order.shippingOption.toLowerCase().includes('รับ')) ||
+                    (!order.shippingOption && order.shippingFee && order.shippingFee > 0)));
 
               const getStatusIcon = () => {
                 if (category === 'WAITING_PAYMENT') return <Clock size={14} />;
@@ -561,6 +914,18 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                 if (category === 'RECEIVED') return <Package size={14} />;
                 if (category === 'CANCELLED') return <XCircle size={14} />;
                 return <span>•</span>;
+              };
+
+              const actionBtnSx = {
+                px: 1.6,
+                py: 0.85,
+                borderRadius: '11px',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                textTransform: 'none' as const,
+                flex: 1,
+                minWidth: 0,
+                whiteSpace: 'nowrap' as const,
               };
 
               return (
@@ -575,183 +940,256 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                   }}
                 >
                   {/* Status Accent Bar */}
-                  <Box sx={{ height: 3, background: statusColor, opacity: 0.85 }} />
+                  <Box sx={{ height: 3, background: statusTone.bar, opacity: 0.9 }} />
 
                   {/* Order Summary (always visible) */}
-                  <Box
-                    onClick={() => toggleExpanded(order.ref)}
-                    sx={{
-                      p: { xs: 1.5, sm: 2 },
-                      cursor: 'pointer',
-                      '&:active': { bgcolor: 'rgba(0,0,0,0.02)' },
-                    }}
-                  >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                      {/* Product Thumbnail Preview */}
-                      <Box sx={{
-                        width: 52,
-                        height: 52,
-                        borderRadius: '12px',
-                        bgcolor: 'var(--surface)',
-                        flexShrink: 0,
-                        overflow: 'hidden',
-                        border: '1px solid var(--glass-border)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        position: 'relative',
-                      }}>
-                        {firstProductImage ? (
-                          <Box
-                            component="img"
-                            src={firstProductImage}
-                            alt=""
-                            sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                            loading="lazy"
-                          />
+                  <Box sx={{ p: { xs: 1.5, sm: 2 } }}>
+                    <Box
+                      onClick={() => toggleExpanded(order.ref)}
+                      sx={{
+                        cursor: 'pointer',
+                        '&:active': { opacity: 0.92 },
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1, mb: 0.6 }}>
+                        <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)', letterSpacing: '-0.01em' }}>
+                          #{order.ref}
+                        </Typography>
+                        <Box sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 0.5,
+                          px: 1,
+                          py: 0.35,
+                          borderRadius: '8px',
+                          bgcolor: statusTone.bg,
+                          border: `1px solid ${statusTone.border}`,
+                          flexShrink: 0,
+                        }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', color: statusTone.color }}>{getStatusIcon()}</Box>
+                          <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: statusTone.color }}>
+                            {statusLabel}
+                          </Typography>
+                        </Box>
+                      </Box>
+
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.25 }}>
+                        <Typography sx={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                          {new Date(order.date).toLocaleDateString(lang === 'en' ? 'en-US' : 'th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          {' • '}
+                          {totalItems} {t.common.pieces}
+                        </Typography>
+                        {isExpanded ? (
+                          <ChevronUp size={16} style={{ color: 'var(--text-muted)' }} />
                         ) : (
-                          <ShoppingBag size={22} style={{ color: 'var(--text-muted)' }} />
-                        )}
-                        {totalItems > 1 && (
-                          <Box sx={{
-                            position: 'absolute',
-                            bottom: -2,
-                            right: -2,
-                            width: 20,
-                            height: 20,
-                            borderRadius: '50%',
-                            bgcolor: 'var(--primary)',
-                            color: 'white',
-                            fontSize: '0.65rem',
-                            fontWeight: 700,
-                            display: 'grid',
-                            placeItems: 'center',
-                            border: '2px solid var(--surface-2)',
-                          }}>
-                            {totalItems}
-                          </Box>
+                          <ChevronDown size={16} style={{ color: 'var(--text-muted)' }} />
                         )}
                       </Box>
 
-                      {/* Order Info */}
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.3 }}>
-                          <Typography sx={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                            #{order.ref}
-                          </Typography>
+                      {/* Product preview — always visible */}
+                      {firstItem && (
+                        <Box sx={{
+                          display: 'flex',
+                          gap: 1.35,
+                          pb: 1.35,
+                          borderBottom: '1px solid var(--glass-border)',
+                        }}>
                           <Box sx={{
+                            width: 52,
+                            height: 52,
+                            borderRadius: '12px',
+                            bgcolor: 'var(--surface)',
+                            flexShrink: 0,
+                            overflow: 'hidden',
+                            border: '1px solid var(--glass-border)',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: 0.5,
-                            px: 1,
-                            py: 0.3,
-                            borderRadius: '8px',
-                            bgcolor: `${statusColor}15`,
-                            border: `1px solid ${statusColor}25`,
+                            justifyContent: 'center',
                           }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', color: statusColor }}>{getStatusIcon()}</Box>
-                            <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: statusColor }}>
-                              {statusLabel}
+                            {firstProductImage ? (
+                              <Box
+                                component="img"
+                                src={firstProductImage}
+                                alt=""
+                                sx={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                                loading="lazy"
+                              />
+                            ) : (
+                              <ShoppingBag size={20} style={{ color: 'var(--text-muted)' }} />
+                            )}
+                          </Box>
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography sx={{
+                              fontSize: '0.84rem',
+                              fontWeight: 700,
+                              color: 'var(--foreground)',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}>
+                              {firstItemName}
+                            </Typography>
+                            <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', mt: 0.15 }}>
+                              {lang === 'en' ? 'Option: ' : 'ตัวเลือก: '}{firstItemOption}
+                              {orderItems.length > 1 ? ` · +${orderItems.length - 1}` : ''}
+                            </Typography>
+                            <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--foreground)', mt: 0.35 }}>
+                              ฿{(firstItemPrice ?? 0).toLocaleString()}
                             </Typography>
                           </Box>
                         </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                            {new Date(order.date).toLocaleDateString(lang === 'en' ? 'en-US' : 'th-TH', { day: 'numeric', month: 'short', year: '2-digit' })}
-                            {' • '}
-                            {totalItems} {t.common.pieces}
-                          </Typography>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--success)' }}>
-                              ฿{order.total?.toLocaleString() || '0'}
-                            </Typography>
-                            {isExpanded ? <ChevronUp size={16} style={{ color: 'var(--text-muted)' }} /> : <ChevronDown size={16} style={{ color: 'var(--text-muted)' }} />}
-                          </Box>
-                        </Box>
-                      </Box>
+                      )}
                     </Box>
 
-                    {/* Quick Action Buttons (always visible for important actions) */}
-                    {/* Countdown timer for WAITING_PAYMENT orders */}
+                    {/* Net total */}
+                    <Box sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      py: 1.2,
+                      borderBottom: '1px solid var(--glass-border)',
+                    }}>
+                      <Typography sx={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+                        {t.orderHistory.netTotal}
+                      </Typography>
+                      <Typography sx={{ fontSize: '1rem', fontWeight: 800, color: 'var(--foreground)' }}>
+                        ฿{order.total?.toLocaleString() || '0'}
+                      </Typography>
+                    </Box>
+
                     {canPay && order.date && !isOrderExpired(order.date) && (
-                      <Box sx={{ mt: 1, ml: '68px' }}>
+                      <Box sx={{ mt: 1.1 }}>
                         <CountdownBadge orderDate={order.date} compact />
                       </Box>
                     )}
 
-                    {(canPay || (canCancel && !canPay)) && (
-                      <Box sx={{ display: 'flex', gap: 1, mt: 1, ml: '68px', flexWrap: 'wrap', alignItems: 'center' }}>
-                        {canPay && !isOrderExpired(order.date) && (
-                          <Button
-                            size="small"
-                            onClick={(e) => { e.stopPropagation(); onOpenPayment(order.ref); }}
-                            sx={{
-                              px: 2,
-                              py: 0.7,
-                              borderRadius: '10px',
-                              background: 'linear-gradient(135deg, #34c759 0%, #30d158 100%)',
-                              color: 'white',
-                              fontSize: '0.78rem',
-                              fontWeight: 700,
-                              textTransform: 'none',
-                              boxShadow: '0 2px 8px rgba(52,199,89,0.3)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 0.5,
-                              '&:hover': {
-                                background: 'linear-gradient(135deg, #30d158 0%, #28a745 100%)',
-                              },
-                            }}
-                          >
-                            <CreditCard size={14} />
-                            {t.orderHistory.payNow}
-                          </Button>
-                        )}
-                        {canCancel && (
-                          <Button
-                            size="small"
-                            onClick={(e) => { e.stopPropagation(); onCancelOrder(order.ref); }}
-                            disabled={cancellingRef === order.ref}
-                            sx={{
-                              px: 2,
-                              py: 0.7,
-                              borderRadius: '10px',
-                              bgcolor: 'rgba(239,68,68,0.08)',
-                              border: '1px solid rgba(239,68,68,0.2)',
-                              color: 'var(--error)',
-                              fontSize: '0.78rem',
-                              fontWeight: 700,
-                              textTransform: 'none',
-                              display: 'flex',
-                              alignItems: 'center',
-                              '&:hover': { bgcolor: 'rgba(239,68,68,0.15)' },
-                              '&:disabled': { color: 'var(--text-muted)', borderColor: 'rgba(100,116,139,0.2)' },
-                            }}
-                          >
-                            {cancellingRef === order.ref ? t.orderHistory.cancelling : t.orderHistory.cancelOrder}
-                          </Button>
-                        )}
-                        {canPay && isOrderExpired(order.date) && (
-                          <CountdownBadge orderDate={order.date} compact />
-                        )}
-                        {!isShopOpen && PAYABLE_STATUSES.includes(statusKey) && (
-                          <Typography sx={{ 
-                            fontSize: '0.7rem', 
-                            color: 'var(--warning)',
-                            bgcolor: 'rgba(245,158,11,0.1)',
-                            px: 1.5,
-                            py: 0.5,
-                            borderRadius: '8px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 0.5,
-                          }}>
-                            <Clock size={12} />
-                            {t.orderHistory.expiredPayment}
-                          </Typography>
-                        )}
-                      </Box>
-                    )}
+                    {/* Footer actions — status-driven */}
+                    <Box
+                      sx={{ display: 'flex', gap: 1, mt: 1.25, flexWrap: 'wrap' }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {canPay && !isOrderExpired(order.date) && (
+                        <Button
+                          size="small"
+                          onClick={() => onOpenPayment(order.ref)}
+                          startIcon={<CreditCard size={14} />}
+                          sx={{
+                            ...actionBtnSx,
+                            background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                            color: 'white',
+                            boxShadow: '0 2px 8px rgba(245,158,11,0.28)',
+                            '&:hover': { background: 'linear-gradient(135deg, #d97706 0%, #b45309 100%)' },
+                          }}
+                        >
+                          {t.orderHistory.attachSlip}
+                        </Button>
+                      )}
+                      {canTrack && (
+                        <Button
+                          size="small"
+                          onClick={() => openTracking(order)}
+                          startIcon={<Truck size={14} />}
+                          sx={{
+                            ...actionBtnSx,
+                            bgcolor: 'rgba(16,185,129,0.12)',
+                            border: '1px solid rgba(16,185,129,0.28)',
+                            color: '#059669',
+                            '&:hover': { bgcolor: 'rgba(16,185,129,0.18)' },
+                          }}
+                        >
+                          {t.orderHistory.trackPackage}
+                        </Button>
+                      )}
+                      {canReorder && reorderMeta && (
+                        <Button
+                          size="small"
+                          onClick={() => {
+                            if (!reorderMeta.canAddAny) return;
+                            handleReorder(order);
+                          }}
+                          disabled={!reorderMeta.canAddAny}
+                          startIcon={<RotateCcw size={14} />}
+                          title={
+                            reorderMeta.allBlocked
+                              ? reorderMeta.buttonLabel
+                              : reorderMeta.blocked.length > 0
+                                ? `${reorderMeta.available.length}/${reorderMeta.evals.length}`
+                                : undefined
+                          }
+                          sx={{
+                            ...actionBtnSx,
+                            bgcolor: reorderMeta.canAddAny ? 'var(--surface)' : 'rgba(148,163,184,0.12)',
+                            border: '1px solid var(--glass-border)',
+                            color: reorderMeta.canAddAny ? 'var(--foreground)' : 'var(--text-muted)',
+                            opacity: reorderMeta.canAddAny ? 1 : 0.85,
+                            cursor: reorderMeta.canAddAny ? 'pointer' : 'not-allowed',
+                            '&:hover': reorderMeta.canAddAny
+                              ? { bgcolor: 'rgba(100,116,139,0.08)' }
+                              : { bgcolor: 'rgba(148,163,184,0.12)' },
+                            '&.Mui-disabled': {
+                              color: 'var(--text-muted)',
+                              bgcolor: 'rgba(148,163,184,0.12)',
+                              borderColor: 'var(--glass-border)',
+                              opacity: 1,
+                            },
+                          }}
+                        >
+                          {reorderMeta.buttonLabel}
+                        </Button>
+                      )}
+                      {canCancel && (
+                        <Button
+                          size="small"
+                          onClick={() => onCancelOrder(order.ref)}
+                          disabled={cancellingRef === order.ref}
+                          sx={{
+                            ...actionBtnSx,
+                            flex: '0 0 auto',
+                            bgcolor: 'rgba(239,68,68,0.06)',
+                            border: '1px solid rgba(239,68,68,0.18)',
+                            color: 'var(--error)',
+                            '&:hover': { bgcolor: 'rgba(239,68,68,0.12)' },
+                            '&:disabled': { color: 'var(--text-muted)', borderColor: 'rgba(100,116,139,0.2)' },
+                          }}
+                        >
+                          {cancellingRef === order.ref ? t.orderHistory.cancelling : t.orderHistory.cancelOrder}
+                        </Button>
+                      )}
+                      <Button
+                        size="small"
+                        onClick={() => toggleExpanded(order.ref)}
+                        sx={{
+                          ...actionBtnSx,
+                          flex: canPay || canTrack || canReorder ? '0 0 auto' : 1,
+                          bgcolor: 'transparent',
+                          border: '1px solid var(--glass-border)',
+                          color: 'var(--text-muted)',
+                          '&:hover': { bgcolor: 'rgba(100,116,139,0.06)', color: 'var(--foreground)' },
+                        }}
+                      >
+                        {isExpanded ? t.orderHistory.hideDetails : t.orderHistory.viewDetails}
+                      </Button>
+                      {canPay && isOrderExpired(order.date) && (
+                        <CountdownBadge orderDate={order.date} compact />
+                      )}
+                      {!isShopOpen && PAYABLE_STATUSES.includes(statusKey) && (
+                        <Typography sx={{
+                          fontSize: '0.7rem',
+                          color: 'var(--warning)',
+                          bgcolor: 'rgba(245,158,11,0.1)',
+                          px: 1.5,
+                          py: 0.5,
+                          borderRadius: '8px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 0.5,
+                          width: '100%',
+                        }}>
+                          <Clock size={12} />
+                          {t.orderHistory.expiredPayment}
+                        </Typography>
+                      )}
+                    </Box>
                   </Box>
 
                   {/* Expanded Details */}
@@ -1174,7 +1612,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                           {(canRequestRefund || hasRequestedRefund) && (
                             <Button
                               size="small"
-                              onClick={() => canRequestRefund ? openRefundDialog(order.ref, order.total || 0) : null}
+                              onClick={() => canRequestRefund ? openRefundDialog(order) : null}
                               disabled={hasRequestedRefund}
                               sx={{
                                 px: 1.5,
@@ -1335,14 +1773,140 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
           fontSize: '1.05rem',
           borderBottom: '1px solid var(--glass-border)',
           pb: 1.5,
+          pr: 1.5,
         }}>
-          <RotateCcw size={20} style={{ color: '#bf5af2' }} />
-          {t.orderHistory.refundTitle}
-          <Typography sx={{ ml: 'auto', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            {refundOrderRef}
-          </Typography>
+          <RotateCcw size={20} style={{ color: '#8b5cf6' }} />
+          <Box sx={{ minWidth: 0, flex: 1 }}>
+            <Typography component="span" sx={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--foreground)' }}>
+              {t.orderHistory.refundTitle}
+            </Typography>
+            <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', mt: 0.15 }}>
+              {refundOrderRef}
+            </Typography>
+          </Box>
+          <IconButton
+            size="small"
+            onClick={() => !refundSubmitting && setRefundDialogOpen(false)}
+            disabled={refundSubmitting}
+            sx={{ color: 'var(--text-muted)' }}
+          >
+            <X size={18} />
+          </IconButton>
         </DialogTitle>
-        <DialogContent sx={{ pt: '16px !important', display: 'flex', flexDirection: 'column', gap: 2 }}>
+
+        <DialogContent sx={{ pt: '16px !important', display: 'flex', flexDirection: 'column', gap: 2.25 }}>
+          {/* Product selection */}
+          <Box>
+            <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, mb: 1, color: 'var(--foreground)', display: 'flex', alignItems: 'center', gap: 0.75 }}>
+              <Package size={14} />
+              {t.orderHistory.refundItemsTitle}
+            </Typography>
+            {(refundOrderItems || []).length === 0 ? (
+              <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                {t.orderHistory.unknownProduct}
+              </Typography>
+            ) : (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {(refundOrderItems || []).map((item, index) => {
+                  const productInfo = item.productId
+                    ? config?.products?.find((p) => p.id === item.productId)
+                    : null;
+                  const image = productInfo?.coverImage || productInfo?.images?.[0] || null;
+                  const name =
+                    (productInfo ? getProductName(productInfo, lang) : null) ||
+                    item.name ||
+                    item.productName ||
+                    t.orderHistory.unknownProduct;
+                  const qty = Math.max(1, Number(item.qty ?? item.quantity ?? 1) || 1);
+                  const lineAmt = refundLineAmount(item as Record<string, unknown>);
+                  const checked = refundSelectedIndexes.has(index);
+                  const multi = (refundOrderItems || []).length > 1;
+                  return (
+                    <Box
+                      key={`${refundOrderRef}-${index}`}
+                      onClick={() => multi && toggleRefundItem(index)}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1.25,
+                        p: 1.15,
+                        borderRadius: '12px',
+                        border: checked ? '1px solid rgba(139,92,246,0.35)' : '1px solid var(--glass-border)',
+                        bgcolor: checked ? 'rgba(139,92,246,0.06)' : 'var(--surface-2)',
+                        cursor: multi ? 'pointer' : 'default',
+                      }}
+                    >
+                      {multi && (
+                        <Checkbox
+                          checked={checked}
+                          onChange={() => toggleRefundItem(index)}
+                          onClick={(e) => e.stopPropagation()}
+                          size="small"
+                          sx={{ p: 0.25, color: 'var(--text-muted)', '&.Mui-checked': { color: '#8b5cf6' } }}
+                        />
+                      )}
+                      <Box
+                        sx={{
+                          width: 48,
+                          height: 48,
+                          borderRadius: '10px',
+                          overflow: 'hidden',
+                          flexShrink: 0,
+                          bgcolor: 'var(--glass-bg)',
+                          border: '1px solid var(--glass-border)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        {image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <Package size={18} style={{ color: 'var(--text-muted)' }} />
+                        )}
+                      </Box>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography sx={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--foreground)', lineHeight: 1.3 }}>
+                          {name}
+                        </Typography>
+                        <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', mt: 0.2 }}>
+                          {item.size ? `${item.size} × ${qty}` : `${qty} ${t.common.pieces}`}
+                        </Typography>
+                      </Box>
+                      <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--foreground)', whiteSpace: 'nowrap' }}>
+                        ฿{lineAmt.toLocaleString()}
+                      </Typography>
+                    </Box>
+                  );
+                })}
+              </Box>
+            )}
+            {(refundOrderItems || []).length > 1 && (
+              <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', mt: 0.85 }}>
+                {t.orderHistory.refundItemsHint}
+              </Typography>
+            )}
+            <Box sx={{
+              mt: 1.25,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              px: 1.25,
+              py: 1,
+              borderRadius: '10px',
+              bgcolor: 'rgba(16,185,129,0.08)',
+              border: '1px solid rgba(16,185,129,0.2)',
+            }}>
+              <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                {t.orderHistory.refundAmountAuto}
+              </Typography>
+              <Typography sx={{ fontSize: '0.95rem', fontWeight: 800, color: '#059669' }}>
+                ฿{refundComputedAmount.toLocaleString()}
+              </Typography>
+            </Box>
+          </Box>
+
           {/* Reason */}
           <Box>
             <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, mb: 0.5, color: 'var(--foreground)' }}>
@@ -1378,7 +1942,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
               value={refundDetails}
               onChange={(e) => setRefundDetails(e.target.value)}
               multiline
-              rows={3}
+              rows={2}
               fullWidth
               placeholder={t.orderHistory.detailsPlaceholder}
               size="small"
@@ -1394,80 +1958,175 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
             />
           </Box>
 
-          {/* Refund Amount */}
+          {/* Evidence photos */}
           <Box>
-            <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, mb: 0.5, color: 'var(--foreground)' }}>
-              {t.orderHistory.refundAmount}
+            <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, mb: 0.75, color: 'var(--foreground)', display: 'flex', alignItems: 'center', gap: 0.75 }}>
+              <Camera size={14} />
+              {t.orderHistory.evidenceTitle}
             </Typography>
-            <TextField
-              value={refundAmount}
-              onChange={(e) => {
-                const v = e.target.value.replace(/[^0-9.]/g, '');
-                if (Number(v) <= refundOrderTotal) setRefundAmount(v);
-              }}
-              fullWidth
-              size="small"
-              type="text"
-              inputMode="decimal"
-              placeholder={`${t.orderHistory.maxAmount} ฿${refundOrderTotal.toLocaleString()}`}
-              helperText={`${t.orderHistory.orderTotal} ฿${refundOrderTotal.toLocaleString()}`}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: '10px',
-                  fontSize: '0.85rem',
-                  color: 'var(--foreground)',
-                  '& fieldset': { borderColor: 'var(--glass-border)' },
-                  '& input::placeholder': { color: 'var(--text-muted)', opacity: 1 },
-                },
-              }}
+            <input
+              ref={refundEvidenceInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              hidden
+              onChange={(e) => handleRefundEvidenceSelect(e.target.files)}
             />
-          </Box>
-
-          {/* Bank Info */}
-          <Box sx={{
-            p: 2,
-            borderRadius: '12px',
-            bgcolor: 'rgba(124,58,237,0.08)',
-            border: '1px solid rgba(124,58,237,0.2)',
-          }}>
-            <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, mb: 1.5, color: '#bf5af2' }}>
-              {t.orderHistory.bankInfo}
-            </Typography>
-
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-              <Box>
-                <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, mb: 0.3, color: 'var(--foreground)' }}>{t.orderHistory.bankName}</Typography>
-                <Select
-                  value={refundBankName}
-                  onChange={(e) => setRefundBankName(e.target.value as string)}
-                  fullWidth
-                  size="small"
-                  displayEmpty
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              {refundEvidenceUrls.map((url) => (
+                <Box
+                  key={url}
                   sx={{
+                    position: 'relative',
+                    width: 72,
+                    height: 72,
                     borderRadius: '10px',
-                    fontSize: '0.85rem',
-                    color: 'var(--foreground)',
-                    '& .MuiOutlinedInput-notchedOutline': { borderColor: 'var(--glass-border)' },
-                    '& .MuiSelect-icon': { color: 'var(--text-muted)' },
+                    overflow: 'hidden',
+                    border: '1px solid var(--glass-border)',
                   }}
                 >
-                  <MenuItem value="" disabled>{t.orderHistory.selectBank}</MenuItem>
-                  {refundBanks.map((b) => (
-                    <MenuItem key={b} value={b}>{b}</MenuItem>
-                  ))}
-                </Select>
-              </Box>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <IconButton
+                    size="small"
+                    onClick={() => setRefundEvidenceUrls((prev) => prev.filter((u) => u !== url))}
+                    disabled={refundSubmitting || refundEvidenceUploading}
+                    sx={{
+                      position: 'absolute',
+                      top: 2,
+                      right: 2,
+                      width: 22,
+                      height: 22,
+                      bgcolor: 'rgba(0,0,0,0.55)',
+                      color: '#fff',
+                      '&:hover': { bgcolor: 'rgba(0,0,0,0.75)' },
+                    }}
+                  >
+                    <X size={12} />
+                  </IconButton>
+                </Box>
+              ))}
+              {refundEvidenceUrls.length < 3 && (
+                <Button
+                  onClick={() => refundEvidenceInputRef.current?.click()}
+                  disabled={refundSubmitting || refundEvidenceUploading}
+                  sx={{
+                    width: 72,
+                    height: 72,
+                    minWidth: 72,
+                    borderRadius: '10px',
+                    border: '1px dashed var(--glass-border)',
+                    color: 'var(--text-muted)',
+                    textTransform: 'none',
+                    fontSize: '0.68rem',
+                    flexDirection: 'column',
+                    gap: 0.35,
+                    bgcolor: 'var(--surface-2)',
+                    '&:hover': { bgcolor: 'var(--glass-bg)', borderColor: 'rgba(139,92,246,0.4)' },
+                  }}
+                >
+                  {refundEvidenceUploading ? <CircularProgress size={16} /> : <Camera size={16} />}
+                  {t.orderHistory.evidenceAdd}
+                </Button>
+              )}
+            </Box>
+            <Typography sx={{ fontSize: '0.68rem', color: 'var(--text-muted)', mt: 0.6 }}>
+              {t.orderHistory.evidenceHint}
+            </Typography>
+          </Box>
+
+          {/* Payout method */}
+          <Box sx={{
+            p: 1.75,
+            borderRadius: '12px',
+            bgcolor: 'rgba(16,185,129,0.06)',
+            border: '1px solid rgba(16,185,129,0.18)',
+          }}>
+            <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, mb: 1.25, color: '#059669', display: 'flex', alignItems: 'center', gap: 0.75 }}>
+              <CreditCard size={14} />
+              {t.orderHistory.payoutTitle}
+            </Typography>
+
+            <Box sx={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: 0.75,
+              mb: 1.5,
+              p: 0.4,
+              borderRadius: '10px',
+              bgcolor: 'var(--surface-2)',
+              border: '1px solid var(--glass-border)',
+            }}>
+              {([
+                { key: 'promptpay' as const, label: t.orderHistory.payoutPromptPay },
+                { key: 'bank' as const, label: t.orderHistory.payoutBank },
+              ]).map((opt) => {
+                const active = refundPayoutMethod === opt.key;
+                return (
+                  <Button
+                    key={opt.key}
+                    onClick={() => {
+                      setRefundPayoutMethod(opt.key);
+                      if (opt.key === 'promptpay') setRefundBankName('');
+                    }}
+                    sx={{
+                      py: 0.85,
+                      borderRadius: '8px',
+                      textTransform: 'none',
+                      fontWeight: 700,
+                      fontSize: '0.78rem',
+                      color: active ? '#fff' : 'var(--text-muted)',
+                      bgcolor: active ? '#059669' : 'transparent',
+                      boxShadow: active ? '0 2px 8px rgba(5,150,105,0.25)' : 'none',
+                      '&:hover': {
+                        bgcolor: active ? '#047857' : 'var(--glass-bg)',
+                      },
+                    }}
+                  >
+                    {opt.label}
+                  </Button>
+                );
+              })}
+            </Box>
+
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.35 }}>
+              {refundPayoutMethod === 'bank' && (
+                <Box>
+                  <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, mb: 0.3, color: 'var(--foreground)' }}>
+                    {t.orderHistory.bankName}
+                  </Typography>
+                  <Select
+                    value={refundBankName}
+                    onChange={(e) => setRefundBankName(e.target.value as string)}
+                    fullWidth
+                    size="small"
+                    displayEmpty
+                    sx={{
+                      borderRadius: '10px',
+                      fontSize: '0.85rem',
+                      color: 'var(--foreground)',
+                      '& .MuiOutlinedInput-notchedOutline': { borderColor: 'var(--glass-border)' },
+                      '& .MuiSelect-icon': { color: 'var(--text-muted)' },
+                    }}
+                  >
+                    <MenuItem value="" disabled>{t.orderHistory.selectBank}</MenuItem>
+                    {refundBanks.map((b) => (
+                      <MenuItem key={b} value={b}>{b}</MenuItem>
+                    ))}
+                  </Select>
+                </Box>
+              )}
 
               <Box>
                 <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, mb: 0.3, color: 'var(--foreground)' }}>
-                  {refundBankName === promptPayLabel ? t.orderHistory.promptPayNumber : t.orderHistory.accountNumber}
+                  {refundPayoutMethod === 'promptpay' ? t.orderHistory.promptPayNumber : t.orderHistory.accountNumber}
                 </Typography>
                 <TextField
                   value={refundBankAccount}
                   onChange={(e) => setRefundBankAccount(e.target.value.replace(/[^0-9-]/g, ''))}
                   fullWidth
                   size="small"
-                  placeholder={refundBankName === promptPayLabel ? t.orderHistory.promptPayHint : t.orderHistory.accountHint}
+                  placeholder={refundPayoutMethod === 'promptpay' ? t.orderHistory.promptPayHint : t.orderHistory.accountHint}
                   sx={{
                     '& .MuiOutlinedInput-root': {
                       borderRadius: '10px',
@@ -1481,7 +2140,9 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
               </Box>
 
               <Box>
-                <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, mb: 0.3, color: 'var(--foreground)' }}>{t.orderHistory.accountOwner}</Typography>
+                <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, mb: 0.3, color: 'var(--foreground)' }}>
+                  {t.orderHistory.accountOwner}
+                </Typography>
                 <TextField
                   value={refundAccountName}
                   onChange={(e) => setRefundAccountName(e.target.value)}
@@ -1501,7 +2162,24 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
               </Box>
             </Box>
           </Box>
+
+          {/* SLA note */}
+          <Box sx={{
+            display: 'flex',
+            gap: 1,
+            alignItems: 'flex-start',
+            p: 1.25,
+            borderRadius: '10px',
+            bgcolor: 'rgba(59,130,246,0.08)',
+            border: '1px solid rgba(59,130,246,0.18)',
+          }}>
+            <Info size={15} style={{ color: '#3b82f6', marginTop: 1, flexShrink: 0 }} />
+            <Typography sx={{ fontSize: '0.72rem', color: 'var(--foreground)', lineHeight: 1.45 }}>
+              {t.orderHistory.refundSlaNote}
+            </Typography>
+          </Box>
         </DialogContent>
+
         <DialogActions sx={{ px: 3, py: 2, borderTop: '1px solid var(--glass-border)', gap: 1 }}>
           <Button
             onClick={() => setRefundDialogOpen(false)}
@@ -1518,11 +2196,11 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
           </Button>
           <Button
             onClick={handleSubmitRefund}
-            disabled={refundSubmitting || !refundReason || !refundBankName || !refundBankAccount || !refundAccountName || !refundAmount}
+            disabled={refundSubmitting || refundEvidenceUploading || !refundFormValid}
             sx={{
               px: 3,
               borderRadius: '10px',
-              background: 'linear-gradient(135deg, #bf5af2 0%, #6d28d9 100%)',
+              background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
               color: 'white',
               textTransform: 'none',
               fontWeight: 700,
@@ -1542,7 +2220,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                 {t.orderHistory.submitting}
               </Box>
             ) : (
-              t.orderHistory.submitRefund
+              `${t.orderHistory.submitRefund} ฿${refundComputedAmount.toLocaleString()}`
             )}
           </Button>
         </DialogActions>

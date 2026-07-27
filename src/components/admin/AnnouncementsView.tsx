@@ -576,54 +576,45 @@ export const AnnouncementsView = React.memo(function AnnouncementsView({
                     </div>
 
                     <div className="flex shrink-0 gap-1">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="size-8"
-                            onClick={() => handleToggleEnabled(ann)}
-                            disabled={saving}
-                          >
-                            {ann.enabled ? (
-                              <ToggleOn className="size-5 text-emerald-500" />
-                            ) : (
-                              <ToggleOff className="size-5 text-slate-500" />
-                            )}
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>{ann.enabled ? 'ปิดประกาศ' : 'เปิดประกาศ'}</TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="size-8 text-blue-500 hover:bg-blue-500/10 hover:text-blue-500"
-                            onClick={() => handleEdit(ann)}
-                          >
-                            <Edit size={18} />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>แก้ไข</TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="size-8 text-red-500 hover:bg-red-500/10 hover:text-red-500"
-                            onClick={() => handleDelete(ann)}
-                            disabled={saving}
-                          >
-                            <Delete size={18} />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>ลบ</TooltipContent>
-                      </Tooltip>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className={cn(
+                          'h-8 gap-1 border-slate-500/30 px-2 text-xs',
+                          ann.enabled
+                            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'
+                            : 'bg-slate-500/10 text-slate-400 hover:bg-slate-500/20'
+                        )}
+                        onClick={() => handleToggleEnabled(ann)}
+                        disabled={saving}
+                      >
+                        {ann.enabled ? <ToggleOn className="size-4" /> : <ToggleOff className="size-4" />}
+                        <span>{ann.enabled ? 'เปิดอยู่' : 'ปิดอยู่'}</span>
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1 border-blue-500/30 bg-blue-500/10 px-2.5 text-xs text-blue-400 hover:bg-blue-500/20"
+                        onClick={() => handleEdit(ann)}
+                      >
+                        <Edit size={14} />
+                        <span>แก้ไข</span>
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1 border-red-500/30 bg-red-500/10 px-2.5 text-xs text-red-400 hover:bg-red-500/20 hover:text-red-300"
+                        onClick={() => handleDelete(ann)}
+                        disabled={saving}
+                      >
+                        <Delete size={14} />
+                        <span>ลบ</span>
+                      </Button>
                     </div>
                   </div>
                 </div>

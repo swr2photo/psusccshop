@@ -195,22 +195,24 @@ export const PromoCodesView = React.memo(function PromoCodesView({
                       {code.expiresAt ? ` • หมดอายุ ${new Date(code.expiresAt).toLocaleDateString('th-TH')}` : ''}
                     </p>
                   </div>
-                  <div className="flex shrink-0 gap-1">
+                  <div className="flex shrink-0 gap-1.5">
                     <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-8 text-emerald-500 hover:text-emerald-400"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1 border-blue-500/30 bg-blue-500/10 px-2.5 text-xs text-blue-400 hover:bg-blue-500/20"
                       onClick={() => setEditingCode(code)}
                     >
-                      <Edit className="size-4" />
+                      <Edit className="size-3.5" />
+                      <span>แก้ไข</span>
                     </Button>
                     <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-8 text-red-500 hover:text-red-400"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1 border-red-500/30 bg-red-500/10 px-2.5 text-xs text-red-400 hover:bg-red-500/20 hover:text-red-300"
                       onClick={() => handleDelete(code.id)}
                     >
-                      <Trash2 className="size-4" />
+                      <Trash2 className="size-3.5" />
+                      <span>ลบ</span>
                     </Button>
                   </div>
                 </CardContent>

@@ -9,6 +9,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { CountdownBadge } from './OrderCountdown';
 import StripePromptPay from './StripePromptPay';
 import { useTranslation } from '@/hooks/useTranslation';
+import { toast } from '@/components/ui/toast';
 
 interface PaymentModalProps {
   orderRef: string;
@@ -28,179 +29,28 @@ interface CartItem {
   coverImage?: string;
 }
 
-interface Toast {
-  id: string;
-  type: 'success' | 'error' | 'info' | 'warning';
-  title: string;
-  message?: string;
-}
-
-// ============== ENHANCED TOAST SYSTEM ==============
-
-const TOAST_STYLES = {
-  success: {
-    bg: 'linear-gradient(135deg, rgba(16, 185, 129, 0.98) 0%, rgba(5, 150, 105, 0.98) 100%)',
-    border: 'rgba(16, 185, 129, 0.5)',
-    icon: <CheckCircle2 size={18} />,
-    shadow: '0 8px 32px rgba(16, 185, 129, 0.35)',
-  },
-  error: {
-    bg: 'linear-gradient(135deg, rgba(239, 68, 68, 0.98) 0%, rgba(220, 38, 38, 0.98) 100%)',
-    border: 'rgba(239, 68, 68, 0.5)',
-    icon: <AlertCircle size={18} />,
-    shadow: '0 8px 32px rgba(239, 68, 68, 0.35)',
-  },
-  warning: {
-    bg: 'linear-gradient(135deg, rgba(245, 158, 11, 0.98) 0%, rgba(234, 88, 12, 0.98) 100%)',
-    border: 'rgba(245, 158, 11, 0.5)',
-    icon: <AlertTriangle size={18} />,
-    shadow: '0 8px 32px rgba(245, 158, 11, 0.35)',
-  },
-  info: {
-    bg: 'linear-gradient(135deg, rgba(0,113,227, 0.98) 0%, rgba(0,113,227, 0.98) 100%)',
-    border: 'rgba(0,113,227, 0.5)',
-    icon: <Info size={18} />,
-    shadow: '0 8px 32px rgba(0,113,227, 0.35)',
-  },
-};
-
 const usePaymentToast = () => {
-  const [toasts, setToasts] = useState<Toast[]>([]);
-  const timeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
-
-  const removeToast = (id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-    const timeout = timeoutsRef.current.get(id);
-    if (timeout) {
-      clearTimeout(timeout);
-      timeoutsRef.current.delete(id);
-    }
-  };
-
-  const addToast = (type: Toast['type'], title: string, message?: string) => {
-    const id = `${type}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
-    const newToast: Toast = { id, type, title, message };
-    
-    setToasts((prev) => {
-      // Prevent duplicates
-      if (prev.some((t) => t.title === title && t.type === type)) {
-        return prev;
-      }
-      // Keep max 3 toasts
-      return [...prev, newToast].slice(-3);
+  const addToast = (
+    type: 'success' | 'error' | 'info' | 'warning',
+    title: string,
+    message?: string,
+  ) =>
+    toast.add({
+      type,
+      title,
+      description: message,
+      timeout: type === 'error' ? 5000 : 3500,
+      priority: type === 'error' ? 'high' : 'low',
     });
-    
-    const duration = type === 'error' ? 5000 : 3500;
-    const timeout = setTimeout(() => removeToast(id), duration);
-    timeoutsRef.current.set(id, timeout);
-    
-    return id;
-  };
 
-  return { toasts, addToast, removeToast };
+  return { addToast };
 };
-
-function PaymentToastContainer({
-  toasts,
-  removeToast,
-}: {
-  toasts: Toast[];
-  removeToast: (id: string) => void;
-}) {
-  if (toasts.length === 0) return null;
-
-  return (
-    <Box
-      sx={{
-        position: 'absolute',
-        bottom: { xs: 200, sm: 180 },
-        left: 0,
-        right: 0,
-        zIndex: 100,
-        display: 'flex',
-        flexDirection: 'column-reverse',
-        alignItems: 'center',
-        gap: 1.5,
-        px: 2,
-        pointerEvents: 'none',
-      }}
-    >
-      {toasts.map((toast) => {
-        const style = TOAST_STYLES[toast.type];
-        return (
-          <Slide key={toast.id} direction="up" in={true} mountOnEnter unmountOnExit>
-            <Box
-              sx={{
-                background: style.bg,
-                backdropFilter: 'blur(16px)',
-                border: `1px solid ${style.border}`,
-                color: 'white',
-                py: 1.5,
-                px: 2,
-                borderRadius: '14px',
-                boxShadow: style.shadow,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1.5,
-                maxWidth: 380,
-                width: '100%',
-                pointerEvents: 'auto',
-                animation: 'toastSlideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
-                '@keyframes toastSlideUp': {
-                  '0%': { opacity: 0, transform: 'translateY(12px) scale(0.96)' },
-                  '100%': { opacity: 1, transform: 'translateY(0) scale(1)' },
-                },
-                '&:hover': {
-                  transform: 'scale(1.02)',
-                  transition: 'transform 0.2s ease',
-                },
-              }}
-            >
-              <Box
-                sx={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: '10px',
-                  bgcolor: 'rgba(255, 255, 255, 0.2)',
-                  display: 'grid',
-                  placeItems: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                {style.icon}
-              </Box>
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography sx={{ fontWeight: 700, fontSize: '0.9rem', lineHeight: 1.3 }}>{toast.title}</Typography>
-                {toast.message && (
-                  <Typography sx={{ fontSize: '0.75rem', opacity: 0.9, lineHeight: 1.3, mt: 0.2 }}>
-                    {toast.message}
-                  </Typography>
-                )}
-              </Box>
-              <IconButton 
-                size="small" 
-                onClick={() => removeToast(toast.id)} 
-                sx={{ 
-                  color: 'rgba(255, 255, 255, 0.8)', 
-                  p: 0.5,
-                  '&:hover': { color: 'white', bgcolor: 'var(--glass-bg)' } 
-                }}
-              >
-                <X size={14} />
-              </IconButton>
-            </Box>
-          </Slide>
-        );
-      })}
-    </Box>
-  );
-}
 
 // Statuses considered as paid
 const PAID_STATUSES = ['PAID', 'COMPLETED', 'SHIPPED', 'READY', 'VERIFYING'];
 
 export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentModalProps): JSX.Element {
-  const { toasts, addToast, removeToast } = usePaymentToast();
+  const { addToast } = usePaymentToast();
   const { t, lang } = useTranslation();
   const isMobile = useMediaQuery('(max-width: 640px)');
   const [loading, setLoading] = useState(true);
@@ -609,7 +459,6 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
         },
       }}
     >
-      <PaymentToastContainer toasts={toasts} removeToast={removeToast} />
       
       {/* Header - Compact */}
       <Box sx={{

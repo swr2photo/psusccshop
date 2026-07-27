@@ -1,4 +1,5 @@
 'use client';
+// Refreshed: 2026-07-27 Tracking Management State Fix
 
 import { useState, useMemo, useCallback, type ReactNode } from 'react';
 import {
@@ -38,6 +39,7 @@ import {
   useUpdateTracking,
   useTrackShipment,
 } from '@/hooks/useShippingOrders';
+import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -201,107 +203,96 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
   const {
     trackShipment,
     isTracking: loadingTracking,
-    error: trackingErrorObj,
-    resetError: resetTrackingError,
+    error: trackingError,
   } = useTrackShipment();
+  const [trackingResult, setTrackingResult] = useState<any>(null);
 
-  const [activeTab, setActiveTab] = useState(0);
+  const { confirm: confirmDialog, ConfirmDialog } = useConfirmDialog();
 
-  const [searchTrackingNumber, setSearchTrackingNumber] = useState('');
-  const [searchProvider, setSearchProvider] = useState<ShippingProvider | ''>('');
-  const [trackingResult, setTrackingResult] = useState<TrackingInfo | null>(null);
-  const [trackingError, setTrackingError] = useState<string | null>(null);
-
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'shipped'>('pending');
-
-  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
-  const [editTrackingNumber, setEditTrackingNumber] = useState('');
-  const [editProvider, setEditProvider] = useState<ShippingProvider>('thailand_post');
-
+  // States
+  const [activeTab, setActiveTab] = useState<number>(0);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'shipped'>('all');
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
-  const [bulkTrackingInput, setBulkTrackingInput] = useState('');
-  const [bulkProvider, setBulkProvider] = useState<ShippingProvider>('thailand_post');
+  const [bulkTrackingInput, setBulkTrackingInput] = useState<string>('');
+  const [bulkProvider, setBulkProvider] = useState<ShippingProvider>('thailand_post' as ShippingProvider);
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const [editTrackingNumber, setEditTrackingNumber] = useState<string>('');
+  const [editProvider, setEditProvider] = useState<ShippingProvider>('thailand_post' as ShippingProvider);
+  const [searchTrackingNumber, setSearchTrackingNumber] = useState<string>('');
+  const [searchProvider, setSearchProvider] = useState<ShippingProvider | ''>('');
 
-  const loadOrders = useCallback(() => {
-    refreshOrders();
-    if (ordersError) {
-      showToast?.('warning', 'ไม่สามารถโหลดข้อมูลได้');
-    }
-  }, [refreshOrders, ordersError, showToast]);
+  // Derived filtered order lists
+  const pendingOrders = useMemo(() => {
+    return allOrders.filter((o: any) => !o.trackingNumber || o.status === 'READY' || o.status === 'PAID');
+  }, [allOrders]);
 
-  const filteredOrders = useMemo((): Order[] => {
-    return (allOrders as Order[]).filter((order: Order) => {
-      if (filterStatus === 'pending' && order.trackingNumber) return false;
-      if (filterStatus === 'shipped' && !order.trackingNumber) return false;
+  const shippedOrders = useMemo(() => {
+    return allOrders.filter((o: any) => !!o.trackingNumber || o.status === 'SHIPPED' || o.status === 'COMPLETED');
+  }, [allOrders]);
 
-      if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase();
-        return (
-          order.ref.toLowerCase().includes(query) ||
-          order.customerName?.toLowerCase().includes(query) ||
-          order.email?.toLowerCase().includes(query) ||
-          order.trackingNumber?.toLowerCase().includes(query)
-        );
-      }
-      return true;
+  const filteredOrders = useMemo(() => {
+    return allOrders.filter((o: any) => {
+      // Filter by status tab/dropdown
+      if (filterStatus === 'pending' && (o.trackingNumber || o.status === 'SHIPPED' || o.status === 'COMPLETED')) return false;
+      if (filterStatus === 'shipped' && !o.trackingNumber && o.status !== 'SHIPPED' && o.status !== 'COMPLETED') return false;
+
+      // Filter by search query
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase().trim();
+      return (
+        o.ref.toLowerCase().includes(q) ||
+        (o.customerName || o.name || '').toLowerCase().includes(q) ||
+        (o.email || '').toLowerCase().includes(q) ||
+        (o.phone || '').includes(q) ||
+        (o.trackingNumber || '').toLowerCase().includes(q)
+      );
     });
   }, [allOrders, filterStatus, searchQuery]);
 
-  const pendingOrders = useMemo((): Order[] =>
-    (allOrders as Order[]).filter((o: Order) => !o.trackingNumber),
-    [allOrders]
-  );
-
-  const shippedOrders = useMemo((): Order[] =>
-    (allOrders as Order[]).filter((o: Order) => !!o.trackingNumber),
-    [allOrders]
-  );
-
   const handleTrack = async () => {
     if (!searchTrackingNumber.trim()) {
-      setTrackingError('กรุณาใส่เลขพัสดุ');
+      showToast?.('warning', 'กรุณาระบุเลขพัสดุ');
       return;
     }
-
-    setTrackingError(null);
-    setTrackingResult(null);
-    resetTrackingError();
-
     try {
-      const result = await trackShipment(
-        searchTrackingNumber.trim(),
-        searchProvider || undefined
-      );
-      setTrackingResult(result);
-    } catch (error: any) {
-      setTrackingError(error.message || 'ไม่สามารถดึงข้อมูลการติดตามได้');
+      await trackShipment(searchTrackingNumber.trim(), searchProvider || undefined);
+    } catch (err: any) {
+      showToast?.('error', err?.message || 'ไม่สามารถดึงข้อมูลติดตามพัสดุได้');
     }
   };
 
   const handleSaveTracking = async () => {
     if (!editingOrder) return;
-
     try {
-      await updateTracking(
-        editingOrder.ref,
-        editTrackingNumber.trim() || null,
-        editTrackingNumber.trim() ? editProvider : null,
-        'SHIPPED'
-      );
-
-      showToast?.('success', editTrackingNumber.trim()
-        ? `บันทึกเลขพัสดุสำหรับ ${editingOrder.ref} แล้ว`
-        : `ลบเลขพัสดุสำหรับ ${editingOrder.ref} แล้ว`
-      );
+      if (!editTrackingNumber.trim()) {
+        await deleteTrackingMutation(editingOrder.ref);
+        showToast?.('success', `ลบเลขพัสดุสำหรับ ${editingOrder.ref} แล้ว`);
+      } else {
+        await updateTracking(
+          editingOrder.ref,
+          editTrackingNumber.trim(),
+          editProvider,
+          'SHIPPED'
+        );
+        showToast?.('success', `บันทึกเลขพัสดุสำหรับ ${editingOrder.ref} เรียบร้อยแล้ว`);
+      }
       setEditingOrder(null);
     } catch (error: any) {
-      showToast?.('error', error.message || 'ไม่สามารถบันทึกได้');
+      showToast?.('error', error?.message || 'ไม่สามารถบันทึกเลขพัสดุได้');
     }
   };
 
   const handleDeleteTracking = async (order: Order) => {
-    if (!confirm(`ต้องการลบเลขพัสดุของ ${order.ref} ใช่หรือไม่?`)) return;
+    const ok = await confirmDialog({
+      title: 'ลบเลขพัสดุ?',
+      message: `ต้องการลบเลขพัสดุของ ${order.ref} ใช่หรือไม่?`,
+      variant: 'warning',
+      confirmText: 'ลบเลย',
+      cancelText: 'ยกเลิก',
+      destructive: true,
+    });
+    if (!ok) return;
 
     try {
       await deleteTrackingMutation(order.ref);
@@ -346,7 +337,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
 
   const handleExportShipping = () => {
     const ordersToExport = selectedOrders.size > 0
-      ? filteredOrders.filter(o => selectedOrders.has(o.ref))
+      ? filteredOrders.filter((o: any) => selectedOrders.has(o.ref))
       : pendingOrders;
 
     if (ordersToExport.length === 0) {
@@ -355,7 +346,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
     }
 
     const headers = ['ลำดับ', 'เลขออเดอร์', 'ชื่อผู้รับ', 'เบอร์โทร', 'ที่อยู่', 'อีเมล', 'รายการสินค้า', 'ยอดรวม', 'เลขพัสดุ', 'ขนส่ง'];
-    const rows = ordersToExport.map((order, idx) => {
+    const rows = ordersToExport.map((order: any, idx: number) => {
       const items = order.cart?.map((item: any) => {
         const name = item.productName || item.name || item.type || 'สินค้า';
         const size = item.size || '-';
@@ -364,7 +355,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
       }).join(', ') || '-';
 
       const providerName = order.shippingProvider
-        ? (SHIPPING_PROVIDERS[order.shippingProvider]?.nameThai || order.shippingProvider)
+        ? ((SHIPPING_PROVIDERS as any)[order.shippingProvider]?.nameThai || order.shippingProvider)
         : '-';
 
       return [
@@ -383,7 +374,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
 
     const csvContent = [
       headers.join(','),
-      ...rows.map(row => row.join(','))
+      ...rows.map((row: any) => row.join(','))
     ].join('\n');
 
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -427,7 +418,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
   };
 
   const selectAllOrders = () => {
-    const allRefs = filteredOrders.map(o => o.ref);
+    const allRefs = filteredOrders.map((o: any) => o.ref);
     setSelectedOrders(new Set(allRefs));
   };
 
@@ -533,7 +524,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={loadOrders}
+                    onClick={refreshOrders}
                     disabled={loadingOrders}
                     className="text-[var(--text-muted)]"
                   >
@@ -633,7 +624,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredOrders.map((order) => (
+                        {filteredOrders.map((order: any) => (
                           <TableRow
                             key={order.ref}
                             data-state={selectedOrders.has(order.ref) ? 'selected' : undefined}
@@ -722,60 +713,47 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                               )}
                             </TableCell>
                             <TableCell className="border-[var(--glass-border)] text-right">
-                              <div className="flex justify-end gap-1">
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon-xs"
-                                      onClick={() => {
-                                        setEditingOrder(order);
-                                        setEditTrackingNumber(order.trackingNumber || '');
-                                        setEditProvider(order.shippingProvider || 'thailand_post');
-                                      }}
-                                    >
-                                      {order.trackingNumber ? (
-                                        <Edit size={18} className="text-blue-400" />
-                                      ) : (
-                                        <Add size={18} className="text-emerald-500" />
-                                      )}
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    {order.trackingNumber ? 'แก้ไขเลขพัสดุ' : 'เพิ่มเลขพัสดุ'}
-                                  </TooltipContent>
-                                </Tooltip>
+                              <div className="flex justify-end gap-1.5">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 gap-1 border-blue-500/30 bg-blue-500/10 px-2.5 text-xs text-blue-400 hover:bg-blue-500/20"
+                                  onClick={() => {
+                                    setEditingOrder(order);
+                                    setEditTrackingNumber(order.trackingNumber || '');
+                                    setEditProvider(order.shippingProvider || 'thailand_post');
+                                  }}
+                                >
+                                  {order.trackingNumber ? <Edit size={14} /> : <Add size={14} />}
+                                  <span>{order.trackingNumber ? 'แก้ไข' : 'เพิ่มเลข'}</span>
+                                </Button>
+
                                 {order.trackingNumber && (
                                   <>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon-xs"
-                                          onClick={() => {
-                                            setSearchTrackingNumber(order.trackingNumber!);
-                                            setSearchProvider(order.shippingProvider || '');
-                                            setActiveTab(2);
-                                            setTimeout(() => handleTrack(), 100);
-                                          }}
-                                        >
-                                          <Search size={18} className="text-violet-400" />
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent>ติดตามพัสดุ</TooltipContent>
-                                    </Tooltip>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon-xs"
-                                          onClick={() => handleDeleteTracking(order)}
-                                        >
-                                          <Delete size={18} className="text-red-500" />
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent>ลบเลขพัสดุ</TooltipContent>
-                                    </Tooltip>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-8 gap-1 border-violet-500/30 bg-violet-500/10 px-2.5 text-xs text-violet-400 hover:bg-violet-500/20"
+                                      onClick={() => {
+                                        setSearchTrackingNumber(order.trackingNumber!);
+                                        setSearchProvider(order.shippingProvider || '');
+                                        setActiveTab(2);
+                                        setTimeout(() => handleTrack(), 100);
+                                      }}
+                                    >
+                                      <Search size={14} />
+                                      <span>ติดตาม</span>
+                                    </Button>
+
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-8 gap-1 border-red-500/30 bg-red-500/10 px-2.5 text-xs text-red-400 hover:bg-red-500/20 hover:text-red-300"
+                                      onClick={() => handleDeleteTracking(order)}
+                                    >
+                                      <Delete size={14} />
+                                      <span>ลบ</span>
+                                    </Button>
                                   </>
                                 )}
                               </div>
@@ -847,7 +825,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                     รายการรอจัดส่ง (คัดลอกเลขออเดอร์):
                   </p>
                   <ScrollArea className="max-h-[150px]">
-                    {pendingOrders.map(order => (
+                    {pendingOrders.map((order: any) => (
                       <div
                         key={order.ref}
                         className="flex items-center justify-between border-b border-[var(--glass-border)] py-1"
@@ -931,7 +909,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
 
                 {trackingError && (
                   <Alert variant="destructive" className="mb-4">
-                    <AlertDescription>{trackingError}</AlertDescription>
+                    <AlertDescription>{String(trackingError)}</AlertDescription>
                   </Alert>
                 )}
 
@@ -955,7 +933,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {STATUS_ICONS[trackingResult.status]}
+                        {(STATUS_ICONS as any)[trackingResult.status]}
                         <Badge
                           className={cn(
                             'font-semibold',
@@ -964,7 +942,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                               : 'border-transparent bg-slate-500/20 text-slate-400'
                           )}
                         >
-                          {TRACKING_STATUS_THAI[trackingResult.status]}
+                          {(TRACKING_STATUS_THAI as any)[trackingResult.status] || trackingResult.status}
                         </Badge>
                       </div>
                     </div>
@@ -974,7 +952,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                       <div className="mt-4">
                         <p className="mb-2 text-[0.8rem] text-[var(--text-muted)]">ประวัติการเคลื่อนไหว</p>
                         <ScrollArea className="max-h-[200px]">
-                          {trackingResult.events.slice(0, 10).map((event, idx) => (
+                          {trackingResult.events.slice(0, 10).map((event: any, idx: number) => (
                             <div
                               key={idx}
                               className={cn(
@@ -1133,6 +1111,8 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <ConfirmDialog />
       </div>
     </TooltipProvider>
   );

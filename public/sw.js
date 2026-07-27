@@ -168,7 +168,7 @@ self.addEventListener('notificationclick', (event) => {
     const separator = urlToOpen.includes('?') ? '&' : '?';
     if (urlToOpen.startsWith('/admin')) {
       // Admin: navigate to support tab with chatId
-      urlToOpen = `/admin?chatId=${chatId}#support`;
+      urlToOpen = `/admin/support?chatId=${encodeURIComponent(chatId)}`;
     } else {
       // Customer: navigate to home with chat param
       urlToOpen = `/?chat=${chatId}`;

@@ -1,5 +1,5 @@
 // src/app/api/support-chat/[sessionId]/accept/route.ts
-// Admin accepts a chat session
+// Admin accepts a pending chat, or takes over an active chat from another assignee
 
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdminEmailAsync, getSession } from '@/lib/auth';
@@ -15,7 +15,7 @@ interface Params {
   params: Promise<{ sessionId: string }>;
 }
 
-// POST: Accept the chat session
+// POST: Accept or take over the chat session
 export async function POST(request: NextRequest, { params }: Params) {
   try {
     const { sessionId } = await params;
@@ -25,7 +25,6 @@ export async function POST(request: NextRequest, { params }: Params) {
       return NextResponse.json('Unauthorized', { status: 401 });
     }
     
-    // Only admin can accept chats
     if (!(await isAdminEmailAsync(session.user.email))) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -35,10 +34,40 @@ export async function POST(request: NextRequest, { params }: Params) {
     if (!chat) {
       return NextResponse.json({ error: 'Chat not found' }, { status: 404 });
     }
-    
-    if (chat.status !== 'pending') {
+
+    if (chat.status === 'closed') {
+      return NextResponse.json(
+        { error: 'การสนทนานี้ปิดแล้ว' },
+        { status: 400 }
+      );
+    }
+
+    const body = await request.json().catch(() => ({} as { force?: boolean }));
+    const force =
+      Boolean(body?.force) ||
+      (chat.status === 'active' &&
+        Boolean(chat.admin_email) &&
+        chat.admin_email.toLowerCase() !== session.user.email.toLowerCase());
+
+    if (chat.status === 'active' && !force) {
+      const mine =
+        chat.admin_email &&
+        chat.admin_email.toLowerCase() === session.user.email.toLowerCase();
+      if (mine) {
+        return NextResponse.json({
+          chat,
+          message: 'คุณดูแลเคสนี้อยู่แล้ว',
+        });
+      }
       return NextResponse.json(
         { error: 'การสนทนานี้ถูกรับไปแล้ว' },
+        { status: 400 }
+      );
+    }
+
+    if (chat.status !== 'pending' && chat.status !== 'active') {
+      return NextResponse.json(
+        { error: 'ไม่สามารถรับเคสนี้ได้' },
         { status: 400 }
       );
     }
@@ -46,12 +75,13 @@ export async function POST(request: NextRequest, { params }: Params) {
     const acceptedChat = await acceptChatSession(
       sessionId,
       session.user.email,
-      session.user.name || 'แอดมิน'
+      session.user.name || 'แอดมิน',
+      { force }
     );
     
     return NextResponse.json({ 
       chat: acceptedChat,
-      message: 'รับเคสสำเร็จ'
+      message: force ? 'โอนเคสสำเร็จ' : 'รับเคสสำเร็จ'
     });
     
   } catch (error: any) {

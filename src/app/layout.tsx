@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import * as Sentry from "@sentry/nextjs";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Providers from "@/components/Providers";
 import ThemeRegistry from "../components/ThemeRegistry";
+import TopProgressBar from "@/components/TopProgressBar";
 import Script from "next/script";
 import { SITE_URL } from "@/lib/site";
 // Google Search Console — HTML tag (URL prefix). Override via GOOGLE_SITE_VERIFICATION in Vercel.
@@ -174,15 +176,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
 
         {/* Inline theme script — runs before React hydration to prevent FOUC */}
-        <script
+        <Script
           id="theme-initializer"
+          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var s=localStorage.getItem('psusccshop-theme');if(s){var m=JSON.parse(s).state.mode;var r=m==='system'?window.matchMedia('(prefers-color-scheme:light)').matches?'light':'dark':m;document.documentElement.setAttribute('data-theme',r);document.documentElement.style.colorScheme=r}else{document.documentElement.setAttribute('data-theme','light');document.documentElement.style.colorScheme='light'}}catch(e){document.documentElement.setAttribute('data-theme','light');document.documentElement.style.colorScheme='light'}})()`,
           }}
         />
         {/* Force SW update + clear old caches on load */}
-        <script
+        <Script
           id="sw-updater"
+          strategy="afterInteractive"
           dangerouslySetInnerHTML={{
             __html: `(function(){
               if('serviceWorker' in navigator){
@@ -205,8 +209,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
         {/* Intercept chunk / script loading errors to auto-reload */}
-        <script
+        <Script
           id="chunk-error-handler"
+          strategy="afterInteractive"
           dangerouslySetInnerHTML={{
             __html: `(function(){
               window.addEventListener('error', function(e) {
@@ -295,6 +300,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeRegistry>
           <Providers>
             <div className="relative z-10 min-h-screen">
+              <Suspense fallback={null}>
+                <TopProgressBar />
+              </Suspense>
               <main id="main-content" tabIndex={-1}>
                 {children}
               </main>

@@ -606,8 +606,8 @@ export function ProductCardSkeleton() {
   return (
     <Box sx={{
       borderRadius: '16px',
-      bgcolor: 'rgba(29,29,31,0.5)',
-      border: '1px solid rgba(255,255,255,0.06)',
+      bgcolor: 'var(--surface)',
+      border: '1px solid var(--glass-border)',
       overflow: 'hidden',
     }}>
       <ModernSkeleton width="100%" height={180} variant="rectangular" />

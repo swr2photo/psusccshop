@@ -417,7 +417,7 @@ export async function POST(req: NextRequest) {
         title: 'มีการชำระเงินใหม่',
         body: `ออเดอร์ ${ref} ชำระ ${slipCheck.slipData?.amount || expectedAmount} บาท`,
         icon: '/icon-192.png',
-        url: '/admin#orders',
+        url: '/admin/orders',
         tag: `payment-${ref}`,
       }).catch(() => {});
     }
@@ -428,7 +428,7 @@ export async function POST(req: NextRequest) {
       type: 'PAYMENT_RECEIVED',
       title: '💰 Payment Verified!',
       message: `Ref: ${ref}\nName: ${senderName}\nAmount: ฿${slipCheck.slipData?.amount || expectedAmount}`,
-      url: `/admin#orders?ref=${ref}`,
+      url: `/admin/orders?ref=${ref}`,
     }).catch(e => console.error('[payment-verify] Notification error:', e));
 
     // ส่งข้อมูลกลับ

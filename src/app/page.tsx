@@ -147,7 +147,7 @@ const TAG_TRANSLATIONS_TH_TO_EN: Record<string, string> = {
   'สินค้าพิเศษ': 'Special',
   'ของใหม่': 'New Arrival',
 };
-import LoadingScreen from '@/components/LoadingScreen';
+import ShopLoadingShell from '@/components/ShopLoadingShell';
 import ThemeToggle from '@/components/ThemeToggle';
 import LanguageToggle from '@/components/LanguageToggle';
 import LoginScreen from '@/components/LoginScreen';
@@ -798,6 +798,7 @@ export default function HomePage() {
     address: '',
     instagram: '',
     profileImage: '',
+    marketingConsent: false,
   });
 
   const { reviews: selectedProductReviewsList } = useProductReviews(selectedProduct?.id, orderData.email);
@@ -1205,6 +1206,7 @@ export default function HomePage() {
         const nextAddress = typeof profile.address === 'string' ? profile.address.trim() : '';
         const nextIg = typeof profile.instagram === 'string' ? profile.instagram.trim() : '';
         const nextImage = typeof profile.profileImage === 'string' ? profile.profileImage : '';
+        const nextMarketingConsent = profile.marketingConsent === true;
 
         setOrderData((prev) => ({
           ...prev,
@@ -1214,6 +1216,7 @@ export default function HomePage() {
           address: nextAddress || prev.address,
           instagram: nextIg || prev.instagram,
           profileImage: nextImage || prev.profileImage,
+          marketingConsent: nextMarketingConsent,
         }));
 
         if (Array.isArray(profile.savedAddresses)) {
@@ -2527,7 +2530,7 @@ export default function HomePage() {
     }
   }, [orderHistory.length]); // Only run when history count changes (not on every render)
 
-  const handleSaveProfile = async (data: Partial<typeof orderData> & { savedAddresses?: SavedAddress[] }) => {
+  const handleSaveProfile = async (data: Partial<typeof orderData> & { savedAddresses?: SavedAddress[]; marketingConsent?: boolean }) => {
     if (!session?.user?.email) {
       showToast('error', t.misc.pleaseLogin);
       return;
@@ -2540,6 +2543,7 @@ export default function HomePage() {
       address: data.address ? data.address.trim() : orderData.address,
       instagram: data.instagram ? data.instagram.trim() : orderData.instagram,
       profileImage: data.profileImage !== undefined ? (data.profileImage || '') : orderData.profileImage,
+      marketingConsent: data.marketingConsent === true,
     };
     setOrderData((prev) => ({ ...prev, ...sanitized }));
 
@@ -2555,6 +2559,7 @@ export default function HomePage() {
         address: sanitized.address,
         instagram: sanitized.instagram,
         profileImage: sanitized.profileImage,
+        marketingConsent: sanitized.marketingConsent,
         ...(data.savedAddresses && { savedAddresses: data.savedAddresses }),
       });
 
@@ -2816,7 +2821,7 @@ export default function HomePage() {
   }, [status]);
 
   if (!mounted || loading || status === 'loading' || (status === 'unauthenticated' && !authSettled)) {
-    return <LoadingScreen />;
+    return <ShopLoadingShell />;
   }
 
   if (status === 'unauthenticated') {
@@ -3215,16 +3220,26 @@ export default function HomePage() {
                       size="small"
                       onClick={() => setCategoryFilter(cat.key)}
                       sx={{
-                        bgcolor: categoryFilter === cat.key ? 'rgba(0,113,227,0.15)' : 'transparent',
-                        color: categoryFilter === cat.key ? '#0071e3' : 'var(--text-muted)',
+                        bgcolor: categoryFilter === cat.key
+                          ? (theme: any) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.92)' : 'rgba(24,24,27,0.9)'
+                          : 'transparent',
+                        color: categoryFilter === cat.key
+                          ? (theme: any) => theme.palette.mode === 'dark' ? '#18181b' : '#fafafa'
+                          : 'var(--text-muted)',
                         border: '1px solid',
-                        borderColor: categoryFilter === cat.key ? 'rgba(0,113,227,0.3)' : (theme: any) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                        borderColor: categoryFilter === cat.key
+                          ? 'transparent'
+                          : (theme: any) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
                         fontSize: '0.72rem',
                         fontWeight: 600,
                         height: 28,
                         cursor: 'pointer',
                         transition: 'all 0.2s ease',
-                        '&:hover': { bgcolor: 'rgba(0,113,227,0.1)', borderColor: 'rgba(0,113,227,0.2)' },
+                        '&:hover': {
+                          bgcolor: categoryFilter === cat.key
+                            ? (theme: any) => theme.palette.mode === 'dark' ? '#fff' : '#18181b'
+                            : 'rgba(255,255,255,0.06)',
+                        },
                       }}
                     />
                   ))}
@@ -3864,10 +3879,16 @@ export default function HomePage() {
                             sx={{
                               px: 1.8,
                               py: 0.8,
-                              borderRadius: '12px',
-                              bgcolor: active ? 'rgba(0,113,227,0.2)' : 'var(--glass-bg)',
-                              border: active ? '1px solid rgba(0,113,227,0.5)' : '1px solid var(--glass-border)',
-                              color: active ? 'var(--primary)' : 'var(--text-muted)',
+                              borderRadius: '999px',
+                              bgcolor: active
+                                ? (theme: any) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.92)' : 'rgba(24,24,27,0.92)'
+                                : 'transparent',
+                              border: active
+                                ? '1px solid transparent'
+                                : '1px solid var(--glass-border)',
+                              color: active
+                                ? (theme: any) => theme.palette.mode === 'dark' ? '#18181b' : '#fafafa'
+                                : 'var(--text-muted)',
                               fontSize: '0.8rem',
                               fontWeight: 600,
                               cursor: 'pointer',
@@ -3876,9 +3897,13 @@ export default function HomePage() {
                               alignItems: 'center',
                               gap: 0.8,
                               '&:hover': {
-                                bgcolor: active ? 'rgba(0,113,227,0.25)' : 'rgba(0,113,227,0.08)',
-                                borderColor: active ? 'rgba(0,113,227,0.6)' : 'rgba(0,113,227,0.2)',
-                                color: 'var(--primary)',
+                                bgcolor: active
+                                  ? (theme: any) => theme.palette.mode === 'dark' ? '#fff' : '#18181b'
+                                  : 'rgba(255,255,255,0.06)',
+                                borderColor: active ? 'transparent' : 'rgba(255,255,255,0.14)',
+                                color: active
+                                  ? (theme: any) => theme.palette.mode === 'dark' ? '#18181b' : '#fafafa'
+                                  : 'var(--foreground)',
                               },
                             }}
                           >
@@ -3888,7 +3913,9 @@ export default function HomePage() {
                               px: 0.7,
                               py: 0.1,
                               borderRadius: '6px',
-                              bgcolor: active ? 'rgba(0,113,227,0.4)' : 'var(--glass-bg)',
+                              bgcolor: active
+                                ? (theme: any) => theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.16)'
+                                : 'var(--glass-bg)',
                               fontSize: '0.65rem',
                               fontWeight: 700,
                             }}>
@@ -4025,9 +4052,13 @@ export default function HomePage() {
                             overflow: 'hidden',
                             bgcolor: 'var(--surface)',
                             boxShadow: 'var(--card-shadow)',
-                            border: isProductClosed ? `1px solid ${SHOP_STATUS_CONFIG[productStatus].borderColor}` : '1px solid transparent',
+                            border: isProductClosed
+                              ? '1px solid rgba(255,255,255,0.06)'
+                              : '1px solid transparent',
                             position: 'relative',
-                            opacity: isProductClosed ? 0.85 : 1,
+                            opacity: isProductClosed ? 0.72 : 1,
+                            filter: isProductClosed ? 'grayscale(1)' : 'none',
+                            transition: 'opacity 0.25s ease, filter 0.25s ease, box-shadow 0.25s ease',
                             '&:hover': isProductAvailable ? {
                               boxShadow: (theme: any) => theme.palette.mode === 'dark'
                                 ? '0 12px 40px rgba(0,0,0,0.45), 0 0 0 1px rgba(0,113,227,0.15)'
@@ -4052,13 +4083,13 @@ export default function HomePage() {
                                 height="100%"
                                 objectFit="cover"
                                 priority={productIdx < 4} // First 4 products load eagerly
-                                placeholder="shimmer"
-                                showLoadingIndicator={productIdx < 4}
+                                placeholder="skeleton"
+                                showLoadingIndicator={false}
                                 style={{
                                   position: 'absolute',
                                   inset: 0,
-                                  filter: isProductClosed ? 'grayscale(40%) brightness(0.7)' : 'none',
-                                  transition: 'filter 0.3s ease, transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+                                  filter: 'none',
+                                  transition: 'transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
                                 }}
                                 className={!isProductClosed ? 'product-image-zoom' : ''}
                               />
@@ -4067,12 +4098,20 @@ export default function HomePage() {
                                 position: 'absolute', 
                                 inset: 0, 
                                 display: 'flex', 
+                                flexDirection: 'column',
                                 alignItems: 'center', 
                                 justifyContent: 'center', 
+                                gap: 1,
                                 color: 'var(--text-muted)',
-                                fontSize: '0.8rem',
+                                bgcolor: 'var(--surface-2)',
                               }}>
-                                {t.common.noImage}
+                                <Box
+                                  component="img"
+                                  src="/favicon.png"
+                                  alt=""
+                                  sx={{ width: 40, height: 40, opacity: 0.3, filter: 'grayscale(1)' }}
+                                />
+                                <Box sx={{ fontSize: '0.75rem', opacity: 0.7 }}>{t.common.noImage}</Box>
                               </Box>
                             )}
                             {/* Status Overlay for closed products */}
@@ -4084,37 +4123,19 @@ export default function HomePage() {
                                 flexDirection: 'column',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                background: 'rgba(0,0,0,0.6)',
-                                backdropFilter: 'blur(2px)',
+                                background: 'rgba(0,0,0,0.45)',
                               }}>
                                 <Box
                                   sx={{
-                                    width: 48,
-                                    height: 48,
-                                    borderRadius: '14px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    background: `linear-gradient(135deg, ${SHOP_STATUS_CONFIG[productStatus].color}40 0%, ${SHOP_STATUS_CONFIG[productStatus].color}20 100%)`,
-                                    border: `2px solid ${SHOP_STATUS_CONFIG[productStatus].color}`,
-                                    color: SHOP_STATUS_CONFIG[productStatus].color,
-                                    mb: 1,
-                                    boxShadow: `0 0 20px ${SHOP_STATUS_CONFIG[productStatus].color}40`,
-                                  }}
-                                >
-                                  {(() => {
-                                    const IconComponent = SHOP_STATUS_CONFIG[productStatus].icon;
-                                    return <IconComponent size={24} />;
-                                  })()}
-                                </Box>
-                                <Typography
-                                  sx={{
-                                    fontSize: '0.8rem',
-                                    fontWeight: 800,
-                                    color: SHOP_STATUS_CONFIG[productStatus].color,
-                                    textAlign: 'center',
-                                    px: 2,
-                                    textShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                                    px: 1.5,
+                                    py: 0.6,
+                                    borderRadius: '999px',
+                                    bgcolor: 'rgba(24,24,27,0.85)',
+                                    border: '1px solid rgba(255,255,255,0.12)',
+                                    color: 'rgba(255,255,255,0.85)',
+                                    fontSize: '0.72rem',
+                                    fontWeight: 700,
+                                    letterSpacing: '0.02em',
                                   }}
                                 >
                                   {({
@@ -4124,10 +4145,10 @@ export default function HomePage() {
                                     TEMPORARILY_CLOSED: t.shopStatus.closed,
                                     WAITING_TO_OPEN: t.shopStatus.waitingToOpen,
                                   } as Record<ShopStatusType, string>)[productStatus]}
-                                </Typography>
+                                </Box>
                                 {/* Show date info */}
                                 {product.startDate && productStatus === 'COMING_SOON' && (
-                                  <Typography sx={{ fontSize: '0.65rem', color: 'var(--foreground)', mt: 0.5, textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
+                                  <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.7)', mt: 1 }}>
                                     {t.product.opensOn} {new Date(product.startDate).toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-US')}
                                   </Typography>
                                 )}
@@ -4558,7 +4579,7 @@ export default function HomePage() {
 
       {showProfileModal && (
         <ProfileModal
-          initialData={{ name: orderData.name, phone: orderData.phone, address: orderData.address, instagram: orderData.instagram, profileImage: orderData.profileImage, savedAddresses }}
+          initialData={{ name: orderData.name, phone: orderData.phone, address: orderData.address, instagram: orderData.instagram, profileImage: orderData.profileImage, savedAddresses, marketingConsent: orderData.marketingConsent }}
           onClose={() => { setShowProfileModal(false); setActiveTab('home'); }}
           onSave={handleSaveProfile}
           userImage={session?.user?.image || ''}
@@ -4943,6 +4964,9 @@ export default function HomePage() {
           setLightboxImage(image);
         }}
         onRefundRequested={() => loadOrderHistory()}
+        onBrowseShop={() => {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
       />
 
       {/* ===== Wishlist Drawer ===== */}

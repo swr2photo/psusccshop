@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/session-from-request';
-import { isAdminEmailAsync } from '@/lib/auth';
+import { isAdminEmailAsync, listAssignableAdminEmails } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { orders } from '@/db/schema';
 import { and, eq, ne } from 'drizzle-orm';
@@ -12,9 +12,11 @@ import {
   getPendingChats,
   getActiveChats,
   getChatStatistics,
+  closeInactiveSupportChats,
   ChatStatus,
   ChatSession
 } from '@/lib/support-chat';
+import { getStoredSupportChatSettings } from '@/lib/support-chat-settings-db';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -46,8 +48,26 @@ export async function GET(request: NextRequest) {
     if (!(await isAdminEmailAsync(session.user.email))) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
-    
+
     const { searchParams } = new URL(request.url);
+    if (searchParams.get('action') === 'admins') {
+      const emails = await listAssignableAdminEmails();
+      const admins = emails.map((email) => ({
+        email,
+        name: email.split('@')[0] || email,
+      }));
+      return NextResponse.json({ admins });
+    }
+
+    try {
+      const settings = await getStoredSupportChatSettings();
+      if (settings.auto_close_enabled) {
+        await closeInactiveSupportChats(settings.auto_close_hours);
+      }
+    } catch (e) {
+      console.error('[admin/support-chat] auto-close failed:', e);
+    }
+    
     const filter = searchParams.get('filter') as ChatStatus | 'all' | 'my' | null;
     const shopId = searchParams.get('shopId');
     

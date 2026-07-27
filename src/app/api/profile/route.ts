@@ -10,7 +10,7 @@ const profileExtrasKey = (email: string) => `profile-extras/${emailHash(email)}.
 // Fields stored in the profiles table (has dedicated columns)
 const PROFILE_TABLE_FIELDS = ['name', 'phone', 'address', 'instagram'];
 // Extra fields stored in key_value_store (no dedicated columns yet)
-const EXTRA_FIELDS = ['profileImage', 'theme', 'savedAddresses'];
+const EXTRA_FIELDS = ['profileImage', 'theme', 'savedAddresses', 'marketingConsent'];
 
 // Helper to save user log server-side
 async function saveUserLogServer(log: {
@@ -129,6 +129,7 @@ export async function POST(req: NextRequest) {
         hasInstagram: !!merged.instagram,
         hasProfileImage: !!extrasData.profileImage,
         hasTheme: !!extrasData.theme,
+        marketingConsent: extrasData.marketingConsent === true,
       },
       ip: clientIP,
       userAgent,

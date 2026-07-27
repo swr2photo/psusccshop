@@ -3,7 +3,7 @@
 
 import { db } from './db';
 import { supportChats, supportMessages } from '../db/schema';
-import { eq, lt, gt, and, desc, inArray, like, count, sql, avg } from 'drizzle-orm';
+import { eq, lt, gt, and, or, desc, inArray, like, count, sql, avg } from 'drizzle-orm';
 import { normalizeEmail } from './auth';
 
 // ==================== TYPES ====================
@@ -146,30 +146,40 @@ export async function getChatSession(sessionId: string): Promise<ChatSession | n
 }
 
 /** Default window for full history fetches (keeps open/sync payloads small). */
-export const CHAT_MESSAGE_PAGE_SIZE = 100;
+export const CHAT_MESSAGE_PAGE_SIZE = 30;
+
+export type ChatSessionWithMessagesPage = ChatSessionWithMessages & {
+  hasMore: boolean;
+};
 
 /**
  * Get chat session with messages (most recent `limit` by default).
+ * Fetches limit+1 to detect whether older history exists.
  */
 export async function getChatSessionWithMessages(
   sessionId: string,
   limit = CHAT_MESSAGE_PAGE_SIZE
-): Promise<ChatSessionWithMessages | null> {
+): Promise<ChatSessionWithMessagesPage | null> {
   const chatRows = await db.select().from(supportChats).where(eq(supportChats.id, sessionId)).limit(1);
   const chat = chatRows[0];
   if (!chat) return null;
 
+  const pageLimit = Math.max(1, Math.min(limit, 50));
   // Fetch newest first, then reverse for chronological UI order
   const msgRowsNewestFirst = await db.select()
     .from(supportMessages)
     .where(eq(supportMessages.sessionId, sessionId))
     .orderBy(desc(supportMessages.createdAt))
-    .limit(Math.max(1, limit));
-  const msgRowsSorted = msgRowsNewestFirst.reverse();
+    .limit(pageLimit + 1);
+
+  const hasMore = msgRowsNewestFirst.length > pageLimit;
+  const page = hasMore ? msgRowsNewestFirst.slice(0, pageLimit) : msgRowsNewestFirst;
+  const msgRowsSorted = page.reverse();
 
   return {
     ...toChat(chat),
     messages: msgRowsSorted.map(toMsg),
+    hasMore,
   };
 }
 
@@ -188,6 +198,46 @@ export async function getMessagesSince(sessionId: string, since: Date): Promise<
     ))
     .orderBy(supportMessages.createdAt);
   return msgRows.map(toMsg);
+}
+
+/**
+ * Older page for infinite scroll (messages strictly before a cursor).
+ * Returns chronological order + hasMore.
+ */
+export async function getMessagesBefore(
+  sessionId: string,
+  beforeCreatedAt: string,
+  limit = CHAT_MESSAGE_PAGE_SIZE,
+  beforeId?: string
+): Promise<{ messages: ChatMessage[]; hasMore: boolean }> {
+  const beforeDate = new Date(beforeCreatedAt);
+  if (Number.isNaN(beforeDate.getTime())) {
+    return { messages: [], hasMore: false };
+  }
+
+  const pageLimit = Math.max(1, Math.min(limit, 50));
+  const conditions = [
+    eq(supportMessages.sessionId, sessionId),
+    beforeId
+      ? or(
+          lt(supportMessages.createdAt, beforeDate),
+          and(eq(supportMessages.createdAt, beforeDate), lt(supportMessages.id, beforeId))
+        )
+      : lt(supportMessages.createdAt, beforeDate),
+  ];
+
+  const rowsNewestFirst = await db.select()
+    .from(supportMessages)
+    .where(and(...conditions))
+    .orderBy(desc(supportMessages.createdAt))
+    .limit(pageLimit + 1);
+
+  const hasMore = rowsNewestFirst.length > pageLimit;
+  const page = hasMore ? rowsNewestFirst.slice(0, pageLimit) : rowsNewestFirst;
+  return {
+    messages: page.reverse().map(toMsg),
+    hasMore,
+  };
 }
 
 /**
@@ -258,13 +308,41 @@ export async function getCustomerActiveChat(customerEmail: string): Promise<Chat
 }
 
 /**
- * Admin accepts a chat session
+ * Admin accepts a pending chat, or takes over an active chat from another assignee.
+ * System marker is created only on a real human accept / take-over — never on auto-reply.
  */
 export async function acceptChatSession(
   sessionId: string, 
   adminEmail: string, 
-  adminName: string
+  adminName: string,
+  options?: { force?: boolean }
 ): Promise<ChatSession> {
+  const existing = await getChatSession(sessionId);
+  if (!existing) {
+    throw new Error('Chat not found');
+  }
+  if (existing.status === 'closed') {
+    throw new Error('การสนทนานี้ปิดแล้ว');
+  }
+
+  const alreadyMine =
+    existing.status === 'active' &&
+    existing.admin_email &&
+    normalizeEmail(existing.admin_email) === normalizeEmail(adminEmail);
+
+  if (alreadyMine) {
+    return existing;
+  }
+
+  if (existing.status === 'active' && existing.admin_email && !options?.force) {
+    throw new Error('การสนทนานี้ถูกรับไปแล้ว');
+  }
+
+  const isTakeover =
+    existing.status === 'active' &&
+    Boolean(existing.admin_email) &&
+    normalizeEmail(existing.admin_email!) !== normalizeEmail(adminEmail);
+
   const data = await db.update(supportChats)
     .set({
       status: 'active',
@@ -275,8 +353,60 @@ export async function acceptChatSession(
     .where(eq(supportChats.id, sessionId))
     .returning();
   
-  await addChatMessage(sessionId, 'system', undefined, undefined, `${adminName} เข้ารับการสนทนา`);
+  const marker = isTakeover
+    ? `${adminName} ดึงเคสมาดูแล`
+    : `${adminName} เข้ารับการสนทนา`;
+  await addChatMessage(sessionId, 'system', undefined, undefined, marker);
   
+  return toChat(data[0]);
+}
+
+/**
+ * Transfer a chat to another admin (assign / reassign).
+ * Works for pending and active chats; creates a system transfer marker.
+ */
+export async function transferChatSession(
+  sessionId: string,
+  toEmail: string,
+  toName: string,
+  fromName: string
+): Promise<ChatSession> {
+  const existing = await getChatSession(sessionId);
+  if (!existing) {
+    throw new Error('Chat not found');
+  }
+  if (existing.status === 'closed') {
+    throw new Error('การสนทนานี้ปิดแล้ว');
+  }
+
+  const targetEmail = normalizeEmail(toEmail);
+  const alreadyTheirs =
+    existing.status === 'active' &&
+    existing.admin_email &&
+    normalizeEmail(existing.admin_email) === targetEmail;
+
+  if (alreadyTheirs) {
+    return existing;
+  }
+
+  const data = await db.update(supportChats)
+    .set({
+      status: 'active',
+      adminEmail: targetEmail,
+      adminName: toName,
+      updatedAt: new Date(),
+    })
+    .where(eq(supportChats.id, sessionId))
+    .returning();
+
+  await addChatMessage(
+    sessionId,
+    'system',
+    undefined,
+    undefined,
+    `${fromName} โอนเคสให้ ${toName}`
+  );
+
   return toChat(data[0]);
 }
 
@@ -298,6 +428,38 @@ export async function closeChatSession(sessionId: string): Promise<ChatSession> 
   await addChatMessage(sessionId, 'system', undefined, undefined, 'การสนทนาสิ้นสุดลง');
   
   return toChat(data[0]);
+}
+
+/**
+ * Close active chats where the customer has been silent for `hours`
+ * (last message is from admin/system and older than cutoff).
+ */
+export async function closeInactiveSupportChats(hours: number): Promise<number> {
+  const safeHours = Math.max(1, Math.min(hours, 720));
+  const cutoff = new Date(Date.now() - safeHours * 60 * 60 * 1000);
+
+  const stale = await db.select()
+    .from(supportChats)
+    .where(and(
+      eq(supportChats.status, 'active'),
+      lt(supportChats.lastMessageAt, cutoff)
+    ))
+    .limit(50);
+
+  let closed = 0;
+  for (const row of stale) {
+    const last = await db.select()
+      .from(supportMessages)
+      .where(eq(supportMessages.sessionId, row.id))
+      .orderBy(desc(supportMessages.createdAt))
+      .limit(1);
+    const sender = last[0]?.sender;
+    if (sender === 'admin' || sender === 'system') {
+      await closeChatSession(row.id);
+      closed += 1;
+    }
+  }
+  return closed;
 }
 
 /**

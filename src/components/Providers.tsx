@@ -19,8 +19,8 @@ import { AuthCookieSync } from './AuthCookieSync';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { NotificationProvider } from './NotificationContext';
+import { Toaster } from '@/components/ui/toast';
 // Performance: lazy-load non-critical UI components
-const ToastContainer = lazy(() => import('./ToastContainer'));
 const CookieConsentBanner = lazy(() => import('./CookieConsentBanner'));
 const NotificationPrompt = lazy(() => import('./NotificationPrompt'));
 const LiveStreamPopup = lazy(() => import('./LiveStreamPopup'));
@@ -528,15 +528,16 @@ export default function Providers({ children }: { children: React.ReactNode }) {
             <ThemeProvider theme={activeTheme}>
               <CssBaseline />
               <TooltipProvider delayDuration={300}>
+              <Toaster>
               <NotificationProvider>
                   {children}
                 <Suspense fallback={null}>
-                  <ToastContainer />
                   <CookieConsentBanner />
                   <NotificationPrompt />
                   <LiveStreamPopup />
                 </Suspense>
               </NotificationProvider>
+              </Toaster>
               </TooltipProvider>
             </ThemeProvider>
             </LiveStreamProvider>

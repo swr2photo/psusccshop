@@ -36,6 +36,26 @@ const SPACING_PROPS = new Set([
   'gap', 'rowGap', 'columnGap',
 ]);
 
+const SPACING_TO_CSS: Record<string, string | string[]> = {
+  p: 'padding',
+  px: ['paddingLeft', 'paddingRight'],
+  py: ['paddingTop', 'paddingBottom'],
+  pt: 'paddingTop',
+  pr: 'paddingRight',
+  pb: 'paddingBottom',
+  pl: 'paddingLeft',
+  m: 'margin',
+  mx: ['marginLeft', 'marginRight'],
+  my: ['marginTop', 'marginBottom'],
+  mt: 'marginTop',
+  mr: 'marginRight',
+  mb: 'marginBottom',
+  ml: 'marginLeft',
+  gap: 'gap',
+  rowGap: 'rowGap',
+  columnGap: 'columnGap',
+};
+
 function space(v: unknown): unknown {
   if (typeof v === 'number') return `${v * 8}px`;
   return v;
@@ -59,11 +79,22 @@ export function sxToStyle(sx: unknown): React.CSSProperties {
     for (const [rawKey, rawVal] of Object.entries(entry as Record<string, unknown>)) {
       if (rawKey.startsWith('&') || rawKey.startsWith('@')) continue;
       if (rawKey === 'typography') continue;
+      let val = pickResponsive(rawVal);
+      if (SPACING_PROPS.has(rawKey)) val = space(val);
+
+      if (rawKey in SPACING_TO_CSS) {
+        const cssKeys = SPACING_TO_CSS[rawKey];
+        if (Array.isArray(cssKeys)) {
+          for (const k of cssKeys) style[k] = val;
+        } else {
+          style[cssKeys] = val;
+        }
+        continue;
+      }
+
       let key = rawKey;
       if (key === 'bgcolor') key = 'backgroundColor';
       if (key === 'bg') key = 'background';
-      let val = pickResponsive(rawVal);
-      if (SPACING_PROPS.has(rawKey)) val = space(val);
       if (rawKey === 'borderRadius' && typeof val === 'number') val = `${val * 8}px`;
       if (rawKey === 'fontWeight' && typeof val === 'number' && val <= 9) {
         // keep as-is (MUI sometimes uses 700 etc already)
@@ -164,7 +195,7 @@ export function Button({
         className={cn(fullWidth && 'w-full', className)}
         style={{ ...sxToStyle(sx), ...style }}
       >
-        <a href={href} target={target} rel={rel} {...rest}>
+        <a href={href} target={target} rel={rel} onClick={onClick as any} {...rest}>
           {startIcon}
           {children}
           {endIcon}
@@ -179,6 +210,7 @@ export function Button({
       disabled={disabled}
       className={cn(fullWidth && 'w-full', className)}
       style={{ ...sxToStyle(sx), ...style }}
+      onClick={onClick}
       {...rest}
     >
       {startIcon}
@@ -212,7 +244,7 @@ export function IconButton({
   if (component === 'a' || href) {
     return (
       <UiButton asChild variant="ghost" size="icon" className={cn(size === 'small' && 'size-8', className)} style={{ ...sxToStyle(sx), ...style }}>
-        <a href={href} {...rest}>{children}</a>
+        <a href={href} onClick={onClick as any} {...rest}>{children}</a>
       </UiButton>
     );
   }
@@ -222,6 +254,7 @@ export function IconButton({
       size="icon"
       className={cn(size === 'small' && 'size-8', className)}
       style={{ ...sxToStyle(sx), ...style }}
+      onClick={onClick}
       {...rest}
     >
       {children}
@@ -306,10 +339,10 @@ export function TextField({
       className="w-full"
       {...(inputProps as any)}
     />
-  ) : (
-    <div className="relative flex w-full items-center">
+  ) : InputProps?.startAdornment || InputProps?.endAdornment ? (
+    <div className="flex w-full items-center gap-2 rounded-md border border-input bg-transparent px-3 shadow-xs focus-within:border-ring">
       {InputProps?.startAdornment ? (
-        <span className="pointer-events-none absolute left-2.5 z-10 flex items-center text-muted-foreground">
+        <span className="flex shrink-0 items-center whitespace-nowrap text-muted-foreground">
           {InputProps.startAdornment}
         </span>
       ) : null}
@@ -323,18 +356,29 @@ export function TextField({
         disabled={disabled}
         autoFocus={autoFocus}
         autoComplete={autoComplete}
-        className={cn(
-          'w-full',
-          InputProps?.startAdornment && 'pl-9',
-          InputProps?.endAdornment && 'pr-9',
-        )}
+        className="w-full min-w-0 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
         {...inputProps}
         {...(InputProps?.inputProps || {})}
       />
       {InputProps?.endAdornment ? (
-        <span className="absolute right-1 z-10 flex items-center">{InputProps.endAdornment}</span>
+        <span className="flex shrink-0 items-center">{InputProps.endAdornment}</span>
       ) : null}
     </div>
+  ) : (
+    <Input
+      ref={inputRef}
+      type={type}
+      value={value as string}
+      onChange={onChange}
+      onKeyDown={onKeyDown}
+      placeholder={placeholder}
+      disabled={disabled}
+      autoFocus={autoFocus}
+      autoComplete={autoComplete}
+      className="w-full"
+      {...inputProps}
+      {...(InputProps?.inputProps || {})}
+    />
   );
 
   return (
@@ -517,6 +561,30 @@ export function CircularProgress({ size = 24, sx, className }: any) {
   );
 }
 
+export function DialogTitle({ children, sx, className }: any) {
+  return (
+    <UiDialogTitle className={cn('text-base font-semibold', className)} style={sxToStyle(sx)}>
+      {children}
+    </UiDialogTitle>
+  );
+}
+DialogTitle.displayName = 'MuiShimDialogTitle';
+
+function nodeContainsDialogTitle(node: React.ReactNode): boolean {
+  return React.Children.toArray(node).some((child) => {
+    if (!React.isValidElement(child)) return false;
+    const type = child.type as { displayName?: string } | string;
+    if (type === DialogTitle || type === UiDialogTitle) return true;
+    if (typeof type === 'function' && (type as { displayName?: string }).displayName === 'MuiShimDialogTitle') {
+      return true;
+    }
+    if (typeof type === 'object' && type && 'displayName' in type && type.displayName === 'MuiShimDialogTitle') {
+      return true;
+    }
+    return nodeContainsDialogTitle((child.props as { children?: React.ReactNode })?.children);
+  });
+}
+
 export function Dialog({
   open,
   onClose,
@@ -524,48 +592,62 @@ export function Dialog({
   fullWidth,
   maxWidth,
   PaperProps,
+  ariaTitle,
+  fullscreen,
 }: {
   open?: boolean;
   onClose?: () => void;
   children?: React.ReactNode;
   fullWidth?: boolean;
-  maxWidth?: string;
+  maxWidth?: string | false;
   PaperProps?: { sx?: unknown };
+  /** Accessible title used when children do not include DialogTitle */
+  ariaTitle?: string;
+  /** Edge-to-edge viewport dialog (like product editor) */
+  fullscreen?: boolean;
 }) {
   const widthClass =
-    maxWidth === 'xs'
-      ? 'sm:max-w-sm'
-      : maxWidth === 'md'
-        ? 'sm:max-w-xl'
-        : maxWidth === 'lg'
-          ? 'sm:max-w-2xl'
-          : maxWidth === 'xl'
-            ? 'sm:max-w-4xl'
-            : 'sm:max-w-lg';
+    maxWidth === false || fullscreen
+      ? 'sm:max-w-none'
+      : maxWidth === 'xs'
+        ? 'sm:max-w-sm'
+        : maxWidth === 'md'
+          ? 'sm:max-w-xl'
+          : maxWidth === 'lg'
+            ? 'sm:max-w-2xl'
+            : maxWidth === 'xl'
+              ? 'sm:max-w-4xl'
+              : maxWidth === 'false'
+                ? 'sm:max-w-none'
+                : 'sm:max-w-lg';
+  const needsTitle = !nodeContainsDialogTitle(children);
   return (
     <UiDialog open={!!open} onOpenChange={(v) => { if (!v) onClose?.(); }}>
       <UiDialogContent
-        className={cn('gap-0 p-0 overflow-visible', fullWidth !== false && widthClass)}
-        style={sxToStyle(PaperProps?.sx)}
+        fullscreen={!!fullscreen}
+        showCloseButton
+        className={cn(
+          'gap-0 p-0',
+          fullscreen
+            ? 'overflow-hidden bg-[var(--surface)] text-[var(--foreground)]'
+            : cn('overflow-visible', fullWidth !== false && widthClass),
+        )}
+        style={fullscreen ? undefined : sxToStyle(PaperProps?.sx)}
+        aria-describedby={undefined}
       >
+        {needsTitle ? (
+          <UiDialogTitle className="sr-only">{ariaTitle || 'Dialog'}</UiDialogTitle>
+        ) : null}
         {children}
       </UiDialogContent>
     </UiDialog>
   );
 }
 
-export function DialogTitle({ children, sx, className }: any) {
-  return (
-    <UiDialogTitle className={cn('px-4 pt-4 text-base', className)} style={sxToStyle(sx)}>
-      {children}
-    </UiDialogTitle>
-  );
-}
-
 export function DialogContent({ children, sx, className }: any) {
   // Outer Dialog already wraps Radix DialogContent — this is just a body region.
   return (
-    <div className={cn('px-4 py-3', className)} style={sxToStyle(sx)}>
+    <div className={cn('flex flex-col gap-4 px-5 py-4', className)} style={sxToStyle(sx)}>
       {children}
     </div>
   );
@@ -573,7 +655,7 @@ export function DialogContent({ children, sx, className }: any) {
 
 export function DialogActions({ children, sx, className }: any) {
   return (
-    <UiDialogFooter className={cn('px-4 pb-4', className)} style={sxToStyle(sx)}>
+    <UiDialogFooter className={cn('shrink-0 gap-3 px-5 pb-5 pt-3', className)} style={sxToStyle(sx)}>
       {children}
     </UiDialogFooter>
   );

@@ -871,7 +871,7 @@ export function getSecurityHeaders(): Record<string, string> {
     'X-Frame-Options': 'DENY',
     'X-XSS-Protection': '1; mode=block',
     'Referrer-Policy': 'strict-origin-when-cross-origin',
-    'Permissions-Policy': 'camera=(self), microphone=(), geolocation=()',
+    'Permissions-Policy': 'camera=(self), microphone=(self), geolocation=()',
     'Cache-Control': 'no-store, no-cache, must-revalidate, private',
   };
 }

@@ -6,7 +6,25 @@ export type InvoiceLang = 'th' | 'en';
 
 export interface InvoiceBuildOptions {
   stripeReceiptUrl?: string | null;
+  /** Inline QR as SVG markup (preferred — works under CSP / srcDoc) */
+  qrSvg?: string | null;
+  /** @deprecated use qrSvg */
+  qrDataUrl?: string | null;
 }
+
+/** Issuer / organization details for official receipts */
+const ISSUER = {
+  nameTh: 'ชุมนุมคอมพิวเตอร์และวิทยาการคำนวณ คณะวิทยาศาสตร์ มหาวิทยาลัยสงขลานครินทร์',
+  nameEn: 'Computer Science & Computing Club, Faculty of Science, Prince of Songkla University',
+  shortTh: 'PSU SCC Shop',
+  shortEn: 'PSU SCC Shop',
+  addressTh: '15 ถ.กาญจนวณิชย์ ต.คอหงส์ อ.หาดใหญ่ จ.สงขลา 90110',
+  addressEn: '15 Kanchanawanit Rd, Kho Hong, Hat Yai, Songkhla 90110, Thailand',
+  phone: '063-092-7759',
+  email: 'psuscc@psusci.club',
+  vatNoteTh: 'ได้รับการยกเว้นภาษีมูลค่าเพิ่ม',
+  vatNoteEn: 'VAT exempt',
+} as const;
 
 function escapeHtml(value: unknown): string {
   return String(value ?? '')
@@ -17,8 +35,9 @@ function escapeHtml(value: unknown): string {
 }
 
 function formatMoney(amount: number, lang: InvoiceLang): string {
-  return `฿${amount.toLocaleString(lang === 'th' ? 'th-TH' : 'en-US', {
-    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
+  const n = Number.isFinite(amount) ? amount : 0;
+  return `฿${n.toLocaleString(lang === 'th' ? 'th-TH' : 'en-US', {
+    minimumFractionDigits: n % 1 === 0 ? 0 : 2,
     maximumFractionDigits: 2,
   })}`;
 }
@@ -44,15 +63,129 @@ function formatDateTime(iso: Date | string, lang: InvoiceLang): string {
   }
 }
 
+/** Deterministic receipt no. from order ref + issue date (REC-YYYYMM-####) */
+export function buildReceiptNumber(ref: string, issuedAt: string | Date): string {
+  const date = typeof issuedAt === 'string' ? new Date(issuedAt) : issuedAt;
+  const valid = !Number.isNaN(date.getTime()) ? date : new Date();
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: TH_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+  }).formatToParts(valid);
+  const year = parts.find((p) => p.type === 'year')?.value || String(valid.getFullYear());
+  const month = parts.find((p) => p.type === 'month')?.value || '01';
+  let hash = 0;
+  const key = String(ref || '');
+  for (let i = 0; i < key.length; i++) {
+    hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+  }
+  const seq = String((hash % 9000) + 1000);
+  return `REC-${year}${month}-${seq}`;
+}
+
+/**
+ * Fix line totals: order carts often store unitPrice/subtotal while `total` is 0.
+ * Never treat a literal 0 `total` as authoritative when unit price exists.
+ */
+export function resolveCartLineAmounts(item: Record<string, unknown>): {
+  qty: number;
+  unitPrice: number;
+  lineTotal: number;
+} {
+  const qty = Math.max(1, Number(item.qty ?? item.quantity ?? 1) || 1);
+  const unitCandidate =
+    Number(item.unitPrice ?? 0) ||
+    Number(item.price ?? 0) ||
+    0;
+  const explicitLine =
+    Number(item.subtotal ?? 0) ||
+    Number(item.lineTotal ?? 0) ||
+    Number(item.total ?? 0) ||
+    0;
+
+  let lineTotal = 0;
+  let unitPrice = 0;
+
+  if (explicitLine > 0 && unitCandidate > 0) {
+    // Prefer explicit line when it matches unit*qty (±1 satang), else use unit*qty
+    const expected = unitCandidate * qty;
+    lineTotal = Math.abs(explicitLine - expected) < 0.02 ? explicitLine : expected;
+    unitPrice = unitCandidate;
+  } else if (unitCandidate > 0) {
+    unitPrice = unitCandidate;
+    lineTotal = unitCandidate * qty;
+  } else if (explicitLine > 0) {
+    lineTotal = explicitLine;
+    unitPrice = qty > 0 ? explicitLine / qty : explicitLine;
+  }
+
+  return { qty, unitPrice, lineTotal };
+}
+
+/** Thai baht text e.g. "(สามร้อยหกสิบเก้าบาทถ้วน)" */
+export function bahtTextThai(amount: number): string {
+  const abs = Math.abs(Number(amount) || 0);
+  const baht = Math.floor(abs + 1e-9);
+  const satang = Math.round((abs - baht) * 100);
+
+  const ones = ['ศูนย์', 'หนึ่ง', 'สอง', 'สาม', 'สี่', 'ห้า', 'หก', 'เจ็ด', 'แปด', 'เก้า'];
+  const positions = ['', 'สิบ', 'ร้อย', 'พัน', 'หมื่น', 'แสน', 'ล้าน'];
+
+  const readNumber = (n: number): string => {
+    if (n === 0) return ones[0];
+    if (n >= 1_000_000) {
+      const millions = Math.floor(n / 1_000_000);
+      const rest = n % 1_000_000;
+      return `${readNumber(millions)}ล้าน${rest ? readNumber(rest) : ''}`;
+    }
+    const digits = String(n).split('').map((d) => Number(d));
+    let text = '';
+    for (let i = 0; i < digits.length; i++) {
+      const d = digits[i];
+      const pos = digits.length - i - 1;
+      if (d === 0) continue;
+      if (pos === 1) {
+        if (d === 1) text += 'สิบ';
+        else if (d === 2) text += 'ยี่สิบ';
+        else text += `${ones[d]}สิบ`;
+      } else if (pos === 0) {
+        text += d === 1 && digits.length > 1 ? 'เอ็ด' : ones[d];
+      } else {
+        text += `${ones[d]}${positions[pos]}`;
+      }
+    }
+    return text || ones[0];
+  };
+
+  let text = `${readNumber(baht)}บาท`;
+  if (satang <= 0) text += 'ถ้วน';
+  else text += `${readNumber(satang)}สตางค์`;
+  if (amount < 0) text = `ลบ${text}`;
+  return `(${text})`;
+}
+
+function bahtTextEnglish(amount: number): string {
+  const n = Math.abs(Number(amount) || 0);
+  const formatted = n.toLocaleString('en-US', {
+    minimumFractionDigits: n % 1 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  });
+  return `(${amount < 0 ? 'Minus ' : ''}${formatted} Baht only)`;
+}
+
 interface InvoiceLabelSet {
   title: string;
+  original: string;
+  receiptNo: string;
   orderRef: string;
+  issuedAt: string;
   date: string;
   paidAt: string;
   customer: string;
   email: string;
   phone: string;
   address: string;
+  no: string;
   item: string;
   size: string;
   qty: string;
@@ -62,6 +195,7 @@ interface InvoiceLabelSet {
   shipping: string;
   discount: string;
   grandTotal: string;
+  amountInWords: string;
   paymentMethod: string;
   status: string;
   pattern: string;
@@ -71,36 +205,42 @@ interface InvoiceLabelSet {
   longSleeve: string;
   shortSleeve: string;
   generatedAt: string;
-  shopName: string;
-  shopTagline: string;
   thankYou: string;
   print: string;
   stripeReceipt: string;
   stripeNote: string;
   paid: string;
+  verifyScan: string;
+  authorizedSign: string;
+  receiverSign: string;
   methods: Record<string, string>;
   statuses: Record<string, string>;
 }
 
 const LABELS: Record<InvoiceLang, InvoiceLabelSet> = {
   th: {
-    title: 'ใบเสร็จรับเงิน / Receipt',
-    orderRef: 'เลขที่คำสั่งซื้อ',
+    title: 'ใบเสร็จรับเงิน / RECEIPT',
+    original: 'ต้นฉบับ / ORIGINAL',
+    receiptNo: 'เลขที่ใบเสร็จ',
+    orderRef: 'อ้างอิงออเดอร์',
+    issuedAt: 'วันที่ออก',
     date: 'วันที่สั่งซื้อ',
     paidAt: 'วันที่ชำระเงิน',
     customer: 'ลูกค้า',
     email: 'อีเมล',
     phone: 'โทรศัพท์',
     address: 'ที่อยู่จัดส่ง',
-    item: 'รายการ',
-    size: 'ไซส์',
+    no: 'ลำดับ',
+    item: 'รายการสินค้า / รายละเอียด',
+    size: 'ขนาด',
     qty: 'จำนวน',
-    unitPrice: 'ราคา/ชิ้น',
-    lineTotal: 'รวม',
+    unitPrice: 'ราคา/หน่วย',
+    lineTotal: 'จำนวนเงิน',
     subtotal: 'ยอดรวมสินค้า',
     shipping: 'ค่าจัดส่ง',
     discount: 'ส่วนลด',
     grandTotal: 'ยอดชำระทั้งสิ้น',
+    amountInWords: 'จำนวนเงินตัวอักษร',
     paymentMethod: 'ช่องทางชำระเงิน',
     status: 'สถานะ',
     pattern: 'ลาย',
@@ -110,22 +250,23 @@ const LABELS: Record<InvoiceLang, InvoiceLabelSet> = {
     longSleeve: 'แขนยาว',
     shortSleeve: 'แขนสั้น',
     generatedAt: 'ออกใบเสร็จเมื่อ',
-    shopName: 'PSU SCC Shop',
-    shopTagline: 'Computer Science & Computing Shop',
-    thankYou: 'ขอบคุณที่อุดหนุน SCC Shop',
+    thankYou: 'ขอบคุณที่อุดหนุนชุมนุมคอมพิวเตอร์และวิทยาการคำนวณ',
     print: 'พิมพ์ / บันทึก PDF',
     stripeReceipt: 'ใบเสร็จอย่างเป็นทางการจาก Stripe',
     stripeNote: 'การชำระผ่าน Stripe PromptPay — สามารถเปิดใบเสร็จอิเล็กทรอนิกส์จาก Stripe ได้ด้านล่าง',
-    paid: 'ชำระแล้ว',
+    paid: 'สำเร็จ',
+    verifyScan: 'สแกนเพื่อตรวจสอบเอกสาร',
+    authorizedSign: 'ผู้มีอำนาจลงนาม / ผู้รับเงิน',
+    receiverSign: '( ลงชื่อ )',
     methods: {
-      promptpay: 'PromptPay (Stripe)',
+      promptpay: 'โอนเงินออนไลน์ PromptPay (Stripe)',
       credit_card: 'บัตรเครดิต/เดบิต',
-      bank_transfer: 'โอนธนาคาร',
+      bank_transfer: 'โอนเงินออนไลน์',
       slip: 'อัปโหลดสลิป',
-      default: 'ออนไลน์',
+      default: 'โอนเงินออนไลน์',
     },
     statuses: {
-      PAID: 'ชำระแล้ว',
+      PAID: 'สำเร็จ',
       WAITING_PAYMENT: 'รอชำระ',
       READY: 'พร้อมจัดส่ง',
       SHIPPED: 'จัดส่งแล้ว',
@@ -135,23 +276,28 @@ const LABELS: Record<InvoiceLang, InvoiceLabelSet> = {
     },
   },
   en: {
-    title: 'Receipt / Tax Invoice',
-    orderRef: 'Order Reference',
+    title: 'RECEIPT',
+    original: 'ORIGINAL',
+    receiptNo: 'Receipt No.',
+    orderRef: 'Order Ref.',
+    issuedAt: 'Issued',
     date: 'Order Date',
     paidAt: 'Paid At',
     customer: 'Customer',
     email: 'Email',
     phone: 'Phone',
     address: 'Shipping Address',
-    item: 'Item',
+    no: 'No.',
+    item: 'Description',
     size: 'Size',
     qty: 'Qty',
-    unitPrice: 'Unit',
-    lineTotal: 'Total',
+    unitPrice: 'Unit Price',
+    lineTotal: 'Amount',
     subtotal: 'Subtotal',
     shipping: 'Shipping',
     discount: 'Discount',
     grandTotal: 'Amount Paid',
+    amountInWords: 'Amount in words',
     paymentMethod: 'Payment Method',
     status: 'Status',
     pattern: 'Pattern',
@@ -161,19 +307,20 @@ const LABELS: Record<InvoiceLang, InvoiceLabelSet> = {
     longSleeve: 'Long sleeve',
     shortSleeve: 'Short sleeve',
     generatedAt: 'Generated at',
-    shopName: 'PSU SCC Shop',
-    shopTagline: 'Computer Science & Computing Shop',
-    thankYou: 'Thank you for your purchase!',
+    thankYou: 'Thank you for supporting PSU SCC',
     print: 'Print / Save PDF',
     stripeReceipt: 'Official Stripe Receipt',
     stripeNote: 'Paid via Stripe PromptPay — open the official Stripe receipt below.',
     paid: 'Paid',
+    verifyScan: 'Scan to verify receipt',
+    authorizedSign: 'Authorized signature / Cashier',
+    receiverSign: '( Signature )',
     methods: {
-      promptpay: 'PromptPay (Stripe)',
+      promptpay: 'Online transfer PromptPay (Stripe)',
       credit_card: 'Credit / Debit Card',
-      bank_transfer: 'Bank Transfer',
+      bank_transfer: 'Online bank transfer',
       slip: 'Slip Upload',
-      default: 'Online',
+      default: 'Online transfer',
     },
     statuses: {
       PAID: 'Paid',
@@ -278,6 +425,59 @@ function formatCartLineMeta(item: Record<string, unknown>, lang: InvoiceLang): s
   return parts.map((p) => `<div class="line-meta">${escapeHtml(p)}</div>`).join('');
 }
 
+/** Sanitize QR SVG from `qrcode` — allow only SVG markup. */
+function sanitizeQrSvg(svg: string): string {
+  const trimmed = String(svg || '').trim();
+  if (!trimmed.startsWith('<svg')) return '';
+  // Strip scripts / event handlers just in case
+  return trimmed
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/\son\w+="[^"]*"/gi, '')
+    .replace(/\son\w+='[^']*'/gi, '');
+}
+
+/** Soft circular official stamp (inline SVG) over signature area */
+function buildOfficialStampSvg(lang: InvoiceLang): string {
+  const ring = lang === 'th' ? 'ชุมนุมคอมพิวเตอร์และวิทยาการคำนวณ · ม.อ. หาดใหญ่' : 'PSU SCC · Faculty of Science · PSU';
+  const center = lang === 'th' ? 'SCC' : 'SCC';
+  const sub = lang === 'th' ? 'ร้านค้าชุมนุม' : 'CLUB SHOP';
+  return `
+<svg class="official-stamp" viewBox="0 0 120 120" width="120" height="120" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <circle cx="60" cy="60" r="56" fill="none" stroke="#1e3a8a" stroke-width="2.2" opacity="0.55"/>
+  <circle cx="60" cy="60" r="48" fill="none" stroke="#1e3a8a" stroke-width="1" opacity="0.45" stroke-dasharray="2 2"/>
+  <circle cx="60" cy="60" r="36" fill="none" stroke="#1e3a8a" stroke-width="1.4" opacity="0.5"/>
+  <text x="60" y="56" text-anchor="middle" font-family="Sarabun, sans-serif" font-size="18" font-weight="700" fill="#1e3a8a" opacity="0.55">${escapeHtml(center)}</text>
+  <text x="60" y="72" text-anchor="middle" font-family="Sarabun, sans-serif" font-size="8" font-weight="600" fill="#1e3a8a" opacity="0.5" letter-spacing="0.08em">${escapeHtml(sub)}</text>
+  <defs>
+    <path id="stamp-ring" d="M60,60 m-42,0 a42,42 0 1,1 84,0 a42,42 0 1,1 -84,0"/>
+  </defs>
+  <text font-family="Sarabun, sans-serif" font-size="7.2" fill="#1e3a8a" opacity="0.55" letter-spacing="0.5">
+    <textPath xlink:href="#stamp-ring" href="#stamp-ring" startOffset="0%">${escapeHtml(ring)} · </textPath>
+  </text>
+</svg>`;
+}
+
+function renderQrBlock(options: InvoiceBuildOptions, verifyUrl: string, receiptNo: string, label: string): string {
+  const svg = sanitizeQrSvg(options.qrSvg || '');
+  if (svg) {
+    return `
+      <div class="qr-block">
+        <div class="qr-svg">${svg}</div>
+        <p>${escapeHtml(label)}<br /><span class="mono" style="font-size:9px;word-break:break-all;">${escapeHtml(receiptNo)}</span></p>
+      </div>`;
+  }
+  // Last-resort: link + code (never broken external img)
+  return `
+      <div class="qr-block">
+        <div class="qr-fallback">
+          <div class="qr-fallback-title">VERIFY</div>
+          <div class="mono qr-fallback-code">${escapeHtml(receiptNo)}</div>
+          <a class="qr-fallback-link" href="${escapeHtml(verifyUrl)}">${escapeHtml(verifyUrl.replace(/^https?:\/\//, '').slice(0, 42))}…</a>
+        </div>
+        <p>${escapeHtml(label)}</p>
+      </div>`;
+}
+
 export function buildInvoiceHtml(
   order: Record<string, unknown>,
   ref: string,
@@ -301,19 +501,20 @@ export function buildInvoiceHtml(
     paidAt ||
     orderDate;
   const status = readOrderField(order, 'status') || 'WAITING_PAYMENT';
-  const isPaid = status.toUpperCase() === 'PAID' || order.paymentVerified === true;
+  const isPaid =
+    ['PAID', 'READY', 'SHIPPED', 'RECEIVED', 'COMPLETED'].includes(status.toUpperCase()) ||
+    order.paymentVerified === true;
 
-  const subtotal = cart.reduce((sum, item) => {
-    const qty = Number(item.qty ?? item.quantity ?? 1) || 1;
-    const line = Number(item.total ?? item.price ?? 0);
-    const unit = Number(item.unitPrice ?? 0);
-    return sum + (line || unit * qty);
-  }, 0);
+  const lineAmounts = cart.map((item) => resolveCartLineAmounts(item));
+  const subtotalFromCart = lineAmounts.reduce((sum, line) => sum + line.lineTotal, 0);
+  const orderSubtotal = Number(order.subtotal ?? 0) || 0;
+  const subtotal = subtotalFromCart > 0 ? subtotalFromCart : orderSubtotal;
 
   const shippingFee = Number(order.shippingFee ?? order.shipping_fee ?? 0) || 0;
   const discount = Number(order.discount ?? order.promoDiscount ?? 0) || 0;
   const grandTotal =
-    Number(order.totalAmount ?? order.total_amount ?? 0) || subtotal + shippingFee - discount;
+    Number(order.totalAmount ?? order.total_amount ?? 0) ||
+    Math.max(0, subtotal + shippingFee - discount);
 
   const customerName = readOrderField(order, 'customerName', 'customer_name', 'name') || '-';
   const customerEmail = readOrderField(order, 'customerEmail', 'customer_email', 'email') || '-';
@@ -322,27 +523,41 @@ export function buildInvoiceHtml(
     ? readOrderField(order, 'customerAddress', 'customer_address', 'address')
     : '';
 
+  const receiptNo = buildReceiptNumber(ref, receiptIssuedDate);
+  const verifyUrl = absoluteUrl(`/receipt/${encodeURIComponent(ref)}?lang=${lang}`);
+  const amountWords = lang === 'th' ? bahtTextThai(grandTotal) : bahtTextEnglish(grandTotal);
+  const vatNote = lang === 'th' ? ISSUER.vatNoteTh : ISSUER.vatNoteEn;
+  const orgName = lang === 'th' ? ISSUER.nameTh : ISSUER.nameEn;
+  const orgAddress = lang === 'th' ? ISSUER.addressTh : ISSUER.addressEn;
+  const paymentStatusText = isPaid
+    ? lang === 'th'
+      ? `${paymentMethodLabel(order, lang)} (สถานะ: ${L.paid})`
+      : `${paymentMethodLabel(order, lang)} (Status: ${L.paid})`
+    : paymentMethodLabel(order, lang);
+
   const cartRows = cart
-    .map((item) => {
-      const qty = Number(item.qty ?? item.quantity ?? 1) || 1;
-      const lineTotal = Number(item.total ?? item.price ?? 0) || 0;
-      const unitPrice =
-        Number(item.unitPrice ?? 0) ||
-        (qty > 0 && lineTotal > 0 ? lineTotal / qty : 0);
+    .map((item, index) => {
+      const { qty, unitPrice, lineTotal } = lineAmounts[index] || resolveCartLineAmounts(item);
       const name =
         readOrderField(item as Record<string, unknown>, 'productName', 'name') || L.item;
+      const size = String(item.size || '-');
       const meta = formatCartLineMeta(item, lang);
+      const titleWithSize =
+        size && size !== '-'
+          ? `${escapeHtml(name)} <span class="size-inline">(${escapeHtml(L.size)}: ${escapeHtml(size)})</span>`
+          : escapeHtml(name);
 
       return `
         <tr>
+          <td class="num col-no">${index + 1}</td>
           <td>
-            <div class="line-title">${escapeHtml(name)}</div>
+            <div class="line-title">${titleWithSize}</div>
             ${meta}
           </td>
-          <td class="num">${escapeHtml(item.size || '-')}</td>
-          <td class="num">${qty}</td>
-          <td class="num">${formatMoney(unitPrice, lang)}</td>
-          <td class="num strong">${formatMoney(lineTotal, lang)}</td>
+          <td class="num col-size">${escapeHtml(size)}</td>
+          <td class="num col-qty">${qty}</td>
+          <td class="num col-unit">${formatMoney(unitPrice, lang)}</td>
+          <td class="num col-amt strong">${formatMoney(lineTotal, lang)}</td>
         </tr>`;
     })
     .join('');
@@ -364,268 +579,478 @@ export function buildInvoiceHtml(
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${escapeHtml(L.title)} — ${escapeHtml(ref)}</title>
+  <title>${escapeHtml(L.title)} — ${escapeHtml(receiptNo)}</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+    :root {
+      --ink: #1f2937;
+      --navy: #1e3a8a;
+      --muted: #4b5563;
+      --line: #cbd5e1;
+      --paper: #ffffff;
+      --wash: #f8fafc;
+    }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: 'IBM Plex Sans Thai', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: #f0f4f8;
-      color: #1a1f36;
-      padding: 24px 16px 40px;
-      line-height: 1.5;
+      font-family: 'Sarabun', 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #e5e7eb;
+      color: var(--ink);
+      padding: 20px 12px 36px;
+      line-height: 1.45;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
-    .toolbar { text-align: center; margin-bottom: 20px; }
+    .toolbar { text-align: center; margin-bottom: 16px; }
     .btn-print {
-      padding: 11px 22px;
-      background: linear-gradient(135deg, #0a2540, #1a4d7a);
+      padding: 10px 20px;
+      background: var(--navy);
       color: #fff;
       border: none;
-      border-radius: 12px;
+      border-radius: 4px;
       font-size: 14px;
       font-weight: 700;
       cursor: pointer;
-      box-shadow: 0 4px 14px rgba(10,37,64,0.25);
+      font-family: inherit;
     }
-    .invoice {
-      max-width: 720px;
+    .sheet {
+      width: 100%;
+      max-width: 210mm;
+      min-height: 297mm;
       margin: 0 auto;
-      background: #fff;
-      border-radius: 20px;
-      overflow: hidden;
-      box-shadow: 0 8px 40px rgba(10,37,64,0.1);
-      border: 1px solid #e3e8ef;
+      background: var(--paper);
+      border: 1px solid #94a3b8;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+      padding: 18mm 16mm 16mm;
+      position: relative;
     }
-    .header {
-      background: linear-gradient(135deg, #0a2540 0%, #1a4d7a 55%, #2d6a9f 100%);
-      color: #fff;
-      padding: 28px 32px 24px;
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 16px;
-    }
-    .brand { display: flex; gap: 14px; align-items: center; }
-    .brand img {
-      width: 52px; height: 52px;
-      border-radius: 12px;
-      background: #fff;
-      object-fit: contain;
-      padding: 4px;
-    }
-    .brand h1 { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
-    .brand p { font-size: 12px; opacity: 0.85; margin-top: 2px; }
-    .doc-title { text-align: right; }
-    .doc-title .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.8; }
-    .doc-title .ref { font-size: 15px; font-weight: 700; margin-top: 4px; font-family: ui-monospace, monospace; }
-    .badge-paid {
-      display: inline-block;
-      margin-top: 10px;
-      padding: 4px 12px;
-      border-radius: 999px;
-      background: rgba(48,209,88,0.2);
-      border: 1px solid rgba(48,209,88,0.5);
-      color: #b8f5c8;
+    .original-badge {
+      position: absolute;
+      top: 12mm;
+      right: 14mm;
+      border: 1.5px solid var(--navy);
+      color: var(--navy);
       font-size: 11px;
       font-weight: 700;
       letter-spacing: 0.04em;
+      padding: 4px 10px;
+      text-transform: uppercase;
     }
-    .stripe-box {
-      margin: 20px 32px 0;
-      padding: 14px 16px;
-      border-radius: 12px;
-      background: #f6f9fc;
-      border: 1px solid #d8e3f0;
+    .header {
+      display: grid;
+      grid-template-columns: 56px 1fr;
+      gap: 14px;
+      align-items: start;
+      padding-bottom: 14px;
+      border-bottom: 2.5px solid var(--navy);
+      padding-right: 120px;
     }
-    .stripe-box p { font-size: 12px; color: #4f566b; margin-bottom: 10px; }
-    .stripe-btn {
-      display: inline-block;
-      padding: 9px 16px;
-      background: #635bff;
-      color: #fff !important;
-      text-decoration: none;
-      border-radius: 8px;
-      font-size: 13px;
+    .header img {
+      width: 56px;
+      height: 56px;
+      object-fit: contain;
+      border: 1px solid var(--line);
+      padding: 3px;
+      background: #fff;
+    }
+    .org-name {
+      font-size: 14px;
       font-weight: 700;
+      color: var(--navy);
+      line-height: 1.35;
     }
-    .section { padding: 22px 32px; }
-    .section + .section { padding-top: 0; }
-    .section-title {
+    .org-name-en {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+      line-height: 1.35;
+    }
+    .org-contact {
+      margin-top: 6px;
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .doc-title {
+      text-align: center;
+      margin: 18px 0 16px;
+    }
+    .doc-title h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--navy);
+      letter-spacing: 0.04em;
+    }
+    .doc-title .sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .meta {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 10px 24px;
+      padding: 12px 0 16px;
+      border-bottom: 1px solid var(--line);
+      font-size: 12.5px;
+    }
+    .meta .label {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .meta .value {
+      font-weight: 600;
+      margin-top: 1px;
+      word-break: break-word;
+    }
+    .meta .mono { font-family: ui-monospace, 'Courier New', monospace; font-size: 12px; }
+    table.items {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+      font-size: 12.5px;
+    }
+    table.items th {
+      background: var(--wash);
+      border-top: 1.5px solid var(--navy);
+      border-bottom: 1.5px solid var(--navy);
+      color: var(--navy);
       font-size: 11px;
       font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: #697386;
-      margin-bottom: 12px;
-    }
-    .info-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 14px 20px;
-    }
-    .info-label { font-size: 11px; color: #8792a2; font-weight: 600; }
-    .info-value { font-size: 14px; font-weight: 600; margin-top: 3px; word-break: break-word; }
-    .span-2 { grid-column: span 2; }
-    table { width: 100%; border-collapse: collapse; }
-    th {
-      background: #f6f9fc;
-      font-size: 10px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: #697386;
-      padding: 10px 12px;
+      padding: 8px 6px;
       text-align: left;
-      border-bottom: 2px solid #e3e8ef;
     }
-    td {
-      padding: 12px;
-      border-bottom: 1px solid #eef2f7;
-      font-size: 13px;
+    table.items td {
+      border-bottom: 1px solid var(--line);
+      padding: 9px 6px;
       vertical-align: top;
     }
-    .line-title { font-weight: 600; color: #1a1f36; }
-    .line-meta { font-size: 11px; color: #5469d4; margin-top: 3px; font-weight: 500; }
+    .line-title { font-weight: 600; color: var(--ink); }
+    .size-inline { font-weight: 500; color: var(--muted); }
+    .line-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
     .num { text-align: center; white-space: nowrap; }
-    td.num:last-child, th:last-child { text-align: right; }
-    th:nth-child(2), th:nth-child(3), th:nth-child(4) { text-align: center; }
+    .col-no { width: 36px; }
+    .col-size { width: 64px; }
+    .col-qty { width: 52px; }
+    .col-unit, .col-amt { text-align: right !important; width: 88px; }
+    th.col-unit, th.col-amt { text-align: right; }
+    th.col-no, th.col-size, th.col-qty { text-align: center; }
     .strong { font-weight: 700; }
-    .totals { padding: 8px 32px 24px; }
+    .summary {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr;
+      gap: 16px;
+      margin-top: 14px;
+      align-items: start;
+    }
+    .words-box {
+      border: 1px solid var(--line);
+      background: var(--wash);
+      padding: 10px 12px;
+      font-size: 12px;
+    }
+    .words-box .label { color: var(--muted); font-size: 11px; font-weight: 600; }
+    .words-box .value { margin-top: 4px; font-weight: 700; color: var(--ink); }
+    .pay-meta { margin-top: 10px; font-size: 12px; color: var(--muted); line-height: 1.55; }
+    .pay-meta strong { color: var(--ink); }
+    .totals {
+      border: 1px solid var(--line);
+      padding: 8px 12px 10px;
+    }
     .total-row {
       display: flex;
       justify-content: space-between;
-      padding: 5px 0;
-      font-size: 14px;
-      color: #4f566b;
+      gap: 12px;
+      padding: 4px 0;
+      font-size: 12.5px;
+      color: var(--muted);
     }
     .total-row.grand {
-      margin-top: 12px;
-      padding-top: 14px;
-      border-top: 2px solid #0a2540;
-      font-size: 20px;
+      margin-top: 6px;
+      padding-top: 8px;
+      border-top: 2px solid var(--navy);
+      font-size: 15px;
       font-weight: 800;
-      color: #0a2540;
+      color: var(--navy);
     }
-    .meta-row {
+    .vat-note {
+      margin-top: 8px;
+      font-size: 11px;
+      color: var(--muted);
+      font-style: italic;
+    }
+    .footer-grid {
+      display: grid;
+      grid-template-columns: 140px 1fr;
+      gap: 24px;
+      margin-top: 28px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+      align-items: end;
+    }
+    .qr-block { text-align: center; }
+    .qr-svg {
+      display: inline-flex;
+      width: 110px;
+      height: 110px;
+      border: 1px solid var(--line);
+      padding: 4px;
+      background: #fff;
+      align-items: center;
+      justify-content: center;
+    }
+    .qr-svg svg { width: 100%; height: 100%; display: block; }
+    .qr-fallback {
+      width: 110px;
+      height: 110px;
+      margin: 0 auto;
+      border: 1px solid var(--navy);
       display: flex;
-      justify-content: space-between;
-      gap: 16px;
-      padding: 14px 32px;
-      background: #f6f9fc;
-      border-top: 1px solid #e3e8ef;
-      font-size: 13px;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      padding: 6px;
+      background: var(--wash);
     }
-    .meta-row span:first-child { color: #697386; font-weight: 600; }
-    .meta-row span:last-child { font-weight: 700; text-align: right; }
-    .footer {
+    .qr-fallback-title { font-size: 10px; font-weight: 800; color: var(--navy); letter-spacing: 0.08em; }
+    .qr-fallback-code { font-size: 9px; color: var(--ink); word-break: break-all; line-height: 1.2; }
+    .qr-fallback-link { font-size: 8px; color: var(--navy); text-decoration: none; word-break: break-all; line-height: 1.2; }
+    .qr-block p {
+      margin-top: 6px;
+      font-size: 10px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+    .sign-block {
       text-align: center;
-      padding: 20px 32px 28px;
-      color: #8792a2;
-      font-size: 12px;
-      border-top: 1px solid #eef2f7;
+      padding-bottom: 4px;
+      position: relative;
     }
-    .footer strong { color: #4f566b; }
+    .sign-area {
+      position: relative;
+      margin: 8px auto 8px;
+      width: 70%;
+      max-width: 280px;
+      height: 100px;
+    }
+    .sign-line {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 18px;
+      border-bottom: 1px solid var(--ink);
+    }
+    .official-stamp {
+      position: absolute;
+      left: 50%;
+      top: 46%;
+      transform: translate(-50%, -50%) rotate(-12deg);
+      opacity: 0.72;
+      pointer-events: none;
+      mix-blend-mode: multiply;
+    }
+    .sign-caption {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--ink);
+    }
+    .sign-sub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .thanks {
+      margin-top: 18px;
+      text-align: center;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .stripe-box {
+      margin-top: 14px;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      background: var(--wash);
+      font-size: 12px;
+    }
+    .stripe-box p { color: var(--muted); margin-bottom: 8px; }
+    .stripe-btn {
+      display: inline-block;
+      padding: 8px 12px;
+      background: #4f46e5;
+      color: #fff !important;
+      text-decoration: none;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 700;
+    }
     @media print {
       body { background: #fff; padding: 0; }
-      .invoice { box-shadow: none; border-radius: 0; border: none; }
+      .sheet {
+        max-width: none;
+        width: 210mm;
+        min-height: 297mm;
+        margin: 0;
+        border: none;
+        box-shadow: none;
+        padding: 12mm 14mm;
+      }
+      .toolbar,
       .no-print { display: none !important; }
+      .official-stamp { opacity: 0.65; }
+      @page { size: A4; margin: 10mm; }
+    }
+    @media (max-width: 720px) {
+      .sheet { padding: 18px 14px 24px; min-height: 0; }
+      .header { padding-right: 0; }
+      .original-badge { position: static; margin-bottom: 10px; display: inline-block; }
+      .meta, .summary, .footer-grid { grid-template-columns: 1fr; }
+      .col-size { display: none; }
+      th.col-size { display: none; }
     }
   </style>
 </head>
 <body>
   <div class="toolbar no-print">
-    <button class="btn-print" onclick="window.print()">🖨️ ${escapeHtml(L.print)}</button>
+    <button class="btn-print" type="button" onclick="window.print()">${escapeHtml(L.print)}</button>
   </div>
-  <div class="invoice">
-    <div class="header">
-      <div class="brand">
-        <img src="${escapeHtml(logoUrl)}" alt="${escapeHtml(L.shopName)}" />
-        <div>
-          <h1>${escapeHtml(L.shopName)}</h1>
-          <p>${escapeHtml(L.shopTagline)}</p>
+  <article class="sheet" aria-label="${escapeHtml(L.title)}">
+    <div class="original-badge">${escapeHtml(L.original)}</div>
+    <header class="header">
+      <img src="${escapeHtml(logoUrl)}" alt="${escapeHtml(ISSUER.shortTh)}" />
+      <div>
+        <div class="org-name">${escapeHtml(lang === 'th' ? ISSUER.nameTh : ISSUER.nameEn)}</div>
+        <div class="org-name-en">${escapeHtml(lang === 'th' ? ISSUER.nameEn : ISSUER.nameTh)}</div>
+        <div class="org-contact">
+          ${escapeHtml(orgAddress)}<br />
+          ${lang === 'th' ? 'โทร' : 'Tel'}: ${escapeHtml(ISSUER.phone)}
+          &nbsp;|&nbsp;
+          ${lang === 'th' ? 'อีเมล' : 'Email'}: ${escapeHtml(ISSUER.email)}
         </div>
       </div>
-      <div class="doc-title">
-        <div class="label">${escapeHtml(L.title)}</div>
-        <div class="ref">${escapeHtml(ref)}</div>
-        ${isPaid ? `<div class="badge-paid">✓ ${escapeHtml(L.paid)}</div>` : ''}
-      </div>
+    </header>
+
+    <div class="doc-title">
+      <h1>${escapeHtml(L.title)}</h1>
+      <div class="sub">${escapeHtml(ISSUER.shortTh)}</div>
     </div>
+
+    <section class="meta">
+      <div>
+        <div class="label">${escapeHtml(L.customer)}</div>
+        <div class="value">${escapeHtml(customerName)}</div>
+      </div>
+      <div>
+        <div class="label">${escapeHtml(L.receiptNo)}</div>
+        <div class="value mono">${escapeHtml(receiptNo)}</div>
+      </div>
+      <div>
+        <div class="label">${escapeHtml(L.email)}</div>
+        <div class="value">${escapeHtml(customerEmail)}</div>
+      </div>
+      <div>
+        <div class="label">${escapeHtml(L.orderRef)}</div>
+        <div class="value mono">${escapeHtml(ref)}</div>
+      </div>
+      <div>
+        <div class="label">${escapeHtml(L.phone)}</div>
+        <div class="value">${escapeHtml(customerPhone)}</div>
+      </div>
+      <div>
+        <div class="label">${escapeHtml(L.issuedAt)}</div>
+        <div class="value">${escapeHtml(formatDateTime(receiptIssuedDate, lang))}</div>
+      </div>
+      ${
+        customerAddress
+          ? `<div style="grid-column:1/-1">
+        <div class="label">${escapeHtml(L.address)}</div>
+        <div class="value">${escapeHtml(customerAddress)}</div>
+      </div>`
+          : ''
+      }
+      ${
+        paidAt
+          ? `<div>
+        <div class="label">${escapeHtml(L.paidAt)}</div>
+        <div class="value">${escapeHtml(formatDateTime(paidAt, lang))}</div>
+      </div>`
+          : `<div>
+        <div class="label">${escapeHtml(L.date)}</div>
+        <div class="value">${escapeHtml(formatDateTime(orderDate, lang))}</div>
+      </div>`
+      }
+      <div>
+        <div class="label">${escapeHtml(L.status)}</div>
+        <div class="value">${escapeHtml(statusLabel(status, lang))}</div>
+      </div>
+    </section>
+
     ${stripeBlock}
-    <div class="section">
-      <div class="section-title">${escapeHtml(L.customer)}</div>
-      <div class="info-grid">
-        <div>
-          <div class="info-label">${escapeHtml(L.customer)}</div>
-          <div class="info-value">${escapeHtml(customerName)}</div>
-        </div>
-        <div>
-          <div class="info-label">${escapeHtml(L.date)}</div>
-          <div class="info-value">${escapeHtml(formatDateTime(orderDate, lang))}</div>
-        </div>
-        <div>
-          <div class="info-label">${escapeHtml(L.email)}</div>
-          <div class="info-value">${escapeHtml(customerEmail)}</div>
-        </div>
-        <div>
-          <div class="info-label">${escapeHtml(L.phone)}</div>
-          <div class="info-value">${escapeHtml(customerPhone)}</div>
-        </div>
+
+    <table class="items">
+      <thead>
+        <tr>
+          <th class="col-no">${escapeHtml(L.no)}</th>
+          <th>${escapeHtml(L.item)}</th>
+          <th class="col-size">${escapeHtml(L.size)}</th>
+          <th class="col-qty">${escapeHtml(L.qty)}</th>
+          <th class="col-unit">${escapeHtml(L.unitPrice)}</th>
+          <th class="col-amt">${escapeHtml(L.lineTotal)}</th>
+        </tr>
+      </thead>
+      <tbody>
         ${
-          customerAddress
-            ? `<div class="span-2">
-          <div class="info-label">${escapeHtml(L.address)}</div>
-          <div class="info-value">${escapeHtml(customerAddress)}</div>
-        </div>`
-            : ''
+          cartRows ||
+          `<tr><td colspan="6" style="text-align:center;color:#6b7280;padding:16px;">—</td></tr>`
         }
-        ${
-          paidAt
-            ? `<div>
-          <div class="info-label">${escapeHtml(L.paidAt)}</div>
-          <div class="info-value">${escapeHtml(formatDateTime(paidAt, lang))}</div>
-        </div>`
-            : ''
-        }
+      </tbody>
+    </table>
+
+    <section class="summary">
+      <div>
+        <div class="words-box">
+          <div class="label">${escapeHtml(L.amountInWords)}</div>
+          <div class="value">${escapeHtml(amountWords)}</div>
+        </div>
+        <div class="pay-meta">
+          <div><strong>${escapeHtml(L.paymentMethod)}:</strong> ${escapeHtml(paymentStatusText)}</div>
+        </div>
       </div>
-    </div>
-    <div class="section">
-      <div class="section-title">${escapeHtml(L.item)}</div>
-      <table>
-        <thead>
-          <tr>
-            <th>${escapeHtml(L.item)}</th>
-            <th>${escapeHtml(L.size)}</th>
-            <th>${escapeHtml(L.qty)}</th>
-            <th>${escapeHtml(L.unitPrice)}</th>
-            <th>${escapeHtml(L.lineTotal)}</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${cartRows || `<tr><td colspan="5" style="text-align:center;color:#8792a2;">—</td></tr>`}
-        </tbody>
-      </table>
-    </div>
-    <div class="totals">
-      <div class="total-row"><span>${escapeHtml(L.subtotal)}</span><span>${formatMoney(subtotal, lang)}</span></div>
-      ${shippingFee > 0 ? `<div class="total-row"><span>${escapeHtml(L.shipping)}</span><span>${formatMoney(shippingFee, lang)}</span></div>` : ''}
-      ${discount > 0 ? `<div class="total-row"><span>${escapeHtml(L.discount)}</span><span style="color:#df1b41;">-${formatMoney(discount, lang)}</span></div>` : ''}
-      <div class="total-row grand"><span>${escapeHtml(L.grandTotal)}</span><span>${formatMoney(grandTotal, lang)}</span></div>
-    </div>
-    <div class="meta-row">
-      <span>${escapeHtml(L.paymentMethod)}</span>
-      <span>${escapeHtml(paymentMethodLabel(order, lang))}</span>
-    </div>
-    <div class="meta-row" style="border-top:none;padding-top:0;">
-      <span>${escapeHtml(L.status)}</span>
-      <span>${escapeHtml(statusLabel(status, lang))}</span>
-    </div>
-    <div class="footer">
-      <p><strong>${escapeHtml(L.thankYou)}</strong></p>
-      <p style="margin-top:6px;">${escapeHtml(L.generatedAt)}: ${escapeHtml(formatDateTime(receiptIssuedDate, lang))}</p>
-      <p style="margin-top:4px;">${escapeHtml(absoluteUrl('/'))}</p>
-    </div>
-  </div>
+      <div class="totals">
+        <div class="total-row"><span>${escapeHtml(L.subtotal)}</span><span>${formatMoney(subtotal, lang)}</span></div>
+        ${
+          shippingFee > 0
+            ? `<div class="total-row"><span>${escapeHtml(L.shipping)}</span><span>${formatMoney(shippingFee, lang)}</span></div>`
+            : ''
+        }
+        ${
+          discount > 0
+            ? `<div class="total-row"><span>${escapeHtml(L.discount)}</span><span>-${formatMoney(discount, lang)}</span></div>`
+            : ''
+        }
+        <div class="total-row grand"><span>${escapeHtml(L.grandTotal)}</span><span>${formatMoney(grandTotal, lang)}</span></div>
+        <div class="vat-note">${escapeHtml(vatNote)}</div>
+      </div>
+    </section>
+
+    <section class="footer-grid">
+      ${renderQrBlock(options, verifyUrl, receiptNo, L.verifyScan)}
+      <div class="sign-block">
+        <div class="sign-area" aria-hidden="true">
+          ${buildOfficialStampSvg(lang)}
+          <div class="sign-line"></div>
+        </div>
+        <div class="sign-caption">${escapeHtml(L.receiverSign)}</div>
+        <div class="sign-sub">${escapeHtml(L.authorizedSign)}</div>
+        <div class="sign-sub" style="margin-top:6px;">${escapeHtml(ISSUER.shortTh)}</div>
+      </div>
+    </section>
+
+    <p class="thanks">
+      ${escapeHtml(L.thankYou)}<br />
+      ${escapeHtml(L.generatedAt)}: ${escapeHtml(formatDateTime(receiptIssuedDate, lang))}
+    </p>
+  </article>
 </body>
 </html>`;
 }

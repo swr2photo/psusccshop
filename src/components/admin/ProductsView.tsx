@@ -54,6 +54,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { DateTimePicker } from '@/components/ui/date-picker';
 import {
   Dialog,
   DialogContent,
@@ -131,18 +132,6 @@ const sectionClass =
   'flex flex-col gap-3 rounded-lg border border-[var(--glass-border)] bg-[var(--surface-2)] p-4';
 
 // ============== HELPERS ==============
-function toDateTimeLocal(dateInput?: Date | string | null): string {
-  if (!dateInput) return '';
-  const d = new Date(dateInput);
-  if (isNaN(d.getTime())) return '';
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mm = String(d.getMinutes()).padStart(2, '0');
-  return `${y}-${m}-${day}T${hh}:${mm}`;
-}
-
 function sanitizeInput(str?: string): string {
   if (!str) return '';
   return str.trim();
@@ -180,6 +169,8 @@ export interface ProductsViewProps {
   showToast: (type: 'success' | 'error' | 'info' | 'warning', message: string) => void;
   addLog: (action: string, detail: string, overrides?: { config?: ShopConfig }) => void;
   saving: boolean;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
 }
 
 interface ProductPickupSettings {
@@ -209,13 +200,13 @@ const ProductCardItem = ({
   const { isOpen, status } = isProductOpen(product);
 
   const statusConfig = {
-    upcoming: { label: 'รอเปิด', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)', icon: <AccessTime size={12} /> },
-    active: { label: 'กำลังขาย', color: '#10b981', bg: 'rgba(16, 185, 129, 0.15)', icon: <FiberManualRecord size={10} className="text-green-500" /> },
-    ended: { label: 'หมดเวลา', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.15)', icon: <FiberManualRecord size={10} className="text-red-500" /> },
+    upcoming: { label: 'รอเปิดขาย', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.2)', icon: <AccessTime size={12} /> },
+    active: { label: 'กำลังขาย', color: '#10b981', bg: 'rgba(16, 185, 129, 0.2)', icon: <FiberManualRecord size={10} className="text-emerald-400" /> },
+    ended: { label: 'หมดเวลา', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.2)', icon: <FiberManualRecord size={10} className="text-rose-400" /> },
     always: {
       label: product.isActive ? 'เปิดขาย' : 'ปิดขาย',
-      color: product.isActive ? '#10b981' : '#64748b',
-      bg: product.isActive ? 'rgba(16, 185, 129, 0.15)' : 'rgba(100, 116, 139, 0.15)',
+      color: product.isActive ? '#10b981' : '#94a3b8',
+      bg: product.isActive ? 'rgba(16, 185, 129, 0.2)' : 'rgba(148, 163, 184, 0.15)',
       icon: product.isActive ? <Check size={12} /> : <Close size={12} />,
     },
   };
@@ -227,89 +218,135 @@ const ProductCardItem = ({
       ? `url(${product.images[0]})`
       : 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)';
 
+  const categoryKey = product.category || (product.type === 'OTHER' ? 'OTHER' : 'APPAREL');
+  const categoryLabel = CATEGORY_LABELS[categoryKey] || categoryKey;
+  const categoryIcon = CATEGORY_ICON_COMPONENTS[categoryKey] || <Inventory size={14} />;
+
   return (
-    <Card className={cn(glassCardClass, 'flex h-full flex-col gap-0 py-0')}>
+    <Card className={cn(glassCardClass, 'flex h-full flex-col gap-0 overflow-hidden py-0 transition-all duration-200 hover:-translate-y-1 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10')}>
+      {/* Cover Image & Badges */}
       <div
-        className="relative flex h-[150px] items-center justify-center overflow-hidden border-b border-[var(--glass-border)] bg-[var(--surface-2)] bg-cover bg-center"
+        className="relative flex h-[160px] items-center justify-center overflow-hidden border-b border-[var(--glass-border)] bg-[var(--surface-2)] bg-cover bg-center"
         style={{ backgroundImage: coverBg }}
       >
+        {/* Category Tag */}
+        <div className="absolute left-2.5 top-2.5 flex items-center gap-1.5 rounded-lg border border-white/20 bg-black/60 px-2.5 py-1 backdrop-blur-md">
+          <span className="text-xs text-primary-foreground">{categoryIcon}</span>
+          <span className="text-[0.7rem] font-bold text-white">{categoryLabel}</span>
+        </div>
+
+        {/* Status Tag */}
         <div
-          className="absolute left-2 top-2 flex items-center gap-1 rounded-lg px-2 py-0.5 backdrop-blur-md"
-          style={{ backgroundColor: currentStatus.bg, border: `1px solid ${currentStatus.color}40` }}
+          className="absolute right-2.5 top-2.5 flex items-center gap-1 rounded-lg px-2.5 py-1 backdrop-blur-md"
+          style={{ backgroundColor: currentStatus.bg, border: `1px solid ${currentStatus.color}50` }}
         >
           <span className="flex items-center gap-1 text-[0.7rem] font-bold" style={{ color: currentStatus.color }}>
             {currentStatus.icon} {currentStatus.label}
           </span>
         </div>
 
-        {(product.startDate || product.endDate) && (
-          <div className="absolute right-2 top-2 rounded-md bg-black/60 px-2 py-0.5 backdrop-blur-md">
-            <span className="flex items-center gap-1 text-[0.65rem] text-[var(--foreground)]">
-              <CalendarToday size={12} />
-              {product.startDate ? formatDateTime(product.startDate).split(' ')[0] : '...'} -{' '}
-              {product.endDate ? formatDateTime(product.endDate).split(' ')[0] : '...'}
-            </span>
-          </div>
-        )}
-
+        {/* Inactive Overlay */}
         {!isOpen && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+          <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-[2px]">
             <span
-              className="text-sm font-bold uppercase"
-              style={{ color: status === 'upcoming' ? '#f59e0b' : '#ff6b6b' }}
+              className="rounded-lg border px-3 py-1 text-xs font-extrabold uppercase tracking-wider shadow-lg"
+              style={{
+                color: status === 'upcoming' ? '#f59e0b' : '#ef4444',
+                borderColor: status === 'upcoming' ? 'rgba(245,158,11,0.4)' : 'rgba(239,68,68,0.4)',
+                backgroundColor: 'rgba(0,0,0,0.6)',
+              }}
             >
-              {status === 'upcoming' ? 'Coming Soon' : status === 'ended' ? 'Ended' : 'Inactive'}
+              {status === 'upcoming' ? 'เร็วๆ นี้ (Coming Soon)' : status === 'ended' ? 'หมดเวลาขาย' : 'ปิดการขาย'}
             </span>
           </div>
         )}
       </div>
 
-      <CardContent className="flex flex-1 flex-col gap-3 px-4 py-4">
-        <p className="text-sm font-bold text-[var(--foreground)]">{product.name}</p>
-        <p className="text-xs text-[var(--text-muted)]">{product.type}</p>
-        <p className="text-lg font-bold text-emerald-500">฿{product.basePrice}</p>
+      {/* Details */}
+      <CardContent className="flex flex-1 flex-col justify-between gap-3 px-4.5 py-4">
+        <div>
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="line-clamp-1 text-base font-bold text-[var(--foreground)]" title={product.name}>
+              {product.name || 'ไม่มีชื่อสินค้า'}
+            </h3>
+            <span className="whitespace-nowrap text-lg font-black text-emerald-400">
+              ฿{Number(product.basePrice || 0).toLocaleString()}
+            </span>
+          </div>
 
-        <div className="flex flex-col gap-2">
-          <Button variant="outline" size="sm" onClick={onEdit} className="w-full border-[var(--glass-border)]">
-            <Edit size={16} className="mr-1" /> แก้ไข
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onDelete}
-            className="w-full border-red-500/45 text-red-400 hover:bg-red-500/10"
-          >
-            <Delete size={16} className="mr-1" /> ลบ
-          </Button>
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {product.subType && (
+              <Badge variant="outline" className="h-5 text-[0.68rem] font-medium border-primary/30 bg-primary/10 text-primary">
+                {SUBTYPE_LABELS[product.subType] || product.subType}
+              </Badge>
+            )}
+            {Object.keys(product.sizePricing || {}).length > 0 && (
+              <Badge variant="outline" className="h-5 text-[0.68rem] font-medium border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
+                {Object.keys(product.sizePricing || {}).length} ไซส์
+              </Badge>
+            )}
+            {product.options?.hasCustomName && (
+              <Badge variant="outline" className="h-5 text-[0.68rem] font-medium border-amber-500/30 bg-amber-500/10 text-amber-400">
+                ชื่อ custom
+              </Badge>
+            )}
+          </div>
         </div>
 
-        {onToggle && (
-          <div className="mt-1 flex items-center justify-between rounded-lg border border-[var(--glass-border)] bg-white/[0.03] p-2">
-            <span className="text-xs font-semibold text-[var(--text-muted)]">เปิด/ปิดขาย</span>
-            <Switch
-              checked={product.isActive}
-              onCheckedChange={onToggle}
-              className="data-[state=checked]:bg-emerald-500"
-            />
+        {/* Action Controls */}
+        <div className="flex flex-col gap-2 pt-2 border-t border-[var(--glass-border)]">
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onEdit}
+              className="h-8 gap-1.5 border-blue-500/30 bg-blue-500/10 text-xs font-semibold text-blue-400 hover:bg-blue-500/20"
+            >
+              <Edit size={14} /> แก้ไข
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onDelete}
+              className="h-8 gap-1.5 border-rose-500/30 bg-rose-500/10 text-xs font-semibold text-rose-400 hover:bg-rose-500/20"
+            >
+              <Delete size={14} /> ลบ
+            </Button>
           </div>
-        )}
 
-        {onPickupSetting && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onPickupSetting}
-            className={cn(
-              'mt-1 w-full text-xs',
-              product.pickup?.enabled
-                ? 'border-emerald-500 bg-emerald-500/10 text-emerald-500'
-                : 'border-[var(--glass-border)] text-[var(--text-muted)]'
-            )}
-          >
-            <LocalMall size={16} className="mr-1" />
-            {product.pickup?.enabled ? '✓ รับสินค้า' : 'ตั้งค่ารับสินค้า'}
-          </Button>
-        )}
+          {onToggle && (
+            <div className="flex items-center justify-between rounded-xl border border-[var(--glass-border)] bg-black/20 px-3 py-1.5">
+              <span className="text-xs font-semibold text-[var(--text-muted)]">สถานะสินค้า</span>
+              <div className="flex items-center gap-2">
+                <span className={cn('text-[0.7rem] font-bold', product.isActive ? 'text-emerald-400' : 'text-muted-foreground')}>
+                  {product.isActive ? 'เปิดขาย' : 'ปิดขาย'}
+                </span>
+                <Switch
+                  checked={product.isActive}
+                  onCheckedChange={onToggle}
+                  className="data-[state=checked]:bg-emerald-500"
+                />
+              </div>
+            </div>
+          )}
+
+          {onPickupSetting && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onPickupSetting}
+              className={cn(
+                'h-8 w-full text-xs font-semibold transition-colors',
+                product.pickup?.enabled
+                  ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25'
+                  : 'border-[var(--glass-border)] bg-black/10 text-[var(--text-muted)] hover:bg-black/20'
+              )}
+            >
+              <LocalMall size={14} className="mr-1.5" />
+              {product.pickup?.enabled ? '✓ รับสินค้าหน้าร้าน (เปิดอยู่)' : 'ตั้งค่ารับสินค้าหน้าร้าน'}
+            </Button>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
@@ -387,26 +424,28 @@ const ProductPickupDialog = ({
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
+                <div className="min-w-0 space-y-1.5">
                   <Label className="flex items-center gap-1 text-cyan-400">
                     <CalendarDays size={14} /> วันเริ่มรับสินค้า
                   </Label>
-                  <Input
-                    type="datetime-local"
-                    className={inputClass}
+                  <DateTimePicker
+                    id="product-pickup-start"
                     value={pickup.startDate}
-                    onChange={(e) => setPickup({ ...pickup, startDate: e.target.value })}
+                    onChange={(local) => setPickup({ ...pickup, startDate: local })}
+                    placeholder="เลือกวันและเวลาเริ่มรับ"
+                    buttonClassName={cn(inputClass, 'h-10')}
                   />
                 </div>
-                <div className="space-y-1.5">
+                <div className="min-w-0 space-y-1.5">
                   <Label className="flex items-center gap-1 text-cyan-400">
                     <CalendarDays size={14} /> วันสิ้นสุดรับสินค้า
                   </Label>
-                  <Input
-                    type="datetime-local"
-                    className={inputClass}
+                  <DateTimePicker
+                    id="product-pickup-end"
                     value={pickup.endDate}
-                    onChange={(e) => setPickup({ ...pickup, endDate: e.target.value })}
+                    onChange={(local) => setPickup({ ...pickup, endDate: local })}
+                    placeholder="เลือกวันและเวลาสิ้นสุดรับ"
+                    buttonClassName={cn(inputClass, 'h-10')}
                   />
                 </div>
               </div>
@@ -1200,18 +1239,20 @@ const ProductEditDialog = ({
                   </div>
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="space-y-1.5">
+                  <div className="min-w-0 space-y-1.5">
                     <Label className="flex items-center gap-1 text-[var(--text-muted)]">
                       <FiberManualRecord size={10} className="text-green-500" /> เปิดขายเมื่อ
                     </Label>
-                    <Input
-                      type="datetime-local"
-                      className={inputClass}
-                      value={toDateTimeLocal(product.startDate)}
-                      onChange={(e) => onChange({ ...product, startDate: e.target.value })}
+                    <DateTimePicker
+                      id="product-sale-start"
+                      value={product.startDate}
+                      onChange={(local) => onChange({ ...product, startDate: local })}
+                      placeholder="เลือกวันและเวลาเปิดขาย"
+                      buttonClassName={cn(inputClass, 'h-10')}
                     />
                     {product.startDate && (
                       <Button
+                        type="button"
                         variant="ghost"
                         size="sm"
                         className="h-auto p-0 text-xs text-[var(--text-muted)]"
@@ -1221,18 +1262,20 @@ const ProductEditDialog = ({
                       </Button>
                     )}
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="min-w-0 space-y-1.5">
                     <Label className="flex items-center gap-1 text-[var(--text-muted)]">
                       <FiberManualRecord size={10} className="text-red-500" /> ปิดขายเมื่อ
                     </Label>
-                    <Input
-                      type="datetime-local"
-                      className={inputClass}
-                      value={toDateTimeLocal(product.endDate)}
-                      onChange={(e) => onChange({ ...product, endDate: e.target.value })}
+                    <DateTimePicker
+                      id="product-sale-end"
+                      value={product.endDate}
+                      onChange={(local) => onChange({ ...product, endDate: local })}
+                      placeholder="เลือกวันและเวลาปิดขาย"
+                      buttonClassName={cn(inputClass, 'h-10')}
                     />
                     {product.endDate && (
                       <Button
+                        type="button"
                         variant="ghost"
                         size="sm"
                         className="h-auto p-0 text-xs text-[var(--text-muted)]"
@@ -1753,18 +1796,38 @@ export function ProductsView({
   showToast,
   addLog,
   saving,
+  onRefresh,
+  isRefreshing,
 }: ProductsViewProps): JSX.Element {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [pickupSettingProduct, setPickupSettingProduct] = useState<Product | null>(null);
   const [pickupSaving, setPickupSaving] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const { confirm, ConfirmDialog: ProductConfirmDialog } = useConfirmDialog();
 
+  // Auto-fetch latest product data when component mounts
+  useEffect(() => {
+    onRefresh?.();
+  }, []);
+
   const filteredProducts = useMemo(() => {
-    const term = searchTerm.toLowerCase();
-    return config.products.filter(
-      (p) => p.name.toLowerCase().includes(term) || p.id.toLowerCase().includes(term)
-    );
-  }, [searchTerm, config.products]);
+    const term = searchTerm.toLowerCase().trim();
+    return config.products.filter((p) => {
+      // Category filter
+      if (selectedCategory !== 'ALL') {
+        const pCat = p.category || (p.type === 'OTHER' ? 'OTHER' : 'APPAREL');
+        if (pCat !== selectedCategory) return false;
+      }
+      // Search term filter
+      if (!term) return true;
+      return (
+        p.name.toLowerCase().includes(term) ||
+        p.id.toLowerCase().includes(term) ||
+        (p.type || '').toLowerCase().includes(term) ||
+        (p.category || '').toLowerCase().includes(term)
+      );
+    });
+  }, [searchTerm, selectedCategory, config.products]);
 
   const createNewProduct = () => {
     const now = new Date().toISOString();
@@ -1793,17 +1856,17 @@ export function ProductsView({
 
   const handleDelete = async (id: string) => {
     const ok = await confirm({
-      title: 'Delete Product?',
-      message: 'This action cannot be undone',
+      title: 'ลบสินค้า?',
+      message: 'การลบสินค้าจะไม่สามารถย้อนกลับได้ คุณแน่ใจหรือไม่?',
       variant: 'warning',
-      confirmText: 'Delete',
-      cancelText: 'Cancel',
+      confirmText: 'ลบเลย',
+      cancelText: 'ยกเลิก',
       destructive: true,
     });
     if (ok) {
       const newProducts = config.products.filter((p) => p.id !== id);
       saveFullConfig({ ...config, products: newProducts });
-      showToast('success', 'Product deleted');
+      showToast('success', 'ลบสินค้าเรียบร้อยแล้ว');
     }
   };
 
@@ -1855,47 +1918,105 @@ export function ProductsView({
     saveFullConfig({ ...config, products: newProducts });
   };
 
+  const categories = ['ALL', ...PRODUCT_CATEGORIES];
+
   return (
-    <div className="flex h-full flex-col gap-4">
+    <div className="flex h-full flex-col gap-5">
       <ProductConfirmDialog />
 
-      <div className="sticky top-0 z-10 bg-[var(--background)] px-0 pb-3 pt-1 md:-mx-3 md:px-3">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-extrabold text-[var(--foreground)] md:text-2xl">
-            สินค้า ({filteredProducts.length}/{config.products.length})
-          </h2>
-          <Button size="sm" onClick={createNewProduct} className={gradientBtnClass}>
-            <Add size={18} className="mr-1" /> เพิ่มสินค้า
-          </Button>
+      {/* Sticky Header Bar */}
+      <div className="sticky top-0 z-10 space-y-3 bg-[var(--background)]/90 px-0 pb-3 pt-1 backdrop-blur-xl md:-mx-3 md:px-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-extrabold text-[var(--foreground)] md:text-2xl">
+              จัดการสินค้า ({filteredProducts.length}/{config.products.length} รายการ)
+            </h2>
+            <p className="text-xs text-[var(--text-muted)]">
+              สร้าง แก้ไข และกำหนดค่าการขายสินค้าของร้านค้า
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onRefresh?.()}
+              disabled={isRefreshing}
+              className="gap-1.5 border-[var(--glass-border)] bg-[var(--glass-bg)] font-medium"
+            >
+              <Loader2 className={cn("size-4 text-primary", isRefreshing && "animate-spin")} />
+              <span>{isRefreshing ? 'กำลังโหลด...' : 'ดึงข้อมูลล่าสุด'}</span>
+            </Button>
+            <Button size="sm" onClick={createNewProduct} className={gradientBtnClass}>
+              <Add size={18} className="mr-1" /> เพิ่มสินค้าใหม่
+            </Button>
+          </div>
         </div>
 
-        <div className="relative">
-          <Search size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-          <Input
-            placeholder="ค้นหาชื่อหรือ ID..."
-            className={cn(inputClass, 'rounded-xl py-2 pl-10 pr-10')}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          {searchTerm && (
-            <button
-              type="button"
-              onClick={() => setSearchTerm('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
-            >
-              <Clear size={18} />
-            </button>
-          )}
+        {/* Search & Category Pill Filters */}
+        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
+          <div className="relative flex-1">
+            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+            <Input
+              placeholder="ค้นหาชื่อสินค้า, หมวดหมู่ หรือ ID..."
+              className={cn(inputClass, 'h-10 rounded-xl py-2 pl-9 pr-9 text-xs sm:text-sm')}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--foreground)]"
+              >
+                <Clear size={16} />
+              </button>
+            )}
+          </div>
+
+          {/* Category Filter Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+            {categories.map((cat) => {
+              const isActive = selectedCategory === cat;
+              const label = cat === 'ALL' ? 'ทั้งหมด' : CATEGORY_LABELS[cat] || cat;
+              const count = cat === 'ALL' ? config.products.length : config.products.filter(p => (p.category || (p.type === 'OTHER' ? 'OTHER' : 'APPAREL')) === cat).length;
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setSelectedCategory(cat)}
+                  className={cn(
+                    'flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all',
+                    isActive
+                      ? 'border-primary/40 bg-primary/15 text-primary shadow-sm'
+                      : 'border-[var(--glass-border)] bg-black/10 text-muted-foreground hover:bg-black/20 hover:text-foreground'
+                  )}
+                >
+                  {cat !== 'ALL' && CATEGORY_ICON_COMPONENTS[cat]}
+                  <span>{label}</span>
+                  <span className={cn(
+                    'rounded-md px-1.5 py-0.2 text-[0.65rem] font-bold',
+                    isActive ? 'bg-primary/25 text-primary' : 'bg-white/10 text-muted-foreground'
+                  )}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
+      {/* Product Cards Grid */}
       {filteredProducts.length === 0 ? (
-        <div className="py-8 text-center">
-          <History size={48} className="mx-auto mb-2 text-[var(--text-muted)]" />
-          <p className="text-[var(--text-muted)]">No logs found</p>
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-[var(--glass-border)] bg-[var(--glass-bg)] py-12 text-center backdrop-blur-xl">
+          <Inventory size={48} className="mb-3 text-[var(--text-muted)] opacity-60" />
+          <p className="text-base font-bold text-[var(--foreground)]">ไม่พบรายการสินค้า</p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            {searchTerm ? `ไม่พบสินค้าที่ตรงกับคำค้นหา "${searchTerm}"` : 'ยังไม่มีสินค้าในหมวดหมู่นี้'}
+          </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filteredProducts.map((p) => (
             <ProductCardItem
               key={p.id}

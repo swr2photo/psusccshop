@@ -2,11 +2,11 @@
 
 import { apiFetch, uploadImageApi } from '@/lib/api-client';
 import { useState, useEffect, useMemo, useCallback, useRef, type HTMLAttributes } from 'react';
-import { X, ShieldCheck, User, Phone, Instagram, AlertTriangle, MapPin, Check, ArrowRight, UserCircle, CheckCircle2, AlertCircle, Search, Camera, ZoomIn, ZoomOut, RotateCw, Move, Plus, Trash2, Star, Pencil } from 'lucide-react';
+import { X, ShieldCheck, User, Phone, Instagram, AlertTriangle, MapPin, Check, ArrowRight, UserCircle, CheckCircle2, AlertCircle, Search, Camera, ZoomIn, ZoomOut, RotateCw, Move, Plus, Trash2, Star, Pencil, ExternalLink, FileText } from 'lucide-react';
 import {
   Drawer, Box, Typography, Button, IconButton, TextField, InputAdornment,
   Slide, Avatar, Autocomplete, CircularProgress, Paper, Dialog, Slider, Chip,
-  useMediaQuery,
+  Switch, useMediaQuery,
 } from '@mui/material';
 import PasskeyManager from '@/components/PasskeyManager';
 import { useThaiAddress, type AddressSelection } from '@/hooks/useThaiAddress';
@@ -54,10 +54,20 @@ export interface ProfileSaveData {
   instagram: string;
   profileImage?: string;
   savedAddresses?: SavedAddress[];
+  /** Optional marketing consent (PDPA) — default false / withdrawable */
+  marketingConsent?: boolean;
 }
 
 interface ProfileModalProps {
-  initialData: { name: string; phone: string; address: string; instagram: string; profileImage?: string; savedAddresses?: SavedAddress[] };
+  initialData: {
+    name: string;
+    phone: string;
+    address: string;
+    instagram: string;
+    profileImage?: string;
+    savedAddresses?: SavedAddress[];
+    marketingConsent?: boolean;
+  };
   onClose: () => void;
   onSave: (data: ProfileSaveData) => void;
   userImage?: string;
@@ -135,7 +145,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
     detail: '',
   });
 
-  const [pdpaAccepted, setPdpaAccepted] = useState(false);
+  const [marketingConsent, setMarketingConsent] = useState(initialData.marketingConsent === true);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [notification, setNotification] = useState<InlineNotification | null>(null);
 
@@ -234,10 +244,8 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
   }, [initialData.address, provinces.length]);
 
   useEffect(() => {
-    if (initialData.name && initialData.phone && initialData.instagram) {
-      setPdpaAccepted(true);
-    }
-  }, [initialData]);
+    setMarketingConsent(initialData.marketingConsent === true);
+  }, [initialData.marketingConsent]);
 
   // Auto-hide notification
   useEffect(() => {
@@ -442,9 +450,6 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
     }
     if (!formData.instagram.trim()) {
       nextErrors.instagram = t.profile.fillIG;
-    }
-    if (!pdpaAccepted) {
-      nextErrors.pdpa = t.profile.pdpaAcceptRequired;
     }
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
@@ -717,10 +722,11 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
       address: composedAddress,
       profileImage: customProfileImage || undefined,
       savedAddresses,
+      marketingConsent,
     });
   };
 
-  const isFormValid = formData.name && formData.phone && formData.instagram && pdpaAccepted;
+  const isFormValid = Boolean(formData.name && formData.phone && formData.instagram);
 
   const inputSx = {
     '& .MuiOutlinedInput-root': {
@@ -954,7 +960,7 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
               key: 'personal' as const,
               label: t.profile.tabPersonal,
               icon: <User size={14} strokeWidth={1.75} />,
-              complete: !!(formData.name && formData.phone && formData.instagram && pdpaAccepted),
+              complete: !!(formData.name && formData.phone && formData.instagram),
               show: true,
             },
             {
@@ -1407,62 +1413,83 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
 
           {/* ====== PDPA Card (personal tab) ====== */}
           {activeTab === 'personal' && (
-          <Box sx={{
-            ...FORMAL.card,
-            borderColor: pdpaAccepted ? 'var(--foreground)' : 'var(--glass-border)',
-          }}>
+          <Box sx={FORMAL.card}>
             <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, mb: 1.5 }}>
               <Box sx={FORMAL.iconBox}>
                 <ShieldCheck size={16} strokeWidth={1.75} />
               </Box>
-              <Box sx={{ flex: 1 }}>
-                <Typography sx={{ fontSize: '0.85rem', fontWeight: 650, color: 'var(--foreground)', mb: 0.3 }}>
-                  {pdpaAccepted ? t.profile.pdpaAccepted : t.profile.privacyPolicy}
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography sx={{ fontSize: '0.85rem', fontWeight: 650, color: 'var(--foreground)', mb: 0.5 }}>
+                  {t.profile.pdpaTitle}
                 </Typography>
-                <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                  {t.profile.pdpaDesc}
+                <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: 1.55 }}>
+                  {t.profile.pdpaNotice}
                 </Typography>
+                <Box
+                  component="a"
+                  href="/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  sx={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 0.6,
+                    mt: 1,
+                    fontSize: '0.75rem',
+                    fontWeight: 650,
+                    color: 'var(--foreground)',
+                    textDecoration: 'underline',
+                    textUnderlineOffset: '3px',
+                    '&:hover': { opacity: 0.8 },
+                  }}
+                >
+                  <FileText size={13} strokeWidth={1.75} />
+                  {t.profile.privacyPolicyLink}
+                  <ExternalLink size={12} strokeWidth={1.75} style={{ opacity: 0.7 }} />
+                </Box>
               </Box>
             </Box>
+
+            <Typography sx={{ fontSize: '0.7rem', fontWeight: 650, color: 'var(--text-muted)', mb: 0.75, letterSpacing: '0.02em' }}>
+              {t.profile.marketingOptionalTitle}
+            </Typography>
             <Box
-              onClick={() => setPdpaAccepted(!pdpaAccepted)}
-              role="checkbox"
-              aria-checked={pdpaAccepted}
               sx={{
                 display: 'flex',
-                alignItems: 'center',
-                gap: 1.5,
+                alignItems: 'flex-start',
+                gap: 1.25,
                 p: 1.25,
                 borderRadius: '6px',
                 bgcolor: 'var(--surface-2)',
                 border: '1px solid var(--glass-border)',
-                cursor: 'pointer',
-                '&:hover': { bgcolor: 'var(--glass-bg)' },
               }}
             >
-              <Box sx={{
-                width: 18, height: 18, borderRadius: '4px',
-                bgcolor: pdpaAccepted ? 'var(--foreground)' : 'transparent',
-                border: pdpaAccepted ? 'none' : '1.5px solid var(--text-muted)',
-                display: 'grid', placeItems: 'center',
-                flexShrink: 0,
-              }}>
-                {pdpaAccepted && <Check size={12} strokeWidth={2.5} style={{ color: 'var(--background)' }} />}
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography sx={{ fontSize: '0.8rem', color: 'var(--foreground)', fontWeight: 550, lineHeight: 1.45 }}>
+                  {t.profile.marketingConsentLabel}
+                </Typography>
+                <Typography sx={{ fontSize: '0.68rem', color: 'var(--text-muted)', mt: 0.35, lineHeight: 1.4 }}>
+                  {t.profile.marketingConsentOptional}
+                </Typography>
               </Box>
-              <Typography sx={{ fontSize: '0.8rem', color: 'var(--foreground)', fontWeight: 550 }}>
-                {t.profile.pdpaConsent}
-              </Typography>
+              <Switch
+                checked={marketingConsent}
+                onChange={(_, checked) => setMarketingConsent(checked)}
+                size="small"
+                inputProps={{ 'aria-label': t.profile.marketingConsentLabel }}
+                sx={{
+                  mt: 0.1,
+                  '& .MuiSwitch-switchBase.Mui-checked': { color: 'var(--foreground)' },
+                  '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                    bgcolor: 'var(--foreground)',
+                    opacity: 0.45,
+                  },
+                }}
+              />
             </Box>
-            {errors.pdpa && (
-              <Box sx={{
-                display: 'flex', alignItems: 'center', gap: 1,
-                mt: 1.5, p: 1.25, borderRadius: '6px',
-                bgcolor: 'var(--surface-2)', border: '1px solid var(--glass-border)',
-              }}>
-                <AlertTriangle size={15} strokeWidth={1.75} style={{ color: FORMAL.mutedIcon }} />
-                <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{errors.pdpa}</Typography>
-              </Box>
-            )}
+            <Typography sx={{ fontSize: '0.68rem', color: 'var(--text-muted)', mt: 1, lineHeight: 1.45 }}>
+              {t.profile.marketingConsentHint}
+            </Typography>
           </Box>
           )}
         </Box>
@@ -1480,10 +1507,10 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
           <UiButton
             type="submit"
             onClick={handleSubmit}
-            disabled={!pdpaAccepted}
+            disabled={!isFormValid}
             className={cn(
               'h-11 w-full rounded-md text-sm font-semibold',
-              pdpaAccepted
+              isFormValid
                 ? 'bg-[var(--foreground)] text-[var(--background)] hover:bg-[var(--foreground)]/90'
                 : 'bg-[var(--surface-2)] text-[var(--text-muted)]',
             )}
@@ -1500,11 +1527,6 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
               </>
             )}
           </UiButton>
-          {!pdpaAccepted && (
-            <Typography sx={{ textAlign: 'center', fontSize: '0.7rem', color: 'var(--text-muted)', mt: 1 }}>
-              {t.profile.pdpaRequired}
-            </Typography>
-          )}
         </Box>
       </Box>
 

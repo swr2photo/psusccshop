@@ -1,5 +1,5 @@
 // src/app/api/support-chat/[sessionId]/route.ts
-// Get chat session details and messages (supports ETag + delta sync)
+// Get chat session details and messages (supports ETag + delta sync + older pages)
 
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdminEmailAsync, isResourceOwner, getSession } from '@/lib/auth';
@@ -7,8 +7,10 @@ import {
   getChatSession,
   getChatSessionWithMessages,
   getMessagesSince,
+  getMessagesBefore,
   buildChatEtag,
   markMessagesAsRead,
+  CHAT_MESSAGE_PAGE_SIZE,
 } from '@/lib/support-chat';
 
 export const runtime = 'nodejs';
@@ -18,7 +20,14 @@ interface Params {
   params: Promise<{ sessionId: string }>;
 }
 
-// GET: Get chat session with messages (full, delta, or 304)
+function parseLimit(raw: string | null): number {
+  if (!raw) return CHAT_MESSAGE_PAGE_SIZE;
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n)) return CHAT_MESSAGE_PAGE_SIZE;
+  return Math.max(1, Math.min(n, 50));
+}
+
+// GET: Get chat session with messages (full, older page, delta, or 304)
 export async function GET(request: NextRequest, { params }: Params) {
   try {
     const { sessionId } = await params;
@@ -43,6 +52,19 @@ export async function GET(request: NextRequest, { params }: Params) {
     const { searchParams } = new URL(request.url);
     const shouldMarkRead = searchParams.get('markRead') === 'true';
     const sinceParam = searchParams.get('since');
+    const beforeParam = searchParams.get('before');
+    const beforeId = searchParams.get('beforeId') || undefined;
+    const limit = parseLimit(searchParams.get('limit'));
+
+    // Older history page (infinite scroll up)
+    if (beforeParam && !sinceParam) {
+      const page = await getMessagesBefore(sessionId, beforeParam, limit, beforeId);
+      return NextResponse.json({
+        messages: page.messages,
+        hasMore: page.hasMore,
+        sync: 'older',
+      });
+    }
 
     // ETag check before markRead so idle polls stay cheap (304)
     let sessionForResponse = chatSession;
@@ -70,19 +92,21 @@ export async function GET(request: NextRequest, { params }: Params) {
           {
             chat: { ...sessionForResponse, messages: deltaMessages },
             sync: 'delta',
+            hasMore: null,
           },
           { headers: { ETag: etag } }
         );
       }
     }
 
-    const chat = await getChatSessionWithMessages(sessionId);
+    const chat = await getChatSessionWithMessages(sessionId, limit);
     if (!chat) {
       return NextResponse.json({ error: 'Chat not found' }, { status: 404 });
     }
 
+    const { hasMore, ...chatPayload } = chat;
     return NextResponse.json(
-      { chat, sync: 'full' },
+      { chat: chatPayload, sync: 'full', hasMore },
       { headers: { ETag: etag } }
     );
   } catch (error: any) {

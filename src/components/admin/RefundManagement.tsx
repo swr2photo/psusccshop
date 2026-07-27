@@ -36,6 +36,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { parseRefundDetails } from '@/lib/refund-details';
 
 interface RefundOrder {
   ref: string;
@@ -325,16 +326,58 @@ export default function RefundManagement({ showToast, selectedShopId }: Props) {
                           <p className="mb-3 flex items-center gap-1.5 text-[0.78rem] font-bold text-violet-400">
                             <RotateCcw size={14} /> ข้อมูลคำขอคืนเงิน
                           </p>
-                          <div className="flex flex-col gap-2">
-                            <DetailRow label="เหตุผล" value={order.refundReason} />
-                            {order.refundDetails && <DetailRow label="รายละเอียด" value={order.refundDetails} />}
-                            <DetailRow label="จำนวนเงินคืน" value={`฿${order.refundAmount?.toLocaleString() || '0'}`} highlight />
-                            <DetailRow label="วันที่ขอ" value={new Date(order.refundRequestedAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' })} />
-                            {order.refundReviewedAt && (
-                              <DetailRow label="วันที่ตรวจสอบ" value={new Date(order.refundReviewedAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' })} />
-                            )}
-                            {order.refundAdminNote && <DetailRow label="หมายเหตุแอดมิน" value={order.refundAdminNote} />}
-                          </div>
+                          {(() => {
+                            const parsed = parseRefundDetails(order.refundDetails);
+                            return (
+                              <div className="flex flex-col gap-2">
+                                <DetailRow label="เหตุผล" value={order.refundReason} />
+                                {parsed.text ? <DetailRow label="รายละเอียด" value={parsed.text} /> : null}
+                                {parsed.payoutMethod && (
+                                  <DetailRow
+                                    label="ช่องทางรับเงิน"
+                                    value={parsed.payoutMethod === 'promptpay' ? 'พร้อมเพย์' : 'บัญชีธนาคาร'}
+                                  />
+                                )}
+                                {parsed.items && parsed.items.length > 0 && (
+                                  <div className="mt-1">
+                                    <p className="mb-1 text-[0.72rem] text-muted-foreground">สินค้าที่ขอคืน:</p>
+                                    {parsed.items.map((item, i) => (
+                                      <p key={i} className="text-[0.72rem] text-muted-foreground">
+                                        • {item.name}
+                                        {item.size ? ` (${item.size})` : ''} ×{item.qty}
+                                        {item.amount > 0 ? ` — ฿${item.amount.toLocaleString()}` : ''}
+                                      </p>
+                                    ))}
+                                  </div>
+                                )}
+                                {parsed.evidenceUrls && parsed.evidenceUrls.length > 0 && (
+                                  <div className="mt-1">
+                                    <p className="mb-1.5 text-[0.72rem] text-muted-foreground">รูปหลักฐาน:</p>
+                                    <div className="flex flex-wrap gap-2">
+                                      {parsed.evidenceUrls.map((url) => (
+                                        <a
+                                          key={url}
+                                          href={url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="block h-16 w-16 overflow-hidden rounded-lg border border-[var(--border)]"
+                                        >
+                                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                                          <img src={url} alt="evidence" className="h-full w-full object-cover" />
+                                        </a>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                                <DetailRow label="จำนวนเงินคืน" value={`฿${order.refundAmount?.toLocaleString() || '0'}`} highlight />
+                                <DetailRow label="วันที่ขอ" value={new Date(order.refundRequestedAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' })} />
+                                {order.refundReviewedAt && (
+                                  <DetailRow label="วันที่ตรวจสอบ" value={new Date(order.refundReviewedAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' })} />
+                                )}
+                                {order.refundAdminNote && <DetailRow label="หมายเหตุแอดมิน" value={order.refundAdminNote} />}
+                              </div>
+                            );
+                          })()}
                         </div>
 
                         <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 sm:col-span-2">
@@ -342,8 +385,14 @@ export default function RefundManagement({ showToast, selectedShopId }: Props) {
                             <Banknote size={14} /> ข้อมูลบัญชีรับเงิน
                           </p>
                           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                            <DetailRow label="ธนาคาร" value={order.refundBankName} />
-                            <DetailRow label="เลขบัญชี" value={order.refundBankAccount} />
+                            <DetailRow
+                              label={order.refundBankName === 'พร้อมเพย์' || order.refundBankName?.toLowerCase().includes('prompt') ? 'ช่องทาง' : 'ธนาคาร'}
+                              value={order.refundBankName}
+                            />
+                            <DetailRow
+                              label={order.refundBankName === 'พร้อมเพย์' || order.refundBankName?.toLowerCase().includes('prompt') ? 'หมายเลขพร้อมเพย์' : 'เลขบัญชี'}
+                              value={order.refundBankAccount}
+                            />
                             <DetailRow label="ชื่อเจ้าของบัญชี" value={order.refundAccountName} />
                           </div>
                         </div>

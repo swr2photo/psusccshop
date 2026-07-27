@@ -5,7 +5,9 @@ import { API_CACHE } from '@/lib/api-helpers';
 import { buildInvoiceHtml } from '@/lib/invoice-html';
 import { fetchStripeReceiptUrl, readStoredStripeReceiptUrl } from '@/lib/stripe-receipt';
 import { isOrderPaidForReceipt } from '@/lib/shop-constants';
+import { absoluteUrl } from '@/lib/site';
 import { eq, desc } from 'drizzle-orm';
+import QRCode from 'qrcode';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -129,7 +131,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(stripeReceiptUrl, 302);
     }
 
-    const html = buildInvoiceHtml(order, ref, lang, { stripeReceiptUrl });
+    // Inline SVG QR — works under CSP and inside srcDoc iframes (no external img)
+    const verifyUrl = absoluteUrl(`/receipt/${encodeURIComponent(ref)}?lang=${lang}`);
+    let qrSvg: string | null = null;
+    try {
+      qrSvg = await QRCode.toString(verifyUrl, {
+        type: 'svg',
+        width: 110,
+        margin: 1,
+        errorCorrectionLevel: 'M',
+        color: { dark: '#1e3a8a', light: '#ffffff' },
+      });
+    } catch (qrErr) {
+      console.error('[Invoice] QR generate failed:', qrErr);
+    }
+
+    const html = buildInvoiceHtml(order, ref, lang, { stripeReceiptUrl, qrSvg });
 
     return new NextResponse(html, {
       headers: {

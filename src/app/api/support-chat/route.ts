@@ -9,8 +9,13 @@ import {
   getCustomerChats,
   getChatSessionWithMessages,
   markMessagesAsRead,
+  addChatMessage,
 } from '@/lib/support-chat';
 import { getProfileName } from '@/lib/profile-utils';
+import {
+  getStoredSupportChatSettings,
+} from '@/lib/support-chat-settings-db';
+import { resolveAutoReplyMessage } from '@/lib/support-chat-settings';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -47,7 +52,11 @@ export async function GET(request: NextRequest) {
         await markMessagesAsRead(activeChat.id, 'customer');
       }
       const chat = await getChatSessionWithMessages(activeChat.id);
-      return NextResponse.json({ chat });
+      if (!chat) {
+        return NextResponse.json({ chat: null });
+      }
+      const { hasMore, ...chatPayload } = chat;
+      return NextResponse.json({ chat: chatPayload, hasMore });
     }
 
     return NextResponse.json({ chat: activeChat });
@@ -74,8 +83,15 @@ export async function POST(request: NextRequest) {
     const existingChat = await getCustomerActiveChat(session.user.email);
     if (existingChat) {
       const chat = await getChatSessionWithMessages(existingChat.id);
+      if (chat) {
+        const { hasMore: _hasMore, ...chatPayload } = chat;
+        return NextResponse.json({ 
+          chat: chatPayload,
+          message: 'คุณมีการสนทนาที่กำลังดำเนินอยู่แล้ว'
+        });
+      }
       return NextResponse.json({ 
-        chat: chat || existingChat,
+        chat: existingChat,
         message: 'คุณมีการสนทนาที่กำลังดำเนินอยู่แล้ว'
       });
     }
@@ -103,7 +119,29 @@ export async function POST(request: NextRequest) {
       shopId || undefined,
       shopName || undefined
     );
-    const chat = (await getChatSessionWithMessages(created.id)) || created;
+
+    try {
+      const settings = await getStoredSupportChatSettings();
+      const autoReply = resolveAutoReplyMessage(settings);
+      // Auto-reply is a system action only — never changes status or assignee.
+      // Cases stay `pending` until a human admin presses Accept / Take over.
+      if (autoReply) {
+        await addChatMessage(
+          created.id,
+          'admin',
+          undefined,
+          settings.admin_display_name || 'ทีมงาน',
+          autoReply
+        );
+      }
+    } catch (e) {
+      console.error('[support-chat] auto-reply failed:', e);
+    }
+
+    const withMessages = await getChatSessionWithMessages(created.id);
+    const chat = withMessages
+      ? (({ hasMore: _h, ...rest }) => rest)(withMessages)
+      : created;
     
     return NextResponse.json({ 
       chat,

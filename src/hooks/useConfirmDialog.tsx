@@ -4,7 +4,7 @@
 
 'use client';
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -74,65 +74,22 @@ const VARIANT_CONFIG: Record<DialogVariant, { icon: React.ReactNode; color: stri
   },
 };
 
-/**
- * Modern confirm dialog hook — drop-in replacement for Swal.fire confirm dialogs.
- *
- * Usage:
- * ```tsx
- * const { confirm, ConfirmDialog } = useConfirmDialog();
- *
- * const ok = await confirm({
- *   title: 'ลบรายการ?',
- *   message: 'รายการนี้จะถูกลบถาวร',
- *   variant: 'warning',
- *   confirmText: 'ลบ',
- *   destructive: true,
- * });
- * if (ok) { ... }
- *
- * // Render <ConfirmDialog /> once in your component tree
- * return <><ConfirmDialog />...</>;
- * ```
- */
-export function useConfirmDialog() {
-  const [state, setState] = useState<DialogState>({
-    open: false,
-    title: '',
-    variant: 'warning',
-  });
-
-  const resolveRef = useRef<((value: boolean) => void) | null>(null);
-
-  const confirm = useCallback((options: ConfirmDialogOptions): Promise<boolean> => {
-    return new Promise<boolean>((resolve) => {
-      resolveRef.current = resolve;
-      setState({
-        open: true,
-        title: options.title,
-        message: options.message,
-        variant: options.variant || 'warning',
-        confirmText: options.confirmText || 'ยืนยัน',
-        cancelText: options.cancelText || 'ยกเลิก',
-        confirmColor: options.confirmColor,
-        destructive: options.destructive,
-      });
-    });
-  }, []);
-
-  const handleClose = useCallback((confirmed: boolean) => {
-    setState((prev) => ({ ...prev, open: false }));
-    resolveRef.current?.(confirmed);
-    resolveRef.current = null;
-  }, []);
-
+// Stable View Component for Confirm Dialog
+function ConfirmDialogView({
+  state,
+  onClose,
+}: {
+  state: DialogState;
+  onClose: (confirmed: boolean) => void;
+}) {
   const variantCfg = VARIANT_CONFIG[state.variant || 'warning'];
-  const confirmBtnColor = state.confirmColor ||
-    (state.destructive ? '#ef4444' : variantCfg.color);
+  const confirmBtnColor =
+    state.confirmColor || (state.destructive ? '#ef4444' : variantCfg.color);
 
-  const ConfirmDialog = useCallback(() => (
+  return (
     <Dialog
       open={state.open}
-      onClose={() => handleClose(false)}
+      onClose={() => onClose(false)}
       TransitionComponent={SlideTransition}
       maxWidth="xs"
       fullWidth
@@ -145,19 +102,21 @@ export function useConfirmDialog() {
             border: '1px solid var(--glass-border, rgba(148,163,184,0.15))',
             boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
             overflow: 'hidden',
+            zIndex: 99999,
           },
         },
         backdrop: {
           sx: {
             backdropFilter: 'blur(4px)',
             backgroundColor: 'rgba(0,0,0,0.4)',
+            zIndex: 99998,
           },
         },
       }}
     >
       {/* Close button */}
       <IconButton
-        onClick={() => handleClose(false)}
+        onClick={() => onClose(false)}
         size="small"
         sx={{
           position: 'absolute',
@@ -227,7 +186,7 @@ export function useConfirmDialog() {
         }}
       >
         <Button
-          onClick={() => handleClose(false)}
+          onClick={() => onClose(false)}
           sx={{
             color: 'var(--text-muted, #64748b)',
             textTransform: 'none',
@@ -243,7 +202,7 @@ export function useConfirmDialog() {
           {state.cancelText}
         </Button>
         <Button
-          onClick={() => handleClose(true)}
+          onClick={() => onClose(true)}
           variant="contained"
           disableElevation
           sx={{
@@ -264,60 +223,23 @@ export function useConfirmDialog() {
         </Button>
       </DialogActions>
     </Dialog>
-  ), [state, handleClose, variantCfg, confirmBtnColor]);
-
-  return { confirm, ConfirmDialog };
+  );
 }
 
-/**
- * Alert dialog (no cancel button) — replacement for Swal.fire({ icon: 'error', ... })
- *
- * Usage:
- * ```tsx
- * const { alert, AlertDialog } = useAlertDialog();
- * await alert({ title: 'Error', message: '...', variant: 'error' });
- * ```
- */
-export function useAlertDialog() {
-  const [state, setState] = useState<DialogState & { onClose?: () => void }>({
-    open: false,
-    title: '',
-    variant: 'info',
-  });
-
-  const resolveRef = useRef<(() => void) | null>(null);
-
-  const alert = useCallback((
-    options: Omit<ConfirmDialogOptions, 'cancelText'> & { onClose?: () => void }
-  ): Promise<void> => {
-    return new Promise<void>((resolve) => {
-      resolveRef.current = resolve;
-      setState({
-        open: true,
-        title: options.title,
-        message: options.message,
-        variant: options.variant || 'info',
-        confirmText: options.confirmText || 'ตกลง',
-        confirmColor: options.confirmColor,
-        onClose: options.onClose,
-      });
-    });
-  }, []);
-
-  const handleClose = useCallback(() => {
-    const onCloseCb = state.onClose;
-    setState((prev) => ({ ...prev, open: false }));
-    resolveRef.current?.();
-    resolveRef.current = null;
-    onCloseCb?.();
-  }, [state.onClose]);
-
+// Stable View Component for Alert Dialog
+function AlertDialogView({
+  state,
+  onClose,
+}: {
+  state: DialogState & { onClose?: () => void };
+  onClose: () => void;
+}) {
   const variantCfg = VARIANT_CONFIG[state.variant || 'info'];
 
-  const AlertDialog = useCallback(() => (
+  return (
     <Dialog
       open={state.open}
-      onClose={handleClose}
+      onClose={onClose}
       TransitionComponent={SlideTransition}
       maxWidth="xs"
       fullWidth
@@ -330,12 +252,14 @@ export function useAlertDialog() {
             border: '1px solid var(--glass-border, rgba(148,163,184,0.15))',
             boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
             overflow: 'hidden',
+            zIndex: 99999,
           },
         },
         backdrop: {
           sx: {
             backdropFilter: 'blur(4px)',
             backgroundColor: 'rgba(0,0,0,0.4)',
+            zIndex: 99998,
           },
         },
       }}
@@ -387,7 +311,7 @@ export function useAlertDialog() {
 
       <DialogActions sx={{ px: 3, pb: 2.5, pt: 2 }}>
         <Button
-          onClick={handleClose}
+          onClick={onClose}
           variant="contained"
           disableElevation
           sx={{
@@ -408,7 +332,90 @@ export function useAlertDialog() {
         </Button>
       </DialogActions>
     </Dialog>
-  ), [state, handleClose, variantCfg]);
+  );
+}
+
+/**
+ * Modern confirm dialog hook — drop-in replacement for Swal.fire confirm dialogs.
+ */
+export function useConfirmDialog() {
+  const [state, setState] = useState<DialogState>({
+    open: false,
+    title: '',
+    variant: 'warning',
+  });
+
+  const resolveRef = useRef<((value: boolean) => void) | null>(null);
+
+  const confirm = useCallback((options: ConfirmDialogOptions): Promise<boolean> => {
+    return new Promise<boolean>((resolve) => {
+      resolveRef.current = resolve;
+      setState({
+        open: true,
+        title: options.title,
+        message: options.message,
+        variant: options.variant || 'warning',
+        confirmText: options.confirmText || 'ยืนยัน',
+        cancelText: options.cancelText || 'ยกเลิก',
+        confirmColor: options.confirmColor,
+        destructive: options.destructive,
+      });
+    });
+  }, []);
+
+  const handleClose = useCallback((confirmed: boolean) => {
+    setState((prev) => ({ ...prev, open: false }));
+    resolveRef.current?.(confirmed);
+    resolveRef.current = null;
+  }, []);
+
+  const ConfirmDialog = useCallback(() => (
+    <ConfirmDialogView state={state} onClose={handleClose} />
+  ), [state, handleClose]);
+
+  return { confirm, ConfirmDialog };
+}
+
+/**
+ * Alert dialog (no cancel button) — replacement for Swal.fire({ icon: 'error', ... })
+ */
+export function useAlertDialog() {
+  const [state, setState] = useState<DialogState & { onClose?: () => void }>({
+    open: false,
+    title: '',
+    variant: 'info',
+  });
+
+  const resolveRef = useRef<(() => void) | null>(null);
+
+  const alert = useCallback((
+    options: Omit<ConfirmDialogOptions, 'cancelText'> & { onClose?: () => void }
+  ): Promise<void> => {
+    return new Promise<void>((resolve) => {
+      resolveRef.current = resolve;
+      setState({
+        open: true,
+        title: options.title,
+        message: options.message,
+        variant: options.variant || 'info',
+        confirmText: options.confirmText || 'ตกลง',
+        confirmColor: options.confirmColor,
+        onClose: options.onClose,
+      });
+    });
+  }, []);
+
+  const handleClose = useCallback(() => {
+    const onCloseCb = state.onClose;
+    setState((prev) => ({ ...prev, open: false }));
+    resolveRef.current?.();
+    resolveRef.current = null;
+    onCloseCb?.();
+  }, [state.onClose]);
+
+  const AlertDialog = useCallback(() => (
+    <AlertDialogView state={state} onClose={handleClose} />
+  ), [state, handleClose]);
 
   return { alert, AlertDialog };
 }

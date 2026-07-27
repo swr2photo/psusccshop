@@ -6,6 +6,7 @@ import { orders as ordersSchema } from '@/db/schema';
 import { and, eq, desc, isNotNull } from 'drizzle-orm';
 import { triggerSheetSync } from '@/lib/sheet-sync';
 import { sendPushNotification } from '@/lib/push-notification';
+import { packRefundDetails, type RefundPayoutMethod } from '@/lib/refund-details';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -212,11 +213,45 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { ref, reason, details, bankName, bankAccount, accountName, amount } = body;
+    const {
+      ref,
+      reason,
+      details,
+      bankName,
+      bankAccount,
+      accountName,
+      amount,
+      payoutMethod,
+      evidenceUrls,
+      items,
+    } = body as {
+      ref?: string;
+      reason?: string;
+      details?: string;
+      bankName?: string;
+      bankAccount?: string;
+      accountName?: string;
+      amount?: number;
+      payoutMethod?: RefundPayoutMethod;
+      evidenceUrls?: string[];
+      items?: Array<{ index: number; name: string; size?: string; qty: number; amount: number }>;
+    };
 
     if (!ref || !reason || !bankName || !bankAccount || !accountName) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
+
+    const method: RefundPayoutMethod = payoutMethod === 'promptpay' ? 'promptpay' : 'bank';
+    if (method === 'promptpay') {
+      const digits = String(bankAccount).replace(/\D/g, '');
+      if (digits.length < 10 || digits.length > 13) {
+        return NextResponse.json({ error: 'หมายเลขพร้อมเพย์ไม่ถูกต้อง' }, { status: 400 });
+      }
+    }
+
+    const safeEvidence = Array.isArray(evidenceUrls)
+      ? evidenceUrls.filter((u) => typeof u === 'string' && /^https?:\/\//i.test(u)).slice(0, 5)
+      : [];
 
     const order = await getOrderByRef(ref);
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 });
@@ -240,12 +275,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'จำนวนเงินไม่ถูกต้อง' }, { status: 400 });
     }
 
+    const resolvedBankName = method === 'promptpay' ? 'พร้อมเพย์' : bankName;
+    const packedDetails = packRefundDetails({
+      text: details || '',
+      evidenceUrls: safeEvidence,
+      payoutMethod: method,
+      items: Array.isArray(items) ? items.slice(0, 50) : [],
+    });
+
     await db.update(ordersSchema)
       .set({
         refundStatus: 'REQUESTED',
         refundReason: reason,
-        refundDetails: details || null,
-        refundBankName: bankName,
+        refundDetails: packedDetails || null,
+        refundBankName: resolvedBankName,
         refundBankAccount: bankAccount,
         refundAccountName: accountName,
         refundAmount: refundAmount,
@@ -259,7 +302,14 @@ export async function POST(req: NextRequest) {
       email: authResult.email,
       action: 'refund_request',
       details: `ขอคืนเงินออเดอร์ ${ref} จำนวน ฿${refundAmount}`,
-      metadata: { ref, reason, amount: refundAmount, bankName },
+      metadata: {
+        ref,
+        reason,
+        amount: refundAmount,
+        bankName: resolvedBankName,
+        payoutMethod: method,
+        evidenceCount: safeEvidence.length,
+      },
       request: req,
     });
     await writeAuditTrail({
@@ -269,7 +319,13 @@ export async function POST(req: NextRequest) {
       performedBy: authResult.email,
       changes: {
         subjectEmail: authResult.email,
-        after: { status: 'REQUESTED', reason, amount: refundAmount, bankName },
+        after: {
+          status: 'REQUESTED',
+          reason,
+          amount: refundAmount,
+          bankName: resolvedBankName,
+          payoutMethod: method,
+        },
         summary: `ขอคืนเงิน ${ref}`,
       },
       request: req,

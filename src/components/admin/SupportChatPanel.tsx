@@ -1,6 +1,6 @@
 'use client';
 
-import { apiFetch, uploadImageApi } from '@/lib/api-client';
+import { apiFetch, uploadImageApi, uploadAudioApi } from '@/lib/api-client';
 // src/components/admin/SupportChatPanel.tsx
 // Admin Panel for Support Chat Management - Mobile Responsive with Typing & Read Receipts
 
@@ -12,11 +12,31 @@ import { useRealtimeChat, useRealtimeChatList } from '@/hooks/useRealtimeChat';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  Message,
+  MessageAvatar,
+  MessageContent,
+  MessageFooter,
+} from '@/components/ui/message';
+import { Bubble, BubbleContent } from '@/components/ui/bubble';
+import { ChatImage } from '@/components/ui/chat-image';
+import { ChatComposer } from '@/components/ui/chat-composer';
+import { ChatSystemMarker } from '@/components/ui/chat-system-marker';
+import { VoiceMessage } from '@/components/ui/voice-message';
+import {
+  MessageScrollerProvider,
+  MessageScroller,
+  MessageScrollerViewport,
+  MessageScrollerContent,
+  MessageScrollerItem,
+  MessageScrollerButton,
+  MessageScrollerApiBridge,
+  MessageScrollerLoadOlder,
+  useMessageScroller,
+} from '@/components/ui/message-scroller';
 import {
   Dialog,
   DialogContent,
@@ -36,7 +56,6 @@ import {
   Star as StarIcon,
   RotateCcw as RefreshIcon,
   Circle as DotIcon,
-  Image as ImageIcon,
   X as CloseIcon,
   Settings as SettingsIcon,
   ArrowLeft as ArrowBackIcon,
@@ -45,11 +64,26 @@ import {
   Receipt as ReceiptIcon,
   Search as SearchIcon,
   Eye as ViewIcon,
-  ZoomIn as ZoomInIcon,
+  PanelRight,
+  PanelRightClose,
   Loader2,
 } from 'lucide-react';
+import { ChatSettingsDialog } from '@/components/admin/ChatSettingsDialog';
+import {
+  CustomerContextPanel,
+  ChatTextWithOrderLinks,
+} from '@/components/admin/CustomerContextPanel';
+import {
+  DEFAULT_SUPPORT_CHAT_SETTINGS,
+  normalizeSupportChatSettings,
+  playNotificationTone,
+  type SupportChatSettings,
+} from '@/lib/support-chat-settings';
 import { chatMessagesChanged, getDbTypingFromSession } from '@/lib/support-chat-typing';
-import { fetchChatSync, mergeChatMessages, getChatPollIntervalMs } from '@/lib/support-chat-sync';
+import { fetchChatSync, mergeChatMessages, mergeNewestWindow, fetchOlderChatMessages, getChatPollIntervalMs } from '@/lib/support-chat-sync';
+import { formatStickerMessage } from '@/lib/chat-stickers';
+import { formatVoiceMessage, VOICE_DATA_URL_FALLBACK_MAX } from '@/lib/chat-voice';
+import { parseChatMessage } from '@/lib/chat-message';
 
 const TAB_KEYS = ['all', 'pending', 'my', 'closed'] as const;
 
@@ -97,14 +131,6 @@ interface ChatStats {
   avgRating: number;
 }
 
-interface ChatSettings {
-  admin_display_name: string;
-  auto_reply_enabled: boolean;
-  auto_reply_message: string;
-  quick_replies: string[];
-  notification_sound: boolean;
-}
-
 function StarRating({ value }: { value: number }) {
   return (
     <div className="flex items-center gap-0.5">
@@ -113,7 +139,7 @@ function StarRating({ value }: { value: number }) {
           key={star}
           className={cn(
             'size-4',
-            star <= value ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30'
+            star <= value ? 'fill-amber-500 text-amber-500 dark:fill-amber-400 dark:text-amber-400' : 'text-muted-foreground/30'
           )}
         />
       ))}
@@ -145,6 +171,9 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
   }, []);
 
   const [loading, setLoading] = useState(true);
+  const [loadingChatDetail, setLoadingChatDetail] = useState(false);
+  const [hasMoreOlder, setHasMoreOlder] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const [chats, setChats] = useState<ChatSession[]>([]);
   const [stats, setStats] = useState<ChatStats | null>(null);
   const [selectedChat, setSelectedChat] = useState<ChatWithMessages | null>(null);
@@ -152,26 +181,32 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
   const [sending, setSending] = useState(false);
   const [tabValue, setTabValue] = useState(0);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadLabel, setUploadLabel] = useState('กำลังอัปโหลดรูปภาพ...');
+  const [uploadFileCount, setUploadFileCount] = useState(1);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [mobileShowChat, setMobileShowChat] = useState(false);
   const [fallbackTyping, setFallbackTyping] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [chatSettings, setChatSettings] = useState<ChatSettings>({
-    admin_display_name: 'ทีมงาน PSU SCC',
-    auto_reply_enabled: true,
-    auto_reply_message: 'ขอบคุณที่ติดต่อมา ทีมงานจะตอบกลับโดยเร็วที่สุดค่ะ',
-    quick_replies: ['สวัสดีค่ะ', 'รอสักครู่นะคะ', 'ขอบคุณที่รอค่ะ', 'ยินดีให้บริการค่ะ'],
-    notification_sound: true,
-  });
+  const [chatSettings, setChatSettings] = useState<SupportChatSettings>(DEFAULT_SUPPORT_CHAT_SETTINGS);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [transferAdmins, setTransferAdmins] = useState<{ email: string; name: string }[]>([]);
+  const [transferToEmail, setTransferToEmail] = useState('');
+  const [transferring, setTransferring] = useState(false);
+  const [focusOrderRef, setFocusOrderRef] = useState<string | null>(null);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const scrollApiRef = useRef<ReturnType<typeof useMessageScroller> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadAbortRef = useRef<AbortController | null>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const chatEtagRef = useRef<string | null>(null);
   const lastMessageAtRef = useRef<string | null>(null);
   const prevMessageCountRef = useRef<number>(0);
-  const isUserScrollingRef = useRef<boolean>(false);
+  const loadingOlderRef = useRef(false);
+  const hasMoreOlderRef = useRef(false);
+  const selectedChatRef = useRef<ChatWithMessages | null>(null);
+  selectedChatRef.current = selectedChat;
+  hasMoreOlderRef.current = hasMoreOlder;
 
   const {
     messages: realtimeMessages,
@@ -206,9 +241,17 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
   const [orderSearchRef, setOrderSearchRef] = useState('');
   const [foundOrder, setFoundOrder] = useState<any>(null);
   const [searchingOrder, setSearchingOrder] = useState(false);
-  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [customerOrders, setCustomerOrders] = useState<any[]>([]);
   const [loadingCustomerOrders, setLoadingCustomerOrders] = useState(false);
+  const [contextPanelOpen, setContextPanelOpen] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    try {
+      return window.localStorage.getItem('support-chat-context-panel') !== '0';
+    } catch {
+      return true;
+    }
+  });
+  const [adminNote, setAdminNote] = useState('');
 
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   useEffect(() => {
@@ -218,13 +261,9 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
   }, []);
 
   const scrollToBottom = useCallback((force = false) => {
-    if (!isUserScrollingRef.current || force) {
-      const el = messagesContainerRef.current;
-      if (!el) return;
-      requestAnimationFrame(() => {
-        el.scrollTop = el.scrollHeight;
-      });
-    }
+    // MessageScroller owns follow/hold; only re-engage live edge after explicit send
+    if (!force) return;
+    scrollApiRef.current?.scrollToEnd({ behavior: 'smooth' });
   }, []);
 
   const deepLinkHandledRef = useRef(false);
@@ -261,15 +300,48 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
 
   const fetchChatDetails = useCallback(async (chatId: string, markRead = false) => {
     try {
-      const url = '/api/support-chat/' + chatId + (markRead ? '?markRead=true' : '');
-      const res = await apiFetch(url);
+      const params = new URLSearchParams({ limit: '30' });
+      if (markRead) params.set('markRead', 'true');
+      const res = await apiFetch(`/api/support-chat/${chatId}?${params}`);
       const data = await res.json();
       if (data.chat) {
         setSelectedChat(data.chat);
         if (data.chat.messages) setRealtimeMessages(data.chat.messages || []);
+        setHasMoreOlder(Boolean(data.hasMore));
       }
     } catch (error) {
       console.error('Error fetching chat details:', error);
+    }
+  }, [setRealtimeMessages]);
+
+  const loadOlderMessages = useCallback(async () => {
+    const chat = selectedChatRef.current;
+    if (!chat?.id || loadingOlderRef.current || !hasMoreOlderRef.current) return;
+    const oldest = chat.messages?.[0];
+    if (!oldest) return;
+
+    loadingOlderRef.current = true;
+    setLoadingOlder(true);
+    try {
+      const page = await fetchOlderChatMessages<ChatMessage>(chat.id, {
+        before: oldest.created_at,
+        beforeId: oldest.id,
+        limit: 30,
+      });
+      if (page.messages.length) {
+        setSelectedChat((prev) => {
+          if (!prev || prev.id !== chat.id) return prev;
+          const merged = mergeChatMessages(page.messages, prev.messages);
+          setRealtimeMessages(merged);
+          return { ...prev, messages: merged };
+        });
+      }
+      setHasMoreOlder(page.hasMore);
+    } catch (error) {
+      console.error('Error loading older messages:', error);
+    } finally {
+      loadingOlderRef.current = false;
+      setLoadingOlder(false);
     }
   }, [setRealtimeMessages]);
 
@@ -376,15 +448,19 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
         let didUpdate = false;
         setSelectedChat((prev) => {
           if (!prev || prev.id !== chatId) return prev;
+          const merged = mergeNewestWindow(prev.messages, incoming);
           const changed =
-            chatMessagesChanged(prev.messages, incoming) ||
+            chatMessagesChanged(prev.messages, merged) ||
             result.chat.status !== prev.status;
           if (!changed) return prev;
           didUpdate = true;
-          setRealtimeMessages(incoming);
-          lastMessageAtRef.current = incoming[incoming.length - 1]?.created_at ?? null;
-          return { ...result.chat, messages: incoming };
+          setRealtimeMessages(merged);
+          lastMessageAtRef.current = merged[merged.length - 1]?.created_at ?? null;
+          return { ...result.chat, messages: merged };
         });
+        if (typeof result.hasMore === 'boolean' && !hasMoreOlderRef.current) {
+          setHasMoreOlder(result.hasMore);
+        }
         if (didUpdate && (result.chat.unread_count || 0) > 0) {
           apiFetch('/api/support-chat/' + chatId + '/read', { method: 'POST' }).catch(() => {});
         }
@@ -424,10 +500,16 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
           return;
         }
 
-        setSelectedChat(result.chat);
-        setRealtimeMessages(result.chat.messages || []);
-        lastMessageAtRef.current =
-          result.chat.messages?.[result.chat.messages.length - 1]?.created_at ?? null;
+        setSelectedChat((prev) => {
+          if (!prev || prev.id !== chatId) return prev;
+          const merged = mergeNewestWindow(prev.messages, result.chat.messages || []);
+          setRealtimeMessages(merged);
+          lastMessageAtRef.current = merged[merged.length - 1]?.created_at ?? null;
+          return { ...result.chat, messages: merged };
+        });
+        if (typeof result.hasMore === 'boolean' && !hasMoreOlderRef.current) {
+          setHasMoreOlder(result.hasMore);
+        }
       } catch {
         /* ignore */
       }
@@ -461,11 +543,21 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     if (selectedChat?.messages) {
       const currentCount = selectedChat.messages.length;
       if (prevMessageCountRef.current > 0 && currentCount > prevMessageCountRef.current) {
-        scrollToBottom();
-
         const latestMsg = selectedChat.messages[selectedChat.messages.length - 1];
-        if (document.hidden && latestMsg?.sender === 'customer') {
-          if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        if (latestMsg?.sender === 'customer') {
+          if (chatSettings.notification_sound) {
+            try {
+              playNotificationTone(chatSettings.notification_sound_id);
+            } catch {
+              /* ignore */
+            }
+          }
+          if (
+            document.hidden &&
+            chatSettings.notification_desktop &&
+            typeof Notification !== 'undefined' &&
+            Notification.permission === 'granted'
+          ) {
             try {
               const notif = new Notification(`ข้อความใหม่จาก ${latestMsg.sender_name || 'ลูกค้า'}`, {
                 body: latestMsg.message.substring(0, 100),
@@ -484,7 +576,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
       }
       prevMessageCountRef.current = currentCount;
     }
-  }, [selectedChat?.messages?.length, scrollToBottom]);
+  }, [selectedChat?.messages?.length, chatSettings.notification_sound, chatSettings.notification_sound_id, chatSettings.notification_desktop, selectedChat?.id]);
 
   useEffect(() => {
     if (pushSupported && !pushSubscribed && session?.user?.email) {
@@ -524,22 +616,48 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
   useEffect(() => {
     apiFetch('/api/support-chat/settings')
       .then(res => res.json())
-      .then(data => { if (data.settings) setChatSettings(data.settings); })
+      .then(data => {
+        if (data.settings) setChatSettings(normalizeSupportChatSettings(data.settings));
+      })
+      .catch(() => {});
+
+    apiFetch('/api/admin/support-chat?action=admins')
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data.admins)) setTransferAdmins(data.admins);
+      })
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    setTransferToEmail('');
+  }, [selectedChat?.id]);
+
   const handleSelectChat = async (chatId: string) => {
-    isUserScrollingRef.current = false;
     prevMessageCountRef.current = 0;
-    const res = await apiFetch('/api/support-chat/' + chatId + '?markRead=true');
-    const data = await res.json();
-    if (data.chat) {
-      setSelectedChat(data.chat);
-      setRealtimeMessages(data.chat.messages || []);
-    }
-    fetchChats();
-    broadcastRead();
+    setLoadingChatDetail(true);
+    setHasMoreOlder(false);
     if (isMobile) setMobileShowChat(true);
+    const preview = chats.find((c) => c.id === chatId);
+    if (preview) {
+      setSelectedChat({
+        ...preview,
+        messages: [],
+      });
+    }
+    try {
+      const res = await apiFetch(`/api/support-chat/${chatId}?markRead=true&limit=30`);
+      const data = await res.json();
+      if (data.chat) {
+        setSelectedChat(data.chat);
+        setRealtimeMessages(data.chat.messages || []);
+        setHasMoreOlder(Boolean(data.hasMore));
+      }
+      fetchChats();
+      broadcastRead();
+    } finally {
+      setLoadingChatDetail(false);
+    }
   };
 
   const handleMobileBack = () => {
@@ -549,35 +667,79 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
   };
 
   const handleSaveSettings = async () => {
+    setSettingsSaving(true);
     try {
-      await apiFetch('/api/support-chat/settings', {
+      const res = await apiFetch('/api/support-chat/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(chatSettings),
       });
+      const data = await res.json();
+      if (data.settings) setChatSettings(normalizeSupportChatSettings(data.settings));
       setSettingsOpen(false);
     } catch (error) {
       console.error('Error saving settings:', error);
+    } finally {
+      setSettingsSaving(false);
     }
   };
 
-  const handleQuickReply = (reply: string) => setMessage(reply);
-
-  const handleAcceptChat = async (chatId: string) => {
+  const handleAcceptChat = async (chatId: string, options?: { force?: boolean }) => {
     try {
-      const res = await apiFetch('/api/support-chat/' + chatId + '/accept', { method: 'POST' });
+      const res = await apiFetch('/api/support-chat/' + chatId + '/accept', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ force: Boolean(options?.force) }),
+      });
       const data = await res.json();
       if (data.chat) {
         await fetchChats();
-        const detailRes = await apiFetch('/api/support-chat/' + chatId);
+        const detailRes = await apiFetch(`/api/support-chat/${chatId}?limit=30`);
         const detailData = await detailRes.json();
         if (detailData.chat) {
           setSelectedChat(detailData.chat);
           setRealtimeMessages(detailData.chat.messages || []);
+          setHasMoreOlder(Boolean(detailData.hasMore));
         }
       }
     } catch (error) {
       console.error('Error accepting chat:', error);
+    }
+  };
+
+  const handleTransferChat = async () => {
+    if (!selectedChat || !transferToEmail) return;
+    setTransferring(true);
+    try {
+      const target = transferAdmins.find((a) => a.email === transferToEmail);
+      const res = await apiFetch(`/api/support-chat/${selectedChat.id}/transfer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          toEmail: transferToEmail,
+          toName: target?.name,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        console.error('Transfer failed:', data?.error);
+        return;
+      }
+      if (data.chat) {
+        setTransferToEmail('');
+        await fetchChats();
+        const detailRes = await apiFetch(`/api/support-chat/${selectedChat.id}?limit=30`);
+        const detailData = await detailRes.json();
+        if (detailData.chat) {
+          setSelectedChat(detailData.chat);
+          setRealtimeMessages(detailData.chat.messages || []);
+          setHasMoreOlder(Boolean(detailData.hasMore));
+        }
+      }
+    } catch (error) {
+      console.error('Error transferring chat:', error);
+    } finally {
+      setTransferring(false);
     }
   };
 
@@ -596,11 +758,12 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     }
   };
 
-  const handleSendMessage = async () => {
-    if (previewImage) { await handleSendWithImage(); return; }
-    if (!message.trim() || !selectedChat) return;
+  const handleSendMessage = async (overrideText?: string) => {
+    if (previewImage && !overrideText) { await handleSendWithImage(); return; }
+    if (!selectedChat) return;
+    const msgText = (overrideText ?? message).trim();
+    if (!msgText) return;
 
-    const msgText = message.trim();
     const tempId = `opt_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
     addOptimisticMessage(tempId, msgText, session?.user?.name || chatSettings.admin_display_name, session?.user?.image || undefined);
@@ -628,6 +791,171 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     }
   };
 
+  const handleQuickReply = (reply: string) => {
+    void handleSendMessage(reply);
+  };
+
+  const beginUpload = (label: string, fileCount = 1) => {
+    uploadAbortRef.current?.abort();
+    const controller = new AbortController();
+    uploadAbortRef.current = controller;
+    setUploadingImage(true);
+    setUploadProgress(0);
+    setUploadLabel(label);
+    setUploadFileCount(fileCount);
+    return controller;
+  };
+
+  const endUpload = () => {
+    uploadAbortRef.current = null;
+    setUploadingImage(false);
+    setUploadProgress(0);
+  };
+
+  const cancelUpload = useCallback(() => {
+    uploadAbortRef.current?.abort();
+    uploadAbortRef.current = null;
+    setUploadingImage(false);
+    setUploadProgress(0);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }, []);
+
+  const handleSendSticker = async (src: string) => {
+    if (!selectedChat || sending || uploadingImage) return;
+
+    // Built-in GIF sticker — send path directly (animated)
+    if (src.startsWith('/chat-stickers/')) {
+      const msgContent = formatStickerMessage(src);
+      const tempId = `opt_sticker_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      addOptimisticMessage(
+        tempId,
+        msgContent,
+        session?.user?.name || chatSettings.admin_display_name,
+        session?.user?.image || undefined
+      );
+      scrollToBottom(true);
+      setSending(true);
+      try {
+        const res = await apiFetch(`/api/support-chat/${selectedChat.id}/message`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: msgContent }),
+        });
+        const data = await res.json();
+        if (data.success && data.message) resolveOptimistic(tempId, data.message);
+        else resolveOptimistic(tempId, null);
+      } catch {
+        resolveOptimistic(tempId, null);
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
+
+    // Custom GIF/WebP (data URL) — upload then send
+    if (src.startsWith('data:')) {
+      const controller = beginUpload('กำลังอัปโหลดสติกเกอร์...', 1);
+      try {
+        const mimeMatch = src.match(/data:([^;]+);/);
+        const mime = mimeMatch ? mimeMatch[1] : 'image/gif';
+        const ext = mime.includes('webp') ? 'webp' : 'gif';
+        const uploadRes = await uploadImageApi(
+          {
+            base64: src,
+            filename: `sticker_${Date.now()}.${ext}`,
+            mime,
+          },
+          { signal: controller.signal, onProgress: setUploadProgress }
+        );
+        if (!uploadRes.ok) throw new Error('upload failed');
+        const uploadData = await uploadRes.json();
+        if (uploadData.status !== 'success' || !uploadData.data?.url) throw new Error('upload failed');
+        setUploadProgress(100);
+        const imageUrl = uploadData.data.url;
+        const msgContent = formatStickerMessage(imageUrl);
+        const tempId = `opt_sticker_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        addOptimisticMessage(
+          tempId,
+          msgContent,
+          session?.user?.name || chatSettings.admin_display_name,
+          session?.user?.image || undefined
+        );
+        scrollToBottom(true);
+        const res = await apiFetch(`/api/support-chat/${selectedChat.id}/message`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: msgContent }),
+        });
+        const data = await res.json();
+        if (data.success && data.message) resolveOptimistic(tempId, data.message);
+        else resolveOptimistic(tempId, null);
+      } catch (error: any) {
+        if (error?.name !== 'AbortError') {
+          toastError('ส่งสติกเกอร์ไม่สำเร็จ');
+        }
+      } finally {
+        endUpload();
+      }
+    }
+  };
+
+  const handleSendVoice = async (payload: { base64: string; mime: string; duration: number }) => {
+    if (!selectedChat || sending || uploadingImage) return;
+    const controller = beginUpload('กำลังอัปโหลดเสียง...', 1);
+    try {
+      let voiceUrl: string | null = null;
+      let voiceDuration = Math.max(1, Math.round(payload.duration || 1));
+
+      const uploadRes = await uploadAudioApi(
+        {
+          base64: payload.base64,
+          mime: payload.mime,
+          duration: voiceDuration,
+        },
+        { signal: controller.signal, onProgress: setUploadProgress }
+      );
+      const uploadData = await uploadRes.json().catch(() => null);
+      if (uploadRes.ok && uploadData?.status === 'success' && uploadData?.data?.url) {
+        voiceUrl = uploadData.data.url;
+        if (uploadData.data.duration) voiceDuration = uploadData.data.duration;
+      } else if (payload.base64.length <= VOICE_DATA_URL_FALLBACK_MAX) {
+        voiceUrl = payload.base64;
+      }
+
+      if (!voiceUrl) {
+        throw new Error('อัปโหลดเสียงไม่สำเร็จ (ไฟล์ใหญ่เกินไป)');
+      }
+
+      setUploadProgress(100);
+      const msgContent = formatVoiceMessage(voiceUrl, voiceDuration);
+      const tempId = `opt_voice_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      addOptimisticMessage(
+        tempId,
+        msgContent,
+        session?.user?.name || chatSettings.admin_display_name,
+        session?.user?.image || undefined
+      );
+      scrollToBottom(true);
+      const res = await apiFetch(`/api/support-chat/${selectedChat.id}/message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: msgContent }),
+      });
+      const data = await res.json();
+      if (data.success && data.message) resolveOptimistic(tempId, data.message);
+      else {
+        resolveOptimistic(tempId, null);
+        toastError(data?.error || 'ส่งข้อความเสียงไม่สำเร็จ');
+      }
+    } catch (error: any) {
+      if (error?.name !== 'AbortError') {
+        toastError(error?.message || 'ส่งข้อความเสียงไม่สำเร็จ');
+      }
+    } finally {
+      endUpload();
+    }
+  };
+
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -639,25 +967,28 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
   };
 
   const handleSendWithImage = async () => {
-    if (!previewImage || !selectedChat) return;
-    setUploadingImage(true);
-
-    const tempId = `opt_img_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    const msgText = message.trim() ? message.trim() + '\n[กำลังอัปโหลดรูปภาพ...]' : '[กำลังอัปโหลดรูปภาพ...]';
-    addOptimisticMessage(tempId, msgText, session?.user?.name || chatSettings.admin_display_name, session?.user?.image || undefined);
+    if (!previewImage || !selectedChat || uploadingImage) return;
+    const caption = message.trim();
+    const imageData = previewImage;
+    const controller = beginUpload('กำลังอัปโหลดรูปภาพ...', 1);
     setPreviewImage(null);
     setMessage('');
-    scrollToBottom(true);
 
     try {
-      const mimeMatch = previewImage.match(/data:([^;]+);/);
+      const mimeMatch = imageData.match(/data:([^;]+);/);
       const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
       const ext = mime.split('/')[1] || 'jpg';
-      const uploadRes = await uploadImageApi({
-        base64: previewImage,
-        filename: 'admin_chat_' + Date.now() + '.' + ext,
-        mime,
-      });
+      const uploadRes = await uploadImageApi(
+        {
+          base64: imageData,
+          filename: 'admin_chat_' + Date.now() + '.' + ext,
+          mime,
+        },
+        {
+          signal: controller.signal,
+          onProgress: setUploadProgress,
+        }
+      );
       if (!uploadRes.ok) {
         throw new Error(`อัปโหลดล้มเหลว (HTTP ${uploadRes.status})`);
       }
@@ -668,8 +999,17 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
         throw new Error('เซิร์ฟเวอร์ตอบกลับผิดปกติ กรุณาลองใหม่');
       }
       if (uploadData.status === 'success' && uploadData.data?.url) {
+        setUploadProgress(100);
         const imageUrl = uploadData.data.url;
-        const finalMsg = message.trim() ? message.trim() + '\n[รูปภาพ: ' + imageUrl + ']' : '[รูปภาพ: ' + imageUrl + ']';
+        const finalMsg = caption ? caption + '\n[รูปภาพ: ' + imageUrl + ']' : '[รูปภาพ: ' + imageUrl + ']';
+        const tempId = `opt_img_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        addOptimisticMessage(
+          tempId,
+          finalMsg,
+          session?.user?.name || chatSettings.admin_display_name,
+          session?.user?.image || undefined
+        );
+        scrollToBottom(true);
         const res = await apiFetch('/api/support-chat/' + selectedChat.id + '/message', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -682,18 +1022,23 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
           resolveOptimistic(tempId, null);
         }
       } else {
-        resolveOptimistic(tempId, null);
         toastError('ไม่สามารถอัปโหลดรูปภาพได้');
       }
     } catch (error: any) {
-      console.error('Error uploading image:', error);
-      resolveOptimistic(tempId, null);
-      toastError(error?.message || 'เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ');
+      if (error?.name === 'AbortError') {
+        // cancelled by user
+      } else {
+        console.error('Error uploading image:', error);
+        toastError(error?.message || 'เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ');
+      }
     } finally {
-      setUploadingImage(false);
+      endUpload();
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
+
+  const formatClock = (dateString: string) =>
+    new Date(dateString).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -707,10 +1052,40 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending': return '#fbbf24';
-      case 'active': return '#22c55e';
-      case 'closed': return '#64748b';
+      case 'pending': return '#d97706'; // amber-600
+      case 'active': return '#059669'; // emerald-600
+      case 'closed': return '#475569'; // slate-600
       default: return '#64748b';
+    }
+  };
+
+  const getChatStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return 'bg-amber-50 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400';
+      case 'active':
+        return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400';
+      case 'closed':
+        return 'bg-slate-100 text-slate-700 dark:bg-slate-500/20 dark:text-slate-300';
+      default:
+        return 'bg-slate-100 text-slate-600 dark:bg-white/5 dark:text-muted-foreground';
+    }
+  };
+
+  const getOrderStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case 'CANCELLED':
+      case 'cancelled':
+        return 'bg-red-50 text-red-700 dark:bg-red-500/20 dark:text-red-400';
+      case 'COMPLETED':
+      case 'PAID':
+      case 'SHIPPED':
+      case 'completed':
+        return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400';
+      case 'PENDING':
+      case 'pending':
+      default:
+        return 'bg-amber-50 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400';
     }
   };
 
@@ -723,21 +1098,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     }
   };
 
-  const parseMessage = (msg: string) => {
-    const imageMatch = msg.match(/\[รูปภาพ: (\/api\/image\/[^\]]+|https?:\/\/[^\]]+)\]/);
-    if (imageMatch) {
-      const imageUrl = imageMatch[1];
-      const textPart = msg.replace(imageMatch[0], '').trim();
-      return { text: textPart, imageUrl };
-    }
-    const orderMatch = msg.match(/\[ORDER_REF:([^\]]+)\]/);
-    if (orderMatch) {
-      const orderRef = orderMatch[1];
-      const textPart = msg.replace(orderMatch[0], '').trim();
-      return { text: textPart, imageUrl: null, orderRef };
-    }
-    return { text: msg, imageUrl: null, orderRef: null };
-  };
+  const parseMessage = parseChatMessage;
 
   const handleSearchOrder = async () => {
     if (!orderSearchRef.trim()) return;
@@ -763,7 +1124,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     if (!email) return;
     setLoadingCustomerOrders(true);
     try {
-      const res = await apiFetch(`/api/admin/orders?email=${encodeURIComponent(email)}&limit=10`);
+      const res = await apiFetch(`/api/admin/orders?email=${encodeURIComponent(email)}&limit=50`);
       const data = await res.json();
       if (data.status === 'success' && Array.isArray(data.data)) {
         setCustomerOrders(data.data);
@@ -776,6 +1137,87 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     } finally {
       setLoadingCustomerOrders(false);
     }
+  };
+
+  useEffect(() => {
+    if (!selectedChat?.id) {
+      setAdminNote('');
+      return;
+    }
+    try {
+      setAdminNote(window.localStorage.getItem(`support-chat-note:${selectedChat.id}`) || '');
+    } catch {
+      setAdminNote('');
+    }
+    void fetchCustomerOrders(selectedChat.customer_email);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once per chat id
+  }, [selectedChat?.id]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const typing =
+        !!target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable);
+
+      if (e.altKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+        e.preventDefault();
+        if (!chats.length) return;
+        const idx = selectedChat ? chats.findIndex((c) => c.id === selectedChat.id) : -1;
+        const next =
+          e.key === 'ArrowDown'
+            ? Math.min(chats.length - 1, Math.max(0, idx + 1))
+            : Math.max(0, idx <= 0 ? 0 : idx - 1);
+        const chat = chats[next];
+        if (chat && chat.id !== selectedChat?.id) void handleSelectChat(chat.id);
+        return;
+      }
+
+      if (e.altKey && (e.key === 'c' || e.key === 'C') && !typing) {
+        e.preventDefault();
+        if (selectedChat?.status === 'active') void handleCloseChat();
+        return;
+      }
+
+      if (e.altKey && (e.key === 'i' || e.key === 'I') && !typing) {
+        e.preventDefault();
+        setContextPanelOpen((v) => {
+          const next = !v;
+          try {
+            window.localStorage.setItem('support-chat-context-panel', next ? '1' : '0');
+          } catch {
+            /* ignore */
+          }
+          return next;
+        });
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chats, selectedChat?.id, selectedChat?.status]);
+
+  const persistAdminNote = (chatId: string, note: string) => {
+    setAdminNote(note);
+    try {
+      window.localStorage.setItem(`support-chat-note:${chatId}`, note);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const toggleContextPanel = () => {
+    setContextPanelOpen((v) => {
+      const next = !v;
+      try {
+        window.localStorage.setItem('support-chat-context-panel', next ? '1' : '0');
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
   };
 
   const handleSendOrderToChat = async (order: any) => {
@@ -812,6 +1254,71 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
     }
   };
 
+  const handleSendTrackingUpdate = async (order: any) => {
+    if (!selectedChat || selectedChat.status !== 'active') return;
+    const tracking = order.trackingNumber || order.tracking_number || '';
+    const provider = order.shippingProvider || order.shipping_provider || '';
+    const items = Array.isArray(order.cart)
+      ? order.cart
+          .slice(0, 3)
+          .map((item: any) => {
+            const name = item?.productName || item?.name || 'สินค้า';
+            const size = item?.size ? ` (${item.size})` : '';
+            const qty = item?.quantity ?? item?.qty;
+            return `- ${name}${size}${qty ? ` x${qty}` : ''}`;
+          })
+          .join('\n')
+      : '';
+
+    const orderMsg = `📦 อัปเดตสถานะออเดอร์ #${order.ref}
+สถานะ: ${getOrderStatusLabel(order.status)}
+${items ? `รายการ:\n${items}\n` : ''}ยอดรวม: ฿${(order.totalAmount || order.amount || 0).toLocaleString()}
+${tracking ? `เลขพัสดุ: ${tracking}` : 'เลขพัสดุ: ยังไม่มี'}
+${provider ? `ผู้ให้บริการ: ${provider}` : ''}
+[ORDER_REF:${order.ref}]`.trim();
+
+    setSending(true);
+    const tempId = `opt_track_${Date.now()}`;
+    addOptimisticMessage(
+      tempId,
+      orderMsg,
+      session?.user?.name || chatSettings.admin_display_name,
+      session?.user?.image || undefined
+    );
+    scrollToBottom(true);
+
+    try {
+      const res = await apiFetch('/api/support-chat/' + selectedChat.id + '/message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: orderMsg }),
+      });
+      const data = await res.json();
+      if (data.success && data.message) {
+        resolveOptimistic(tempId, data.message);
+      } else {
+        resolveOptimistic(tempId, null);
+      }
+    } catch (error) {
+      console.error('Error sending tracking update:', error);
+      resolveOptimistic(tempId, null);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const focusOrderInPanel = (ref: string) => {
+    const clean = ref.replace(/^#/, '').trim();
+    if (!clean) return;
+    setContextPanelOpen(true);
+    try {
+      window.localStorage.setItem('support-chat-context-panel', '1');
+    } catch {
+      /* ignore */
+    }
+    setFocusOrderRef(clean);
+  };
+
   const getOrderStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
       'PENDING': 'รอดำเนินการ',
@@ -844,43 +1351,6 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
           100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
         }
       `}</style>
-
-      {lightboxImage && (
-        <div
-          onClick={() => setLightboxImage(null)}
-          className="fixed inset-0 z-[9999] flex cursor-zoom-out items-center justify-center bg-black/95"
-        >
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => setLightboxImage(null)}
-            className="absolute top-4 right-4 bg-[var(--glass-bg)] text-white hover:bg-[var(--glass-strong)]"
-          >
-            <CloseIcon />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={(e) => { e.stopPropagation(); window.open(lightboxImage, '_blank'); }}
-            className="absolute top-4 right-16 bg-[var(--glass-bg)] text-white hover:bg-[var(--glass-strong)]"
-            title="เปิดในแท็บใหม่"
-          >
-            <ZoomInIcon />
-          </Button>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={lightboxImage}
-            alt="รูปภาพขยาย"
-            onClick={(e) => e.stopPropagation()}
-            className="max-h-[90vh] max-w-[95vw] cursor-default rounded-lg object-contain shadow-2xl"
-          />
-          <p className="absolute bottom-6 text-sm text-[var(--text-muted)]">
-            คลิกที่ใดก็ได้เพื่อปิด
-          </p>
-        </div>
-      )}
 
       <Dialog open={orderLookupOpen} onOpenChange={setOrderLookupOpen}>
         <DialogContent className="max-w-lg bg-card text-foreground">
@@ -928,14 +1398,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
                           {foundOrder.customerName || foundOrder.name} · {foundOrder.customerEmail || foundOrder.email}
                         </p>
                       </div>
-                      <Badge
-                        className={cn(
-                          'text-[0.7rem]',
-                          foundOrder.status === 'PAID'
-                            ? 'bg-green-500/20 text-green-500'
-                            : 'bg-amber-400/20 text-amber-400'
-                        )}
-                      >
+                      <Badge className={cn('text-[0.7rem]', getOrderStatusBadgeClass(foundOrder.status))}>
                         {getOrderStatusLabel(foundOrder.status)}
                       </Badge>
                     </div>
@@ -947,14 +1410,14 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => window.open(`/admin?tab=orders&ref=${foundOrder.ref}`, '_blank')}
+                        onClick={() => window.open(`/admin/orders?ref=${foundOrder.ref}`, '_blank')}
                       >
                         <ViewIcon className="size-4" />
                         ดูรายละเอียด
                       </Button>
                       <Button
                         size="sm"
-                        className="bg-green-500 text-xs hover:bg-green-600"
+                        className="bg-emerald-600 text-xs text-white hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600"
                         onClick={() => handleSendOrderToChat(foundOrder)}
                         disabled={!selectedChat || selectedChat.status !== 'active'}
                       >
@@ -1022,16 +1485,16 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
       </Dialog>
 
       <div className={cn(
-        'flex min-h-[400px]',
+        'flex min-h-[400px] gap-0 overflow-hidden rounded-xl bg-slate-50 dark:bg-[#090D16]',
         isMobile ? 'h-[calc(100vh-120px)]' : 'h-[calc(100vh-200px)]'
       )}>
         {/* Chat List Panel */}
         <div className={cn(
-          'flex shrink-0 flex-col overflow-hidden border bg-card',
-          isMobile ? 'w-full rounded-none' : 'mr-2 w-[340px] rounded-lg',
+          'flex min-h-0 shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white dark:border-white/5 dark:bg-[#0c1220]',
+          isMobile ? 'w-full border-r-0' : 'w-[300px]',
           isMobile && mobileShowChat && 'hidden'
         )}>
-          <div className="border-b border-border p-4">
+          <div className="border-b border-slate-200 p-4 dark:border-white/5">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="flex items-center text-sm font-bold sm:text-base">
                 <SupportAgentIcon className="mr-2 size-6" />
@@ -1059,56 +1522,73 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
                 </Button>
               </div>
             </div>
-            {stats && (
+            {stats ? (
               <div className="flex flex-wrap gap-2">
-                <Badge className="bg-amber-400/10 text-[0.7rem] font-medium text-amber-400">
-                  <DotIcon className="size-2.5 fill-amber-400 text-amber-400" />
+                <Badge className="bg-amber-50 text-[0.7rem] font-medium text-amber-700 dark:bg-amber-400/10 dark:text-amber-400">
+                  <DotIcon className="size-2.5 fill-amber-600 text-amber-600 dark:fill-amber-400 dark:text-amber-400" />
                   รอ {stats.pendingCount}
                 </Badge>
-                <Badge className="bg-green-500/10 text-[0.7rem] font-medium text-green-500">
-                  <DotIcon className="size-2.5 fill-green-500 text-green-500" />
+                <Badge className="bg-emerald-50 text-[0.7rem] font-medium text-emerald-700 dark:bg-green-500/10 dark:text-green-500">
+                  <DotIcon className="size-2.5 fill-emerald-600 text-emerald-600 dark:fill-green-500 dark:text-green-500" />
                   Active {stats.activeCount}
                 </Badge>
                 {stats.avgRating > 0 && (
-                  <Badge className="bg-amber-400/10 text-[0.7rem] font-medium text-amber-400">
-                    <StarIcon className="size-3 fill-amber-400 text-amber-400" />
+                  <Badge className="bg-amber-50 text-[0.7rem] font-medium text-amber-700 dark:bg-amber-400/10 dark:text-amber-400">
+                    <StarIcon className="size-3 fill-amber-600 text-amber-600 dark:fill-amber-400 dark:text-amber-400" />
                     {stats.avgRating.toFixed(1)}
                   </Badge>
                 )}
               </div>
-            )}
+            ) : loading ? (
+              <div className="flex flex-wrap gap-2">
+                <Skeleton className="h-5 w-14 rounded-full" />
+                <Skeleton className="h-5 w-16 rounded-full" />
+                <Skeleton className="h-5 w-12 rounded-full" />
+              </div>
+            ) : null}
           </div>
 
           <Tabs
             value={TAB_KEYS[tabValue]}
             onValueChange={(v) => setTabValue(TAB_KEYS.indexOf(v as typeof TAB_KEYS[number]))}
-            className="flex min-h-0 flex-1 flex-col"
+            className="flex min-h-0 flex-1 flex-col gap-0"
           >
-            <TabsList variant="line" className="h-9 w-full rounded-none border-b border-border bg-transparent p-0">
-              <TabsTrigger value="all" className="min-h-9 flex-1 px-0.5 text-[0.7rem] data-[state=active]:text-blue-600">
+            <TabsList variant="line" className="h-9 w-full shrink-0 rounded-none border-b border-slate-200 bg-transparent p-0 dark:border-white/5">
+              <TabsTrigger value="all" className="min-h-9 flex-1 px-0.5 text-[0.7rem] after:bg-blue-600 data-[state=active]:text-blue-600 dark:after:bg-sky-400 dark:data-[state=active]:text-sky-400">
                 ทั้งหมด
               </TabsTrigger>
-              <TabsTrigger value="pending" className="relative min-h-9 flex-1 px-0.5 text-[0.7rem] data-[state=active]:text-blue-600">
+              <TabsTrigger value="pending" className="relative min-h-9 flex-1 px-0.5 text-[0.7rem] after:bg-blue-600 data-[state=active]:text-blue-600 dark:after:bg-sky-400 dark:data-[state=active]:text-sky-400">
                 รอรับ
                 {(stats?.pendingCount ?? 0) > 0 && (
-                  <span className="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
+                  <span className="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-600 px-1 text-[10px] font-bold text-white dark:bg-amber-500">
                     {stats!.pendingCount > 99 ? '99+' : stats!.pendingCount}
                   </span>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="my" className="min-h-9 flex-1 px-0.5 text-[0.7rem] data-[state=active]:text-blue-600">
+              <TabsTrigger value="my" className="min-h-9 flex-1 px-0.5 text-[0.7rem] after:bg-blue-600 data-[state=active]:text-blue-600 dark:after:bg-sky-400 dark:data-[state=active]:text-sky-400">
                 ของฉัน
               </TabsTrigger>
-              <TabsTrigger value="closed" className="min-h-9 flex-1 px-0.5 text-[0.7rem] data-[state=active]:text-blue-600">
+              <TabsTrigger value="closed" className="min-h-9 flex-1 px-0.5 text-[0.7rem] after:bg-blue-600 data-[state=active]:text-blue-600 dark:after:bg-sky-400 dark:data-[state=active]:text-sky-400">
                 ปิด
               </TabsTrigger>
             </TabsList>
-          </Tabs>
 
-          <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="min-h-0 flex-1 overflow-y-auto">
             {loading ? (
-              <div className="grid h-[200px] place-items-center">
-                <Loader2 className="size-8 animate-spin text-blue-600" />
+              <div className="flex flex-col">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="flex items-start gap-3 border-b border-slate-100 px-4 py-3 dark:border-border/60">
+                    <Skeleton className="size-10 shrink-0 rounded-full" />
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="ml-auto h-4 w-10 rounded-full" />
+                      </div>
+                      <Skeleton className="h-3 w-[80%] max-w-[200px]" />
+                      <Skeleton className="h-2.5 w-16" />
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : chats.length === 0 ? (
               <div className="p-6 text-center">
@@ -1116,15 +1596,15 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
                 <p className="text-[var(--text-muted)]">ไม่มีแชท</p>
               </div>
             ) : (
-              <div>
+              <div className="flex flex-col justify-start">
                 {chats.map((chat) => (
                   <React.Fragment key={chat.id}>
                     <button
                       type="button"
                       onClick={() => handleSelectChat(chat.id)}
                       className={cn(
-                        'flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/50',
-                        selectedChat?.id === chat.id && 'border-l-[3px] border-l-blue-600 bg-blue-600/10'
+                        'flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50 dark:hover:bg-white/[0.04]',
+                        selectedChat?.id === chat.id && 'bg-blue-50 dark:bg-white/[0.06]'
                       )}
                     >
                       <div className="relative shrink-0">
@@ -1146,13 +1626,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
                           )}>
                             {chat.customer_name}
                           </p>
-                          <Badge
-                            className="h-4 px-1 text-[0.55rem]"
-                            style={{
-                              backgroundColor: getStatusColor(chat.status) + '20',
-                              color: getStatusColor(chat.status),
-                            }}
-                          >
+                          <Badge className={cn('h-4 px-1 text-[0.55rem]', getChatStatusBadgeClass(chat.status))}>
                             {getStatusLabel(chat.status)}
                           </Badge>
                         </div>
@@ -1164,23 +1638,23 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
                         </p>
                       </div>
                     </button>
-                    <Separator />
+                    <Separator className="bg-slate-200 dark:bg-white/5" />
                   </React.Fragment>
                 ))}
               </div>
             )}
-          </div>
+            </div>
+          </Tabs>
         </div>
 
         {/* Chat Detail Panel */}
         <div className={cn(
-          'flex min-h-0 flex-1 flex-col overflow-hidden border bg-card',
-          isMobile ? 'rounded-none' : 'rounded-lg',
+          'flex min-h-0 flex-1 flex-col overflow-hidden bg-white dark:bg-[#111827]',
           isMobile && !mobileShowChat && 'hidden'
         )}>
           {selectedChat ? (
             <>
-              <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+              <div className="flex items-center gap-2 border-b border-slate-200 px-4 py-2.5 dark:border-white/5">
                 {isMobile && (
                   <Button variant="ghost" size="icon-sm" onClick={handleMobileBack} className="mr-1">
                     <ArrowBackIcon />
@@ -1195,12 +1669,12 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-bold">{selectedChat.customer_name}</p>
-                  <p className="flex items-center gap-1 truncate text-xs text-[var(--text-muted)]">
+                  <p className="truncate text-sm font-semibold">{selectedChat.customer_name}</p>
+                  <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
                     <span
                       className={cn(
                         'size-1.5 shrink-0 rounded-full',
-                        connectionState === 'connected' && 'bg-[#30d158] shadow-[0_0_3px_#30d158]',
+                        connectionState === 'connected' && 'bg-[#30d158]',
                         connectionState === 'connecting' && 'bg-[#ff9f0a]',
                         connectionState !== 'connected' && connectionState !== 'connecting' && 'bg-[#ff453a]'
                       )}
@@ -1210,6 +1684,17 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
                       : selectedChat.subject}
                   </p>
                 </div>
+                {!isMobile && (
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={toggleContextPanel}
+                    className="text-muted-foreground"
+                    title="แผงข้อมูลลูกค้า (Alt+I)"
+                  >
+                    {contextPanelOpen ? <PanelRightClose className="size-4" /> : <PanelRight className="size-4" />}
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="icon-sm"
@@ -1219,7 +1704,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
                     setOrderSearchRef('');
                     fetchCustomerOrders(selectedChat.customer_email);
                   }}
-                  className="bg-green-500/10 text-green-500 hover:bg-green-500/20"
+                  className="text-emerald-600 hover:bg-emerald-50 dark:text-emerald-500 dark:hover:bg-emerald-500/10"
                   title="ค้นหาออเดอร์"
                 >
                   <ReceiptIcon className="size-5" />
@@ -1228,18 +1713,44 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
                   <Button
                     size="sm"
                     onClick={() => handleAcceptChat(selectedChat.id)}
-                    className="bg-green-500 text-xs hover:bg-green-600"
+                    className="bg-emerald-600 text-xs hover:bg-emerald-700"
                   >
                     <AcceptIcon className="size-4" />
                     รับเคส
                   </Button>
                 )}
-                {selectedChat.status === 'active' && (
+                {selectedChat.status === 'active' &&
+                  selectedChat.admin_email &&
+                  selectedChat.admin_email.toLowerCase() !== (session?.user?.email || '').toLowerCase() && (
                   <Button
                     size="sm"
                     variant="outline"
+                    onClick={() => handleAcceptChat(selectedChat.id, { force: true })}
+                    className="border-blue-200 text-xs text-blue-700 hover:bg-blue-50 dark:border-blue-500/30 dark:text-blue-300 dark:hover:bg-blue-500/10"
+                  >
+                    <AcceptIcon className="size-4" />
+                    โอนเคสมาให้ฉัน
+                  </Button>
+                )}
+                {selectedChat.status === 'active' && !selectedChat.admin_email && (
+                  <Button
+                    size="sm"
+                    onClick={() => handleAcceptChat(selectedChat.id, { force: true })}
+                    className="bg-emerald-600 text-xs hover:bg-emerald-700"
+                  >
+                    <AcceptIcon className="size-4" />
+                    รับเคส
+                  </Button>
+                )}
+                {selectedChat.status === 'active' &&
+                  selectedChat.admin_email &&
+                  selectedChat.admin_email.toLowerCase() === (session?.user?.email || '').toLowerCase() && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
                     onClick={handleCloseChat}
-                    className="border-slate-500 text-xs text-[var(--text-muted)] hover:bg-slate-500/10"
+                    className="text-xs text-muted-foreground hover:bg-slate-100 dark:hover:bg-white/5"
+                    title="ปิดแชท (Alt+C)"
                   >
                     <CheckCircleIcon className="size-4" />
                     ปิด
@@ -1250,209 +1761,274 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
                 )}
               </div>
 
-              <div
-                ref={messagesContainerRef}
-                className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto bg-[var(--surface)] p-4"
-                onScroll={(e) => {
-                  const el = e.target as HTMLDivElement;
-                  isUserScrollingRef.current = el.scrollHeight - el.scrollTop - el.clientHeight > 100;
-                }}
+              <div className="flex min-h-0 flex-1">
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              <MessageScrollerProvider
+                key={selectedChat.id}
+                autoScroll
+                defaultScrollPosition="last-anchor"
+                scrollPreviousItemPeek={48}
               >
-                {(() => {
+                <MessageScrollerApiBridge apiRef={scrollApiRef} />
+                <MessageScroller className="min-h-0 flex-1 bg-slate-50/80 dark:bg-[#111827]">
+                  <MessageScrollerViewport>
+                    <MessageScrollerContent className="gap-1 px-4 py-3">
+                {loadingChatDetail ? (
+                  <div className="flex flex-col gap-3 py-1">
+                    {[0, 1, 2, 3].map((i) => (
+                      <div
+                        key={i}
+                        className={cn(
+                          'flex items-end gap-2',
+                          i % 2 === 1 ? 'flex-row-reverse' : 'flex-row',
+                        )}
+                      >
+                        <Skeleton className="size-7 shrink-0 rounded-full" />
+                        <div className={cn('space-y-1.5', i % 2 === 1 ? 'items-end' : 'items-start')}>
+                          <Skeleton
+                            className={cn(
+                              'h-16 rounded-2xl',
+                              i % 3 === 0 ? 'w-48' : i % 3 === 1 ? 'w-56' : 'w-40',
+                            )}
+                          />
+                          <Skeleton className="h-2.5 w-16" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (() => {
                   const messages = selectedChat.messages;
                   const lastAdminMsgIndex = messages.map(m => m.sender).lastIndexOf('admin');
-                  return messages.map((msg, index) => {
-                    const { text, imageUrl, orderRef } = parseMessage(msg.message);
-                    const isImageOnly = Boolean(imageUrl && !text && !orderRef);
+                  return (
+                    <>
+                      <MessageScrollerItem messageId="__load_older__">
+                        <MessageScrollerLoadOlder
+                          hasMore={hasMoreOlder}
+                          loading={loadingOlder}
+                          onLoadMore={loadOlderMessages}
+                        />
+                      </MessageScrollerItem>
+                      {messages.map((msg, index) => {
+                    // Hide legacy optimistic upload placeholders (progress lives in composer now)
+                    if (
+                      (msg as ChatMessage & { _optimistic?: boolean })._optimistic &&
+                      typeof msg.message === 'string' &&
+                      msg.message.includes('[กำลังอัปโหลด')
+                    ) {
+                      return null;
+                    }
+                    const { text, imageUrl, orderRef, animated, voiceUrl, voiceDuration, voiceBroken } = parseMessage(msg.message);
+                    const isOrderOnly = Boolean(orderRef && !text && !imageUrl && !voiceUrl && !voiceBroken);
+                    const isImageOnly = Boolean(imageUrl && !text && !orderRef && !voiceUrl && !voiceBroken);
+                    const isVoiceOnly = Boolean(voiceUrl && !text && !orderRef && !imageUrl);
+                    const isVoiceBrokenOnly = Boolean(voiceBroken && !text && !orderRef && !imageUrl && !voiceUrl);
                     const isLastAdminMessage = msg.sender === 'admin' && index === lastAdminMsgIndex;
                     const isOptimistic = (msg as ChatMessage & { _optimistic?: boolean })._optimistic;
                     const isFailed = (msg as ChatMessage & { _failed?: boolean })._failed;
+                    const prev = messages[index - 1];
+                    const next = messages[index + 1];
+                    const showAvatar = !next || next.sender !== msg.sender || next.sender === 'system';
+                    const isGroupedWithPrev = !!prev && prev.sender === msg.sender && prev.sender !== 'system';
+                    const align = msg.sender === 'admin' ? 'end' : 'start';
+                    const bubbleVariant = isFailed
+                      ? 'destructive'
+                      : msg.sender === 'admin'
+                        ? 'default'
+                        : 'muted';
+
+                    if (msg.sender === 'system') {
+                      return (
+                        <MessageScrollerItem key={msg.id} messageId={msg.id}>
+                          <ChatSystemMarker>{msg.message}</ChatSystemMarker>
+                        </MessageScrollerItem>
+                      );
+                    }
+
+                    if (isOrderOnly && orderRef) {
+                      return (
+                        <MessageScrollerItem key={`${msg.id}-${index}`} messageId={msg.id}>
+                          <button
+                            type="button"
+                            className="w-full"
+                            onClick={() => focusOrderInPanel(orderRef)}
+                          >
+                            <ChatSystemMarker tone="order">
+                              ออเดอร์ #{orderRef}
+                            </ChatSystemMarker>
+                          </button>
+                        </MessageScrollerItem>
+                      );
+                    }
 
                     return (
-                      <div
-                        key={msg.id}
-                        className={cn(
-                          'flex',
-                          msg.sender === 'admin' ? 'justify-end' : msg.sender === 'system' ? 'justify-center' : 'justify-start'
-                        )}
+                      <MessageScrollerItem
+                        key={`${msg.id}-${index}`}
+                        messageId={msg.id}
+                        scrollAnchor={msg.sender === 'admin'}
                       >
-                        {msg.sender === 'system' ? (
-                          <Badge variant="secondary" className="bg-[var(--glass-bg)] text-[0.7rem] text-[var(--text-muted)]">
-                            {msg.message}
-                          </Badge>
-                        ) : (
-                          <div className={cn(
-                            'flex max-w-[85%] items-start gap-2 sm:max-w-[75%]',
-                            msg.sender === 'admin' && 'flex-row-reverse'
-                          )}>
-                            {msg.sender === 'customer' && (
-                              <Avatar size="sm" className="size-7 shrink-0">
-                                {msg.sender_avatar && <AvatarImage src={msg.sender_avatar} alt="" />}
-                                <AvatarFallback className="bg-amber-400">
-                                  <PersonIcon className="size-4" />
-                                </AvatarFallback>
-                              </Avatar>
-                            )}
-                            {msg.sender === 'admin' && (
-                              <Avatar size="sm" className="size-7 shrink-0">
-                                {msg.sender_avatar && <AvatarImage src={msg.sender_avatar} alt="" />}
-                                <AvatarFallback className="bg-blue-600">
-                                  <SupportAgentIcon className="size-4 text-white" />
-                                </AvatarFallback>
-                              </Avatar>
-                            )}
-                            <div className="min-w-0">
-                              {isImageOnly ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                  src={imageUrl!}
-                                  alt="รูปภาพ"
-                                  loading="lazy"
-                                  onClick={(e) => { e.stopPropagation(); setLightboxImage(imageUrl!); }}
-                                  className={cn(
-                                    'block max-h-[260px] max-w-[200px] cursor-zoom-in rounded-[14px] object-contain shadow-md transition-opacity hover:opacity-90 sm:max-h-[340px] sm:max-w-[260px]',
-                                    isOptimistic && 'opacity-60'
-                                  )}
-                                />
-                              ) : (
-                                <div
-                                  className={cn(
-                                    'rounded-lg px-3 py-2 transition-opacity',
-                                    isFailed ? 'bg-[#ff453a]' : msg.sender === 'admin' ? 'bg-blue-600 text-white' : 'bg-card',
-                                    msg.sender === 'admin' ? 'rounded-br-sm' : 'rounded-bl-sm',
-                                    isOptimistic && 'opacity-60'
-                                  )}
-                                >
-                                  {text && (
-                                    <p className="whitespace-pre-wrap break-words text-sm leading-snug">{text}</p>
-                                  )}
-                                  {orderRef && (
-                                    <div
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setOrderSearchRef(orderRef || '');
-                                        setOrderLookupOpen(true);
-                                        handleSearchOrder();
-                                      }}
-                                      className={cn(
-                                        'cursor-pointer rounded-md border p-3 transition-all',
-                                        text && 'mt-2',
-                                        msg.sender === 'admin'
-                                          ? 'border-[var(--glass-border)] bg-[var(--glass-bg)] hover:bg-[var(--glass-strong)]'
-                                          : 'border-border bg-[var(--surface)] hover:bg-blue-600/10'
-                                      )}
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        <div className="flex size-8 items-center justify-center rounded bg-green-500">
-                                          <ReceiptIcon className="size-[18px] text-white" />
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                          <p className={cn(
-                                            'text-sm font-semibold',
-                                            msg.sender === 'admin' ? 'text-white' : 'text-foreground'
-                                          )}>
-                                            ออเดอร์ #{orderRef}
-                                          </p>
-                                          <p className={cn(
-                                            'text-xs',
-                                            msg.sender === 'admin' ? 'text-[var(--text-muted)]' : 'text-[var(--text-muted)]'
-                                          )}>
-                                            คลิกเพื่อดูรายละเอียด
-                                          </p>
-                                        </div>
-                                        <ViewIcon className="size-4 text-[var(--text-muted)]" />
-                                      </div>
-                                    </div>
-                                  )}
-                                  {imageUrl && (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img
-                                      src={imageUrl}
-                                      alt="รูปภาพ"
-                                      loading="lazy"
-                                      className={cn(
-                                        'mt-2 max-h-[140px] w-full max-w-[160px] cursor-zoom-in rounded-md object-cover transition-transform hover:scale-[1.02] sm:max-h-[180px] sm:max-w-[200px]',
-                                        !text && !orderRef && 'mt-0'
-                                      )}
-                                      onClick={(e) => { e.stopPropagation(); setLightboxImage(imageUrl); }}
-                                    />
-                                  )}
-                                </div>
+                      <Message
+                        align={align}
+                        className={cn(isGroupedWithPrev ? 'mt-0.5' : 'mt-2')}
+                      >
+                        <MessageAvatar className={cn(!showAvatar && 'invisible')}>
+                          <Avatar size="sm" className="size-7 shrink-0 ring-2 ring-background">
+                            {msg.sender_avatar && <AvatarImage src={msg.sender_avatar} alt="" />}
+                            <AvatarFallback className={msg.sender === 'admin' ? 'bg-blue-600 text-white' : 'bg-amber-100 text-amber-800 dark:bg-amber-400 dark:text-white'}>
+                              {msg.sender === 'admin'
+                                ? <SupportAgentIcon className="size-3.5 text-white" />
+                                : <PersonIcon className="size-3.5" />}
+                            </AvatarFallback>
+                          </Avatar>
+                        </MessageAvatar>
+                        <MessageContent>
+                          {isVoiceOnly ? (
+                            <VoiceMessage
+                              src={voiceUrl!}
+                              duration={voiceDuration}
+                              className={cn(isOptimistic && 'opacity-60')}
+                            />
+                          ) : isVoiceBrokenOnly ? (
+                            <Bubble
+                              variant={bubbleVariant}
+                              align={align}
+                              className={cn('max-w-full', isOptimistic && 'opacity-60')}
+                            >
+                              <BubbleContent className="shadow-sm">
+                                <p className="text-[0.85rem] opacity-85">ข้อความเสียงไม่สมบูรณ์ กรุณาส่งใหม่</p>
+                              </BubbleContent>
+                            </Bubble>
+                          ) : isImageOnly ? (
+                            <ChatImage
+                              src={imageUrl!}
+                              alt="รูปภาพ"
+                              animated={animated}
+                              objectFit="contain"
+                              maxWidth={260}
+                              maxHeight={340}
+                              className={cn(
+                                'rounded-2xl shadow-sm',
+                                isOptimistic && 'opacity-60'
                               )}
-                              <div className={cn(
-                                'mt-0.5 flex flex-wrap items-center gap-1',
-                                msg.sender === 'admin' ? 'justify-end' : 'justify-start'
-                              )}>
-                                <span className="text-[0.6rem] text-[var(--text-muted)]">
-                                  {new Date(msg.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} · {formatTime(msg.created_at)}
-                                </span>
-                                {isLastAdminMessage && (
-                                  <>
-                                    {msg.is_read
-                                      ? <DoneAllIcon className="size-3 text-green-500" />
-                                      : <DoneIcon className="size-3 text-[var(--text-muted)]" />
-                                    }
-                                    {msg.is_read && msg.read_at && (
-                                      <span className="text-[0.55rem] text-green-500">
-                                        ลูกค้าอ่านแล้ว {formatTime(msg.read_at)}
-                                      </span>
-                                    )}
-                                  </>
+                            />
+                          ) : (
+                            <Bubble
+                              variant={bubbleVariant}
+                              align={align}
+                              className={cn('max-w-full', isOptimistic && 'opacity-60')}
+                            >
+                              <BubbleContent className="shadow-sm">
+                                {text && (
+                                  <ChatTextWithOrderLinks text={text} onOrderClick={focusOrderInPanel} />
                                 )}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                                {voiceUrl && (
+                                  <VoiceMessage
+                                    src={voiceUrl}
+                                    duration={voiceDuration}
+                                    className={cn(text && 'mt-2')}
+                                  />
+                                )}
+                                {orderRef && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      focusOrderInPanel(orderRef);
+                                    }}
+                                    className={cn(
+                                      'mt-1.5 inline-flex max-w-full items-center gap-1.5 rounded-md px-2 py-0.5 text-[0.7rem] transition',
+                                      msg.sender === 'admin'
+                                        ? 'bg-blue-500/15 text-blue-800 hover:bg-blue-500/25 dark:bg-white/10 dark:text-white/90 dark:hover:bg-white/15'
+                                        : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20 dark:hover:bg-emerald-500/15'
+                                    )}
+                                  >
+                                    <ReceiptIcon className="size-3 shrink-0 opacity-80" />
+                                    <span className="truncate">#{orderRef}</span>
+                                  </button>
+                                )}
+                                {imageUrl && (
+                                  <ChatImage
+                                    src={imageUrl}
+                                    alt="รูปภาพ"
+                                    animated={animated}
+                                    objectFit="cover"
+                                    maxWidth={200}
+                                    maxHeight={180}
+                                    className={cn(
+                                      'mt-2 rounded-xl',
+                                      !text && !orderRef && 'mt-0'
+                                    )}
+                                  />
+                                )}
+                              </BubbleContent>
+                            </Bubble>
+                          )}
+                          {showAvatar && (
+                            <MessageFooter className="pt-0.5 text-[0.65rem] text-muted-foreground">
+                              <span className="tabular-nums">{formatClock(msg.created_at)}</span>
+                              {isLastAdminMessage && (
+                                <>
+                                  {msg.is_read
+                                    ? <DoneAllIcon className="size-3 text-emerald-600 dark:text-green-500" />
+                                    : <DoneIcon className="size-3 text-[var(--text-muted)]" />
+                                  }
+                                  {msg.is_read && msg.read_at && (
+                                    <span className="text-[0.6rem] text-emerald-600 tabular-nums dark:text-green-500">
+                                      อ่านแล้ว {formatClock(msg.read_at)}
+                                    </span>
+                                  )}
+                                </>
+                              )}
+                            </MessageFooter>
+                          )}
+                        </MessageContent>
+                      </Message>
+                      </MessageScrollerItem>
                     );
-                  });
+                  })}
+                    </>
+                  );
                 })()}
 
                 {otherTyping && (
-                  <div className="flex items-center gap-2">
-                    <Avatar size="sm" className="size-7 bg-amber-400">
-                      <AvatarFallback className="bg-amber-400">
-                        <PersonIcon className="size-4" />
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="rounded-lg bg-card px-4 py-2">
-                      <p className="mb-1 text-xs text-[var(--text-muted)]">
-                        {typingDisplay || 'ลูกค้ากำลังพิมพ์...'}
-                      </p>
-                      <div className="flex gap-1">
-                        {[0, 0.2, 0.4].map((delay) => (
-                          <span
-                            key={delay}
-                            className="size-1.5 rounded-full bg-[var(--text-muted)]"
-                            style={{ animation: 'bounce 1.4s infinite ease-in-out both', animationDelay: `${delay}s` }}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+                  <MessageScrollerItem messageId="__typing__">
+                    <Message align="start" className="mt-1">
+                      <MessageAvatar>
+                        <Avatar size="sm" className="size-7 bg-amber-100 ring-2 ring-background dark:bg-amber-400">
+                          <AvatarFallback className="bg-amber-100 text-amber-800 dark:bg-amber-400 dark:text-white">
+                            <PersonIcon className="size-3.5" />
+                          </AvatarFallback>
+                        </Avatar>
+                      </MessageAvatar>
+                      <MessageContent>
+                        <Bubble variant="muted" align="start">
+                          <BubbleContent className="min-w-[4.5rem] py-2.5">
+                            <p className="sr-only">{typingDisplay || 'ลูกค้ากำลังพิมพ์...'}</p>
+                            <div className="flex gap-1">
+                              {[0, 0.15, 0.3].map((delay) => (
+                                <span
+                                  key={delay}
+                                  className="size-1.5 rounded-full bg-muted-foreground/70"
+                                  style={{ animation: 'bounce 1.2s infinite ease-in-out both', animationDelay: `${delay}s` }}
+                                />
+                              ))}
+                            </div>
+                          </BubbleContent>
+                        </Bubble>
+                      </MessageContent>
+                    </Message>
+                  </MessageScrollerItem>
                 )}
-                <div ref={messagesEndRef} />
-              </div>
-
-              {selectedChat.status === 'active' && selectedChat.admin_email === session?.user?.email && (
-                <div className="flex gap-1 overflow-x-auto border-t border-border px-4 py-2">
-                  {chatSettings.quick_replies.map((reply, idx) => (
-                    <Badge
-                      key={idx}
-                      className="shrink-0 cursor-pointer bg-blue-600/10 text-[0.7rem] text-blue-600 hover:bg-blue-600/20"
-                      onClick={() => handleQuickReply(reply)}
-                    >
-                      {reply}
-                    </Badge>
-                  ))}
-                </div>
-              )}
+                    </MessageScrollerContent>
+                  </MessageScrollerViewport>
+                  <MessageScrollerButton />
+                </MessageScroller>
+              </MessageScrollerProvider>
 
               {previewImage && (
-                <div className="border-t border-border bg-[var(--surface)] px-4 py-2">
+                <div className="border-t border-slate-200 bg-white px-4 py-2 dark:border-white/5 dark:bg-[#0c1220]">
                   <div className="relative inline-block">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={previewImage} alt="Preview" className="max-h-20 rounded" />
+                    <img src={previewImage} alt="Preview" className="max-h-20 rounded-lg" />
                     <Button
                       type="button"
                       size="icon-xs"
@@ -1466,35 +2042,102 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
               )}
 
               {selectedChat.status === 'active' && selectedChat.admin_email === session?.user?.email && (
-                <div className="flex gap-2 border-t border-border p-3">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploadingImage}
-                    className="text-[var(--text-muted)] hover:text-blue-600"
-                  >
-                    <ImageIcon />
-                  </Button>
-                  <Textarea
-                    placeholder={isTouchDevice ? 'พิมพ์ข้อความ...' : 'พิมพ์ข้อความ... (Shift+Enter = ขึ้นบรรทัดใหม่)'}
+                <div className="shrink-0 border-t border-slate-200 bg-white dark:border-white/5 dark:bg-[#0c1220]">
+                  {chatSettings.quick_replies.length > 0 && (
+                    <div
+                      className="flex gap-1 overflow-x-auto px-3 pt-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                      role="list"
+                      aria-label="ข้อความตอบกลับด่วน"
+                    >
+                      {chatSettings.quick_replies.filter((r) => r.text.trim()).map((reply) => (
+                        <button
+                          key={reply.id}
+                          type="button"
+                          role="listitem"
+                          title={`/${reply.slash} — ${reply.text}`}
+                          className="max-w-[10rem] shrink-0 truncate rounded-md px-2 py-0.5 text-[0.65rem] text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-slate-900 dark:text-muted-foreground dark:ring-white/10 dark:hover:bg-white/5 dark:hover:text-foreground"
+                          onClick={() => handleQuickReply(reply.text)}
+                        >
+                          <span className="mr-1 font-mono text-[0.6rem] opacity-60">/{reply.slash}</span>
+                          {reply.text}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <ChatComposer
                     value={message}
-                    rows={1}
-                    className="min-h-9 max-h-32 flex-1 resize-none bg-[var(--surface)] text-sm"
-                    onChange={(e) => { setMessage(e.target.value); sendTypingIndicator(); }}
-                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !isTouchDevice) { e.preventDefault(); handleSendMessage(); } }}
-                    disabled={sending || uploadingImage}
+                    onChange={(v) => {
+                      setMessage(v);
+                      sendTypingIndicator();
+                    }}
+                    onSend={() => void handleSendMessage()}
+                    onSlashSend={(text) => void handleSendMessage(text)}
+                    quickReplies={chatSettings.quick_replies}
+                    sendOnCtrlEnter
+                    onAttachImage={() => {
+                      if (uploadingImage) return;
+                      fileInputRef.current?.click();
+                    }}
+                    onSendSticker={handleSendSticker}
+                    onSendVoice={handleSendVoice}
+                    placeholder="ส่งข้อความ... (Ctrl+Enter หรือ /)"
+                    disabled={sending}
+                    sending={sending}
+                    hasAttachment={Boolean(previewImage)}
+                    isTouchDevice={isTouchDevice}
+                    showMic
+                    upload={
+                      uploadingImage
+                        ? {
+                            progress: uploadProgress,
+                            fileCount: uploadFileCount,
+                            label: uploadLabel,
+                            onCancel: cancelUpload,
+                          }
+                        : null
+                    }
+                    className={chatSettings.quick_replies.length > 0 ? 'pt-1.5' : undefined}
                   />
-                  <Button
-                    size="icon"
-                    onClick={handleSendMessage}
-                    disabled={(!message.trim() && !previewImage) || sending || uploadingImage}
-                    className="bg-blue-600 hover:bg-blue-700 disabled:bg-border"
-                  >
-                    {sending || uploadingImage ? <Loader2 className="size-5 animate-spin" /> : <SendIcon className="size-5" />}
-                  </Button>
                 </div>
               )}
+              </div>
+
+              {/* Customer context panel */}
+              {contextPanelOpen && !isMobile && (
+                <CustomerContextPanel
+                  customerName={selectedChat.customer_name}
+                  customerEmail={selectedChat.customer_email}
+                  customerAvatar={selectedChat.customer_avatar}
+                  chatStatus={selectedChat.status}
+                  adminName={selectedChat.admin_name}
+                  adminEmail={selectedChat.admin_email}
+                  currentAdminEmail={session?.user?.email}
+                  orders={customerOrders}
+                  loadingOrders={loadingCustomerOrders}
+                  onRefreshOrders={() => fetchCustomerOrders(selectedChat.customer_email)}
+                  focusOrderRef={focusOrderRef}
+                  onFocusHandled={() => setFocusOrderRef(null)}
+                  canSendToChat={
+                    selectedChat.status === 'active' &&
+                    selectedChat.admin_email?.toLowerCase() === (session?.user?.email || '').toLowerCase()
+                  }
+                  onSendOrderSummary={(order) => void handleSendOrderToChat(order)}
+                  onSendTrackingUpdate={(order) => void handleSendTrackingUpdate(order)}
+                  onAccept={() => handleAcceptChat(selectedChat.id)}
+                  onTakeOver={() => handleAcceptChat(selectedChat.id, { force: true })}
+                  onCloseCase={handleCloseChat}
+                  transferAdmins={transferAdmins}
+                  transferToEmail={transferToEmail}
+                  onTransferToEmailChange={setTransferToEmail}
+                  transferring={transferring}
+                  onTransfer={() => void handleTransferChat()}
+                  adminNote={adminNote}
+                  onAdminNoteChange={(v) => persistAdminNote(selectedChat.id, v)}
+                  getOrderStatusLabel={getOrderStatusLabel}
+                  getOrderStatusBadgeClass={getOrderStatusBadgeClass}
+                />
+              )}
+              </div>
             </>
           ) : (
             <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-background">
@@ -1516,20 +2159,20 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
                 </p>
 
                 <div className="flex flex-wrap justify-center gap-4">
-                  <div className="min-w-[90px] rounded-lg border border-amber-400/30 bg-amber-400/10 px-5 py-3 text-center">
-                    <p className="text-2xl font-bold text-amber-400">{stats?.pendingCount || 0}</p>
-                    <p className="text-xs text-amber-400/80">รอรับเคส</p>
+                  <div className="min-w-[90px] rounded-lg bg-amber-50 px-5 py-3 text-center ring-1 ring-amber-100 dark:border dark:border-amber-400/30 dark:bg-amber-400/10 dark:ring-0">
+                    <p className="text-2xl font-bold text-amber-700 dark:text-amber-400">{stats?.pendingCount || 0}</p>
+                    <p className="text-xs text-amber-700/80 dark:text-amber-400/80">รอรับเคส</p>
                   </div>
-                  <div className="min-w-[90px] rounded-lg border border-green-500/30 bg-green-500/10 px-5 py-3 text-center">
-                    <p className="text-2xl font-bold text-green-500">{stats?.activeCount || 0}</p>
-                    <p className="text-xs text-green-500/80">กำลังสนทนา</p>
+                  <div className="min-w-[90px] rounded-lg bg-emerald-50 px-5 py-3 text-center ring-1 ring-emerald-100 dark:border dark:border-green-500/30 dark:bg-green-500/10 dark:ring-0">
+                    <p className="text-2xl font-bold text-emerald-700 dark:text-green-500">{stats?.activeCount || 0}</p>
+                    <p className="text-xs text-emerald-700/80 dark:text-green-500/80">กำลังสนทนา</p>
                   </div>
                 </div>
 
-                <div className="mt-8 max-w-[320px] rounded-lg border border-blue-600/20 bg-blue-600/10 p-4">
-                  <p className="mb-1 text-xs font-semibold text-blue-600">เคล็ดลับ</p>
-                  <p className="text-xs leading-normal text-[var(--text-muted)]">
-                    คลิกที่แชทในรายการเพื่อดูรายละเอียด กดปุ่ม &quot;รับเคส&quot; เพื่อเริ่มช่วยเหลือลูกค้า
+                <div className="mt-8 max-w-[320px] rounded-lg bg-slate-100 p-4 ring-1 ring-slate-200 dark:bg-white/5 dark:ring-white/10">
+                  <p className="mb-1 text-xs font-semibold text-blue-600 dark:text-sky-400">คีย์ลัด</p>
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    Alt+↑/↓ สลับแชท · Alt+C ปิดเคส · Alt+I แผงข้อมูล · พิมพ์ / ตอบด่วน · Ctrl+Enter ส่ง
                   </p>
                 </div>
               </div>
@@ -1538,82 +2181,14 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
         </div>
       </div>
 
-      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-        <DialogContent className="max-w-lg bg-card text-foreground">
-          <DialogHeader className="border-b border-border pb-4">
-            <DialogTitle className="flex items-center gap-2">
-              <SettingsIcon className="size-6" />
-              ตั้งค่าแชท
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4 pt-2">
-            <div className="space-y-2">
-              <Label htmlFor="admin-display-name">ชื่อทีมแอดมินที่แสดง</Label>
-              <Input
-                id="admin-display-name"
-                value={chatSettings.admin_display_name}
-                onChange={(e) => setChatSettings(s => ({ ...s, admin_display_name: e.target.value }))}
-                placeholder="เช่น ทีมงาน PSU SCC"
-              />
-              <p className="text-xs text-[var(--text-muted)]">ชื่อที่ลูกค้าจะเห็นในหัวข้อแชท</p>
-            </div>
-
-            <div className="flex items-center justify-between gap-4">
-              <Label htmlFor="auto-reply">เปิดใช้ข้อความตอบอัตโนมัติ</Label>
-              <Switch
-                id="auto-reply"
-                checked={chatSettings.auto_reply_enabled}
-                onCheckedChange={(checked) => setChatSettings(s => ({ ...s, auto_reply_enabled: checked }))}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="auto-reply-message">ข้อความตอบอัตโนมัติ</Label>
-              <Textarea
-                id="auto-reply-message"
-                rows={2}
-                value={chatSettings.auto_reply_message}
-                onChange={(e) => setChatSettings(s => ({ ...s, auto_reply_message: e.target.value }))}
-              />
-            </div>
-
-            <div className="flex items-center justify-between gap-4">
-              <Label htmlFor="notification-sound">เปิดเสียงแจ้งเตือน</Label>
-              <Switch
-                id="notification-sound"
-                checked={chatSettings.notification_sound}
-                onCheckedChange={(checked) => setChatSettings(s => ({ ...s, notification_sound: checked }))}
-              />
-            </div>
-
-            <div>
-              <p className="mb-2 text-sm text-[var(--text-muted)]">ข้อความตอบด่วน</p>
-              {chatSettings.quick_replies.map((reply, idx) => (
-                <Input
-                  key={idx}
-                  value={reply}
-                  onChange={(e) => {
-                    const newReplies = [...chatSettings.quick_replies];
-                    newReplies[idx] = e.target.value;
-                    setChatSettings(s => ({ ...s, quick_replies: newReplies }));
-                  }}
-                  className="mb-2 text-sm"
-                />
-              ))}
-            </div>
-          </div>
-
-          <DialogFooter className="border-t border-border pt-4">
-            <Button variant="ghost" onClick={() => setSettingsOpen(false)} className="text-[var(--text-muted)]">
-              ยกเลิก
-            </Button>
-            <Button onClick={handleSaveSettings} className="bg-blue-600 hover:bg-blue-700">
-              บันทึก
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ChatSettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        settings={chatSettings}
+        onChange={setChatSettings}
+        onSave={handleSaveSettings}
+        saving={settingsSaving}
+      />
     </>
   );
 }
