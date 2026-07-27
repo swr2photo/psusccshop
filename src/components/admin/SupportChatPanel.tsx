@@ -2111,7 +2111,7 @@ ${provider ? `ผู้ให้บริการ: ${provider}` : ''}
                   chatStatus={selectedChat.status}
                   adminName={selectedChat.admin_name}
                   adminEmail={selectedChat.admin_email}
-                  currentAdminEmail={session?.user?.email}
+                  currentAdminEmail={session?.user?.email ?? undefined}
                   orders={customerOrders}
                   loadingOrders={loadingCustomerOrders}
                   onRefreshOrders={() => fetchCustomerOrders(selectedChat.customer_email)}
