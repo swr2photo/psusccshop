@@ -43,17 +43,14 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
 
     const body = await request.json().catch(() => ({} as { force?: boolean }));
+    const adminEmail = (chat.admin_email || '').toLowerCase();
+    const actorEmail = session.user.email.toLowerCase();
     const force =
       Boolean(body?.force) ||
-      (chat.status === 'active' &&
-        Boolean(chat.admin_email) &&
-        chat.admin_email.toLowerCase() !== session.user.email.toLowerCase());
+      (chat.status === 'active' && Boolean(adminEmail) && adminEmail !== actorEmail);
 
     if (chat.status === 'active' && !force) {
-      const mine =
-        chat.admin_email &&
-        chat.admin_email.toLowerCase() === session.user.email.toLowerCase();
-      if (mine) {
+      if (adminEmail && adminEmail === actorEmail) {
         return NextResponse.json({
           chat,
           message: 'คุณดูแลเคสนี้อยู่แล้ว',
