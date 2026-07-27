@@ -128,6 +128,13 @@ const CARRIER_LABEL_URLS: Record<string, string> = {
   flash: 'https://merchant.flashexpress.com/',
 };
 
+function getShippingProviderInfo(provider: unknown) {
+  if (typeof provider === 'string' && provider in SHIPPING_PROVIDERS) {
+    return SHIPPING_PROVIDERS[provider as ShippingProvider];
+  }
+  return undefined;
+}
+
 function getShippingOptionBadge(order: Order) {
   if (order.shippingOption === 'pickup') {
     return (
@@ -154,10 +161,11 @@ function getShippingOptionBadge(order: Order) {
     );
   }
   if (order.shippingProvider) {
+    const providerInfo = getShippingProviderInfo(order.shippingProvider);
     return (
       <Badge className="h-[22px] gap-1 border-transparent bg-blue-400/20 text-[0.7rem] text-blue-400">
         <LocalShipping size={14} />
-        {SHIPPING_PROVIDERS[order.shippingProvider]?.nameThai || order.shippingProvider}
+        {providerInfo?.nameThai || order.shippingProvider}
       </Badge>
     );
   }
@@ -355,7 +363,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
       }).join(', ') || '-';
 
       const providerName = order.shippingProvider
-        ? ((SHIPPING_PROVIDERS as any)[order.shippingProvider]?.nameThai || order.shippingProvider)
+        ? (getShippingProviderInfo(order.shippingProvider)?.nameThai || order.shippingProvider)
         : '-';
 
       return [
@@ -624,7 +632,9 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredOrders.map((order: any) => (
+                        {filteredOrders.map((order: any) => {
+                          const providerInfo = getShippingProviderInfo(order.shippingProvider);
+                          return (
                           <TableRow
                             key={order.ref}
                             data-state={selectedOrders.has(order.ref) ? 'selected' : undefined}
@@ -700,9 +710,9 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                                   >
                                     <ContentCopy size={14} className="text-slate-500" />
                                   </Button>
-                                  {order.shippingProvider && SHIPPING_PROVIDERS[order.shippingProvider] && (
+                                  {providerInfo && (
                                     <Badge className="h-[18px] border-transparent bg-blue-400/20 text-[0.6rem] text-blue-400">
-                                      {SHIPPING_PROVIDERS[order.shippingProvider].nameThai}
+                                      {providerInfo.nameThai}
                                     </Badge>
                                   )}
                                 </div>
@@ -759,7 +769,8 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                               </div>
                             </TableCell>
                           </TableRow>
-                        ))}
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </ScrollArea>
