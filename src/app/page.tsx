@@ -2901,7 +2901,6 @@ export default function HomePage() {
       // Only load if the full list was never fetched (locally-added orders
       // from checkout/realtime don't count as a loaded history)
       if (!historyLoadedRef.current) {
-        setHistoryCursor(null);
         setHistoryHasMore(false);
         loadOrderHistory();
       }
