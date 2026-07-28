@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getJson } from '@/lib/filebase';
-import { generatePromptPayPayload, generatePromptPayPayloadForId, generatePromptPayQR, calculateOrderTotal } from '@/lib/payment-utils';
+import { generatePromptPayPayloadForId, calculateOrderTotal } from '@/lib/payment-utils';
 import { requireAuth, isResourceOwner, isAdminEmailAsync } from '@/lib/auth';
 import { maskPhone, sanitizeUtf8Input } from '@/lib/sanitize';
 import { getShopById } from '@/lib/shops';
@@ -70,9 +70,8 @@ export async function GET(req: NextRequest) {
     const baseAmount = Number(order.totalAmount ?? order.amount ?? calculateOrderTotal(order.cart || [])) || 0;
     const discount = Number(order.discount ?? 0);
     const finalAmount = Math.max(0, baseAmount - discount);
-    // Generate QR payload — main shop PromptPay ID for all orders
+    // Generate QR payload — main shop PromptPay ID for all orders (client renders with qrcode.react)
     const qrPayload = finalAmount > 0 ? generatePromptPayPayloadForId(effectivePromptPayId, finalAmount) : null;
-    const qrUrl = finalAmount > 0 && qrPayload ? `https://quickchart.io/qr?size=300&text=${encodeURIComponent(qrPayload)}` : null;
 
     // Fetch products list to get coverImage/imageUrl
     let productsList: any[] = [];
@@ -118,7 +117,6 @@ export async function GET(req: NextRequest) {
         discount,
         finalAmount,
         qrPayload, // For client-side QR rendering with qrcode.react
-        qrUrl,     // Legacy URL fallback
         cart: cartItems,
         status: order.status || 'PENDING',
         // วันที่สั่งซื้อ สำหรับ countdown timer

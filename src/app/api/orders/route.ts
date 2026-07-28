@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import { requireAuth, requireAdmin, isAdminEmailAsync, isResourceOwner, normalizeEmail as authNormalizeEmail } from '@/lib/auth';
 import { triggerSheetSync } from '@/lib/sheet-sync';
 import { sanitizeOrderForUser, sanitizeOrdersForUser, sanitizeObjectUtf8, sanitizeUtf8Input } from '@/lib/sanitize';
-import { verifyTurnstileToken, getClientIP } from '@/lib/cloudflare';
+import { verifyTurnstileToken, getClientIP } from '@/lib/cloudflare-server';
 import { checkCombinedRateLimitAsync, RATE_LIMITS, getRateLimitHeaders } from '@/lib/rate-limit';
 import { sendOrderConfirmationEmail } from '@/lib/email';
 import { db } from '@/lib/db';

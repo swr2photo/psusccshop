@@ -1,4 +1,4 @@
-import { trackShipmentWithFallback } from '../src/lib/shipping';
+import { trackShipmentWithFallback } from '../src/lib/shipping-server';
 
 async function main() {
   const trackingNumber = 'EG123456789TH'; // Example

@@ -17,8 +17,8 @@ import { requireAuth, isResourceOwner, isAdminEmailAsync } from '@/lib/auth';
 import {
   createStripePaymentIntentDetailed,
   isStripeEnvConfigured,
-} from '@/lib/payment';
-import { getStripePromptPayEnabled } from '@/lib/payment-server';
+  getStripePromptPayEnabled,
+} from '@/lib/payment-server';
 import { fetchStripeReceiptUrl, mergeStripeReceiptSlipData } from '@/lib/stripe-receipt';
 import { sanitizeUtf8Input } from '@/lib/sanitize';
 

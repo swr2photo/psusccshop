@@ -7,13 +7,15 @@ import { db } from '@/lib/db';
 import { orders, paymentTransactions } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import crypto from 'crypto';
-import { 
-  PaymentMethod, 
+import type {
+  PaymentMethod,
   PaymentGateway,
+} from '@/lib/payment';
+import {
   createOmiseCharge,
   createOmiseSource,
   createStripePaymentIntent,
-} from '@/lib/payment';
+} from '@/lib/payment-server';
 import { isResourceOwner } from '@/lib/auth';
 import { rateLimitOrNull } from '@/lib/api-helpers';
 import { RATE_LIMITS } from '@/lib/rate-limit';

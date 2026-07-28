@@ -45,16 +45,6 @@ export function generatePromptPayPayloadForId(ppID: string, amount: number): str
   return payload + crc16(payload);
 }
 
-/**
- * @deprecated Use generatePromptPayPayload instead and render QR code client-side
- * Legacy function that returns quickchart.io URL
- */
-export function generatePromptPayQR(amount: number): string {
-  const payload = generatePromptPayPayload(amount);
-  if (!payload) return '';
-  return `https://quickchart.io/qr?size=300&text=${encodeURIComponent(payload)}`;
-}
-
 // --- Pricing Logic (ต้องตรงกับหน้าเว็บ) ---
 export function calculateOrderTotal(items: any[], longSleevePrice: number = 50) {
   if (!Array.isArray(items)) return 0;

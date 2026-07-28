@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { orders, paymentTransactions } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
-import { verifyOmiseWebhook } from '@/lib/payment';
+import { verifyOmiseWebhook } from '@/lib/payment-server';
 import { webhookSecretMissingResponse } from '@/lib/api-helpers';
 
 export const runtime = 'nodejs';

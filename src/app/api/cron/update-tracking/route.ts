@@ -7,7 +7,8 @@ import { db } from '@/lib/db';
 import { withCronMonitor } from '@/lib/sentry-cron';
 import { orders } from '@/db/schema';
 import { eq, and, desc, isNotNull } from 'drizzle-orm';
-import { trackShipment, TrackingStatus, ShippingProvider } from '@/lib/shipping';
+import { TrackingStatus, ShippingProvider } from '@/lib/shipping';
+import { trackShipment } from '@/lib/shipping-server';
 import { verifyCronAuth } from '@/lib/cron-auth';
 
 export const runtime = 'nodejs';

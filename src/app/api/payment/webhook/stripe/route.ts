@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { orders, paymentTransactions } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
-import { verifyStripeWebhook } from '@/lib/payment';
+import { verifyStripeWebhook } from '@/lib/payment-server';
 import { fetchStripeReceiptUrl, mergeStripeReceiptSlipData } from '@/lib/stripe-receipt';
 import { webhookSecretMissingResponse } from '@/lib/api-helpers';
 

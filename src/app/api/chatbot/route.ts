@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     
     // Anonymous users must pass Turnstile
     if (!userEmail) {
-      const { verifyTurnstileToken, getClientIP } = await import('@/lib/cloudflare');
+      const { verifyTurnstileToken, getClientIP } = await import('@/lib/cloudflare-server');
       const turnstileResult = await verifyTurnstileToken(
         body.turnstileToken || '',
         getClientIP(req)

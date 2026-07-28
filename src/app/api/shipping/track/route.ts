@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  trackShipment,
-  trackShipmentWithFallback,
-  trackMultipleShipments,
   getTrackingUrl,
   getTrack123Url,
   ShippingProvider,
   SHIPPING_PROVIDERS,
 } from '@/lib/shipping';
+import {
+  trackShipment,
+  trackShipmentWithFallback,
+  trackMultipleShipments,
+} from '@/lib/shipping-server';
 import { isAdminEmailAsync, getSession } from '@/lib/auth';
 import { userOwnsTrackingNumber } from '@/lib/order-lookup';
 import { rateLimitOrNull } from '@/lib/api-helpers';

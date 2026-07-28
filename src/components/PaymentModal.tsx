@@ -91,7 +91,6 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
   const [loading, setLoading] = useState(true);
   const [verifying, setVerifying] = useState(false);
   const [qrPayload, setQrPayload] = useState<string | null>(null);
-  const [qrUrl, setQrUrl] = useState<string | null>(null);
   const [amount, setAmount] = useState(0);
   const [baseAmount, setBaseAmount] = useState(0);
   const [discount, setDiscount] = useState(0);
@@ -197,7 +196,6 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
       if (data.status === 'success') {
         const info = data.data || data;
         setQrPayload(info.qrPayload || null);
-        setQrUrl(info.qrUrl || null);
         setAmount(Number(info.finalAmount ?? info.amount ?? 0));
         setBaseAmount(Number(info.baseAmount ?? info.amount ?? 0));
         setDiscount(Number(info.discount ?? 0));
@@ -435,50 +433,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
       return;
     }
 
-    if (!qrUrl) {
-      addToast('warning', t.payment.noQR);
-      return;
-    }
-    try {
-      setDownloading(true);
-      setDownloadProgress(0);
-      const xhr = new XMLHttpRequest();
-      xhr.open('GET', qrUrl, true);
-      xhr.responseType = 'blob';
-      xhr.onprogress = (event) => {
-        if (event.lengthComputable && event.total > 0) {
-          setDownloadProgress(Math.round((event.loaded / event.total) * 100));
-        } else {
-          setDownloadProgress((prev) => Math.min(99, prev + 5));
-        }
-      };
-      xhr.onload = () => {
-        if (xhr.status === 200) {
-          const blobUrl = URL.createObjectURL(xhr.response);
-          const link = document.createElement('a');
-          link.href = blobUrl;
-          link.download = `qr-${orderRef}.png`;
-          link.click();
-          URL.revokeObjectURL(blobUrl);
-          setDownloadProgress(100);
-          addToast('success', t.payment.savedQRToast);
-        } else {
-          addToast('error', t.payment.saveFailed, t.payment.tryAgain);
-        }
-        setDownloading(false);
-        setTimeout(() => setDownloadProgress(0), 500);
-      };
-      xhr.onerror = () => {
-        addToast('error', t.payment.saveFailed, t.payment.tryAgain);
-        setDownloading(false);
-        setDownloadProgress(0);
-      };
-      xhr.send();
-    } catch {
-      addToast('error', t.payment.saveFailed, t.payment.tryAgain);
-      setDownloading(false);
-      setDownloadProgress(0);
-    }
+    addToast('warning', t.payment.noQR);
   };
 
   const formatMoney = (value: number) =>
@@ -1221,15 +1176,6 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                             {t.payment.scanInstruction}
                           </Typography>
                         </Box>
-                      ) : qrUrl ? (
-                        <Box sx={{ bgcolor: 'white', borderRadius: '12px', p: 1.5, border: '1px solid var(--glass-border)' }}>
-                          <Box
-                            component="img"
-                            src={qrUrl}
-                            alt="PromptPay QR"
-                            sx={{ width: 180, height: 180, objectFit: 'contain', display: 'block' }}
-                          />
-                        </Box>
                       ) : (
                         <Box sx={{
                           width: '100%',
@@ -1253,7 +1199,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                         fullWidth
                         startIcon={downloading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
                         onClick={handleSaveQr}
-                        disabled={(!qrPayload && !qrUrl) || downloading || !paymentEnabled}
+                        disabled={!qrPayload || downloading || !paymentEnabled}
                         sx={{
                           maxWidth: 220,
                           py: 1,

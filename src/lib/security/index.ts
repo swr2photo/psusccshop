@@ -126,15 +126,16 @@ export {
 
 // ==================== CLOUDFLARE ====================
 export {
+  TURNSTILE_SITE_KEY,
+} from '../cloudflare';
+
+export {
   verifyTurnstileToken,
   getClientIP as getCFClientIP,
   isCloudflareRequest,
   getCloudflareCountry,
-  TURNSTILE_SITE_KEY,
-  
-  // Types
   type TurnstileVerifyResponse,
-} from '../cloudflare';
+} from '../cloudflare-server';
 
 // ==================== COMBINED SECURITY CHECK ====================
 

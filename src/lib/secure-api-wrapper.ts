@@ -7,7 +7,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions, isAdminEmail, isAdminEmailAsync } from './auth';
 import { logSecurityEvent, SecurityEventType } from './security-audit';
 import { checkCombinedRateLimit, RATE_LIMITS, getRateLimitHeaders } from './rate-limit';
-import { verifyTurnstileToken, getClientIP } from './cloudflare';
+import { verifyTurnstileToken, getClientIP } from './cloudflare-server';
 import { sanitizeString, escapeHtml } from './security';
 import crypto from 'crypto';
 

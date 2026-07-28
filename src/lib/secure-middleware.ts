@@ -24,7 +24,7 @@ import {
   ThreatScore,
 } from './advanced-security';
 import { checkCombinedRateLimit, RATE_LIMITS, getRateLimitHeaders, RateLimitResult } from './rate-limit';
-import { verifyTurnstileToken } from './cloudflare';
+import { verifyTurnstileToken } from './cloudflare-server';
 
 // ==================== TYPES ====================
 
