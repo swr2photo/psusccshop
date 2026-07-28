@@ -12,8 +12,8 @@ export interface InvoiceBuildOptions {
   qrDataUrl?: string | null;
 }
 
-/** Issuer / organization details for official receipts */
-const ISSUER = {
+/** Issuer / organization details for official receipts & payment notices */
+export const ISSUER = {
   nameTh: 'ชุมนุมคอมพิวเตอร์และวิทยาการคำนวณ คณะวิทยาศาสตร์ มหาวิทยาลัยสงขลานครินทร์',
   nameEn: 'Computer Science & Computing Club, Faculty of Science, Prince of Songkla University',
   shortTh: 'PSU SCC Shop',
@@ -63,8 +63,16 @@ function formatDateTime(iso: Date | string, lang: InvoiceLang): string {
   }
 }
 
-/** Deterministic receipt no. from order ref + issue date (REC-YYYYMM-####) */
-export function buildReceiptNumber(ref: string, issuedAt: string | Date): string {
+function hashRefSeq(ref: string): string {
+  let hash = 0;
+  const key = String(ref || '');
+  for (let i = 0; i < key.length; i++) {
+    hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+  }
+  return String((hash % 9000) + 1000);
+}
+
+function bangkokYearMonth(issuedAt: string | Date): { year: string; month: string } {
   const date = typeof issuedAt === 'string' ? new Date(issuedAt) : issuedAt;
   const valid = !Number.isNaN(date.getTime()) ? date : new Date();
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -72,15 +80,22 @@ export function buildReceiptNumber(ref: string, issuedAt: string | Date): string
     year: 'numeric',
     month: '2-digit',
   }).formatToParts(valid);
-  const year = parts.find((p) => p.type === 'year')?.value || String(valid.getFullYear());
-  const month = parts.find((p) => p.type === 'month')?.value || '01';
-  let hash = 0;
-  const key = String(ref || '');
-  for (let i = 0; i < key.length; i++) {
-    hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
-  }
-  const seq = String((hash % 9000) + 1000);
-  return `REC-${year}${month}-${seq}`;
+  return {
+    year: parts.find((p) => p.type === 'year')?.value || String(valid.getFullYear()),
+    month: parts.find((p) => p.type === 'month')?.value || '01',
+  };
+}
+
+/** Deterministic receipt no. from order ref + issue date (REC-YYYYMM-####) */
+export function buildReceiptNumber(ref: string, issuedAt: string | Date): string {
+  const { year, month } = bangkokYearMonth(issuedAt);
+  return `REC-${year}${month}-${hashRefSeq(ref)}`;
+}
+
+/** Deterministic payment notice no. from order ref + order date (PAY-YYYYMM-####) */
+export function buildPaymentNoticeNumber(ref: string, issuedAt: string | Date): string {
+  const { year, month } = bangkokYearMonth(issuedAt);
+  return `PAY-${year}${month}-${hashRefSeq(ref)}`;
 }
 
 /**
@@ -164,13 +179,18 @@ export function bahtTextThai(amount: number): string {
   return `(${text})`;
 }
 
-function bahtTextEnglish(amount: number): string {
+export function bahtTextEnglish(amount: number): string {
   const n = Math.abs(Number(amount) || 0);
   const formatted = n.toLocaleString('en-US', {
     minimumFractionDigits: n % 1 === 0 ? 0 : 2,
     maximumFractionDigits: 2,
   });
   return `(${amount < 0 ? 'Minus ' : ''}${formatted} Baht only)`;
+}
+
+/** Localized amount-in-words for invoices / payment notices */
+export function bahtText(amount: number, lang: InvoiceLang): string {
+  return lang === 'th' ? bahtTextThai(amount) : bahtTextEnglish(amount);
 }
 
 interface InvoiceLabelSet {

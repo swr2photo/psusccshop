@@ -227,34 +227,24 @@ function OptimizedImageComponent({
             sx={{
               position: 'absolute',
               inset: 0,
-              bgcolor: 'var(--glass-bg)',
+              bgcolor: (theme) =>
+                theme.palette.mode === 'dark' ? 'var(--surface-2)' : '#ececef',
               borderRadius,
               overflow: 'hidden',
-              '&::after': effectivePlaceholder === 'shimmer' ? {
+              '&::after': {
                 content: '""',
                 position: 'absolute',
                 inset: 0,
-                background: 'linear-gradient(90deg, transparent 0%, rgba(0,113,227,0.15) 50%, transparent 100%)',
-                animation: 'shimmer 1.5s infinite',
-                '@keyframes shimmer': {
+                background:
+                  'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.35) 50%, transparent 100%)',
+                animation: 'imgShimmer 1.4s ease-in-out infinite',
+                '@keyframes imgShimmer': {
                   '0%': { transform: 'translateX(-100%)' },
                   '100%': { transform: 'translateX(100%)' },
                 },
-              } : {},
+              },
             }}
-          >
-            {/* Image placeholder icon */}
-            <Box sx={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              color: 'rgba(0,113,227,0.3)',
-              fontSize: '2rem',
-            }}>
-              
-            </Box>
-          </Box>
+          />
         )}
         {effectivePlaceholder === 'blur' && (
           <Box
@@ -282,51 +272,44 @@ function OptimizedImageComponent({
       <Box
         ref={containerRef}
         className={className}
-        onClick={() => {
+        onClick={(e) => {
+          e.stopPropagation();
           setError(false);
           setLoaded(false);
         }}
         sx={{
           ...containerStyles,
           display: 'flex',
-          flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: 1,
-          bgcolor: 'var(--surface-2)',
-          color: 'var(--text-muted)',
-          fontSize: '0.7rem',
+          bgcolor: (theme) =>
+            theme.palette.mode === 'dark'
+              ? 'color-mix(in srgb, var(--surface-2) 90%, #1a1a1c)'
+              : '#ececef',
           cursor: 'pointer',
           transition: 'background-color 0.2s ease',
           '&:hover': {
-            bgcolor: 'var(--surface-3)',
+            bgcolor: (theme) =>
+              theme.palette.mode === 'dark' ? 'var(--surface-3)' : '#e4e4e8',
           },
         }}
         title={t.misc.tapToRetry}
+        aria-label={t.misc.tapToRetry}
       >
         <Box
           component="img"
           src="/favicon.png"
-          alt=""
+          alt="SCC Shop"
           sx={{
-            width: 44,
-            height: 44,
+            width: 40,
+            height: 40,
             objectFit: 'contain',
-            opacity: 0.35,
+            opacity: 0.4,
             filter: 'grayscale(1)',
             userSelect: 'none',
             pointerEvents: 'none',
           }}
         />
-        <Box sx={{ textAlign: 'center', px: 1.5, opacity: 0.7 }}>
-          {t.misc.loadImageFailed}
-          <Box
-            component="span"
-            sx={{ display: 'block', fontSize: '0.62rem', color: 'var(--text-muted)', mt: 0.4, opacity: 0.85 }}
-          >
-            {t.misc.tapToRetry}
-          </Box>
-        </Box>
       </Box>
     );
   }
@@ -345,58 +328,42 @@ function OptimizedImageComponent({
               sx={{
                 position: 'absolute',
                 inset: 0,
-                bgcolor: 'var(--glass-bg)',
+                bgcolor: (theme) =>
+                  theme.palette.mode === 'dark' ? 'var(--surface-2)' : '#ececef',
                 borderRadius,
                 overflow: 'hidden',
-                '&::after': effectivePlaceholder === 'shimmer' ? {
+                '&::after': {
                   content: '""',
                   position: 'absolute',
                   inset: 0,
-                  background: 'linear-gradient(90deg, transparent 0%, rgba(0,113,227,0.2) 50%, transparent 100%)',
-                  animation: 'shimmer 1.5s infinite',
-                  '@keyframes shimmer': {
+                  background:
+                    'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.35) 50%, transparent 100%)',
+                  animation: 'imgShimmerIn 1.4s ease-in-out infinite',
+                  '@keyframes imgShimmerIn': {
                     '0%': { transform: 'translateX(-100%)' },
                     '100%': { transform: 'translateX(100%)' },
                   },
-                } : {},
+                },
               }}
             >
-              {/* Centered loading indicator */}
               {showLoadingIndicator && (
                 <Box sx={{
                   position: 'absolute',
                   top: '50%',
                   left: '50%',
                   transform: 'translate(-50%, -50%)',
+                  zIndex: 1,
                 }}>
                   <CircularProgress 
-                    size={32} 
+                    size={28} 
                     thickness={3}
                     sx={{ 
-                      color: '#0071e3',
+                      color: 'color-mix(in srgb, var(--primary) 55%, transparent)',
                       '& .MuiCircularProgress-circle': {
                         strokeLinecap: 'round',
                       },
                     }} 
                   />
-                </Box>
-              )}
-              {/* Image placeholder icon when no loading indicator */}
-              {!showLoadingIndicator && (
-                <Box sx={{
-                  position: 'absolute',
-                  top: '50%',
-                  left: '50%',
-                  transform: 'translate(-50%, -50%)',
-                  color: 'rgba(0,113,227,0.4)',
-                  fontSize: '2rem',
-                  animation: 'pulse 2s ease-in-out infinite',
-                  '@keyframes pulse': {
-                    '0%, 100%': { opacity: 0.4 },
-                    '50%': { opacity: 0.8 },
-                  },
-                }}>
-                  
                 </Box>
               )}
             </Box>

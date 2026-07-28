@@ -5,6 +5,7 @@ import { db } from './db';
 import { rateLimits, blockedIps } from '../db/schema';
 import { eq, lt, gt, and, desc } from 'drizzle-orm';
 import { isCloudflareWorkersRuntime } from '@/lib/runtime-env';
+import { toIsoString } from '@/lib/safe-date';
 
 // ==================== TYPES ====================
 
@@ -224,7 +225,7 @@ export async function getBlockedIPs(): Promise<Array<{
   return data.map((row: any) => ({
     ip: row.ipAddress,
     reason: row.reason,
-    blockedAt: row.blockedAt.toISOString(),
-    expiresAt: row.expiresAt.toISOString(),
+    blockedAt: toIsoString(row.blockedAt),
+    expiresAt: toIsoString(row.expiresAt),
   }));
 }

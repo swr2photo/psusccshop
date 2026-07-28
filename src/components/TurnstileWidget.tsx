@@ -221,16 +221,22 @@ export default function TurnstileWidget({
     };
   }, [hasSiteKey, theme, size, action, isDevelopment]);
 
-  // Show dev mode indicator
+  // Dev bypass: console-only signal + tiny muted corner hint (never a centered badge)
   if (devMode || isDevelopment) {
     return (
-      <div className={className}>
-        <div className="flex items-center gap-2 text-sm text-green-400 py-2 px-3 bg-green-500/10 border border-green-500/30 rounded-lg">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
-          <span>Dev Mode - Bot protection bypassed</span>
-        </div>
+      <div className={className} style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <span
+          style={{
+            fontSize: '0.65rem',
+            lineHeight: 1.2,
+            color: 'var(--text-muted, #94a3b8)',
+            opacity: 0.55,
+            userSelect: 'none',
+          }}
+          title="Bot protection bypassed in development"
+        >
+          Dev · captcha bypassed
+        </span>
       </div>
     );
   }

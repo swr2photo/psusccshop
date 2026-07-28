@@ -1252,7 +1252,54 @@ textarea::placeholder {
     inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
-/* ---- Skeleton Loading (gradient shimmer) ---- */
+/* ---- Privacy policy print (docs layout) ---- */
+@media print {
+  .privacy-chrome {
+    display: none !important;
+  }
+  .privacy-doc {
+    max-width: 100% !important;
+  }
+}
+
+/* ---- Electronic Payment Notice print (PaymentModal) ---- */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  .payment-notice-print,
+  .payment-notice-print * {
+    visibility: visible !important;
+  }
+  .payment-notice-print {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: 210mm !important;
+    margin: 0 auto !important;
+    padding: 12mm 14mm !important;
+    background: #fff !important;
+    color: #1e293b !important;
+    box-shadow: none !important;
+    border: 1px solid #94a3b8 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .payment-notice-no-print {
+    display: none !important;
+  }
+  .payment-notice-letterhead {
+    display: block !important;
+  }
+  .payment-notice-stamp {
+    opacity: 0.72 !important;
+  }
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+}
 @keyframes skeleton-shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
@@ -1629,3 +1676,6 @@ textarea::placeholder {
 .mobile-scroll-x > * {
   scroll-snap-align: start;
 }
+
+/* Site footer layout uses Tailwind utilities in Footer.tsx */
+

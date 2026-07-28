@@ -6,6 +6,7 @@ import { eq, and, isNull } from 'drizzle-orm';
 import { createHash } from 'crypto';
 import { requireAuth } from '@/lib/auth';
 import { rateLimitOrNull } from '@/lib/api-helpers';
+import { toIsoString } from '@/lib/safe-date';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -130,7 +131,7 @@ export async function GET(request: NextRequest) {
       alerts: (data || []).map((a: any) => ({
         productId: a.productId,
         size: a.size,
-        createdAt: a.createdAt?.toISOString(),
+        createdAt: toIsoString(a.createdAt) || undefined,
       })),
     });
   } catch (error: any) {

@@ -114,7 +114,9 @@ function DateRangePicker({
   id,
 }: DateRangePickerProps) {
   const [open, setOpen] = React.useState(false)
-  const hasRange = Boolean(value?.from)
+  const from = parseDate(value?.from)
+  const to = parseDate(value?.to)
+  const hasRange = Boolean(from)
 
   return (
     <div className={cn("grid gap-1.5", className)}>
@@ -132,14 +134,14 @@ function DateRangePicker({
             )}
           >
             <CalendarIcon />
-            {value?.from ? (
-              value.to ? (
+            {from ? (
+              to ? (
                 <>
-                  {format(value.from, "d MMM yyyy", { locale: th })} –{" "}
-                  {format(value.to, "d MMM yyyy", { locale: th })}
+                  {format(from, "d MMM yyyy", { locale: th })} –{" "}
+                  {format(to, "d MMM yyyy", { locale: th })}
                 </>
               ) : (
-                format(value.from, "d MMM yyyy", { locale: th })
+                format(from, "d MMM yyyy", { locale: th })
               )
             ) : (
               <span>{placeholder}</span>

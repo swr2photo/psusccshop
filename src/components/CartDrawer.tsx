@@ -1,39 +1,50 @@
 'use client';
 
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Box,
   Button,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   Drawer,
   IconButton,
-  Switch,
   TextField,
   Typography,
   useMediaQuery,
 } from '@mui/material';
 import {
+  AlertTriangle,
   Edit,
   Minus,
   Palette,
   Plus,
   ShoppingCart,
+  Tag,
+  Ticket,
   Truck,
   X,
 } from 'lucide-react';
 import OptimizedImage from '@/components/OptimizedImage';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
-import { 
-  normalizeEngName, 
+import {
+  normalizeEngName,
   normalizeDigits99,
   type CartItem,
 } from '@/lib/shop-constants';
 import { ShopConfig, Product, SIZES } from '@/lib/config';
 import { ShippingConfig } from '@/lib/shipping';
+import { evaluateReorderItem, type ReorderBlockReason } from '@/lib/reorder-availability';
+import { apiFetch } from '@/lib/api-client';
+
+export type CartPromoResult = {
+  code: string;
+  discount: number;
+  description?: string;
+};
 
 interface CartDrawerProps {
   open: boolean;
@@ -46,15 +57,48 @@ interface CartDrawerProps {
   onUpdateQuantity: (itemId: string, quantity: number) => void;
   onRemoveItem: (itemId: string) => void;
   onEditItem: (item: CartItem) => void;
-  onCheckout: () => void;
+  onCheckout: (promo?: CartPromoResult) => void;
   onStartHold: (itemId: string, direction: number) => void;
   onStopHold: (itemId: string) => void;
   onGoHome: () => void;
   getTotalPrice: () => number;
+  /** Resolve live product for a cart line (multi-shop / storefront). Falls back to config.products. */
+  getProduct?: (item: CartItem) => Product | undefined;
+  /** Multi-shop: validate promo codes against this shop's config */
+  shopId?: string;
   // Edit dialog props
   editingCartItem: CartItem | null;
   onSetEditingCartItem: (item: CartItem | null) => void;
   onUpdateCartItem: (itemId: string, item: CartItem) => void;
+}
+
+function lineIssueMessage(reason: ReorderBlockReason | undefined, lang: 'th' | 'en'): string {
+  if (lang === 'en') {
+    switch (reason) {
+      case 'ended':
+        return 'This product’s order window has ended. Please remove it to continue.';
+      case 'out_of_stock':
+        return 'This product is sold out. Please remove it to continue.';
+      case 'upcoming':
+        return 'This product is not on sale yet. Please remove it to continue.';
+      case 'inactive':
+      case 'missing':
+      default:
+        return 'This product is no longer available. Please remove it to continue.';
+    }
+  }
+  switch (reason) {
+    case 'ended':
+      return 'สินค้านี้หมดเขตสั่งซื้อแล้ว กรุณาลบออกเพื่อดำเนินการต่อ';
+    case 'out_of_stock':
+      return 'สินค้านี้หมดสต็อกแล้ว กรุณาลบออกเพื่อดำเนินการต่อ';
+    case 'upcoming':
+      return 'สินค้านี้ยังไม่เปิดขาย กรุณาลบออกเพื่อดำเนินการต่อ';
+    case 'inactive':
+    case 'missing':
+    default:
+      return 'สินค้านี้ไม่พร้อมจำหน่ายแล้ว กรุณาลบออกเพื่อดำเนินการต่อ';
+  }
 }
 
 export default function CartDrawer(props: CartDrawerProps) {
@@ -74,6 +118,8 @@ export default function CartDrawer(props: CartDrawerProps) {
     onStopHold,
     onGoHome,
     getTotalPrice,
+    getProduct,
+    shopId,
     editingCartItem,
     onSetEditingCartItem,
     onUpdateCartItem,
@@ -87,6 +133,46 @@ export default function CartDrawer(props: CartDrawerProps) {
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const swipeStartY = useRef(0);
+
+  // Promo state
+  const [promoInput, setPromoInput] = useState('');
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [promoError, setPromoError] = useState('');
+  const [promoResult, setPromoResult] = useState<CartPromoResult | null>(null);
+
+  const resolveProduct = useCallback(
+    (item: CartItem): Product | undefined => {
+      if (getProduct) return getProduct(item);
+      return config?.products?.find((p) => p.id === item.productId);
+    },
+    [getProduct, config?.products],
+  );
+
+  const lineIssues = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const item of cart) {
+      const product = resolveProduct(item);
+      const products = product ? [product] : (config?.products || []);
+      const evalResult = evaluateReorderItem(
+        {
+          productId: item.productId,
+          size: item.size,
+          quantity: item.quantity,
+          name: item.productName,
+          productName: item.productName,
+        },
+        products,
+        lang,
+      );
+      if (!evalResult.ok) {
+        map.set(item.id, lineIssueMessage(evalResult.reason, lang));
+      }
+    }
+    return map;
+  }, [cart, resolveProduct, config?.products, lang]);
+
+  const hasInvalidLines = lineIssues.size > 0;
+  const canCheckout = isShopOpen && !hasInvalidLines;
 
   const handleSwipeStart = useCallback((e: React.TouchEvent) => {
     swipeStartY.current = e.touches[0].clientY;
@@ -111,18 +197,109 @@ export default function CartDrawer(props: CartDrawerProps) {
     }
   }, [isDragging, dragOffset, onClose]);
 
-  React.useEffect(() => { if (!open) { setDragOffset(0); setIsDragging(false); } }, [open]);
+  React.useEffect(() => {
+    if (!open) {
+      setDragOffset(0);
+      setIsDragging(false);
+    }
+  }, [open]);
 
-  // Get enabled shipping options info
-  const enabledShippingOptions = shippingConfig?.options?.filter(o => o.enabled) || [];
-  const lowestShippingFee = enabledShippingOptions.length > 0
-    ? Math.min(...enabledShippingOptions.map(o => o.baseFee))
-    : null;
-  const freeShippingMinimum = shippingConfig?.globalFreeShippingMinimum 
-    || (enabledShippingOptions.find(o => o.freeShippingMinimum)?.freeShippingMinimum);
   const cartTotal = getTotalPrice();
+  const appliedPromoCodeRef = useRef<string | null>(null);
+  appliedPromoCodeRef.current = promoResult?.code ?? null;
+
+  // Re-validate applied promo when cart subtotal changes
+  React.useEffect(() => {
+    const code = appliedPromoCodeRef.current;
+    if (!code) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiFetch('/api/promo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code,
+            subtotal: cartTotal,
+            ...(shopId ? { shopId } : {}),
+          }),
+        });
+        const data = await res.json();
+        if (cancelled) return;
+        if (res.ok && data.valid) {
+          setPromoResult({
+            code: data.code,
+            discount: data.discount,
+            description: data.description,
+          });
+          setPromoError('');
+        } else {
+          setPromoResult(null);
+          setPromoError(data.error || t.checkout.invalidCode);
+        }
+      } catch {
+        // Keep existing promo; checkout will re-validate
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [cartTotal, shopId, t.checkout.invalidCode]);
+
+  const applyPromoCode = async () => {
+    if (!promoInput.trim()) return;
+    setPromoLoading(true);
+    setPromoError('');
+    try {
+      const res = await apiFetch('/api/promo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: promoInput.trim(),
+          subtotal: cartTotal,
+          ...(shopId ? { shopId } : {}),
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.valid) {
+        setPromoResult({
+          code: data.code,
+          discount: data.discount,
+          description: data.description,
+        });
+        setPromoError('');
+      } else {
+        setPromoResult(null);
+        setPromoError(data.error || t.checkout.invalidCode);
+      }
+    } catch {
+      setPromoError(t.checkout.cannotVerifyCode);
+      setPromoResult(null);
+    } finally {
+      setPromoLoading(false);
+    }
+  };
+
+  const clearPromo = () => {
+    setPromoInput('');
+    setPromoResult(null);
+    setPromoError('');
+  };
+
+  // Shipping / free-shipping progress
+  const enabledShippingOptions = shippingConfig?.options?.filter((o) => o.enabled) || [];
+  const freeShippingMinimum = shippingConfig?.globalFreeShippingMinimum
+    || (enabledShippingOptions.find((o) => o.freeShippingMinimum)?.freeShippingMinimum);
   const remainingForFreeShipping = freeShippingMinimum ? Math.max(0, freeShippingMinimum - cartTotal) : null;
-  const hasFreeShipping = freeShippingMinimum && cartTotal >= freeShippingMinimum;
+  const hasFreeShipping = Boolean(freeShippingMinimum && cartTotal >= freeShippingMinimum);
+  const promoDiscount = promoResult?.discount || 0;
+  const displayTotal = Math.max(0, cartTotal - promoDiscount);
+
+  const chipSx = {
+    px: 1,
+    py: 0.2,
+    borderRadius: '6px',
+    bgcolor: 'var(--surface)',
+    border: '1px solid var(--glass-border)',
+  } as const;
 
   return (
     <>
@@ -141,6 +318,8 @@ export default function CartDrawer(props: CartDrawerProps) {
             bgcolor: 'var(--background)',
             color: 'var(--foreground)',
             overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
             transform: isMobile && dragOffset > 0 ? `translateY(${dragOffset}px) !important` : undefined,
             transition: isDragging ? 'none !important' : 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1) !important',
           },
@@ -155,8 +334,8 @@ export default function CartDrawer(props: CartDrawerProps) {
           position: 'sticky',
           top: 0,
           zIndex: 10,
+          flexShrink: 0,
         }}>
-          {/* Drag Handle - Swipe to dismiss */}
           {isMobile && (
             <Box
               onTouchStart={handleSwipeStart}
@@ -167,19 +346,19 @@ export default function CartDrawer(props: CartDrawerProps) {
               <Box sx={{ width: isDragging ? 48 : 36, height: 4, bgcolor: isDragging ? 'var(--text-muted)' : 'var(--glass-bg)', borderRadius: 2, transition: 'all 0.2s ease' }} />
             </Box>
           )}
-          
+
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
               <Box sx={{
                 width: 44,
                 height: 44,
                 borderRadius: '14px',
-                background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
+                bgcolor: 'var(--surface-2)',
+                border: '1px solid var(--glass-border)',
                 display: 'grid',
                 placeItems: 'center',
-                boxShadow: '0 4px 14px rgba(0,113,227,0.3)',
               }}>
-                <ShoppingCart size={22} color="white" />
+                <ShoppingCart size={22} style={{ color: 'var(--foreground)' }} />
               </Box>
               <Box>
                 <Typography sx={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--foreground)' }}>
@@ -190,7 +369,7 @@ export default function CartDrawer(props: CartDrawerProps) {
                 </Typography>
               </Box>
             </Box>
-            <Box sx={{ display: 'flex', gap: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
               {cart.length > 0 && (
                 <Button
                   size="small"
@@ -206,20 +385,22 @@ export default function CartDrawer(props: CartDrawerProps) {
                       destructive: true,
                     });
                     if (ok) {
+                      clearPromo();
                       onClearCart();
                     }
                   }}
-                  sx={{ 
-                    color: '#ff453a', 
+                  sx={{
+                    color: 'var(--text-muted)',
                     fontSize: '0.75rem',
                     textTransform: 'none',
-                    '&:hover': { bgcolor: 'rgba(239,68,68,0.1)' },
+                    fontWeight: 500,
+                    '&:hover': { color: 'var(--foreground)', bgcolor: 'var(--surface-2)' },
                   }}
                 >
                   {t.cart.clearAll}
                 </Button>
               )}
-              <IconButton onClick={onClose} sx={{ color: 'var(--text-muted)', bgcolor: 'var(--glass-bg)', '&:hover': { bgcolor: 'var(--glass-bg)' } }}>
+              <IconButton onClick={onClose} sx={{ color: 'var(--text-muted)', bgcolor: 'var(--glass-bg)', '&:hover': { bgcolor: 'var(--surface-2)' } }}>
                 <X size={20} />
               </IconButton>
             </Box>
@@ -227,14 +408,14 @@ export default function CartDrawer(props: CartDrawerProps) {
         </Box>
 
         {/* Content */}
-        <Box sx={{ flex: 1, overflow: 'auto', WebkitOverflowScrolling: 'touch' }}>
+        <Box sx={{ flex: 1, overflow: 'auto', WebkitOverflowScrolling: 'touch', minHeight: 0 }}>
           {cart.length === 0 ? (
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 10, gap: 2 }}>
               <Box sx={{
                 width: 80,
                 height: 80,
                 borderRadius: '50%',
-                bgcolor: 'rgba(100,116,139,0.1)',
+                bgcolor: 'var(--surface-2)',
                 display: 'grid',
                 placeItems: 'center',
               }}>
@@ -249,10 +430,12 @@ export default function CartDrawer(props: CartDrawerProps) {
                   px: 3,
                   py: 1,
                   borderRadius: '12px',
-                  background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
-                  color: 'white',
+                  bgcolor: 'var(--surface-2)',
+                  border: '1px solid var(--glass-border)',
+                  color: 'var(--foreground)',
                   fontWeight: 600,
                   textTransform: 'none',
+                  '&:hover': { bgcolor: 'var(--surface)' },
                 }}
               >
                 {t.cart.shopNow}
@@ -261,7 +444,8 @@ export default function CartDrawer(props: CartDrawerProps) {
           ) : (
             <Box sx={{ px: { xs: 2, sm: 3 }, py: 2 }}>
               {cart.map((item) => {
-                const product = config?.products?.find(p => p.id === item.productId);
+                const product = resolveProduct(item);
+                const issue = lineIssues.get(item.id);
                 return (
                   <Box
                     key={item.id}
@@ -270,9 +454,8 @@ export default function CartDrawer(props: CartDrawerProps) {
                       mb: 1.5,
                       borderRadius: '16px',
                       bgcolor: 'var(--surface-2)',
-                      border: '1px solid var(--glass-border)',
+                      border: issue ? '1px solid rgba(148,163,184,0.45)' : '1px solid var(--glass-border)',
                       transition: 'background-color 0.2s ease, transform 0.2s ease',
-                      '&:hover': { bgcolor: 'var(--surface-2)' },
                     }}
                   >
                     <Box sx={{ display: 'flex', gap: 2 }}>
@@ -284,6 +467,7 @@ export default function CartDrawer(props: CartDrawerProps) {
                           overflow: 'hidden',
                           flexShrink: 0,
                           border: '1px solid var(--glass-border)',
+                          opacity: issue ? 0.65 : 1,
                         }}>
                           <OptimizedImage
                             src={product.images[0]}
@@ -295,33 +479,33 @@ export default function CartDrawer(props: CartDrawerProps) {
                           />
                         </Box>
                       )}
-                      
+
                       <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--foreground)', mb: 0.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {item.productName}
                         </Typography>
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.6, mb: 1.5 }}>
-                          <Box sx={{ px: 1, py: 0.2, borderRadius: '6px', bgcolor: 'rgba(0,113,227,0.15)', border: '1px solid rgba(0,113,227,0.3)' }}>
-                            <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--secondary)' }}>{item.size}</Typography>
+                          <Box sx={chipSx}>
+                            <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-muted)' }}>{item.size}</Typography>
                           </Box>
                           {item.options?.isLongSleeve && (
-                            <Box sx={{ px: 1, py: 0.2, borderRadius: '6px', bgcolor: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)' }}>
-                              <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--warning)' }}>{t.common.longSleeve}</Typography>
+                            <Box sx={chipSx}>
+                              <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-muted)' }}>{t.common.longSleeve}</Typography>
                             </Box>
                           )}
                           {item.options?.customName && (
-                            <Box sx={{ px: 1, py: 0.2, borderRadius: '6px', bgcolor: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)' }}>
-                              <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--success)' }}>{item.options.customName}</Typography>
+                            <Box sx={chipSx}>
+                              <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-muted)' }}>{item.options.customName}</Typography>
                             </Box>
                           )}
                           {item.options?.customNumber && (
-                            <Box sx={{ px: 1, py: 0.2, borderRadius: '6px', bgcolor: 'rgba(6,182,212,0.15)', border: '1px solid rgba(6,182,212,0.3)' }}>
-                              <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--secondary)' }}>#{item.options.customNumber}</Typography>
+                            <Box sx={chipSx}>
+                              <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-muted)' }}>#{item.options.customNumber}</Typography>
                             </Box>
                           )}
                           {item.options?.pattern && (
-                            <Box sx={{ px: 1, py: 0.2, borderRadius: '6px', bgcolor: 'rgba(56,189,248,0.15)', border: '1px solid rgba(56,189,248,0.3)' }}>
-                              <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: '#38bdf8' }}>{item.options.pattern}</Typography>
+                            <Box sx={chipSx}>
+                              <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-muted)' }}>{item.options.pattern}</Typography>
                             </Box>
                           )}
                         </Box>
@@ -370,14 +554,14 @@ export default function CartDrawer(props: CartDrawerProps) {
                             <IconButton
                               size="small"
                               onClick={() => onEditItem(item)}
-                              sx={{ color: 'var(--text-muted)', p: 0.6, '&:hover': { color: '#0071e3', bgcolor: 'rgba(0,113,227,0.1)' } }}
+                              sx={{ color: 'var(--text-muted)', p: 0.6, '&:hover': { color: 'var(--foreground)', bgcolor: 'var(--surface)' } }}
                             >
                               <Edit size={14} />
                             </IconButton>
                             <IconButton
                               size="small"
                               onClick={() => onRemoveItem(item.id)}
-                              sx={{ color: 'var(--text-muted)', p: 0.6, '&:hover': { color: '#f87171', bgcolor: 'rgba(239,68,68,0.1)' } }}
+                              sx={{ color: 'var(--text-muted)', p: 0.6, '&:hover': { color: 'var(--foreground)', bgcolor: 'var(--surface)' } }}
                             >
                               <X size={14} />
                             </IconButton>
@@ -386,19 +570,116 @@ export default function CartDrawer(props: CartDrawerProps) {
                       </Box>
 
                       <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center', minWidth: 70 }}>
-                        <Typography sx={{ fontSize: '1rem', fontWeight: 800, color: 'var(--success)' }}>
+                        <Typography sx={{ fontSize: '1rem', fontWeight: 800, color: 'var(--foreground)' }}>
                           ฿{(item.unitPrice * item.quantity).toLocaleString()}
                         </Typography>
                       </Box>
                     </Box>
+
+                    {issue && (
+                      <Box sx={{
+                        mt: 1.5,
+                        p: 1.2,
+                        borderRadius: '10px',
+                        bgcolor: 'var(--surface)',
+                        border: '1px solid var(--glass-border)',
+                        display: 'flex',
+                        gap: 1,
+                        alignItems: 'flex-start',
+                      }}>
+                        <AlertTriangle size={14} style={{ color: 'var(--text-muted)', marginTop: 2, flexShrink: 0 }} />
+                        <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: 1.45, fontWeight: 500 }}>
+                          {issue}
+                        </Typography>
+                      </Box>
+                    )}
                   </Box>
                 );
               })}
+
+              {/* Coupon */}
+              <Box sx={{
+                p: 1.5,
+                mb: 1,
+                borderRadius: '14px',
+                bgcolor: 'var(--surface-2)',
+                border: '1px solid var(--glass-border)',
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <Ticket size={15} style={{ color: 'var(--text-muted)' }} />
+                  <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                    {t.checkout.promoCode}
+                  </Typography>
+                </Box>
+                {promoResult ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+                      <Tag size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                          {promoResult.code}
+                        </Typography>
+                        <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                          {promoResult.description || `-฿${promoResult.discount.toLocaleString()}`}
+                        </Typography>
+                      </Box>
+                    </Box>
+                    <IconButton size="small" onClick={clearPromo} sx={{ color: 'var(--text-muted)' }}>
+                      <X size={16} />
+                    </IconButton>
+                  </Box>
+                ) : (
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <TextField
+                      size="small"
+                      fullWidth
+                      placeholder={t.checkout.promoPlaceholder}
+                      value={promoInput}
+                      onChange={(e) => { setPromoInput(e.target.value); setPromoError(''); }}
+                      onKeyDown={(e) => e.key === 'Enter' && applyPromoCode()}
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          color: 'var(--foreground)',
+                          borderRadius: '10px',
+                          bgcolor: 'var(--surface)',
+                          fontSize: '0.85rem',
+                        },
+                        '& fieldset': { borderColor: 'var(--glass-border)' },
+                      }}
+                    />
+                    <Button
+                      onClick={applyPromoCode}
+                      disabled={!promoInput.trim() || promoLoading}
+                      sx={{
+                        px: 2,
+                        borderRadius: '10px',
+                        textTransform: 'none',
+                        fontWeight: 600,
+                        fontSize: '0.8rem',
+                        bgcolor: 'var(--surface)',
+                        border: '1px solid var(--glass-border)',
+                        color: promoInput.trim() ? 'var(--foreground)' : 'var(--text-muted)',
+                        whiteSpace: 'nowrap',
+                        minWidth: 72,
+                        '&:hover': { bgcolor: 'var(--glass-bg)' },
+                        '&:disabled': { color: 'var(--text-muted)' },
+                      }}
+                    >
+                      {promoLoading ? <CircularProgress size={16} sx={{ color: 'var(--text-muted)' }} /> : t.checkout.applyCode}
+                    </Button>
+                  </Box>
+                )}
+                {promoError && (
+                  <Typography sx={{ mt: 0.8, fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    {promoError}
+                  </Typography>
+                )}
+              </Box>
             </Box>
           )}
         </Box>
 
-        {/* Bottom */}
+        {/* Sticky bottom: summary + primary CTA only */}
         {cart.length > 0 && (
           <Box sx={{
             px: { xs: 2, sm: 3 },
@@ -407,95 +688,98 @@ export default function CartDrawer(props: CartDrawerProps) {
             background: 'var(--glass-strong)',
             backdropFilter: 'blur(20px)',
             paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
+            flexShrink: 0,
           }}>
-            {/* Shipping Info */}
-            {enabledShippingOptions.length > 0 && (
-              <Box sx={{
-                p: 1.5,
-                mb: 2,
-                borderRadius: '12px',
-                bgcolor: 'rgba(251,146,60,0.08)',
-                border: '1px solid rgba(251,146,60,0.2)',
-              }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                  <Truck size={16} style={{ color: '#fb923c' }} />
-                  <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#fb923c' }}>
-                    {t.cart.shippingFee}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
-                  {lowestShippingFee !== null && lowestShippingFee > 0 && (
-                    <Typography sx={{ fontSize: '0.75rem', color: '#fb923c' }}>
-                      {t.cart.shippingStart} ฿{lowestShippingFee.toLocaleString()}
-                    </Typography>
-                  )}
-                  {hasFreeShipping ? (
-                    <Box sx={{ 
-                      px: 1, 
-                      py: 0.2, 
-                      borderRadius: '6px', 
-                      bgcolor: 'rgba(34,197,94,0.15)', 
-                      border: '1px solid rgba(34,197,94,0.3)' 
-                    }}>
-                      <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--success)' }}>
-                        {t.cart.freeShipping}
-                      </Typography>
-                    </Box>
-                  ) : remainingForFreeShipping && remainingForFreeShipping > 0 ? (
-                    <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                      {t.cart.moreForFree} ฿{remainingForFreeShipping.toLocaleString()} {t.cart.moreForFreeSuffix}
-                    </Typography>
-                  ) : null}
-                </Box>
+            {/* Shipping note / free-shipping progress */}
+            <Box sx={{
+              p: 1.5,
+              mb: 1.5,
+              borderRadius: '12px',
+              bgcolor: 'var(--surface-2)',
+              border: '1px solid var(--glass-border)',
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                <Truck size={15} style={{ color: 'var(--text-muted)' }} />
+                <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                  {t.cart.shippingFee}
+                </Typography>
               </Box>
-            )}
+              {hasFreeShipping ? (
+                <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  {t.cart.freeShippingUnlocked}
+                </Typography>
+              ) : remainingForFreeShipping != null && remainingForFreeShipping > 0 ? (
+                <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  {t.cart.orderMoreForFree.replace('{amount}', remainingForFreeShipping.toLocaleString())}
+                </Typography>
+              ) : (
+                <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  {t.cart.shippingNextStep}
+                </Typography>
+              )}
+            </Box>
 
+            {/* Summary */}
             <Box sx={{
               p: 2,
               mb: 2,
               borderRadius: '14px',
-              bgcolor: 'rgba(16,185,129,0.08)',
-              border: '1px solid rgba(16,185,129,0.2)',
+              bgcolor: 'var(--surface-2)',
+              border: '1px solid var(--glass-border)',
             }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Box>
-                  <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', mb: 0.3 }}>{t.cart.subtotal}</Typography>
-                  <Typography sx={{ fontSize: '1.6rem', fontWeight: 900, color: 'var(--success)' }}>
-                    ฿{getTotalPrice().toLocaleString()}
-                  </Typography>
-                  {!hasFreeShipping && lowestShippingFee !== null && lowestShippingFee > 0 && (
-                    <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                      {t.cart.shippingCalcNote}
-                    </Typography>
-                  )}
-                </Box>
-                <Box sx={{ textAlign: 'right' }}>
-                  <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{cart.length} {t.common.items}</Typography>
-                  <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                    {cart.reduce((sum, item) => sum + item.quantity, 0)} {t.common.pieces}
-                  </Typography>
-                </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: promoDiscount > 0 ? 1 : 0 }}>
+                <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t.cart.subtotal}</Typography>
+                <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                  ฿{cartTotal.toLocaleString()}
+                </Typography>
               </Box>
+              {promoDiscount > 0 && (
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                  <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    {t.checkout.discount} ({promoResult?.code})
+                  </Typography>
+                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                    -฿{promoDiscount.toLocaleString()}
+                  </Typography>
+                </Box>
+              )}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pt: promoDiscount > 0 ? 1 : 0, borderTop: promoDiscount > 0 ? '1px solid var(--glass-border)' : 'none' }}>
+                <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                  {t.cart.total}
+                </Typography>
+                <Typography sx={{ fontSize: '1.35rem', fontWeight: 900, color: 'var(--foreground)' }}>
+                  ฿{displayTotal.toLocaleString()}
+                </Typography>
+              </Box>
+              <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', mt: 0.5 }}>
+                {t.cart.shippingCalcNote}
+              </Typography>
             </Box>
+
+            {hasInvalidLines && (
+              <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', mb: 1.2, textAlign: 'center' }}>
+                {t.cart.removeInvalidToCheckout}
+              </Typography>
+            )}
 
             <Button
               fullWidth
-              onClick={onCheckout}
-              disabled={!isShopOpen}
+              onClick={() => onCheckout(promoResult || undefined)}
+              disabled={!canCheckout}
               sx={{
                 py: 1.8,
                 borderRadius: '14px',
-                background: isShopOpen 
-                  ? 'linear-gradient(135deg, #34c759 0%, #34c759 100%)'
+                background: canCheckout
+                  ? 'linear-gradient(135deg, #34c759 0%, #30b350 100%)'
                   : 'rgba(100,116,139,0.2)',
-                color: isShopOpen ? 'white' : 'var(--text-muted)',
+                color: canCheckout ? 'white' : 'var(--text-muted)',
                 fontSize: '1rem',
                 fontWeight: 700,
                 textTransform: 'none',
-                boxShadow: isShopOpen ? '0 4px 20px rgba(16,185,129,0.3)' : 'none',
+                boxShadow: canCheckout ? '0 4px 20px rgba(52,199,89,0.28)' : 'none',
                 '&:hover': {
-                  background: isShopOpen 
-                    ? 'linear-gradient(135deg, #34c759 0%, #047857 100%)'
+                  background: canCheckout
+                    ? 'linear-gradient(135deg, #30b350 0%, #28a745 100%)'
                     : 'rgba(100,116,139,0.3)',
                 },
                 '&:disabled': {
@@ -505,55 +789,6 @@ export default function CartDrawer(props: CartDrawerProps) {
               }}
             >
               {isShopOpen ? t.cart.checkout : t.cart.shopClosed}
-            </Button>
-
-            <Button
-              fullWidth
-              onClick={onClose}
-              startIcon={<X size={18} />}
-              sx={{
-                mt: 1,
-                py: 1.2,
-                borderRadius: '12px',
-                bgcolor: 'rgba(100,116,139,0.15)',
-                border: '1px solid rgba(100,116,139,0.3)',
-                color: 'var(--text-muted)',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                textTransform: 'none',
-                '&:hover': { bgcolor: 'rgba(100,116,139,0.25)' },
-              }}
-            >
-              {t.common.close}
-            </Button>
-          </Box>
-        )}
-
-        {cart.length === 0 && (
-          <Box sx={{
-            px: { xs: 2, sm: 3 },
-            py: 2,
-            borderTop: '1px solid var(--glass-border)',
-            background: 'var(--glass-strong)',
-            paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
-          }}>
-            <Button
-              fullWidth
-              onClick={onClose}
-              startIcon={<X size={18} />}
-              sx={{
-                py: 1.2,
-                borderRadius: '12px',
-                bgcolor: 'rgba(100,116,139,0.15)',
-                border: '1px solid rgba(100,116,139,0.3)',
-                color: 'var(--text-muted)',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                textTransform: 'none',
-                '&:hover': { bgcolor: 'rgba(100,116,139,0.25)' },
-              }}
-            >
-              {t.common.close}
             </Button>
           </Box>
         )}
@@ -576,9 +811,8 @@ export default function CartDrawer(props: CartDrawerProps) {
         }}
       >
         {editingCartItem && (() => {
-          const product = config?.products?.find(p => p.id === editingCartItem.productId);
+          const product = resolveProduct(editingCartItem) || config?.products?.find((p) => p.id === editingCartItem.productId);
           const sizeKeys = product?.sizePricing ? Object.keys(product.sizePricing) : SIZES;
-          // Sort sizes from small to large using SIZES order
           const displaySizes = sizeKeys.sort((a, b) => {
             const indexA = SIZES.indexOf(a);
             const indexB = SIZES.indexOf(b);
@@ -587,17 +821,17 @@ export default function CartDrawer(props: CartDrawerProps) {
             if (indexB !== -1) return 1;
             return a.localeCompare(b);
           });
-          
+
           return (
             <>
-              <DialogTitle sx={{ 
+              <DialogTitle sx={{
                 borderBottom: '1px solid var(--glass-border)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
               }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                  <Edit size={20} color="#0071e3" />
+                  <Edit size={20} style={{ color: 'var(--text-muted)' }} />
                   <Typography sx={{ fontWeight: 700 }}>{t.cart.editItem}</Typography>
                 </Box>
               </DialogTitle>
@@ -610,30 +844,30 @@ export default function CartDrawer(props: CartDrawerProps) {
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}>
                   {displaySizes.map((size) => {
                     const basePrice = product?.sizePricing?.[size] ?? product?.basePrice ?? editingCartItem.unitPrice;
-                    const longSleeveFee = product?.options?.hasLongSleeve && editingCartItem.options?.isLongSleeve 
-                      ? (product?.options?.longSleevePrice ?? 50) 
+                    const longSleeveFee = product?.options?.hasLongSleeve && editingCartItem.options?.isLongSleeve
+                      ? (product?.options?.longSleevePrice ?? 50)
                       : 0;
                     const active = editingCartItem.size === size;
                     return (
                       <Box
                         key={size}
-                        onClick={() => onSetEditingCartItem({ 
-                          ...editingCartItem, 
-                          size, 
-                          unitPrice: basePrice + longSleeveFee 
+                        onClick={() => onSetEditingCartItem({
+                          ...editingCartItem,
+                          size,
+                          unitPrice: basePrice + longSleeveFee,
                         })}
                         sx={{
                           px: 2,
                           py: 1,
                           borderRadius: '10px',
-                          border: active ? '2px solid var(--primary)' : '1px solid var(--glass-border)',
-                          bgcolor: active ? 'rgba(0,113,227,0.15)' : 'var(--surface-2)',
+                          border: active ? '2px solid var(--foreground)' : '1px solid var(--glass-border)',
+                          bgcolor: active ? 'var(--surface)' : 'var(--surface-2)',
                           cursor: 'pointer',
                           transition: 'all 0.2s',
-                          '&:hover': { borderColor: 'var(--primary)' },
+                          '&:hover': { borderColor: 'var(--foreground)' },
                         }}
                       >
-                        <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: active ? 'var(--primary)' : 'var(--foreground)' }}>
+                        <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)' }}>
                           {size}
                         </Typography>
                       </Box>
@@ -648,10 +882,10 @@ export default function CartDrawer(props: CartDrawerProps) {
                     value={editingCartItem.options?.customName || ''}
                     onChange={(e) => onSetEditingCartItem({
                       ...editingCartItem,
-                      options: { ...editingCartItem.options, customName: normalizeEngName(e.target.value) }
+                      options: { ...editingCartItem.options, customName: normalizeEngName(e.target.value) },
                     })}
                     inputProps={{ maxLength: 7 }}
-                    sx={{ 
+                    sx={{
                       mb: 2,
                       '& .MuiOutlinedInput-root': { color: 'var(--foreground)', borderRadius: '12px' },
                       '& fieldset': { borderColor: 'var(--glass-border)' },
@@ -667,10 +901,10 @@ export default function CartDrawer(props: CartDrawerProps) {
                     value={editingCartItem.options?.customNumber || ''}
                     onChange={(e) => onSetEditingCartItem({
                       ...editingCartItem,
-                      options: { ...editingCartItem.options, customNumber: normalizeDigits99(e.target.value) }
+                      options: { ...editingCartItem.options, customNumber: normalizeDigits99(e.target.value) },
                     })}
                     inputProps={{ inputMode: 'numeric' }}
-                    sx={{ 
+                    sx={{
                       mb: 2,
                       '& .MuiOutlinedInput-root': { color: 'var(--foreground)', borderRadius: '12px' },
                       '& fieldset': { borderColor: 'var(--glass-border)' },
@@ -685,40 +919,37 @@ export default function CartDrawer(props: CartDrawerProps) {
                       {lang === 'en' ? 'Sleeve Option' : 'ตัวเลือกความยาวแขนเสื้อ'}
                     </Typography>
                     <Box sx={{ display: 'flex', gap: 2 }}>
-                      {/* Short Sleeve Button */}
                       <Box
                         onClick={() => {
                           const basePrice = product?.sizePricing?.[editingCartItem.size || ''] ?? product?.basePrice ?? editingCartItem.unitPrice;
                           onSetEditingCartItem({
                             ...editingCartItem,
                             options: { ...editingCartItem.options, isLongSleeve: false },
-                            unitPrice: basePrice
+                            unitPrice: basePrice,
                           });
                         }}
                         sx={{
                           flex: 1,
                           p: 1.5,
                           borderRadius: '10px',
-                          border: !editingCartItem.options?.isLongSleeve ? '2px solid var(--primary)' : '1px solid var(--glass-border)',
-                          bgcolor: !editingCartItem.options?.isLongSleeve ? 'rgba(0,113,227,0.15)' : 'var(--surface-2)',
+                          border: !editingCartItem.options?.isLongSleeve ? '2px solid var(--foreground)' : '1px solid var(--glass-border)',
+                          bgcolor: !editingCartItem.options?.isLongSleeve ? 'var(--surface)' : 'var(--surface-2)',
                           cursor: 'pointer',
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
                           justifyContent: 'center',
                           transition: 'all 0.2s',
-                          '&:hover': { borderColor: 'var(--primary)' },
                         }}
                       >
-                        <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: !editingCartItem.options?.isLongSleeve ? 'var(--primary)' : 'var(--foreground)' }}>
+                        <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)' }}>
                           {lang === 'en' ? 'Short Sleeve' : 'แขนสั้น'}
                         </Typography>
-                        <Typography sx={{ fontSize: '0.7rem', color: !editingCartItem.options?.isLongSleeve ? '#0071e3' : 'var(--text-muted)', mt: 0.5 }}>
+                        <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', mt: 0.5 }}>
                           {lang === 'en' ? 'Free' : 'ไม่มีค่าบริการเพิ่ม'}
                         </Typography>
                       </Box>
 
-                      {/* Long Sleeve Button */}
                       <Box
                         onClick={() => {
                           const basePrice = product?.sizePricing?.[editingCartItem.size || ''] ?? product?.basePrice ?? editingCartItem.unitPrice;
@@ -726,28 +957,27 @@ export default function CartDrawer(props: CartDrawerProps) {
                           onSetEditingCartItem({
                             ...editingCartItem,
                             options: { ...editingCartItem.options, isLongSleeve: true },
-                            unitPrice: basePrice + sleeveFee
+                            unitPrice: basePrice + sleeveFee,
                           });
                         }}
                         sx={{
                           flex: 1,
                           p: 1.5,
                           borderRadius: '10px',
-                          border: editingCartItem.options?.isLongSleeve ? '2px solid var(--primary)' : '1px solid var(--glass-border)',
-                          bgcolor: editingCartItem.options?.isLongSleeve ? 'rgba(0,113,227,0.15)' : 'var(--surface-2)',
+                          border: editingCartItem.options?.isLongSleeve ? '2px solid var(--foreground)' : '1px solid var(--glass-border)',
+                          bgcolor: editingCartItem.options?.isLongSleeve ? 'var(--surface)' : 'var(--surface-2)',
                           cursor: 'pointer',
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: 'center',
                           justifyContent: 'center',
                           transition: 'all 0.2s',
-                          '&:hover': { borderColor: 'var(--primary)' },
                         }}
                       >
-                        <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: editingCartItem.options?.isLongSleeve ? 'var(--primary)' : 'var(--foreground)' }}>
+                        <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)' }}>
                           {lang === 'en' ? 'Long Sleeve' : 'แขนยาว'}
                         </Typography>
-                        <Typography sx={{ fontSize: '0.7rem', color: editingCartItem.options?.isLongSleeve ? '#0071e3' : 'var(--text-muted)', mt: 0.5, fontWeight: 600 }}>
+                        <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', mt: 0.5, fontWeight: 600 }}>
                           + ฿{product?.options?.longSleevePrice ?? 50}
                         </Typography>
                       </Box>
@@ -755,14 +985,14 @@ export default function CartDrawer(props: CartDrawerProps) {
                   </Box>
                 )}
 
-                {product?.patterns && product.patterns.filter(p => p.isActive !== false).length > 0 && (
+                {product?.patterns && product.patterns.filter((p) => p.isActive !== false).length > 0 && (
                   <Box sx={{ mb: 3 }}>
                     <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', mb: 1.5 }}>
                       {lang === 'en' ? 'Pattern/Design' : 'ลายสินค้า'}
                     </Typography>
                     <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 1.2 }}>
                       {product.patterns
-                        .filter(p => p.isActive !== false)
+                        .filter((p) => p.isActive !== false)
                         .map((pattern) => {
                           const active = editingCartItem.options?.pattern === pattern.name;
                           return (
@@ -770,19 +1000,18 @@ export default function CartDrawer(props: CartDrawerProps) {
                               key={pattern.id}
                               onClick={() => onSetEditingCartItem({
                                 ...editingCartItem,
-                                options: { ...editingCartItem.options, pattern: pattern.name }
+                                options: { ...editingCartItem.options, pattern: pattern.name },
                               })}
                               sx={{
                                 p: 0.8,
                                 borderRadius: '10px',
-                                border: active ? '2px solid var(--primary)' : '1px solid var(--glass-border)',
-                                bgcolor: active ? 'rgba(0,113,227,0.15)' : 'var(--surface-2)',
+                                border: active ? '2px solid var(--foreground)' : '1px solid var(--glass-border)',
+                                bgcolor: active ? 'var(--surface)' : 'var(--surface-2)',
                                 cursor: 'pointer',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 alignItems: 'center',
                                 gap: 0.5,
-                                '&:hover': { borderColor: 'var(--primary)' },
                                 transition: 'all 0.2s',
                               }}
                             >
@@ -803,15 +1032,15 @@ export default function CartDrawer(props: CartDrawerProps) {
                                   <Palette size={18} style={{ color: 'var(--text-muted)' }} />
                                 )}
                               </Box>
-                              <Typography sx={{ 
-                                fontSize: '0.7rem', 
-                                fontWeight: 600, 
-                                color: active ? 'var(--primary)' : 'var(--foreground)',
-                                textAlign: 'center', 
-                                overflow: 'hidden', 
-                                textOverflow: 'ellipsis', 
-                                whiteSpace: 'nowrap', 
-                                width: '100%' 
+                              <Typography sx={{
+                                fontSize: '0.7rem',
+                                fontWeight: 600,
+                                color: 'var(--foreground)',
+                                textAlign: 'center',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                width: '100%',
                               }}>
                                 {pattern.name}
                               </Typography>
@@ -856,10 +1085,12 @@ export default function CartDrawer(props: CartDrawerProps) {
                   variant="contained"
                   onClick={() => onUpdateCartItem(editingCartItem.id, editingCartItem)}
                   sx={{
-                    background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
+                    bgcolor: 'var(--foreground)',
+                    color: 'var(--background)',
                     fontWeight: 700,
                     borderRadius: '12px',
                     px: 3,
+                    '&:hover': { bgcolor: 'var(--foreground)', opacity: 0.9 },
                   }}
                 >
                   {t.cart.saveEdit}

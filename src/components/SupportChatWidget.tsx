@@ -1089,6 +1089,32 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [externalOpen]);
 
+  // Footer / global open-support-chat hook (optional detail: prefill, orderRef)
+  useEffect(() => {
+    const onFooterOpen = (event: Event) => {
+      const detail = (event as CustomEvent<{ prefill?: string; orderRef?: string }>).detail || {};
+      const prefillText = String(detail.prefill || '').trim();
+      if (!isLoggedIn) {
+        window.location.href = '/api/auth/signin?callbackUrl=' + encodeURIComponent(window.location.pathname);
+        return;
+      }
+      if (prefillText) {
+        setMessage(prefillText);
+        setShowHistory(false);
+        setShowRating(false);
+        if (detail.orderRef) {
+          setSubject(lang === 'th' ? 'ปัญหาการสั่งซื้อ' : 'Order issue');
+        }
+      }
+      setOpen(true);
+      setLoading(true);
+      fetchActiveChat().finally(() => setLoading(false));
+    };
+    window.addEventListener('psuscc:open-support-chat', onFooterOpen as EventListener);
+    return () => window.removeEventListener('psuscc:open-support-chat', onFooterOpen as EventListener);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoggedIn, lang]);
+
   // Deep link: open specific chat from push notification (?chat=<sessionId>)
   useEffect(() => {
     if (!session?.user?.email) return;

@@ -56,6 +56,7 @@ export async function GET(req: NextRequest) {
     const accountName = process.env.PAYMENT_ACCOUNT_NAME || '';
     const accountNumber = process.env.PAYMENT_ACCOUNT || '';
     const effectivePromptPayId = process.env.PROMPTPAY_ID || '';
+    const taxId = process.env.PAYMENT_TAX_ID || process.env.TAX_ID || '';
 
     const orderShopId = order.shopId || order.shop_id;
 
@@ -112,6 +113,7 @@ export async function GET(req: NextRequest) {
         // SECURITY: Mask account number - แสดงแค่ 4 ตัวท้าย
         accountNumber: maskAccountNumber(accountNumber),
         promptPayId: effectivePromptPayId,
+        taxId: taxId || null,
         baseAmount,
         discount,
         finalAmount,

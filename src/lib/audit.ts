@@ -7,6 +7,7 @@ import { and, desc, eq, or, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { auditTrail, emailLogs, orders, securityAuditLog, userLogs } from '@/db/schema';
 import { createHash } from 'crypto';
+import { toIsoString } from '@/lib/safe-date';
 
 export type AuditEntityType =
   | 'order'
@@ -50,10 +51,7 @@ function emailHash(email: string): string {
 }
 
 function toIso(value: Date | string | null | undefined): string {
-  if (!value) return new Date(0).toISOString();
-  if (value instanceof Date) return value.toISOString();
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? String(value) : d.toISOString();
+  return toIsoString(value, new Date(0).toISOString());
 }
 
 /** Insert immutable audit_trail row (before/after diffs). */

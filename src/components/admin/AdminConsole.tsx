@@ -551,9 +551,13 @@ function isoToLocalDatetime(iso?: string): string {
  */
 function localDatetimeToIso(localStr?: string): string {
   if (!localStr) return '';
-  const d = new Date(localStr);
-  if (isNaN(d.getTime())) return '';
-  return d.toISOString();
+  try {
+    const d = new Date(localStr);
+    if (isNaN(d.getTime())) return '';
+    return d.toISOString();
+  } catch {
+    return '';
+  }
 }
 
 function toDateTimeLocal(dateInput?: Date | string | null): string {

@@ -55,24 +55,9 @@ import {
 import { useGalleryImagePreload, isGalleryImageInRange } from '@/hooks/useGalleryImagePreload';
 import OptimizedImage from '@/components/OptimizedImage';
 import { type ShopEvent } from '@/components/EventBanner';
+import { resolveSizeMeasurement } from '@/lib/shop-constants';
 
 const SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL', '7XL', '8XL', '9XL', '10XL'] as const;
-const SIZE_MEASUREMENTS: Record<(typeof SIZE_ORDER)[number], { chest: number; length: number }> = {
-  XS: { chest: 34, length: 24 },
-  S: { chest: 36, length: 25 },
-  M: { chest: 38, length: 26 },
-  L: { chest: 40, length: 27 },
-  XL: { chest: 42, length: 28 },
-  '2XL': { chest: 44, length: 29 },
-  '3XL': { chest: 46, length: 30 },
-  '4XL': { chest: 48, length: 31 },
-  '5XL': { chest: 50, length: 32 },
-  '6XL': { chest: 52, length: 33 },
-  '7XL': { chest: 54, length: 34 },
-  '8XL': { chest: 56, length: 35 },
-  '9XL': { chest: 58, length: 36 },
-  '10XL': { chest: 60, length: 37 },
-};
 
 const TAG_TRANSLATIONS_TH_TO_EN: Record<string, string> = {
   'ใหม่': 'New',
@@ -875,76 +860,31 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
               )}
             </Box>
 
-            {/* Description - Enhanced Premium Design */}
+            {/* Description — clean typography, no pastel capsule */}
             {(getProductDescription(selectedProduct, lang) || selectedProduct.description) && (
               <Box sx={{
-                p: 0,
                 mb: 3,
-                borderRadius: '20px',
-                background: (theme: any) => theme.palette.mode === 'dark' 
-                  ? 'linear-gradient(145deg, rgba(0,0,0,0.8) 0%, rgba(29,29,31,0.6) 100%)' 
-                  : 'linear-gradient(145deg, rgba(255,255,255,0.9) 0%, rgba(245,245,247,0.8) 100%)',
-                border: (theme: any) => theme.palette.mode === 'dark' ? '1px solid rgba(0,113,227,0.2)' : '1px solid rgba(0,113,227,0.15)',
-                position: 'relative',
-                overflow: 'hidden',
-                boxShadow: (theme: any) => theme.palette.mode === 'dark' ? '0 4px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)' : '0 4px 20px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.8)',
+                pb: 2.5,
+                borderBottom: '1px solid var(--glass-border)',
               }}>
-                {/* Header */}
-                <Box sx={{
-                  px: 2.5,
-                  py: 1.5,
-                  background: 'linear-gradient(90deg, rgba(0,113,227,0.15) 0%, rgba(0,113,227,0.1) 100%)',
-                  borderBottom: '1px solid rgba(0,113,227,0.15)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1,
+                <Typography sx={{
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  color: 'var(--text-muted)',
+                  letterSpacing: '0.04em',
+                  textTransform: 'uppercase',
+                  mb: 1,
                 }}>
-                  <Box sx={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: '8px',
-                    background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 2px 8px rgba(0,113,227,0.4)',
-                  }}>
-                    <Info size={14} color="#fff" />
-                  </Box>
-                  <Typography sx={{ 
-                    fontSize: '0.85rem', 
-                    fontWeight: 700, 
-                    color: 'var(--foreground)',
-                    letterSpacing: '0.02em',
-                  }}>
-                    {t.product.description}
-                  </Typography>
-                </Box>
-                
-                {/* Content */}
-                <Box sx={{ p: 2.5 }}>
-                  <Typography sx={{ 
-                    fontSize: '0.88rem', 
-                    color: 'var(--foreground)', 
-                    opacity: 0.85,
-                    lineHeight: 1.7,
-                    whiteSpace: 'pre-line' 
-                  }}>
-                    {getProductDescription(selectedProduct, lang) || selectedProduct.description}
-                  </Typography>
-                </Box>
-                
-                {/* Decorative corner */}
-                <Box sx={{
-                  position: 'absolute',
-                  top: -30,
-                  right: -30,
-                  width: 80,
-                  height: 80,
-                  borderRadius: '50%',
-                  background: 'radial-gradient(circle, rgba(0,113,227,0.15) 0%, transparent 70%)',
-                  pointerEvents: 'none',
-                }} />
+                  {t.product.description}
+                </Typography>
+                <Typography sx={{
+                  fontSize: '0.9rem',
+                  color: 'var(--foreground)',
+                  lineHeight: 1.65,
+                  whiteSpace: 'pre-line',
+                }}>
+                  {getProductDescription(selectedProduct, lang) || selectedProduct.description}
+                </Typography>
               </Box>
             )}
 
@@ -1105,10 +1045,52 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
                   const reviewsList = productReviews[selectedProduct.id] || [];
                   if (reviewsList.length === 0) {
                     return (
-                      <Box sx={{ textAlign: 'center', py: 3, borderRadius: '14px', bgcolor: 'var(--surface)', border: '1px solid var(--glass-border)' }}>
-                        <Star size={32} strokeWidth={1} color="var(--text-muted)" />
-                        <Typography sx={{ mt: 1, fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>{t.reviews.noReviews}</Typography>
-                        <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', opacity: 0.7 }}>{t.reviews.beFirst}</Typography>
+                      <Box sx={{
+                        textAlign: 'center',
+                        py: 3.5,
+                        px: 2,
+                        borderRadius: '16px',
+                        border: '1px dashed var(--glass-border)',
+                        bgcolor: 'transparent',
+                      }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.35, mb: 1.25, opacity: 0.35 }}>
+                          {[1, 2, 3, 4, 5].map((s) => (
+                            <Star key={s} size={18} color="var(--text-muted)" strokeWidth={1.5} />
+                          ))}
+                        </Box>
+                        <Typography sx={{ fontSize: '0.88rem', color: 'var(--foreground)', fontWeight: 700 }}>
+                          {t.reviews.noReviews}
+                        </Typography>
+                        <Typography sx={{ mt: 0.4, fontSize: '0.78rem', color: 'var(--text-muted)', mb: 1.75 }}>
+                          {t.reviews.beFirst}
+                        </Typography>
+                        <Button
+                          size="small"
+                          startIcon={<Edit size={14} />}
+                          onClick={() => {
+                            if (!session) {
+                              showToast('warning', t.reviews.loginRequired);
+                              return;
+                            }
+                            setReviewRating(0);
+                            setReviewComment('');
+                            setReviewDialogOpen(true);
+                          }}
+                          sx={{
+                            textTransform: 'none',
+                            fontWeight: 700,
+                            fontSize: '0.78rem',
+                            px: 1.75,
+                            py: 0.7,
+                            borderRadius: '10px',
+                            border: '1px solid var(--glass-border)',
+                            color: 'var(--foreground)',
+                            bgcolor: 'var(--surface)',
+                            '&:hover': { borderColor: 'var(--primary)', bgcolor: 'var(--surface-2)' },
+                          }}
+                        >
+                          {t.reviews.writeFirstReview}
+                        </Button>
                       </Box>
                     );
                   }
@@ -1244,61 +1226,45 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
               flexDirection: 'column',
               gap: 2.5,
             }}>
-              {/* Size Chart & Selection - Redesigned Interactive Vertical Table */}
+              {/* Size Chart & Selection — thin borders, readable contrast */}
               {productRequiresSize(selectedProduct) && (
                 <Box sx={{
-                  p: { xs: 2.5, sm: 3 },
                   mb: 2.5,
-                  borderRadius: '20px',
-                  background: (theme: any) => theme.palette.mode === 'dark' 
-                    ? 'linear-gradient(135deg, rgba(29,29,31,0.6) 0%, rgba(29,29,31,0.3) 100%)' 
-                    : 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(245,245,247,0.6) 100%)',
-                  border: '1px solid var(--glass-border)',
-                  boxShadow: (theme: any) => theme.palette.mode === 'dark' ? 'inset 0 1px 0 rgba(255,255,255,0.05)' : 'inset 0 1px 0 rgba(255,255,255,0.8)',
+                  pb: 2.5,
+                  borderBottom: '1px solid var(--glass-border)',
                 }}>
-                  <Box ref={sizeSelectorRef} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-                    <Box sx={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: '10px',
-                      bgcolor: 'rgba(0,113,227,0.15)',
-                      display: 'grid',
-                      placeItems: 'center',
-                    }}>
-                      <Ruler size={18} color="#2997ff" />
-                    </Box>
-                    <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                  <Box ref={sizeSelectorRef} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                    <Ruler size={16} color="var(--text-muted)" />
+                    <Typography sx={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--foreground)' }}>
                       {t.product.sizeChart} & {t.product.selectSize}
                     </Typography>
                   </Box>
 
-                  <Box sx={{ 
-                    mb: 1, 
-                    borderRadius: '16px', 
+                  <Box sx={{
+                    borderRadius: '14px',
                     bgcolor: 'var(--surface)',
                     border: '1px solid var(--glass-border)',
                     overflow: 'hidden',
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.04)',
                   }}>
                     {/* Table Header */}
-                    <Box sx={{ 
-                      display: 'grid', 
-                      gridTemplateColumns: '1.2fr 1fr 1.2fr 1fr', 
-                      p: 1.5, 
-                      bgcolor: 'rgba(0,113,227,0.08)',
+                    <Box sx={{
+                      display: 'grid',
+                      gridTemplateColumns: '1.2fr 1fr 1.2fr 1fr',
+                      p: 1.5,
+                      bgcolor: 'var(--surface-2)',
                       borderBottom: '1px solid var(--glass-border)',
                       textAlign: 'center',
                     }}>
-                      <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--primary)', textAlign: 'left', pl: 2 }}>
+                      <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textAlign: 'left', pl: 2, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                         {lang === 'en' ? 'Size' : 'ขนาดไซส์'}
                       </Typography>
-                      <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--primary)' }}>
+                      <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                         {lang === 'en' ? 'Chest (in)' : 'รอบอก (นิ้ว)'}
                       </Typography>
-                      <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--primary)' }}>
+                      <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                         {lang === 'en' ? 'Length (in)' : 'ความยาว (นิ้ว)'}
                       </Typography>
-                      <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--primary)', pr: 1 }}>
+                      <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', pr: 1, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                         {lang === 'en' ? 'Price' : 'ราคา'}
                       </Typography>
                     </Box>
@@ -1306,18 +1272,17 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
                     {/* Table Body */}
                     <Box sx={{ display: 'flex', flexDirection: 'column' }}>
                       {displaySizes.map((size) => {
-                        const sizeKey = size as keyof typeof SIZE_MEASUREMENTS;
-                        const measurement = SIZE_MEASUREMENTS[sizeKey];
+                        const measurement = resolveSizeMeasurement(selectedProduct, size);
                         const isSelected = productOptions.size === size;
-                        
+
                         const basePrice = selectedProduct?.sizePricing?.[size] ?? selectedProduct?.basePrice ?? 0;
-                        const longSleeveFee = selectedProduct.options?.hasLongSleeve && productOptions.isLongSleeve 
-                          ? (selectedProduct.options?.longSleevePrice ?? 50) 
+                        const longSleeveFee = selectedProduct.options?.hasLongSleeve && productOptions.isLongSleeve
+                          ? (selectedProduct.options?.longSleevePrice ?? 50)
                           : 0;
                         const price = basePrice + longSleeveFee;
 
                         return (
-                          <Box 
+                          <Box
                             key={size}
                             onClick={() => setProductOptions({ ...productOptions, size })}
                             sx={{
@@ -1327,59 +1292,60 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
                               alignItems: 'center',
                               textAlign: 'center',
                               cursor: 'pointer',
-                              bgcolor: isSelected ? 'rgba(0,113,227,0.08)' : 'transparent',
+                              bgcolor: isSelected ? 'color-mix(in srgb, var(--primary) 8%, var(--surface))' : 'transparent',
                               borderBottom: '1px solid var(--glass-border)',
                               '&:last-child': { borderBottom: 'none' },
                               position: 'relative',
-                              transition: 'all 0.2s ease',
+                              transition: 'background 0.2s ease',
                               '&:hover': {
-                                bgcolor: isSelected ? 'rgba(0,113,227,0.12)' : 'var(--surface-2)',
+                                bgcolor: isSelected
+                                  ? 'color-mix(in srgb, var(--primary) 12%, var(--surface))'
+                                  : 'var(--surface-2)',
                               },
                             }}
                           >
-                            {/* Left indicator line for active row */}
                             {isSelected && (
                               <Box sx={{
                                 position: 'absolute',
                                 left: 0,
                                 top: 0,
                                 bottom: 0,
-                                width: 4,
+                                width: 3,
                                 bgcolor: 'var(--primary)',
-                                borderRadius: '0 4px 4px 0',
+                                borderRadius: '0 3px 3px 0',
                               }} />
                             )}
-                            
-                            <Typography sx={{ 
-                              fontSize: '0.85rem', 
-                              fontWeight: 700, 
-                              color: isSelected ? 'var(--primary)' : 'var(--foreground)',
+
+                            <Typography sx={{
+                              fontSize: '0.85rem',
+                              fontWeight: 700,
+                              color: 'var(--foreground)',
                               textAlign: 'left',
                               pl: 2,
                             }}>
                               {size}
                             </Typography>
-                            
-                            <Typography sx={{ 
-                              fontSize: '0.82rem', 
+
+                            <Typography sx={{
+                              fontSize: '0.82rem',
                               fontWeight: isSelected ? 600 : 500,
-                              color: isSelected ? 'var(--foreground)' : 'var(--text-muted)',
+                              color: 'var(--foreground)',
                             }}>
-                              {measurement?.chest ? `${measurement.chest}"` : '-'}
-                            </Typography>
-                            
-                            <Typography sx={{ 
-                              fontSize: '0.82rem', 
-                              fontWeight: isSelected ? 600 : 500,
-                              color: isSelected ? 'var(--foreground)' : 'var(--text-muted)',
-                            }}>
-                              {measurement?.length ? `${measurement.length}"` : '-'}
+                              {measurement?.chest ? `${measurement.chest}"` : '—'}
                             </Typography>
 
-                            <Typography sx={{ 
-                              fontSize: '0.82rem', 
-                              fontWeight: 700, 
-                              color: isSelected ? 'var(--success)' : 'var(--foreground)',
+                            <Typography sx={{
+                              fontSize: '0.82rem',
+                              fontWeight: isSelected ? 600 : 500,
+                              color: 'var(--foreground)',
+                            }}>
+                              {measurement?.length ? `${measurement.length}"` : '—'}
+                            </Typography>
+
+                            <Typography sx={{
+                              fontSize: '0.82rem',
+                              fontWeight: 700,
+                              color: 'var(--foreground)',
                               pr: 1,
                             }}>
                               ฿{price.toLocaleString()}
@@ -1412,7 +1378,7 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
                     }}>
                       <span style={{ fontSize: '1.1rem' }}></span>
                     </Box>
-                    <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--secondary)' }}>
+                    <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--foreground)' }}>
                       {t.product.selectOption}
                     </Typography>
                   </Box>
@@ -1668,56 +1634,45 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
                 </Box>
               )}
 
-              {/* Quantity - Enhanced */}
+              {/* Quantity — bordered zone, no pastel icon capsule */}
               <Box sx={{
-                p: { xs: 2.5, sm: 3 },
-                mb: 2.5,
-                borderRadius: '20px',
-                background: 'var(--surface-2)',
-                border: 'none',
+                py: 2,
+                mb: 1,
+                borderTop: '1px solid var(--glass-border)',
+                borderBottom: '1px solid var(--glass-border)',
               }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                    <Box sx={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: '12px',
-                      bgcolor: 'rgba(0,113,227,0.15)',
-                      display: 'grid',
-                      placeItems: 'center',
-                    }}>
-                      <Package size={20} color="#2997ff" />
-                    </Box>
-                    <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Package size={16} color="var(--text-muted)" />
+                    <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--foreground)' }}>
                       {t.product.quantity}
                     </Typography>
                   </Box>
                   <Box sx={{
                     display: 'flex',
                     alignItems: 'center',
-                    bgcolor: 'var(--glass-bg)',
-                    borderRadius: '16px',
+                    bgcolor: 'var(--surface)',
+                    borderRadius: '12px',
                     border: '1px solid var(--glass-border)',
                     overflow: 'hidden',
                   }}>
                     <IconButton
                       onClick={() => setProductOptions({ ...productOptions, quantity: clampQty(productOptions.quantity - 1) })}
-                      sx={{ 
-                        color: 'var(--text-muted)', 
-                        p: 1.5, 
+                      sx={{
+                        color: 'var(--foreground)',
+                        p: 1.25,
                         borderRadius: 0,
-                        '&:hover': { color: '#f87171', bgcolor: 'rgba(239,68,68,0.1)' },
-                        transition: 'all 0.2s ease',
+                        '&:hover': { bgcolor: 'var(--surface-2)' },
                       }}
                     >
-                      <Minus size={20} />
+                      <Minus size={18} />
                     </IconButton>
-                    <Typography sx={{ 
-                      color: 'var(--foreground)', 
-                      minWidth: 56, 
+                    <Typography sx={{
+                      color: 'var(--foreground)',
+                      minWidth: 48,
                       textAlign: 'center',
                       fontWeight: 800,
-                      fontSize: '1.2rem',
+                      fontSize: '1.1rem',
                       borderLeft: '1px solid var(--glass-border)',
                       borderRight: '1px solid var(--glass-border)',
                       py: 0.5,
@@ -1726,15 +1681,14 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
                     </Typography>
                     <IconButton
                       onClick={() => setProductOptions({ ...productOptions, quantity: clampQty(productOptions.quantity + 1) })}
-                      sx={{ 
-                        color: 'var(--text-muted)', 
-                        p: 1.5, 
+                      sx={{
+                        color: 'var(--foreground)',
+                        p: 1.25,
                         borderRadius: 0,
-                        '&:hover': { color: 'var(--success)', bgcolor: 'rgba(16,185,129,0.1)' },
-                        transition: 'all 0.2s ease',
+                        '&:hover': { bgcolor: 'var(--surface-2)' },
                       }}
                     >
-                      <Plus size={20} />
+                      <Plus size={18} />
                     </IconButton>
                   </Box>
                 </Box>
@@ -1752,83 +1706,70 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
                 pointerEvents: needsPatternFirst ? 'none' : 'auto',
                 transition: 'all 0.3s ease',
               }}>
-                {/* Price Summary Card */}
+                {/* Price Summary — clean, high-contrast */}
                 <Box sx={{
-                  p: 2.5,
-                  borderRadius: '18px',
-                  background: 'linear-gradient(135deg, rgba(16,185,129,0.12) 0%, rgba(16,185,129,0.05) 100%)',
-                  border: '1px solid rgba(16,185,129,0.25)',
+                  py: 2,
+                  borderTop: '1px solid var(--glass-border)',
+                  borderBottom: '1px solid var(--glass-border)',
                   display: 'flex',
-                  alignItems: 'center',
+                  alignItems: 'flex-end',
                   justifyContent: 'space-between',
-                  position: 'relative',
-                  overflow: 'hidden',
+                  gap: 2,
                 }}>
-                  <Box sx={{
-                    position: 'absolute',
-                    top: -20,
-                    right: -20,
-                    width: 100,
-                    height: 100,
-                    borderRadius: '50%',
-                    background: 'radial-gradient(circle, rgba(16,185,129,0.2) 0%, transparent 70%)',
-                    pointerEvents: 'none',
-                  }} />
-                  <Box sx={{ position: 'relative', zIndex: 1 }}>
-                    <Typography sx={{ fontSize: '0.78rem', color: 'var(--success)', fontWeight: 600, mb: 0.3 }}>{t.product.totalPrice}</Typography>
-                    <Typography sx={{ 
-                      fontSize: '1.75rem', 
-                      fontWeight: 900, 
-                      color: 'var(--success)',
+                  <Box>
+                    <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600, mb: 0.4, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      {t.product.totalPrice}
+                    </Typography>
+                    <Typography sx={{
+                      fontSize: '1.75rem',
+                      fontWeight: 900,
+                      color: 'var(--foreground)',
                       lineHeight: 1,
+                      letterSpacing: '-0.03em',
                     }}>
                       ฿{getCurrentPrice().toLocaleString()}
                     </Typography>
                   </Box>
-                  <Box sx={{ textAlign: 'right', position: 'relative', zIndex: 1 }}>
-                    <Box sx={{
-                      px: 1.5,
-                      py: 0.5,
-                      borderRadius: '10px',
-                      bgcolor: 'var(--surface)',
-                      border: '1px solid var(--glass-border)',
-                      mb: 0.5,
-                    }}>
-                      <Typography sx={{ fontSize: '0.85rem', color: 'var(--foreground)', fontWeight: 700 }}>
-                        {productOptions.size || '-'} × {productOptions.quantity}
-                      </Typography>
-                    </Box>
+                  <Box sx={{ textAlign: 'right' }}>
+                    <Typography sx={{ fontSize: '0.85rem', color: 'var(--foreground)', fontWeight: 600 }}>
+                      {productOptions.size || '—'} × {productOptions.quantity}
+                    </Typography>
                     {productOptions.isLongSleeve && selectedProduct && (
-                      <Typography sx={{ fontSize: '0.72rem', color: 'var(--warning)', fontWeight: 600 }}>+ {t.common.longSleeve} ฿{selectedProduct.options?.longSleevePrice ?? 50}</Typography>
+                      <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600, mt: 0.35 }}>
+                        + {t.common.longSleeve} ฿{selectedProduct.options?.longSleevePrice ?? 50}
+                      </Typography>
                     )}
                   </Box>
                 </Box>
 
-                {/* Action Buttons */}
+                {/* Action Buttons — ATC outline + Buy Now solid */}
                 <Box sx={{ display: 'flex', gap: 1.5 }}>
                   <Button
                     onClick={handleAddToCart}
                     disabled={!isDialogShopOpen}
-                    startIcon={<ShoppingCart size={20} />}
+                    startIcon={<ShoppingCart size={18} />}
+                    variant="outlined"
                     sx={{
                       flex: 1,
-                      py: 1.6,
-                      borderRadius: '16px',
-                      background: isDialogShopOpen 
-                        ? 'rgba(0,122,255,0.08)'
-                        : 'var(--surface-2)',
-                      border: 'none',
-                      color: isDialogShopOpen ? 'var(--primary)' : '#86868b',
-                      fontSize: '0.95rem',
+                      py: 1.5,
+                      borderRadius: '14px',
+                      borderWidth: '1.5px',
+                      borderColor: isDialogShopOpen ? 'var(--primary)' : 'var(--glass-border)',
+                      bgcolor: 'transparent',
+                      color: isDialogShopOpen ? 'var(--foreground)' : 'var(--text-muted)',
+                      fontSize: '0.92rem',
                       fontWeight: 700,
                       textTransform: 'none',
                       boxShadow: 'none',
-                      transition: 'all 0.25s ease',
-                      '&:hover': { 
-                        background: isDialogShopOpen ? 'rgba(0,122,255,0.12)' : 'var(--surface-2)',
-                        transform: isDialogShopOpen ? 'scale(0.98)' : 'none',
+                      '&:hover': {
+                        borderWidth: '1.5px',
+                        borderColor: 'var(--primary)',
+                        bgcolor: 'color-mix(in srgb, var(--primary) 6%, transparent)',
                       },
-                      '&:disabled': { color: 'var(--text-muted)' },
+                      '&:disabled': {
+                        borderColor: 'var(--glass-border)',
+                        color: 'var(--text-muted)',
+                      },
                     }}
                   >
                     {t.product.addToCart}
@@ -1836,27 +1777,21 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
                   <Button
                     onClick={handleBuyNow}
                     disabled={!isDialogShopOpen}
-                    startIcon={<Zap size={20} />}
+                    startIcon={<Zap size={18} />}
                     sx={{
-                      flex: 1.3,
-                      py: 1.6,
-                      borderRadius: '16px',
-                      background: isDialogShopOpen 
-                        ? 'var(--primary)'
-                        : 'var(--surface-2)',
-                      color: isDialogShopOpen ? 'white' : '#86868b',
-                      fontSize: '0.95rem',
+                      flex: 1,
+                      py: 1.5,
+                      borderRadius: '14px',
+                      bgcolor: isDialogShopOpen ? 'var(--primary)' : 'var(--surface-2)',
+                      color: isDialogShopOpen ? 'var(--primary-foreground)' : 'var(--text-muted)',
+                      fontSize: '0.92rem',
                       fontWeight: 800,
                       textTransform: 'none',
                       boxShadow: 'none',
-                      transition: 'all 0.25s ease',
                       '&:hover': {
-                        background: isDialogShopOpen 
-                          ? '#0062cc' 
-                          : 'var(--surface-2)',
-                        transform: isDialogShopOpen ? 'scale(0.98)' : 'none',
+                        bgcolor: isDialogShopOpen ? 'color-mix(in srgb, var(--primary) 88%, #000)' : 'var(--surface-2)',
                       },
-                      '&:disabled': { background: 'var(--surface-2)', color: 'var(--text-muted)' },
+                      '&:disabled': { bgcolor: 'var(--surface-2)', color: 'var(--text-muted)' },
                     }}
                   >
                     {t.product.buyNow}
@@ -1952,7 +1887,7 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
               px: 1,
             }}>
               <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
-                <Typography sx={{ fontSize: '1.3rem', fontWeight: 900, color: 'var(--success)', lineHeight: 1 }}>
+                <Typography sx={{ fontSize: '1.3rem', fontWeight: 900, color: 'var(--foreground)', lineHeight: 1 }}>
                   ฿{getCurrentPrice().toLocaleString()}
                 </Typography>
                 <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>
@@ -1972,52 +1907,41 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
             transition: 'max-height 0.35s ease, opacity 0.25s ease',
             opacity: bottomPanelCollapsed ? 0 : 1,
           }}>
-            {/* Price Summary - Enhanced */}
+            {/* Price Summary — high contrast */}
             <Box sx={{
-              p: 2.5,
-              mb: 2.5,
-              borderRadius: '18px',
-              background: 'var(--surface-2)',
-              border: 'none',
+              py: 2,
+              mb: 2,
+              borderTop: '1px solid var(--glass-border)',
+              borderBottom: '1px solid var(--glass-border)',
               display: 'flex',
-              alignItems: 'center',
+              alignItems: 'flex-end',
               justifyContent: 'space-between',
-              position: 'relative',
-              overflow: 'hidden',
+              gap: 2,
             }}>
-              <Box sx={{ position: 'relative', zIndex: 1 }}>
-                <Typography sx={{ fontSize: '0.78rem', color: 'var(--success)', fontWeight: 600, mb: 0.3 }}>
+              <Box>
+                <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600, mb: 0.35, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   {t.product.totalPrice}
                   {(() => {
                     const d = getEventDiscount(selectedProduct.id, activeProductCatalog.events);
-                    return d ? <Typography component="span" sx={{ fontSize: '0.68rem', color: '#ff453a', fontWeight: 700, ml: 0.5 }}>({d.discountLabel} {d.eventTitle})</Typography> : null;
+                    return d ? <Typography component="span" sx={{ fontSize: '0.68rem', color: '#ff453a', fontWeight: 700, ml: 0.5, textTransform: 'none', letterSpacing: 0 }}>({d.discountLabel} {d.eventTitle})</Typography> : null;
                   })()}
                 </Typography>
-                <Typography sx={{ 
-                  fontSize: '1.75rem', 
-                  fontWeight: 900, 
-                  color: 'var(--success)',
+                <Typography sx={{
+                  fontSize: '1.75rem',
+                  fontWeight: 900,
+                  color: 'var(--foreground)',
                   lineHeight: 1,
-                  textShadow: '0 2px 12px rgba(16,185,129,0.3)',
+                  letterSpacing: '-0.03em',
                 }}>
                   ฿{getCurrentPrice().toLocaleString()}
                 </Typography>
               </Box>
-              <Box sx={{ textAlign: 'right', position: 'relative', zIndex: 1 }}>
-                <Box sx={{
-                  px: 1.5,
-                  py: 0.5,
-                  borderRadius: '10px',
-                  bgcolor: 'var(--glass-bg)',
-                  border: '1px solid var(--glass-border)',
-                  mb: 0.5,
-                }}>
-                  <Typography sx={{ fontSize: '0.85rem', color: 'var(--foreground)', fontWeight: 700 }}>
-                    {productOptions.size} × {productOptions.quantity}
-                  </Typography>
-                </Box>
+              <Box sx={{ textAlign: 'right' }}>
+                <Typography sx={{ fontSize: '0.85rem', color: 'var(--foreground)', fontWeight: 600 }}>
+                  {productOptions.size} × {productOptions.quantity}
+                </Typography>
                 {productOptions.isLongSleeve && selectedProduct && (
-                  <Typography sx={{ fontSize: '0.72rem', color: 'var(--warning)', fontWeight: 600 }}>+ {t.common.longSleeve} ฿{selectedProduct.options?.longSleevePrice ?? 50}</Typography>
+                  <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600, mt: 0.35 }}>+ {t.common.longSleeve} ฿{selectedProduct.options?.longSleevePrice ?? 50}</Typography>
                 )}
               </Box>
             </Box>
@@ -2067,10 +1991,52 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
                   const reviews = productReviews[selectedProduct.id] || [];
                   if (reviews.length === 0) {
                     return (
-                      <Box sx={{ textAlign: 'center', py: 3, borderRadius: '14px', bgcolor: 'var(--surface-2)', border: '1px solid var(--glass-border)' }}>
-                        <Star size={32} strokeWidth={1} color="var(--text-muted)" />
-                        <Typography sx={{ mt: 1, fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>{t.reviews.noReviews}</Typography>
-                        <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', opacity: 0.7 }}>{t.reviews.beFirst}</Typography>
+                      <Box sx={{
+                        textAlign: 'center',
+                        py: 3,
+                        px: 2,
+                        borderRadius: '14px',
+                        border: '1px dashed var(--glass-border)',
+                        bgcolor: 'transparent',
+                      }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.3, mb: 1, opacity: 0.35 }}>
+                          {[1, 2, 3, 4, 5].map((s) => (
+                            <Star key={s} size={16} color="var(--text-muted)" strokeWidth={1.5} />
+                          ))}
+                        </Box>
+                        <Typography sx={{ fontSize: '0.82rem', color: 'var(--foreground)', fontWeight: 700 }}>
+                          {t.reviews.noReviews}
+                        </Typography>
+                        <Typography sx={{ mt: 0.35, fontSize: '0.72rem', color: 'var(--text-muted)', mb: 1.5 }}>
+                          {t.reviews.beFirst}
+                        </Typography>
+                        <Button
+                          size="small"
+                          startIcon={<Edit size={13} />}
+                          onClick={() => {
+                            if (!session) {
+                              showToast('warning', t.reviews.loginRequired);
+                              return;
+                            }
+                            setReviewRating(0);
+                            setReviewComment('');
+                            setReviewDialogOpen(true);
+                          }}
+                          sx={{
+                            textTransform: 'none',
+                            fontWeight: 700,
+                            fontSize: '0.72rem',
+                            px: 1.5,
+                            py: 0.55,
+                            borderRadius: '9px',
+                            border: '1px solid var(--glass-border)',
+                            color: 'var(--foreground)',
+                            bgcolor: 'var(--surface)',
+                            '&:hover': { borderColor: 'var(--primary)', bgcolor: 'var(--surface-2)' },
+                          }}
+                        >
+                          {t.reviews.writeFirstReview}
+                        </Button>
                       </Box>
                     );
                   }
@@ -2151,26 +2117,29 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
             <Button
               onClick={handleAddToCart}
               disabled={!isDialogShopOpen}
-              startIcon={<ShoppingCart size={20} />}
+              startIcon={<ShoppingCart size={18} />}
+              variant="outlined"
               sx={{
                 flex: 1,
-                py: 1.6,
-                borderRadius: '16px',
-                background: isDialogShopOpen 
-                  ? 'rgba(0,122,255,0.08)'
-                  : 'var(--surface-2)',
-                border: 'none',
-                color: isDialogShopOpen ? 'var(--primary)' : '#86868b',
-                fontSize: '0.95rem',
+                py: 1.5,
+                borderRadius: '14px',
+                borderWidth: '1.5px',
+                borderColor: isDialogShopOpen ? 'var(--primary)' : 'var(--glass-border)',
+                bgcolor: 'transparent',
+                color: isDialogShopOpen ? 'var(--foreground)' : 'var(--text-muted)',
+                fontSize: '0.92rem',
                 fontWeight: 700,
                 textTransform: 'none',
                 boxShadow: 'none',
-                transition: 'all 0.25s ease',
-                '&:hover': { 
-                  background: isDialogShopOpen ? 'rgba(0,122,255,0.12)' : 'var(--surface-2)',
-                  transform: isDialogShopOpen ? 'scale(0.98)' : 'none',
+                '&:hover': {
+                  borderWidth: '1.5px',
+                  borderColor: 'var(--primary)',
+                  bgcolor: 'color-mix(in srgb, var(--primary) 6%, transparent)',
                 },
-                '&:disabled': { color: 'var(--text-muted)' },
+                '&:disabled': {
+                  borderColor: 'var(--glass-border)',
+                  color: 'var(--text-muted)',
+                },
               }}
             >
               {t.product.addToCart}
@@ -2178,27 +2147,21 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
             <Button
               onClick={handleBuyNow}
               disabled={!isDialogShopOpen}
-              startIcon={<Zap size={20} />}
+              startIcon={<Zap size={18} />}
               sx={{
-                flex: 1.3,
-                py: 1.6,
-                borderRadius: '16px',
-                background: isDialogShopOpen 
-                  ? 'var(--primary)'
-                  : 'var(--surface-2)',
-                color: isDialogShopOpen ? 'white' : '#86868b',
-                fontSize: '0.95rem',
+                flex: 1,
+                py: 1.5,
+                borderRadius: '14px',
+                bgcolor: isDialogShopOpen ? 'var(--primary)' : 'var(--surface-2)',
+                color: isDialogShopOpen ? 'var(--primary-foreground)' : 'var(--text-muted)',
+                fontSize: '0.92rem',
                 fontWeight: 800,
                 textTransform: 'none',
                 boxShadow: 'none',
-                transition: 'all 0.25s ease',
                 '&:hover': {
-                  background: isDialogShopOpen 
-                    ? '#0062cc' 
-                    : 'var(--surface-2)',
-                  transform: isDialogShopOpen ? 'scale(0.98)' : 'none',
+                  bgcolor: isDialogShopOpen ? 'color-mix(in srgb, var(--primary) 88%, #000)' : 'var(--surface-2)',
                 },
-                '&:disabled': { background: 'var(--surface-2)', color: 'var(--text-muted)' },
+                '&:disabled': { bgcolor: 'var(--surface-2)', color: 'var(--text-muted)' },
               }}
             >
               {t.product.buyNow}

@@ -498,43 +498,68 @@ export default function ProtectedImage({
           style={{
             position: 'absolute',
             inset: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'rgba(29,29,31,0.5)',
             zIndex: 1,
+            overflow: 'hidden',
+            background: 'var(--surface-2, #ececef)',
           }}
         >
-          <div style={{
-            width: 32, height: 32, borderRadius: '50%',
-            border: '2px solid rgba(255,255,255,0.1)',
-            borderTopColor: 'rgba(41,151,255,0.6)',
-            animation: 'protimg-spin 0.8s linear infinite',
-          }} />
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background:
+                'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.35) 50%, transparent 100%)',
+              animation: 'protimg-shimmer 1.4s ease-in-out infinite',
+            }}
+          />
         </div>
       )}
 
       {error && (
         <div
+          role="button"
+          tabIndex={0}
+          onClick={() => setError(false)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') setError(false);
+          }}
+          title={t.misc.tapToRetry}
+          aria-label={t.misc.tapToRetry}
           style={{
             position: 'absolute',
             inset: 0,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: 'rgba(29,29,31,0.8)',
-            color: '#86868b',
-            fontSize: '0.875rem',
+            background: '#ececef',
             zIndex: 1,
+            cursor: 'pointer',
           }}
         >
-          {t.misc.cannotLoadImage}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/favicon.png"
+            alt="SCC Shop"
+            style={{
+              width: 40,
+              height: 40,
+              objectFit: 'contain',
+              opacity: 0.4,
+              filter: 'grayscale(1)',
+              pointerEvents: 'none',
+              userSelect: 'none',
+            }}
+          />
         </div>
       )}
 
       <style>{`
         @keyframes protimg-spin {
           to { transform: rotate(360deg); }
+        }
+        @keyframes protimg-shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
         }
         .protected-image-container {
           -webkit-user-drag: none;

@@ -28,7 +28,8 @@ export interface CookieOptions {
 // ============== CONSTANTS ==============
 
 export const COOKIE_CONSENT_KEY = 'cookie_consent';
-export const COOKIE_CONSENT_VERSION = '1.0';
+/** Bump when consent defaults/UI change so users re-confirm (PDPA). */
+export const COOKIE_CONSENT_VERSION = '1.1';
 export const DEFAULT_COOKIE_EXPIRY_DAYS = 365;
 
 export const COOKIE_CATEGORIES: Record<CookieCategory, { name: string; description: string; required: boolean }> = {
@@ -151,7 +152,8 @@ export function getConsentState(): CookieConsent | null {
 export function saveConsentState(consent: Partial<Omit<CookieConsent, 'timestamp' | 'version'>>): CookieConsent {
   const fullConsent: CookieConsent = {
     essential: true, // ต้องเป็น true เสมอ
-    functional: consent.functional ?? true,
+    // Non-essential categories must default OFF (explicit opt-in)
+    functional: consent.functional ?? false,
     analytics: consent.analytics ?? false,
     marketing: consent.marketing ?? false,
     timestamp: Date.now(),

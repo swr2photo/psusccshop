@@ -39,32 +39,40 @@ export default function ShopLoadingShell({
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-0 pb-24 pt-3 sm:px-4 sm:pt-5 md:pb-8">
-        {/* Banner */}
-        <div className="skeleton mb-4 h-36 w-full rounded-none sm:mb-5 sm:h-48 sm:rounded-2xl md:h-56" />
-
-        {/* Category / filter strip */}
-        <div className="mb-4 flex gap-2 overflow-hidden px-3.5 sm:px-0">
-          {[72, 88, 64, 96, 70].map((w, i) => (
-            <div
-              key={i}
-              className="skeleton h-8 shrink-0 rounded-full"
-              style={{ width: w }}
-            />
-          ))}
+      <main className="mx-auto w-full max-w-6xl flex-1 px-0 pb-24 pt-0 sm:px-0 sm:pt-0 md:pb-8">
+        {/* Hero skeleton — full-bleed */}
+        <div className="skeleton mb-0 h-[340px] w-full rounded-none sm:h-[380px] md:h-[440px]" />
+        {/* Trust strip skeleton */}
+        <div className="mb-4 flex justify-center gap-4 border-b border-[var(--glass-border)] px-3 py-3 sm:gap-8">
+          <div className="skeleton h-3 w-24" />
+          <div className="skeleton h-3 w-28" />
+          <div className="skeleton h-3 w-32" />
         </div>
 
-        {/* Section title */}
-        <div className="mb-3 space-y-1.5 px-3.5 sm:px-0">
-          <div className="skeleton h-5 w-40 max-w-[50%]" />
-          <div className="skeleton h-3 w-24 max-w-[30%]" />
-        </div>
+        <div className="mx-auto max-w-6xl px-3.5 sm:px-4">
+          {/* Category / filter strip */}
+          <div className="mb-4 flex gap-2 overflow-hidden">
+            {[72, 88, 64, 96, 70].map((w, i) => (
+              <div
+                key={i}
+                className="skeleton h-8 shrink-0 rounded-full"
+                style={{ width: w }}
+              />
+            ))}
+          </div>
 
-        {/* Product cards — horizontal on xs, grid from sm */}
-        <div className="flex gap-3 overflow-hidden px-3.5 sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:px-0 md:grid-cols-3 lg:grid-cols-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <ProductCardSkeleton key={i} className={i >= 2 ? 'hidden sm:block' : undefined} />
-          ))}
+          {/* Section title */}
+          <div className="mb-3 space-y-1.5">
+            <div className="skeleton h-5 w-48 max-w-[55%]" />
+            <div className="skeleton h-3 w-36 max-w-[40%]" />
+          </div>
+
+          {/* Product cards — horizontal on xs, grid from sm */}
+          <div className="flex gap-3 overflow-hidden sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-visible md:grid-cols-3 lg:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <ProductCardSkeleton key={i} className={i >= 2 ? 'hidden sm:block' : undefined} />
+            ))}
+          </div>
         </div>
       </main>
 

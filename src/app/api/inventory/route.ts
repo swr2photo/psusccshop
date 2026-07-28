@@ -8,6 +8,7 @@ import { requireAdmin, isAdminEmailAsync, getSession } from '@/lib/auth';
 import { API_CACHE, API_CDN_HEADERS } from '@/lib/api-helpers';
 import { getCached, invalidateCachePrefix, CACHE_TTL } from '@/lib/server-cache';
 import { groupInventoryRows, toPublicInventory } from '@/lib/inventory-public';
+import { toIsoString } from '@/lib/safe-date';
 
 type InventoryDbRow = typeof inventory.$inferSelect;
 
@@ -129,7 +130,7 @@ export async function POST(request: NextRequest) {
         variant_id: resultData.variantId,
         quantity: resultData.quantity,
         low_stock_threshold: resultData.lowStockThreshold,
-        updated_at: resultData.updatedAt?.toISOString(),
+        updated_at: toIsoString(resultData.updatedAt) || undefined,
       },
     });
   } catch (error: any) {

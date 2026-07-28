@@ -187,6 +187,11 @@ export interface Product {
   basePrice: number;
   /** ราคาตามขนาด (สำหรับเสื้อ) */
   sizePricing?: { [key: string]: number };
+  /**
+   * Optional per-size chest/length chart (inches).
+   * Keys match sizePricing keys, or FREE / ฟรีไซส์ for free-size.
+   */
+  sizeChart?: Record<string, { chest: number; length: number }>;
   /** ตัวเลือกสินค้าแบบกำหนดเอง (สำหรับของที่ระลึก/ค่ายฯ) */
   variants?: ProductVariant[];
   /** ลายสินค้า (เช่น ลายเสื้อ) */

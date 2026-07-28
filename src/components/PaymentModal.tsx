@@ -1,15 +1,23 @@
 'use client';
 
 import { apiFetch } from '@/lib/api-client';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { JSX } from 'react';
-import { X, Upload, Check, Loader2, AlertCircle, CheckCircle2, Image, Clock3, Download, CreditCard, QrCode, Copy, Smartphone, Sparkles, AlertTriangle, Info, ShoppingBag, Tag, Hash, Shirt, Clock, Palette } from 'lucide-react';
-import { Drawer, Box, Typography, Button, IconButton, Skeleton, useMediaQuery, LinearProgress, Slide, Collapse } from '@mui/material';
+import {
+  X, Upload, Check, Loader2, AlertCircle, CheckCircle2, Download,
+  Copy, Smartphone, Sparkles, AlertTriangle, Info, Mail, FileText, Printer, Headphones,
+} from 'lucide-react';
+import { Drawer, Box, Typography, Button, IconButton, Skeleton, useMediaQuery, LinearProgress, Checkbox, FormControlLabel, TextField } from '@mui/material';
 import { QRCodeSVG } from 'qrcode.react';
-import { CountdownBadge } from './OrderCountdown';
+import { PaymentCountdown } from './OrderCountdown';
 import StripePromptPay from './StripePromptPay';
 import { useTranslation } from '@/hooks/useTranslation';
 import { toast } from '@/components/ui/toast';
+import {
+  ISSUER,
+  bahtText,
+  buildPaymentNoticeNumber,
+} from '@/lib/invoice-html';
 
 interface PaymentModalProps {
   orderRef: string;
@@ -46,8 +54,34 @@ const usePaymentToast = () => {
   return { addToast };
 };
 
-// Statuses considered as paid
 const PAID_STATUSES = ['PAID', 'COMPLETED', 'SHIPPED', 'READY', 'VERIFYING'];
+
+const NAVY = '#1e3a5f';
+const NAVY_SOFT = 'rgba(30, 58, 95, 0.08)';
+const EMERALD = '#059669';
+const EMERALD_SOFT = 'rgba(5, 150, 105, 0.12)';
+const AMBER = '#d97706';
+const MONO = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace';
+
+/** Common Thai bank app URL schemes (open app only — not a payment API). */
+const MOBILE_BANK_APPS = [
+  { id: 'scb', scheme: 'scbeasy://', labelKey: 'openScbEasy' as const },
+  { id: 'kbank', scheme: 'kplus://', labelKey: 'openKPlus' as const },
+  { id: 'ktb', scheme: 'ktbnext://', labelKey: 'openKtbNext' as const },
+  { id: 'bbl', scheme: 'bualuangmbanking://', labelKey: 'openBualuang' as const },
+] as const;
+
+const OPEN_SUPPORT_CHAT_EVENT = 'psuscc:open-support-chat';
+
+function itemSpec(item: CartItem, t: { sizeLabel: string; numberLabel: string; longSleeve: string }): string {
+  const parts: string[] = [];
+  if (item.size && item.size !== '-') parts.push(`${t.sizeLabel} ${item.size}`);
+  if (item.customName) parts.push(item.customName);
+  if (item.customNumber) parts.push(`${t.numberLabel} ${item.customNumber}`);
+  if (item.isLongSleeve) parts.push(t.longSleeve);
+  if (item.pattern) parts.push(item.pattern);
+  return parts.join(' · ') || '—';
+}
 
 export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentModalProps): JSX.Element {
   const { addToast } = usePaymentToast();
@@ -63,24 +97,29 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [showCartDetails, setShowCartDetails] = useState(false);
   const [orderStatus, setOrderStatus] = useState<string>('PENDING');
   const [orderDate, setOrderDate] = useState<string | null>(null);
-  
-  // Payment system status
+  const [taxId, setTaxId] = useState<string>('');
+
   const [paymentEnabled, setPaymentEnabled] = useState(true);
   const [paymentDisabledMessage, setPaymentDisabledMessage] = useState<string | null>(null);
   const [accountHolderName, setAccountHolderName] = useState<string>('');
   const [promptPayId, setPromptPayId] = useState<string>('');
+  const [bankName, setBankName] = useState<string>('');
+  const [accountNumber, setAccountNumber] = useState<string>('');
 
-  // Stripe PromptPay (auto-verified QR via Stripe.js)
   const [stripeEnabled, setStripeEnabled] = useState(false);
   const [payMethod, setPayMethod] = useState<'stripe' | 'manual'>('manual');
-  
-  // Check if already paid
+
+  const [wantFullReceipt, setWantFullReceipt] = useState(false);
+  const [receiptTaxOrStudentId, setReceiptTaxOrStudentId] = useState('');
+  const [receiptOrgName, setReceiptOrgName] = useState('');
+  const [receiptAddress, setReceiptAddress] = useState('');
+
   const isPaid = PAID_STATUSES.includes(orderStatus.toUpperCase());
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const printRegionRef = useRef<HTMLDivElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
@@ -88,13 +127,20 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
   const hasSlip = Boolean(selectedFile);
   const discountValue = Math.abs(discount);
 
-  // Swipe-to-dismiss state
   const [swipeDragOffset, setSwipeDragOffset] = useState(0);
   const [isSwipeDragging, setIsSwipeDragging] = useState(false);
   const swipeStartY = useRef(0);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
-  // Scroll content to top when loading or orderRef changes
+  const orgName = lang === 'th' ? ISSUER.nameTh : ISSUER.nameEn;
+  const orgShort = lang === 'th' ? ISSUER.shortTh : ISSUER.shortEn;
+  const vatNote = lang === 'th' ? ISSUER.vatNoteTh : ISSUER.vatNoteEn;
+  const amountWords = useMemo(() => bahtText(amount, lang === 'th' ? 'th' : 'en'), [amount, lang]);
+  const noticeNo = useMemo(
+    () => buildPaymentNoticeNumber(orderRef, orderDate || new Date()),
+    [orderRef, orderDate],
+  );
+
   useEffect(() => {
     if (scrollContainerRef.current) {
       scrollContainerRef.current.scrollTop = 0;
@@ -144,30 +190,29 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
         setCartItems(info.cart || []);
         setOrderStatus(info.status || 'PENDING');
         setOrderDate(info.orderDate || info.date || info.createdAt || null);
-        // Payment system status
         setPaymentEnabled(info.paymentEnabled !== false);
         setPaymentDisabledMessage(info.paymentDisabledMessage || null);
         setAccountHolderName(info.accountName || '');
         setPromptPayId(info.promptPayId || '');
-        // Prefer the auto-verified Stripe flow when available
+        setBankName(info.bankName || '');
+        setAccountNumber(info.accountNumber || '');
+        setTaxId(info.taxId || '');
         const stripeOk = info.stripePromptPayEnabled === true;
         setStripeEnabled(stripeOk);
         if (stripeOk) setPayMethod('stripe');
       } else {
         addToast('error', t.common.error, data.message || t.payment.noPaymentInfo);
       }
-    } catch (error) {
+    } catch {
       addToast('error', t.payment.connectionError, t.payment.tryAgain);
     } finally {
       setLoading(false);
     }
   };
 
-  // Stripe PromptPay paid — webhook marks the order PAID server-side
   const handleStripeSuccess = () => {
     addToast('success', t.payment.paymentSuccessToast, t.payment.paymentDetected);
     setOrderStatus('PAID');
-    // Brief pause so the success state is visible before closing the modal
     setTimeout(() => onSuccess(), 800);
   };
 
@@ -207,15 +252,24 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
             base64,
             mime: selectedFile.type,
             name: selectedFile.name,
+            ...(wantFullReceipt
+              ? {
+                  receiptRequest: {
+                    wanted: true,
+                    taxOrStudentId: receiptTaxOrStudentId.trim(),
+                    orgName: receiptOrgName.trim(),
+                    address: receiptAddress.trim(),
+                  },
+                }
+              : {}),
           }),
         });
         const data: any = await res.json();
 
         if (data.status === 'success') {
-          // Show sender name if available
           const senderName = data.data?.senderName;
-          const successMsg = senderName 
-            ? `${t.payment.thankYouPrefix} ${senderName}` 
+          const successMsg = senderName
+            ? `${t.payment.thankYouPrefix} ${senderName}`
             : t.payment.slipReceived;
           addToast('success', t.payment.paymentSuccessToast, successMsg);
           setTimeout(() => {
@@ -223,12 +277,10 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
             onClose();
           }, 1800);
         } else {
-          // Show specific error message
           const errorCode = data.code;
           let title: string = t.payment.verifyFailed;
           let message: string = data.message || t.payment.checkSlipRetry;
 
-          // Adjust title based on error code
           if (errorCode === 1012) {
             title = t.payment.duplicateSlip;
             message = t.payment.duplicateSlipDesc;
@@ -242,20 +294,18 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
           } else if (errorCode === 'PAYMENT_DISABLED') {
             title = t.payment.systemClosed;
             message = data.message || t.payment.systemClosedDesc;
-            // Update state to show correct UI
             setPaymentEnabled(false);
             setPaymentDisabledMessage(data.message);
           }
 
           addToast('error', title, message);
-          
-          // If duplicate slip or wrong account, reset slip
+
           if (errorCode === 1012 || errorCode === 1014) {
             setSelectedFile(null);
             setPreviewUrl(null);
           }
         }
-      } catch (error) {
+      } catch {
         addToast('error', t.common.error, t.payment.serverError);
       } finally {
         setVerifying(false);
@@ -264,13 +314,11 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
   };
 
   const handleSaveQr = async () => {
-    // If we have qrPayload, convert SVG to PNG and download
     if (qrPayload) {
       try {
         setDownloading(true);
         setDownloadProgress(30);
-        
-        // Find the QR SVG element by ID
+
         const svgElement = document.getElementById('promptpay-qr-svg');
         if (!svgElement) {
           addToast('error', t.payment.noQRCode);
@@ -278,39 +326,31 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
           setDownloadProgress(0);
           return;
         }
-        
+
         setDownloadProgress(50);
-        
-        // Get SVG data
+
         const svgData = new XMLSerializer().serializeToString(svgElement);
         const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
         const svgUrl = URL.createObjectURL(svgBlob);
-        
-        // Create canvas with padding for nice output
+
         const canvas = document.createElement('canvas');
         const padding = 40;
         const qrSize = 200;
         const totalSize = qrSize + (padding * 2);
         canvas.width = totalSize;
-        canvas.height = totalSize + 60; // Extra space for text
+        canvas.height = totalSize + 60;
         const ctx = canvas.getContext('2d');
-        
+
         if (!ctx) {
           addToast('error', t.payment.cannotCreateImage);
           setDownloading(false);
           setDownloadProgress(0);
           return;
         }
-        
-        // Draw gradient background
-        const gradient = ctx.createLinearGradient(0, 0, totalSize, totalSize);
-        gradient.addColorStop(0, '#1a237e');
-        gradient.addColorStop(0.5, '#283593');
-        gradient.addColorStop(1, '#3949ab');
-        ctx.fillStyle = gradient;
+
+        ctx.fillStyle = NAVY;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // Draw white rounded rectangle for QR
+
         ctx.fillStyle = '#ffffff';
         const rx = 16;
         const qrX = padding;
@@ -327,28 +367,24 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
         ctx.quadraticCurveTo(qrX, qrY, qrX + rx, qrY);
         ctx.closePath();
         ctx.fill();
-        
+
         setDownloadProgress(70);
-        
-        // Load and draw QR
+
         const img = document.createElement('img') as HTMLImageElement;
         img.onload = () => {
           ctx.drawImage(img, padding + 10, padding + 10, qrSize - 20, qrSize - 20);
-          
-          // Draw amount text
+
           ctx.fillStyle = '#ffffff';
           ctx.font = 'bold 20px Arial, sans-serif';
           ctx.textAlign = 'center';
           ctx.fillText(`฿${amount.toLocaleString(lang === 'th' ? 'th-TH' : 'en-US', { minimumFractionDigits: 2 })}`, totalSize / 2, totalSize + 35);
-          
-          // Draw "PromptPay" text
+
           ctx.font = '12px Arial, sans-serif';
           ctx.fillStyle = 'rgba(255,255,255,0.7)';
           ctx.fillText('PromptPay', totalSize / 2, totalSize + 52);
-          
+
           setDownloadProgress(90);
-          
-          // Convert to blob and download
+
           canvas.toBlob((blob) => {
             if (blob) {
               const url = URL.createObjectURL(blob);
@@ -365,27 +401,26 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
             setDownloading(false);
             setTimeout(() => setDownloadProgress(0), 500);
           }, 'image/png', 0.95);
-          
+
           URL.revokeObjectURL(svgUrl);
         };
-        
+
         img.onerror = () => {
           addToast('error', t.payment.loadQRFailed);
           setDownloading(false);
           setDownloadProgress(0);
           URL.revokeObjectURL(svgUrl);
         };
-        
+
         img.src = svgUrl;
-      } catch (error) {
+      } catch {
         addToast('error', t.payment.saveFailed, t.payment.tryAgain);
         setDownloading(false);
         setDownloadProgress(0);
       }
       return;
     }
-    
-    // Legacy: download from qrUrl
+
     if (!qrUrl) {
       addToast('warning', t.payment.noQR);
       return;
@@ -398,16 +433,14 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
       xhr.responseType = 'blob';
       xhr.onprogress = (event) => {
         if (event.lengthComputable && event.total > 0) {
-          const percent = Math.round((event.loaded / event.total) * 100);
-          setDownloadProgress(percent);
+          setDownloadProgress(Math.round((event.loaded / event.total) * 100));
         } else {
           setDownloadProgress((prev) => Math.min(99, prev + 5));
         }
       };
       xhr.onload = () => {
         if (xhr.status === 200) {
-          const blob = xhr.response;
-          const blobUrl = URL.createObjectURL(blob);
+          const blobUrl = URL.createObjectURL(xhr.response);
           const link = document.createElement('a');
           link.href = blobUrl;
           link.download = `qr-${orderRef}.png`;
@@ -427,31 +460,96 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
         setDownloadProgress(0);
       };
       xhr.send();
-    } catch (error) {
+    } catch {
       addToast('error', t.payment.saveFailed, t.payment.tryAgain);
       setDownloading(false);
       setDownloadProgress(0);
     }
   };
 
-  const copyAmount = () => {
-    navigator.clipboard.writeText(amount.toString());
-    addToast('success', t.payment.copiedAmount);
+  const formatMoney = (value: number) =>
+    `฿${value.toLocaleString(lang === 'th' ? 'th-TH' : 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  const copyText = async (value: string, successTitle: string) => {
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      addToast('success', successTitle);
+    } catch {
+      addToast('error', t.common.error, t.payment.tryAgain);
+    }
   };
+
+  const copyAmount = () => copyText(amount.toFixed(2), t.payment.copiedAmount);
+  const copyPromptPay = () => copyText(promptPayId, t.payment.copiedPromptPay);
+  const copyAccount = () => copyText(accountNumber, t.payment.copiedAccount);
+
+  const handlePrintNotice = useCallback(() => {
+    window.print();
+  }, []);
+
+  const openSupportForPayment = useCallback(() => {
+    const prefill = String(t.payment.supportPrefillMessage || '')
+      .replace(/\{ref\}/g, orderRef)
+      .replace(/\{noticeNo\}/g, noticeNo);
+    window.dispatchEvent(
+      new CustomEvent(OPEN_SUPPORT_CHAT_EVENT, {
+        detail: { prefill, orderRef },
+      }),
+    );
+  }, [t.payment.supportPrefillMessage, orderRef, noticeNo]);
+
+  const openBankApp = useCallback((scheme: string) => {
+    const isLikelyMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+    if (!isLikelyMobile) {
+      addToast('info', t.payment.payOnMobile, t.payment.bankAppDesktopHint);
+      return;
+    }
+    try {
+      // Custom schemes: try without leaving the page when possible
+      const anchor = document.createElement('a');
+      anchor.href = scheme;
+      anchor.rel = 'noopener';
+      anchor.style.display = 'none';
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+    } catch {
+      addToast('warning', t.payment.bankAppOpenFailed);
+    }
+  }, [addToast, t.payment.payOnMobile, t.payment.bankAppDesktopHint, t.payment.bankAppOpenFailed]);
+
+  const sectionSx = {
+    borderRadius: '12px',
+    bgcolor: 'var(--surface-2)',
+    border: '1px solid var(--glass-border)',
+    overflow: 'hidden',
+  } as const;
+
+  const sectionHeaderSx = {
+    px: 2.25,
+    py: 1.5,
+    borderBottom: '1px solid var(--glass-border)',
+    bgcolor: NAVY_SOFT,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 1,
+  } as const;
 
   return (
     <Drawer
-      anchor={isMobile ? "bottom" : "right"}
+      anchor={isMobile ? 'bottom' : 'right'}
       open={true}
       onClose={onClose}
       PaperProps={{
         sx: {
-          height: isMobile ? { xs: '85vh', sm: '85vh' } : '100vh',
-          maxHeight: isMobile ? '90vh' : '100vh',
-          width: isMobile ? '100%' : '520px',
-          borderTopLeftRadius: isMobile ? { xs: 20, sm: 24 } : { xs: 0, sm: 24 },
-          borderTopRightRadius: isMobile ? { xs: 20, sm: 24 } : 0,
-          borderBottomLeftRadius: isMobile ? 0 : { xs: 0, sm: 24 },
+          height: isMobile ? { xs: '88vh', sm: '88vh' } : '100vh',
+          maxHeight: isMobile ? '92vh' : '100vh',
+          width: isMobile ? '100%' : '560px',
+          borderTopLeftRadius: isMobile ? { xs: 16, sm: 20 } : { xs: 0, sm: 16 },
+          borderTopRightRadius: isMobile ? { xs: 16, sm: 20 } : 0,
+          borderBottomLeftRadius: isMobile ? 0 : { xs: 0, sm: 16 },
           bgcolor: 'var(--background)',
           overflow: 'hidden',
           transform: isMobile && swipeDragOffset > 0 ? `translateY(${swipeDragOffset}px) !important` : undefined,
@@ -459,19 +557,17 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
         },
       }}
     >
-      
-      {/* Header - Compact */}
+      {/* Official document header */}
       <Box sx={{
-        px: { xs: 2, sm: 3 },
+        px: { xs: 2, sm: 2.5 },
         pt: 1,
-        pb: 1.5,
-        borderBottom: '1px solid var(--glass-border)',
+        pb: 1.75,
+        borderBottom: `2px solid ${NAVY}`,
         background: 'var(--glass-strong)',
         position: 'sticky',
         top: 0,
         zIndex: 10,
       }}>
-        {/* Drag Handle - Swipe to dismiss */}
         {isMobile && (
           <Box
             onTouchStart={handleSwipeStart}
@@ -479,461 +575,490 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
             onTouchEnd={handleSwipeEnd}
             sx={{ width: '100%', display: 'flex', justifyContent: 'center', py: 0.5, cursor: 'grab', touchAction: 'none' }}
           >
-            <Box sx={{ width: isSwipeDragging ? 48 : 36, height: 4, bgcolor: isSwipeDragging ? 'var(--text-muted)' : 'var(--glass-bg)', borderRadius: 3, transition: 'all 0.2s ease' }} />
+            <Box sx={{
+              width: isSwipeDragging ? 48 : 36,
+              height: 4,
+              bgcolor: isSwipeDragging ? 'var(--text-muted)' : 'var(--glass-bg)',
+              borderRadius: 3,
+              transition: 'all 0.2s ease',
+            }} />
           </Box>
         )}
-        
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Box sx={{
-              width: 40,
-              height: 40,
-              borderRadius: '12px',
-              background: 'linear-gradient(135deg, #34c759 0%, #64d2ff 100%)',
-              display: 'grid',
-              placeItems: 'center',
-              boxShadow: '0 4px 16px rgba(16,185,129,0.25)',
+
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1.5 }}>
+          <Box sx={{ minWidth: 0, flex: 1 }}>
+            <Typography sx={{
+              fontSize: '0.68rem',
+              fontWeight: 600,
+              color: NAVY,
+              letterSpacing: 0.2,
+              lineHeight: 1.45,
+              mb: 0.75,
             }}>
-              <CreditCard size={20} color="white" />
-            </Box>
-            <Box>
-              <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--foreground)', lineHeight: 1.2 }}>
+              {orgName}
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+              <Box sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 0.6,
+                px: 1,
+                py: 0.35,
+                borderRadius: '6px',
+                bgcolor: NAVY,
+                color: '#fff',
+              }}>
+                <FileText size={12} />
+                <Typography sx={{ fontSize: '0.68rem', fontWeight: 800, letterSpacing: 0.8 }}>
+                  {t.payment.titleShort}
+                </Typography>
+              </Box>
+              <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--foreground)' }}>
                 {t.payment.title}
               </Typography>
-              <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
-                #{orderRef}
+            </Box>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: { xs: 1, sm: 2 }, mt: 1 }}>
+              <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                {t.payment.noticeNo}:{' '}
+                <Box component="span" sx={{ fontFamily: MONO, fontWeight: 700, color: 'var(--foreground)', letterSpacing: 0.4 }}>
+                  {noticeNo}
+                </Box>
+              </Typography>
+              <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                {t.payment.orderRefId}:{' '}
+                <Box component="span" sx={{ fontFamily: MONO, fontWeight: 700, color: 'var(--foreground)', letterSpacing: 0.4 }}>
+                  {orderRef}
+                </Box>
               </Typography>
             </Box>
           </Box>
-          
-          {/* Close Button */}
-          <IconButton
-            onClick={onClose}
-            size="small"
-            sx={{
-              bgcolor: 'var(--glass-bg)',
-              color: 'var(--text-muted)',
-              '&:hover': { bgcolor: 'var(--glass-bg)', color: 'var(--foreground)' },
-            }}
-          >
-            <X size={20} />
-          </IconButton>
-        </Box>
 
+          <Box className="payment-notice-no-print" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
+            {!loading && (
+              <Button
+                size="small"
+                startIcon={<Printer size={14} />}
+                onClick={handlePrintNotice}
+                aria-label={t.payment.downloadPdf}
+                sx={{
+                  display: { xs: 'none', sm: 'inline-flex' },
+                  textTransform: 'none',
+                  fontWeight: 700,
+                  fontSize: '0.68rem',
+                  color: NAVY,
+                  border: '1px solid rgba(30,58,95,0.28)',
+                  bgcolor: NAVY_SOFT,
+                  borderRadius: '8px',
+                  px: 1.1,
+                  minHeight: 34,
+                  '&:hover': { bgcolor: 'rgba(30,58,95,0.14)' },
+                }}
+              >
+                {t.payment.downloadPdf}
+              </Button>
+            )}
+            {!loading && (
+              <IconButton
+                onClick={handlePrintNotice}
+                size="small"
+                aria-label={t.payment.printNotice}
+                sx={{
+                  display: { xs: 'inline-flex', sm: 'none' },
+                  bgcolor: NAVY_SOFT,
+                  color: NAVY,
+                  border: '1px solid rgba(30,58,95,0.28)',
+                  '&:hover': { bgcolor: 'rgba(30,58,95,0.14)' },
+                }}
+              >
+                <Printer size={16} />
+              </IconButton>
+            )}
+            <IconButton
+              onClick={onClose}
+              size="small"
+              aria-label={t.common.cancel}
+              sx={{
+                bgcolor: 'var(--glass-bg)',
+                color: 'var(--text-muted)',
+                border: '1px solid var(--glass-border)',
+                '&:hover': { bgcolor: 'var(--glass-bg)', color: 'var(--foreground)' },
+              }}
+            >
+              <X size={18} />
+            </IconButton>
+          </Box>
+        </Box>
       </Box>
 
-      {/* Content */}
-      <Box 
+      <Box
         ref={scrollContainerRef}
-        sx={{ flex: 1, overflow: 'auto', WebkitOverflowScrolling: 'touch', px: { xs: 2, sm: 3 }, py: 2.5 }}
+        sx={{ flex: 1, overflow: 'auto', WebkitOverflowScrolling: 'touch', px: { xs: 2, sm: 2.5 }, py: 2 }}
       >
+        <Box
+          ref={printRegionRef}
+          className="payment-notice-print"
+          sx={{ position: 'relative', maxWidth: 520, mx: 'auto' }}
+        >
+          {/* Print-only letterhead (screen header is outside print scope) */}
+          <Box
+            className="payment-notice-letterhead"
+            sx={{
+              display: 'none',
+              '@media print': { display: 'block' },
+              mb: 2,
+              pb: 1.5,
+              borderBottom: `2.5px solid ${NAVY}`,
+              pr: 14,
+            }}
+          >
+            <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: NAVY, lineHeight: 1.35 }}>
+              {orgName}
+            </Typography>
+            <Typography sx={{ fontSize: '0.7rem', color: '#64748b', mt: 0.35 }}>
+              {lang === 'th' ? ISSUER.nameEn : ISSUER.nameTh}
+            </Typography>
+            <Typography sx={{ fontSize: '0.68rem', color: '#64748b', mt: 0.5, lineHeight: 1.45 }}>
+              {lang === 'th' ? ISSUER.addressTh : ISSUER.addressEn}
+              <br />
+              {lang === 'th' ? 'โทร' : 'Tel'}: {ISSUER.phone} · {ISSUER.email}
+            </Typography>
+            <Typography sx={{ fontSize: '0.95rem', fontWeight: 800, color: NAVY, mt: 1.25, letterSpacing: 0.4 }}>
+              {t.payment.title}
+            </Typography>
+            <Typography sx={{ fontSize: '0.72rem', color: '#475569', mt: 0.5, fontFamily: MONO }}>
+              {t.payment.noticeNo}: {noticeNo} · {orderRef}
+            </Typography>
+          </Box>
+
+          {/* Digital status stamp */}
+          {!loading && (
+            <Box
+              className="payment-notice-stamp"
+              aria-hidden
+              sx={{
+                position: 'absolute',
+                top: { xs: 4, sm: 8 },
+                right: { xs: 4, sm: 8 },
+                zIndex: 2,
+                pointerEvents: 'none',
+                transform: 'rotate(12deg)',
+                px: 1.25,
+                py: 0.55,
+                borderRadius: '4px',
+                border: `2.5px solid ${isPaid ? EMERALD : AMBER}`,
+                color: isPaid ? EMERALD : AMBER,
+                bgcolor: isPaid ? 'rgba(5,150,105,0.06)' : 'rgba(217,119,6,0.07)',
+                opacity: 0.88,
+                minWidth: 88,
+                textAlign: 'center',
+              }}
+            >
+              <Typography sx={{
+                fontSize: '0.62rem',
+                fontWeight: 900,
+                letterSpacing: 1.2,
+                lineHeight: 1.2,
+                textTransform: 'uppercase',
+              }}>
+                {isPaid ? 'PAID' : 'PENDING'}
+              </Typography>
+              <Typography sx={{ fontSize: '0.58rem', fontWeight: 700, lineHeight: 1.25, mt: 0.15 }}>
+                {isPaid ? t.payment.stampPaid : t.payment.stampPending}
+              </Typography>
+            </Box>
+          )}
+
         {loading ? (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, maxWidth: 500, mx: 'auto' }}>
-            <Skeleton variant="rectangular" height={120} sx={{ bgcolor: 'var(--skeleton-bg)', borderRadius: '20px' }} />
-            <Skeleton variant="rectangular" height={300} sx={{ bgcolor: 'var(--skeleton-bg)', borderRadius: '20px' }} />
-            <Skeleton variant="rectangular" height={180} sx={{ bgcolor: 'var(--skeleton-bg)', borderRadius: '20px' }} />
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Skeleton variant="rectangular" height={72} sx={{ bgcolor: 'var(--skeleton-bg)', borderRadius: '12px' }} />
+            <Skeleton variant="rectangular" height={180} sx={{ bgcolor: 'var(--skeleton-bg)', borderRadius: '12px' }} />
+            <Skeleton variant="rectangular" height={220} sx={{ bgcolor: 'var(--skeleton-bg)', borderRadius: '12px' }} />
           </Box>
         ) : isPaid ? (
-          /* ============== ALREADY PAID UI ============== */
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, maxWidth: 500, mx: 'auto' }}>
-            {/* Success Hero Card — formal, theme-aware */}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Box sx={{
-              p: 4,
-              borderRadius: '20px',
+              p: 3.5,
+              borderRadius: '12px',
               bgcolor: 'var(--surface-2)',
               border: '1px solid var(--glass-border)',
-              borderTop: '4px solid #34c759',
+              borderTop: `4px solid ${EMERALD}`,
               textAlign: 'center',
             }}>
-              {/* Success Icon */}
               <Box sx={{
-                width: 64,
-                height: 64,
+                width: 56,
+                height: 56,
                 borderRadius: '50%',
-                bgcolor: 'rgba(52,199,89,0.12)',
-                border: '2px solid rgba(52,199,89,0.35)',
+                bgcolor: EMERALD_SOFT,
+                border: `2px solid rgba(5,150,105,0.35)`,
                 display: 'grid',
                 placeItems: 'center',
                 mx: 'auto',
-                mb: 2,
+                mb: 1.75,
               }}>
-                <Check size={32} strokeWidth={3} style={{ color: '#34c759' }} />
+                <Check size={28} strokeWidth={3} style={{ color: EMERALD }} />
               </Box>
-              
-              <Typography sx={{ fontSize: '1.35rem', fontWeight: 700, mb: 0.75, color: 'var(--foreground)' }}>
+              <Typography sx={{ fontSize: '1.2rem', fontWeight: 700, mb: 0.5, color: 'var(--foreground)' }}>
                 {t.payment.paymentSuccess}
               </Typography>
-              <Typography sx={{ fontSize: '0.875rem', color: 'var(--text-muted)', mb: 2.5 }}>
+              <Typography sx={{ fontSize: '0.85rem', color: 'var(--text-muted)', mb: 2 }}>
                 {t.payment.paymentSuccessDesc}
               </Typography>
-              
-              {/* Order Reference */}
               <Box sx={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 gap: 1,
-                px: 2,
-                py: 1.25,
-                borderRadius: '12px',
+                px: 1.75,
+                py: 1.1,
+                borderRadius: '10px',
                 bgcolor: 'var(--glass-bg)',
                 border: '1px solid var(--glass-border)',
               }}>
-                <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                <Typography sx={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                   {t.payment.orderRef}
                 </Typography>
-                <Typography sx={{ fontSize: '0.875rem', fontWeight: 700, fontFamily: 'monospace', color: 'var(--foreground)', letterSpacing: 0.5 }}>
+                <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, fontFamily: MONO, color: 'var(--foreground)' }}>
                   {orderRef}
                 </Typography>
               </Box>
             </Box>
 
-            {/* Status Info Card */}
-            <Box sx={{
-              p: 2.5,
-              borderRadius: '20px',
-              bgcolor: 'var(--surface-2)',
-              border: '1px solid var(--glass-border)',
-            }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-                <Box sx={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: '10px',
-                  background: 'linear-gradient(135deg, rgba(0,113,227,0.2) 0%, rgba(6,182,212,0.2) 100%)',
-                  display: 'grid',
-                  placeItems: 'center',
-                }}>
-                  <Clock size={18} style={{ color: '#64d2ff' }} />
-                </Box>
-                <Box>
-                  <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                    {t.payment.orderStatus}
-                  </Typography>
-                  <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                    {t.payment.lastUpdated}
-                  </Typography>
-                </Box>
-              </Box>
-              
-              <Box sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1,
-                p: 1.5,
-                borderRadius: '12px',
-                bgcolor: 'rgba(16,185,129,0.1)',
-                border: '1px solid rgba(16,185,129,0.2)',
-              }}>
-                <Box sx={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: '50%',
-                  bgcolor: '#34c759',
-                  display: 'grid',
-                  placeItems: 'center',
-                }}>
-                  <Check size={14} color="white" />
-                </Box>
-                <Box>
-                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--success)' }}>
-                    {orderStatus === 'PAID' && t.payment.paidWaiting}
-                    {orderStatus === 'READY' && t.payment.readyForPickup}
-                    {orderStatus === 'SHIPPED' && t.payment.shipped}
-                    {orderStatus === 'COMPLETED' && t.payment.completed}
-                    {orderStatus === 'VERIFYING' && t.payment.verifyingSlipStatus}
-                    {!['PAID', 'READY', 'SHIPPED', 'COMPLETED', 'VERIFYING'].includes(orderStatus) && t.payment.processed}
-                  </Typography>
-                  <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                    {t.payment.waitingAdmin}
-                  </Typography>
-                </Box>
-              </Box>
+            <Box sx={{ ...sectionSx, p: 2 }}>
+              <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)', mb: 0.75 }}>
+                {t.payment.orderStatus}
+              </Typography>
+              <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: EMERALD }}>
+                {orderStatus === 'PAID' && t.payment.paidWaiting}
+                {orderStatus === 'READY' && t.payment.readyForPickup}
+                {orderStatus === 'SHIPPED' && t.payment.shipped}
+                {orderStatus === 'COMPLETED' && t.payment.completed}
+                {orderStatus === 'VERIFYING' && t.payment.verifyingSlipStatus}
+                {!['PAID', 'READY', 'SHIPPED', 'COMPLETED', 'VERIFYING'].includes(orderStatus) && t.payment.processed}
+              </Typography>
+              <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', mt: 0.5 }}>
+                {t.payment.waitingAdmin}
+              </Typography>
             </Box>
 
-            {/* Amount Paid Card */}
-            <Box sx={{
-              p: 2.5,
-              borderRadius: '20px',
-              bgcolor: 'var(--surface-2)',
-              border: '1px solid var(--glass-border)',
-            }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Typography sx={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                  {t.payment.amountPaid}
-                </Typography>
-                <Typography sx={{ fontSize: '1.5rem', fontWeight: 800, color: '#34c759' }}>
-                  ฿{amount.toLocaleString()}
-                </Typography>
-              </Box>
+            <Box sx={{ ...sectionSx, p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography sx={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                {t.payment.amountPaid}
+              </Typography>
+              <Typography sx={{ fontSize: '1.35rem', fontWeight: 800, color: EMERALD }}>
+                {formatMoney(amount)}
+              </Typography>
             </Box>
           </Box>
         ) : (
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, maxWidth: 500, mx: 'auto' }}>
-            
-            {/* Payment Disabled Alert */}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {!paymentEnabled && (
               <Box sx={{
-                p: 2.5,
-                borderRadius: '20px',
-                background: 'linear-gradient(135deg, rgba(239,68,68,0.15) 0%, rgba(220,38,38,0.1) 100%)',
-                border: '1px solid rgba(239,68,68,0.3)',
+                p: 2,
+                borderRadius: '12px',
+                bgcolor: 'rgba(239,68,68,0.08)',
+                border: '1px solid rgba(239,68,68,0.28)',
                 display: 'flex',
-                alignItems: 'flex-start',
-                gap: 2,
+                gap: 1.5,
               }}>
-                <Box sx={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: '12px',
-                  bgcolor: 'rgba(239,68,68,0.2)',
-                  display: 'grid',
-                  placeItems: 'center',
-                  flexShrink: 0,
-                }}>
-                  <AlertCircle size={24} style={{ color: '#f87171' }} />
-                </Box>
+                <AlertCircle size={22} style={{ color: '#dc2626', flexShrink: 0, marginTop: 2 }} />
                 <Box>
-                  <Typography sx={{ 
-                    fontSize: '1rem', 
-                    fontWeight: 700, 
-                    color: 'var(--error)', 
-                    mb: 0.5 
-                  }}>
+                  <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--error)', mb: 0.35 }}>
                     {t.payment.paymentDisabled}
                   </Typography>
-                  <Typography sx={{ 
-                    fontSize: '0.85rem', 
-                    color: 'var(--error)',
-                    lineHeight: 1.6,
-                  }}>
+                  <Typography sx={{ fontSize: '0.82rem', color: 'var(--error)', lineHeight: 1.55 }}>
                     {paymentDisabledMessage || t.payment.waitAdminOpenPayment}
                   </Typography>
                 </Box>
               </Box>
             )}
 
-            {/* Cart Items Card */}
-            {cartItems.length > 0 && (
+            {/* Status + countdown */}
+            {paymentEnabled && (
               <Box sx={{
-                borderRadius: '24px',
-                bgcolor: 'var(--surface-2)',
-                border: '1px solid var(--glass-border)',
-                overflow: 'hidden',
+                ...sectionSx,
+                p: 1.75,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 1.25,
               }}>
-                {/* Card Header - Clickable */}
-                <Box 
-                  onClick={() => setShowCartDetails(!showCartDetails)}
-                  sx={{ 
-                    px: 2.5, 
-                    py: 2, 
-                    borderBottom: showCartDetails ? '1px solid var(--glass-border)' : 'none',
-                    display: 'flex',
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                  <Box sx={{
+                    display: 'inline-flex',
                     alignItems: 'center',
-                    justifyContent: 'space-between',
-                    cursor: 'pointer',
-                    transition: 'background 0.2s',
-                    '&:hover': { bgcolor: 'var(--glass-bg)' },
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                    <Box sx={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: '12px',
-                      background: 'linear-gradient(135deg, rgba(0,113,227,0.2) 0%, rgba(236,72,153,0.2) 100%)',
-                      display: 'grid',
-                      placeItems: 'center',
-                    }}>
-                      <ShoppingBag size={20} style={{ color: 'var(--secondary)' }} />
-                    </Box>
-                    <Box>
-                      <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                        {t.payment.cartItems}
-                      </Typography>
-                      <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        {cartItems.length} {t.common.items} • {cartItems.reduce((sum, item) => sum + item.quantity, 0)} {t.common.pieces}
-                      </Typography>
-                    </Box>
+                    gap: 0.6,
+                    px: 1,
+                    py: 0.4,
+                    borderRadius: '6px',
+                    bgcolor: 'rgba(217,119,6,0.12)',
+                    border: '1px solid rgba(217,119,6,0.28)',
+                  }}>
+                    <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: AMBER }} />
+                    <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: AMBER }}>
+                      {t.payment.awaitingPayment}
+                    </Typography>
                   </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Box sx={{
-                      px: 1.5,
-                      py: 0.5,
-                      borderRadius: '20px',
-                      bgcolor: 'rgba(0,113,227,0.1)',
-                      border: '1px solid rgba(0,113,227,0.2)',
-                    }}>
-                      <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--secondary)' }}>
-                        {showCartDetails ? t.payment.hideDetail : t.payment.showDetail}
-                      </Typography>
-                    </Box>
-                  </Box>
+                  <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: MONO }}>
+                    {orgShort}
+                  </Typography>
                 </Box>
-                
-                {/* Cart Items List */}
-                <Collapse in={showCartDetails}>
-                  <Box sx={{ px: 2, py: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                    {cartItems.map((item, index) => (
-                      <Box 
-                        key={index}
-                        sx={{
-                          p: 1.5,
-                          borderRadius: '16px',
-                          bgcolor: 'var(--surface)',
-                          border: '1px solid var(--glass-border)',
-                          display: 'flex',
-                          gap: 1.5,
-                        }}
-                      >
-                        {/* Product Image */}
-                        <Box sx={{
-                          width: 56,
-                          height: 56,
-                          borderRadius: '10px',
-                          bgcolor: 'var(--surface-2)',
-                          flexShrink: 0,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          border: '1px solid var(--glass-border)',
-                          overflow: 'hidden',
-                          position: 'relative',
-                        }}>
-                          {item.coverImage ? (
-                            <img
-                              src={item.coverImage}
-                              alt={item.productName}
-                              style={{
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'cover',
-                                display: 'block',
-                              }}
-                              loading="lazy"
-                            />
-                          ) : (
-                            <ShoppingBag size={20} style={{ color: 'var(--text-muted)' }} />
-                          )}
-                        </Box>
-
-                        {/* Product Details */}
-                        <Box sx={{ flex: 1, minWidth: 0 }}>
-                          {/* Product Name & Price Row */}
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0.5 }}>
-                            <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--foreground)', pr: 1 }} noWrap>
-                              {item.productName}
-                            </Typography>
-                            <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--success)', flexShrink: 0 }}>
-                              ฿{(item.unitPrice * item.quantity).toLocaleString()}
-                            </Typography>
-                          </Box>
-                          
-                          {/* Size & Qty */}
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                              {t.payment.sizeLabel} {item.size}
-                            </Typography>
-                            <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>•</Typography>
-                            <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                              x{item.quantity}
-                            </Typography>
-                          </Box>
-                          
-                          {/* Custom Options Badges */}
-                          {(item.customName || item.customNumber || item.isLongSleeve || item.pattern) && (
-                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.8, mt: 1 }}>
-                              {item.customName && (
-                                <Box sx={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: 0.5,
-                                  px: 1.2,
-                                  py: 0.4,
-                                  borderRadius: '8px',
-                                  bgcolor: 'rgba(236,72,153,0.15)',
-                                  border: '1px solid rgba(236,72,153,0.3)',
-                                }}>
-                                  <Tag size={12} style={{ color: '#f472b6' }} />
-                                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#f472b6' }}>
-                                    {item.customName}
-                                  </Typography>
-                                </Box>
-                              )}
-                              {item.customNumber && (
-                                <Box sx={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: 0.5,
-                                  px: 1.2,
-                                  py: 0.4,
-                                  borderRadius: '8px',
-                                  bgcolor: 'rgba(251,191,36,0.15)',
-                                  border: '1px solid rgba(251,191,36,0.3)',
-                                }}>
-                                  <Hash size={12} style={{ color: '#ffd60a' }} />
-                                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#ffd60a' }}>
-                                    {t.payment.numberLabel} {item.customNumber}
-                                  </Typography>
-                                </Box>
-                              )}
-                              {item.isLongSleeve && (
-                                <Box sx={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: 0.5,
-                                  px: 1.2,
-                                  py: 0.4,
-                                  borderRadius: '8px',
-                                  bgcolor: 'rgba(34,211,238,0.15)',
-                                  border: '1px solid rgba(34,211,238,0.3)',
-                                }}>
-                                  <Shirt size={12} style={{ color: '#64d2ff' }} />
-                                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#64d2ff' }}>
-                                    {t.common.longSleeve}
-                                  </Typography>
-                                </Box>
-                              )}
-                              {item.pattern && (
-                                <Box sx={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: 0.5,
-                                  px: 1.2,
-                                  py: 0.4,
-                                  borderRadius: '8px',
-                                  bgcolor: 'rgba(167,139,250,0.15)',
-                                  border: '1px solid rgba(167,139,250,0.3)',
-                                }}>
-                                  <Palette size={12} style={{ color: '#a78bfa' }} />
-                                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#a78bfa' }}>
-                                    {item.pattern}
-                                  </Typography>
-                                </Box>
-                              )}
-                            </Box>
-                          )}
-                        </Box>
-                      </Box>
-                    ))}
-                  </Box>
-                </Collapse>
+                {orderDate && (
+                  <PaymentCountdown
+                    orderDate={orderDate}
+                    onExpired={() => addToast('warning', t.payment.expiredPayment, t.payment.autoCancel)}
+                  />
+                )}
               </Box>
             )}
 
-            {/* Payment Method Switcher (Stripe auto vs manual transfer) */}
+            {/* Structured order amount table */}
+            <Box sx={sectionSx}>
+              <Box sx={sectionHeaderSx}>
+                <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, color: NAVY }}>
+                  {t.payment.orderSummary}
+                </Typography>
+                <Typography sx={{ fontSize: '0.7rem', fontFamily: MONO, color: 'var(--text-muted)' }}>
+                  {orderRef}
+                </Typography>
+              </Box>
+
+              <Box sx={{ overflowX: 'auto' }}>
+                <Box
+                  component="table"
+                  sx={{
+                    width: '100%',
+                    borderCollapse: 'collapse',
+                    fontSize: '0.75rem',
+                    minWidth: 360,
+                    '& th': {
+                      textAlign: 'left',
+                      px: 1.25,
+                      py: 1,
+                      color: 'var(--text-muted)',
+                      fontWeight: 700,
+                      borderBottom: '1px solid var(--glass-border)',
+                      bgcolor: 'var(--surface)',
+                      whiteSpace: 'nowrap',
+                    },
+                    '& td': {
+                      px: 1.25,
+                      py: 1.05,
+                      borderBottom: '1px solid var(--glass-border)',
+                      color: 'var(--foreground)',
+                      verticalAlign: 'top',
+                    },
+                    '& tbody tr:last-of-type td': { borderBottom: 'none' },
+                  }}
+                >
+                  <thead>
+                    <tr>
+                      <th style={{ width: 28 }}>{t.payment.colNo}</th>
+                      <th>{t.payment.colItem}</th>
+                      <th>{t.payment.colSpec}</th>
+                      <th style={{ textAlign: 'right', width: 44 }}>{t.payment.colQty}</th>
+                      <th style={{ textAlign: 'right', width: 88 }}>{t.payment.colAmount}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cartItems.length > 0 ? cartItems.map((item, index) => (
+                      <tr key={index}>
+                        <td style={{ fontFamily: MONO, color: 'var(--text-muted)' }}>{index + 1}</td>
+                        <td>
+                          <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, lineHeight: 1.35 }}>
+                            {item.productName}
+                          </Typography>
+                        </td>
+                        <td>
+                          <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: 1.35 }}>
+                            {itemSpec(item, {
+                              sizeLabel: t.payment.sizeLabel,
+                              numberLabel: t.payment.numberLabel,
+                              longSleeve: t.common.longSleeve,
+                            })}
+                          </Typography>
+                        </td>
+                        <td style={{ textAlign: 'right', fontFamily: MONO }}>{item.quantity}</td>
+                        <td style={{ textAlign: 'right', fontFamily: MONO, fontWeight: 600 }}>
+                          {formatMoney(item.unitPrice * item.quantity)}
+                        </td>
+                      </tr>
+                    )) : (
+                      <tr>
+                        <td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+                          —
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </Box>
+              </Box>
+
+              <Box sx={{ px: 1.75, py: 1.75, borderTop: '1px solid var(--glass-border)', bgcolor: 'var(--surface)' }}>
+                {discountValue > 0 && (
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>
+                    <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      {t.payment.discount}
+                    </Typography>
+                    <Typography sx={{ fontSize: '0.75rem', fontFamily: MONO, color: 'var(--text-muted)' }}>
+                      −{formatMoney(discountValue)}
+                    </Typography>
+                  </Box>
+                )}
+                {discountValue > 0 && (
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>
+                    <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                      {lang === 'th' ? 'ยอดก่อนลด' : 'Subtotal'}
+                    </Typography>
+                    <Typography sx={{ fontSize: '0.75rem', fontFamily: MONO, color: 'var(--text-muted)' }}>
+                      {formatMoney(baseAmount)}
+                    </Typography>
+                  </Box>
+                )}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 1 }}>
+                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: NAVY }}>
+                    {t.payment.netAmount}
+                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                    <Typography sx={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--foreground)', letterSpacing: '-0.02em' }}>
+                      {formatMoney(amount)}
+                    </Typography>
+                    <IconButton
+                      size="small"
+                      onClick={copyAmount}
+                      aria-label={t.payment.copy}
+                      sx={{
+                        bgcolor: 'var(--glass-bg)',
+                        border: '1px solid var(--glass-border)',
+                        color: 'var(--foreground)',
+                        width: 32,
+                        height: 32,
+                      }}
+                    >
+                      <Copy size={14} />
+                    </IconButton>
+                  </Box>
+                </Box>
+                <Typography sx={{ fontSize: '0.78rem', color: 'var(--text-muted)', mt: 0.75, fontStyle: 'italic' }}>
+                  {t.payment.amountInWords}: {amountWords}
+                </Typography>
+                <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', mt: 0.85 }}>
+                  {vatNote}
+                </Typography>
+              </Box>
+            </Box>
+
+            {/* Stripe / manual switcher */}
             {stripeEnabled && paymentEnabled && (
               <Box sx={{
                 display: 'flex',
-                gap: 0.75,
-                p: 0.75,
-                borderRadius: '18px',
+                gap: 0.6,
+                p: 0.6,
+                borderRadius: '12px',
                 bgcolor: 'var(--surface-2)',
                 border: '1px solid var(--glass-border)',
               }}>
                 {([
-                  { key: 'stripe' as const, label: t.payment.autoPromptPay, icon: <Sparkles size={15} /> },
-                  { key: 'manual' as const, label: t.payment.manualTransfer, icon: <Upload size={15} /> },
+                  { key: 'stripe' as const, label: t.payment.autoPromptPay, icon: <Sparkles size={14} /> },
+                  { key: 'manual' as const, label: t.payment.manualTransfer, icon: <Upload size={14} /> },
                 ]).map((m) => {
                   const active = payMethod === m.key;
                   return (
@@ -945,21 +1070,18 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: 0.75,
-                        py: 1.25,
+                        gap: 0.6,
+                        py: 1.1,
                         px: 1,
-                        borderRadius: '13px',
+                        borderRadius: '9px',
                         cursor: 'pointer',
-                        fontSize: '0.8rem',
+                        fontSize: '0.78rem',
                         fontWeight: 700,
                         transition: 'all 0.2s ease',
                         color: active ? '#fff' : 'var(--text-muted)',
                         background: active
-                          ? (m.key === 'stripe'
-                            ? 'linear-gradient(135deg, #0891b2 0%, #0071e3 100%)'
-                            : 'linear-gradient(135deg, #34c759 0%, #0891b2 100%)')
+                          ? (m.key === 'stripe' ? NAVY : EMERALD)
                           : 'transparent',
-                        boxShadow: active ? '0 4px 16px rgba(8,145,178,0.35)' : 'none',
                         '&:hover': { bgcolor: active ? undefined : 'var(--glass-bg)' },
                       }}
                     >
@@ -971,44 +1093,19 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
               </Box>
             )}
 
-            {/* Stripe PromptPay — custom QR via Stripe.js, auto-verified */}
             {stripeEnabled && paymentEnabled && payMethod === 'stripe' && (
-              <Box sx={{
-                borderRadius: '24px',
-                bgcolor: 'var(--surface-2)',
-                border: '1px solid var(--glass-border)',
-                overflow: 'hidden',
-              }}>
-                <Box sx={{
-                  px: 2.5,
-                  py: 2,
-                  borderBottom: '1px solid var(--glass-border)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                    <Box sx={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: '12px',
-                      background: 'linear-gradient(135deg, rgba(8,145,178,0.2) 0%, rgba(0,113,227,0.2) 100%)',
-                      display: 'grid',
-                      placeItems: 'center',
-                    }}>
-                      <QrCode size={20} style={{ color: '#64d2ff' }} />
-                    </Box>
-                    <Box>
-                      <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                        {t.payment.autoPromptPay}
-                      </Typography>
-                      <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        {t.payment.autoPromptPayDesc}
-                      </Typography>
-                    </Box>
+              <Box sx={sectionSx}>
+                <Box sx={sectionHeaderSx}>
+                  <Box>
+                    <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: NAVY }}>
+                      {t.payment.autoPromptPay}
+                    </Typography>
+                    <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                      {t.payment.autoPromptPayDesc}
+                    </Typography>
                   </Box>
                 </Box>
-                <Box sx={{ p: 3 }}>
+                <Box sx={{ p: 2.5 }}>
                   <StripePromptPay
                     orderRef={orderRef}
                     orderDate={orderDate ?? undefined}
@@ -1019,589 +1116,801 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
               </Box>
             )}
 
-            {payMethod === 'manual' && (<>
-            {/* QR Code Card */}
-            <Box sx={{
-              borderRadius: '24px',
-              bgcolor: 'var(--surface-2)',
-              border: '1px solid var(--glass-border)',
-              overflow: 'hidden',
-            }}>
-              {/* Card Header */}
-              <Box sx={{ 
-                px: 2.5, 
-                py: 2, 
-                borderBottom: '1px solid var(--glass-border)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            {payMethod === 'manual' && (
+              <>
+                {/* Payment channels: QR + official account */}
+                <Box sx={sectionSx}>
+                  <Box sx={sectionHeaderSx}>
+                    <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: NAVY }}>
+                      {t.payment.paymentChannels}
+                    </Typography>
+                    <Typography sx={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                      {t.payment.step1}
+                    </Typography>
+                  </Box>
+
                   <Box sx={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: '12px',
-                    background: 'linear-gradient(135deg, rgba(16,185,129,0.2) 0%, rgba(6,182,212,0.2) 100%)',
-                    display: 'grid',
-                    placeItems: 'center',
-                  }}>
-                    <QrCode size={20} style={{ color: '#30d158' }} />
-                  </Box>
-                  <Box>
-                    <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                      {t.payment.scanToTransfer}
-                    </Typography>
-                    <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                      PromptPay / Mobile Banking
-                    </Typography>
-                  </Box>
-                </Box>
-                <Box sx={{
-                  px: 1.5,
-                  py: 0.5,
-                  borderRadius: '20px',
-                  bgcolor: 'rgba(16,185,129,0.1)',
-                  border: '1px solid rgba(16,185,129,0.2)',
-                }}>
-                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#30d158' }}>
-                    {t.payment.step1}
-                  </Typography>
-                </Box>
-              </Box>
-              
-              {/* QR Image */}
-              <Box sx={{ p: 3, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                {!paymentEnabled ? (
-                  /* Payment Disabled - Hide QR */
-                  <Box sx={{ 
-                    width: 220,
-                    height: 220,
-                    bgcolor: 'rgba(239,68,68,0.1)', 
-                    borderRadius: '20px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 1.5,
-                    mb: 2,
-                    border: '2px dashed rgba(239,68,68,0.3)',
-                  }}>
-                    <AlertCircle size={40} style={{ color: '#f87171' }} />
-                    <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: '#fca5a5', textAlign: 'center', px: 2 }}>
-                      {t.payment.paymentDisabledOverlay}
-                    </Typography>
-                    <Typography sx={{ fontSize: '0.75rem', color: '#fb7185', textAlign: 'center', px: 2 }}>
-                      {t.payment.waitAdminOpen}
-                    </Typography>
-                  </Box>
-                ) : qrPayload ? (
-                  <Box sx={{ 
-                    background: 'linear-gradient(135deg, #1a237e 0%, #283593 50%, #3949ab 100%)',
-                    borderRadius: '20px', 
                     p: 2,
-                    boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-                    mb: 2,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
+                    display: 'grid',
+                    gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                    gap: 2,
+                    alignItems: 'start',
                   }}>
-                    {/* PromptPay Header */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                      <Typography sx={{ color: '#fff', fontWeight: 700, letterSpacing: 1, textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
-                        {t.payment.promptPay}
+                    {/* QR column */}
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.25 }}>
+                      <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', alignSelf: 'stretch' }}>
+                        {t.payment.scanToTransfer}
                       </Typography>
-                      <Box component="span" sx={{ bgcolor: '#fff', color: '#1a237e', px: 1, py: 0.25, borderRadius: 1, fontSize: '0.65rem', fontWeight: 700 }}>
-                        PROMPTPAY
+
+                      {!paymentEnabled ? (
+                        <Box sx={{
+                          width: '100%',
+                          maxWidth: 200,
+                          aspectRatio: '1',
+                          bgcolor: 'rgba(239,68,68,0.08)',
+                          borderRadius: '12px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 1,
+                          border: '2px dashed rgba(239,68,68,0.3)',
+                        }}>
+                          <AlertCircle size={32} style={{ color: '#dc2626' }} />
+                          <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: '#dc2626', textAlign: 'center', px: 1.5 }}>
+                            {t.payment.paymentDisabledOverlay}
+                          </Typography>
+                        </Box>
+                      ) : qrPayload ? (
+                        <Box sx={{
+                          bgcolor: NAVY,
+                          borderRadius: '12px',
+                          p: 1.5,
+                          width: '100%',
+                          maxWidth: 220,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                        }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 1 }}>
+                            <Box
+                              component="img"
+                              src="/trust/promptpay.svg"
+                              alt="PromptPay"
+                              sx={{ height: 14, width: 'auto', filter: 'brightness(0) invert(1)' }}
+                            />
+                            <Typography sx={{ color: '#fff', fontWeight: 700, fontSize: '0.75rem', letterSpacing: 0.6 }}>
+                              {t.payment.promptPay}
+                            </Typography>
+                          </Box>
+                          <Box sx={{ bgcolor: '#fff', p: 1.25, borderRadius: 1.5, lineHeight: 0 }}>
+                            <QRCodeSVG
+                              id="promptpay-qr-svg"
+                              value={qrPayload}
+                              size={168}
+                              level="M"
+                              includeMargin={false}
+                              bgColor="#ffffff"
+                              fgColor={NAVY}
+                              imageSettings={{
+                                src: '/trust/promptpay.svg',
+                                height: 24,
+                                width: 24,
+                                excavate: true,
+                              }}
+                            />
+                          </Box>
+                          <Typography sx={{ color: '#fff', fontWeight: 700, fontSize: '1rem', mt: 1.1 }}>
+                            {formatMoney(amount)}
+                          </Typography>
+                          <Typography sx={{ color: 'rgba(255,255,255,0.72)', fontSize: '0.65rem', mt: 0.35, textAlign: 'center', px: 0.5 }}>
+                            {t.payment.scanInstruction}
+                          </Typography>
+                        </Box>
+                      ) : qrUrl ? (
+                        <Box sx={{ bgcolor: 'white', borderRadius: '12px', p: 1.5, border: '1px solid var(--glass-border)' }}>
+                          <Box
+                            component="img"
+                            src={qrUrl}
+                            alt="PromptPay QR"
+                            sx={{ width: 180, height: 180, objectFit: 'contain', display: 'block' }}
+                          />
+                        </Box>
+                      ) : (
+                        <Box sx={{
+                          width: '100%',
+                          p: 2,
+                          borderRadius: '12px',
+                          bgcolor: 'rgba(217,119,6,0.08)',
+                          border: '1px dashed rgba(217,119,6,0.35)',
+                          textAlign: 'center',
+                        }}>
+                          <AlertTriangle size={22} style={{ color: AMBER, marginBottom: 6 }} />
+                          <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--foreground)', mb: 0.35 }}>
+                            {t.payment.qrUnavailable}
+                          </Typography>
+                          <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
+                            {t.payment.qrUnavailableDesc}
+                          </Typography>
+                        </Box>
+                      )}
+
+                      <Button
+                        fullWidth
+                        startIcon={downloading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                        onClick={handleSaveQr}
+                        disabled={(!qrPayload && !qrUrl) || downloading || !paymentEnabled}
+                        sx={{
+                          maxWidth: 220,
+                          py: 1,
+                          borderRadius: '10px',
+                          bgcolor: NAVY_SOFT,
+                          border: `1px solid rgba(30,58,95,0.25)`,
+                          color: NAVY,
+                          fontWeight: 600,
+                          textTransform: 'none',
+                          fontSize: '0.8rem',
+                          '&:hover': { bgcolor: 'rgba(30,58,95,0.14)' },
+                          '&:disabled': { opacity: 0.5 },
+                        }}
+                      >
+                        {downloading ? `${t.payment.savingQR} ${downloadProgress}%` : t.payment.saveQR}
+                      </Button>
+                      {downloading && (
+                        <LinearProgress
+                          variant="determinate"
+                          value={downloadProgress}
+                          sx={{
+                            width: '100%',
+                            maxWidth: 220,
+                            borderRadius: 1,
+                            bgcolor: 'var(--glass-bg)',
+                            '& .MuiLinearProgress-bar': { bgcolor: NAVY },
+                          }}
+                        />
+                      )}
+
+                      {/* Mobile banking deep links */}
+                      <Box className="payment-notice-no-print" sx={{ width: '100%', maxWidth: 220, mt: 0.5 }}>
+                        <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', mb: 0.75 }}>
+                          {t.payment.payOnMobile}
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.6 }}>
+                          {MOBILE_BANK_APPS.map((bank) => (
+                            <Button
+                              key={bank.id}
+                              size="small"
+                              startIcon={<Smartphone size={13} />}
+                              onClick={() => openBankApp(bank.scheme)}
+                              disabled={!paymentEnabled}
+                              sx={{
+                                justifyContent: 'flex-start',
+                                textTransform: 'none',
+                                fontWeight: 600,
+                                fontSize: '0.72rem',
+                                color: NAVY,
+                                border: '1px solid rgba(30,58,95,0.2)',
+                                bgcolor: 'var(--surface)',
+                                borderRadius: '8px',
+                                py: 0.55,
+                                '&:hover': { bgcolor: NAVY_SOFT },
+                              }}
+                            >
+                              {t.payment[bank.labelKey]}
+                            </Button>
+                          ))}
+                        </Box>
+                        <Typography sx={{ fontSize: '0.62rem', color: 'var(--text-muted)', mt: 0.65, lineHeight: 1.4 }}>
+                          {t.payment.bankAppDesktopHint}
+                        </Typography>
                       </Box>
                     </Box>
-                    {/* QR Code */}
-                    <Box sx={{ bgcolor: '#fff', p: 2, borderRadius: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
-                      <QRCodeSVG
-                        id="promptpay-qr-svg"
-                        value={qrPayload}
-                        size={200}
-                        level="M"
-                        includeMargin={false}
-                        bgColor="#ffffff"
-                        fgColor="#1a237e"
-                      />
+
+                    {/* Official account column */}
+                    <Box>
+                      <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', mb: 1.1 }}>
+                        {t.payment.officialAccount}
+                      </Typography>
+                      <Box sx={{
+                        p: 1.75,
+                        borderRadius: '10px',
+                        bgcolor: 'var(--surface)',
+                        border: '1px solid var(--glass-border)',
+                      }}>
+                        <Box sx={{ mb: 1.35 }}>
+                          <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                            {t.payment.accountName}
+                          </Typography>
+                          <Typography sx={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--foreground)', mt: 0.2 }}>
+                            {accountHolderName || t.payment.accountHolderName || '—'}
+                          </Typography>
+                        </Box>
+
+                        {bankName && (
+                          <Box sx={{ mb: 1.35 }}>
+                            <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                              {t.payment.bankName}
+                            </Typography>
+                            <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)', mt: 0.2 }}>
+                              {bankName}
+                            </Typography>
+                          </Box>
+                        )}
+
+                        {promptPayId && (
+                          <Box sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: 1,
+                            mb: 1.1,
+                            p: 1.1,
+                            borderRadius: '8px',
+                            bgcolor: EMERALD_SOFT,
+                            border: '1px solid rgba(5,150,105,0.22)',
+                          }}>
+                            <Box sx={{ minWidth: 0 }}>
+                              <Typography sx={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>
+                                {t.payment.promptPayNumber}
+                              </Typography>
+                              <Typography sx={{
+                                fontSize: '1rem',
+                                fontWeight: 800,
+                                fontFamily: MONO,
+                                letterSpacing: 0.8,
+                                color: 'var(--foreground)',
+                                wordBreak: 'break-all',
+                              }}>
+                                {promptPayId}
+                              </Typography>
+                            </Box>
+                            <Button
+                              size="small"
+                              startIcon={<Copy size={13} />}
+                              onClick={copyPromptPay}
+                              sx={{
+                                flexShrink: 0,
+                                textTransform: 'none',
+                                fontWeight: 700,
+                                borderRadius: '8px',
+                                bgcolor: 'rgba(5,150,105,0.16)',
+                                color: EMERALD,
+                                minHeight: 36,
+                                px: 1.25,
+                                '&:hover': { bgcolor: 'rgba(5,150,105,0.26)' },
+                              }}
+                            >
+                              {t.payment.copy}
+                            </Button>
+                          </Box>
+                        )}
+
+                        {accountNumber && (
+                          <Box sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: 1,
+                            mb: taxId ? 1.1 : 0,
+                            p: 1.1,
+                            borderRadius: '8px',
+                            bgcolor: 'var(--glass-bg)',
+                            border: '1px solid var(--glass-border)',
+                          }}>
+                            <Box sx={{ minWidth: 0 }}>
+                              <Typography sx={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>
+                                {t.payment.bankAccount}
+                              </Typography>
+                              <Typography sx={{
+                                fontSize: '0.92rem',
+                                fontWeight: 700,
+                                fontFamily: MONO,
+                                color: 'var(--foreground)',
+                                wordBreak: 'break-all',
+                              }}>
+                                {accountNumber}
+                              </Typography>
+                            </Box>
+                            <Button
+                              size="small"
+                              startIcon={<Copy size={13} />}
+                              onClick={copyAccount}
+                              sx={{
+                                flexShrink: 0,
+                                textTransform: 'none',
+                                fontWeight: 700,
+                                borderRadius: '8px',
+                                bgcolor: 'var(--glass-bg)',
+                                color: 'var(--foreground)',
+                                border: '1px solid var(--glass-border)',
+                                minHeight: 36,
+                                px: 1.25,
+                              }}
+                            >
+                              {t.payment.copy}
+                            </Button>
+                          </Box>
+                        )}
+
+                        {taxId && (
+                          <Box sx={{ mt: accountNumber || promptPayId ? 0 : 0 }}>
+                            <Typography sx={{ fontSize: '0.62rem', color: 'var(--text-muted)' }}>
+                              {t.payment.taxId}
+                            </Typography>
+                            <Typography sx={{
+                              fontSize: '0.85rem',
+                              fontWeight: 700,
+                              fontFamily: MONO,
+                              color: 'var(--foreground)',
+                              mt: 0.2,
+                            }}>
+                              {taxId}
+                            </Typography>
+                          </Box>
+                        )}
+
+                        <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', mt: 1.35, fontStyle: 'italic' }}>
+                          {amountWords}
+                        </Typography>
+                      </Box>
                     </Box>
-                    {orderDate && !isPaid && (
-                      <Box sx={{ mt: 1, display: 'flex', justifyContent: 'center' }}>
-                        <CountdownBadge
-                          orderDate={orderDate}
-                          compact
-                          tone="inverse"
-                          onExpired={() => addToast('warning', t.payment.expiredPayment, t.payment.autoCancel)}
+                  </Box>
+                </Box>
+
+                {/* Full E-Receipt / tax invoice options */}
+                <Box className="payment-notice-no-print" sx={sectionSx}>
+                  <Box sx={sectionHeaderSx}>
+                    <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: NAVY }}>
+                      {lang === 'th' ? 'ใบเสร็จ / ใบกำกับภาษี' : 'Receipt / Tax invoice'}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ p: 2 }}>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={wantFullReceipt}
+                          onChange={(e) => setWantFullReceipt(e.target.checked)}
+                          size="small"
+                          sx={{
+                            color: NAVY,
+                            '&.Mui-checked': { color: EMERALD },
+                          }}
+                        />
+                      }
+                      label={
+                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)', lineHeight: 1.4 }}>
+                          {t.payment.wantFullReceipt}
+                        </Typography>
+                      }
+                      sx={{ alignItems: 'flex-start', m: 0 }}
+                    />
+                    {wantFullReceipt && (
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25, mt: 1.5 }}>
+                        <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
+                          {t.payment.receiptFieldsHint}
+                        </Typography>
+                        <TextField
+                          size="small"
+                          fullWidth
+                          label={t.payment.receiptTaxOrStudentId}
+                          value={receiptTaxOrStudentId}
+                          onChange={(e) => setReceiptTaxOrStudentId(e.target.value)}
+                          inputProps={{ maxLength: 64 }}
+                        />
+                        <TextField
+                          size="small"
+                          fullWidth
+                          label={t.payment.receiptOrgName}
+                          value={receiptOrgName}
+                          onChange={(e) => setReceiptOrgName(e.target.value)}
+                          inputProps={{ maxLength: 160 }}
+                        />
+                        <TextField
+                          size="small"
+                          fullWidth
+                          multiline
+                          minRows={2}
+                          label={t.payment.receiptAddress}
+                          value={receiptAddress}
+                          onChange={(e) => setReceiptAddress(e.target.value)}
+                          inputProps={{ maxLength: 400 }}
                         />
                       </Box>
                     )}
-                    {/* Amount */}
-                    <Box sx={{ mt: 1.5, textAlign: 'center' }}>
-                      <Typography sx={{ color: 'var(--foreground)', fontSize: '0.75rem', mb: 0.25 }}>
-                        {t.payment.amount}
-                      </Typography>
-                      <Typography sx={{ color: '#fff', fontWeight: 700, fontSize: '1.25rem', textShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
-                        ฿{amount.toLocaleString(lang === 'th' ? 'th-TH' : 'en-US', { minimumFractionDigits: 2 })}
-                      </Typography>
-                    </Box>
-                    {/* PromptPay ID + Account Name */}
-                    <Box sx={{ mt: 1, textAlign: 'center', bgcolor: 'var(--glass-bg)', borderRadius: 1.5, px: 2, py: 0.75 }}>
-                      <Typography sx={{ color: 'var(--foreground)', fontSize: '0.65rem' }}>
-                        {t.payment.accountName}
-                      </Typography>
-                      <Typography sx={{ color: '#fff', fontWeight: 600, fontSize: '0.8rem' }}>
-                        {accountHolderName || t.payment.accountHolderName}
-                      </Typography>
-                      {promptPayId && (
-                        <Typography sx={{ color: '#fff', fontWeight: 700, fontSize: '1.1rem', letterSpacing: 1, mt: 0.5 }}>
-                          {promptPayId}
-                        </Typography>
-                      )}
-                      {t.payment.secretaryRole && (
-                        <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.6rem' }}>
-                          {t.payment.secretaryRole}
-                        </Typography>
-                      )}
-                    </Box>
-                    <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.65rem', mt: 1, textAlign: 'center' }}>
-                      {t.payment.scanInstruction}
-                    </Typography>
-                  </Box>
-                ) : qrUrl ? (
-                  /* Legacy fallback using img tag */
-                  <Box sx={{ 
-                    bgcolor: 'white', 
-                    borderRadius: '20px', 
-                    p: 2.5,
-                    boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-                    mb: 2,
-                  }}>
-                    <Box
-                      component="img"
-                      src={qrUrl}
-                      alt="QR Code"
-                      sx={{ 
-                        width: 220,
-                        height: 220,
-                        objectFit: 'contain',
-                        display: 'block',
-                      }}
-                    />
-                  </Box>
-                ) : (
-                  <Box sx={{ 
-                    width: 220,
-                    height: 220,
-                    bgcolor: 'rgba(100,116,139,0.1)', 
-                    borderRadius: '20px',
-                    display: 'grid',
-                    placeItems: 'center',
-                    mb: 2,
-                  }}>
-                    <Loader2 size={32} style={{ color: 'var(--text-muted)' }} className="animate-spin" />
-                  </Box>
-                )}
-
-                <Button
-                  fullWidth
-                  startIcon={downloading ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
-                  onClick={handleSaveQr}
-                  disabled={(!qrPayload && !qrUrl) || downloading || !paymentEnabled}
-                  sx={{
-                    py: 1.3,
-                    borderRadius: '12px',
-                    bgcolor: paymentEnabled ? 'rgba(16,185,129,0.1)' : 'rgba(100,116,139,0.1)',
-                    border: paymentEnabled ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(100,116,139,0.2)',
-                    color: paymentEnabled ? '#30d158' : '#86868b',
-                    fontWeight: 600,
-                    textTransform: 'none',
-                    '&:hover': { bgcolor: paymentEnabled ? 'rgba(16,185,129,0.2)' : 'rgba(100,116,139,0.15)' },
-                    '&:disabled': { opacity: 0.5 },
-                  }}
-                >
-                  {downloading ? `${t.payment.savingQR} ${downloadProgress}%` : t.payment.saveQR}
-                </Button>
-                {downloading && (
-                  <LinearProgress 
-                    variant="determinate" 
-                    value={downloadProgress} 
-                    sx={{ 
-                      mt: 1.5, 
-                      width: '100%',
-                      borderRadius: 1, 
-                      bgcolor: 'var(--glass-bg)',
-                      '& .MuiLinearProgress-bar': { bgcolor: '#34c759' }
-                    }} 
-                  />
-                )}
-              </Box>
-            </Box>
-
-            {/* Slip Upload Card */}
-            <Box sx={{
-              borderRadius: '24px',
-              bgcolor: 'var(--surface-2)',
-              border: hasSlip ? '2px solid rgba(16,185,129,0.4)' : '1px solid var(--glass-border)',
-              overflow: 'hidden',
-              transition: 'all 0.3s ease',
-            }}>
-              {/* Card Header */}
-              <Box sx={{ 
-                px: 2.5, 
-                py: 2, 
-                borderBottom: '1px solid var(--glass-border)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                  <Box sx={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: '12px',
-                    background: hasSlip 
-                      ? 'linear-gradient(135deg, #34c759 0%, #34c759 100%)'
-                      : 'linear-gradient(135deg, rgba(6,182,212,0.2) 0%, rgba(0,113,227,0.2) 100%)',
-                    display: 'grid',
-                    placeItems: 'center',
-                  }}>
-                    {hasSlip ? <Check size={20} style={{ color: 'white' }} /> : <Image size={20} style={{ color: '#64d2ff' }} />}
-                  </Box>
-                  <Box>
-                    <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                      {hasSlip ? t.payment.slipAttached : t.payment.attachSlipBtn}
-                    </Typography>
-                    <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                      {hasSlip ? t.payment.readyToConfirm : t.payment.uploadSlipInstruction}
-                    </Typography>
                   </Box>
                 </Box>
+
+                {/* Formal slip upload */}
                 <Box sx={{
-                  px: 1.5,
-                  py: 0.5,
-                  borderRadius: '20px',
-                  bgcolor: hasSlip ? 'rgba(16,185,129,0.15)' : 'rgba(6,182,212,0.1)',
-                  border: `1px solid ${hasSlip ? 'rgba(16,185,129,0.3)' : 'rgba(6,182,212,0.2)'}`,
+                  ...sectionSx,
+                  border: hasSlip ? `2px solid rgba(5,150,105,0.4)` : '1px solid var(--glass-border)',
                 }}>
-                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: hasSlip ? '#30d158' : '#64d2ff' }}>
-                    {t.payment.step2}
-                  </Typography>
-                </Box>
-              </Box>
-              
-              <Box sx={{ p: 2.5 }}>
-                {!paymentEnabled ? (
-                  /* Payment Disabled - Cannot Upload */
-                  <Box sx={{
-                    border: '2px dashed rgba(239,68,68,0.3)',
-                    borderRadius: '16px',
-                    p: 4,
-                    textAlign: 'center',
-                    bgcolor: 'rgba(239,68,68,0.05)',
-                  }}>
-                    <Box sx={{
-                      width: 64,
-                      height: 64,
-                      borderRadius: '20px',
-                      bgcolor: 'rgba(239,68,68,0.1)',
-                      display: 'grid',
-                      placeItems: 'center',
-                      mx: 'auto',
-                      mb: 2,
-                    }}>
-                      <AlertCircle size={28} style={{ color: '#f87171' }} />
+                  <Box sx={sectionHeaderSx}>
+                    <Box>
+                      <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: NAVY }}>
+                        {hasSlip ? t.payment.slipAttached : t.payment.attachSlipBtn}
+                      </Typography>
+                      <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                        {hasSlip ? t.payment.readyToConfirm : t.payment.uploadSlipInstruction}
+                      </Typography>
                     </Box>
-                    <Typography sx={{ color: '#fca5a5', fontWeight: 600, mb: 0.5, fontSize: '1rem' }}>
-                      {t.payment.paymentDisabledOverlay}
-                    </Typography>
-                    <Typography sx={{ color: '#fb7185', fontSize: '0.8rem' }}>
-                      {t.payment.waitAdminOpenPayment}
+                    <Typography sx={{ fontSize: '0.68rem', fontWeight: 600, color: hasSlip ? EMERALD : 'var(--text-muted)' }}>
+                      {t.payment.step2}
                     </Typography>
                   </Box>
-                ) : !previewUrl ? (
-                  <Box
-                    onClick={() => fileInputRef.current?.click()}
-                    onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
-                    onDragLeave={() => setDragActive(false)}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      setDragActive(false);
-                      const droppedFile = e.dataTransfer.files?.[0];
-                      if (droppedFile) processFile(droppedFile);
-                    }}
-                    sx={{
-                      border: '2px dashed',
-                      borderColor: dragActive ? '#64d2ff' : 'rgba(255,255,255,0.15)',
-                      borderRadius: '16px',
-                      p: 4,
-                      textAlign: 'center',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      bgcolor: dragActive ? 'rgba(6,182,212,0.1)' : 'rgba(255,255,255,0.02)',
-                      '&:hover': { 
-                        borderColor: '#64d2ff', 
-                        bgcolor: 'rgba(6,182,212,0.05)',
-                        transform: 'scale(1.01)',
-                      },
-                    }}
-                  >
-                    <Box sx={{
-                      width: 64,
-                      height: 64,
-                      borderRadius: '20px',
-                      bgcolor: 'rgba(6,182,212,0.1)',
-                      display: 'grid',
-                      placeItems: 'center',
-                      mx: 'auto',
-                      mb: 2,
-                    }}>
-                      <Upload size={28} style={{ color: '#64d2ff' }} />
-                    </Box>
-                    <Typography sx={{ color: 'var(--foreground)', fontWeight: 600, mb: 0.5, fontSize: '1rem' }}>
-                      {t.payment.clickOrDrag}
-                    </Typography>
-                    <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                      {t.payment.slipHint}
-                    </Typography>
-                    <Box sx={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center',
-                      gap: 0.5, 
-                      mt: 1.5,
-                      color: 'var(--text-muted)',
-                      fontSize: '0.75rem',
-                    }}>
-                      <Smartphone size={14} />
-                      <Typography sx={{ fontSize: 'inherit' }}>{t.payment.fileHint}</Typography>
-                    </Box>
-                  </Box>
-                ) : (
-                  <Box sx={{ position: 'relative' }}>
-                    <Box sx={{
-                      borderRadius: '16px',
-                      overflow: 'hidden',
-                      bgcolor: '#000',
-                      position: 'relative',
-                    }}>
-                      <Box
-                        component="img"
-                        src={previewUrl}
-                        alt="Slip Preview"
-                        sx={{
-                          width: '100%',
-                          maxHeight: 280,
-                          objectFit: 'contain',
-                          display: 'block',
-                        }}
-                      />
-                      {/* Success Overlay */}
+
+                  <Box sx={{ p: 2 }}>
+                    {!paymentEnabled ? (
                       <Box sx={{
-                        position: 'absolute',
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        py: 1.5,
-                        px: 2,
-                        background: 'linear-gradient(transparent, rgba(16,185,129,0.9))',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 1,
+                        border: '2px dashed rgba(239,68,68,0.3)',
+                        borderRadius: '12px',
+                        p: 3.5,
+                        textAlign: 'center',
+                        bgcolor: 'rgba(239,68,68,0.05)',
                       }}>
-                        <CheckCircle2 size={18} />
-                        <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'white' }}>
-                          {t.payment.readyToSubmit}
+                        <AlertCircle size={28} style={{ color: '#dc2626', marginBottom: 8 }} />
+                        <Typography sx={{ color: '#dc2626', fontWeight: 600, mb: 0.35, fontSize: '0.95rem' }}>
+                          {t.payment.paymentDisabledOverlay}
+                        </Typography>
+                        <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                          {t.payment.waitAdminOpenPayment}
                         </Typography>
                       </Box>
-                    </Box>
-                    <Button
-                      fullWidth
-                      onClick={() => {
-                        setSelectedFile(null);
-                        setPreviewUrl(null);
-                      }}
-                      sx={{
-                        mt: 1.5,
-                        py: 1,
-                        borderRadius: '10px',
-                        bgcolor: 'rgba(245,158,11,0.1)',
-                        color: '#ffd60a',
-                        fontWeight: 600,
-                        textTransform: 'none',
-                        '&:hover': { bgcolor: 'rgba(245,158,11,0.2)' },
-                      }}
-                    >
-                      {t.payment.changeSlip}
-                    </Button>
+                    ) : !previewUrl ? (
+                      <Box
+                        onClick={() => fileInputRef.current?.click()}
+                        onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+                        onDragLeave={() => setDragActive(false)}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          setDragActive(false);
+                          const droppedFile = e.dataTransfer.files?.[0];
+                          if (droppedFile) processFile(droppedFile);
+                        }}
+                        sx={{
+                          border: '2px dashed',
+                          borderColor: dragActive ? NAVY : 'var(--glass-border)',
+                          borderRadius: '12px',
+                          p: 3.5,
+                          textAlign: 'center',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          bgcolor: dragActive ? NAVY_SOFT : 'var(--surface)',
+                          '&:hover': {
+                            borderColor: NAVY,
+                            bgcolor: NAVY_SOFT,
+                          },
+                        }}
+                      >
+                        <Box sx={{
+                          width: 56,
+                          height: 56,
+                          borderRadius: '12px',
+                          bgcolor: NAVY_SOFT,
+                          display: 'grid',
+                          placeItems: 'center',
+                          mx: 'auto',
+                          mb: 1.5,
+                        }}>
+                          <Upload size={24} style={{ color: NAVY }} />
+                        </Box>
+                        <Typography sx={{ color: 'var(--foreground)', fontWeight: 600, mb: 0.4, fontSize: '0.95rem' }}>
+                          {t.payment.clickOrDrag}
+                        </Typography>
+                        <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                          {t.payment.slipHint}
+                        </Typography>
+                        <Box sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 0.5,
+                          mt: 1.25,
+                          color: 'var(--text-muted)',
+                          fontSize: '0.72rem',
+                        }}>
+                          <Smartphone size={13} />
+                          <Typography sx={{ fontSize: 'inherit' }}>{t.payment.fileHint}</Typography>
+                        </Box>
+                      </Box>
+                    ) : (
+                      <Box sx={{ position: 'relative' }}>
+                        <Box sx={{
+                          borderRadius: '12px',
+                          overflow: 'hidden',
+                          bgcolor: '#0f172a',
+                          position: 'relative',
+                        }}>
+                          <Box
+                            component="img"
+                            src={previewUrl}
+                            alt="Slip Preview"
+                            sx={{
+                              width: '100%',
+                              maxHeight: 260,
+                              objectFit: 'contain',
+                              display: 'block',
+                            }}
+                          />
+                          <Box sx={{
+                            position: 'absolute',
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            py: 1.25,
+                            px: 2,
+                            background: 'linear-gradient(transparent, rgba(5,150,105,0.92))',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 0.75,
+                          }}>
+                            <CheckCircle2 size={16} color="#fff" />
+                            <Typography sx={{ fontSize: '0.82rem', fontWeight: 600, color: 'white' }}>
+                              {t.payment.readyToSubmit}
+                            </Typography>
+                          </Box>
+                        </Box>
+                        <Button
+                          fullWidth
+                          onClick={() => {
+                            setSelectedFile(null);
+                            setPreviewUrl(null);
+                          }}
+                          sx={{
+                            mt: 1.25,
+                            py: 0.9,
+                            borderRadius: '10px',
+                            bgcolor: 'rgba(217,119,6,0.1)',
+                            color: AMBER,
+                            fontWeight: 600,
+                            textTransform: 'none',
+                            '&:hover': { bgcolor: 'rgba(217,119,6,0.18)' },
+                          }}
+                        >
+                          {t.payment.changeSlip}
+                        </Button>
+                      </Box>
+                    )}
                   </Box>
-                )}
-              </Box>
 
-              <input
-                type="file"
-                accept="image/*"
-                ref={fileInputRef}
-                onChange={(e) => e.target.files && processFile(e.target.files[0])}
-                style={{ display: 'none' }}
-              />
-            </Box>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    ref={fileInputRef}
+                    onChange={(e) => e.target.files && processFile(e.target.files[0])}
+                    style={{ display: 'none' }}
+                  />
+                </Box>
 
-            {/* Tips - Compact */}
+                <Box sx={{
+                  px: 1.75,
+                  py: 1.35,
+                  borderRadius: '10px',
+                  bgcolor: EMERALD_SOFT,
+                  border: '1px solid rgba(5,150,105,0.2)',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 1.25,
+                }}>
+                  <Info size={16} style={{ color: EMERALD, flexShrink: 0, marginTop: 2 }} />
+                  <Typography sx={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                    {t.payment.slipOkAutoCheck}
+                  </Typography>
+                </Box>
+              </>
+            )}
+
+            {/* E-Receipt notice */}
             <Box sx={{
-              px: 2,
+              px: 1.75,
               py: 1.5,
-              borderRadius: '14px',
-              bgcolor: 'rgba(245,158,11,0.06)',
-              border: '1px solid rgba(245,158,11,0.15)',
+              borderRadius: '10px',
+              bgcolor: NAVY_SOFT,
+              border: '1px solid rgba(30,58,95,0.18)',
               display: 'flex',
-              alignItems: 'center',
-              gap: 1.5,
+              alignItems: 'flex-start',
+              gap: 1.25,
             }}>
-              <Clock3 size={18} style={{ color: '#ffd60a', flexShrink: 0 }} />
-              <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                {t.payment.uploadSlipFooter}
+              <Mail size={16} style={{ color: NAVY, flexShrink: 0, marginTop: 2 }} />
+              <Typography sx={{ fontSize: '0.78rem', color: 'var(--foreground)', lineHeight: 1.55 }}>
+                {t.payment.eReceiptNotice}
               </Typography>
             </Box>
-            </>)}
+
+            {/* Payment support escalation */}
+            <Box
+              className="payment-notice-no-print"
+              sx={{
+                px: 1.75,
+                py: 1.35,
+                borderRadius: '10px',
+                bgcolor: 'var(--surface-2)',
+                border: '1px solid var(--glass-border)',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 1.1,
+                flexWrap: 'wrap',
+              }}
+            >
+              <Headphones size={15} style={{ color: NAVY, flexShrink: 0, marginTop: 2 }} />
+              <Typography sx={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                {t.payment.paymentSupportHelp}{' '}
+                <Box
+                  component="button"
+                  type="button"
+                  onClick={openSupportForPayment}
+                  sx={{
+                    appearance: 'none',
+                    border: 0,
+                    background: 'none',
+                    p: 0,
+                    m: 0,
+                    color: NAVY,
+                    fontWeight: 700,
+                    fontSize: 'inherit',
+                    textDecoration: 'underline',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  {t.payment.contactAccounting}
+                </Box>
+              </Typography>
+            </Box>
           </Box>
         )}
+        </Box>
       </Box>
 
-      {/* Bottom Submit Button */}
+      {/* Footer — Cancel left | Confirm right */}
       <Box sx={{
-        px: { xs: 2, sm: 3 },
-        py: 2,
+        px: { xs: 2, sm: 2.5 },
+        py: 1.75,
         borderTop: '1px solid var(--glass-border)',
         background: 'var(--glass-strong)',
         backdropFilter: 'blur(20px)',
-        paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
+        paddingBottom: 'max(14px, env(safe-area-inset-bottom))',
       }}>
-        <Box sx={{ maxWidth: 500, mx: 'auto' }}>
+        <Box sx={{ maxWidth: 520, mx: 'auto' }}>
           {isPaid ? (
-            /* Already Paid - Show Close Button */
             <Button
               fullWidth
               onClick={onClose}
               sx={{
-                py: 2,
-                borderRadius: '16px',
-                background: 'linear-gradient(135deg, #0071e3 0%, #0071e3 100%)',
+                py: 1.6,
+                borderRadius: '12px',
+                bgcolor: NAVY,
                 color: 'white',
-                fontSize: '1.05rem',
+                fontSize: '0.95rem',
                 fontWeight: 700,
                 textTransform: 'none',
-                boxShadow: '0 8px 24px rgba(0,113,227,0.35)',
-                '&:hover': {
-                  background: 'linear-gradient(135deg, #0071e3 0%, #1d4ed8 100%)',
-                },
+                '&:hover': { bgcolor: '#16304f' },
               }}
             >
               {t.payment.closeWindow}
             </Button>
           ) : !paymentEnabled ? (
-            /* Payment Disabled - Show Disabled Button */
-            <Button
-              fullWidth
-              disabled
-              startIcon={<AlertCircle size={22} />}
-              sx={{
-                py: 2,
-                borderRadius: '16px',
-                background: 'rgba(239,68,68,0.15)',
-                color: '#f87171',
-                fontSize: '1.05rem',
-                fontWeight: 700,
-                textTransform: 'none',
-                '&:disabled': {
-                  background: 'rgba(239,68,68,0.15)',
-                  color: '#f87171',
-                },
-              }}
-            >
-              {t.payment.paymentDisabledOverlay}
-            </Button>
+            <Box sx={{ display: 'flex', gap: 1.25 }}>
+              <Button
+                onClick={onClose}
+                sx={{
+                  flex: 1,
+                  py: 1.45,
+                  borderRadius: '12px',
+                  bgcolor: 'transparent',
+                  border: '1px solid var(--glass-border)',
+                  color: 'var(--foreground)',
+                  fontWeight: 600,
+                  textTransform: 'none',
+                  '&:hover': { bgcolor: 'var(--glass-bg)' },
+                }}
+              >
+                {t.common.cancel}
+              </Button>
+              <Button
+                disabled
+                startIcon={<AlertCircle size={18} />}
+                sx={{
+                  flex: 2,
+                  py: 1.45,
+                  borderRadius: '12px',
+                  background: 'rgba(239,68,68,0.12)',
+                  color: '#dc2626',
+                  fontSize: '0.9rem',
+                  fontWeight: 700,
+                  textTransform: 'none',
+                  '&:disabled': {
+                    background: 'rgba(239,68,68,0.12)',
+                    color: '#dc2626',
+                  },
+                }}
+              >
+                {t.payment.paymentDisabledOverlay}
+              </Button>
+            </Box>
           ) : payMethod === 'stripe' ? (
-            /* Stripe auto flow — no slip needed, payment confirms itself */
-            <Box sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 1,
-              py: 1.5,
-              borderRadius: '16px',
-              bgcolor: 'rgba(8,145,178,0.08)',
-              border: '1px solid rgba(8,145,178,0.2)',
-            }}>
-              <Sparkles size={16} style={{ color: '#64d2ff' }} />
-              <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: '#64d2ff' }}>
-                {t.payment.autoVerifyHint}
-              </Typography>
+            <Box sx={{ display: 'flex', gap: 1.25, alignItems: 'center' }}>
+              <Button
+                onClick={onClose}
+                sx={{
+                  flexShrink: 0,
+                  py: 1.45,
+                  px: 2.25,
+                  borderRadius: '12px',
+                  bgcolor: 'transparent',
+                  border: '1px solid var(--glass-border)',
+                  color: 'var(--foreground)',
+                  fontWeight: 600,
+                  textTransform: 'none',
+                  '&:hover': { bgcolor: 'var(--glass-bg)' },
+                }}
+              >
+                {t.common.cancel}
+              </Button>
+              <Box sx={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 0.85,
+                py: 1.35,
+                borderRadius: '12px',
+                bgcolor: NAVY_SOFT,
+                border: '1px solid rgba(30,58,95,0.2)',
+              }}>
+                <Sparkles size={15} style={{ color: NAVY }} />
+                <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: NAVY }}>
+                  {t.payment.autoVerifyHint}
+                </Typography>
+              </Box>
             </Box>
           ) : (
-            /* Normal Payment Button */
-            <Button
-              fullWidth
-              onClick={handleConfirmPayment}
-              disabled={verifying || loading || !selectedFile}
-              startIcon={verifying ? <Loader2 size={22} className="animate-spin" /> : hasSlip ? <Check size={22} /> : <Upload size={22} />}
-              sx={{
-                py: 2,
-                borderRadius: '16px',
-                background: hasSlip && !verifying
-                  ? 'linear-gradient(135deg, #34c759 0%, #34c759 100%)'
-                  : 'rgba(100,116,139,0.15)',
-                color: hasSlip && !verifying ? 'white' : '#86868b',
-                fontSize: '1.05rem',
-                fontWeight: 700,
-                textTransform: 'none',
-                boxShadow: hasSlip && !verifying ? '0 8px 32px rgba(16,185,129,0.35)' : 'none',
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  background: hasSlip && !verifying
-                    ? 'linear-gradient(135deg, #34c759 0%, #047857 100%)'
-                    : 'rgba(100,116,139,0.2)',
-                  transform: hasSlip && !verifying ? 'translateY(-2px)' : 'none',
-                  boxShadow: hasSlip && !verifying ? '0 12px 40px rgba(16,185,129,0.4)' : 'none',
-                },
-                '&:disabled': {
-                  background: verifying ? 'linear-gradient(135deg, #0891b2 0%, #64d2ff 100%)' : 'rgba(100,116,139,0.15)',
-                  color: verifying ? 'white' : '#86868b',
-                },
-              }}
-            >
-              {verifying ? t.payment.verifyingSlip : hasSlip ? t.payment.confirmPayment : t.payment.attachFirst}
-            </Button>
-          )}
-          {!hasSlip && paymentEnabled && !isPaid && payMethod === 'manual' && (
-            <Typography sx={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)', mt: 1.5 }}>
-              {t.payment.attachBeforeConfirm}
-            </Typography>
-          )}
-
-          {/* Secondary Close Button — hidden when paid (primary button already closes) */}
-          {!isPaid && (
-            <Button
-              fullWidth
-              onClick={onClose}
-              startIcon={<X size={16} />}
-              sx={{
-                mt: 1.5,
-                py: 1.2,
-                borderRadius: '12px',
-                bgcolor: 'transparent',
-                border: '1px solid var(--glass-border)',
-                color: 'var(--foreground)',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                textTransform: 'none',
-                opacity: 0.85,
-                '&:hover': { bgcolor: 'var(--glass-bg)', opacity: 1 },
-              }}
-            >
-              {t.common.close}
-            </Button>
+            <Box sx={{ display: 'flex', gap: 1.25 }}>
+              <Button
+                onClick={onClose}
+                disabled={verifying}
+                sx={{
+                  flex: 1,
+                  py: 1.45,
+                  borderRadius: '12px',
+                  bgcolor: 'transparent',
+                  border: '1px solid var(--glass-border)',
+                  color: 'var(--foreground)',
+                  fontWeight: 600,
+                  textTransform: 'none',
+                  '&:hover': { bgcolor: 'var(--glass-bg)' },
+                }}
+              >
+                {t.common.cancel}
+              </Button>
+              <Button
+                onClick={handleConfirmPayment}
+                disabled={verifying || loading || !selectedFile}
+                startIcon={verifying ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
+                sx={{
+                  flex: 2,
+                  py: 1.45,
+                  borderRadius: '12px',
+                  background: hasSlip && !verifying ? EMERALD : 'rgba(100,116,139,0.15)',
+                  color: hasSlip && !verifying ? 'white' : '#86868b',
+                  fontSize: '0.9rem',
+                  fontWeight: 700,
+                  textTransform: 'none',
+                  boxShadow: hasSlip && !verifying ? '0 6px 18px rgba(5,150,105,0.28)' : 'none',
+                  transition: 'all 0.25s ease',
+                  '&:hover': {
+                    background: hasSlip && !verifying ? '#047857' : 'rgba(100,116,139,0.2)',
+                  },
+                  '&:disabled': {
+                    background: verifying ? NAVY : 'rgba(100,116,139,0.15)',
+                    color: verifying ? 'white' : '#86868b',
+                  },
+                }}
+              >
+                {verifying ? t.payment.verifyingSlip : t.payment.confirmAndSubmit}
+              </Button>
+            </Box>
           )}
         </Box>
       </Box>

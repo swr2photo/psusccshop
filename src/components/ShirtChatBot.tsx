@@ -1,6 +1,7 @@
 'use client';
 
 import { apiFetch } from '@/lib/api-client';
+import { toIsoString } from '@/lib/safe-date';
 import React from 'react';
 import {
   Avatar,
@@ -152,7 +153,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
         id: m.id,
         sender: m.sender,
         text: m.text.slice(0, 2000),
-        timestamp: m.timestamp.toISOString(),
+        timestamp: toIsoString(m.timestamp, new Date().toISOString()),
         source: m.source,
         productImages: m.productImages,
       }));
@@ -185,10 +186,14 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
       
       if (saved) {
         const parsed = JSON.parse(saved);
-        return parsed.map((m: any) => ({
-          ...m,
-          timestamp: new Date(m.timestamp),
-        }));
+        return parsed.map((m: any) => {
+          const raw = m.timestamp;
+          const ts = raw instanceof Date ? raw : new Date(raw);
+          return {
+            ...m,
+            timestamp: Number.isNaN(ts.getTime()) ? new Date() : ts,
+          };
+        });
       }
     } catch (e) {
       console.warn('Failed to load chat history');
@@ -592,8 +597,10 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
     setIsFullscreen(!isFullscreen);
   };
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+  const formatTime = (date: Date | string | number | null | undefined) => {
+    const d = date instanceof Date ? date : date != null ? new Date(date) : null;
+    if (!d || Number.isNaN(d.getTime())) return '';
+    return d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
   };
 
   // Parse and render markdown tables

@@ -650,7 +650,23 @@ const ProductEditDialog = ({
   const handleRemoveSize = (size: string) => {
     const next = { ...(product.sizePricing || {}) };
     delete next[size];
-    onChange({ ...product, sizePricing: next });
+    const nextChart = { ...(product.sizeChart || {}) };
+    delete nextChart[size];
+    onChange({
+      ...product,
+      sizePricing: next,
+      sizeChart: Object.keys(nextChart).length ? nextChart : undefined,
+    });
+  };
+
+  const handleSizeChartChange = (size: string, field: 'chest' | 'length', value: number) => {
+    if (!size || Number.isNaN(value)) return;
+    const prev = product.sizeChart?.[size] || { chest: 0, length: 0 };
+    const next = {
+      ...(product.sizeChart || {}),
+      [size]: { ...prev, [field]: Math.max(0, value) },
+    };
+    onChange({ ...product, sizeChart: next });
   };
 
   const handleAddSize = () => {
@@ -1080,6 +1096,47 @@ const ProductEditDialog = ({
                         <Add size={16} className="mr-1" /> เพิ่มไซส์
                       </Button>
                     </div>
+                    {Object.keys(product.sizePricing || {}).length > 0 && (
+                      <div className="mt-3 space-y-2 rounded-lg border border-[var(--glass-border)] bg-[var(--surface)] p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-bold">ตารางวัดไซส์ (นิ้ว)</p>
+                          <p className="text-xs text-[var(--text-muted)]">รอบอก / ความยาว — ว่างได้ถ้าใช้ค่ามาตรฐาน</p>
+                        </div>
+                        {Object.keys(product.sizePricing || {}).map((size) => (
+                          <div key={`chart-${size}`} className="grid grid-cols-[64px_1fr_1fr] items-center gap-2">
+                            <span className="text-xs font-bold text-[var(--foreground)]">{size}</span>
+                            <Input
+                              type="number"
+                              min={0}
+                              className={inputClass}
+                              placeholder="รอบอก"
+                              value={product.sizeChart?.[size]?.chest ?? ''}
+                              onChange={(e) =>
+                                handleSizeChartChange(
+                                  size,
+                                  'chest',
+                                  e.target.value === '' ? 0 : Number(e.target.value)
+                                )
+                              }
+                            />
+                            <Input
+                              type="number"
+                              min={0}
+                              className={inputClass}
+                              placeholder="ยาว"
+                              value={product.sizeChart?.[size]?.length ?? ''}
+                              onChange={(e) =>
+                                handleSizeChartChange(
+                                  size,
+                                  'length',
+                                  e.target.value === '' ? 0 : Number(e.target.value)
+                                )
+                              }
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </section>
                 )}
 

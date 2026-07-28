@@ -11,7 +11,6 @@ import { Palette, MessageCircle as ChatIcon, Send as SendIcon, X as CloseIcon, B
 import ShirtChatBot from '@/components/ShirtChatBot';
 import { ProductDetailsDialog } from '@/components/ProductDetailsDialog';
 import MobileBottomNav from '@/components/MobileBottomNav';
-import ProgressiveBlurChrome from '@/components/ui/ProgressiveBlurChrome';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -93,6 +92,7 @@ import {
   Headphones,
   Bot,
   HandMetal,
+  Settings,
   Share2,
   Link2,
   Percent,
@@ -118,6 +118,10 @@ import { useNotification } from '@/components/NotificationContext';
 import AnnouncementBar from '@/components/AnnouncementBar';
 import EventBanner, { type ShopEvent } from '@/components/EventBanner';
 import Footer from '@/components/Footer';
+import HomeHero from '@/components/HomeHero';
+import HomeTrustStrip from '@/components/HomeTrustStrip';
+import { FLAGSHIP_PRODUCTS, getFlagshipSlugForProduct } from '@/lib/flagship/config';
+import { flushFlagshipCartQueue } from '@/lib/flagship/cart-bridge';
 import TurnstileWidget from '@/components/TurnstileWidget';
 import { ShopStatusBanner, getProductStatus, getShopStatus, SHOP_STATUS_CONFIG, type ShopStatusType } from '@/components/ShopStatusCard';
 import type { SavedAddress } from '@/components/ProfileModal';
@@ -305,6 +309,50 @@ const productRequiresSize = (product: Product): boolean => {
   if (product.options?.requiresSize === false) return false;
   const category = (product as any).category || getCategoryFromType(product.type);
   return category === 'APPAREL';
+};
+
+const EVENT_SECTION_CATEGORIES = new Set(['CAMP_FEE', 'EVENT']);
+
+/** Stock / variant exhaustion — push to end of grids with muted styling */
+const isProductOutOfStock = (product: Product): boolean => {
+  if (product.stock !== null && product.stock !== undefined && product.stock <= 0) return true;
+  const variants = (product as any).variants as Array<{ stock?: number | null; isActive?: boolean }> | undefined;
+  if (variants && variants.length > 0) {
+    const active = variants.filter((v) => v.isActive !== false);
+    if (active.length > 0 && active.every((v) => v.stock !== null && v.stock !== undefined && v.stock <= 0)) {
+      return true;
+    }
+  }
+  return false;
+};
+
+/** Sellable products sort ahead of expired / closed / OOS */
+const getProductSellabilityRank = (
+  product: Product,
+  nowOverride?: Date,
+): number => {
+  if (getProductStatus(product, nowOverride) !== 'OPEN') return 1;
+  if (isProductOutOfStock(product)) return 1;
+  return 0;
+};
+
+/**
+ * Quick-add only when no meaningful customization / multi-choice is required
+ * (free-size or single size/variant, no name/number/pattern/sleeve).
+ */
+const canQuickAddToCart = (product: Product): boolean => {
+  if (product.options?.hasCustomName || product.options?.hasCustomNumber) return false;
+  if (product.options?.hasLongSleeve) return false;
+  const patterns = (product.patterns || []).filter((p: any) => p.isActive !== false);
+  if (patterns.length > 0) return false;
+  const customFields = (product as any).customFields as Array<{ required?: boolean }> | undefined;
+  if (customFields?.some((f) => f.required)) return false;
+
+  if (productRequiresSize(product)) {
+    return Object.keys(product.sizePricing || {}).length <= 1;
+  }
+  const variants = ((product as any).variants || []).filter((v: any) => v.isActive !== false);
+  return variants.length <= 1;
 };
 
 const SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL', '7XL', '8XL', '9XL', '10XL'] as const;
@@ -563,6 +611,15 @@ export default function HomePage() {
       type: 'JERSEY',
       basePrice: 350,
       sizePricing: { 'S': 350, 'M': 350, 'L': 350, 'XL': 370, '2XL': 390 },
+      sizeChart: {
+        S: { chest: 36, length: 25 },
+        M: { chest: 38, length: 26 },
+        L: { chest: 40, length: 27 },
+        XL: { chest: 42, length: 28 },
+        '2XL': { chest: 44, length: 29 },
+        FREE: { chest: 42, length: 28 },
+        'ฟรีไซส์': { chest: 42, length: 28 },
+      },
       isActive: true,
       options: { hasCustomName: true, hasCustomNumber: true, hasLongSleeve: true, longSleevePrice: 50 },
       images: ['https://placehold.co/400x400/6366f1/white?text=Jersey+SCC'],
@@ -748,14 +805,8 @@ export default function HomePage() {
     }
     return 'right';
   });
-  const toggleNavHandedness = useCallback(() => {
-    setNavHandedness(prev => {
-      const next = prev === 'right' ? 'left' : 'right';
-      localStorage.setItem('scc_nav_hand', next);
-      return next;
-    });
-  }, []);
   const [showCart, setShowCart] = useState(false);
+  const [cartPromo, setCartPromo] = useState<{ code: string; discount: number; description?: string } | null>(null);
   const [showHistoryDialog, setShowHistoryDialog] = useState(false);
   const [showOrderDialog, setShowOrderDialog] = useState(false);
   const [showQRFullscreen, setShowQRFullscreen] = useState<string | null>(null); // Store order ref for fullscreen QR
@@ -904,6 +955,24 @@ export default function HomePage() {
       fontWeight: 700,
     },
   } as const;
+
+  const sidebarMenuRowSx = {
+    textAlign: 'left' as const,
+    mb: 0.25,
+    color: 'var(--foreground)',
+    justifyContent: 'flex-start',
+    borderRadius: 2,
+    px: 1.5,
+    py: 1.05,
+    textTransform: 'none' as const,
+    fontWeight: 500,
+    bgcolor: 'transparent',
+    boxShadow: 'none',
+    border: 'none',
+    '&:hover': {
+      bgcolor: 'var(--surface-2)',
+    },
+  };
 
   const bottomTabs = useMemo(() => {
     const leftTabs = [
@@ -1179,6 +1248,65 @@ export default function HomePage() {
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, [config?.products, loading, now]);
+
+  // Merge guest cart items queued from /flagship/[slug]; open cart via ?cart=1
+  useEffect(() => {
+    if (loading) return;
+    const pending = flushFlagshipCartQueue(true);
+    if (pending.length > 0) {
+      setCart((prev) => {
+        const next = [...prev, ...pending];
+        if (session?.user?.email) {
+          saveCartApi(session.user.email, next).catch((err) =>
+            console.error('Failed to persist flagship cart', err),
+          );
+        }
+        return next;
+      });
+    }
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('cart') === '1') {
+      setShowCart(true);
+      params.delete('cart');
+      const qs = params.toString();
+      window.history.replaceState({}, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot merge on home ready
+  }, [loading, session?.user?.email]);
+
+  // Footer / deep-link hashes: /#product-grid|/shop-section|/events-section scroll; /#history opens order history
+  useEffect(() => {
+    if (loading) return;
+    const hash = window.location.hash.replace(/^#/, '').split('?')[0];
+    const scrollTargets = ['product-grid', 'shop-section', 'events-section'];
+    if (!scrollTargets.includes(hash)) return;
+    const timer = window.setTimeout(() => {
+      document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth' });
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [loading]);
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace(/^#/, '').split('?')[0];
+      if (hash === 'product-grid' || hash === 'shop-section' || hash === 'events-section') {
+        document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth' });
+      } else if (hash === 'history') {
+        setShowHistoryDialog(true);
+        loadOrderHistoryRef.current();
+      }
+      // /#payment skipped — PaymentFlow needs an order ref; no clear no-ref opener
+    };
+
+    // Initial /#history (product-grid initial scroll is handled above after loading)
+    if (window.location.hash.replace(/^#/, '').split('?')[0] === 'history') {
+      setShowHistoryDialog(true);
+      loadOrderHistoryRef.current();
+    }
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   useEffect(() => {
     const email = session?.user?.email;
@@ -2005,6 +2133,86 @@ export default function HomePage() {
     commitCartItem(newItem, { goCheckout: true });
   };
 
+  /** One-tap add for free-size / single-option products; otherwise open detail */
+  const handleQuickAddToCart = useCallback((
+    product: Product,
+    shopContext?: { shopId?: string; shopSlug?: string },
+  ) => {
+    if (!catalogContext.isOpen) {
+      showToast('warning', t.checkout.shopClosedWarning);
+      return;
+    }
+    if (getProductStatus(product, now) !== 'OPEN' || isProductOutOfStock(product)) {
+      showToast('warning', lang === 'en' ? 'This product is no longer available' : 'สินค้านี้ไม่พร้อมจำหน่ายแล้ว');
+      return;
+    }
+    if (!canQuickAddToCart(product)) {
+      handleSelectProduct(product, shopContext);
+      return;
+    }
+
+    const needsSize = productRequiresSize(product);
+    const sizeKeys = Object.keys(product.sizePricing || {});
+    const variants = ((product as any).variants || []).filter((v: any) => v.isActive !== false);
+
+    let sizeToUse = '-';
+    let basePrice = product.basePrice;
+    let variantId: string | undefined;
+    let variantName: string | undefined;
+
+    if (needsSize) {
+      sizeToUse = sizeKeys[0] || t.common.freeSize;
+      if (sizeKeys[0]) basePrice = product.sizePricing?.[sizeKeys[0]] ?? product.basePrice;
+    } else if (variants.length === 1) {
+      variantId = variants[0].id;
+      variantName = variants[0].name;
+      sizeToUse = variants[0].name;
+      basePrice = variants[0].price || product.basePrice;
+    }
+
+    const discount = getEventDiscount(product.id, catalogContext.events);
+    if (discount) basePrice = discount.discountedPrice(basePrice);
+
+    const incomingShop = shopContext?.shopSlug || catalogContext.shopSlug || '';
+    const cartShop = cart[0]?.shopSlug || '';
+    if (cart.length > 0 && incomingShop !== cartShop) {
+      showToast('warning', t.storefront.mixedCartWarning);
+      return;
+    }
+
+    const item: CartItem = {
+      id: `${product.id}-${sizeToUse}----false-`,
+      productId: product.id,
+      productName: product.name,
+      size: sizeToUse,
+      quantity: 1,
+      unitPrice: basePrice,
+      options: {
+        variantId,
+        variantName,
+      },
+      shopId: shopContext?.shopId ?? catalogContext.shopId,
+      shopSlug: shopContext?.shopSlug ?? catalogContext.shopSlug,
+    };
+    saveCart([...cart, item]);
+    showToast('success', t.cart.addedToCart);
+  }, [
+    catalogContext.isOpen,
+    catalogContext.events,
+    catalogContext.shopId,
+    catalogContext.shopSlug,
+    cart,
+    handleSelectProduct,
+    lang,
+    now,
+    saveCart,
+    showToast,
+    t.cart.addedToCart,
+    t.checkout.shopClosedWarning,
+    t.common.freeSize,
+    t.storefront.mixedCartWarning,
+  ]);
+
   // ==================== BULK ORDER LOGIC ====================
   const openBulkOrder = () => {
     if (!selectedProduct || !activeProductCatalog.isOpen) return;
@@ -2729,13 +2937,22 @@ export default function HomePage() {
       })
       .filter(([, items]) => items.length > 0);
     
-    // Apply sorting
+    // Apply sorting — unavailable (closed / OOS) always sink to the end
     for (const entry of entries) {
       const items = [...entry[1]];
+      const bySellability = (a: Product, b: Product) =>
+        getProductSellabilityRank(a, now) - getProductSellabilityRank(b, now);
+
       if (term && sortBy === 'default') {
-        items.sort((a, b) => rankProductSearch(b, term, lang) - rankProductSearch(a, term, lang));
+        items.sort((a, b) => {
+          const rank = bySellability(a, b);
+          if (rank !== 0) return rank;
+          return rankProductSearch(b, term, lang) - rankProductSearch(a, term, lang);
+        });
       } else if (sortBy !== 'default') {
         items.sort((a, b) => {
+          const rank = bySellability(a, b);
+          if (rank !== 0) return rank;
           switch (sortBy) {
             case 'price-low': return getBasePrice(a) - getBasePrice(b);
             case 'price-high': return getBasePrice(b) - getBasePrice(a);
@@ -2743,6 +2960,12 @@ export default function HomePage() {
             case 'name': return getProductName(a, lang).localeCompare(getProductName(b, lang), lang === 'th' ? 'th' : 'en');
             default: return 0;
           }
+        });
+      } else {
+        items.sort((a, b) => {
+          const rank = bySellability(a, b);
+          if (rank !== 0) return rank;
+          return getProductSortTime(b) - getProductSortTime(a);
         });
       }
       (entry as any)[1] = items;
@@ -2764,9 +2987,48 @@ export default function HomePage() {
     if (!term) return filteredGroupedProducts;
     const flat = Object.values(filteredGroupedProducts).flat();
     if (flat.length === 0) return filteredGroupedProducts;
-    const ranked = [...flat].sort((a, b) => rankProductSearch(b, term, lang) - rankProductSearch(a, term, lang));
+    const ranked = [...flat].sort((a, b) => {
+      const rank = getProductSellabilityRank(a, now) - getProductSellabilityRank(b, now);
+      if (rank !== 0) return rank;
+      return rankProductSearch(b, term, lang) - rankProductSearch(a, term, lang);
+    });
     return { __SEARCH__: ranked };
-  }, [filteredGroupedProducts, productSearch, lang]);
+  }, [filteredGroupedProducts, productSearch, lang, now]);
+
+  /** Partition catalog into shop merch vs events/camps for sectioned layout */
+  const storefrontSections = useMemo(() => {
+    const entries = Object.entries(displayGroupedProducts);
+    const isSearch = Boolean(productSearch.trim()) || entries.some(([k]) => k === '__SEARCH__');
+    if (isSearch) {
+      return { shop: entries, events: [] as typeof entries, isSearch: true };
+    }
+    const shop: typeof entries = [];
+    const events: typeof entries = [];
+    for (const entry of entries) {
+      if (EVENT_SECTION_CATEGORIES.has(entry[0])) events.push(entry);
+      else shop.push(entry);
+    }
+    const order = (keys: string[]) => (a: (typeof entries)[0], b: (typeof entries)[0]) => {
+      const ia = keys.indexOf(a[0]);
+      const ib = keys.indexOf(b[0]);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    };
+    shop.sort(order(['APPAREL', 'MERCHANDISE', 'SERVICE', 'OTHER']));
+    events.sort(order(['CAMP_FEE', 'EVENT']));
+    return { shop, events, isSearch: false };
+  }, [displayGroupedProducts, productSearch]);
+
+  const flagshipHeroProduct = useMemo(() => {
+    const catalog = isDev
+      ? [...devTestProducts, ...(config?.products || [])]
+      : (config?.products || []);
+    const cfg = FLAGSHIP_PRODUCTS['scc-jersey-2026'];
+    if (cfg?.productId) {
+      const byId = catalog.find((p) => p.id === cfg.productId);
+      if (byId) return byId;
+    }
+    return catalog.find((p) => getFlagshipSlugForProduct(p)) || null;
+  }, [config?.products, isDev, devTestProducts]);
 
   const filteredProductCount = useMemo(
     () => Object.values(filteredGroupedProducts).reduce((acc, items) => acc + items.length, 0),
@@ -2837,10 +3099,13 @@ export default function HomePage() {
         position="sticky"
         elevation={0}
         sx={{
-          bgcolor: 'transparent',
+          bgcolor: 'color-mix(in srgb, var(--background) 82%, transparent)',
           backgroundImage: 'none',
+          backdropFilter: 'blur(14px) saturate(1.2)',
+          WebkitBackdropFilter: 'blur(14px) saturate(1.2)',
           boxShadow: 'none',
           border: 'none',
+          borderBottom: '1px solid var(--glass-border)',
           color: 'var(--foreground)',
           transform: hideNavBars ? 'translateY(-110%)' : 'translateY(0)',
           opacity: hideNavBars ? 0 : 1,
@@ -2852,19 +3117,15 @@ export default function HomePage() {
           pt: { xs: 'env(safe-area-inset-top)', md: 0 },
         }}
       >
-        <ProgressiveBlurChrome
-          edge="bottom"
-          fadeExtent={56}
-          intensity="strong"
-          sx={{ display: { xs: 'block', md: 'none' } }}
+        {/* Mobile header */}
+        <Toolbar
+          sx={{
+            display: { xs: 'flex', md: 'none' },
+            minHeight: 52,
+            px: 1.25,
+            gap: 0.35,
+          }}
         >
-          <Toolbar
-            sx={{
-              minHeight: 52,
-              px: 1.25,
-              gap: 0.35,
-            }}
-          >
             <BrandMark size={30} showText={false} />
             <Typography
               sx={{
@@ -2882,9 +3143,11 @@ export default function HomePage() {
               onClick={() => setShowSearchBar((v) => !v)}
               sx={{
                 color: showSearchBar ? '#0071e3' : 'var(--foreground)',
-                bgcolor: showSearchBar ? 'rgba(0,113,227,0.12)' : 'transparent',
+                bgcolor: 'transparent',
                 width: 36,
                 height: 36,
+                borderBottom: showSearchBar ? '2px solid #0071e3' : '2px solid transparent',
+                borderRadius: '8px',
               }}
             >
               <Badge badgeContent={activeFilterCount || undefined} color="warning" invisible={activeFilterCount === 0}>
@@ -2931,69 +3194,22 @@ export default function HomePage() {
                 <ThemeToggle size="small" />
               </Box>
             )}
-          </Toolbar>
-        </ProgressiveBlurChrome>
+        </Toolbar>
 
-        <ProgressiveBlurChrome
-          edge="bottom"
-          fadeExtent={44}
-          sx={{ display: { xs: 'none', md: 'block' } }}
-        >
+        {/* Desktop header */}
         <Toolbar
           sx={{
+            display: { xs: 'none', md: 'flex' },
             minHeight: 60,
             px: 2.5,
-            gap: 0.5,
+            gap: 0,
           }}
         >
           <BrandMark />
           <Box sx={{ flexGrow: 1 }} />
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mr: 1.5 }}>
-            <Button
-              variant="text"
-              startIcon={(
-                <Badge badgeContent={activeFilterCount || undefined} color="warning" invisible={activeFilterCount === 0}>
-                  <Search size={17} />
-                </Badge>
-              )}
-              onClick={() => setShowSearchBar((v) => !v)}
-              sx={{
-                color: showSearchBar ? '#0071e3' : 'var(--foreground)',
-                bgcolor: (theme) =>
-                  showSearchBar
-                    ? theme.palette.mode === 'dark'
-                      ? 'rgba(10,132,255,0.18)'
-                      : 'rgba(0,113,227,0.1)'
-                    : 'transparent',
-                textTransform: 'none',
-                fontWeight: 600,
-                fontSize: '0.875rem',
-                borderRadius: '980px',
-                px: 1.75,
-                py: 0.75,
-                minHeight: 36,
-                border: 'none',
-                '&:hover': {
-                  bgcolor: (theme) =>
-                    theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
-                },
-              }}
-            >
-              {t.nav.search}
-            </Button>
-          </Box>
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 0.35,
-              mr: 1.5,
-              p: 0.35,
-              borderRadius: '980px',
-              bgcolor: (theme) =>
-                theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-            }}
-          >
+
+          {/* Group 1: Primary nav — Home, History */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
             {([
               { key: 'home' as const, label: t.nav.home, icon: <Home size={16} /> },
               {
@@ -3011,16 +3227,6 @@ export default function HomePage() {
                   </Badge>
                 ),
               },
-              { key: 'profile' as const, label: t.nav.profile, icon: <User size={16} /> },
-              {
-                key: 'cart' as const,
-                label: t.nav.cart,
-                icon: (
-                  <Badge badgeContent={cart.length} color="error">
-                    <ShoppingCart size={16} />
-                  </Badge>
-                ),
-              },
             ]).map((item) => {
               const active = activeTab === item.key;
               return (
@@ -3031,37 +3237,21 @@ export default function HomePage() {
                   onClick={() => handleTabChange(item.key)}
                   sx={{
                     color: active ? '#0071e3' : 'var(--foreground)',
-                    bgcolor: (theme) =>
-                      active
-                        ? theme.palette.mode === 'dark'
-                          ? 'rgba(255,255,255,0.12)'
-                          : 'rgba(255,255,255,0.92)'
-                        : 'transparent',
-                    boxShadow: active
-                      ? (theme) =>
-                          theme.palette.mode === 'dark'
-                            ? '0 1px 3px rgba(0,0,0,0.35)'
-                            : '0 1px 3px rgba(0,0,0,0.08)'
-                      : 'none',
+                    bgcolor: 'transparent',
+                    boxShadow: 'none',
                     textTransform: 'none',
                     fontWeight: active ? 700 : 500,
                     fontSize: '0.8125rem',
                     letterSpacing: '-0.01em',
-                    borderRadius: '980px',
+                    borderRadius: 0,
                     px: 1.5,
-                    py: 0.65,
-                    minHeight: 34,
-                    border: 'none',
-                    transition: 'background-color 0.22s ease, color 0.22s ease, box-shadow 0.22s ease',
+                    py: 0.85,
+                    minHeight: 40,
+                    borderBottom: active ? '2px solid #0071e3' : '2px solid transparent',
+                    transition: 'color 0.2s ease, border-color 0.2s ease',
                     '&:hover': {
-                      bgcolor: (theme) =>
-                        active
-                          ? theme.palette.mode === 'dark'
-                            ? 'rgba(255,255,255,0.14)'
-                            : '#fff'
-                          : theme.palette.mode === 'dark'
-                            ? 'rgba(255,255,255,0.06)'
-                            : 'rgba(255,255,255,0.55)',
+                      bgcolor: 'transparent',
+                      color: '#0071e3',
                     },
                   }}
                 >
@@ -3069,6 +3259,100 @@ export default function HomePage() {
                 </Button>
               );
             })}
+          </Box>
+
+          <Box
+            aria-hidden
+            sx={{
+              width: '1px',
+              height: 22,
+              mx: 1.5,
+              bgcolor: 'var(--glass-border)',
+              flexShrink: 0,
+            }}
+          />
+
+          {/* Group 2: Search & Cart (+ Live) */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Button
+              variant="text"
+              startIcon={(
+                <Badge badgeContent={activeFilterCount || undefined} color="warning" invisible={activeFilterCount === 0}>
+                  <Search size={17} />
+                </Badge>
+              )}
+              onClick={() => setShowSearchBar((v) => !v)}
+              sx={{
+                color: showSearchBar ? '#0071e3' : 'var(--foreground)',
+                bgcolor: 'transparent',
+                textTransform: 'none',
+                fontWeight: showSearchBar ? 700 : 500,
+                fontSize: '0.8125rem',
+                borderRadius: 0,
+                px: 1.5,
+                py: 0.85,
+                minHeight: 40,
+                borderBottom: showSearchBar ? '2px solid #0071e3' : '2px solid transparent',
+                '&:hover': {
+                  bgcolor: 'transparent',
+                  color: '#0071e3',
+                },
+              }}
+            >
+              {t.nav.search}
+            </Button>
+            <Button
+              variant="text"
+              startIcon={(
+                <Badge badgeContent={cart.length} color="error">
+                  <ShoppingCart size={16} />
+                </Badge>
+              )}
+              onClick={() => handleTabChange('cart')}
+              sx={{
+                color: activeTab === 'cart' ? '#0071e3' : 'var(--foreground)',
+                bgcolor: 'transparent',
+                textTransform: 'none',
+                fontWeight: activeTab === 'cart' ? 700 : 500,
+                fontSize: '0.8125rem',
+                borderRadius: 0,
+                px: 1.5,
+                py: 0.85,
+                minHeight: 40,
+                borderBottom: activeTab === 'cart' ? '2px solid #0071e3' : '2px solid transparent',
+                '&:hover': {
+                  bgcolor: 'transparent',
+                  color: '#0071e3',
+                },
+              }}
+            >
+              {t.nav.cart}
+            </Button>
+            {session && (
+              <Button
+                variant="text"
+                startIcon={<User size={16} />}
+                onClick={() => handleTabChange('profile')}
+                sx={{
+                  color: activeTab === 'profile' ? '#0071e3' : 'var(--foreground)',
+                  bgcolor: 'transparent',
+                  textTransform: 'none',
+                  fontWeight: activeTab === 'profile' ? 700 : 500,
+                  fontSize: '0.8125rem',
+                  borderRadius: 0,
+                  px: 1.5,
+                  py: 0.85,
+                  minHeight: 40,
+                  borderBottom: activeTab === 'profile' ? '2px solid #0071e3' : '2px solid transparent',
+                  '&:hover': {
+                    bgcolor: 'transparent',
+                    color: '#0071e3',
+                  },
+                }}
+              >
+                {t.nav.profile}
+              </Button>
+            )}
             {isLiveActive && (
               <Button
                 variant="text"
@@ -3084,6 +3368,7 @@ export default function HomePage() {
                   minHeight: 34,
                   fontWeight: 700,
                   fontSize: '0.8125rem',
+                  ml: 0.5,
                   position: 'relative',
                   overflow: 'visible',
                   animation: 'navLivePulse 2s ease-in-out infinite',
@@ -3113,10 +3398,23 @@ export default function HomePage() {
               </Button>
             )}
           </Box>
-          {session && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-              <LanguageToggle size="small" />
-              <ThemeToggle size="small" />
+
+          <Box
+            aria-hidden
+            sx={{
+              width: '1px',
+              height: 22,
+              mx: 1.5,
+              bgcolor: 'var(--glass-border)',
+              flexShrink: 0,
+            }}
+          />
+
+          {/* Group 3: Personal settings */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+            <LanguageToggle size="small" />
+            <ThemeToggle size="small" />
+            {session && (
               <Avatar
                 src={orderData.profileImage || session?.user?.image || ''}
                 sx={{
@@ -3130,16 +3428,9 @@ export default function HomePage() {
                 }}
                 onClick={() => setSidebarOpen(true)}
               />
-            </Box>
-          )}
-          {!session && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-              <LanguageToggle size="small" />
-              <ThemeToggle size="small" />
-            </Box>
-          )}
+            )}
+          </Box>
         </Toolbar>
-        </ProgressiveBlurChrome>
         {showSearchBar && (
           <Box sx={{ px: { xs: 1.25, md: 3 }, pb: 2, pt: 0.5, position: 'relative', zIndex: 2 }}>
             <Box sx={{
@@ -3475,6 +3766,15 @@ export default function HomePage() {
         customMessage={config?.closedMessage}
       />
 
+      {/* Hero → Trust strip (first impression) */}
+      <HomeHero
+        product={flagshipHeroProduct}
+        onBuy={(product) => {
+          handleSelectProduct(product);
+        }}
+      />
+      <HomeTrustStrip />
+
       {/* Modern Announcement Bar */}
       <AnnouncementBar
         announcements={announcements || []}
@@ -3531,7 +3831,7 @@ export default function HomePage() {
           sx: {
             bgcolor: 'var(--surface)',
             color: 'var(--foreground)',
-            width: 320,
+            width: 'min(320px, 85vw)',
             maxHeight: '100dvh',
             overflowY: 'auto',
             WebkitOverflowScrolling: 'touch',
@@ -3542,47 +3842,42 @@ export default function HomePage() {
               const dir = navHandedness === 'left' ? '18px' : '-18px';
               return theme.palette.mode === 'dark' ? `${dir} 0 60px rgba(0,0,0,0.45)` : `${dir} 0 60px rgba(0,0,0,0.08)`;
             },
-            backgroundImage: (theme: any) => theme.palette.mode === 'dark' 
-              ? 'radial-gradient(circle at 20% 20%, rgba(0,113,227,0.18), transparent 42%), radial-gradient(circle at 80% 0%, rgba(14,165,233,0.16), transparent 38%)'
-              : 'radial-gradient(circle at 20% 20%, rgba(0,113,227,0.06), transparent 42%), radial-gradient(circle at 80% 0%, rgba(14,165,233,0.04), transparent 38%)',
           },
         }}
       >
-        <Box sx={{ p: 2 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Typography variant="h6" sx={{ fontWeight: 'bold' }}>{t.nav.menu}</Typography>
-            <IconButton onClick={() => setSidebarOpen(false)}>
+            <IconButton onClick={() => setSidebarOpen(false)} aria-label={t.common.close}>
               <X style={{ color: 'var(--foreground)' }} size={24} />
             </IconButton>
           </Box>
-          <Divider sx={{ mb: 2, borderColor: 'var(--glass-border)' }} />
 
-          {session && (
+          {session ? (
             <>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Avatar src={orderData.profileImage || session?.user?.image || ''} sx={{ mr: 2, width: 40, height: 40 }} />
-                <Box>
-                  <Typography sx={{ fontWeight: 'bold', color: 'var(--foreground)' }}>{session?.user?.name}</Typography>
-                  <Typography variant="caption" sx={{ color: 'var(--text-muted)' }}>{session?.user?.email}</Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2.5, px: 0.5 }}>
+                <Avatar src={orderData.profileImage || session?.user?.image || ''} sx={{ mr: 1.5, width: 44, height: 44 }} />
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography sx={{ fontWeight: 700, color: 'var(--foreground)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {session?.user?.name}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'var(--text-muted)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {session?.user?.email}
+                  </Typography>
                 </Box>
               </Box>
-              <Divider sx={{ my: 2, borderColor: 'var(--glass-border)' }} />
+
+              {/* Account section */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 1.5, mb: 0.75 }}>
+                <User size={14} color="var(--text-muted)" />
+                <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.02em' }}>
+                  {t.nav.myAccount}
+                </Typography>
+              </Box>
               <Button
                 fullWidth
                 onClick={() => { setSidebarOpen(false); setShowProfileModal(true); setActiveTab('profile'); }}
-                sx={{
-                  textAlign: 'left',
-                  mb: 1,
-                  color: 'var(--foreground)',
-                  justifyContent: 'flex-start',
-                  borderRadius: 2,
-                  px: 1.5,
-                  py: 1.1,
-                  background: 'linear-gradient(120deg, rgba(0,113,227,0.18), rgba(14,165,233,0.12))',
-                  border: '1px solid var(--glass-border)',
-                  boxShadow: (theme: any) => theme.palette.mode === 'dark' ? '0 12px 30px rgba(0,0,0,0.25)' : '0 4px 12px rgba(0,0,0,0.06)',
-                  '&:hover': { borderColor: 'rgba(0,113,227,0.5)', background: 'linear-gradient(120deg, rgba(0,113,227,0.24), rgba(14,165,233,0.18))' },
-                }}
+                sx={sidebarMenuRowSx}
                 startIcon={<User size={20} />}
               >
                 {t.nav.myShippingInfo}
@@ -3590,19 +3885,7 @@ export default function HomePage() {
               <Button
                 fullWidth
                 onClick={() => { setSidebarOpen(false); setShowHistoryDialog(true); loadOrderHistory(); }}
-                sx={{
-                  textAlign: 'left',
-                  mb: 1,
-                  color: 'var(--foreground)',
-                  justifyContent: 'flex-start',
-                  borderRadius: 2,
-                  px: 1.5,
-                  py: 1.1,
-                  background: 'linear-gradient(120deg, rgba(16,185,129,0.18), rgba(14,165,233,0.12))',
-                  border: '1px solid var(--glass-border)',
-                  boxShadow: (theme: any) => theme.palette.mode === 'dark' ? '0 12px 30px rgba(0,0,0,0.25)' : '0 4px 12px rgba(0,0,0,0.06)',
-                  '&:hover': { borderColor: 'rgba(16,185,129,0.5)', background: 'linear-gradient(120deg, rgba(16,185,129,0.22), rgba(14,165,233,0.16))' },
-                }}
+                sx={sidebarMenuRowSx}
                 startIcon={(
                   <Badge
                     badgeContent={pendingOrderCount > 0 ? pendingOrderCount : undefined}
@@ -3617,143 +3900,122 @@ export default function HomePage() {
               >
                 {t.nav.orderHistory}
               </Button>
-              {/* Wishlist button */}
               <Button
                 fullWidth
                 onClick={() => { setSidebarOpen(false); setShowWishlistDrawer(true); }}
-                sx={{
-                  textAlign: 'left',
-                  mb: 1,
-                  color: 'var(--foreground)',
-                  justifyContent: 'flex-start',
-                  borderRadius: 2,
-                  px: 1.5,
-                  py: 1.1,
-                  background: 'linear-gradient(120deg, rgba(255,69,58,0.18), rgba(255,159,10,0.12))',
-                  border: '1px solid var(--glass-border)',
-                  boxShadow: (theme: any) => theme.palette.mode === 'dark' ? '0 12px 30px rgba(0,0,0,0.25)' : '0 4px 12px rgba(0,0,0,0.06)',
-                  '&:hover': { borderColor: 'rgba(255,69,58,0.5)', background: 'linear-gradient(120deg, rgba(255,69,58,0.24), rgba(255,159,10,0.18))' },
-                }}
+                sx={sidebarMenuRowSx}
                 startIcon={
-                  <Badge badgeContent={wishlistStore.items.length} color="error" sx={{ '& .MuiBadge-badge': { fontSize: '0.6rem', minWidth: 16, height: 16 } }}>
+                  <Badge
+                    badgeContent={wishlistStore.items.length}
+                    color="error"
+                    sx={{ '& .MuiBadge-badge': { fontSize: '0.6rem', minWidth: 16, height: 16, bgcolor: '#ff453a' } }}
+                  >
                     <Heart size={20} />
                   </Badge>
                 }
               >
                 {t.wishlist.title}
               </Button>
-              {/* Recently Viewed button */}
               <Button
                 fullWidth
                 onClick={() => { setSidebarOpen(false); setShowRecentlyViewed(true); }}
-                sx={{
-                  textAlign: 'left',
-                  mb: 1,
-                  color: 'var(--foreground)',
-                  justifyContent: 'flex-start',
-                  borderRadius: 2,
-                  px: 1.5,
-                  py: 1.1,
-                  background: 'linear-gradient(120deg, rgba(100,210,255,0.18), rgba(48,209,88,0.12))',
-                  border: '1px solid var(--glass-border)',
-                  boxShadow: (theme: any) => theme.palette.mode === 'dark' ? '0 12px 30px rgba(0,0,0,0.25)' : '0 4px 12px rgba(0,0,0,0.06)',
-                  '&:hover': { borderColor: 'rgba(100,210,255,0.5)', background: 'linear-gradient(120deg, rgba(100,210,255,0.24), rgba(48,209,88,0.18))' },
-                }}
+                sx={sidebarMenuRowSx}
                 startIcon={<Eye size={20} />}
               >
                 {t.recentlyViewed.title}
               </Button>
+
+              {/* Settings section */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 1.5, mt: 2, mb: 0.75 }}>
+                <Settings size={14} color="var(--text-muted)" />
+                <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.02em' }}>
+                  {t.nav.settingsAndSystem}
+                </Typography>
+              </Box>
               <Button
                 fullWidth
                 onClick={() => { setSidebarOpen(false); setSwitchAccountOpen(true); }}
-                sx={{
-                  textAlign: 'left',
-                  mb: 1,
-                  color: 'var(--foreground)',
-                  justifyContent: 'flex-start',
-                  borderRadius: 2,
-                  px: 1.5,
-                  py: 1.1,
-                  background: 'linear-gradient(120deg, rgba(139,92,246,0.18), rgba(99,102,241,0.12))',
-                  border: '1px solid var(--glass-border)',
-                  boxShadow: (theme: any) => theme.palette.mode === 'dark' ? '0 12px 30px rgba(0,0,0,0.25)' : '0 4px 12px rgba(0,0,0,0.06)',
-                  '&:hover': { borderColor: 'rgba(139,92,246,0.5)', background: 'linear-gradient(120deg, rgba(139,92,246,0.24), rgba(99,102,241,0.18))' },
-                }}
+                sx={sidebarMenuRowSx}
                 startIcon={<ArrowLeftRight size={20} />}
               >
                 {t.nav.switchAccount}
               </Button>
-              <Button
-                fullWidth
-                onClick={toggleNavHandedness}
+              <Box
                 sx={{
-                  textAlign: 'left',
-                  mb: 1,
-                  color: 'var(--foreground)',
-                  justifyContent: 'flex-start',
-                  borderRadius: 2,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 1,
                   px: 1.5,
-                  py: 1.1,
-                  background: 'linear-gradient(120deg, rgba(245,158,11,0.18), rgba(251,191,36,0.12))',
-                  border: '1px solid var(--glass-border)',
-                  boxShadow: (theme: any) => theme.palette.mode === 'dark' ? '0 12px 30px rgba(0,0,0,0.25)' : '0 4px 12px rgba(0,0,0,0.06)',
-                  '&:hover': { borderColor: 'rgba(245,158,11,0.5)', background: 'linear-gradient(120deg, rgba(245,158,11,0.24), rgba(251,191,36,0.18))' },
+                  py: 0.85,
+                  mb: 0.25,
+                  borderRadius: 2,
+                  color: 'var(--foreground)',
+                  '&:hover': { bgcolor: 'var(--surface-2)' },
                 }}
-                startIcon={<HandMetal size={20} style={{ transform: navHandedness === 'left' ? 'scaleX(-1)' : 'none' }} />}
               >
-                {navHandedness === 'right' ? t.nav.switchViewRight : t.nav.switchViewLeft}
-              </Button>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
+                  <HandMetal size={20} style={{ flexShrink: 0, transform: navHandedness === 'left' ? 'scaleX(-1)' : 'none' }} />
+                  <Typography sx={{ fontSize: '0.875rem', fontWeight: 500 }}>
+                    {t.nav.rightHandedMode}
+                  </Typography>
+                </Box>
+                <Switch
+                  checked={navHandedness === 'right'}
+                  onChange={(_, checked) => {
+                    const next = checked ? 'right' : 'left';
+                    setNavHandedness(next);
+                    localStorage.setItem('scc_nav_hand', next);
+                  }}
+                  size="small"
+                  inputProps={{ 'aria-label': t.nav.rightHandedMode }}
+                  sx={{
+                    flexShrink: 0,
+                    '& .MuiSwitch-switchBase.Mui-checked': { color: 'var(--foreground)' },
+                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                      bgcolor: 'var(--foreground)',
+                      opacity: 0.45,
+                    },
+                  }}
+                />
+              </Box>
+
+              <Divider sx={{ my: 1.5, borderColor: 'var(--glass-border)' }} />
               <Button
                 fullWidth
                 onClick={() => { setSidebarOpen(false); setLogoutConfirmOpen(true); }}
                 sx={{
-                  textAlign: 'left',
-                  color: (theme: any) => theme.palette.mode === 'dark' ? '#fecdd3' : '#ff3b30',
-                  justifyContent: 'flex-start',
-                  borderRadius: 2,
-                  px: 1.5,
-                  py: 1.1,
-                  background: 'linear-gradient(120deg, rgba(239,68,68,0.12), rgba(239,68,68,0.06))',
-                  border: '1px solid rgba(248,113,113,0.4)',
-                  boxShadow: (theme: any) => theme.palette.mode === 'dark' ? '0 12px 30px rgba(239,68,68,0.18)' : '0 4px 12px rgba(239,68,68,0.08)',
-                  '&:hover': { borderColor: 'rgba(248,113,113,0.8)', background: 'linear-gradient(120deg, rgba(239,68,68,0.18), rgba(239,68,68,0.12))' },
+                  ...sidebarMenuRowSx,
+                  color: '#ff3b30',
+                  '&:hover': { bgcolor: 'rgba(255,59,48,0.08)' },
                 }}
-                startIcon={<LogOut size={20} />}
+                startIcon={<LogOut size={20} color="#ff3b30" />}
               >
                 {t.nav.logout}
               </Button>
             </>
+          ) : (
+            <Button
+              component={Link}
+              href="/"
+              fullWidth
+              onClick={() => setSidebarOpen(false)}
+              sx={sidebarMenuRowSx}
+              startIcon={<Home size={20} />}
+            >
+              {t.nav.home}
+            </Button>
           )}
-
-          <Divider sx={{ my: 2, borderColor: 'var(--glass-border)' }} />
-          <Button
-            component={Link}
-            href="/"
-            fullWidth
-            sx={{
-              textAlign: 'left',
-              color: 'var(--foreground)',
-              justifyContent: 'flex-start',
-              borderRadius: 2,
-              px: 1.5,
-              py: 1.1,
-              background: (theme: any) => theme.palette.mode === 'dark' 
-                ? 'linear-gradient(120deg, rgba(0,113,227,0.16), rgba(29,29,31,0.6))' 
-                : 'linear-gradient(120deg, rgba(0,113,227,0.08), rgba(245,245,247,0.6))',
-              border: '1px solid var(--glass-border)',
-              boxShadow: (theme: any) => theme.palette.mode === 'dark' ? '0 12px 30px rgba(0,0,0,0.22)' : '0 4px 12px rgba(0,0,0,0.06)',
-              '&:hover': { borderColor: 'rgba(0,113,227,0.6)', background: 'linear-gradient(120deg, rgba(0,113,227,0.22), rgba(0,113,227,0.08))' },
-            }}
-            startIcon={<Home size={20} />}
-          >
-            {t.nav.home}
-          </Button>
         </Box>
       </Drawer>
 
       <Box sx={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         <Box sx={{ flex: 1, p: { xs: 2, md: 3 }, overflow: 'auto', maxWidth: '100%' }}>
-          <Container maxWidth="lg" sx={{ px: { xs: 0, sm: 2 } }}>
+          <Container
+            maxWidth="lg"
+            id="product-grid"
+            sx={{ px: { xs: 0, sm: 2 }, scrollMarginTop: { xs: '64px', md: '80px' } }}
+          >
             
 
             {(activeProductCount > 0 || subShopCatalog.length > 0) && (
@@ -3815,60 +4077,56 @@ export default function HomePage() {
                     )}
                   </Box>
                 )}
-                {/* Modern Filter Bar */}
-                <Box sx={{
-                  p: 2,
-                  mb: 3,
-                  borderRadius: '20px',
-                  bgcolor: 'var(--surface)',
-                  border: '1px solid var(--glass-border)',
-                  backdropFilter: 'blur(16px)',
-                  backgroundImage: (theme: any) => theme.palette.mode === 'dark'
-                    ? 'radial-gradient(ellipse at 30% 0%, rgba(0,113,227,0.08) 0%, transparent 60%)'
-                    : 'radial-gradient(ellipse at 30% 0%, rgba(0,113,227,0.04) 0%, transparent 60%)',
-                  boxShadow: (theme: any) => theme.palette.mode === 'dark'
-                    ? '0 8px 32px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.04)'
-                    : '0 4px 16px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.8)',
-                }}>
-                  {/* Search and Stats Row */}
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                      <Box sx={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: '10px',
-                        bgcolor: 'rgba(0,113,227,0.15)',
-                        display: 'grid',
-                        placeItems: 'center',
-                      }}>
-                        <Store size={18} color="#2997ff" />
+                {/* Light filter pills — no heavy card chrome */}
+                <Box sx={{ mb: 2.5 }}>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 1,
+                      mb: 1.25,
+                      px: { xs: 0.25, sm: 0 },
+                    }}
+                  >
+                    <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                      {catalogContext.shopName || t.product.allProducts}
+                      <Box component="span" sx={{ fontWeight: 500, opacity: 0.85 }}>
+                        {' · '}{filteredProductCount} {t.common.items}
                       </Box>
-                      <Box>
-                        <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                          {catalogContext.shopName || t.product.allProducts}
-                        </Typography>
-                        <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                          {t.product.foundItems} {filteredProductCount} {t.common.items} ({activeProductCount} {t.product.openForSale})
-                        </Typography>
-                      </Box>
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <IconButton 
-                        onClick={() => setShowSearchBar(!showSearchBar)}
-                        sx={{ 
-                          color: showSearchBar ? 'var(--primary)' : 'var(--text-muted)',
-                          bgcolor: showSearchBar ? 'rgba(0,113,227,0.15)' : 'var(--glass-bg)',
-                        }}
-                      >
-                        <Badge badgeContent={activeFilterCount || undefined} color="warning" invisible={activeFilterCount === 0}>
-                          <Search size={18} />
-                        </Badge>
-                      </IconButton>
-                    </Box>
+                    </Typography>
+                    <IconButton
+                      size="small"
+                      onClick={() => setShowSearchBar(!showSearchBar)}
+                      sx={{
+                        color: showSearchBar ? 'var(--primary)' : 'var(--text-muted)',
+                        width: 34,
+                        height: 34,
+                        borderBottom: showSearchBar ? '2px solid var(--primary)' : '2px solid transparent',
+                        borderRadius: '8px',
+                      }}
+                    >
+                      <Badge badgeContent={activeFilterCount || undefined} color="warning" invisible={activeFilterCount === 0}>
+                        <Search size={17} />
+                      </Badge>
+                    </IconButton>
                   </Box>
 
                   {!showSearchBar && (
-                    <Box sx={{ display: 'flex', gap: 0.8, flexWrap: 'wrap', pb: 0.5 }}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        gap: 0.75,
+                        flexWrap: 'nowrap',
+                        overflowX: 'auto',
+                        pb: 0.5,
+                        mx: { xs: -0.5, sm: 0 },
+                        px: { xs: 0.5, sm: 0 },
+                        WebkitOverflowScrolling: 'touch',
+                        '&::-webkit-scrollbar': { display: 'none' },
+                        scrollbarWidth: 'none',
+                      }}
+                    >
                       {categoryMeta.map((cat) => {
                         const active = categoryFilter === cat.key;
                         return (
@@ -3877,8 +4135,9 @@ export default function HomePage() {
                             className={active ? 'category-chip-active' : ''}
                             onClick={() => setCategoryFilter(cat.key)}
                             sx={{
-                              px: 1.8,
-                              py: 0.8,
+                              flexShrink: 0,
+                              px: 1.5,
+                              py: 0.65,
                               borderRadius: '999px',
                               bgcolor: active
                                 ? (theme: any) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.92)' : 'rgba(24,24,27,0.92)'
@@ -3889,38 +4148,23 @@ export default function HomePage() {
                               color: active
                                 ? (theme: any) => theme.palette.mode === 'dark' ? '#18181b' : '#fafafa'
                                 : 'var(--text-muted)',
-                              fontSize: '0.8rem',
+                              fontSize: '0.78rem',
                               fontWeight: 600,
                               cursor: 'pointer',
-                              transition: 'all 0.2s ease',
-                              display: 'flex',
+                              transition: 'background 0.2s ease, color 0.2s ease, border-color 0.2s ease',
+                              display: 'inline-flex',
                               alignItems: 'center',
-                              gap: 0.8,
+                              gap: 0.55,
                               '&:hover': {
-                                bgcolor: active
-                                  ? (theme: any) => theme.palette.mode === 'dark' ? '#fff' : '#18181b'
-                                  : 'rgba(255,255,255,0.06)',
-                                borderColor: active ? 'transparent' : 'rgba(255,255,255,0.14)',
-                                color: active
-                                  ? (theme: any) => theme.palette.mode === 'dark' ? '#18181b' : '#fafafa'
-                                  : 'var(--foreground)',
+                                color: active ? undefined : 'var(--foreground)',
+                                borderColor: active ? 'transparent' : 'color-mix(in srgb, var(--primary) 30%, var(--glass-border))',
                               },
                             }}
                           >
-                            <span style={{ fontSize: '0.9rem' }}>{(cat as any).icon || ''}</span>
+                            {(cat as any).icon ? (
+                              <span style={{ fontSize: '0.85rem', lineHeight: 1 }}>{(cat as any).icon}</span>
+                            ) : null}
                             {cat.label}
-                            <Box sx={{
-                              px: 0.7,
-                              py: 0.1,
-                              borderRadius: '6px',
-                              bgcolor: active
-                                ? (theme: any) => theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.16)'
-                                : 'var(--glass-bg)',
-                              fontSize: '0.65rem',
-                              fontWeight: 700,
-                            }}>
-                              {cat.count}
-                            </Box>
                           </Box>
                         );
                       })}
@@ -3931,56 +4175,97 @@ export default function HomePage() {
             )}
 
             {catalogContext.products.length > 0 && Object.keys(displayGroupedProducts).length > 0 ? (
-              Object.entries(displayGroupedProducts).map(([category, items]) => (
+              ([
+                ...(!storefrontSections.isSearch && storefrontSections.shop.length > 0
+                  ? [['__HDR_SHOP__', [] as Product[]] as const]
+                  : []),
+                ...storefrontSections.shop,
+                ...(!storefrontSections.isSearch && storefrontSections.events.length > 0
+                  ? [['__HDR_EVENTS__', [] as Product[]] as const]
+                  : []),
+                ...storefrontSections.events,
+              ] as Array<readonly [string, Product[]]>).map(([category, items]) => {
+                if (category === '__HDR_SHOP__' || category === '__HDR_EVENTS__') {
+                  const isEvents = category === '__HDR_EVENTS__';
+                  return (
+                    <Box
+                      key={category}
+                      id={isEvents ? 'events-section' : 'shop-section'}
+                      sx={{
+                        mb: 2.5,
+                        mt: isEvents ? 1 : 0,
+                        scrollMarginTop: { xs: '64px', md: '80px' },
+                      }}
+                    >
+                      <Typography
+                        sx={{
+                          fontSize: { xs: '1.25rem', sm: '1.4rem' },
+                          fontWeight: 800,
+                          letterSpacing: '-0.03em',
+                          color: 'var(--foreground)',
+                          lineHeight: 1.2,
+                        }}
+                      >
+                        {isEvents ? t.home.eventsSectionTitle : t.home.shopSectionTitle}
+                      </Typography>
+                      <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)', mt: 0.4, fontWeight: 500 }}>
+                        {isEvents ? t.home.eventsSectionSubtitle : t.home.shopSectionSubtitle}
+                      </Typography>
+                    </Box>
+                  );
+                }
+
+                return (
                 <Box key={category} sx={{ mb: 5 }}>
-                  {/* Category Header — Redesigned */}
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
-                    <Box sx={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: '12px',
-                      background: 'linear-gradient(135deg, rgba(0,113,227,0.15) 0%, rgba(100,210,255,0.1) 100%)',
-                      border: '1px solid rgba(0,113,227,0.15)',
-                      display: 'grid',
-                      placeItems: 'center',
-                      fontSize: '1.15rem',
-                      flexShrink: 0,
-                    }}>
+                  {/* Plain category title + view-all link */}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                    <Box
+                      component="span"
+                      sx={{ fontSize: '1.05rem', lineHeight: 1, flexShrink: 0, opacity: 0.9 }}
+                      aria-hidden
+                    >
                       {category === '__SEARCH__' ? '🔍' : getCategoryIcon(category)}
                     </Box>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography sx={{ 
-                        fontSize: '1.15rem', 
-                        fontWeight: 800, 
-                        color: 'var(--foreground)', 
-                        letterSpacing: '-0.02em',
-                        lineHeight: 1.2,
-                      }}>
-                        {category === '__SEARCH__'
-                          ? t.search.results
-                          : (t.category as Record<string, string>)[category] || getCategoryLabel(category, lang) || TYPE_LABELS_I18N[category] || category || t.type.OTHER}
-                      </Typography>
-                      <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-                        {items.length} {t.common.items}
-                        {items.length > 1 && <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' }, ml: 0.5 }}>• {t.product.scrollMore}</Box>}
-                      </Typography>
-                    </Box>
-                    <Box sx={{
-                      px: 1.5,
-                      py: 0.5,
-                      borderRadius: '10px',
-                      bgcolor: 'rgba(0,113,227,0.1)',
-                      border: '1px solid rgba(0,113,227,0.15)',
-                      fontSize: '0.7rem',
-                      fontWeight: 700,
-                      color: 'var(--primary)',
-                      flexShrink: 0,
+                    <Typography sx={{
+                      flex: 1,
+                      minWidth: 0,
+                      fontSize: '1.05rem',
+                      fontWeight: 800,
+                      color: 'var(--foreground)',
+                      letterSpacing: '-0.02em',
+                      lineHeight: 1.25,
                     }}>
-                      {items.filter(p => getProductStatus(p, now) === 'OPEN').length}/{items.length}
-                    </Box>
+                      {category === '__SEARCH__'
+                        ? t.search.results
+                        : (t.category as Record<string, string>)[category] || getCategoryLabel(category, lang) || TYPE_LABELS_I18N[category] || category || t.type.OTHER}
+                    </Typography>
+                    {category !== '__SEARCH__' && items.length > 0 && (
+                      <Box
+                        component="button"
+                        type="button"
+                        onClick={() => setCategoryFilter(category)}
+                        sx={{
+                          flexShrink: 0,
+                          border: 'none',
+                          background: 'none',
+                          cursor: 'pointer',
+                          p: 0,
+                          fontFamily: 'inherit',
+                          fontSize: '0.78rem',
+                          fontWeight: 600,
+                          color: 'var(--primary)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 0.35,
+                          letterSpacing: '-0.01em',
+                          '&:hover': { textDecoration: 'underline' },
+                        }}
+                      >
+                        {t.search.viewAllCount.replace('{count}', String(items.length))}
+                        <ChevronRight size={14} strokeWidth={2.5} />
+                      </Box>
+                    )}
                   </Box>
-                  {/* Gradient Divider */}
-                  <Box className="gradient-divider" sx={{ mb: 2.5 }} />
                   <Box sx={{ position: 'relative', overflow: 'hidden', mx: { xs: -2, sm: 0 } }}>
                     {/* Right fade hint on mobile */}
                     <Box sx={{
@@ -3998,6 +4283,7 @@ export default function HomePage() {
                     display: { xs: 'flex', sm: 'grid' },
                     gridTemplateColumns: { sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)', lg: 'repeat(4, 1fr)' },
                     gap: 2,
+                    alignItems: 'stretch',
                     overflowX: { xs: 'auto', sm: 'visible' },
                     scrollSnapType: { xs: 'x mandatory', sm: 'none' },
                     WebkitOverflowScrolling: 'touch',
@@ -4008,9 +4294,12 @@ export default function HomePage() {
                   }}>
                     {items.map((product, productIdx) => {
                       const productStatus = getProductStatus(product, now);
-                      const isProductAvailable = productStatus === 'OPEN' && catalogContext.isOpen;
-                      const isProductClosed = productStatus !== 'OPEN'; // Product is closed/coming soon/ended
+                      const outOfStock = isProductOutOfStock(product);
+                      const isProductUnavailable = productStatus !== 'OPEN' || outOfStock;
+                      const isProductAvailable = productStatus === 'OPEN' && !outOfStock && catalogContext.isOpen;
+                      const isProductClosed = isProductUnavailable;
                       const eventDiscount = getEventDiscount(product.id, catalogContext.events);
+                      const quickAdd = canQuickAddToCart(product);
                       
                       return (
                       <Box key={product.id} sx={{
@@ -4018,6 +4307,8 @@ export default function HomePage() {
                         maxWidth: { xs: '68vw', sm: 'none' },
                         flex: { xs: '0 0 auto', sm: '1 1 auto' },
                         scrollSnapAlign: { xs: 'start', sm: 'unset' },
+                        display: 'flex',
+                        height: '100%',
                       }}>
                         <Box
                           className={isProductAvailable ? 'product-card-hover' : ''}
@@ -4027,7 +4318,6 @@ export default function HomePage() {
                               return;
                             }
                             if (productStatus !== 'OPEN') {
-                              const statusConfig = SHOP_STATUS_CONFIG[productStatus];
                               const statusLabelsMap: Record<ShopStatusType, string> = {
                                 OPEN: t.shopStatus.open,
                                 COMING_SOON: t.shopStatus.comingSoon,
@@ -4038,6 +4328,10 @@ export default function HomePage() {
                               showToast('info', `${getProductName(product, lang)} - ${statusLabelsMap[productStatus]}`);
                               return;
                             }
+                            if (outOfStock) {
+                              showToast('info', `${getProductName(product, lang)} - ${t.product.soldOut}`);
+                              return;
+                            }
                             handleSelectProduct(product, {
                               shopId: catalogContext.shopId,
                               shopSlug: catalogContext.shopSlug,
@@ -4045,6 +4339,7 @@ export default function HomePage() {
                           }}
                           sx={{
                             height: '100%',
+                            width: '100%',
                             display: 'flex',
                             flexDirection: 'column',
                             cursor: isProductAvailable ? 'pointer' : 'default',
@@ -4056,7 +4351,7 @@ export default function HomePage() {
                               ? '1px solid rgba(255,255,255,0.06)'
                               : '1px solid transparent',
                             position: 'relative',
-                            opacity: isProductClosed ? 0.72 : 1,
+                            opacity: isProductClosed ? 0.6 : 1,
                             filter: isProductClosed ? 'grayscale(1)' : 'none',
                             transition: 'opacity 0.25s ease, filter 0.25s ease, box-shadow 0.25s ease',
                             '&:hover': isProductAvailable ? {
@@ -4083,7 +4378,7 @@ export default function HomePage() {
                                 height="100%"
                                 objectFit="cover"
                                 priority={productIdx < 4} // First 4 products load eagerly
-                                placeholder="skeleton"
+                                placeholder="shimmer"
                                 showLoadingIndicator={false}
                                 style={{
                                   position: 'absolute',
@@ -4098,23 +4393,19 @@ export default function HomePage() {
                                 position: 'absolute', 
                                 inset: 0, 
                                 display: 'flex', 
-                                flexDirection: 'column',
                                 alignItems: 'center', 
                                 justifyContent: 'center', 
-                                gap: 1,
-                                color: 'var(--text-muted)',
-                                bgcolor: 'var(--surface-2)',
+                                bgcolor: '#ececef',
                               }}>
                                 <Box
                                   component="img"
                                   src="/favicon.png"
-                                  alt=""
-                                  sx={{ width: 40, height: 40, opacity: 0.3, filter: 'grayscale(1)' }}
+                                  alt="SCC Shop"
+                                  sx={{ width: 40, height: 40, opacity: 0.4, filter: 'grayscale(1)' }}
                                 />
-                                <Box sx={{ fontSize: '0.75rem', opacity: 0.7 }}>{t.common.noImage}</Box>
                               </Box>
                             )}
-                            {/* Status Overlay for closed products */}
+                            {/* Status Overlay for closed / OOS products */}
                             {isProductClosed && (
                               <Box sx={{
                                 position: 'absolute',
@@ -4138,7 +4429,9 @@ export default function HomePage() {
                                     letterSpacing: '0.02em',
                                   }}
                                 >
-                                  {({
+                                  {outOfStock && productStatus === 'OPEN'
+                                    ? t.product.soldOut
+                                    : ({
                                     OPEN: t.shopStatus.open,
                                     COMING_SOON: t.shopStatus.comingSoon,
                                     ORDER_ENDED: t.shopStatus.closedEnded,
@@ -4196,40 +4489,7 @@ export default function HomePage() {
                               </Box>
                             )}
                             
-                            {/* Price badge */}
-                            <Box sx={{
-                              position: 'absolute',
-                              bottom: 10,
-                              right: 10,
-                              px: 1.2,
-                              py: 0.4,
-                              borderRadius: '10px',
-                              bgcolor: (theme: any) => theme.palette.mode === 'dark' ? 'rgba(0,0,0,0.75)' : 'rgba(255,255,255,0.9)',
-                              backdropFilter: 'blur(12px)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 0.5,
-                              boxShadow: (theme: any) => theme.palette.mode === 'dark' ? 'none' : '0 1px 4px rgba(0,0,0,0.1)',
-                            }}>
-                              {eventDiscount && !isProductClosed ? (
-                                <>
-                                  <Typography sx={{ fontSize: '0.68rem', fontWeight: 600, color: 'var(--text-muted)', textDecoration: 'line-through' }}>
-                                    ฿{product.basePrice.toLocaleString()}
-                                  </Typography>
-                                  <Typography sx={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--error)' }}>
-                                    ฿{eventDiscount.discountedPrice(product.basePrice).toLocaleString()}
-                                  </Typography>
-                                </>
-                              ) : (
-                                <Typography sx={{ 
-                                  fontSize: '0.88rem', 
-                                  fontWeight: 800, 
-                                  color: isProductClosed ? 'var(--text-muted)' : 'var(--foreground)',
-                                }}>
-                                  ฿{product.basePrice.toLocaleString()}
-                                </Typography>
-                              )}
-                            </Box>
+                            {/* Price badge removed — single price below image */}
 
                             {/* Event discount badge */}
                             {eventDiscount && !isProductClosed && (
@@ -4306,13 +4566,14 @@ export default function HomePage() {
                             </Box>
                           </Box>
 
-                          {/* Product Info — Redesigned */}
+                          {/* Product Info — equal-height flex column */}
                           <Box sx={{ 
                             p: 2, 
                             pt: 1.5,
                             flex: 1, 
                             display: 'flex', 
                             flexDirection: 'column',
+                            minHeight: { xs: 148, sm: 156 },
                           }}>
                             {/* Type Label */}
                             <Typography sx={{
@@ -4323,11 +4584,12 @@ export default function HomePage() {
                               letterSpacing: '0.06em',
                               mb: 0.3,
                               opacity: isProductClosed ? 0.5 : 0.8,
+                              minHeight: '0.9rem',
                             }}>
                               {(t.category as Record<string, string>)[((product as any).category || getCategoryFromType(product.type))] || TYPE_LABELS_I18N[product.type] || product.type}
                             </Typography>
 
-                            {/* Product Name */}
+                            {/* Product Name — fixed 2-line block */}
                             <Typography sx={{ 
                               fontSize: '0.9rem', 
                               fontWeight: 700, 
@@ -4340,79 +4602,82 @@ export default function HomePage() {
                               WebkitBoxOrient: 'vertical',
                               lineHeight: 1.3,
                               letterSpacing: '-0.01em',
+                              minHeight: '2.6em',
                             }}>
                               {getProductName(product, lang)}
                             </Typography>
                             
-                            {/* Description — 1 line */}
-                            {getProductDescription(product, lang) && (
-                              <Typography sx={{ 
-                                fontSize: '0.72rem', 
-                                color: 'var(--text-muted)',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                                lineHeight: 1.4,
-                                mb: 0.8,
-                              }}>
-                                {getProductDescription(product, lang)}
-                              </Typography>
-                            )}
+                            {/* Description — reserved 1 line */}
+                            <Typography sx={{ 
+                              fontSize: '0.72rem', 
+                              color: 'var(--text-muted)',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              lineHeight: 1.4,
+                              mb: 0.8,
+                              minHeight: '1.05em',
+                              opacity: getProductDescription(product, lang) ? 1 : 0,
+                            }}>
+                              {getProductDescription(product, lang) || '\u00A0'}
+                            </Typography>
 
-                            {/* Tags — inline compact */}
-                            {(() => {
-                              const tags = product.customTags && product.customTags.length > 0 
-                                ? product.customTags 
-                                : [
-                                    ...(product.options?.hasCustomName ? [{
-                                      text: t.product.customNameAvailable,
-                                      color: 'var(--success)',
-                                      bgColor: 'rgba(16,185,129,0.1)',
-                                      borderColor: 'rgba(16,185,129,0.2)'
-                                    }] : []),
-                                    ...(product.options?.hasCustomNumber ? [{
-                                      text: t.product.customNumberAvailable,
-                                      color: 'var(--secondary)',
-                                      bgColor: 'rgba(0,113,227,0.1)',
-                                      borderColor: 'rgba(0,113,227,0.2)'
-                                    }] : []),
-                                  ];
-                              
-                              if (tags.length === 0) return null;
-                              
-                              return (
-                                <Box sx={{ 
-                                  display: 'flex', 
-                                  flexWrap: 'wrap', 
-                                  gap: 0.4, 
-                                  mb: 0.8,
-                                }}>
-                                  {tags.slice(0, 3).map((tag, idx) => (
-                                    <Box key={idx} sx={{
-                                      px: 0.7,
-                                      py: 0.15,
-                                      borderRadius: '5px',
-                                      bgcolor: (tag as any).bgColor || `${tag.color}15`,
-                                      fontSize: '0.55rem',
-                                      fontWeight: 600,
-                                      color: tag.color,
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: 0.2,
-                                    }}>
-                                      {lang === 'en' 
-                                        ? ((tag as any).textEn || TAG_TRANSLATIONS_TH_TO_EN[tag.text] || tag.text)
-                                        : tag.text}
-                                    </Box>
-                                  ))}
-                                </Box>
-                              );
-                            })()}
+                            {/* Tags — reserved row so heights stay even */}
+                            <Box sx={{ 
+                              display: 'flex', 
+                              flexWrap: 'nowrap', 
+                              gap: 0.4, 
+                              mb: 0.8,
+                              minHeight: 20,
+                              overflow: 'hidden',
+                            }}>
+                              {(() => {
+                                const tags = product.customTags && product.customTags.length > 0 
+                                  ? product.customTags 
+                                  : [
+                                      ...(product.options?.hasCustomName ? [{
+                                        text: t.product.customNameAvailable,
+                                        color: 'var(--success)',
+                                        bgColor: 'rgba(16,185,129,0.1)',
+                                        borderColor: 'rgba(16,185,129,0.2)'
+                                      }] : []),
+                                      ...(product.options?.hasCustomNumber ? [{
+                                        text: t.product.customNumberAvailable,
+                                        color: 'var(--secondary)',
+                                        bgColor: 'rgba(0,113,227,0.1)',
+                                        borderColor: 'rgba(0,113,227,0.2)'
+                                      }] : []),
+                                    ];
+                                if (tags.length === 0) return null;
+                                return tags.slice(0, 2).map((tag, idx) => (
+                                  <Box key={idx} sx={{
+                                    px: 0.7,
+                                    py: 0.15,
+                                    borderRadius: '5px',
+                                    bgcolor: (tag as any).bgColor || `${tag.color}15`,
+                                    fontSize: '0.55rem',
+                                    fontWeight: 600,
+                                    color: tag.color,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 0.2,
+                                    whiteSpace: 'nowrap',
+                                    maxWidth: '100%',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                  }}>
+                                    {lang === 'en' 
+                                      ? ((tag as any).textEn || TAG_TRANSLATIONS_TH_TO_EN[tag.text] || tag.text)
+                                      : tag.text}
+                                  </Box>
+                                ));
+                              })()}
+                            </Box>
 
-                            {/* ---- Price + Action Row ---- */}
+                            {/* ---- Price + ATC locked to bottom ---- */}
                             <Box sx={{ mt: 'auto', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 1 }}>
-                              {/* Price Display */}
-                              <Box>
+                              {/* Price Display — single location */}
+                              <Box sx={{ minWidth: 0 }}>
                                 {!isProductClosed && (
                                   <>
                                     {eventDiscount ? (
@@ -4452,22 +4717,37 @@ export default function HomePage() {
                                         color: 'var(--text-muted)',
                                         mt: 0.2,
                                       }}>
-                                        {lang === 'en' ? 'Starting from' : 'เริ่มต้น'}
+                                        {t.product.startingFrom}
                                       </Typography>
                                     )}
                                   </>
                                 )}
                               </Box>
                               
-                              {/* Action Button — Compact */}
+                              {/* Always show ATC for sellable products; opens dialog when options needed */}
                               {!isProductClosed ? (
                                 <Button
                                   className={isProductAvailable ? 'shimmer-btn' : ''}
                                   disabled={!isProductAvailable}
                                   size="small"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (!isProductAvailable) return;
+                                    if (quickAdd) {
+                                      handleQuickAddToCart(product, {
+                                        shopId: catalogContext.shopId,
+                                        shopSlug: catalogContext.shopSlug,
+                                      });
+                                      return;
+                                    }
+                                    handleSelectProduct(product, {
+                                      shopId: catalogContext.shopId,
+                                      shopSlug: catalogContext.shopSlug,
+                                    });
+                                  }}
                                   sx={{
                                     minWidth: 0,
-                                    px: 2,
+                                    px: 1.5,
                                     py: 0.7,
                                     borderRadius: '10px',
                                     bgcolor: isProductAvailable ? 'var(--primary)' : 'var(--surface-3)',
@@ -4482,9 +4762,12 @@ export default function HomePage() {
                                       boxShadow: isProductAvailable ? '0 5px 16px rgba(0,113,227,0.35)' : 'none',
                                     },
                                     whiteSpace: 'nowrap',
+                                    flexShrink: 0,
                                   }}
                                 >
-                                  {catalogContext.isOpen ? t.product.viewDetail : t.product.shopClosedTemp}
+                                  {!catalogContext.isOpen
+                                    ? t.product.shopClosedTemp
+                                    : t.product.quickAdd}
                                 </Button>
                               ) : (
                                 <Box
@@ -4492,15 +4775,19 @@ export default function HomePage() {
                                     px: 1.2,
                                     py: 0.5,
                                     borderRadius: '8px',
-                                    background: SHOP_STATUS_CONFIG[productStatus].bgGradient,
-                                    border: `1px solid ${SHOP_STATUS_CONFIG[productStatus].borderColor}`,
+                                    background: outOfStock && productStatus === 'OPEN'
+                                      ? 'rgba(120,120,128,0.2)'
+                                      : SHOP_STATUS_CONFIG[productStatus].bgGradient,
+                                    border: `1px solid ${outOfStock && productStatus === 'OPEN' ? 'rgba(120,120,128,0.35)' : SHOP_STATUS_CONFIG[productStatus].borderColor}`,
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: 0.5,
                                     flexShrink: 0,
                                   }}
                                 >
-                                  {(() => {
+                                  {outOfStock && productStatus === 'OPEN' ? (
+                                    <Package size={12} color="var(--text-muted)" />
+                                  ) : (() => {
                                     const IconComponent = SHOP_STATUS_CONFIG[productStatus].icon;
                                     return <IconComponent size={12} color={SHOP_STATUS_CONFIG[productStatus].color} />;
                                   })()}
@@ -4508,11 +4795,15 @@ export default function HomePage() {
                                     sx={{ 
                                       fontSize: '0.65rem', 
                                       fontWeight: 700, 
-                                      color: SHOP_STATUS_CONFIG[productStatus].color,
+                                      color: outOfStock && productStatus === 'OPEN'
+                                        ? 'var(--text-muted)'
+                                        : SHOP_STATUS_CONFIG[productStatus].color,
                                       whiteSpace: 'nowrap',
                                     }}
                                   >
-                                    {({
+                                    {outOfStock && productStatus === 'OPEN'
+                                      ? t.product.soldOut
+                                      : ({
                                       OPEN: t.shopStatus.open,
                                       COMING_SOON: t.shopStatus.comingSoon,
                                       ORDER_ENDED: t.shopStatus.closedEnded,
@@ -4531,7 +4822,8 @@ export default function HomePage() {
                   </Box>
                   </Box>
                 </Box>
-              ))
+                );
+              })
             ) : (
               <Box sx={{ textAlign: 'center', py: 8 }}>
                 <Store size={64} style={{ color: 'var(--text-muted)', marginBottom: 16 }} />
@@ -4597,15 +4889,19 @@ export default function HomePage() {
         config={config}
         shippingConfig={shippingConfig}
         isShopOpen={cartCheckoutOpen}
+        shopId={checkoutShopId}
+        getProduct={findProductForCartItem}
         onClearCart={() => {
           saveCart([]);
+          setCartPromo(null);
           showToast('success', t.cart.cleared);
         }}
         onUpdateQuantity={(itemId, quantity) => updateCartQuantity(itemId, quantity)}
         onRemoveItem={(itemId) => removeFromCart(itemId)}
         onEditItem={(item) => openEditCartItem(item)}
-        onCheckout={() => {
+        onCheckout={(promo) => {
           if (!requireProfileBeforeCheckout()) return;
+          setCartPromo(promo || null);
           setShowCart(false);
           setShowOrderDialog(true);
         }}
@@ -4867,7 +5163,7 @@ export default function HomePage() {
       {/* Checkout Dialog with Shipping & Payment Selection */}
       <CheckoutDialog
         open={showOrderDialog}
-        onClose={() => setShowOrderDialog(false)}
+        onClose={() => { setShowOrderDialog(false); setCartPromo(null); }}
         cart={cart}
         orderData={orderData}
         profileComplete={profileComplete}
@@ -4878,6 +5174,7 @@ export default function HomePage() {
         onEditProfile={() => { setShowProfileModal(true); setPendingCheckout(true); }}
         products={allCatalogProducts}
         shopId={checkoutShopId}
+        initialPromo={cartPromo}
         isMobile={isMobile}
         savedAddresses={savedAddresses}
         onAddressChange={(address) => setOrderData(prev => ({ ...prev, address }))}

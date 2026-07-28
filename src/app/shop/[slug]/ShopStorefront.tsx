@@ -67,7 +67,7 @@ import type { OrderHistory } from '@/lib/shop-constants';
 import {
   isValidCustomerName, sanitizeCustomerName, onlyDigitsPhone, resolveProfileAddress,
   getStatusCategory, normalizeStatus,
-  productRequiresSize, getDisplaySizes, SIZE_MEASUREMENTS, resolveProductUnitPrice,
+  productRequiresSize, getDisplaySizes, resolveProductUnitPrice, resolveSizeMeasurement,
   resolveShopOpenFields, applyRealtimeShopRow,
   parseThailandDateTime,
 } from '@/lib/shop-constants';
@@ -233,6 +233,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [cartOpen, setCartOpen] = useState(false);
+  const [cartPromo, setCartPromo] = useState<{ code: string; discount: number; description?: string } | null>(null);
   const paymentOpenerRef = useRef<((ref: string) => void) | null>(null);
   const cartHoldTimers = useRef<Record<string, ReturnType<typeof setInterval> | null>>({});
   const shopCartRef = useRef(shopCart);
@@ -1525,7 +1526,10 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       )}
 
       {/* ==================== SEARCH & FILTERS ==================== */}
-      <Box sx={{ maxWidth: '1200px', mx: 'auto', px: 2, pt: 3 }}>
+      <Box
+        id="product-grid"
+        sx={{ maxWidth: '1200px', mx: 'auto', px: 2, pt: 3, scrollMarginTop: { xs: '64px', md: '80px' } }}
+      >
         <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
           <TextField
             size="small"
@@ -1623,30 +1627,47 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
           /* Products grouped by category */
           Object.entries(filteredGroupedProducts).map(([category, items]) => (
             <Box key={category} sx={{ mb: 4 }}>
-              {/* Category header */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
-                <Box sx={{
-                  px: 1.5, py: 0.6, borderRadius: '10px',
-                  background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
-                  display: 'flex', alignItems: 'center', gap: 0.75,
-                }}>
-                  <Box component="span" sx={{ fontSize: '0.9rem' }}>{getCategoryIcon(category)}</Box>
-                  <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: 'white' }}>
-                    {(t.category as Record<string, string>)[category] || getCategoryLabel(category, lang) || category}
-                  </Typography>
+              {/* Plain category title + view-all link */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                <Box component="span" sx={{ fontSize: '1.05rem', lineHeight: 1, flexShrink: 0 }} aria-hidden>
+                  {getCategoryIcon(category)}
                 </Box>
-                <Typography sx={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                  {items.length} {t.common.items}
+                <Typography sx={{
+                  flex: 1,
+                  minWidth: 0,
+                  fontSize: '1.05rem',
+                  fontWeight: 800,
+                  color: 'var(--foreground)',
+                  letterSpacing: '-0.02em',
+                  lineHeight: 1.25,
+                }}>
+                  {(t.category as Record<string, string>)[category] || getCategoryLabel(category, lang) || category}
                 </Typography>
-                {items.length > 1 && (
-                  <Typography sx={{
-                    display: { xs: 'flex', sm: 'none' },
-                    alignItems: 'center', gap: 0.5,
-                    fontSize: '0.7rem', color: 'var(--text-muted)',
-                    ml: 'auto',
-                  }}>
-                    {t.product.scrollMore}
-                  </Typography>
+                {items.length > 0 && (
+                  <Box
+                    component="button"
+                    type="button"
+                    onClick={() => setSelectedCategory(category)}
+                    sx={{
+                      flexShrink: 0,
+                      border: 'none',
+                      background: 'none',
+                      cursor: 'pointer',
+                      p: 0,
+                      fontFamily: 'inherit',
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      color: 'var(--primary)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 0.35,
+                      letterSpacing: '-0.01em',
+                      '&:hover': { textDecoration: 'underline' },
+                    }}
+                  >
+                    {t.search.viewAllCount.replace('{count}', String(items.length))}
+                    <ChevronRight size={14} strokeWidth={2.5} />
+                  </Box>
                 )}
               </Box>
 
@@ -1663,6 +1684,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                   display: { xs: 'flex', sm: 'grid' },
                   gridTemplateColumns: { sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)', lg: 'repeat(4, 1fr)' },
                   gap: 2,
+                  alignItems: 'stretch',
                   overflowX: { xs: 'auto', sm: 'visible' },
                   scrollSnapType: { xs: 'x mandatory', sm: 'none' },
                   WebkitOverflowScrolling: 'touch',
@@ -1683,6 +1705,8 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                         maxWidth: { xs: '68vw', sm: 'none' },
                         flex: { xs: '0 0 auto', sm: '1 1 auto' },
                         scrollSnapAlign: { xs: 'start', sm: 'unset' },
+                        display: 'flex',
+                        height: '100%',
                       }}>
                         <Box
                           className={isProductAvailable ? 'product-card-hover' : ''}
@@ -1706,6 +1730,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                           }}
                           sx={{
                             height: '100%',
+                            width: '100%',
                             display: 'flex',
                             flexDirection: 'column',
                             cursor: isProductAvailable ? 'pointer' : 'default',
@@ -1718,7 +1743,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                               : '1px solid transparent',
                             transition: 'opacity 0.25s ease, filter 0.25s ease, box-shadow 0.25s ease',
                             position: 'relative',
-                            opacity: isProductClosed ? 0.72 : 1,
+                            opacity: isProductClosed ? 0.6 : 1,
                             filter: isProductClosed ? 'grayscale(1)' : 'none',
                             '&:hover': isProductAvailable ? {
                               boxShadow: (theme: any) => theme.palette.mode === 'dark'
@@ -1743,7 +1768,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                                 height="100%"
                                 objectFit="cover"
                                 priority={productIdx < 4}
-                                placeholder="skeleton"
+                                placeholder="shimmer"
                                 showLoadingIndicator={false}
                                 style={{
                                   position: 'absolute',
@@ -1755,17 +1780,16 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                             ) : (
                               <Box sx={{
                                 position: 'absolute', inset: 0,
-                                display: 'flex', flexDirection: 'column',
-                                alignItems: 'center', justifyContent: 'center', gap: 1,
-                                color: 'var(--text-muted)', bgcolor: 'var(--surface-2)',
+                                display: 'flex',
+                                alignItems: 'center', justifyContent: 'center',
+                                bgcolor: '#ececef',
                               }}>
                                 <Box
                                   component="img"
                                   src="/favicon.png"
-                                  alt=""
-                                  sx={{ width: 40, height: 40, opacity: 0.3, filter: 'grayscale(1)' }}
+                                  alt="SCC Shop"
+                                  sx={{ width: 40, height: 40, opacity: 0.4, filter: 'grayscale(1)' }}
                                 />
-                                <Box sx={{ fontSize: '0.75rem', opacity: 0.7 }}>{t.common.noImage}</Box>
                               </Box>
                             )}
 
@@ -2008,7 +2032,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                                     whiteSpace: 'nowrap',
                                   }}
                                 >
-                                  {isShopOpen ? t.product.viewDetail : t.product.shopClosedTemp}
+                                  {isShopOpen ? t.product.quickAdd : t.product.shopClosedTemp}
                                 </Button>
                               ) : (
                                 <Box sx={{
@@ -2092,23 +2116,27 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                 <Button
                   onClick={handleAddToCart}
                   disabled={!isShopOpen}
+                  variant="outlined"
                   startIcon={<ShoppingCart size={18} />}
                   sx={{
                     flex: 1,
                     py: 1.4,
                     borderRadius: '14px',
-                    border: '1px solid var(--glass-border)',
-                    bgcolor: 'var(--surface)',
+                    borderWidth: '1.5px',
+                    borderStyle: 'solid',
+                    borderColor: isShopOpen ? 'var(--primary)' : 'var(--glass-border)',
+                    bgcolor: 'transparent',
                     color: isShopOpen ? 'var(--foreground)' : 'var(--text-muted)',
                     fontSize: '0.9rem',
                     fontWeight: 700,
                     textTransform: 'none',
                     boxShadow: 'none',
                     '&:hover': {
-                      bgcolor: isShopOpen ? 'var(--surface-2)' : 'var(--surface)',
-                      transform: isShopOpen ? 'scale(0.98)' : 'none',
+                      borderWidth: '1.5px',
+                      borderColor: 'var(--primary)',
+                      bgcolor: 'color-mix(in srgb, var(--primary) 6%, transparent)',
                     },
-                    '&.Mui-disabled': { color: 'var(--text-muted)' },
+                    '&.Mui-disabled': { color: 'var(--text-muted)', borderColor: 'var(--glass-border)' },
                   }}
                 >
                   {t.product.addToCart}
@@ -2121,18 +2149,17 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                   disabled={!isShopOpen}
                   startIcon={<Zap size={18} />}
                   sx={{
-                    flex: 1.3,
+                    flex: 1,
                     py: 1.4,
                     borderRadius: '14px',
                     bgcolor: isShopOpen ? 'var(--primary)' : 'var(--surface-2)',
-                    color: isShopOpen ? 'white' : 'var(--text-muted)',
+                    color: isShopOpen ? 'var(--primary-foreground)' : 'var(--text-muted)',
                     fontSize: '0.95rem',
                     fontWeight: 800,
                     textTransform: 'none',
                     boxShadow: 'none',
                     '&:hover': {
-                      bgcolor: isShopOpen ? '#0062cc' : 'var(--surface-2)',
-                      transform: isShopOpen ? 'scale(0.98)' : 'none',
+                      bgcolor: isShopOpen ? 'color-mix(in srgb, var(--primary) 88%, #000)' : 'var(--surface-2)',
                     },
                     '&.Mui-disabled': { bgcolor: 'var(--surface-2)', color: 'var(--text-muted)' },
                   }}
@@ -2480,25 +2507,13 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                       {/* Size Chart & Selection — same as main shop */}
                       {productRequiresSize(selectedProduct) && (
                         <Box sx={{
-                          p: { xs: 2.5, sm: 3 },
-                          borderRadius: '20px',
-                          background: (theme: any) => theme.palette.mode === 'dark'
-                            ? 'linear-gradient(135deg, rgba(29,29,31,0.6) 0%, rgba(29,29,31,0.3) 100%)'
-                            : 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, rgba(245,245,247,0.6) 100%)',
-                          border: '1px solid var(--glass-border)',
-                          boxShadow: (theme: any) => theme.palette.mode === 'dark'
-                            ? 'inset 0 1px 0 rgba(255,255,255,0.05)'
-                            : 'inset 0 1px 0 rgba(255,255,255,0.8)',
+                          mb: 1,
+                          pb: 2.5,
+                          borderBottom: '1px solid var(--glass-border)',
                         }}>
-                          <Box ref={sizeSelectorRef} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-                            <Box sx={{
-                              width: 36, height: 36, borderRadius: '10px',
-                              bgcolor: 'rgba(0,113,227,0.15)',
-                              display: 'grid', placeItems: 'center',
-                            }}>
-                              <Ruler size={18} color="#2997ff" />
-                            </Box>
-                            <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                          <Box ref={sizeSelectorRef} sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                            <Ruler size={16} color="var(--text-muted)" />
+                            <Typography sx={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--foreground)' }}>
                               {t.product.sizeChart} & {t.product.selectSize}
                             </Typography>
                           </Box>
@@ -2506,27 +2521,26 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                           <Box sx={{ borderRadius: '16px', bgcolor: 'var(--surface)', border: '1px solid var(--glass-border)', overflow: 'hidden' }}>
                             <Box sx={{
                               display: 'grid', gridTemplateColumns: '1.2fr 1fr 1.2fr 1fr',
-                              p: 1.5, bgcolor: 'rgba(0,113,227,0.08)',
+                              p: 1.5, bgcolor: 'var(--surface-2)',
                               borderBottom: '1px solid var(--glass-border)', textAlign: 'center',
                             }}>
-                              <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--primary)', textAlign: 'left', pl: 2 }}>
+                              <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textAlign: 'left', pl: 2, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                                 {lang === 'en' ? 'Size' : 'ขนาดไซส์'}
                               </Typography>
-                              <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--primary)' }}>
+                              <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                                 {lang === 'en' ? 'Chest (in)' : 'รอบอก (นิ้ว)'}
                               </Typography>
-                              <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--primary)' }}>
+                              <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                                 {lang === 'en' ? 'Length (in)' : 'ความยาว (นิ้ว)'}
                               </Typography>
-                              <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--primary)', pr: 1 }}>
+                              <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', pr: 1, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
                                 {lang === 'en' ? 'Price' : 'ราคา'}
                               </Typography>
                             </Box>
 
                             <Box sx={{ display: 'flex', flexDirection: 'column' }}>
                               {displaySizes.map((size) => {
-                                const sizeKey = size as keyof typeof SIZE_MEASUREMENTS;
-                                const measurement = SIZE_MEASUREMENTS[sizeKey];
+                                const measurement = resolveSizeMeasurement(selectedProduct, size);
                                 const isSelected = selectedSize === size;
                                 const rowPrice = resolveProductUnitPrice(selectedProduct, size, isLongSleeve);
                                 return (
@@ -2561,13 +2575,13 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                                       fontSize: '0.82rem', fontWeight: isSelected ? 600 : 500,
                                       color: isSelected ? 'var(--foreground)' : 'var(--text-muted)',
                                     }}>
-                                      {measurement?.chest ? `${measurement.chest}"` : '-'}
+                                      {measurement?.chest ? `${measurement.chest}"` : '—'}
                                     </Typography>
                                     <Typography sx={{
                                       fontSize: '0.82rem', fontWeight: isSelected ? 600 : 500,
                                       color: isSelected ? 'var(--foreground)' : 'var(--text-muted)',
                                     }}>
-                                      {measurement?.length ? `${measurement.length}"` : '-'}
+                                      {measurement?.length ? `${measurement.length}"` : '—'}
                                     </Typography>
                                     <Typography sx={{
                                       fontSize: '0.82rem', fontWeight: 700,
@@ -2599,7 +2613,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                             }}>
                               <Tag size={18} color="#2997ff" />
                             </Box>
-                            <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--secondary)' }}>
+                            <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--foreground)' }}>
                               {t.product.selectOption}
                             </Typography>
                           </Box>
@@ -2839,26 +2853,49 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                         </Box>
                       )}
 
-                      {/* Quantity */}
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                      {/* Quantity — bordered zone */}
+                      <Box sx={{
+                        py: 2,
+                        borderTop: '1px solid var(--glass-border)',
+                        borderBottom: '1px solid var(--glass-border)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 2,
+                      }}>
+                        <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)' }}>
                           {lang === 'en' ? 'Quantity' : 'จำนวน'}
                         </Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          bgcolor: 'var(--surface)',
+                          borderRadius: '12px',
+                          border: '1px solid var(--glass-border)',
+                          overflow: 'hidden',
+                        }}>
                           <IconButton
                             size="small"
                             onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                            sx={{ bgcolor: 'var(--surface-2)', color: 'var(--foreground)', border: '1px solid var(--glass-border)' }}
+                            sx={{ color: 'var(--foreground)', borderRadius: 0, px: 1.25, '&:hover': { bgcolor: 'var(--surface-2)' } }}
                           >
                             <Minus size={16} />
                           </IconButton>
-                          <Typography sx={{ fontWeight: 700, minWidth: 30, textAlign: 'center', color: 'var(--foreground)' }}>
+                          <Typography sx={{
+                            fontWeight: 800,
+                            minWidth: 40,
+                            textAlign: 'center',
+                            color: 'var(--foreground)',
+                            borderLeft: '1px solid var(--glass-border)',
+                            borderRight: '1px solid var(--glass-border)',
+                            py: 0.5,
+                          }}>
                             {quantity}
                           </Typography>
                           <IconButton
                             size="small"
                             onClick={() => setQuantity(quantity + 1)}
-                            sx={{ bgcolor: 'var(--surface-2)', color: 'var(--foreground)', border: '1px solid var(--glass-border)' }}
+                            sx={{ color: 'var(--foreground)', borderRadius: 0, px: 1.25, '&:hover': { bgcolor: 'var(--surface-2)' } }}
                           >
                             <Plus size={16} />
                           </IconButton>
@@ -2887,6 +2924,8 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
         config={shopConfig}
         shippingConfig={shippingConfig}
         isShopOpen={isShopOpen}
+        shopId={shop.id}
+        getProduct={(item) => products.find((p) => p.id === item.productId)}
         onClearCart={async () => {
           const ok = await showConfirm({
             title: lang === 'en' ? 'Clear entire cart?' : 'ล้างตะกร้าทั้งหมด?',
@@ -2900,18 +2939,20 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
           });
           if (ok) {
             useCartStore.getState().clearCartByShop(shopSlug);
+            setCartPromo(null);
             showToast('success', lang === 'en' ? 'Cart cleared' : 'ล้างตะกร้าแล้ว');
           }
         }}
         onUpdateQuantity={updateDrawerCartQuantity}
         onRemoveItem={removeDrawerCartItem}
         onEditItem={(item) => setEditingCartItem(item)}
-        onCheckout={() => {
+        onCheckout={(promo) => {
           if (!isShopOpen) {
             showToast('warning', lang === 'en' ? 'Shop is closed' : 'ร้านค้าปิดรับออเดอร์แล้ว');
             return;
           }
           if (!requireProfileBeforeCheckout()) return;
+          setCartPromo(promo || null);
           setCartOpen(false);
           setCheckoutOpen(true);
         }}
@@ -3068,7 +3109,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       {/* ==================== CHECKOUT DIALOG ==================== */}
       <CheckoutDialog
         open={checkoutOpen}
-        onClose={() => setCheckoutOpen(false)}
+        onClose={() => { setCheckoutOpen(false); setCartPromo(null); }}
         cart={mappedShopCart}
         orderData={orderData}
         profileComplete={profileComplete}
@@ -3082,6 +3123,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
         savedAddresses={savedAddresses}
         onAddressChange={(address) => setOrderAddress(address)}
         shopId={shop.id}
+        initialPromo={cartPromo}
       />
 
       {/* ==================== PROFILE MODAL ==================== */}

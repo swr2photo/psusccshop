@@ -1119,7 +1119,9 @@ export async function updateOrderByRef(ref: string, updates: Partial<any>): Prom
   if (updates.cart !== undefined) dbUpdates.cart = updates.cart;
   if (updates.totalAmount !== undefined) dbUpdates.totalAmount = updates.totalAmount;
   if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+  // Accept legacy `slip` alias used by payment verify route
   if (updates.slipData !== undefined) dbUpdates.slipData = updates.slipData;
+  else if (updates.slip !== undefined) dbUpdates.slipData = updates.slip;
   if (updates.paymentVerifiedAt !== undefined) dbUpdates.paymentVerifiedAt = updates.paymentVerifiedAt;
   if (updates.paymentVerified !== undefined) dbUpdates.paymentVerified = updates.paymentVerified;
   if (updates.receiptIssuedAt !== undefined) dbUpdates.receiptIssuedAt = updates.receiptIssuedAt;

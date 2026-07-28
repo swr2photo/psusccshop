@@ -231,7 +231,7 @@ export function CountdownBadge({ orderDate, compact, tone = 'default', onExpired
  */
 export function PaymentCountdown({ orderDate, onExpired, expiryMs }: OrderCountdownProps) {
   const { t } = useTranslation();
-  const { time, isExpired, isUrgent, isWarning, progress } = useOrderCountdown(orderDate, expiryMs);
+  const { time, isExpired, isUrgent, progress } = useOrderCountdown(orderDate, expiryMs);
 
   useEffect(() => {
     if (isExpired && onExpired) onExpired();
@@ -257,14 +257,17 @@ export function PaymentCountdown({ orderDate, onExpired, expiryMs }: OrderCountd
     );
   }
 
-  const color = isUrgent ? '#ef4444' : isWarning ? '#f59e0b' : '#34c759';
+  // Soft amber institutional accent; escalate to warning/urgent when time runs low
+  const color = isUrgent ? '#ef4444' : '#d97706';
+  const softBg = isUrgent ? 'rgba(239,68,68,0.08)' : 'rgba(217,119,6,0.08)';
+  const softBorder = isUrgent ? 'rgba(239,68,68,0.22)' : 'rgba(217,119,6,0.22)';
 
   return (
     <Box sx={{
       p: 2,
-      borderRadius: '14px',
-      bgcolor: isUrgent ? 'rgba(239,68,68,0.08)' : isWarning ? 'rgba(245,158,11,0.08)' : 'rgba(52,199,89,0.08)',
-      border: `1px solid ${isUrgent ? 'rgba(239,68,68,0.2)' : isWarning ? 'rgba(245,158,11,0.2)' : 'rgba(52,199,89,0.2)'}`,
+      borderRadius: '12px',
+      bgcolor: softBg,
+      border: `1px solid ${softBorder}`,
     }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
         <Clock size={16} style={{ color }} />

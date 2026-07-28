@@ -50,6 +50,7 @@ export async function GET(req: NextRequest) {
       const dayOrders = validOrders.filter(o => {
         if (!o.date) return false;
         const od = new Date(o.date);
+        if (Number.isNaN(od.getTime())) return false;
         return od.toISOString().split('T')[0] === dateStr;
       });
       dailyData.push({

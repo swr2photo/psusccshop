@@ -1,22 +1,47 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { X, Cookie, Shield, Check, ChevronDown, ChevronUp, Settings2 } from 'lucide-react';
-import { Box, Typography, Button, IconButton, Collapse, Switch, Slide } from '@mui/material';
+import { Check, Cookie, Settings2, ChevronUp } from 'lucide-react';
+import { Collapse, Switch } from '@mui/material';
 import { useNotification, COOKIE_CATEGORIES, CookieCategory } from './NotificationContext';
 import Link from 'next/link';
 import { useTranslation } from '@/hooks/useTranslation';
+import { cn } from '@/lib/utils';
 
+const OPT_IN_DEFAULT = {
+  essential: true,
+  functional: false,
+  analytics: false,
+  marketing: false,
+} as const;
+
+/**
+ * Bottom floating cookie banner — non-blocking, PDPA opt-in defaults (OFF except essential).
+ */
 export default function CookieConsentBanner() {
   const { t } = useTranslation();
-  const { showConsentBanner, acceptAll, acceptEssential, updateConsent } = useNotification();
+  const { showConsentBanner, acceptAll, acceptEssential, updateConsent, consent } =
+    useNotification();
   const [showDetails, setShowDetails] = useState(false);
-  const [customConsent, setCustomConsent] = useState({
-    essential: true,
-    functional: true,
-    analytics: false,
-    marketing: false,
-  });
+  const [customConsent, setCustomConsent] = useState({ ...OPT_IN_DEFAULT });
+
+  useEffect(() => {
+    if (!showConsentBanner) return;
+    if (consent) {
+      // Reopened from Privacy / settings — load saved prefs and expand panel
+      setShowDetails(true);
+      setCustomConsent({
+        essential: true,
+        functional: consent.functional === true,
+        analytics: consent.analytics === true,
+        marketing: consent.marketing === true,
+      });
+    } else {
+      // First visit — compact banner, all non-essential OFF
+      setShowDetails(false);
+      setCustomConsent({ ...OPT_IN_DEFAULT });
+    }
+  }, [showConsentBanner, consent]);
 
   if (!showConsentBanner) return null;
 
@@ -25,7 +50,7 @@ export default function CookieConsentBanner() {
   };
 
   const toggleCategory = (category: CookieCategory) => {
-    if (category === 'essential') return; // Cannot disable essential
+    if (category === 'essential') return;
     setCustomConsent((prev) => ({
       ...prev,
       [category]: !prev[category],
@@ -33,337 +58,149 @@ export default function CookieConsentBanner() {
   };
 
   return (
-    <Slide direction="up" in={showConsentBanner} mountOnEnter unmountOnExit>
-      <Box
-        sx={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          zIndex: 9999,
-          p: { xs: 2, sm: 3 },
-          pb: { xs: 'max(16px, env(safe-area-inset-bottom))', sm: 3 },
-        }}
+    <div
+      className="pointer-events-none fixed inset-x-0 bottom-0 z-[9999] flex justify-center p-3 sm:p-4"
+      style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
+      role="dialog"
+      aria-label={t.cookie.title}
+    >
+      <div
+        className={cn(
+          'pointer-events-auto w-full max-w-3xl overflow-hidden rounded-2xl border border-[var(--glass-border)]',
+          'bg-[var(--background)]/95 text-[var(--foreground)] shadow-[0_-8px_32px_rgba(0,0,0,0.12)] backdrop-blur-xl',
+        )}
       >
-        <Box
-          sx={{
-            maxWidth: 520,
-            mx: 'auto',
-            borderRadius: '24px',
-            bgcolor: 'var(--glass-strong)',
-            backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            boxShadow: '0 -8px 40px rgba(0, 0, 0, 0.4), 0 4px 20px rgba(0,113,227, 0.1)',
-            overflow: 'hidden',
-          }}
-        >
-          {/* Header */}
-          <Box
-            sx={{
-              p: 2.5,
-              pb: 2,
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: 2,
-            }}
-          >
-            <Box
-              sx={{
-                width: 48,
-                height: 48,
-                borderRadius: '14px',
-                background: 'linear-gradient(135deg, #0077ED 0%, #0071e3 100%)',
-                display: 'grid',
-                placeItems: 'center',
-                flexShrink: 0,
-                boxShadow: '0 4px 16px rgba(0,113,227, 0.3)',
-              }}
-            >
-              <Cookie size={24} color="white" />
-            </Box>
-            <Box sx={{ flex: 1 }}>
-              <Typography
-                sx={{
-                  fontSize: '1.1rem',
-                  fontWeight: 800,
-                  color: 'var(--foreground)',
-                  mb: 0.5,
-                }}
-              >
-                {t.cookie.title}
-              </Typography>
-              <Typography
-                sx={{
-                  fontSize: '0.85rem',
-                  color: 'var(--text-muted)',
-                  lineHeight: 1.5,
-                }}
-              >
-                {t.cookie.description}
-              </Typography>
-            </Box>
-          </Box>
+        <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:gap-4 sm:p-5">
+          <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#0071e3] text-white shadow-sm">
+            <Cookie size={20} />
+          </div>
 
-          {/* Expand/Collapse Details */}
-          <Box sx={{ px: 2.5, pb: 2 }}>
-            <Button
-              fullWidth
-              onClick={() => setShowDetails(!showDetails)}
-              endIcon={showDetails ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-              startIcon={<Settings2 size={16} />}
-              sx={{
-                py: 1,
-                borderRadius: '12px',
-                bgcolor: 'rgba(255, 255, 255, 0.05)',
-                color: 'var(--text-muted)',
-                textTransform: 'none',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                '&:hover': {
-                  bgcolor: 'rgba(255, 255, 255, 0.08)',
-                },
-              }}
+          <div className="min-w-0 flex-1">
+            <p className="text-[0.95rem] font-bold leading-snug">{t.cookie.title}</p>
+            <p className="mt-1 text-sm leading-relaxed text-[var(--text-muted)]">
+              {t.cookie.description}{' '}
+              <Link
+                href="/privacy#s8"
+                className="font-semibold text-[var(--foreground)] underline underline-offset-2"
+              >
+                {t.cookie.readMore}
+              </Link>
+            </p>
+          </div>
+        </div>
+
+        {/* Compact actions (collapsed) */}
+        {!showDetails && (
+          <div className="flex flex-col gap-2 border-t border-[var(--glass-border)] px-4 py-3 sm:flex-row sm:items-center sm:justify-end sm:gap-2 sm:px-5">
+            <button
+              type="button"
+              onClick={() => setShowDetails(true)}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-semibold text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--foreground)] sm:order-1 sm:mr-auto"
             >
+              <Settings2 size={16} />
               {t.cookie.settings}
-            </Button>
-          </Box>
-
-          {/* Cookie Settings */}
-          <Collapse in={showDetails}>
-            <Box
-              sx={{
-                px: 2.5,
-                pb: 2,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 1.5,
-              }}
+            </button>
+            <button
+              type="button"
+              onClick={acceptEssential}
+              className="inline-flex items-center justify-center rounded-xl border border-[var(--glass-border)] bg-transparent px-4 py-2.5 text-sm font-semibold text-[var(--foreground)] hover:bg-[var(--surface-2)] sm:order-2"
             >
+              {t.cookie.essentialOnly}
+            </button>
+            <button
+              type="button"
+              onClick={acceptAll}
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#0071e3] px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-[#0060c2] sm:order-3"
+            >
+              <Check size={16} />
+              {t.cookie.acceptAll}
+            </button>
+          </div>
+        )}
+
+        {/* Expanded settings */}
+        <Collapse in={showDetails}>
+          <div className="border-t border-[var(--glass-border)] px-4 pb-4 sm:px-5">
+            <button
+              type="button"
+              onClick={() => setShowDetails(false)}
+              className="mb-3 mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--foreground)]"
+            >
+              <ChevronUp size={14} />
+              {t.cookie.settings}
+            </button>
+
+            <div className="mb-3 space-y-2">
               {(Object.keys(COOKIE_CATEGORIES) as CookieCategory[]).map((category) => {
                 const info = COOKIE_CATEGORIES[category];
                 const isEnabled = customConsent[category];
                 const isRequired = info.required;
 
                 return (
-                  <Box
+                  <div
                     key={category}
-                    sx={{
-                      p: 2,
-                      borderRadius: '14px',
-                      bgcolor: isEnabled ? 'rgba(0,113,227, 0.1)' : 'rgba(29,29,31, 0.5)',
-                      border: `1px solid ${isEnabled ? 'rgba(0,113,227, 0.3)' : 'rgba(255, 255, 255, 0.05)'}`,
-                      transition: 'all 0.2s ease',
-                    }}
+                    className={cn(
+                      'flex items-center gap-3 rounded-xl border px-3 py-2.5',
+                      isEnabled
+                        ? 'border-[#0071e3]/25 bg-[#0071e3]/6'
+                        : 'border-[var(--glass-border)] bg-[var(--surface)]',
+                    )}
                   >
-                    <Box
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-0.5 flex flex-wrap items-center gap-1.5">
+                        <span className="text-sm font-bold">{info.name}</span>
+                        {isRequired && (
+                          <span className="rounded-md bg-[var(--surface-2)] px-1.5 py-0.5 text-[0.65rem] font-semibold text-[var(--text-muted)]">
+                            {t.cookie.essential}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs leading-snug text-[var(--text-muted)]">{info.description}</p>
+                    </div>
+                    <Switch
+                      checked={isEnabled}
+                      disabled={isRequired}
+                      onChange={() => toggleCategory(category)}
+                      size="small"
+                      inputProps={{ 'aria-label': info.name }}
                       sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: 2,
+                        '& .MuiSwitch-switchBase.Mui-checked': { color: '#0071e3' },
+                        '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                          bgcolor: '#0071e3',
+                          opacity: 0.5,
+                        },
+                        '& .MuiSwitch-switchBase.Mui-disabled': { color: '#34c759' },
+                        '& .MuiSwitch-switchBase.Mui-disabled + .MuiSwitch-track': {
+                          bgcolor: 'rgba(52,199,89,0.45)',
+                          opacity: 1,
+                        },
                       }}
-                    >
-                      <Box sx={{ flex: 1 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                          <Typography
-                            sx={{
-                              fontSize: '0.9rem',
-                              fontWeight: 700,
-                              color: 'var(--foreground)',
-                            }}
-                          >
-                            {info.name}
-                          </Typography>
-                          {isRequired && (
-                            <Box
-                              sx={{
-                                px: 1,
-                                py: 0.2,
-                                borderRadius: '6px',
-                                bgcolor: 'rgba(16, 185, 129, 0.15)',
-                                border: '1px solid rgba(16, 185, 129, 0.3)',
-                              }}
-                            >
-                              <Typography
-                                sx={{
-                                  fontSize: '0.65rem',
-                                  fontWeight: 600,
-                                  color: '#30d158',
-                                }}
-                              >
-                                {t.cookie.essential}
-                              </Typography>
-                            </Box>
-                          )}
-                        </Box>
-                        <Typography
-                          sx={{
-                            fontSize: '0.75rem',
-                            color: '#86868b',
-                            lineHeight: 1.4,
-                          }}
-                        >
-                          {info.description}
-                        </Typography>
-                      </Box>
-                      <Switch
-                        checked={isEnabled}
-                        disabled={isRequired}
-                        onChange={() => toggleCategory(category)}
-                        sx={{
-                          '& .MuiSwitch-switchBase': {
-                            '&.Mui-checked': {
-                              color: '#0077ED',
-                              '& + .MuiSwitch-track': {
-                                bgcolor: 'rgba(0,113,227, 0.5)',
-                              },
-                            },
-                            '&.Mui-disabled': {
-                              color: '#34c759',
-                              '& + .MuiSwitch-track': {
-                                bgcolor: 'rgba(16, 185, 129, 0.5)',
-                                opacity: 1,
-                              },
-                            },
-                          },
-                          '& .MuiSwitch-track': {
-                            bgcolor: 'rgba(255, 255, 255, 0.1)',
-                          },
-                        }}
-                      />
-                    </Box>
-                  </Box>
+                    />
+                  </div>
                 );
               })}
-            </Box>
-          </Collapse>
+            </div>
 
-          {/* Action Buttons */}
-          <Box
-            sx={{
-              p: 2.5,
-              pt: 0,
-              display: 'flex',
-              gap: 1.5,
-              flexDirection: { xs: 'column', sm: 'row' },
-            }}
-          >
-            {showDetails ? (
-              <>
-                <Button
-                  fullWidth
-                  onClick={acceptEssential}
-                  sx={{
-                    py: 1.5,
-                    borderRadius: '14px',
-                    bgcolor: 'rgba(255, 255, 255, 0.05)',
-                    color: 'var(--text-muted)',
-                    textTransform: 'none',
-                    fontSize: '0.9rem',
-                    fontWeight: 600,
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    '&:hover': {
-                      bgcolor: 'rgba(255, 255, 255, 0.1)',
-                    },
-                  }}
-                >
-                  {t.cookie.essentialOnly}
-                </Button>
-                <Button
-                  fullWidth
-                  onClick={handleSaveCustom}
-                  startIcon={<Check size={18} />}
-                  sx={{
-                    py: 1.5,
-                    borderRadius: '14px',
-                    background: 'linear-gradient(135deg, #0077ED 0%, #0071e3 100%)',
-                    color: 'white',
-                    textTransform: 'none',
-                    fontSize: '0.9rem',
-                    fontWeight: 700,
-                    boxShadow: '0 4px 16px rgba(0,113,227, 0.3)',
-                    '&:hover': {
-                      background: 'linear-gradient(135deg, #bf5af2 0%, #1d4ed8 100%)',
-                    },
-                  }}
-                >
-                  {t.cookie.saveSettings}
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button
-                  fullWidth
-                  onClick={acceptEssential}
-                  sx={{
-                    py: 1.5,
-                    borderRadius: '14px',
-                    bgcolor: 'rgba(255, 255, 255, 0.05)',
-                    color: 'var(--text-muted)',
-                    textTransform: 'none',
-                    fontSize: '0.9rem',
-                    fontWeight: 600,
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    '&:hover': {
-                      bgcolor: 'rgba(255, 255, 255, 0.1)',
-                    },
-                  }}
-                >
-                  {t.cookie.reject}
-                </Button>
-                <Button
-                  fullWidth
-                  onClick={acceptAll}
-                  startIcon={<Check size={18} />}
-                  sx={{
-                    py: 1.5,
-                    borderRadius: '14px',
-                    background: 'linear-gradient(135deg, #34c759 0%, #34c759 100%)',
-                    color: 'white',
-                    textTransform: 'none',
-                    fontSize: '0.9rem',
-                    fontWeight: 700,
-                    boxShadow: '0 4px 16px rgba(16, 185, 129, 0.3)',
-                    '&:hover': {
-                      background: 'linear-gradient(135deg, #34c759 0%, #047857 100%)',
-                    },
-                  }}
-                >
-                  {t.cookie.acceptAll}
-                </Button>
-              </>
-            )}
-          </Box>
-
-          {/* Privacy Link */}
-          <Box
-            sx={{
-              px: 2.5,
-              pb: 2,
-              pt: 0,
-              textAlign: 'center',
-            }}
-          >
-            <Typography
-              sx={{
-                fontSize: '0.75rem',
-                color: '#86868b',
-              }}
-            >
-              {t.cookie.readMore}{' '}
-              <Link
-                href="/privacy"
-                style={{
-                  color: '#bf5af2',
-                  textDecoration: 'none',
-                }}
+            <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={acceptEssential}
+                className="inline-flex items-center justify-center rounded-xl border border-[var(--glass-border)] px-4 py-2.5 text-sm font-semibold hover:bg-[var(--surface-2)]"
               >
-                {t.cookie.privacyPolicy}
-              </Link>
-            </Typography>
-          </Box>
-        </Box>
-      </Box>
-    </Slide>
+                {t.cookie.essentialOnly}
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveCustom}
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#0071e3] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#0060c2]"
+              >
+                <Check size={16} />
+                {t.cookie.saveSettings}
+              </button>
+            </div>
+          </div>
+        </Collapse>
+      </div>
+    </div>
   );
 }

@@ -14,23 +14,19 @@ import {
   RadioGroup,
   Radio,
   FormControlLabel,
-  Collapse,
   CircularProgress,
   LinearProgress,
   Skeleton,
   TextField,
   InputAdornment,
+  IconButton,
 } from '@mui/material';
 import {
-  ShoppingCart,
   Package,
-  User,
   Truck,
   CreditCard,
   MapPin,
   Clock,
-  ChevronDown,
-  ChevronUp,
   AlertCircle,
   Check,
   Banknote,
@@ -39,6 +35,7 @@ import {
   Ticket,
   X,
   Tag,
+  QrCode,
 } from 'lucide-react';
 import { ShippingConfig, ShippingOption } from '@/lib/shipping';
 import { PaymentConfig, PaymentOption } from '@/lib/payment';
@@ -104,6 +101,8 @@ interface CheckoutDialogProps {
   onAddressChange?: (address: string) => void;
   /** Multi-shop: validate promo codes against this shop's config */
   shopId?: string;
+  /** Promo already validated in the cart drawer — seed checkout coupon state */
+  initialPromo?: { code: string; discount: number; description?: string } | null;
 }
 
 // ==================== ICONS ====================
@@ -116,15 +115,6 @@ const PAYMENT_ICONS: Record<string, React.ReactNode> = {
   shopeepay: <Wallet size={20} />,
   cod: <Truck size={20} />,
   installment: <CreditCard size={20} />,
-};
-
-const SHIPPING_ICONS: Record<string, React.ReactNode> = {
-  thailand_post: <Truck size={20} />,
-  kerry: <Truck size={20} />,
-  jandt: <Truck size={20} />,
-  flash: <Truck size={20} />,
-  pickup: <Store size={20} />,
-  custom: <Truck size={20} />,
 };
 
 // ==================== COMPONENT ====================
@@ -145,25 +135,22 @@ export default function CheckoutDialog({
   savedAddresses = [],
   onAddressChange,
   shopId,
+  initialPromo = null,
 }: CheckoutDialogProps) {
-  // Config states
   const [shippingConfig, setShippingConfig] = useState<ShippingConfig | null>(null);
   const [paymentConfig, setPaymentConfig] = useState<PaymentConfig | null>(null);
   const [loadingConfig, setLoadingConfig] = useState(true);
 
-  // Turnstile Widget Resetting mechanism
   const [turnstileKey, setTurnstileKey] = useState(0);
   const prevTokenRef = useRef(turnstileToken);
 
   useEffect(() => {
-    // If turnstileToken was non-empty and now is empty (e.g. cleared on failure)
     if (prevTokenRef.current && !turnstileToken && open) {
       setTurnstileKey(prev => prev + 1);
     }
     prevTokenRef.current = turnstileToken;
   }, [turnstileToken, open]);
 
-  // Also reset and scroll content to top when the dialog opens
   useEffect(() => {
     if (open) {
       setTurnstileKey(prev => prev + 1);
@@ -175,16 +162,9 @@ export default function CheckoutDialog({
     }
   }, [open]);
 
-  // Selection states
   const [selectedShipping, setSelectedShipping] = useState<string>('');
   const [selectedPayment, setSelectedPayment] = useState<string>('');
 
-  // UI states
-  const [showShippingOptions, setShowShippingOptions] = useState(true);
-  const [showPaymentOptions, setShowPaymentOptions] = useState(true);
-  const [showCartDetails, setShowCartDetails] = useState(false);
-
-  // Promo code states
   const [promoCode, setPromoCode] = useState('');
   const [promoLoading, setPromoLoading] = useState(false);
   const [promoResult, setPromoResult] = useState<{ valid: boolean; code: string; discount: number; description: string } | null>(null);
@@ -193,7 +173,7 @@ export default function CheckoutDialog({
   const { t, lang } = useTranslation();
   const { toasts, warning: toastWarning } = useNotification();
   const latestError = useMemo(() => {
-    return [...toasts].reverse().find(t => t.type === 'error');
+    return [...toasts].reverse().find(toast => toast.type === 'error');
   }, [toasts]);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
 
@@ -220,7 +200,6 @@ export default function CheckoutDialog({
 
   const showAddressPicker = checkoutAddresses.length >= 2;
 
-  // Sync selected address when checkout opens or address list changes
   useEffect(() => {
     if (!open) {
       setSelectedAddressId(null);
@@ -246,13 +225,10 @@ export default function CheckoutDialog({
     [onAddressChange],
   );
 
-  // i18n helpers for shipping/payment option names
   const getShippingName = (option: ShippingOption) => lang === 'en' && option.nameEn ? option.nameEn : option.name;
-  const getShippingDesc = (option: ShippingOption) => lang === 'en' && option.descriptionEn ? option.descriptionEn : option.description;
   const getPaymentName = (option: PaymentOption) => lang === 'en' ? option.name : (option.nameThai || option.name);
   const getPaymentDesc = (option: PaymentOption) => lang === 'en' ? option.description : (option.descriptionThai || option.description);
 
-  // Swipe-to-dismiss (mobile fullscreen)
   const [dialogDragOffset, setDialogDragOffset] = useState(0);
   const [isDialogDragging, setIsDialogDragging] = useState(false);
   const dialogSwipeStartY = useRef(0);
@@ -260,7 +236,6 @@ export default function CheckoutDialog({
 
   const handleDialogSwipeStart = useCallback((e: React.TouchEvent) => {
     if (!isMobile) return;
-    // Only start drag if content is scrolled to top
     if (dialogScrollRef.current && dialogScrollRef.current.scrollTop > 5) return;
     dialogSwipeStartY.current = e.touches[0].clientY;
     setIsDialogDragging(true);
@@ -286,16 +261,29 @@ export default function CheckoutDialog({
 
   useEffect(() => { if (!open) { setDialogDragOffset(0); setIsDialogDragging(false); } }, [open]);
 
-  // Reset promo when dialog closes
   useEffect(() => {
     if (!open) {
       setPromoCode('');
       setPromoResult(null);
       setPromoError('');
+      return;
     }
-  }, [open]);
+    if (initialPromo?.code) {
+      setPromoCode(initialPromo.code);
+      setPromoResult({
+        valid: true,
+        code: initialPromo.code,
+        discount: initialPromo.discount,
+        description: initialPromo.description || '',
+      });
+      setPromoError('');
+    } else {
+      setPromoCode('');
+      setPromoResult(null);
+      setPromoError('');
+    }
+  }, [open, initialPromo]);
 
-  // Fetch configs when dialog opens
   useEffect(() => {
     if (open) {
       fetchConfigs();
@@ -312,7 +300,6 @@ export default function CheckoutDialog({
 
       if (shippingRes.success && shippingRes.data) {
         setShippingConfig(shippingRes.data);
-        // Set default shipping option
         const enabledOptions = shippingRes.data.options?.filter((o: ShippingOption) => o.enabled) || [];
         if (enabledOptions.length > 0) {
           const defaultOption = enabledOptions.find((o: ShippingOption) => o.id === shippingRes.data.defaultOptionId) || enabledOptions[0];
@@ -322,7 +309,6 @@ export default function CheckoutDialog({
 
       if (paymentRes.success && paymentRes.data) {
         setPaymentConfig(paymentRes.data);
-        // Set default payment option
         const enabledOptions = paymentRes.data.options?.filter((o: PaymentOption) => o.enabled) || [];
         if (enabledOptions.length > 0) {
           const defaultOption = enabledOptions.find((o: PaymentOption) => o.id === paymentRes.data.defaultMethodId) || enabledOptions[0];
@@ -336,10 +322,11 @@ export default function CheckoutDialog({
     }
   };
 
-  // Calculate totals
   const subtotal = useMemo(() => {
     return cart.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
   }, [cart]);
+
+  const itemCount = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
 
   const selectedShippingOption = useMemo(() => {
     return shippingConfig?.options?.find(o => o.id === selectedShipping);
@@ -347,12 +334,10 @@ export default function CheckoutDialog({
 
   const shippingFee = useMemo(() => {
     if (!selectedShippingOption) return 0;
-    
-    // Check free shipping
+
     const freeMin = shippingConfig?.globalFreeShippingMinimum || selectedShippingOption.freeShippingMinimum;
     if (freeMin && subtotal >= freeMin) return 0;
 
-    // Calculate fee
     let fee = selectedShippingOption.baseFee || 0;
     if (selectedShippingOption.perItemFee) {
       const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -382,7 +367,6 @@ export default function CheckoutDialog({
     return Math.max(0, subtotal + shippingFee + paymentFee - promoDiscount);
   }, [subtotal, shippingFee, paymentFee, promoDiscount]);
 
-  // Promo code handlers
   const applyPromoCode = async () => {
     if (!promoCode.trim()) return;
     setPromoLoading(true);
@@ -415,35 +399,74 @@ export default function CheckoutDialog({
     setPromoError('');
   };
 
-  // Get enabled options
   const enabledShippingOptions = useMemo(() => {
     return shippingConfig?.options?.filter(o => o.enabled) || [];
   }, [shippingConfig]);
+
+  const pickupOptions = useMemo(
+    () => enabledShippingOptions.filter(o => o.provider === 'pickup'),
+    [enabledShippingOptions],
+  );
+
+  const deliveryOptions = useMemo(
+    () => enabledShippingOptions.filter(o => o.provider !== 'pickup'),
+    [enabledShippingOptions],
+  );
+
+  const hasPickup = pickupOptions.length > 0;
+  const hasDelivery = deliveryOptions.length > 0;
+  const shippingMode: 'pickup' | 'delivery' =
+    selectedShippingOption?.provider === 'pickup' || (!selectedShippingOption && hasPickup && !hasDelivery)
+      ? 'pickup'
+      : 'delivery';
 
   const enabledPaymentOptions = useMemo(() => {
     return paymentConfig?.options?.filter(o => o.enabled) || [];
   }, [paymentConfig]);
 
-  // Check if selected shipping requires address (not pickup)
   const requiresAddress = useMemo(() => {
     if (!selectedShippingOption) return false;
     return selectedShippingOption.provider !== 'pickup';
   }, [selectedShippingOption]);
 
-  // Check if address is missing when required
   const addressMissing = useMemo(() => {
     return requiresAddress && !orderData.address?.trim();
   }, [requiresAddress, orderData.address]);
 
+  const pickupLocationText = useMemo(() => {
+    if (shippingConfig?.pickupLocation?.trim()) return shippingConfig.pickupLocation.trim();
+    const pickupOpt = pickupOptions[0] || enabledShippingOptions.find(o => o.provider === 'pickup');
+    if (pickupOpt) {
+      const desc = (lang === 'en' && pickupOpt.descriptionEn) ? pickupOpt.descriptionEn : pickupOpt.description;
+      if (desc?.trim()) return desc.trim();
+    }
+    return lang === 'en'
+      ? 'Computer Club, Faculty of Science, PSU'
+      : 'อาคารตึกคอมฯ คณะวิทย์';
+  }, [shippingConfig, pickupOptions, enabledShippingOptions, lang]);
+
   const handleShippingChange = (value: string) => {
     setSelectedShipping(value);
-    
+
     const selectedOption = shippingConfig?.options?.find(o => o.id === value);
     const requiresAddr = selectedOption && selectedOption.provider !== 'pickup';
-    
+
     if (requiresAddr && !orderData.address?.trim()) {
       toastWarning(t.checkout.addressRequired || 'กรุณากรอกที่อยู่สำหรับจัดส่งสินค้า');
     }
+  };
+
+  const handleShippingModeChange = (mode: 'pickup' | 'delivery') => {
+    if (mode === 'pickup') {
+      const pickupId = pickupOptions[0]?.id || enabledShippingOptions.find(o => o.provider === 'pickup')?.id;
+      if (pickupId) handleShippingChange(pickupId);
+      return;
+    }
+    const preferred =
+      (selectedShippingOption && selectedShippingOption.provider !== 'pickup'
+        ? selectedShippingOption.id
+        : null) || deliveryOptions[0]?.id;
+    if (preferred) handleShippingChange(preferred);
   };
 
   const handleSubmit = () => {
@@ -456,9 +479,19 @@ export default function CheckoutDialog({
     });
   };
 
-  // Require shipping selection for submit
   const hasShippingSelection = Boolean(selectedShipping);
   const canSubmit = profileComplete && turnstileToken && cart.length > 0 && !processing && !addressMissing && hasShippingSelection && !loadingConfig;
+
+  const payCtaLabel = processing
+    ? t.checkout.processing
+    : t.checkout.payScanQr.replace('{amount}', total.toLocaleString());
+
+  const sectionSx = {
+    p: 2,
+    borderRadius: '16px',
+    bgcolor: 'var(--surface-2)',
+    border: '1px solid var(--glass-border)',
+  } as const;
 
   return (
     <Dialog
@@ -481,7 +514,6 @@ export default function CheckoutDialog({
         },
       }}
     >
-      {/* Swipe Handle for mobile */}
       {isMobile && (
         <Box
           onTouchStart={handleDialogSwipeStart}
@@ -492,20 +524,33 @@ export default function CheckoutDialog({
           <Box sx={{ width: isDialogDragging ? 48 : 36, height: 4, bgcolor: 'rgba(255,255,255,0.4)', borderRadius: 2, transition: 'all 0.2s ease' }} />
         </Box>
       )}
+
       {/* Header */}
-      <DialogTitle sx={{ 
-        background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)', 
+      <DialogTitle sx={{
+        background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
         color: 'white',
         display: 'flex',
         alignItems: 'center',
+        justifyContent: 'space-between',
         gap: 1.5,
-        py: 2,
+        py: 1.75,
+        pr: 1.25,
       }}>
-        <ShoppingCart size={22} />
-        <Box>
-          <Typography sx={{ fontWeight: 700, fontSize: '1.1rem' }}>{t.checkout.title}</Typography>
-          <Typography sx={{ fontSize: '0.75rem', opacity: 0.85 }}>{cart.length} {t.common.items}</Typography>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', lineHeight: 1.3 }}>
+            {t.checkout.title}
+            <Box component="span" sx={{ fontWeight: 500, opacity: 0.9, ml: 0.75, fontSize: '0.95rem' }}>
+              ({itemCount} {t.common.items})
+            </Box>
+          </Typography>
         </Box>
+        <IconButton
+          onClick={onClose}
+          aria-label={t.common.close}
+          sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.12)', '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' } }}
+        >
+          <X size={20} />
+        </IconButton>
       </DialogTitle>
 
       {processing && (
@@ -535,33 +580,20 @@ export default function CheckoutDialog({
         </Box>
       )}
 
-      <DialogContent 
+      <DialogContent
         ref={dialogScrollRef}
-        sx={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
-          gap: 2, 
-          pt: 3, 
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2,
+          pt: 3,
           bgcolor: 'var(--background)',
           pb: 2,
         }}
       >
-        {/* Order Summary */}
-        <Box sx={{ 
-          p: 2, 
-          borderRadius: '18px',
-          bgcolor: 'var(--surface-2)',
-          border: '1px solid var(--glass-border)',
-        }}>
-          <Box 
-            sx={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'space-between',
-              cursor: 'pointer',
-            }}
-            onClick={() => setShowCartDetails(!showCartDetails)}
-          >
+        {/* Always-visible product mini cards */}
+        <Box sx={sectionSx}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Package size={18} color="var(--text-muted)" />
               <Typography sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '0.95rem' }}>
@@ -571,514 +603,483 @@ export default function CheckoutDialog({
                 px: 1,
                 py: 0.2,
                 borderRadius: '10px',
-                bgcolor: 'rgba(0,113,227,0.2)',
+                bgcolor: 'rgba(0,113,227,0.15)',
                 fontSize: '0.7rem',
                 fontWeight: 600,
                 color: 'var(--secondary)',
               }}>
-                {cart.reduce((sum, item) => sum + item.quantity, 0)} {t.common.pieces}
+                {itemCount} {t.common.pieces}
               </Box>
             </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography sx={{ fontWeight: 700, color: '#34c759', fontSize: '1rem' }}>
-                ฿{subtotal.toLocaleString()}
-              </Typography>
-                {showCartDetails ? <ChevronUp size={18} color="var(--text-muted)" /> : <ChevronDown size={18} color="var(--text-muted)" />}
-            </Box>
+            <Typography sx={{ fontWeight: 700, color: 'var(--success)', fontSize: '1rem' }}>
+              ฿{subtotal.toLocaleString()}
+            </Typography>
           </Box>
 
-          <Collapse in={showCartDetails}>
-            <Box sx={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              gap: 1,
-              mt: 2,
-              maxHeight: 200,
-              overflow: 'auto',
-            }}>
-              {cart.map((item, idx) => {
-                const productInfo = products?.find(p => p.id === item.productId);
-                const productImage = productInfo?.coverImage || productInfo?.images?.[0];
-                const displayName = (lang === 'en' && productInfo?.nameEn) ? productInfo.nameEn : (productInfo?.name || item.productName);
-                
-                return (
-                  <Box key={`${item.id}-${idx}`} sx={{ 
-                    display: 'flex', 
-                    gap: 1.5,
-                    p: 1.5,
-                    borderRadius: '12px',
-                    bgcolor: 'var(--surface)',
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {cart.map((item, idx) => {
+              const productInfo = products?.find(p => p.id === item.productId);
+              const productImage = productInfo?.coverImage || productInfo?.images?.[0];
+              const displayName = (lang === 'en' && productInfo?.nameEn) ? productInfo.nameEn : (productInfo?.name || item.productName);
+
+              return (
+                <Box key={`${item.id}-${idx}`} sx={{
+                  display: 'flex',
+                  gap: 1.5,
+                  p: 1.25,
+                  borderRadius: '12px',
+                  bgcolor: 'var(--surface)',
+                  border: '1px solid var(--glass-border)',
+                }}>
+                  <Box sx={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: '10px',
+                    bgcolor: 'var(--surface-2)',
+                    flexShrink: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     border: '1px solid var(--glass-border)',
+                    overflow: 'hidden',
                   }}>
-                    <Box sx={{
-                      width: 56,
-                      height: 56,
-                      borderRadius: '10px',
-                      bgcolor: 'var(--surface-2)',
-                      flexShrink: 0,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      border: '1px solid var(--glass-border)',
-                      overflow: 'hidden',
-                      position: 'relative',
-                    }}>
-                      {productImage ? (
-                        <img
-                          src={productImage}
-                          alt={displayName}
-                          style={{
-                            width: '100%',
-                            height: '100%',
-                            objectFit: 'cover',
-                            display: 'block',
-                          }}
-                          loading="lazy"
-                        />
-                      ) : (
-                        <Package size={20} style={{ color: 'var(--text-muted)' }} />
-                      )}
-                    </Box>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography sx={{ 
-                        fontSize: '0.8rem', 
-                        fontWeight: 600, 
-                        color: 'var(--foreground)',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}>
-                        {displayName}
-                      </Typography>
-                      <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.5 }}>
-                        {item.size && item.size !== '-' && (
-                          <Box sx={{ px: 0.6, py: 0.1, borderRadius: '4px', bgcolor: 'rgba(0,113,227,0.15)', fontSize: '0.65rem', color: 'var(--secondary)' }}>
-                            {item.size}
-                          </Box>
-                        )}
-                        <Box sx={{ px: 0.6, py: 0.1, borderRadius: '4px', bgcolor: 'var(--glass-bg)', fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-                          x{item.quantity}
-                        </Box>
-                        {item.options?.isLongSleeve && (
-                          <Box sx={{ px: 0.6, py: 0.1, borderRadius: '4px', bgcolor: 'rgba(99,102,241,0.15)', fontSize: '0.65rem', color: '#818cf8' }}>
-                            {t.common.longSleeve}
-                          </Box>
-                        )}
-                        {item.options?.pattern && (
-                          <Box sx={{ px: 0.6, py: 0.1, borderRadius: '4px', bgcolor: 'rgba(56,189,248,0.15)', fontSize: '0.65rem', color: '#38bdf8' }}>
-                            {item.options.pattern}
-                          </Box>
-                        )}
-                      </Box>
-                      {(item.options?.customName || item.options?.customNumber) && (
-                        <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)', mt: 0.3 }}>
-                          {item.options?.customName ? `${t.common.name}: ${item.options.customName}` : ''}
-                          {item.options?.customName && item.options?.customNumber ? ' · ' : ''}
-                          {item.options?.customNumber ? `${t.payment.numberLabel}: ${item.options.customNumber}` : ''}
-                        </Typography>
-                      )}
-                    </Box>
-                    <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#34c759', flexShrink: 0 }}>
-                      ฿{(item.unitPrice * item.quantity).toLocaleString()}
-                    </Typography>
+                    {productImage ? (
+                      <img
+                        src={productImage}
+                        alt={displayName}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        loading="lazy"
+                      />
+                    ) : (
+                      <Package size={20} style={{ color: 'var(--text-muted)' }} />
+                    )}
                   </Box>
-                );
-              })}
-            </Box>
-          </Collapse>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography sx={{
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      color: 'var(--foreground)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}>
+                      {displayName}
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mt: 0.5 }}>
+                      {item.size && item.size !== '-' && (
+                        <Box sx={{ px: 0.6, py: 0.1, borderRadius: '4px', bgcolor: 'rgba(0,113,227,0.15)', fontSize: '0.65rem', color: 'var(--secondary)' }}>
+                          {item.size}
+                        </Box>
+                      )}
+                      <Box sx={{ px: 0.6, py: 0.1, borderRadius: '4px', bgcolor: 'var(--glass-bg)', fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                        x{item.quantity}
+                      </Box>
+                      {item.options?.isLongSleeve && (
+                        <Box sx={{ px: 0.6, py: 0.1, borderRadius: '4px', bgcolor: 'rgba(99,102,241,0.15)', fontSize: '0.65rem', color: '#818cf8' }}>
+                          {t.common.longSleeve}
+                        </Box>
+                      )}
+                      {item.options?.pattern && (
+                        <Box sx={{ px: 0.6, py: 0.1, borderRadius: '4px', bgcolor: 'rgba(56,189,248,0.15)', fontSize: '0.65rem', color: '#38bdf8' }}>
+                          {item.options.pattern}
+                        </Box>
+                      )}
+                    </Box>
+                    {(item.options?.customName || item.options?.customNumber) && (
+                      <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)', mt: 0.3 }}>
+                        {item.options?.customName ? `${t.common.name}: ${item.options.customName}` : ''}
+                        {item.options?.customName && item.options?.customNumber ? ' · ' : ''}
+                        {item.options?.customNumber ? `${t.payment.numberLabel}: ${item.options.customNumber}` : ''}
+                      </Typography>
+                    )}
+                  </Box>
+                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--success)', flexShrink: 0 }}>
+                    ฿{(item.unitPrice * item.quantity).toLocaleString()}
+                  </Typography>
+                </Box>
+              );
+            })}
+          </Box>
         </Box>
 
-        {/* Shipping Options */}
+        {/* Shipping / pickup + recipient */}
         {loadingConfig ? (
-          <Skeleton variant="rounded" height={120} sx={{ bgcolor: 'var(--skeleton-bg)' }} />
-        ) : enabledShippingOptions.length > 0 && shippingConfig?.showOptions && (
-          <Box sx={{ 
-            p: 2, 
-            borderRadius: '18px',
-            bgcolor: 'rgba(6,182,212,0.08)',
-            border: '1px solid rgba(6,182,212,0.2)',
-          }}>
-            <Box 
-              sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'space-between',
-                cursor: 'pointer',
-                mb: showShippingOptions ? 1.5 : 0,
-              }}
-              onClick={() => setShowShippingOptions(!showShippingOptions)}
-            >
+          <Skeleton variant="rounded" height={160} sx={{ bgcolor: 'var(--skeleton-bg)' }} />
+        ) : (
+          <Box sx={sectionSx}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Truck size={18} color="#64d2ff" />
                 <Typography sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '0.95rem' }}>
-                  {t.checkout.shippingMethod}
+                  {t.checkout.shippingSection}
                 </Typography>
               </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                {selectedShippingOption && (
-                  <Typography sx={{ fontSize: '0.8rem', color: '#64d2ff' }}>
-                    {getShippingName(selectedShippingOption)}
-                  </Typography>
-                )}
-                {showShippingOptions ? <ChevronUp size={18} color="var(--text-muted)" /> : <ChevronDown size={18} color="var(--text-muted)" />}
-              </Box>
+              <Button
+                size="small"
+                onClick={onEditProfile}
+                sx={{
+                  borderRadius: '8px',
+                  px: 1.5,
+                  bgcolor: 'rgba(0,113,227,0.12)',
+                  color: 'var(--secondary)',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  '&:hover': { bgcolor: 'rgba(0,113,227,0.22)' },
+                }}
+              >
+                {t.common.edit}
+              </Button>
             </Box>
 
-            <Collapse in={showShippingOptions}>
-              <RadioGroup
-                value={selectedShipping}
-                onChange={(e) => handleShippingChange(e.target.value)}
-              >
-                {enabledShippingOptions.map((option) => {
-                  const isSelected = selectedShipping === option.id;
-                  const isFreeShipping = option.freeShippingMinimum && subtotal >= option.freeShippingMinimum;
-                  
-                  return (
-                    <FormControlLabel
-                      key={option.id}
-                      value={option.id}
-                      control={<Radio sx={{ color: '#64d2ff', '&.Mui-checked': { color: '#64d2ff' } }} />}
-                      label={
-                        <Box sx={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          justifyContent: 'space-between',
-                          width: '100%',
-                          py: 0.5,
-                        }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                            <Box sx={{
-                              width: 36,
-                              height: 36,
-                              borderRadius: '10px',
-                              bgcolor: isSelected ? 'rgba(6,182,212,0.2)' : 'var(--surface-2)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: isSelected ? '#64d2ff' : 'var(--text-muted)',
-                            }}>
-                              {SHIPPING_ICONS[option.provider] || <Truck size={18} />}
-                            </Box>
-                            <Box>
-                              <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>
-                                {getShippingName(option)}
-                              </Typography>
-                              {option.estimatedDays && (
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.3 }}>
-                                  <Clock size={12} color="var(--text-muted)" />
-                                  <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                                    {option.estimatedDays.min === option.estimatedDays.max 
-                                      ? `${option.estimatedDays.min} ${t.checkout.estimatedDays}`
-                                      : `${option.estimatedDays.min}-${option.estimatedDays.max} ${t.checkout.estimatedDays}`
-                                    }
-                                  </Typography>
-                                </Box>
-                              )}
-                            </Box>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.45, mb: 1.5 }}>
+              <Typography sx={{ color: 'var(--foreground)', fontSize: '0.88rem' }}>
+                <Box component="span" sx={{ color: 'var(--text-muted)', mr: 1 }}>{`${t.common.name}:`}</Box>
+                {orderData.name || '—'}
+              </Typography>
+              <Typography sx={{ color: 'var(--foreground)', fontSize: '0.88rem' }}>
+                <Box component="span" sx={{ color: 'var(--text-muted)', mr: 1 }}>{`${t.common.phone}:`}</Box>
+                {orderData.phone || '—'}
+              </Typography>
+              <Typography sx={{ color: 'var(--foreground)', fontSize: '0.88rem' }}>
+                <Box component="span" sx={{ color: 'var(--text-muted)', mr: 1 }}>IG:</Box>
+                {orderData.instagram || '—'}
+              </Typography>
+            </Box>
+
+            {/* Pickup vs delivery toggle */}
+            {(hasPickup || hasDelivery) && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 1.25 }}>
+                {hasPickup && (
+                  <Box
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => handleShippingModeChange('pickup')}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleShippingModeChange('pickup');
+                      }
+                    }}
+                    sx={{
+                      p: 1.25,
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      bgcolor: shippingMode === 'pickup' ? 'rgba(52,199,89,0.1)' : 'var(--surface)',
+                      border: shippingMode === 'pickup' ? '2px solid rgba(52,199,89,0.45)' : '1px solid var(--glass-border)',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 1.25,
+                      transition: 'border-color 0.15s ease, background 0.15s ease',
+                    }}
+                  >
+                    <Radio
+                      checked={shippingMode === 'pickup'}
+                      size="small"
+                      sx={{ p: 0.25, color: 'var(--text-muted)', '&.Mui-checked': { color: 'var(--success)' } }}
+                      tabIndex={-1}
+                    />
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                          <Store size={16} color={shippingMode === 'pickup' ? '#34c759' : 'var(--text-muted)'} />
+                          <Typography sx={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                            {t.checkout.pickupSelf}
+                          </Typography>
+                        </Box>
+                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--success)' }}>
+                          {t.checkout.pickupFree}
+                        </Typography>
+                      </Box>
+                      {shippingMode === 'pickup' && (
+                        <Box sx={{ mt: 0.85, display: 'flex', alignItems: 'flex-start', gap: 0.75 }}>
+                          <MapPin size={14} color="var(--text-muted)" style={{ marginTop: 2, flexShrink: 0 }} />
+                          <Box>
+                            <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                              {t.checkout.pickupLocationLabel}
+                            </Typography>
+                            <Typography sx={{ fontSize: '0.8rem', color: 'var(--foreground)', lineHeight: 1.4 }}>
+                              {pickupLocationText}
+                            </Typography>
                           </Box>
-                          <Box sx={{ textAlign: 'right' }}>
-                            {isFreeShipping ? (
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                <Typography sx={{ fontSize: '0.8rem', color: '#34c759', fontWeight: 700 }}>
-                                  {t.common.free}
-                                </Typography>
-                                <Box sx={{
-                                  px: 0.8,
-                                  py: 0.2,
-                                  borderRadius: '6px',
-                                  bgcolor: 'rgba(16,185,129,0.15)',
-                                  fontSize: '0.6rem',
-                                  color: '#30d158',
-                                }}>
-                                  {t.checkout.freeShipping}
-                                </Box>
+                        </Box>
+                      )}
+                    </Box>
+                  </Box>
+                )}
+
+                {hasDelivery && (
+                  <Box
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => handleShippingModeChange('delivery')}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleShippingModeChange('delivery');
+                      }
+                    }}
+                    sx={{
+                      p: 1.25,
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      bgcolor: shippingMode === 'delivery' ? 'rgba(0,113,227,0.08)' : 'var(--surface)',
+                      border: shippingMode === 'delivery' ? '2px solid rgba(0,113,227,0.4)' : '1px solid var(--glass-border)',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 1.25,
+                      transition: 'border-color 0.15s ease, background 0.15s ease',
+                    }}
+                  >
+                    <Radio
+                      checked={shippingMode === 'delivery'}
+                      size="small"
+                      sx={{ p: 0.25, color: 'var(--text-muted)', '&.Mui-checked': { color: '#0071e3' } }}
+                      tabIndex={-1}
+                    />
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                          <Truck size={16} color={shippingMode === 'delivery' ? '#2997ff' : 'var(--text-muted)'} />
+                          <Typography sx={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                            {t.checkout.deliveryParcel}
+                          </Typography>
+                        </Box>
+                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                          {(() => {
+                            const opt = deliveryOptions.find(o => o.id === selectedShipping) || deliveryOptions[0];
+                            const fee = opt?.baseFee || 0;
+                            const freeMin = shippingConfig?.globalFreeShippingMinimum || opt?.freeShippingMinimum;
+                            if (freeMin && subtotal >= freeMin) return t.common.free;
+                            return fee > 0 ? `+฿${fee.toLocaleString()}` : t.common.free;
+                          })()}
+                        </Typography>
+                      </Box>
+
+                      {shippingMode === 'delivery' && deliveryOptions.length > 1 && (
+                        <RadioGroup
+                          value={selectedShipping}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            handleShippingChange(e.target.value);
+                          }}
+                          sx={{ mt: 1 }}
+                        >
+                          {deliveryOptions.map((option) => {
+                            const isSelected = selectedShipping === option.id;
+                            const isFreeShipping = option.freeShippingMinimum && subtotal >= option.freeShippingMinimum;
+                            return (
+                              <FormControlLabel
+                                key={option.id}
+                                value={option.id}
+                                onClick={(e) => e.stopPropagation()}
+                                control={<Radio size="small" sx={{ color: '#64d2ff', '&.Mui-checked': { color: '#64d2ff' } }} />}
+                                label={
+                                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 1 }}>
+                                    <Box>
+                                      <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                                        {getShippingName(option)}
+                                      </Typography>
+                                      {option.estimatedDays && (
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.4, mt: 0.2 }}>
+                                          <Clock size={11} color="var(--text-muted)" />
+                                          <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                                            {option.estimatedDays.min === option.estimatedDays.max
+                                              ? `${option.estimatedDays.min} ${t.checkout.estimatedDays}`
+                                              : `${option.estimatedDays.min}-${option.estimatedDays.max} ${t.checkout.estimatedDays}`}
+                                          </Typography>
+                                        </Box>
+                                      )}
+                                    </Box>
+                                    <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: isFreeShipping ? 'var(--success)' : 'var(--foreground)' }}>
+                                      {isFreeShipping ? t.common.free : `฿${(option.baseFee || 0).toLocaleString()}`}
+                                    </Typography>
+                                  </Box>
+                                }
+                                sx={{
+                                  mx: 0,
+                                  mb: 0.5,
+                                  p: 0.75,
+                                  borderRadius: '10px',
+                                  bgcolor: isSelected ? 'rgba(0,113,227,0.08)' : 'transparent',
+                                  border: `1px solid ${isSelected ? 'rgba(0,113,227,0.25)' : 'transparent'}`,
+                                  '& .MuiFormControlLabel-label': { flex: 1 },
+                                }}
+                              />
+                            );
+                          })}
+                        </RadioGroup>
+                      )}
+
+                      {shippingMode === 'delivery' && (
+                        <Box sx={{ mt: 1 }} onClick={(e) => e.stopPropagation()}>
+                          {showAddressPicker ? (
+                            <Box>
+                              <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.8rem', mb: 0.75 }}>
+                                {t.checkout.selectAddress}
+                                <Box component="span" sx={{ color: '#ff453a', ml: 0.3 }}>*</Box>
+                              </Typography>
+                              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                                {checkoutAddresses.map((addr) => {
+                                  const isSelected = selectedAddressId === addr.id;
+                                  return (
+                                    <Box
+                                      key={addr.id}
+                                      role="button"
+                                      tabIndex={0}
+                                      onClick={() => handleSelectAddress(addr)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                          e.preventDefault();
+                                          handleSelectAddress(addr);
+                                        }
+                                      }}
+                                      sx={{
+                                        p: 1.1,
+                                        borderRadius: '10px',
+                                        cursor: 'pointer',
+                                        bgcolor: isSelected ? 'rgba(0,113,227,0.08)' : 'var(--background)',
+                                        border: isSelected ? '2px solid rgba(0,113,227,0.45)' : '1px solid var(--glass-border)',
+                                      }}
+                                    >
+                                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mb: 0.3 }}>
+                                        <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: isSelected ? 'var(--primary)' : 'var(--text-muted)' }}>
+                                          {addr.label}
+                                        </Typography>
+                                        {isSelected && <Check size={14} color="#0071e3" />}
+                                      </Box>
+                                      <Typography sx={{ fontSize: '0.8rem', color: 'var(--foreground)', lineHeight: 1.4 }}>
+                                        {addr.address}
+                                      </Typography>
+                                    </Box>
+                                  );
+                                })}
                               </Box>
-                            ) : (
-                              <Typography sx={{ fontSize: '0.85rem', color: 'var(--foreground)', fontWeight: 600 }}>
-                                ฿{(option.baseFee || 0).toLocaleString()}
+                            </Box>
+                          ) : (
+                            <Typography sx={{ color: 'var(--foreground)', fontSize: '0.85rem', display: 'flex', alignItems: 'flex-start' }}>
+                              <Box component="span" sx={{ color: 'var(--text-muted)', mr: 1, flexShrink: 0 }}>
+                                {`${t.common.address}:`}<Box component="span" sx={{ color: '#ff453a', ml: 0.3 }}>*</Box>
+                              </Box>
+                              <Box component="span" sx={{ color: orderData.address ? 'var(--foreground)' : 'var(--text-muted)' }}>
+                                {orderData.address || t.checkout.addressEmpty}
+                              </Box>
+                            </Typography>
+                          )}
+                        </Box>
+                      )}
+                    </Box>
+                  </Box>
+                )}
+              </Box>
+            )}
+
+            {!profileComplete && (
+              <Box sx={{
+                mt: 0.5,
+                p: 1,
+                borderRadius: '8px',
+                bgcolor: 'rgba(249,115,22,0.1)',
+                border: '1px solid rgba(249,115,22,0.3)',
+              }}>
+                <Typography sx={{ color: '#fb923c', fontSize: '0.8rem', fontWeight: 600 }}>
+                  {t.checkout.profileWarning}
+                </Typography>
+              </Box>
+            )}
+            {addressMissing && profileComplete && (
+              <Box sx={{
+                mt: 0.5,
+                p: 1.2,
+                borderRadius: '10px',
+                bgcolor: 'rgba(239,68,68,0.1)',
+                border: '1px solid rgba(239,68,68,0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+              }}>
+                <MapPin size={16} color="#f87171" />
+                <Typography sx={{ color: '#f87171', fontSize: '0.8rem', fontWeight: 600 }}>
+                  {t.checkout.addressRequired}
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        )}
+
+        {/* Payment options — only when more than one method */}
+        {!loadingConfig && enabledPaymentOptions.length > 1 && (
+          <Box sx={sectionSx}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.25 }}>
+              <CreditCard size={18} color="#34c759" />
+              <Typography sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '0.95rem' }}>
+                {t.checkout.paymentMethod}
+              </Typography>
+            </Box>
+            <RadioGroup value={selectedPayment} onChange={(e) => setSelectedPayment(e.target.value)}>
+              {enabledPaymentOptions.map((option) => {
+                const isSelected = selectedPayment === option.id;
+                return (
+                  <FormControlLabel
+                    key={option.id}
+                    value={option.id}
+                    control={<Radio sx={{ color: '#34c759', '&.Mui-checked': { color: '#34c759' } }} />}
+                    label={
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', py: 0.35 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                          <Box sx={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: '8px',
+                            bgcolor: isSelected ? 'rgba(16,185,129,0.2)' : 'var(--surface)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: isSelected ? '#34c759' : 'var(--text-muted)',
+                          }}>
+                            {PAYMENT_ICONS[option.method] || <CreditCard size={16} />}
+                          </Box>
+                          <Box>
+                            <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>
+                              {getPaymentName(option)}
+                            </Typography>
+                            {option.description && (
+                              <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                {getPaymentDesc(option)}
                               </Typography>
                             )}
                           </Box>
                         </Box>
-                      }
-                      sx={{
-                        mx: 0,
-                        mb: 1,
-                        p: 1,
-                        borderRadius: '12px',
-                        bgcolor: isSelected ? 'rgba(6,182,212,0.1)' : 'transparent',
-                        border: `1px solid ${isSelected ? 'rgba(6,182,212,0.3)' : 'transparent'}`,
-                        '&:hover': { bgcolor: 'rgba(6,182,212,0.05)' },
-                        '& .MuiFormControlLabel-label': { flex: 1 },
-                      }}
-                    />
-                  );
-                })}
-              </RadioGroup>
-            </Collapse>
+                      </Box>
+                    }
+                    sx={{
+                      mx: 0,
+                      mb: 0.75,
+                      p: 0.75,
+                      borderRadius: '12px',
+                      bgcolor: isSelected ? 'rgba(16,185,129,0.1)' : 'transparent',
+                      border: `1px solid ${isSelected ? 'rgba(16,185,129,0.3)' : 'transparent'}`,
+                      '& .MuiFormControlLabel-label': { flex: 1 },
+                    }}
+                  />
+                );
+              })}
+            </RadioGroup>
           </Box>
         )}
 
-        {/* Payment Options */}
-        {loadingConfig ? (
-          <Skeleton variant="rounded" height={120} sx={{ bgcolor: 'var(--skeleton-bg)' }} />
-        ) : enabledPaymentOptions.length > 0 && (
-          <Box sx={{ 
-            p: 2, 
-            borderRadius: '18px',
-            bgcolor: 'rgba(16,185,129,0.08)',
-            border: '1px solid rgba(16,185,129,0.2)',
-          }}>
-            <Box 
-              sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'space-between',
-                cursor: 'pointer',
-                mb: showPaymentOptions ? 1.5 : 0,
-              }}
-              onClick={() => setShowPaymentOptions(!showPaymentOptions)}
-            >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <CreditCard size={18} color="#34c759" />
-                <Typography sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '0.95rem' }}>
-                  {t.checkout.paymentMethod}
-                </Typography>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                {selectedPaymentOption && (
-                  <Typography sx={{ fontSize: '0.8rem', color: '#34c759' }}>
-                    {getPaymentName(selectedPaymentOption)}
-                  </Typography>
-                )}
-                {showPaymentOptions ? <ChevronUp size={18} color="var(--text-muted)" /> : <ChevronDown size={18} color="var(--text-muted)" />}
-              </Box>
-            </Box>
-
-            <Collapse in={showPaymentOptions}>
-              <RadioGroup
-                value={selectedPayment}
-                onChange={(e) => setSelectedPayment(e.target.value)}
-              >
-                {enabledPaymentOptions.map((option) => {
-                  const isSelected = selectedPayment === option.id;
-                  
-                  return (
-                    <FormControlLabel
-                      key={option.id}
-                      value={option.id}
-                      control={<Radio sx={{ color: '#34c759', '&.Mui-checked': { color: '#34c759' } }} />}
-                      label={
-                        <Box sx={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          justifyContent: 'space-between',
-                          width: '100%',
-                          py: 0.5,
-                        }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                            <Box sx={{
-                              width: 36,
-                              height: 36,
-                              borderRadius: '10px',
-                              bgcolor: isSelected ? 'rgba(16,185,129,0.2)' : 'var(--surface-2)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: isSelected ? '#34c759' : 'var(--text-muted)',
-                            }}>
-                              {PAYMENT_ICONS[option.method] || <CreditCard size={18} />}
-                            </Box>
-                            <Box>
-                              <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>
-                                {getPaymentName(option)}
-                              </Typography>
-                              {option.description && (
-                                <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                                  {getPaymentDesc(option)}
-                                </Typography>
-                              )}
-                            </Box>
-                          </Box>
-                          {option.feeAmount && option.feeAmount > 0 && (
-                            <Typography sx={{ fontSize: '0.75rem', color: '#ff9f0a' }}>
-                              +{option.feeType === 'percentage' ? `${option.feeAmount}%` : `฿${option.feeAmount}`}
-                            </Typography>
-                          )}
-                        </Box>
-                      }
-                      sx={{
-                        mx: 0,
-                        mb: 1,
-                        p: 1,
-                        borderRadius: '12px',
-                        bgcolor: isSelected ? 'rgba(16,185,129,0.1)' : 'transparent',
-                        border: `1px solid ${isSelected ? 'rgba(16,185,129,0.3)' : 'transparent'}`,
-                        '&:hover': { bgcolor: 'rgba(16,185,129,0.05)' },
-                        '& .MuiFormControlLabel-label': { flex: 1 },
-                      }}
-                    />
-                  );
-                })}
-              </RadioGroup>
-            </Collapse>
-          </Box>
-        )}
-
-        {/* Recipient Info */}
-        <Box sx={{ 
-          p: 2, 
-          borderRadius: '18px',
-          bgcolor: 'rgba(0,113,227,0.08)', 
-          border: '1px solid rgba(0,113,227,0.2)',
+        {/* Promo / coupon */}
+        <Box sx={{
+          ...sectionSx,
+          border: promoResult?.valid ? '1px solid rgba(52,199,89,0.4)' : sectionSx.border,
         }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <User size={18} color="#2997ff" />
-              <Typography sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '0.95rem' }}>{t.checkout.recipientInfo}</Typography>
-            </Box>
-            <Button 
-              size="small" 
-              onClick={onEditProfile}
-              sx={{ 
-                borderRadius: '8px',
-                px: 1.5,
-                bgcolor: 'rgba(0,113,227,0.15)',
-                color: 'var(--secondary)', 
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                '&:hover': { bgcolor: 'rgba(0,113,227,0.25)' },
-              }}
-            >
-              {t.common.edit}
-            </Button>
-          </Box>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-            <Typography sx={{ color: 'var(--foreground)', fontSize: '0.9rem' }}>
-              <Box component="span" sx={{ color: 'var(--text-muted)', mr: 1 }}>{`${t.common.name}:`}</Box>{orderData.name || '—'}
-            </Typography>
-            <Typography sx={{ color: 'var(--foreground)', fontSize: '0.9rem' }}>
-              <Box component="span" sx={{ color: 'var(--text-muted)', mr: 1 }}>{`${t.common.phone}:`}</Box>{orderData.phone || '—'}
-            </Typography>
-            <Typography sx={{ color: 'var(--foreground)', fontSize: '0.9rem' }}>
-              <Box component="span" sx={{ color: 'var(--text-muted)', mr: 1 }}>IG:</Box>{orderData.instagram || '—'}
-            </Typography>
-            {/* Address — only for delivery (hidden for self-pickup) */}
-            {requiresAddress && (
-              showAddressPicker ? (
-                <Box sx={{ mt: 0.5 }}>
-                  <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem', mb: 0.75 }}>
-                    {t.checkout.selectAddress}
-                    <Box component="span" sx={{ color: '#ff453a', ml: 0.3 }}>*</Box>
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                    {checkoutAddresses.map((addr) => {
-                      const isSelected = selectedAddressId === addr.id;
-                      return (
-                        <Box
-                          key={addr.id}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => handleSelectAddress(addr)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              handleSelectAddress(addr);
-                            }
-                          }}
-                          sx={{
-                            p: 1.1,
-                            borderRadius: '10px',
-                            cursor: 'pointer',
-                            bgcolor: isSelected ? 'rgba(0,113,227,0.08)' : 'var(--surface)',
-                            border: isSelected ? '2px solid rgba(0,113,227,0.45)' : '1px solid var(--glass-border)',
-                            transition: 'all 0.2s ease',
-                            '&:hover': { borderColor: 'rgba(0,113,227,0.35)' },
-                          }}
-                        >
-                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mb: 0.3 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0 }}>
-                              <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: isSelected ? 'var(--primary)' : 'var(--text-muted)' }}>
-                                {addr.label}
-                              </Typography>
-                              {addr.isDefault && (
-                                <Typography sx={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--success)', bgcolor: 'rgba(16,185,129,0.1)', px: 0.5, borderRadius: '4px' }}>
-                                  {t.common.default}
-                                </Typography>
-                              )}
-                            </Box>
-                            {isSelected && <Check size={14} color="#0071e3" />}
-                          </Box>
-                          <Typography sx={{ fontSize: '0.8rem', color: 'var(--foreground)', lineHeight: 1.4 }}>
-                            {addr.address}
-                          </Typography>
-                        </Box>
-                      );
-                    })}
-                  </Box>
-                </Box>
-              ) : (
-                <Typography sx={{ color: 'var(--foreground)', fontSize: '0.9rem', display: 'flex', alignItems: 'flex-start' }}>
-                  <Box component="span" sx={{ color: 'var(--text-muted)', mr: 1, flexShrink: 0 }}>
-                    {`${t.common.address}:`}<Box component="span" sx={{ color: '#ff453a', ml: 0.3 }}>*</Box>
-                  </Box>
-                  <Box component="span" sx={{ color: orderData.address ? 'var(--foreground)' : 'var(--text-muted)' }}>
-                    {orderData.address || t.checkout.addressEmpty}
-                  </Box>
-                </Typography>
-              )
-            )}
-          </Box>
-          {/* Profile incomplete warning */}
-          {!profileComplete && (
-            <Box sx={{ 
-              mt: 1.5, 
-              p: 1, 
-              borderRadius: '8px',
-              bgcolor: 'rgba(249,115,22,0.1)',
-              border: '1px solid rgba(249,115,22,0.3)',
-            }}>
-              <Typography sx={{ color: '#fb923c', fontSize: '0.8rem', fontWeight: 600 }}>
-                {t.checkout.profileWarning}
-              </Typography>
-            </Box>
-          )}
-          {/* Address required warning for delivery */}
-          {addressMissing && profileComplete && (
-            <Box sx={{ 
-              mt: 1.5, 
-              p: 1.2, 
-              borderRadius: '10px',
-              bgcolor: 'rgba(239,68,68,0.1)',
-              border: '1px solid rgba(239,68,68,0.3)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 1,
-            }}>
-              <MapPin size={16} color="#f87171" />
-              <Typography sx={{ color: '#f87171', fontSize: '0.8rem', fontWeight: 600 }}>
-                {t.checkout.addressRequired}
-              </Typography>
-            </Box>
-          )}
-        </Box>
-
-        {/* Promo Code */}
-        <Box sx={{ 
-          p: 2, 
-          borderRadius: '18px',
-          bgcolor: 'var(--surface-2)',
-          border: promoResult?.valid ? '1px solid rgba(52,199,89,0.4)' : '1px solid var(--glass-border)',
-          transition: 'border-color 0.3s ease',
-        }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.25 }}>
             <Ticket size={16} style={{ color: promoResult?.valid ? '#34c759' : 'var(--text-muted)' }} />
             <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>
               {t.checkout.promoCode}
             </Typography>
           </Box>
           {promoResult?.valid ? (
-            <Box sx={{ 
+            <Box sx={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               p: 1.5, borderRadius: '12px',
               bgcolor: 'rgba(52,199,89,0.1)', border: '1px solid rgba(52,199,89,0.3)',
@@ -1094,9 +1095,9 @@ export default function CheckoutDialog({
                   </Typography>
                 </Box>
               </Box>
-              <Button size="small" onClick={clearPromo} sx={{ 
-                minWidth: 'auto', p: 0.5, color: 'var(--text-muted)', 
-                '&:hover': { color: '#ef4444' } 
+              <Button size="small" onClick={clearPromo} sx={{
+                minWidth: 'auto', p: 0.5, color: 'var(--text-muted)',
+                '&:hover': { color: '#ef4444' },
               }}>
                 <X size={16} />
               </Button>
@@ -1153,34 +1154,60 @@ export default function CheckoutDialog({
           )}
         </Box>
 
-        {/* Price Summary */}
-        <Box sx={{ 
-          p: 2, 
-          borderRadius: '18px',
-          bgcolor: 'var(--surface-2)',
-          border: '1px solid var(--glass-border)',
+        {/* Next step: PromptPay QR */}
+        <Box sx={{
+          p: 1.75,
+          borderRadius: '14px',
+          bgcolor: 'rgba(0,113,227,0.08)',
+          border: '1px solid rgba(0,113,227,0.22)',
+          display: 'flex',
+          gap: 1.25,
+          alignItems: 'flex-start',
         }}>
+          <Box sx={{
+            width: 36,
+            height: 36,
+            borderRadius: '10px',
+            bgcolor: 'rgba(0,113,227,0.15)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            color: '#2997ff',
+          }}>
+            <QrCode size={18} />
+          </Box>
+          <Box>
+            <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)', lineHeight: 1.35 }}>
+              {t.checkout.nextStepQr}
+            </Typography>
+            <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', mt: 0.35, lineHeight: 1.4 }}>
+              {t.checkout.nextStepQrHint}
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* Totals */}
+        <Box sx={sectionSx}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
             <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{t.checkout.productPrice}</Typography>
             <Typography sx={{ color: 'var(--foreground)', fontSize: '0.85rem' }}>฿{subtotal.toLocaleString()}</Typography>
           </Box>
-          {shippingFee > 0 && (
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-              <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{t.checkout.shippingFee}</Typography>
-              <Typography sx={{ color: 'var(--foreground)', fontSize: '0.85rem' }}>฿{shippingFee.toLocaleString()}</Typography>
-            </Box>
-          )}
-          {shippingFee === 0 && selectedShippingOption && selectedShippingOption.baseFee > 0 && (
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-              <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{t.checkout.shippingFee}</Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+            <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{t.checkout.shippingFee}</Typography>
+            {shippingFee === 0 ? (
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.8rem', textDecoration: 'line-through' }}>
-                  ฿{selectedShippingOption.baseFee}
-                </Typography>
-                <Typography sx={{ color: '#34c759', fontSize: '0.85rem', fontWeight: 600 }}>{t.common.free}</Typography>
+                {selectedShippingOption && selectedShippingOption.baseFee > 0 && (
+                  <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.8rem', textDecoration: 'line-through' }}>
+                    ฿{selectedShippingOption.baseFee}
+                  </Typography>
+                )}
+                <Typography sx={{ color: 'var(--success)', fontSize: '0.85rem', fontWeight: 600 }}>{t.common.free}</Typography>
               </Box>
-            </Box>
-          )}
+            ) : (
+              <Typography sx={{ color: 'var(--foreground)', fontSize: '0.85rem' }}>฿{shippingFee.toLocaleString()}</Typography>
+            )}
+          </Box>
           {paymentFee > 0 && (
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
               <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{t.checkout.processingFee}</Typography>
@@ -1189,10 +1216,10 @@ export default function CheckoutDialog({
           )}
           {promoDiscount > 0 && (
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-              <Typography sx={{ color: '#34c759', fontSize: '0.85rem', fontWeight: 600 }}>
+              <Typography sx={{ color: 'var(--success)', fontSize: '0.85rem', fontWeight: 600 }}>
                 {t.checkout.discount} ({promoResult?.code})
               </Typography>
-              <Typography sx={{ color: '#34c759', fontSize: '0.85rem', fontWeight: 700 }}>
+              <Typography sx={{ color: 'var(--success)', fontSize: '0.85rem', fontWeight: 700 }}>
                 -฿{promoDiscount.toLocaleString()}
               </Typography>
             </Box>
@@ -1200,14 +1227,14 @@ export default function CheckoutDialog({
           <Divider sx={{ my: 1.5, borderColor: 'var(--glass-border)' }} />
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Typography sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '1rem' }}>{t.checkout.grandTotal}</Typography>
-            <Typography sx={{ fontWeight: 900, color: '#34c759', fontSize: '1.4rem' }}>
+            <Typography sx={{ fontWeight: 900, color: 'var(--success)', fontSize: '1.35rem' }}>
               ฿{total.toLocaleString()}
             </Typography>
           </Box>
         </Box>
 
-        {/* Turnstile */}
-        <Box sx={{ display: 'flex', justifyContent: 'center', pt: 1 }}>
+        {/* Turnstile — bottom-aligned, not a centered hero badge */}
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', pt: 0.5 }}>
           <TurnstileWidget
             key={turnstileKey}
             onSuccess={(token) => setTurnstileToken(token)}
@@ -1220,22 +1247,24 @@ export default function CheckoutDialog({
         </Box>
       </DialogContent>
 
-      {/* Actions */}
-      <DialogActions sx={{ 
-        p: 2, 
-        gap: 1, 
+      {/* Footer: Cancel | Pay CTA */}
+      <DialogActions sx={{
+        p: 2,
+        gap: 1.25,
         borderTop: '1px solid var(--glass-border)',
         bgcolor: 'var(--background)',
+        justifyContent: 'space-between',
       }}>
         <Button
           onClick={onClose}
-          sx={{ 
-            flex: 1,
-            py: 1.3,
-            color: 'var(--text-muted)', 
+          sx={{
+            py: 1.35,
+            px: 2,
+            color: 'var(--text-muted)',
             borderRadius: '14px',
             fontSize: '0.9rem',
             fontWeight: 600,
+            flexShrink: 0,
             '&:hover': { bgcolor: 'var(--glass-bg)' },
           }}
         >
@@ -1244,29 +1273,33 @@ export default function CheckoutDialog({
         <Button
           onClick={handleSubmit}
           disabled={!canSubmit}
-          startIcon={processing ? <CircularProgress size={18} color="inherit" /> : <Check size={18} />}
-          sx={{ 
-            flex: 2,
-            py: 1.3,
+          startIcon={processing ? <CircularProgress size={18} color="inherit" /> : <QrCode size={18} />}
+          sx={{
+            flex: 1,
+            maxWidth: '72%',
+            py: 1.45,
             borderRadius: '14px',
-            fontSize: '0.9rem',
-            fontWeight: 700,
-            background: canSubmit 
-              ? 'linear-gradient(135deg, #34c759 0%, #34c759 100%)'
-              : 'rgba(100,116,139,0.3)',
-            color: canSubmit ? 'white' : 'var(--text-muted)',
-            boxShadow: canSubmit ? '0 4px 14px rgba(16,185,129,0.4)' : 'none',
+            fontSize: { xs: '0.82rem', sm: '0.92rem' },
+            fontWeight: 800,
+            letterSpacing: 0.1,
+            textTransform: 'none',
+            background: canSubmit
+              ? 'linear-gradient(135deg, #30d158 0%, #248a3d 100%)'
+              : 'linear-gradient(135deg, rgba(48,209,88,0.28) 0%, rgba(36,138,61,0.22) 100%)',
+            color: canSubmit ? '#fff' : 'rgba(255,255,255,0.55)',
+            boxShadow: canSubmit ? '0 6px 18px rgba(48,209,88,0.45)' : 'none',
+            border: canSubmit ? 'none' : '1px solid rgba(48,209,88,0.25)',
             '&:hover': {
-              background: canSubmit 
-                ? 'linear-gradient(135deg, #34c759 0%, #047857 100%)'
-                : 'rgba(100,116,139,0.3)',
+              background: canSubmit
+                ? 'linear-gradient(135deg, #34c759 0%, #1f7a35 100%)'
+                : 'linear-gradient(135deg, rgba(48,209,88,0.28) 0%, rgba(36,138,61,0.22) 100%)',
             },
-            '&:disabled': {
-              color: 'var(--text-muted)',
+            '&.Mui-disabled': {
+              color: 'rgba(255,255,255,0.55)',
             },
           }}
         >
-          {processing ? t.checkout.processing : `${t.checkout.confirmOrder} ฿${total.toLocaleString()}`}
+          {payCtaLabel}
         </Button>
       </DialogActions>
     </Dialog>

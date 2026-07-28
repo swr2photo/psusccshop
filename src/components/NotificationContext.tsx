@@ -51,6 +51,7 @@ interface NotificationContextValue {
   consent: CookieConsent | null;
   showConsentBanner: boolean;
   setShowConsentBanner: (show: boolean) => void;
+  reopenConsentSettings: () => void;
   acceptAll: () => void;
   acceptEssential: () => void;
   updateConsent: (consent: Partial<Omit<CookieConsent, 'timestamp' | 'version'>>) => void;
@@ -182,6 +183,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     [consent],
   );
 
+  const reopenConsentSettings = useCallback(() => {
+    setShowConsentBanner(true);
+  }, []);
+
   const value: NotificationContextValue = {
     toasts: mapManagerToasts(manager.toasts),
     addToast,
@@ -194,6 +199,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     consent,
     showConsentBanner,
     setShowConsentBanner,
+    reopenConsentSettings,
     acceptAll,
     acceptEssential,
     updateConsent,

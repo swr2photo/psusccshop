@@ -10,6 +10,7 @@ import { rateLimitOrNull, API_CACHE } from '@/lib/api-helpers';
 import { getCached, invalidateCachePrefix, CACHE_TTL } from '@/lib/server-cache';
 
 import { getOrdersByEmail } from '@/lib/supabase';
+import { toIsoString } from '@/lib/safe-date';
 
 const PAID_STATUSES = new Set(['PAID', 'COMPLETED', 'SHIPPED', 'READY']);
 
@@ -76,7 +77,7 @@ async function GETHandler(request: NextRequest) {
         userImage: r.userImage,
         rating: r.rating,
         comment: r.comment || '',
-        date: r.createdAt?.toISOString() || new Date().toISOString(),
+        date: toIsoString(r.createdAt, new Date().toISOString()),
         verified: r.verified,
         helpful: r.helpfulCount || 0,
       }));

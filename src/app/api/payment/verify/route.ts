@@ -262,7 +262,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const { ref, base64, mime, name } = await req.json();
+    const { ref, base64, mime, name, receiptRequest } = await req.json();
     if (!ref || !base64) {
       return NextResponse.json({ status: 'error', message: 'กรุณาอัพโหลดสลิปและระบุหมายเลขคำสั่งซื้อ' }, { status: 400 });
     }
@@ -331,6 +331,23 @@ export async function POST(req: NextRequest) {
     // ใช้ชื่อเต็มถ้ามี ไม่งั้นใช้ displayName
     const senderName = senderFullName || senderDisplayName;
     
+    // Optional full tax invoice / formal receipt request (stored on slip_data JSON)
+    const sanitizeReceiptField = (value: unknown, max = 200) =>
+      String(value ?? '').trim().slice(0, max);
+    const wantsFullReceipt = Boolean(
+      receiptRequest &&
+      (receiptRequest.wanted === true || receiptRequest.wanted === 'true' || receiptRequest.wanted === 1),
+    );
+    const normalizedReceiptRequest = wantsFullReceipt
+      ? {
+          wanted: true,
+          taxOrStudentId: sanitizeReceiptField(receiptRequest.taxOrStudentId ?? receiptRequest.taxId, 64),
+          orgName: sanitizeReceiptField(receiptRequest.orgName, 160),
+          address: sanitizeReceiptField(receiptRequest.address, 400),
+          requestedAt: new Date().toISOString(),
+        }
+      : null;
+
     const slipInfo: Record<string, any> = {
       uploadedAt: new Date().toISOString(),
       mime: mime || 'image/png',
@@ -358,12 +375,14 @@ export async function POST(req: NextRequest) {
         receiverAccount: slipCheck.slipData.receiver?.account?.value,
         receiverBank: slipCheck.slipData.receivingBank,
       } : null,
+      ...(normalizedReceiptRequest ? { receiptRequest: normalizedReceiptRequest } : {}),
     };
 
     const updated = {
       ...order,
       status: 'PAID',
       slip: slipInfo,
+      slipData: slipInfo,
       verifiedAt: new Date().toISOString(),
       paidAmount: slipCheck.slipData?.amount || expectedAmount,
     };
@@ -402,6 +421,7 @@ export async function POST(req: NextRequest) {
           amount: slipCheck.slipData?.amount || expectedAmount,
           transRef: slipCheck.slipData?.transRef,
           senderName: slipCheck.slipData?.sender?.displayName,
+          ...(normalizedReceiptRequest ? { receiptRequest: normalizedReceiptRequest } : {}),
         },
         ip: clientIP,
         userAgent,

@@ -303,6 +303,7 @@ export const DashboardView = React.memo(function DashboardView({
                 const dayLabel = d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
                 const dayOrders = validOrders.filter(o => {
                   const od = new Date(o.date || '');
+                  if (Number.isNaN(od.getTime())) return false;
                   return od.toISOString().split('T')[0] === dateStr;
                 });
                 dailyData.push({

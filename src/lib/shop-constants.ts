@@ -309,6 +309,59 @@ export const SIZE_MEASUREMENTS: Record<(typeof SIZE_ORDER)[number], { chest: num
   '10XL': { chest: 60, length: 37 },
 };
 
+export type SizeMeasurement = { chest: number; length: number };
+
+const FREE_SIZE_ALIASES = new Set([
+  'free',
+  'freesize',
+  'free size',
+  'free-size',
+  'onesize',
+  'one size',
+  'one-size',
+  'ฟรีไซส์',
+  'ฟรีไซซ์',
+  'ไซส์เดียว',
+]);
+
+/** Resolve chest/length for a size row — product chart first, then standard table, then jersey free-size fallback. */
+export function resolveSizeMeasurement(
+  product: { type?: string; subType?: string; sizeChart?: Record<string, SizeMeasurement> } | null | undefined,
+  sizeLabel: string,
+): SizeMeasurement | null {
+  if (!sizeLabel) return null;
+  const chart = product?.sizeChart;
+  if (chart?.[sizeLabel]?.chest && chart?.[sizeLabel]?.length) {
+    return chart[sizeLabel];
+  }
+  const normalized = sizeLabel.trim().toLowerCase().replace(/\s+/g, ' ');
+  if (chart) {
+    for (const [key, value] of Object.entries(chart)) {
+      if (key.trim().toLowerCase().replace(/\s+/g, ' ') === normalized && value?.chest && value?.length) {
+        return value;
+      }
+    }
+  }
+  if (sizeLabel in SIZE_MEASUREMENTS) {
+    return SIZE_MEASUREMENTS[sizeLabel as keyof typeof SIZE_MEASUREMENTS];
+  }
+  const isFree = FREE_SIZE_ALIASES.has(normalized) || FREE_SIZE_ALIASES.has(sizeLabel);
+  if (isFree) {
+    const freeChart =
+      chart?.FREE ||
+      chart?.['Free Size'] ||
+      chart?.ONESIZE ||
+      chart?.['ฟรีไซส์'];
+    if (freeChart?.chest && freeChart?.length) return freeChart;
+    // Flagship / jersey free-size: use XL reference from the standard apparel chart
+    const isJersey =
+      product?.type === 'JERSEY' ||
+      product?.subType === 'JERSEY';
+    if (isJersey) return SIZE_MEASUREMENTS.XL;
+  }
+  return null;
+}
+
 // ==================== ANNOUNCEMENT COLORS ====================
 export const ANNOUNCEMENT_COLOR_MAP: Record<string, string> = {
   blue: '#3b82f6',
@@ -459,6 +512,8 @@ export type CartItem = {
   size: string;
   quantity: number;
   unitPrice: number;
+  shopId?: string;
+  shopSlug?: string;
   options: {
     customName?: string;
     customNumber?: string;
