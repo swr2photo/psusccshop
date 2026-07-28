@@ -121,7 +121,7 @@ import HomeTrustStrip from '@/components/HomeTrustStrip';
 import { FLAGSHIP_PRODUCTS, getFlagshipSlugForProduct } from '@/lib/flagship/config';
 import { flushFlagshipCartQueue } from '@/lib/flagship/cart-bridge';
 import TurnstileWidget from '@/components/TurnstileWidget';
-import { ShopStatusBanner, getProductStatus, getShopStatus, SHOP_STATUS_CONFIG, type ShopStatusType } from '@/components/ShopStatusCard';
+import { ShopStatusBanner, getProductStatus, getShopStatus, getProductUnavailableToast, SHOP_STATUS_CONFIG, type ShopStatusType } from '@/components/ShopStatusCard';
 import type { SavedAddress } from '@/components/ProfileModal';
 import { useTheme } from '@mui/material';
 import { formatFriendlyError } from '@/utils/error';
@@ -1571,6 +1571,25 @@ export default function HomePage() {
 
   // Unified product select handler — batches all state into one render
   const handleSelectProduct = useCallback((product: Product, shopContext?: { shopId?: string; shopSlug?: string }) => {
+    const status = getProductStatus(product, now);
+    const outOfStock = isProductOutOfStock(product);
+    if (status !== 'OPEN' || outOfStock) {
+      const toast = getProductUnavailableToast({
+        status,
+        outOfStock,
+        productName: getProductName(product, lang),
+        labels: {
+          comingSoon: t.shopStatus.comingSoon,
+          waitingToOpen: t.shopStatus.waitingToOpen,
+          orderEnded: t.shopStatus.closedEnded,
+          closed: t.shopStatus.closed,
+          soldOut: t.product.soldOut,
+          unavailable: lang === 'en' ? 'This product is no longer available' : 'สินค้านี้ไม่พร้อมจำหน่ายแล้ว',
+        },
+      });
+      showToast(toast.severity, toast.message);
+      return;
+    }
     const sizeKeys = Object.keys(product.sizePricing || {});
     const defaultSize = sizeKeys.length > 0 ? sizeKeys[0] : t.common.freeSize;
     setSelectedProduct(product);
@@ -1579,7 +1598,7 @@ export default function HomePage() {
     setProductDialogOpen(true);
     // Track recently viewed
     recentlyViewedStore.addItem(product.id);
-  }, [t.common.freeSize]);
+  }, [t, lang, now, showToast]);
 
   const catalogContext = useMemo(() => {
     if (activeShopMenu === 'main') {
@@ -1763,12 +1782,26 @@ export default function HomePage() {
       (updatedProduct.stock !== null && updatedProduct.stock !== undefined && updatedProduct.stock <= 0) ||
       (updatedProduct.variants && updatedProduct.variants.length > 0 && updatedProduct.variants.every(v => v.stock !== null && v.stock !== undefined && v.stock <= 0))
     );
-    if (!updatedProduct || getProductStatus(updatedProduct, now) !== 'OPEN' || isOutOfStock) {
-      showToast('warning', lang === 'en' ? 'This product is no longer available' : 'สินค้านี้ไม่พร้อมจำหน่ายแล้ว');
+    const status = updatedProduct ? getProductStatus(updatedProduct, now) : 'TEMPORARILY_CLOSED';
+    if (!updatedProduct || status !== 'OPEN' || isOutOfStock) {
+      const toast = getProductUnavailableToast({
+        status,
+        outOfStock: Boolean(isOutOfStock),
+        productName: getProductName(selectedProduct, lang),
+        labels: {
+          comingSoon: t.shopStatus.comingSoon,
+          waitingToOpen: t.shopStatus.waitingToOpen,
+          orderEnded: t.shopStatus.closedEnded,
+          closed: t.shopStatus.closed,
+          soldOut: t.product.soldOut,
+          unavailable: lang === 'en' ? 'This product is no longer available' : 'สินค้านี้ไม่พร้อมจำหน่ายแล้ว',
+        },
+      });
+      showToast(toast.severity, toast.message);
       setSelectedProduct(null);
       setProductDialogOpen(false);
     }
-  }, [selectedProduct, selectedProductContext.shopSlug, subShopCatalog, config?.products, lang, showToast, now]);
+  }, [selectedProduct, selectedProductContext.shopSlug, subShopCatalog, config?.products, lang, showToast, now, t]);
 
   //  Realtime config updates via Supabase + fallback polling for visibility changes
   // The realtime payload is a lightweight signal ({ updatedAt, isOpen }) —
@@ -2223,7 +2256,21 @@ export default function HomePage() {
       return;
     }
     if (getProductStatus(product, now) !== 'OPEN' || isProductOutOfStock(product)) {
-      showToast('warning', lang === 'en' ? 'This product is no longer available' : 'สินค้านี้ไม่พร้อมจำหน่ายแล้ว');
+      const status = getProductStatus(product, now);
+      const toast = getProductUnavailableToast({
+        status,
+        outOfStock: isProductOutOfStock(product),
+        productName: getProductName(product, lang),
+        labels: {
+          comingSoon: t.shopStatus.comingSoon,
+          waitingToOpen: t.shopStatus.waitingToOpen,
+          orderEnded: t.shopStatus.closedEnded,
+          closed: t.shopStatus.closed,
+          soldOut: t.product.soldOut,
+          unavailable: lang === 'en' ? 'This product is no longer available' : 'สินค้านี้ไม่พร้อมจำหน่ายแล้ว',
+        },
+      });
+      showToast(toast.severity, toast.message);
       return;
     }
     if (!canQuickAddToCart(product)) {

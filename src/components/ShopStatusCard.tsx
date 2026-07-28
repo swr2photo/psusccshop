@@ -113,6 +113,41 @@ export const getProductStatus = (product: { isActive?: boolean; startDate?: stri
   return 'OPEN';
 };
 
+/** Toast copy when a product can't be purchased — coming soon ≠ discontinued */
+export function getProductUnavailableToast(opts: {
+  status: ShopStatusType;
+  outOfStock?: boolean;
+  productName?: string;
+  labels: {
+    comingSoon: string;
+    waitingToOpen: string;
+    orderEnded: string;
+    closed: string;
+    soldOut: string;
+    unavailable: string;
+  };
+}): { severity: 'info' | 'warning'; message: string } {
+  const { status, outOfStock, productName, labels } = opts;
+  const withName = (text: string) => (productName ? `${productName} - ${text}` : text);
+
+  if (outOfStock) {
+    return { severity: 'info', message: withName(labels.soldOut) };
+  }
+  if (status === 'COMING_SOON') {
+    return { severity: 'info', message: withName(labels.comingSoon) };
+  }
+  if (status === 'WAITING_TO_OPEN') {
+    return { severity: 'info', message: withName(labels.waitingToOpen) };
+  }
+  if (status === 'ORDER_ENDED') {
+    return { severity: 'warning', message: withName(labels.orderEnded) };
+  }
+  if (status === 'TEMPORARILY_CLOSED') {
+    return { severity: 'warning', message: withName(labels.closed) };
+  }
+  return { severity: 'warning', message: withName(labels.unavailable) };
+}
+
 // Format countdown time
 export const formatCountdown = (targetDate: Date, t?: { common: { days: string; hours: string; minutes: string } }, nowOverride?: Date): string => {
   // Handle invalid date

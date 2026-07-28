@@ -48,7 +48,7 @@ import SupportChatWidget from '@/components/SupportChatWidget';
 import ProgressiveBlurChrome from '@/components/ui/ProgressiveBlurChrome';
 import { useNotification } from '@/components/NotificationContext';
 import {
-  getProductStatus, getShopStatus, SHOP_STATUS_CONFIG, ShopStatusBanner, type ShopStatusType,
+  getProductStatus, getShopStatus, getProductUnavailableToast, SHOP_STATUS_CONFIG, ShopStatusBanner, type ShopStatusType,
 } from '@/components/ShopStatusCard';
 import type { Product, ShopConfig } from '@/lib/config';
 import type { ShippingConfig } from '@/lib/shipping';
@@ -680,13 +680,27 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       (updatedProduct.stock !== null && updatedProduct.stock !== undefined && updatedProduct.stock <= 0) ||
       (updatedProduct.variants && updatedProduct.variants.length > 0 && updatedProduct.variants.every(v => v.stock !== null && v.stock !== undefined && v.stock <= 0))
     );
-    if (!updatedProduct || getProductStatus(updatedProduct, now) !== 'OPEN' || isOutOfStock) {
-      showToast('warning', lang === 'en' ? 'This product is no longer available' : 'สินค้านี้ไม่พร้อมจำหน่ายแล้ว');
+    const status = updatedProduct ? getProductStatus(updatedProduct, now) : 'TEMPORARILY_CLOSED';
+    if (!updatedProduct || status !== 'OPEN' || isOutOfStock) {
+      const toast = getProductUnavailableToast({
+        status,
+        outOfStock: Boolean(isOutOfStock),
+        productName: getProductName(selectedProduct, lang),
+        labels: {
+          comingSoon: t.shopStatus.comingSoon,
+          waitingToOpen: t.shopStatus.waitingToOpen,
+          orderEnded: t.shopStatus.closedEnded,
+          closed: t.shopStatus.closed,
+          soldOut: t.product.soldOut,
+          unavailable: lang === 'en' ? 'This product is no longer available' : 'สินค้านี้ไม่พร้อมจำหน่ายแล้ว',
+        },
+      });
+      showToast(toast.severity, toast.message);
       setSelectedProduct(null);
     } else {
       setSelectedProduct(updatedProduct);
     }
-  }, [products, selectedProduct, lang, showToast, now]);
+  }, [products, selectedProduct, lang, showToast, now, t]);
 
   // Auto-close product dialog/cart when shop becomes closed
   useEffect(() => {
@@ -1180,6 +1194,27 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
   const cartCount = shopCart.length;
 
   const handleSelectProduct = useCallback((product: Product) => {
+    const status = getProductStatus(product, now);
+    const outOfStock =
+      (product.stock !== null && product.stock !== undefined && product.stock <= 0) ||
+      (product.variants && product.variants.length > 0 && product.variants.every(v => v.stock !== null && v.stock !== undefined && v.stock <= 0));
+    if (status !== 'OPEN' || outOfStock) {
+      const toast = getProductUnavailableToast({
+        status,
+        outOfStock: Boolean(outOfStock),
+        productName: getProductName(product, lang),
+        labels: {
+          comingSoon: t.shopStatus.comingSoon,
+          waitingToOpen: t.shopStatus.waitingToOpen,
+          orderEnded: t.shopStatus.closedEnded,
+          closed: t.shopStatus.closed,
+          soldOut: t.product.soldOut,
+          unavailable: lang === 'en' ? 'This product is no longer available' : 'สินค้านี้ไม่พร้อมจำหน่ายแล้ว',
+        },
+      });
+      showToast(toast.severity, toast.message);
+      return;
+    }
     setSelectedProduct(product);
     setSelectedSize('');
     setSelectedPattern(null);
@@ -1188,7 +1223,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
     setCustomNumber('');
     setIsLongSleeve(null);
     setActiveImageIndex(0);
-  }, []);
+  }, [now, lang, t, showToast]);
 
   const handleAnnouncementProductClick = useCallback((productId: string) => {
     const target = products.find((p) => p.id === productId);

@@ -1620,8 +1620,8 @@ const shopStatus = {
   th: {
     open: 'เปิดให้บริการ',
     openDesc: 'สั่งซื้อสินค้าได้แล้ววันนี้!',
-    comingSoon: 'เร็วๆ นี้',
-    comingSoonDesc: 'เตรียมพบกับสินค้าใหม่เร็วๆ นี้!',
+    comingSoon: 'เปิดขายเร็วๆ นี้',
+    comingSoonDesc: 'สินค้านี้จะเปิดให้สั่งซื้อเร็วๆ นี้',
     closedEnded: 'หมดเขตสั่งซื้อ',
     closedEndedDesc: 'ระยะเวลาการสั่งซื้อสิ้นสุดแล้ว',
     closed: 'ปิดชั่วคราว',
@@ -1634,8 +1634,8 @@ const shopStatus = {
   en: {
     open: 'Open',
     openDesc: 'Order now!',
-    comingSoon: 'Coming Soon',
-    comingSoonDesc: 'New products coming soon!',
+    comingSoon: 'Opens for sale soon',
+    comingSoonDesc: 'This product will be available to order soon.',
     closedEnded: 'Order Period Ended',
     closedEndedDesc: 'The ordering period has ended',
     closed: 'Temporarily Closed',
