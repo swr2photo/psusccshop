@@ -28,6 +28,7 @@ export const PAGE_CACHE_KEYS = {
 
 const CACHE_KEY = 'scc_shop_cache_v2';
 const CACHE_EXPIRY = 5 * 60 * 1000; // 5 minutes
+const SESSION_CONFIG_CACHE_KEY = 'shopConfigCache';
 
 interface CachedData {
   config?: any;
@@ -37,6 +38,14 @@ interface CachedData {
 function loadLocalCache(): CachedData | null {
   if (typeof window === 'undefined') return null;
   try {
+    // Prefer sessionStorage lean cache written by the home page (same TTL key)
+    const sessionRaw = window.sessionStorage.getItem(SESSION_CONFIG_CACHE_KEY);
+    if (sessionRaw) {
+      const parsed = JSON.parse(sessionRaw);
+      if (parsed?.timestamp && Date.now() - parsed.timestamp < CACHE_EXPIRY && parsed.config) {
+        return { config: parsed.config, timestamp: parsed.timestamp };
+      }
+    }
     const cached = localStorage.getItem(CACHE_KEY);
     if (!cached) return null;
     const data = JSON.parse(cached);
@@ -137,7 +146,7 @@ export function usePageConfig() {
 // ============== SHOP CATALOG HOOK ==============
 
 export function useShopCatalog() {
-  const { data, error, isLoading, mutate } = useSWR(
+  const { data, error, isLoading, isValidating, mutate } = useSWR(
     PAGE_CACHE_KEYS.CATALOG,
     fetcher,
     {
@@ -154,7 +163,15 @@ export function useShopCatalog() {
     return [];
   }, [data]);
 
-  return { shops, isLoading, error, refresh: () => mutate(), mutate };
+  // Prefer isLoading && !data — keep UI mounted while SWR revalidates
+  return {
+    shops,
+    isLoading: isLoading && !data,
+    isValidating,
+    error,
+    refresh: () => mutate(),
+    mutate,
+  };
 }
 
 // ============== PRODUCT REVIEWS HOOK ==============

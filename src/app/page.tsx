@@ -12,7 +12,7 @@ import ShirtChatBot from '@/components/ShirtChatBot';
 import { ProductDetailsDialog } from '@/components/ProductDetailsDialog';
 import MobileBottomNav from '@/components/MobileBottomNav';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useSession, signIn } from 'next-auth/react';
@@ -193,7 +193,14 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { useCurrentTime } from '@/hooks/useCurrentTime';
 import { useShopCatalog, useProductReviews, PAGE_CACHE_KEYS } from '@/hooks/usePageData';
 import { mutate } from 'swr';
-import { parseThailandDateTime, isValidDate, createCartLineId, ensureUniqueCartLineIds } from '@/lib/shop-constants';
+import {
+  parseThailandDateTime,
+  isValidDate,
+  createCartLineId,
+  ensureUniqueCartLineIds,
+  CONFIG_CACHE_KEY,
+  CONFIG_CACHE_TTL,
+} from '@/lib/shop-constants';
 import { getClientReservationExpiryMs } from '@/components/OrderCountdown';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -393,9 +400,6 @@ const getAnnouncementColor = (color: string | undefined): string => {
   return ANNOUNCEMENT_COLOR_MAP[color] || '#0071e3';
 };
 
-const CONFIG_CACHE_KEY = 'shopConfigCache';
-const CONFIG_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
 type ToastSeverity = 'success' | 'error' | 'warning' | 'info';
 
 type Toast = {
@@ -493,6 +497,52 @@ type LeanConfig = {
   products: LeanProduct[];
 };
 
+/** Sync read of lean storefront config from sessionStorage (client only). */
+function readCachedShopConfig(): LeanConfig | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.sessionStorage.getItem(CONFIG_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.timestamp || Date.now() - parsed.timestamp > CONFIG_CACHE_TTL) return null;
+    return parsed.config as LeanConfig;
+  } catch (error) {
+    console.error('Failed to read cached config', error);
+    return null;
+  }
+}
+
+function writeCachedShopConfig(lean: LeanConfig) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), config: lean }));
+  } catch (error) {
+    console.error('Failed to cache config', error);
+  }
+}
+
+function sanitizeShopConfig(cfg: ShopConfig): LeanConfig {
+  return {
+    isOpen: cfg.isOpen,
+    closeDate: cfg.closeDate,
+    openDate: cfg.openDate,
+    announcements: cfg.announcements || [],
+    announcementHistory: cfg.announcementHistory || [],
+    products: (cfg.products || []).map((p) => ({
+      id: p.id,
+      name: p.name,
+      description: p.description,
+      type: p.type,
+      images: p.images,
+      basePrice: p.basePrice,
+      sizePricing: p.sizePricing,
+      isActive: p.isActive,
+      startDate: p.startDate,
+      endDate: p.endDate,
+    })),
+  };
+}
+
 const clampQty = (value: number) => Math.min(99, Math.max(1, value));
 const normalizeStatus = (status: string) => (status || '').trim().toUpperCase();
 
@@ -579,8 +629,7 @@ export default function HomePage() {
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
 
-  const [mounted, setMounted] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !readCachedShopConfig());
   const [processing, setProcessing] = useState(false);
   
   // Chatbot dialog state
@@ -594,7 +643,10 @@ export default function HomePage() {
   const [switchAccountOpen, setSwitchAccountOpen] = useState(false);
   const [availableProviders, setAvailableProviders] = useState<string[]>(['google']);
 
-  const [config, setConfig] = useState<ShopConfig | null>(null);
+  const [config, setConfig] = useState<ShopConfig | null>(() => {
+    const cached = readCachedShopConfig();
+    return cached ? (cached as unknown as ShopConfig) : null;
+  });
   const [shippingConfig, setShippingConfig] = useState<ShippingConfig | null>(null);
   
   // ==================== DEV MODE TEST PRODUCTS ====================
@@ -783,13 +835,21 @@ export default function HomePage() {
   ] : [];
   // ==================== END DEV TEST PRODUCTS ====================
   
-  const [announcements, setAnnouncements] = useState<ShopConfig['announcements']>([]);
-  const [announcementHistory, setAnnouncementHistory] = useState<ShopConfig['announcementHistory']>([]);
+  const [announcements, setAnnouncements] = useState<ShopConfig['announcements']>(() =>
+    readCachedShopConfig()?.announcements || [],
+  );
+  const [announcementHistory, setAnnouncementHistory] = useState<ShopConfig['announcementHistory']>(() =>
+    readCachedShopConfig()?.announcementHistory || [],
+  );
   const [showAnnouncementHistory, setShowAnnouncementHistory] = useState(false);
   const [showAnnouncementPopup, setShowAnnouncementPopup] = useState(true); // For floating popup
   const [currentAnnouncementIndex, setCurrentAnnouncementIndex] = useState(0); // For cycling announcements
   const [showAnnouncementImage, setShowAnnouncementImage] = useState(false); // For image lightbox
-  const [isShopOpen, setIsShopOpen] = useState(true);
+  const [isShopOpen, setIsShopOpen] = useState(() => {
+    const cached = readCachedShopConfig();
+    if (!cached) return true;
+    return getShopStatus(cached.isOpen, cached.closeDate, cached.openDate) === 'OPEN';
+  });
   // Health of the public config realtime channel — gates fallback polling.
   // (realtimeConnected from useRealtimeOrders only reflects the orders channel)
   const [configRealtimeOk, setConfigRealtimeOk] = useState(false);
@@ -1060,7 +1120,24 @@ export default function HomePage() {
   );
 
   // ==================== SHOP STATUS CARD COMPONENT ====================
-  useEffect(() => setMounted(true), []);
+  // Hydrate lean config from sessionStorage before paint so remounts skip the skeleton
+  useLayoutEffect(() => {
+    const cached = readCachedShopConfig();
+    if (!cached) return;
+    setConfig(cached as unknown as ShopConfig);
+    setAnnouncements(cached.announcements || []);
+    setAnnouncementHistory(cached.announcementHistory || []);
+    const shopStatus = getShopStatus(cached.isOpen, cached.closeDate, cached.openDate);
+    setIsShopOpen(shopStatus === 'OPEN');
+    setLoading(false);
+
+    const imageUrls = (cached.products || [])
+      .flatMap((p) => p.images?.slice(0, 1) || [])
+      .filter(Boolean);
+    if (imageUrls.length > 0) {
+      preloadImages(imageUrls).catch(() => {});
+    }
+  }, []);
 
   useEffect(() => {
     apiFetch('/api/auth/available-providers')
@@ -1162,8 +1239,8 @@ export default function HomePage() {
       if (res.status === 'success') {
         const cfg = (res.data as ShopConfig | undefined) ?? (res.config as ShopConfig | undefined);
         if (cfg) {
-          const lean = sanitizeConfig(cfg);
-          cacheConfig(lean);
+          const lean = sanitizeShopConfig(cfg);
+          writeCachedShopConfig(lean);
           // Only update state if data actually changed to prevent flickering
           setConfig(prev => {
             if (!prev) return cfg;
@@ -1202,41 +1279,28 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     const loadConfig = async () => {
       try {
-        const cached = loadCachedConfig();
-        if (cached) {
-          setConfig(cached as unknown as ShopConfig);
-          setAnnouncements(cached.announcements || []);
-          setAnnouncementHistory(cached.announcementHistory || []);
-          // Calculate actual shop open status based on isOpen flag AND closeDate
-          const cachedCfg = cached as unknown as ShopConfig;
-          const shopStatus = getShopStatus(cachedCfg.isOpen, cachedCfg.closeDate, cachedCfg.openDate);
-          setIsShopOpen(shopStatus === 'OPEN');
-          
-          // Preload product images from cache (first image of each product)
-          const imageUrls = (cachedCfg.products || [])
-            .flatMap((p: Product) => p.images?.slice(0, 1) || [])
-            .filter(Boolean);
-          if (imageUrls.length > 0) {
-            preloadImages(imageUrls).catch(() => {});
-          }
-        }
-
+        // Cache already applied in useLayoutEffect when present; soft-refresh only.
+        // Cold start (no cache): keep loading=true until network returns.
         await Promise.all([refreshConfig(), refreshShippingConfig(true)]);
       } catch (error) {
         console.error('Failed to load config:', error);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     loadConfig();
+    return () => {
+      cancelled = true;
+    };
   }, [refreshConfig, refreshShippingConfig]);
 
   // Auto-open product from URL query param (?p=id or legacy ?product=slug-or-id)
   useEffect(() => {
-    if (!config?.products?.length || loading) return;
+    if (!config?.products?.length) return;
     const params = new URLSearchParams(window.location.search);
     const productParam = params.get('p') || params.get('product');
     if (!productParam) return;
@@ -1251,11 +1315,11 @@ export default function HomePage() {
       // Clean URL without reload
       window.history.replaceState({}, '', window.location.pathname);
     }
-  }, [config?.products, loading, now]);
+  }, [config?.products, now]);
 
   // Merge guest cart items queued from /flagship/[slug]; open cart via ?cart=1
   useEffect(() => {
-    if (loading) return;
+    if (loading && !config) return;
     const pending = flushFlagshipCartQueue(true);
     if (pending.length > 0) {
       setCart((prev) => {
@@ -1276,11 +1340,11 @@ export default function HomePage() {
       window.history.replaceState({}, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot merge on home ready
-  }, [loading, session?.user?.email]);
+  }, [loading, config, session?.user?.email]);
 
   // Footer / deep-link hashes: /#product-grid|/shop-section|/events-section scroll; /#history opens order history
   useEffect(() => {
-    if (loading) return;
+    if (loading && !config) return;
     const hash = window.location.hash.replace(/^#/, '').split('?')[0];
     const scrollTargets = ['product-grid', 'shop-section', 'events-section'];
     if (!scrollTargets.includes(hash)) return;
@@ -1288,7 +1352,7 @@ export default function HomePage() {
       document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth' });
     }, 50);
     return () => clearTimeout(timer);
-  }, [loading]);
+  }, [loading, config]);
 
   useEffect(() => {
     const handleHashChange = () => {
@@ -1946,49 +2010,6 @@ export default function HomePage() {
     if (productDialogOpen) {
       setInlineNotice({ id, type, message: friendlyMessage });
       setTimeout(() => setInlineNotice(null), 2000);
-    }
-  };
-
-  const sanitizeConfig = (cfg: ShopConfig): LeanConfig => ({
-    isOpen: cfg.isOpen,
-    closeDate: cfg.closeDate,
-    openDate: cfg.openDate,
-    announcements: cfg.announcements || [],
-    announcementHistory: cfg.announcementHistory || [],
-    products: (cfg.products || []).map((p) => ({
-      id: p.id,
-      name: p.name,
-      description: p.description,
-      type: p.type,
-      images: p.images,
-      basePrice: p.basePrice,
-      sizePricing: p.sizePricing,
-      isActive: p.isActive,
-      startDate: p.startDate,
-      endDate: p.endDate,
-    })),
-  });
-
-  const loadCachedConfig = (): LeanConfig | null => {
-    if (typeof window === 'undefined') return null;
-    try {
-      const raw = window.sessionStorage.getItem(CONFIG_CACHE_KEY);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (!parsed?.timestamp || Date.now() - parsed.timestamp > CONFIG_CACHE_TTL) return null;
-      return parsed.config as LeanConfig;
-    } catch (error) {
-      console.error('Failed to read cached config', error);
-      return null;
-    }
-  };
-
-  const cacheConfig = (lean: LeanConfig) => {
-    if (typeof window === 'undefined') return;
-    try {
-      window.sessionStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), config: lean }));
-    } catch (error) {
-      console.error('Failed to cache config', error);
     }
   };
 
@@ -3114,7 +3135,9 @@ export default function HomePage() {
     return () => clearTimeout(timer);
   }, [status]);
 
-  if (!mounted || loading || status === 'loading' || (status === 'unauthenticated' && !authSettled)) {
+  // Skeleton only when there is no usable catalog yet (cold cache).
+  // Soft revalidation keeps the real UI mounted; TopProgressBar covers navigations.
+  if ((loading && !config) || status === 'loading' || (status === 'unauthenticated' && !authSettled)) {
     return <ShopLoadingShell />;
   }
 
