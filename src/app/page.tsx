@@ -2808,8 +2808,36 @@ export default function HomePage() {
   };
   loadOrderHistoryRef.current = loadOrderHistory;
 
-  // Prefetch order history removed — load on history drawer open / #history deep-link
-  // (pending badge fills once history is opened or via realtime order events)
+  // Silent prefetch after login (idle) so the pending badge on ประวัติ
+  // appears before the user opens the drawer — does not block first paint.
+  useEffect(() => {
+    if (!session?.user?.email) {
+      historyLoadedRef.current = false;
+      return;
+    }
+    if (historyLoadedRef.current) return;
+
+    let idleId: number | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const prefetch = () => {
+      if (!historyLoadedRef.current) {
+        loadOrderHistoryRef.current({ silent: true });
+      }
+    };
+
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      idleId = window.requestIdleCallback(prefetch, { timeout: 3000 });
+    } else {
+      timeoutId = setTimeout(prefetch, 1500);
+    }
+
+    return () => {
+      if (idleId != null && typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
+        window.cancelIdleCallback(idleId);
+      }
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [session?.user?.email]);
 
   // ===== Auto-cancel expired unpaid orders (reservation timeout) =====
   useEffect(() => {
