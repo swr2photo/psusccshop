@@ -16,7 +16,6 @@ import {
   IconButton,
   MenuItem,
   Select,
-  Skeleton,
   TextField,
   Typography,
   useMediaQuery,
@@ -144,50 +143,149 @@ function softStatusTone(category: string): { bg: string; color: string; border: 
 }
 
 // Number of orders rendered per chunk (progressive rendering)
-const ORDERS_PER_CHUNK = 10;
+const ORDERS_PER_CHUNK = 8;
 
-const skeletonSx = { bgcolor: 'var(--skeleton-bg)' } as const;
-
-/** Skeleton placeholder matching the collapsed order card layout */
-function OrderCardSkeleton() {
+/** Soft bone using storefront `.skeleton` shimmer (matches ShopLoadingShell) */
+function Bone({
+  width,
+  height,
+  radius = 8,
+  className,
+  style,
+}: {
+  width?: number | string;
+  height?: number | string;
+  radius?: number | string;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
   return (
-    <Box sx={{
-      borderRadius: '16px',
-      bgcolor: 'var(--surface-2)',
-      border: '1px solid var(--glass-border)',
-      overflow: 'hidden',
-    }}>
-      <Skeleton variant="rectangular" height={3} sx={skeletonSx} animation="wave" />
-      <Box sx={{ p: { xs: 1.5, sm: 2 }, display: 'flex', alignItems: 'center', gap: 1.5 }}>
-        <Skeleton variant="rounded" width={52} height={52} animation="wave" sx={{ ...skeletonSx, borderRadius: '12px', flexShrink: 0 }} />
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.6 }}>
-            <Skeleton variant="text" width="38%" height={20} animation="wave" sx={skeletonSx} />
-            <Skeleton variant="rounded" width={70} height={22} animation="wave" sx={{ ...skeletonSx, borderRadius: '8px' }} />
-          </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Skeleton variant="text" width="48%" height={15} animation="wave" sx={skeletonSx} />
-            <Skeleton variant="text" width="22%" height={20} animation="wave" sx={skeletonSx} />
+    <Box
+      className={className ? `skeleton ${className}` : 'skeleton'}
+      sx={{
+        width: width ?? '100%',
+        height: height ?? 14,
+        borderRadius: radius,
+        flexShrink: 0,
+        ...style,
+      }}
+    />
+  );
+}
+
+/**
+ * Skeleton mirroring the collapsed order card:
+ * accent bar → ref + status → date → product preview → net total → actions
+ */
+function OrderCardSkeleton({
+  index = 0,
+  showActions = true,
+}: {
+  index?: number;
+  showActions?: boolean;
+}) {
+  const stagger = `${Math.min(index, 5) * 90}ms`;
+  const refW = [42, 48, 36, 52, 40][index % 5];
+  const badgeW = [72, 84, 64, 78, 70][index % 5];
+  const nameW = ['72%', '64%', '78%', '58%', '68%'][index % 5];
+  const metaW = ['44%', '38%', '50%', '42%', '46%'][index % 5];
+
+  return (
+    <Box
+      aria-hidden
+      sx={{
+        borderRadius: '16px',
+        bgcolor: 'var(--surface-2)',
+        border: '1px solid var(--glass-border)',
+        overflow: 'hidden',
+        opacity: 0,
+        animation: 'order-skel-in 0.45s ease forwards',
+        animationDelay: stagger,
+      }}
+    >
+      {/* Status accent — muted, no fake color */}
+      <Bone height={3} radius={0} style={{ opacity: 0.55 }} />
+
+      <Box sx={{ p: { xs: 1.5, sm: 2 } }}>
+        {/* Ref + status badge */}
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1, mb: 0.75 }}>
+          <Bone width={refW} height={18} radius={6} />
+          <Bone width={badgeW} height={24} radius={8} />
+        </Box>
+
+        {/* Date · pieces + chevron */}
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.25 }}>
+          <Bone width={metaW} height={12} radius={5} />
+          <Bone width={14} height={14} radius={4} />
+        </Box>
+
+        {/* Product preview row */}
+        <Box
+          sx={{
+            display: 'flex',
+            gap: 1.35,
+            pb: 1.35,
+            borderBottom: '1px solid var(--glass-border)',
+          }}
+        >
+          <Bone width={52} height={52} radius={12} />
+          <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 0.55, pt: 0.15 }}>
+            <Bone width={nameW} height={14} radius={5} />
+            <Bone width="40%" height={11} radius={4} />
+            <Bone width={56} height={14} radius={5} />
           </Box>
         </Box>
+
+        {/* Net total */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            py: 1.2,
+            borderBottom: showActions ? '1px solid var(--glass-border)' : 'none',
+          }}
+        >
+          <Bone width={72} height={12} radius={5} />
+          <Bone width={64} height={18} radius={6} />
+        </Box>
+
+        {/* Action buttons */}
+        {showActions && (
+          <Box sx={{ display: 'flex', gap: 1, mt: 1.25 }}>
+            <Bone height={34} radius={11} style={{ flex: 1 }} />
+            <Bone height={34} radius={11} style={{ flex: 1 }} />
+          </Box>
+        )}
       </Box>
     </Box>
   );
 }
 
-/** Vertical list of skeleton cards */
-function OrderListSkeleton({ count = 5 }: { count?: number }) {
+/** Vertical list of skeleton cards with staggered entrance */
+function OrderListSkeleton({
+  count = 4,
+  ariaLabel,
+}: {
+  count?: number;
+  ariaLabel?: string;
+}) {
   return (
-    <Box sx={{
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 2,
-      maxWidth: 800,
-      mx: 'auto',
-      width: '100%',
-    }}>
+    <Box
+      role="status"
+      aria-busy="true"
+      aria-label={ariaLabel}
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 2,
+        maxWidth: 800,
+        mx: 'auto',
+        width: '100%',
+      }}
+    >
       {Array.from({ length: count }).map((_, i) => (
-        <OrderCardSkeleton key={i} />
+        <OrderCardSkeleton key={i} index={i} showActions={i % 3 !== 2} />
       ))}
     </Box>
   );
@@ -584,10 +682,12 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
   const [visibleCount, setVisibleCount] = useState(ORDERS_PER_CHUNK);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const loadingMoreLockRef = useRef(false);
 
   // Reset chunk size when the drawer reopens or the filter changes
   useEffect(() => {
     setVisibleCount(ORDERS_PER_CHUNK);
+    loadingMoreLockRef.current = false;
   }, [open, historyFilter]);
 
   const visibleOrders = React.useMemo(
@@ -602,26 +702,50 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
 
   useEffect(() => {
     if (!open || loadingHistory) return;
-    const sentinel = sentinelRef.current;
-    if (!sentinel) return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (!entries[0]?.isIntersecting) return;
-        const { hasLocalMore, historyHasMore, loadingHistoryMore, onLoadMore } = loadStateRef.current;
-        if (hasLocalMore) {
-          setVisibleCount((c) => c + ORDERS_PER_CHUNK);
-        } else if (historyHasMore && !loadingHistoryMore) {
-          onLoadMore();
-        }
-      },
-      { root: scrollContainerRef.current, rootMargin: '200px' }
-    );
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-    // visibleCount in deps: re-observe after each chunk reveal so the observer
-    // fires again if the sentinel is still within the viewport
-  }, [open, loadingHistory, filteredOrders.length, visibleCount]);
+    let observer: IntersectionObserver | null = null;
+    let cancelled = false;
+    let raf = 0;
+
+    const attach = () => {
+      if (cancelled) return;
+      const sentinel = sentinelRef.current;
+      const root = scrollContainerRef.current;
+      if (!sentinel || !root) {
+        raf = requestAnimationFrame(attach);
+        return;
+      }
+
+      observer = new IntersectionObserver(
+        (entries) => {
+          if (!entries[0]?.isIntersecting) return;
+          const state = loadStateRef.current;
+          if (state.hasLocalMore) {
+            setVisibleCount((c) => c + ORDERS_PER_CHUNK);
+            return;
+          }
+          if (state.historyHasMore && !state.loadingHistoryMore && !loadingMoreLockRef.current) {
+            loadingMoreLockRef.current = true;
+            state.onLoadMore();
+          }
+        },
+        { root, rootMargin: '280px 0px', threshold: 0 }
+      );
+      observer.observe(sentinel);
+    };
+
+    attach();
+    return () => {
+      cancelled = true;
+      if (raf) cancelAnimationFrame(raf);
+      observer?.disconnect();
+    };
+  }, [open, loadingHistory, filteredOrders.length, visibleCount, historyHasMore, loadingHistoryMore]);
+
+  // Release load-more lock when the remote page finishes
+  useEffect(() => {
+    if (!loadingHistoryMore) loadingMoreLockRef.current = false;
+  }, [loadingHistoryMore]);
 
   // Swipe-to-dismiss state
   const [dragOffset, setDragOffset] = useState(0);
@@ -804,7 +928,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
         WebkitOverflowScrolling: 'touch',
       }}>
         {loadingHistory ? (
-          <OrderListSkeleton count={5} />
+          <OrderListSkeleton count={4} ariaLabel={t.orderHistory.loading} />
         ) : filteredOrders.length === 0 ? (
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 8, gap: 2, px: 2 }}>
             <Box sx={{
@@ -1684,40 +1808,28 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
 
             {/* Skeletons while fetching the next remote page */}
             {loadingHistoryMore && (
-              <>
-                <OrderCardSkeleton />
-                <OrderCardSkeleton />
-              </>
-            )}
-
-            {/* Infinite-scroll sentinel: reveals the next chunk / triggers remote load */}
-            {(hasLocalMore || historyHasMore) && (
-              <Box ref={sentinelRef} sx={{ height: 1 }} />
-            )}
-
-            {/* Load More (manual fallback for the auto infinite scroll) */}
-            {!hasLocalMore && historyHasMore && !loadingHistoryMore && (
-              <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-                <Button
-                  onClick={onLoadMore}
-                  disabled={loadingHistoryMore}
-                  sx={{
-                    px: 4,
-                    py: 1,
-                    borderRadius: '12px',
-                    bgcolor: 'rgba(0,113,227,0.1)',
-                    border: '1px solid rgba(0,113,227,0.3)',
-                    color: 'var(--secondary)',
-                    fontSize: '0.85rem',
-                    fontWeight: 600,
-                    textTransform: 'none',
-                    '&:hover': { bgcolor: 'rgba(0,113,227,0.2)' },
-                    '&:disabled': { color: 'var(--text-muted)' },
-                  }}
-                >
-                  {t.orderHistory.loadMore}
-                </Button>
+              <Box
+                role="status"
+                aria-busy="true"
+                aria-label={t.orderHistory.loadingMore}
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 2,
+                }}
+              >
+                <OrderCardSkeleton index={0} showActions={false} />
+                <OrderCardSkeleton index={1} showActions={false} />
               </Box>
+            )}
+
+            {/* Infinite-scroll sentinel — keep in DOM while more local/remote pages exist */}
+            {(hasLocalMore || historyHasMore) && (
+              <Box
+                ref={sentinelRef}
+                aria-hidden
+                sx={{ height: 24, flexShrink: 0 }}
+              />
             )}
           </Box>
         )}

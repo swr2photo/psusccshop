@@ -411,8 +411,11 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
   const [orderHistory, setOrderHistory] = useState<OrderHistory[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [loadingHistoryMore, setLoadingHistoryMore] = useState(false);
-  const [historyCursor, setHistoryCursor] = useState<string | null>(null);
   const [historyHasMore, setHistoryHasMore] = useState(false);
+  const orderHistoryLenRef = useRef(0);
+  const orderHistoryRefsRef = useRef<Set<string>>(new Set());
+  orderHistoryLenRef.current = orderHistory.length;
+  orderHistoryRefsRef.current = new Set(orderHistory.map((o) => o.ref));
   const [historyFilter, setHistoryFilter] = useState<'ALL' | 'WAITING_PAYMENT' | 'COMPLETED' | 'SHIPPED' | 'RECEIVED' | 'CANCELLED'>('ALL');
   const [cancellingRef, setCancellingRef] = useState<string | null>(null);
 
@@ -725,14 +728,16 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
   const loadOrderHistory = useCallback(async (opts?: { append?: boolean }) => {
     if (!session?.user?.email) return;
     const append = opts?.append;
-    const pageSize = isMobile ? 20 : 50;
+    const pageSize = isMobile ? 10 : 20;
+    const offset = append ? orderHistoryLenRef.current : 0;
+    if (append && !historyHasMore) return;
+    if (append && loadingHistoryMore) return;
     append ? setLoadingHistoryMore(true) : setLoadingHistory(true);
     try {
-      const res = await getHistory(session.user.email, append ? historyCursor || undefined : undefined, pageSize, shopSlug);
+      const res = await getHistory(session.user.email, offset, pageSize, shopSlug);
       if (res.status === 'success') {
         const rawHistory = res.data?.history || (res as any)?.history || [];
         const hasMore = Boolean(res.data?.hasMore);
-        const nextCursor = res.data?.nextCursor || null;
         if (Array.isArray(rawHistory)) {
           const history = rawHistory.map((order: any) => {
             let total = order.total || order.totalAmount || order.amount || 0;
@@ -748,27 +753,33 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
             }
             return { ...order, total, items: order.items || order.cart || [] };
           });
-          setOrderHistory(prev => {
-            if (append) {
-              const existingRefs = new Set(prev.map(o => o.ref));
-              const newOrders = history.filter((o: any) => !existingRefs.has(o.ref));
-              return [...prev, ...newOrders];
+          if (append) {
+            const existingRefs = orderHistoryRefsRef.current;
+            const newOrders = history.filter((o: any) => o?.ref && !existingRefs.has(o.ref));
+            if (newOrders.length === 0) {
+              setHistoryHasMore(false);
             } else {
-              const seen = new Set<string>();
-              return history.filter((o: any) => {
-                if (seen.has(o.ref)) return false;
+              setOrderHistory((prev) => {
+                const refs = new Set(prev.map((o) => o.ref));
+                return [...prev, ...newOrders.filter((o: any) => !refs.has(o.ref))];
+              });
+              setHistoryHasMore(hasMore);
+            }
+          } else {
+            const seen = new Set<string>();
+            setOrderHistory(
+              history.filter((o: any) => {
+                if (!o?.ref || seen.has(o.ref)) return false;
                 seen.add(o.ref);
                 return true;
-              });
-            }
-          });
-          setHistoryHasMore(hasMore);
-          setHistoryCursor(nextCursor);
+              })
+            );
+            setHistoryHasMore(hasMore);
+          }
           historyLoadedRef.current = true;
         } else {
           if (!append) setOrderHistory([]);
           setHistoryHasMore(false);
-          setHistoryCursor(null);
         }
       }
     } catch (error) {
@@ -777,7 +788,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
     } finally {
       append ? setLoadingHistoryMore(false) : setLoadingHistory(false);
     }
-  }, [session?.user?.email, isMobile, historyCursor, shopSlug, showToast, lang]);
+  }, [session?.user?.email, isMobile, historyHasMore, loadingHistoryMore, shopSlug, showToast, lang]);
 
   useEffect(() => {
     loadOrderHistoryRef.current = loadOrderHistory;

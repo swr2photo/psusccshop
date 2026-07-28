@@ -392,9 +392,23 @@ export async function saveProfile(
   });
 }
 
-export async function getHistory(email: string, cursor?: string, limit = 50, shopSlug?: string): Promise<APIResponse> {
+export async function getHistory(
+  email: string,
+  offsetOrCursor?: string | number,
+  limit = 50,
+  shopSlug?: string,
+): Promise<APIResponse> {
   const params = new URLSearchParams({ email, limit: String(limit) });
-  if (cursor) params.append('cursor', cursor);
+  // API paginates with `offset` (legacy callers may still pass a numeric cursor string)
+  const offset =
+    typeof offsetOrCursor === 'number'
+      ? offsetOrCursor
+      : offsetOrCursor
+        ? Number(offsetOrCursor)
+        : 0;
+  if (Number.isFinite(offset) && offset > 0) {
+    params.append('offset', String(Math.max(0, Math.floor(offset))));
+  }
   if (shopSlug) params.append('shopSlug', shopSlug);
   return fetchJson(`/api/orders?${params.toString()}`);
 }

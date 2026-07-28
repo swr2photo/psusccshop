@@ -945,13 +945,16 @@ export default function HomePage() {
   const [orderHistory, setOrderHistory] = useState<OrderHistory[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [loadingHistoryMore, setLoadingHistoryMore] = useState(false);
-  const [historyCursor, setHistoryCursor] = useState<string | null>(null);
   const [historyHasMore, setHistoryHasMore] = useState(false);
   // True once the full history list has been fetched from the server at least
   // once. Orders added locally (after checkout / realtime INSERT) do NOT count —
   // gating "should we fetch?" on orderHistory.length caused the drawer to show
   // only those few local orders and never load the rest.
   const historyLoadedRef = useRef(false);
+  const orderHistoryLenRef = useRef(0);
+  const orderHistoryRefsRef = useRef<Set<string>>(new Set());
+  orderHistoryLenRef.current = orderHistory.length;
+  orderHistoryRefsRef.current = new Set(orderHistory.map((o) => o.ref));
   // Gate localStorage writes until we've tried to restore cached orderData
   const orderDataHydratedRef = useRef(false);
   // Soft-hold LoginScreen during brief session flicker after refresh
@@ -2726,15 +2729,18 @@ export default function HomePage() {
     if (!session?.user?.email) return;
     const append = opts?.append;
     const silent = opts?.silent;
-    const pageSize = isMobile ? 20 : 50;
+    // Smaller first pages so drawer opens fast; more loads via infinite scroll
+    const pageSize = isMobile ? 10 : 20;
+    const offset = append ? orderHistoryLenRef.current : 0;
+    if (append && !historyHasMore) return;
+    if (append && loadingHistoryMore) return;
     if (!silent) { append ? setLoadingHistoryMore(true) : setLoadingHistory(true); }
     try {
-      const res = await getHistory(session.user.email, append ? historyCursor || undefined : undefined, pageSize);
+      const res = await getHistory(session.user.email, offset, pageSize);
 
       if (res.status === 'success') {
         const rawHistory = res.data?.history ?? (res as any)?.history;
         const hasMore = Boolean(res.data?.hasMore);
-        const nextCursor = res.data?.nextCursor || null;
         if (!Array.isArray(rawHistory)) {
           console.warn('History response missing array', { res });
           // Keep previous history; allow retry
@@ -2763,25 +2769,33 @@ export default function HomePage() {
           };
         });
 
-        setOrderHistory((prev) => {
-          if (append) {
-            const existingRefs = new Set(prev.map((o) => o.ref));
-            const newOrders = history.filter((o: any) => !existingRefs.has(o.ref));
-            return [...prev, ...newOrders];
+        if (append) {
+          const existingRefs = orderHistoryRefsRef.current;
+          const newOrders = history.filter((o: any) => o?.ref && !existingRefs.has(o.ref));
+          if (newOrders.length === 0) {
+            setHistoryHasMore(false);
+          } else {
+            setOrderHistory((prev) => {
+              const refs = new Set(prev.map((o) => o.ref));
+              return [...prev, ...newOrders.filter((o: any) => !refs.has(o.ref))];
+            });
+            setHistoryHasMore(hasMore);
           }
-          // Don't replace a non-empty list with a suspicious empty success
-          if (!append && history.length === 0 && prev.length > 0) {
-            return prev;
-          }
-          const seen = new Set<string>();
-          return history.filter((o: any) => {
-            if (seen.has(o.ref)) return false;
-            seen.add(o.ref);
-            return true;
+        } else {
+          setOrderHistory((prev) => {
+            // Don't replace a non-empty list with a suspicious empty success
+            if (history.length === 0 && prev.length > 0) {
+              return prev;
+            }
+            const seen = new Set<string>();
+            return history.filter((o: any) => {
+              if (!o?.ref || seen.has(o.ref)) return false;
+              seen.add(o.ref);
+              return true;
+            });
           });
-        });
-        setHistoryHasMore(hasMore);
-        setHistoryCursor(nextCursor);
+          setHistoryHasMore(hasMore);
+        }
         historyLoadedRef.current = true;
       }
       // status !== success: keep previous history and allow retry
