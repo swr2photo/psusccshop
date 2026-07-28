@@ -166,8 +166,8 @@ export function useProductReviews(productId: string | undefined | null, viewerEm
     productId ? PAGE_CACHE_KEYS.REVIEWS(productId, viewerEmail) : null,
     fetcher,
     {
-      revalidateOnFocus: false,
-      dedupingInterval: 120_000,
+      revalidateOnFocus: true,
+      dedupingInterval: 5_000,
       keepPreviousData: true,
     }
   );

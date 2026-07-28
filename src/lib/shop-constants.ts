@@ -506,6 +506,7 @@ export type ProductOptions = {
 };
 
 export type CartItem = {
+  /** Unique cart line id (never reuse productId alone — delete would wipe duplicates) */
   id: string;
   productId: string;
   productName: string;
@@ -523,6 +524,34 @@ export type CartItem = {
     variantName?: string;
   };
 };
+
+/** Stable unique id per cart line so identical products stay independently removable. */
+export function createCartLineId(productId: string): string {
+  const rand =
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID().replace(/-/g, '').slice(0, 12)
+      : `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+  return `${productId}__${rand}`;
+}
+
+/** Repair legacy carts where multiple lines shared the same deterministic id. */
+export function ensureUniqueCartLineIds<T extends { id: string; productId?: string }>(items: T[]): T[] {
+  if (!Array.isArray(items) || items.length === 0) return items;
+  const seen = new Set<string>();
+  let changed = false;
+  const next = items.map((item) => {
+    const productId = item.productId || String(item.id || '').split('__')[0] || 'item';
+    if (!item.id || seen.has(item.id)) {
+      changed = true;
+      const id = createCartLineId(productId);
+      seen.add(id);
+      return { ...item, id, productId };
+    }
+    seen.add(item.id);
+    return item.productId ? item : { ...item, productId };
+  });
+  return changed ? next : items;
+}
 
 export type OrderHistoryItem = {
   productId?: string;

@@ -8,7 +8,7 @@ import {
   getProductShirtNameConfig,
   type ShirtNameConfig,
 } from '@/lib/config';
-import { getDisplaySizes, productRequiresSize, resolveProductUnitPrice } from '@/lib/shop-constants';
+import { getDisplaySizes, productRequiresSize, resolveProductUnitPrice, createCartLineId } from '@/lib/shop-constants';
 import type { CartItem } from '@/lib/shop-constants';
 import { useTranslation } from '@/hooks/useTranslation';
 
@@ -102,7 +102,7 @@ export default function FlagshipBuyBar({
     );
 
     const item: CartItem = {
-      id: `${product.id}-${sizeToUse}-${normalized}-${customNumber}-${isLongSleeve}`,
+      id: createCartLineId(product.id),
       productId: product.id,
       productName: getProductName(product, lang),
       size: sizeToUse,

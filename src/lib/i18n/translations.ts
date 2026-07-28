@@ -549,7 +549,7 @@ const payment = {
     loadQRFailed: 'โหลด QR ไม่สำเร็จ',
     savedQRToast: 'บันทึกคิวอาร์แล้ว',
     expiredPayment: 'หมดเวลาชำระเงิน',
-    autoCancel: 'คำสั่งซื้อจะถูกยกเลิกอัตโนมัติ',
+    autoCancel: 'คำสั่งซื้อจะถูกยกเลิกอัตโนมัติ และคืนสต็อกเข้าระบบ',
     thankYouPrefix: 'ขอบคุณ',
     accountHolderName: '',
     secretaryRole: '',
@@ -699,7 +699,7 @@ const payment = {
     loadQRFailed: 'Failed to load QR',
     savedQRToast: 'QR saved',
     expiredPayment: 'Payment time expired',
-    autoCancel: 'Order will be auto-cancelled',
+    autoCancel: 'Order will be auto-cancelled and stock released',
     thankYouPrefix: 'Thank you',
     accountHolderName: '',
     secretaryRole: '',
@@ -1655,7 +1655,7 @@ const countdown = {
     autoCancelled: 'คำสั่งซื้อถูกยกเลิกอัตโนมัติ',
     urgentTime: 'เหลือเวลาน้อย!',
     payWithinTime: 'กรุณาชำระเงินภายในเวลาที่กำหนด',
-    payWithin24h: 'ชำระภายใน 24 ชั่วโมงหลังสั่งซื้อ มิฉะนั้นจะถูกยกเลิกอัตโนมัติ',
+    payWithin24h: 'ชำระภายในระยะเวลาจองสต็อกหลังสั่งซื้อ มิฉะนั้นคำสั่งซื้อจะถูกยกเลิกและคืนสต็อกอัตโนมัติ',
   },
   en: {
     expired: 'Payment Time Expired',
@@ -1663,7 +1663,7 @@ const countdown = {
     autoCancelled: 'Order auto-cancelled',
     urgentTime: 'Running out of time!',
     payWithinTime: 'Please pay within the deadline',
-    payWithin24h: 'Pay within 24 hours of ordering or the order will be auto-cancelled',
+    payWithin24h: 'Pay within the stock reservation window or the order will be auto-cancelled and stock released',
   },
 } as const;
 

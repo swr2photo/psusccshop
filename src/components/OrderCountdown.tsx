@@ -5,8 +5,17 @@ import { Box, Typography } from '@mui/material';
 import { Clock, AlertTriangle } from 'lucide-react';
 import { useTranslation } from '@/hooks/useTranslation';
 
-/** 24 hours in milliseconds */
-const EXPIRY_MS = 24 * 60 * 60 * 1000;
+/** Default unpaid reservation window — keep in sync with server ORDER_RESERVATION_HOURS (default 24h). */
+const DEFAULT_EXPIRY_MS = 24 * 60 * 60 * 1000;
+
+/** Prefer NEXT_PUBLIC_ORDER_RESERVATION_HOURS so client countdown matches server cron. */
+export function getClientReservationExpiryMs(): number {
+  const raw = Number(process.env.NEXT_PUBLIC_ORDER_RESERVATION_HOURS);
+  if (Number.isFinite(raw) && raw > 0 && raw <= 168) return raw * 60 * 60 * 1000;
+  return DEFAULT_EXPIRY_MS;
+}
+
+const EXPIRY_MS = getClientReservationExpiryMs();
 
 interface OrderCountdownProps {
   /** Order creation date (ISO string or Date) */
@@ -17,7 +26,7 @@ interface OrderCountdownProps {
   tone?: 'default' | 'inverse';
   /** Called when the countdown reaches zero */
   onExpired?: () => void;
-  /** Custom expiry duration in ms (default: 24h) */
+  /** Custom expiry duration in ms (default: reservation window) */
   expiryMs?: number;
 }
 

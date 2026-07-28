@@ -5,7 +5,7 @@ import type { Product } from '@/lib/config';
 export function zustandCartToDrawerCart(items: ZustandCartItem[]): DrawerCartItem[] {
   return items.map((item) => ({
     id: item.id,
-    productId: item.productId || item.id.split('-')[0],
+    productId: item.productId || item.id.split('__')[0].split('-')[0],
     productName: item.name,
     size: item.size || '-',
     quantity: item.qty,

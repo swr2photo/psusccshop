@@ -1,73 +1,85 @@
 // src/app/api/cron/cancel-expired/route.ts
-// Cron job to auto-cancel orders that haven't been paid within 24 hours
+// Cron: auto-cancel unpaid orders past reservation timeout and restore stock
 
 import { NextRequest, NextResponse } from 'next/server';
 import * as Sentry from '@sentry/nextjs';
-import { putJson, getExpiredUnpaidOrders } from '@/lib/filebase';
+import { putJson, getExpiredUnpaidOrders, updateOrderByRef } from '@/lib/filebase';
 import { withCronMonitor } from '@/lib/sentry-cron';
 import { sendOrderCancelledEmail } from '@/lib/email';
 import { triggerSheetSync } from '@/lib/sheet-sync';
 import { verifyCronAuth } from '@/lib/cron-auth';
+import {
+  getReservationHours,
+  releaseOrderStock,
+  reservationCancelReason,
+  shouldReleaseReservationStock,
+  withStockReleasedFlag,
+} from '@/lib/order-reservation';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-// เวลาหมดอายุ (24 ชั่วโมง)
-const EXPIRY_HOURS = 24;
-
-// Secret key for cron authentication (ป้องกันไม่ให้ใครเรียกใช้ได้โดยตรง)
-const CRON_SECRET = process.env.CRON_SECRET;
-
-if (!CRON_SECRET) {
-  console.error('[Cron] CRON_SECRET environment variable is required!');
-}
 
 export async function GET(req: NextRequest) {
   const authError = verifyCronAuth(req);
   if (authError) return authError;
 
+  const expiryHours = getReservationHours();
+
   return withCronMonitor(
     { monitorSlug: 'cancel-expired', schedule: '*/30 * * * *', maxRuntime: 10 },
     async () => {
   try {
-    console.log('[Cron] Starting auto-cancel expired orders...');
+    console.log(`[Cron] Starting reservation timeout cancel (expiry=${expiryHours}h)...`);
     
-    // Use optimized Supabase query to get expired unpaid orders
-    const expiredOrders = await getExpiredUnpaidOrders(EXPIRY_HOURS);
+    const expiredOrders = await getExpiredUnpaidOrders(expiryHours);
     
     let cancelledCount = 0;
+    let stockRestoredCount = 0;
     let errorCount = 0;
     const cancelledOrders: string[] = [];
     
     for (const order of expiredOrders) {
       try {
-        console.log(`[Cron] Cancelling expired order: ${order.ref}`);
-        
-        // อัปเดตสถานะเป็น CANCELLED
-        const updatedOrder = {
+        console.log(`[Cron] Cancelling expired reservation: ${order.ref}`);
+
+        let updatedOrder: any = {
           ...order,
           status: 'CANCELLED',
-          cancelReason: 'ยกเลิกอัตโนมัติ: ไม่ได้ชำระเงินภายใน 24 ชั่วโมง',
+          cancelReason: reservationCancelReason(expiryHours),
           cancelledAt: new Date().toISOString(),
           cancelledBy: 'SYSTEM_AUTO',
+          reservationTimedOut: true,
         };
+
+        if (shouldReleaseReservationStock(order, order.status)) {
+          const release = await releaseOrderStock(order);
+          stockRestoredCount += release.restored;
+          updatedOrder = withStockReleasedFlag(updatedOrder, {
+            stockRestoreRestored: release.restored,
+            stockRestoreFailed: release.failed,
+          });
+          console.log(`[Cron] Stock release for ${order.ref}:`, release);
+        }
         
-        // Use orderKey pattern for putJson
-        const date = new Date(order.date || order.createdAt);
-        const yyyy = date.getFullYear();
-        const mm = String(date.getMonth() + 1).padStart(2, '0');
-        const key = `orders/${yyyy}-${mm}/${order.ref}.json`;
+        // Prefer DB update; also write legacy key for sheet/compat paths
+        try {
+          await updateOrderByRef(order.ref, updatedOrder);
+        } catch (dbErr) {
+          console.warn(`[Cron] updateOrderByRef failed for ${order.ref}, falling back to putJson:`, dbErr);
+          const date = new Date(order.date || order.createdAt);
+          const yyyy = date.getFullYear();
+          const mm = String(date.getMonth() + 1).padStart(2, '0');
+          const key = `orders/${yyyy}-${mm}/${order.ref}.json`;
+          await putJson(key, updatedOrder);
+        }
         
-        await putJson(key, updatedOrder);
-        
-        // ส่ง email แจ้งลูกค้า
         const email = order.customerEmail || order.email;
         try {
           await sendOrderCancelledEmail({
             ref: order.ref,
             customerName: order.customerName || order.name,
             customerEmail: email,
-            reason: 'ไม่ได้ชำระเงินภายใน 24 ชั่วโมง หากต้องการสั่งซื้อใหม่ สามารถทำรายการได้ที่เว็บไซต์',
+            reason: `ไม่ได้ชำระเงินภายใน ${expiryHours} ชั่วโมง สต็อกถูกคืนเข้าระบบแล้ว หากต้องการสั่งซื้อใหม่ สามารถทำรายการได้ที่เว็บไซต์`,
           });
         } catch (emailError) {
           console.error(`[Cron] Failed to send cancellation email for ${order.ref}:`, emailError);
@@ -81,7 +93,6 @@ export async function GET(req: NextRequest) {
       }
     }
     
-    // Sync กับ Google Sheets ถ้ามีการยกเลิก
     if (cancelledCount > 0) {
       triggerSheetSync().catch((err) => {
         console.error('[Cron] Failed to sync sheets:', err);
@@ -90,10 +101,12 @@ export async function GET(req: NextRequest) {
     
     const result = {
       status: 'success',
-      message: `Checked ${expiredOrders.length} expired orders, cancelled ${cancelledCount}`,
+      message: `Reservation timeout: checked ${expiredOrders.length}, cancelled ${cancelledCount}, stock lines restored ${stockRestoredCount}`,
       details: {
+        expiryHours,
         checked: expiredOrders.length,
         cancelled: cancelledCount,
+        stockLinesRestored: stockRestoredCount,
         errors: errorCount,
         cancelledOrders,
       },
@@ -116,7 +129,6 @@ export async function GET(req: NextRequest) {
   });
 }
 
-// POST method สำหรับ manual trigger (ต้องส่ง Authorization: Bearer CRON_SECRET)
 export async function POST(req: NextRequest) {
   const authError = verifyCronAuth(req);
   if (authError) return authError;

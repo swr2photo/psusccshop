@@ -103,6 +103,30 @@ export async function POST(req: NextRequest) {
       if (body.cancelReason) {
         order.cancelReason = body.cancelReason;
       }
+
+      // Reservation timeout / cancel: restore deducted stock once
+      if (String(status).toUpperCase() === 'CANCELLED') {
+        try {
+          const {
+            releaseOrderStock,
+            shouldReleaseReservationStock,
+            withStockReleasedFlag,
+          } = await import('@/lib/order-reservation');
+          if (shouldReleaseReservationStock(order, previousStatus)) {
+            const release = await releaseOrderStock({ ...order, status: previousStatus });
+            Object.assign(
+              order,
+              withStockReleasedFlag(order, {
+                stockRestoreRestored: release.restored,
+                stockRestoreFailed: release.failed,
+                cancelledAt: order.cancelledAt || new Date().toISOString(),
+              }),
+            );
+          }
+        } catch (stockErr) {
+          console.error('[Status API] stock release on cancel failed:', stockErr);
+        }
+      }
       
       // Add tracking info if provided
       if (body.trackingNumber) {

@@ -308,12 +308,16 @@ export async function POST(req: NextRequest) {
 
     const ref = sanitizedBody?.ref ? String(sanitizedBody.ref) : generateRef();
     const now = new Date();
+    const { buildReservationExpiresAt, getReservationHours } = await import('@/lib/order-reservation');
     const customerEmail = normalizeEmail(sanitizedBody.customerEmail || sanitizedBody.email);
     const order = {
       ref,
       date: now.toISOString(),
       createdAt: now.toISOString(),
       status: 'WAITING_PAYMENT',
+      /** Soft hold: stock deducted until paid or reservation expires */
+      reservationExpiresAt: buildReservationExpiresAt(now),
+      reservationHours: getReservationHours(),
       customerEmail,
       customerName: sanitizedBody.customerName || sanitizedBody.name || '',
       customerPhone: sanitizedBody.customerPhone || sanitizedBody.phone || '',
@@ -329,6 +333,7 @@ export async function POST(req: NextRequest) {
       discount: promoDiscount,
       totalAmount,
       amount: totalAmount,
+      stockReleased: false,
       ...(sanitizedBody.shopId ? { shopId: sanitizedBody.shopId } : {}),
       ...(sanitizedBody.shopSlug ? { shopSlug: sanitizedBody.shopSlug } : {}),
     };
@@ -588,6 +593,18 @@ export async function DELETE(req: NextRequest) {
       if (existing?.customerEmail) {
         await removeIndexEntry(existing.customerEmail, ref);
       }
+      // Hard delete still releases stock if not already released
+      try {
+        const {
+          releaseOrderStock,
+          shouldReleaseReservationStock,
+        } = await import('@/lib/order-reservation');
+        if (shouldReleaseReservationStock(existing, existing.status)) {
+          await releaseOrderStock(existing);
+        }
+      } catch (stockErr) {
+        console.error('[Orders API] stock release on hard delete failed:', stockErr);
+      }
       await deleteOrderByRef(ref);
       triggerSheetSync().catch(() => {});
       return NextResponse.json(
@@ -596,7 +613,26 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    const order = { ...existing, status: 'CANCELLED' };
+    const previousStatus = existing.status;
+    let order = { ...existing, status: 'CANCELLED', cancelledAt: new Date().toISOString() };
+    try {
+      const {
+        releaseOrderStock,
+        shouldReleaseReservationStock,
+        withStockReleasedFlag,
+      } = await import('@/lib/order-reservation');
+      if (shouldReleaseReservationStock(existing, previousStatus)) {
+        const release = await releaseOrderStock(existing);
+        order = withStockReleasedFlag(order, {
+          stockRestoreRestored: release.restored,
+          stockRestoreFailed: release.failed,
+          cancelReason: existing.cancelReason || 'ยกเลิกโดยผู้ใช้/แอดมิน — คืนสต็อกแล้ว',
+        });
+      }
+    } catch (stockErr) {
+      console.error('[Orders API] stock release on cancel failed:', stockErr);
+    }
+
     await updateOrderByRef(ref, order);
     if (order.customerEmail) {
       await upsertIndexEntry(order.customerEmail, order);

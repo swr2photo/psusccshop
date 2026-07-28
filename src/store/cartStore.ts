@@ -3,6 +3,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { ProductCategory, ProductSubType, ProductVariant, ProductCustomField, ProductPattern } from '@/lib/config';
+import { ensureUniqueCartLineIds } from '@/lib/shop-constants';
 
 // รองรับหลายหมวดหมู่สินค้า
 export interface Product {
@@ -44,6 +45,7 @@ interface CartState {
   cart: CartItem[];
   addToCart: (item: CartItem) => void;
   removeFromCart: (index: number) => void;
+  removeFromCartById: (id: string) => void;
   updateItem: (index: number, item: CartItem) => void;
   clearCart: () => void;
   /** Clear only items belonging to a specific shop (or main shop if shopSlug is undefined) */
@@ -63,6 +65,11 @@ export const useCartStore = create<CartState>()(
         cart: state.cart.filter((_, i) => i !== index) 
       })),
 
+      /** Remove a single line by unique cart line id (does not wipe duplicate products). */
+      removeFromCartById: (id: string) => set((state) => ({
+        cart: state.cart.filter((item) => item.id !== id),
+      })),
+
       updateItem: (index, newItem) => set((state) => {
         const newCart = [...state.cart];
         newCart[index] = newItem;
@@ -80,7 +87,12 @@ export const useCartStore = create<CartState>()(
       setCart: (cart) => set({ cart }),
     }),
     {
-      name: 'cart-storage', 
+      name: 'cart-storage',
+      merge: (persisted, current) => {
+        const p = persisted as Partial<CartState> | undefined;
+        const cart = ensureUniqueCartLineIds((p?.cart || current.cart || []) as CartItem[]);
+        return { ...current, ...p, cart };
+      },
     }
   )
 );

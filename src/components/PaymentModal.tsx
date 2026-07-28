@@ -13,6 +13,7 @@ import { PaymentCountdown } from './OrderCountdown';
 import StripePromptPay from './StripePromptPay';
 import { useTranslation } from '@/hooks/useTranslation';
 import { toast } from '@/components/ui/toast';
+import { cancelOrder } from '@/lib/api-client';
 import {
   ISSUER,
   bahtText,
@@ -120,12 +121,25 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const printRegionRef = useRef<HTMLDivElement>(null);
+  const reservationCancelRef = useRef(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
 
   const hasSlip = Boolean(selectedFile);
   const discountValue = Math.abs(discount);
+
+  const handleReservationExpired = useCallback(async () => {
+    if (reservationCancelRef.current || isPaid) return;
+    reservationCancelRef.current = true;
+    addToast('warning', t.payment.expiredPayment, t.payment.autoCancel);
+    try {
+      await cancelOrder(orderRef);
+    } catch (err) {
+      console.error('[PaymentModal] reservation cancel failed:', err);
+    }
+    onClose();
+  }, [addToast, isPaid, onClose, orderRef, t.payment.autoCancel, t.payment.expiredPayment]);
 
   const [swipeDragOffset, setSwipeDragOffset] = useState(0);
   const [isSwipeDragging, setIsSwipeDragging] = useState(false);
@@ -904,7 +918,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                 {orderDate && (
                   <PaymentCountdown
                     orderDate={orderDate}
-                    onExpired={() => addToast('warning', t.payment.expiredPayment, t.payment.autoCancel)}
+                    onExpired={handleReservationExpired}
                   />
                 )}
               </Box>
@@ -1109,7 +1123,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                   <StripePromptPay
                     orderRef={orderRef}
                     orderDate={orderDate ?? undefined}
-                    onExpired={() => addToast('warning', t.payment.expiredPayment, t.payment.autoCancel)}
+                    onExpired={handleReservationExpired}
                     onSuccess={handleStripeSuccess}
                   />
                 </Box>

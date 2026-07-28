@@ -101,7 +101,12 @@ async function GETHandler(request: NextRequest) {
 
     return NextResponse.json(
       { reviews: responseReviews },
-      { headers: { 'Cache-Control': API_CACHE.medium } }
+      {
+        headers: {
+          // Reviews change on submit — avoid CDN stale lists wiping the UI
+          'Cache-Control': API_CACHE.private,
+        },
+      }
     );
   } catch (error: any) {
     console.error('GET /api/reviews error:', error);

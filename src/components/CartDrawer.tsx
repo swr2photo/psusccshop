@@ -309,9 +309,16 @@ export default function CartDrawer(props: CartDrawerProps) {
         onClose={onClose}
         PaperProps={{
           sx: {
-            height: isMobile ? { xs: '90vh', sm: '80vh' } : '100vh',
-            maxHeight: isMobile ? '90vh' : '100vh',
-            width: isMobile ? '100%' : '440px',
+            // Prefer dvh/svh so iPad Safari chrome + home indicator don't clip the CTA
+            height: isMobile ? { xs: '90dvh', sm: '80dvh' } : '100dvh',
+            maxHeight: isMobile ? '90dvh' : '100svh',
+            '@supports not (height: 100dvh)': {
+              height: isMobile ? { xs: '90vh', sm: '80vh' } : '100vh',
+              maxHeight: isMobile ? '90vh' : '100vh',
+            },
+            width: isMobile ? '100%' : { xs: '100%', sm: '440px' },
+            maxWidth: '100vw',
+            boxSizing: 'border-box',
             borderTopLeftRadius: isMobile ? { xs: 20, sm: 24 } : { xs: 0, sm: 24 },
             borderTopRightRadius: isMobile ? { xs: 20, sm: 24 } : 0,
             borderBottomLeftRadius: isMobile ? 0 : { xs: 0, sm: 24 },
@@ -683,12 +690,16 @@ export default function CartDrawer(props: CartDrawerProps) {
         {cart.length > 0 && (
           <Box sx={{
             px: { xs: 2, sm: 3 },
-            py: 2,
+            pt: 2,
             borderTop: '1px solid var(--glass-border)',
             background: 'var(--glass-strong)',
             backdropFilter: 'blur(20px)',
-            paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
+            // Extra inset so the CTA stays tappable above iPad home indicator / Safari chrome
+            paddingBottom: 'max(20px, calc(env(safe-area-inset-bottom, 0px) + 16px))',
             flexShrink: 0,
+            position: 'sticky',
+            bottom: 0,
+            zIndex: 11,
           }}>
             {/* Shipping note / free-shipping progress */}
             <Box sx={{
@@ -767,13 +778,14 @@ export default function CartDrawer(props: CartDrawerProps) {
               onClick={() => onCheckout(promoResult || undefined)}
               disabled={!canCheckout}
               sx={{
-                py: 1.8,
+                py: { xs: 1.5, sm: 1.6 },
+                minHeight: 48,
                 borderRadius: '14px',
                 background: canCheckout
                   ? 'linear-gradient(135deg, #34c759 0%, #30b350 100%)'
                   : 'rgba(100,116,139,0.2)',
                 color: canCheckout ? 'white' : 'var(--text-muted)',
-                fontSize: '1rem',
+                fontSize: { xs: '0.95rem', sm: '1rem' },
                 fontWeight: 700,
                 textTransform: 'none',
                 boxShadow: canCheckout ? '0 4px 20px rgba(52,199,89,0.28)' : 'none',

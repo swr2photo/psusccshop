@@ -193,7 +193,8 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { useCurrentTime } from '@/hooks/useCurrentTime';
 import { useShopCatalog, useProductReviews, PAGE_CACHE_KEYS } from '@/hooks/usePageData';
 import { mutate } from 'swr';
-import { parseThailandDateTime, isValidDate } from '@/lib/shop-constants';
+import { parseThailandDateTime, isValidDate, createCartLineId, ensureUniqueCartLineIds } from '@/lib/shop-constants';
+import { getClientReservationExpiryMs } from '@/components/OrderCountdown';
 
 const STATUS_LABELS: Record<string, string> = {
   PENDING: 'รอดำเนินการ',
@@ -828,7 +829,7 @@ export default function HomePage() {
   const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
   const [reviewRating, setReviewRating] = useState(0);
   const [reviewComment, setReviewComment] = useState('');
-  const [productReviews, setProductReviews] = useState<Record<string, Array<{ id: string; userName: string; userImage?: string; rating: number; comment: string; date: string; verified: boolean; helpful: number }>>>({});
+  const [productReviews, setProductReviews] = useState<Record<string, Array<{ id: string; userName: string; userImage?: string; rating: number; comment: string; date: string; verified: boolean; helpful: number; isOwner?: boolean }>>>({});
   const [editingCartItem, setEditingCartItem] = useState<CartItem | null>(null);
   const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
   const [bulkOrderOpen, setBulkOrderOpen] = useState(false);
@@ -852,7 +853,10 @@ export default function HomePage() {
     marketingConsent: false,
   });
 
-  const { reviews: selectedProductReviewsList } = useProductReviews(selectedProduct?.id, orderData.email);
+  const { reviews: selectedProductReviewsList, mutate: mutateProductReviews } = useProductReviews(
+    selectedProduct?.id,
+    orderData.email || session?.user?.email,
+  );
   const [productDialogOpen, setProductDialogOpen] = useState(false);
   const [bottomPanelCollapsed, setBottomPanelCollapsed] = useState(true);
   const [productOptions, setProductOptions] = useState<ProductOptions>({
@@ -937,7 +941,7 @@ export default function HomePage() {
   const { isActive: isLiveActive, liveTitle, openLiveStream } = useLiveStreamContext();
 
   const pendingOrderCount = useMemo(() => {
-    const EXPIRY_MS = 24 * 60 * 60 * 1000;
+    const EXPIRY_MS = getClientReservationExpiryMs();
     return orderHistory.filter((order) => {
       const status = normalizeStatus(order.status);
       if (!PAYABLE_STATUSES.includes(status)) return false;
@@ -1255,7 +1259,7 @@ export default function HomePage() {
     const pending = flushFlagshipCartQueue(true);
     if (pending.length > 0) {
       setCart((prev) => {
-        const next = [...prev, ...pending];
+        const next = ensureUniqueCartLineIds([...prev, ...pending]);
         if (session?.user?.email) {
           saveCartApi(session.user.email, next).catch((err) =>
             console.error('Failed to persist flagship cart', err),
@@ -1381,7 +1385,7 @@ export default function HomePage() {
         // Don't wipe a non-empty local cart with an ambiguous empty server response
         setCart((prev) => {
           if (serverCart.length === 0 && prev.length > 0) return prev;
-          return serverCart;
+          return ensureUniqueCartLineIds(serverCart as CartItem[]);
         });
       } catch (error) {
         console.error('Failed to load cart:', error);
@@ -1601,7 +1605,7 @@ export default function HomePage() {
     return cart[0]?.shopId || subShopCatalog.find((s) => s.slug === slug)?.id;
   }, [cart, subShopCatalog]);
 
-  // Sync SWR-cached reviews into local state (supports optimistic updates after submit)
+  // Sync SWR reviews into local state (SWR is source of truth after mutate)
   useEffect(() => {
     if (!selectedProduct?.id) return;
     setProductReviews((prev) => ({
@@ -1609,6 +1613,36 @@ export default function HomePage() {
       [selectedProduct.id]: selectedProductReviewsList,
     }));
   }, [selectedProduct?.id, selectedProductReviewsList]);
+
+  const refreshProductReviews = useCallback(
+    async (productId: string) => {
+      if (!productId) return;
+      const viewer = orderData.email || session?.user?.email || '';
+      const qs = new URLSearchParams({
+        productId,
+        _t: String(Date.now()),
+      });
+      if (viewer) qs.set('viewerEmail', viewer);
+      try {
+        const freshRes = await apiFetch(`/api/reviews?${qs.toString()}`, { cache: 'no-store' });
+        if (!freshRes.ok) {
+          await mutateProductReviews();
+          return;
+        }
+        const freshData = await freshRes.json();
+        if (Array.isArray(freshData.reviews)) {
+          setProductReviews((prev) => ({ ...prev, [productId]: freshData.reviews }));
+          await mutateProductReviews({ reviews: freshData.reviews }, { revalidate: false });
+        } else {
+          await mutateProductReviews();
+        }
+      } catch (err) {
+        console.error('[reviews] refresh failed:', err);
+        await mutateProductReviews();
+      }
+    },
+    [mutateProductReviews, orderData.email, session?.user?.email],
+  );
 
   //  Auto-cycle through announcements
   useEffect(() => {
@@ -1959,10 +1993,11 @@ export default function HomePage() {
   };
 
   const saveCart = async (newCart: CartItem[]) => {
-    setCart(newCart);
+    const uniqueCart = ensureUniqueCartLineIds(newCart);
+    setCart(uniqueCart);
     if (!session?.user?.email) return;
     try {
-      await saveCartApi(session.user.email, newCart);
+      await saveCartApi(session.user.email, uniqueCart);
     } catch (error) {
       console.error('Failed to save cart:', error);
     }
@@ -2082,7 +2117,7 @@ export default function HomePage() {
     const patternToUse = productOptions.pattern || '';
 
     return {
-      id: `${selectedProduct.id}-${productOptions.size}-${normalizedCustomName}-${productOptions.customNumber}-${productOptions.isLongSleeve}-${patternToUse}`,
+      id: createCartLineId(selectedProduct.id),
       productId: selectedProduct.id,
       productName: selectedProduct.name,
       size: sizeToUse,
@@ -2181,7 +2216,7 @@ export default function HomePage() {
     }
 
     const item: CartItem = {
-      id: `${product.id}-${sizeToUse}----false-`,
+      id: createCartLineId(product.id),
       productId: product.id,
       productName: product.name,
       size: sizeToUse,
@@ -2255,7 +2290,7 @@ export default function HomePage() {
       if (discount) basePrice = discount.discountedPrice(basePrice);
       const unitPrice = basePrice + longSleeveFee;
       return {
-        id: `${selectedProduct.id}-${a.size}-${a.name}--${bulkLongSleeve}`,
+        id: createCartLineId(selectedProduct.id),
         productId: selectedProduct.id,
         productName: selectedProduct.name,
         size: a.size,
@@ -2706,12 +2741,11 @@ export default function HomePage() {
     }
   }, [session?.user?.email]);
 
-  // ===== Auto-cancel expired unpaid orders (24h) =====
-  // Check if waiting_payment orders have expired and auto-cancel them client-side
+  // ===== Auto-cancel expired unpaid orders (reservation timeout) =====
   useEffect(() => {
     if (orderHistory.length === 0) return;
     
-    const EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+    const EXPIRY_MS = getClientReservationExpiryMs();
     const expiredOrders = orderHistory.filter((order) => {
       const status = normalizeStatus(order.status);
       if (!PAYABLE_STATUSES.includes(status)) return false;
@@ -2721,7 +2755,6 @@ export default function HomePage() {
     });
 
     if (expiredOrders.length > 0) {
-      // Update local state immediately for UI feedback
       setOrderHistory((prev) =>
         prev.map((order) => {
           const isExpired = expiredOrders.some((e) => e.ref === order.ref);
@@ -2729,7 +2762,6 @@ export default function HomePage() {
         })
       );
 
-      // Trigger server-side cancel for each expired order (fire and forget)
       expiredOrders.forEach((order) => {
         cancelOrder(order.ref).catch((err) =>
           console.error(`[auto-cancel] Failed to cancel expired order ${order.ref}:`, err)
@@ -4962,18 +4994,8 @@ export default function HomePage() {
             if (res.ok) {
               const data = await res.json();
               if (data.success) {
-                // Fetch updated reviews
                 if (selectedProduct?.id) {
-                  const freshRes = await apiFetch(`/api/reviews?productId=${encodeURIComponent(selectedProduct.id)}${orderData.email ? `&viewerEmail=${encodeURIComponent(orderData.email)}` : ''}`);
-                  if (freshRes.ok) {
-                    const freshData = await freshRes.json();
-                    if (freshData.reviews) {
-                      setProductReviews((prev) => ({
-                        ...prev,
-                        [selectedProduct.id]: freshData.reviews,
-                      }));
-                    }
-                  }
+                  await refreshProductReviews(selectedProduct.id);
                 }
                 showToast('success', (t.reviews as any)?.deleteSuccess || 'Review deleted successfully');
               } else {
@@ -6636,28 +6658,47 @@ export default function HomePage() {
                     method: editingReviewId ? 'PUT' : 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(reviewData),
+                    cache: 'no-store',
                   });
                   
                   if (res.ok) {
                     const data = await res.json();
                     if (editingReviewId || data.success) {
-                      // Fetch updated reviews
-                      const freshRes = await apiFetch(`/api/reviews?productId=${encodeURIComponent(selectedProduct?.id || '')}${orderData.email ? `&viewerEmail=${encodeURIComponent(orderData.email)}` : ''}`);
-                      if (freshRes.ok) {
-                        const freshData = await freshRes.json();
-                        if (freshData.reviews) {
-                          setProductReviews((prev) => ({
-                            ...prev,
-                            [selectedProduct?.id || '']: freshData.reviews,
-                          }));
-                        }
+                      const productId = selectedProduct?.id || '';
+                      // Optimistic UI — show review immediately
+                      if (productId && data.review && !editingReviewId) {
+                        const optimistic = {
+                          id: String(data.review.id),
+                          userName: session.user.name || 'Anonymous',
+                          userImage: session.user.image || undefined,
+                          rating: reviewRating,
+                          comment: reviewComment,
+                          date: new Date().toISOString(),
+                          verified: Boolean(data.review.verified),
+                          helpful: 0,
+                          isOwner: true,
+                        };
+                        setProductReviews((prev) => ({
+                          ...prev,
+                          [productId]: [optimistic, ...(prev[productId] || [])],
+                        }));
+                        await mutateProductReviews(
+                          { reviews: [optimistic, ...(selectedProductReviewsList || [])] },
+                          { revalidate: false },
+                        );
+                      }
+                      if (productId) {
+                        await refreshProductReviews(productId);
                       }
                       showToast('success', editingReviewId ? 'อัปเดตรีวิวสำเร็จ' : t.reviews.thankYou);
+                      setReviewRating(0);
+                      setReviewComment('');
                     } else {
                       showToast('error', data.error || 'Failed to submit review');
                     }
                   } else {
-                    showToast('error', 'Failed to submit review');
+                    const errBody = await res.json().catch(() => null);
+                    showToast('error', errBody?.error || 'Failed to submit review');
                   }
                 } catch (err) {
                   console.error('Submit review error:', err);

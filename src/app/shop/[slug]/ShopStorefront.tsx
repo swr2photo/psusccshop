@@ -70,7 +70,9 @@ import {
   productRequiresSize, getDisplaySizes, resolveProductUnitPrice, resolveSizeMeasurement,
   resolveShopOpenFields, applyRealtimeShopRow,
   parseThailandDateTime,
+  createCartLineId,
 } from '@/lib/shop-constants';
+import { getClientReservationExpiryMs } from '@/components/OrderCountdown';
 
 // ==================== TYPES ====================
 interface ShopInfo {
@@ -415,11 +417,34 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
   const [cancellingRef, setCancellingRef] = useState<string | null>(null);
 
   const pendingPaymentCount = useMemo(() => {
+    const EXPIRY_MS = getClientReservationExpiryMs();
     return orderHistory.filter((order) => {
       const category = getStatusCategory(normalizeStatus(order.status));
-      return category === 'WAITING_PAYMENT';
+      if (category !== 'WAITING_PAYMENT') return false;
+      if (!order.date) return true;
+      return Date.now() - new Date(order.date).getTime() < EXPIRY_MS;
     }).length;
   }, [orderHistory]);
+
+  // Auto-cancel expired unpaid reservations (matches home page + cron)
+  useEffect(() => {
+    if (orderHistory.length === 0) return;
+    const EXPIRY_MS = getClientReservationExpiryMs();
+    const expired = orderHistory.filter((order) => {
+      const category = getStatusCategory(normalizeStatus(order.status));
+      if (category !== 'WAITING_PAYMENT' || !order.date) return false;
+      return Date.now() - new Date(order.date).getTime() >= EXPIRY_MS;
+    });
+    if (expired.length === 0) return;
+    setOrderHistory((prev) =>
+      prev.map((o) => (expired.some((e) => e.ref === o.ref) ? { ...o, status: 'CANCELLED' } : o)),
+    );
+    expired.forEach((order) => {
+      cancelOrderApi(order.ref).catch((err) =>
+        console.error(`[auto-cancel] Failed to cancel expired order ${order.ref}:`, err),
+      );
+    });
+  }, [orderHistory.length]);
 
   const needsPatternFirst = useMemo(() => {
     if (!selectedProduct) return false;
@@ -835,6 +860,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
 
   // Cart operations
   const removeFromCart = useCartStore((s) => s.removeFromCart);
+  const removeFromCartById = useCartStore((s) => s.removeFromCartById);
   const updateItem = useCartStore((s) => s.updateItem);
 
   const handleRemoveCartItem = useCallback((idx: number) => {
@@ -865,9 +891,9 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
   }, [findCartIndexById, handleUpdateCartQty]);
 
   const removeDrawerCartItem = useCallback((id: string) => {
-    const idx = findCartIndexById(id);
-    if (idx >= 0) handleRemoveCartItem(idx);
-  }, [findCartIndexById, handleRemoveCartItem]);
+    removeFromCartById(id);
+    showToast('success', lang === 'en' ? 'Removed from cart' : 'ลบสินค้าออกจากตะกร้าแล้ว');
+  }, [removeFromCartById, showToast, lang]);
 
   const stopCartHold = useCallback((id: string) => {
     const timer = cartHoldTimers.current[id];
@@ -1251,7 +1277,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
     }
 
     return {
-      id: `${selectedProduct.id}-${selectedSize || '-'}-${variantForCart?.id || '-'}-${patternName || '-'}-${isLongSleeve === true ? 'LONG' : 'SHORT'}-${normalizedCustomName || '-'}-${customNumber || '-'}`,
+      id: createCartLineId(selectedProduct.id),
       productId: selectedProduct.id,
       name: selectedProduct.name,
       type: selectedProduct.type || 'OTHER' as const,
