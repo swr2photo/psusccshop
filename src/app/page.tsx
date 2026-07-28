@@ -855,7 +855,7 @@ export default function HomePage() {
 
   const { reviews: selectedProductReviewsList, mutate: mutateProductReviews } = useProductReviews(
     selectedProduct?.id,
-    orderData.email || session?.user?.email,
+    orderData.email || session?.user?.email || undefined,
   );
   const [productDialogOpen, setProductDialogOpen] = useState(false);
   const [bottomPanelCollapsed, setBottomPanelCollapsed] = useState(true);
