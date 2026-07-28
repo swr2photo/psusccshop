@@ -130,6 +130,29 @@ export function toPublicShopData(shop: Shop) {
   };
 }
 
+/**
+ * Lean catalog entry for the main home storefront (/api/shops/catalog).
+ * Keeps products + checkout-related fields; drops announcement history,
+ * social feeds, payment details, and other storefront-page-only payload.
+ */
+export function toPublicShopCatalogEntry(shop: Shop) {
+  return {
+    id: shop.id,
+    slug: shop.slug,
+    name: shop.name,
+    nameEn: shop.nameEn,
+    logoUrl: shop.logoUrl,
+    isOpen: shop.settings?.isOpen ?? true,
+    settings: shop.settings ? { isOpen: shop.settings.isOpen ?? true } : undefined,
+    products: (shop.products || []).filter((p) => p.isActive !== false),
+    events: shop.config?.events || [],
+    shirtNameConfig: shop.config?.shirtNameConfig,
+    nameValidation: shop.config?.nameValidation,
+    shippingOptions: shop.config?.shippingOptions || [],
+    promoCodes: shop.config?.promoCodes || [],
+  };
+}
+
 export interface ShopSummary {
   id: string;
   slug: string;
@@ -276,7 +299,7 @@ export async function listActiveShops(): Promise<ShopSummary[]> {
 }
 
 /** Active sub-shops with at least one active product — for main storefront catalog */
-export const PUBLIC_SHOP_CATALOG_CACHE_KEY = 'shops:public-catalog';
+export const PUBLIC_SHOP_CATALOG_CACHE_KEY = 'shops:public-catalog-v2';
 
 export function invalidatePublicShopCatalogCache() {
   invalidateCacheKey(PUBLIC_SHOP_CATALOG_CACHE_KEY);
@@ -292,7 +315,7 @@ export async function listActivePublicShopCatalog() {
       return data
         .map(dbToShop)
         .filter((shop: Shop) => (shop.products || []).some((p: { isActive?: boolean }) => p.isActive !== false))
-        .map(toPublicShopData);
+        .map(toPublicShopCatalogEntry);
     } catch (error: any) {
       console.error('[shops] listActivePublicShopCatalog error:', error.message);
       return [];

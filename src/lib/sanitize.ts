@@ -292,20 +292,10 @@ export function sanitizeConfigForPublic(config: ShopConfig | null): PublicShopCo
     }));
   }
   
-  // Copy announcement history without postedBy, encode image URLs
-  if (config.announcementHistory) {
-    sanitized.announcementHistory = config.announcementHistory.map(h => ({
-      id: h.id,
-      message: h.message,
-      color: h.color,
-      imageUrl: encodeImageUrl(h.imageUrl),
-      displayName: h.displayName,
-      postedAt: h.postedAt,
-      type: h.type,
-      deletedAt: h.deletedAt,
-      // SECURITY: postedBy and deletedBy removed - admin emails hidden
-    }));
-  }
+  // announcementHistory omitted from public /api/config — not needed on first paint.
+  // AnnouncementBar history drawer stays empty on the main storefront (active
+  // announcements still ship via `announcements`). Sub-shop pages still get
+  // history from toPublicShopData.
   
   // Bank account - mask account number for security
   if (config.bankAccount) {

@@ -8,8 +8,6 @@ import OptimizedImage, { preloadImages, OptimizedBackground } from '@/components
 import { useGalleryImagePreload, isGalleryImageInRange } from '@/hooks/useGalleryImagePreload';
 import { Palette, MessageCircle as ChatIcon, Send as SendIcon, X as CloseIcon, Bot as SmartToyIcon, RotateCcw as RefreshIcon, Sparkles as AutoAwesomeIcon, Store as StorefrontIcon, Copy as ContentCopyIcon, Check as CheckIcon, Maximize2 as FullscreenIcon, Minimize2 as FullscreenExitIcon, ImagePlus as AddPhotoAlternateIcon, ShoppingCart as ShoppingCartOutlinedIcon, Coins as PaidOutlinedIcon, Ruler as StraightenOutlinedIcon, Truck as LocalShippingOutlinedIcon, Wallet as AccountBalanceWalletOutlinedIcon, HelpCircle as HelpOutlineOutlinedIcon, Image as ImageOutlinedIcon, User as PersonOutlineIcon, BadgeCheck as VerifiedIcon, BookOpen as MenuBookOutlinedIcon, Hand as WavingHandIcon, Reply as ReplyIcon, Pencil as EditIcon, ClipboardList as ClipboardListIcon, Tag as TagIcon, ChevronUp, ChevronDown } from 'lucide-react';
 
-import ShirtChatBot from '@/components/ShirtChatBot';
-import { ProductDetailsDialog } from '@/components/ProductDetailsDialog';
 import MobileBottomNav from '@/components/MobileBottomNav';
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -137,6 +135,12 @@ const OrderHistoryDrawer = dynamic(() => import('@/components/OrderHistoryDrawer
 const CheckoutDialog = dynamic(() => import('@/components/CheckoutDialog'), { ssr: false });
 const SupportChatWidget = dynamic(() => import('@/components/SupportChatWidget'), { ssr: false });
 const PasskeyLoginButton = dynamic(() => import('@/components/PasskeyLoginButton'), { ssr: false });
+const ShirtChatBot = dynamic(() => import('@/components/ShirtChatBot'), { ssr: false });
+const ProductDetailsDialog = dynamic(
+  () => import('@/components/ProductDetailsDialog').then((m) => m.ProductDetailsDialog),
+  { ssr: false },
+);
+const LoginScreen = dynamic(() => import('@/components/LoginScreen'), { ssr: false });
 
 // Common tag translations for well-known tags
 const TAG_TRANSLATIONS_TH_TO_EN: Record<string, string> = {
@@ -154,7 +158,6 @@ const TAG_TRANSLATIONS_TH_TO_EN: Record<string, string> = {
 import ShopLoadingShell from '@/components/ShopLoadingShell';
 import ThemeToggle from '@/components/ThemeToggle';
 import LanguageToggle from '@/components/LanguageToggle';
-import LoginScreen from '@/components/LoginScreen';
 import { 
   Product, 
   ShopConfig, 
@@ -493,9 +496,10 @@ type LeanConfig = {
   closeDate?: string;
   openDate?: string;
   announcements: ShopConfig['announcements'];
-  announcementHistory?: ShopConfig['announcementHistory'];
   products: LeanProduct[];
 };
+/** Above-the-fold cover preload budget (hero + first grid tiles). */
+const HOME_COVER_PRELOAD_LIMIT = 6;
 
 /** Sync read of lean storefront config from sessionStorage (client only). */
 function readCachedShopConfig(): LeanConfig | null {
@@ -527,13 +531,14 @@ function sanitizeShopConfig(cfg: ShopConfig): LeanConfig {
     closeDate: cfg.closeDate,
     openDate: cfg.openDate,
     announcements: cfg.announcements || [],
-    announcementHistory: cfg.announcementHistory || [],
+    // announcementHistory omitted from warm cache — not needed for first paint / skeleton skip
     products: (cfg.products || []).map((p) => ({
       id: p.id,
       name: p.name,
       description: p.description,
       type: p.type,
-      images: p.images,
+      // Keep first cover only in session cache to shrink payload
+      images: p.images?.slice(0, 1),
       basePrice: p.basePrice,
       sizePricing: p.sizePricing,
       isActive: p.isActive,
@@ -838,9 +843,7 @@ export default function HomePage() {
   const [announcements, setAnnouncements] = useState<ShopConfig['announcements']>(() =>
     readCachedShopConfig()?.announcements || [],
   );
-  const [announcementHistory, setAnnouncementHistory] = useState<ShopConfig['announcementHistory']>(() =>
-    readCachedShopConfig()?.announcementHistory || [],
-  );
+  const [announcementHistory, setAnnouncementHistory] = useState<ShopConfig['announcementHistory']>([]);
   const [showAnnouncementHistory, setShowAnnouncementHistory] = useState(false);
   const [showAnnouncementPopup, setShowAnnouncementPopup] = useState(true); // For floating popup
   const [currentAnnouncementIndex, setCurrentAnnouncementIndex] = useState(0); // For cycling announcements
@@ -1126,14 +1129,14 @@ export default function HomePage() {
     if (!cached) return;
     setConfig(cached as unknown as ShopConfig);
     setAnnouncements(cached.announcements || []);
-    setAnnouncementHistory(cached.announcementHistory || []);
     const shopStatus = getShopStatus(cached.isOpen, cached.closeDate, cached.openDate);
     setIsShopOpen(shopStatus === 'OPEN');
     setLoading(false);
 
     const imageUrls = (cached.products || [])
       .flatMap((p) => p.images?.slice(0, 1) || [])
-      .filter(Boolean);
+      .filter(Boolean)
+      .slice(0, HOME_COVER_PRELOAD_LIMIT);
     if (imageUrls.length > 0) {
       preloadImages(imageUrls).catch(() => {});
     }
@@ -1851,10 +1854,28 @@ export default function HomePage() {
   }, []);
 
 
-  // Use realtime subscriptions for user's orders
+  // Use realtime subscriptions for user's orders (deferred until after first paint)
   const userEmail = session?.user?.email;
+  const [realtimeReady, setRealtimeReady] = useState(false);
+  useEffect(() => {
+    let idleId: number | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const enable = () => setRealtimeReady(true);
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      idleId = window.requestIdleCallback(enable, { timeout: 2500 });
+    } else {
+      timeoutId = setTimeout(enable, 1200);
+    }
+    return () => {
+      if (idleId != null && typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
+        window.cancelIdleCallback(idleId);
+      }
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, []);
+
   const { isConnected: realtimeConnected, error: realtimeError } = useRealtimeOrdersByEmail(
-    userEmail,
+    realtimeReady ? userEmail : null,
     handleOrderChange,
     handleConfigChange
   );
@@ -1917,73 +1938,92 @@ export default function HomePage() {
     };
   }, [refreshConfig, configRealtimeOk]);
 
-  // Subscribe to config updates in realtime (for both logged-in and guest users)
+  // Subscribe to config updates in realtime (logged-in + guest).
+  // Deferred until idle so first paint / shop-open from /api/config isn't blocked.
   useEffect(() => {
     if (!supabase) return undefined;
-    
-    console.log('[Realtime] Initializing guest/public config subscription');
-    const channel = supabase
-      .channel('public-config-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'config',
-          // Lightweight version row bumped by the server on every config save
-          filter: 'key=eq.config-version',
-        },
-        (payload) => {
-          console.log('[Realtime] Public config change payload:', payload);
-          const newData = payload.new as Record<string, any> | null;
-          handleConfigChange(newData?.value || {});
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'shops',
-        },
-        (payload) => {
-          console.log('[Realtime] Public shops change payload:', payload);
-          // Refetch the public sub-shop catalog via SWR
-          mutate(PAGE_CACHE_KEYS.CATALOG);
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'products',
-        },
-        (payload) => {
-          console.log('[Realtime] Public products change payload:', payload);
-          mutate(PAGE_CACHE_KEYS.CATALOG);
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'categories',
-        },
-        (payload) => {
-          console.log('[Realtime] Public categories change payload:', payload);
-          mutate(PAGE_CACHE_KEYS.CATALOG);
-        }
-      )
-      .subscribe((status) => {
-        console.log('[Realtime] Public config subscription status:', status);
-        setConfigRealtimeOk(status === 'SUBSCRIBED');
-      });
+
+    let cancelled = false;
+    let channel: ReturnType<NonNullable<typeof supabase>['channel']> | null = null;
+    let idleId: number | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    const start = () => {
+      if (cancelled || !supabase) return;
+      console.log('[Realtime] Initializing guest/public config subscription');
+      channel = supabase
+        .channel('public-config-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'config',
+            // Lightweight version row bumped by the server on every config save
+            filter: 'key=eq.config-version',
+          },
+          (payload) => {
+            console.log('[Realtime] Public config change payload:', payload);
+            const newData = payload.new as Record<string, any> | null;
+            handleConfigChange(newData?.value || {});
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'shops',
+          },
+          (payload) => {
+            console.log('[Realtime] Public shops change payload:', payload);
+            mutate(PAGE_CACHE_KEYS.CATALOG);
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'products',
+          },
+          (payload) => {
+            console.log('[Realtime] Public products change payload:', payload);
+            mutate(PAGE_CACHE_KEYS.CATALOG);
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'categories',
+          },
+          (payload) => {
+            console.log('[Realtime] Public categories change payload:', payload);
+            mutate(PAGE_CACHE_KEYS.CATALOG);
+          }
+        )
+        .subscribe((status) => {
+          console.log('[Realtime] Public config subscription status:', status);
+          setConfigRealtimeOk(status === 'SUBSCRIBED');
+        });
+    };
+
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      idleId = window.requestIdleCallback(start, { timeout: 2500 });
+    } else {
+      timeoutId = setTimeout(start, 1200);
+    }
 
     return () => {
+      cancelled = true;
+      if (idleId != null && typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
+        window.cancelIdleCallback(idleId);
+      }
+      if (timeoutId) clearTimeout(timeoutId);
       setConfigRealtimeOk(false);
-      channel.unsubscribe();
+      channel?.unsubscribe();
     };
   }, [handleConfigChange]);
 
@@ -2754,13 +2794,8 @@ export default function HomePage() {
   };
   loadOrderHistoryRef.current = loadOrderHistory;
 
-  // Prefetch order history for navbar pending-payment badge
-  useEffect(() => {
-    if (!session?.user?.email) return;
-    if (!historyLoadedRef.current) {
-      void loadOrderHistoryRef.current({ silent: true });
-    }
-  }, [session?.user?.email]);
+  // Prefetch order history removed — load on history drawer open / #history deep-link
+  // (pending badge fills once history is opened or via realtime order events)
 
   // ===== Auto-cancel expired unpaid orders (reservation timeout) =====
   useEffect(() => {
