@@ -289,6 +289,7 @@ export function sanitizeConfigForPublic(config: ShopConfig | null): PublicShopCo
       specialIcon: a.specialIcon,
       link: a.link,
       linkText: a.linkText,
+      linkedProductId: a.linkedProductId,
     }));
   }
   

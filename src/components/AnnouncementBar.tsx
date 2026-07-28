@@ -212,6 +212,15 @@ export default function AnnouncementBar({
     [socialMediaNews]
   );
 
+  // Fingerprint so a new/edited announcement reappears even if the user dismissed earlier
+  const contentFingerprint = useMemo(
+    () =>
+      enabled
+        .map((a) => `${a.id}|${a.message}|${a.color}|${a.imageUrl || ''}|${a.postedAt || ''}|${a.link || ''}|${a.linkedProductId || ''}`)
+        .join('::'),
+    [enabled]
+  );
+
   const goTo = useCallback(
     (next: number) => {
       setCurrentIndex(((next % enabled.length) + enabled.length) % enabled.length);
@@ -228,14 +237,20 @@ export default function AnnouncementBar({
   }, [enabled.length, paused, currentIndex, goTo]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && sessionStorage.getItem('ann_dismissed')) {
-      setDismissed(true);
-    }
-  }, []);
+    if (typeof window === 'undefined') return;
+    // Migrate legacy session dismiss that blocked all future announcements
+    sessionStorage.removeItem('ann_dismissed');
+    const dismissedFp = sessionStorage.getItem('ann_dismissed_fp');
+    setDismissed(Boolean(contentFingerprint) && dismissedFp === contentFingerprint);
+    setCurrentIndex(0);
+    setExpanded(false);
+  }, [contentFingerprint]);
 
   const handleDismiss = () => {
     setDismissed(true);
-    if (typeof window !== 'undefined') sessionStorage.setItem('ann_dismissed', '1');
+    if (typeof window !== 'undefined' && contentFingerprint) {
+      sessionStorage.setItem('ann_dismissed_fp', contentFingerprint);
+    }
   };
 
   const locale = lang === 'en' ? 'en-US' : 'th-TH';

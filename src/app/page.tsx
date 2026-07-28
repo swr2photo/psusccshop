@@ -1930,10 +1930,10 @@ export default function HomePage() {
     }
 
     // Fallback polling when config realtime is not available
-    const intervalMs = 60_000; // 60s fallback when config realtime is down
+    const intervalMs = 15_000; // keep announcements relatively fresh while reconnecting
     configPollTimer.current = setInterval(() => {
       if (document.visibilityState === 'hidden') return;
-      refreshConfig();
+      refreshConfig(true);
     }, intervalMs);
 
     return () => {
@@ -1942,91 +1942,72 @@ export default function HomePage() {
   }, [refreshConfig, configRealtimeOk]);
 
   // Subscribe to config updates in realtime (logged-in + guest).
-  // Deferred until idle so first paint / shop-open from /api/config isn't blocked.
+  // Start immediately so announcement / shop-open changes feel live.
   useEffect(() => {
     if (!supabase) return undefined;
 
-    let cancelled = false;
-    let channel: ReturnType<NonNullable<typeof supabase>['channel']> | null = null;
-    let idleId: number | undefined;
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
-
-    const start = () => {
-      if (cancelled || !supabase) return;
-      console.log('[Realtime] Initializing guest/public config subscription');
-      channel = supabase
-        .channel('public-config-changes')
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'config',
-            // Lightweight version row bumped by the server on every config save
-            filter: 'key=eq.config-version',
-          },
-          (payload) => {
-            console.log('[Realtime] Public config change payload:', payload);
-            const newData = payload.new as Record<string, any> | null;
-            handleConfigChange(newData?.value || {});
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'shops',
-          },
-          (payload) => {
-            console.log('[Realtime] Public shops change payload:', payload);
-            mutate(PAGE_CACHE_KEYS.CATALOG);
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'products',
-          },
-          (payload) => {
-            console.log('[Realtime] Public products change payload:', payload);
-            mutate(PAGE_CACHE_KEYS.CATALOG);
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'categories',
-          },
-          (payload) => {
-            console.log('[Realtime] Public categories change payload:', payload);
-            mutate(PAGE_CACHE_KEYS.CATALOG);
-          }
-        )
-        .subscribe((status) => {
-          console.log('[Realtime] Public config subscription status:', status);
-          setConfigRealtimeOk(status === 'SUBSCRIBED');
-        });
-    };
-
-    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-      idleId = window.requestIdleCallback(start, { timeout: 2500 });
-    } else {
-      timeoutId = setTimeout(start, 1200);
-    }
+    console.log('[Realtime] Initializing guest/public config subscription');
+    const channel = supabase
+      .channel('public-config-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'config',
+          // Lightweight version row bumped by the server on every config save
+          filter: 'key=eq.config-version',
+        },
+        (payload) => {
+          console.log('[Realtime] Public config change payload:', payload);
+          const newData = payload.new as Record<string, any> | null;
+          handleConfigChange(newData?.value || {});
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'shops',
+        },
+        (payload) => {
+          console.log('[Realtime] Public shops change payload:', payload);
+          mutate(PAGE_CACHE_KEYS.CATALOG);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'products',
+        },
+        (payload) => {
+          console.log('[Realtime] Public products change payload:', payload);
+          mutate(PAGE_CACHE_KEYS.CATALOG);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'categories',
+        },
+        (payload) => {
+          console.log('[Realtime] Public categories change payload:', payload);
+          mutate(PAGE_CACHE_KEYS.CATALOG);
+        }
+      )
+      .subscribe((status) => {
+        console.log('[Realtime] Public config subscription status:', status);
+        setConfigRealtimeOk(status === 'SUBSCRIBED');
+      });
 
     return () => {
-      cancelled = true;
-      if (idleId != null && typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
-        window.cancelIdleCallback(idleId);
-      }
-      if (timeoutId) clearTimeout(timeoutId);
       setConfigRealtimeOk(false);
-      channel?.unsubscribe();
+      channel.unsubscribe();
     };
   }, [handleConfigChange]);
 
@@ -3889,6 +3870,29 @@ export default function HomePage() {
         )}
       </AppBar>
 
+      {/* Announcements — top of page, under sticky nav */}
+      <AnnouncementBar
+        announcements={announcements || []}
+        history={announcementHistory}
+        socialMediaNews={config?.socialMediaNews}
+        onProductClick={(productId) => {
+          const products = config?.products || [];
+          let product = null;
+          if (productId && productId !== '__default__') {
+            product = products.find(p => p.id === productId)
+              || products.find(p => p.id?.includes(productId) || productId?.includes(p.id));
+          }
+          if (!product && products.length > 0) {
+            product = products[0];
+          }
+          if (product) {
+            handleSelectProduct(product);
+          } else {
+            document.getElementById('product-grid')?.scrollIntoView({ behavior: 'smooth' });
+          }
+        }}
+      />
+
       {/* Shop Status Banner - Shows different states (not open, coming soon, order ended, etc.) */}
       <ShopStatusBanner 
         isOpen={isShopOpen}
@@ -3905,30 +3909,6 @@ export default function HomePage() {
         }}
       />
       <HomeTrustStrip />
-
-      {/* Modern Announcement Bar */}
-      <AnnouncementBar
-        announcements={announcements || []}
-        history={announcementHistory}
-        socialMediaNews={config?.socialMediaNews}
-        onProductClick={(productId) => {
-          const products = config?.products || [];
-          let product = null;
-          if (productId && productId !== '__default__') {
-            product = products.find(p => p.id === productId)
-              || products.find(p => p.id?.includes(productId) || productId?.includes(p.id));
-          }
-          // Fallback: open first product if only one, or scroll to grid
-          if (!product && products.length > 0) {
-            product = products[0];
-          }
-          if (product) {
-            handleSelectProduct(product);
-          } else {
-            document.getElementById('product-grid')?.scrollIntoView({ behavior: 'smooth' });
-          }
-        }}
-      />
 
       {/* Event / Promotion Banners */}
       <EventBanner
