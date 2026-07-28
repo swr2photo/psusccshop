@@ -8,12 +8,19 @@ import Link from 'next/link';
 import { useTranslation } from '@/hooks/useTranslation';
 import { cn } from '@/lib/utils';
 
-const OPT_IN_DEFAULT = {
+type ConsentChoices = {
+  essential: true;
+  functional: boolean;
+  analytics: boolean;
+  marketing: boolean;
+};
+
+const OPT_IN_DEFAULT: ConsentChoices = {
   essential: true,
   functional: false,
   analytics: false,
   marketing: false,
-} as const;
+};
 
 /**
  * Bottom floating cookie banner — non-blocking, PDPA opt-in defaults (OFF except essential).
@@ -23,7 +30,7 @@ export default function CookieConsentBanner() {
   const { showConsentBanner, acceptAll, acceptEssential, updateConsent, consent } =
     useNotification();
   const [showDetails, setShowDetails] = useState(false);
-  const [customConsent, setCustomConsent] = useState({ ...OPT_IN_DEFAULT });
+  const [customConsent, setCustomConsent] = useState<ConsentChoices>({ ...OPT_IN_DEFAULT });
 
   useEffect(() => {
     if (!showConsentBanner) return;
