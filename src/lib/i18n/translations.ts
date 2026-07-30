@@ -1942,6 +1942,7 @@ const misc = {
 // ==================== THEME ====================
 const theme = {
   th: {
+    label: 'ธีม',
     auto: 'ตามระบบ',
     dark: 'มืด',
     light: 'สว่าง',
@@ -1950,7 +1951,8 @@ const theme = {
     changeTheme: 'เปลี่ยนธีม',
   },
   en: {
-    auto: 'Auto',
+    label: 'Theme',
+    auto: 'System',
     dark: 'Dark',
     light: 'Light',
     darkTheme: 'Dark Mode',

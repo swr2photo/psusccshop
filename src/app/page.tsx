@@ -89,6 +89,9 @@ import {
   Bot,
   HandMetal,
   Settings,
+  Globe,
+  Sun,
+  Moon,
   Share2,
   Link2,
   Percent,
@@ -981,13 +984,15 @@ export default function HomePage() {
 
   // Theme sync with DB
   const themeMode = useThemeStore((s) => s.mode);
+  const setThemeMode = useThemeStore((s) => s.setMode);
+  const resolvedThemeMode = useThemeStore((s) => s.resolvedMode);
   const prevThemeModeRef = useRef<ThemeMode | null>(null);
 
   // Wishlist & Recently Viewed
   const wishlistStore = useWishlistStore();
   const recentlyViewedStore = useRecentlyViewedStore();
 
-  const { t, lang } = useTranslation();
+  const { t, lang, setLanguage } = useTranslation();
   const STATUS_LABELS_I18N: Record<string, string> = t.status as unknown as Record<string, string>;
   const TYPE_LABELS_I18N: Record<string, string> = t.type as unknown as Record<string, string>;
 
@@ -1027,20 +1032,70 @@ export default function HomePage() {
 
   const sidebarMenuRowSx = {
     textAlign: 'left' as const,
-    mb: 0.25,
+    mb: 0,
     color: 'var(--foreground)',
     justifyContent: 'flex-start',
-    borderRadius: 2,
-    px: 1.5,
-    py: 1.05,
+    borderRadius: 0,
+    px: 0,
+    py: 1.35,
+    minHeight: 0,
     textTransform: 'none' as const,
     fontWeight: 500,
+    fontSize: '0.875rem',
+    letterSpacing: '0.01em',
     bgcolor: 'transparent',
     boxShadow: 'none',
     border: 'none',
+    borderBottom: '1px solid color-mix(in srgb, var(--foreground) 8%, transparent)',
     '&:hover': {
-      bgcolor: 'var(--surface-2)',
+      bgcolor: 'color-mix(in srgb, var(--foreground) 4%, transparent)',
     },
+    '& .MuiButton-startIcon': {
+      mr: 1.5,
+      ml: 0,
+      color: 'var(--text-muted)',
+    },
+  };
+
+  const sidebarSectionLabelSx = {
+    fontSize: '0.65rem',
+    fontWeight: 700,
+    color: 'var(--text-muted)',
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase' as const,
+    lineHeight: 1.2,
+  };
+
+  const sidebarSegmentSx = (active: boolean) => ({
+    flex: 1,
+    py: 0.65,
+    px: 0.75,
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontSize: '0.68rem',
+    fontWeight: 700,
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase' as const,
+    fontFamily: 'inherit',
+    lineHeight: 1.2,
+    transition: 'background 0.15s ease, color 0.15s ease',
+    bgcolor: active ? 'var(--foreground)' : 'transparent',
+    color: active ? 'var(--background)' : 'var(--text-muted)',
+    '&:hover': {
+      color: active ? 'var(--background)' : 'var(--foreground)',
+    },
+  });
+
+  const sidebarSegmentTrackSx = {
+    display: 'flex',
+    gap: '2px',
+    p: '3px',
+    borderRadius: '6px',
+    border: '1px solid color-mix(in srgb, var(--foreground) 12%, transparent)',
+    bgcolor: 'color-mix(in srgb, var(--foreground) 4%, transparent)',
+    flexShrink: 0,
+    minWidth: 0,
   };
 
   // Hydrate lean config from sessionStorage before paint so remounts skip the skeleton
@@ -3669,56 +3724,127 @@ export default function HomePage() {
         onClose={() => setSidebarOpen(false)}
         PaperProps={{
           sx: {
-            bgcolor: 'var(--surface)',
+            bgcolor: 'var(--background)',
             color: 'var(--foreground)',
-            width: 'min(320px, 85vw)',
+            width: 'min(340px, 88vw)',
             maxHeight: '100dvh',
-            overflowY: 'auto',
-            WebkitOverflowScrolling: 'touch',
-            backdropFilter: 'blur(24px)',
-            borderLeft: navHandedness === 'left' ? 'none' : '1px solid var(--glass-border)',
-            borderRight: navHandedness === 'left' ? '1px solid var(--glass-border)' : 'none',
-            boxShadow: (theme: any) => {
-              const dir = navHandedness === 'left' ? '18px' : '-18px';
-              return theme.palette.mode === 'dark' ? `${dir} 0 60px rgba(0,0,0,0.45)` : `${dir} 0 60px rgba(0,0,0,0.08)`;
-            },
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            borderLeft: navHandedness === 'left' ? 'none' : '1px solid color-mix(in srgb, var(--foreground) 10%, transparent)',
+            borderRight: navHandedness === 'left' ? '1px solid color-mix(in srgb, var(--foreground) 10%, transparent)' : 'none',
+            boxShadow: navHandedness === 'left'
+              ? '4px 0 24px rgba(0,0,0,0.08)'
+              : '-4px 0 24px rgba(0,0,0,0.08)',
           },
         }}
       >
-        <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6" sx={{ fontWeight: 'bold' }}>{t.nav.menu}</Typography>
-            <IconButton onClick={() => setSidebarOpen(false)} aria-label={t.common.close}>
-              <X style={{ color: 'var(--foreground)' }} size={24} />
-            </IconButton>
-          </Box>
+        {/* Header — PCD-style uppercase + hairline */}
+        <Box
+          sx={{
+            px: 2.5,
+            pt: 2,
+            pb: 1.75,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            borderBottom: '1px solid color-mix(in srgb, var(--foreground) 10%, transparent)',
+            flexShrink: 0,
+          }}
+        >
+          <Typography
+            sx={{
+              fontSize: '0.95rem',
+              fontWeight: 700,
+              color: 'var(--foreground)',
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+              lineHeight: 1.3,
+            }}
+          >
+            {t.nav.menu}
+          </Typography>
+          <IconButton
+            onClick={() => setSidebarOpen(false)}
+            aria-label={t.common.close}
+            sx={{ color: 'var(--foreground)', p: 0.75, '&:hover': { bgcolor: 'transparent', opacity: 0.7 } }}
+          >
+            <X size={20} />
+          </IconButton>
+        </Box>
 
+        <Box
+          sx={{
+            px: 2.5,
+            py: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            flex: 1,
+            minHeight: 0,
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
+          }}
+        >
           {session ? (
             <>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2.5, px: 0.5 }}>
-                <Avatar src={orderData.profileImage || session?.user?.image || ''} sx={{ mr: 1.5, width: 44, height: 44 }} />
+              {/* Profile */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.5,
+                  py: 2.25,
+                  borderBottom: '1px solid color-mix(in srgb, var(--foreground) 8%, transparent)',
+                }}
+              >
+                <Avatar
+                  src={orderData.profileImage || session?.user?.image || ''}
+                  sx={{
+                    width: 48,
+                    height: 48,
+                    border: '1px solid color-mix(in srgb, var(--foreground) 12%, transparent)',
+                  }}
+                />
                 <Box sx={{ minWidth: 0 }}>
-                  <Typography sx={{ fontWeight: 700, color: 'var(--foreground)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <Typography
+                    sx={{
+                      fontWeight: 700,
+                      fontSize: '0.95rem',
+                      color: 'var(--foreground)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      lineHeight: 1.3,
+                    }}
+                  >
                     {session?.user?.name}
                   </Typography>
-                  <Typography variant="caption" sx={{ color: 'var(--text-muted)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <Typography
+                    sx={{
+                      mt: 0.25,
+                      fontSize: '0.72rem',
+                      color: 'var(--text-muted)',
+                      display: 'block',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
                     {session?.user?.email}
                   </Typography>
                 </Box>
               </Box>
 
               {/* Account section */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 1.5, mb: 0.75 }}>
-                <User size={14} color="var(--text-muted)" />
-                <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.02em' }}>
-                  {t.nav.myAccount}
-                </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, pt: 2.25, pb: 0.75 }}>
+                <User size={12} color="var(--text-muted)" />
+                <Typography sx={sidebarSectionLabelSx}>{t.nav.myAccount}</Typography>
               </Box>
               <Button
                 fullWidth
                 onClick={() => { setSidebarOpen(false); setShowProfileModal(true); setActiveTab('profile'); }}
                 sx={sidebarMenuRowSx}
-                startIcon={<User size={20} />}
+                startIcon={<MapPin size={18} />}
               >
                 {t.nav.myShippingInfo}
               </Button>
@@ -3734,7 +3860,7 @@ export default function HomePage() {
                     invisible={pendingOrderCount === 0}
                     sx={historyBadgeSx}
                   >
-                    <History size={20} />
+                    <History size={18} />
                   </Badge>
                 )}
               >
@@ -3750,7 +3876,7 @@ export default function HomePage() {
                     color="error"
                     sx={{ '& .MuiBadge-badge': { fontSize: '0.6rem', minWidth: 16, height: 16, bgcolor: '#ff453a' } }}
                   >
-                    <Heart size={20} />
+                    <Heart size={18} />
                   </Badge>
                 }
               >
@@ -3759,24 +3885,31 @@ export default function HomePage() {
               <Button
                 fullWidth
                 onClick={() => { setSidebarOpen(false); setShowRecentlyViewed(true); }}
-                sx={sidebarMenuRowSx}
-                startIcon={<Eye size={20} />}
+                sx={{ ...sidebarMenuRowSx, borderBottom: 'none' }}
+                startIcon={<Eye size={18} />}
               >
                 {t.recentlyViewed.title}
               </Button>
 
               {/* Settings section */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 1.5, mt: 2, mb: 0.75 }}>
-                <Settings size={14} color="var(--text-muted)" />
-                <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.02em' }}>
-                  {t.nav.settingsAndSystem}
-                </Typography>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.75,
+                  pt: 2.5,
+                  pb: 0.75,
+                  borderTop: '1px solid color-mix(in srgb, var(--foreground) 8%, transparent)',
+                }}
+              >
+                <Settings size={12} color="var(--text-muted)" />
+                <Typography sx={sidebarSectionLabelSx}>{t.nav.settingsAndSystem}</Typography>
               </Box>
               <Button
                 fullWidth
                 onClick={() => { setSidebarOpen(false); setSwitchAccountOpen(true); }}
                 sx={sidebarMenuRowSx}
-                startIcon={<ArrowLeftRight size={20} />}
+                startIcon={<ArrowLeftRight size={18} />}
               >
                 {t.nav.switchAccount}
               </Button>
@@ -3786,16 +3919,20 @@ export default function HomePage() {
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   gap: 1,
-                  px: 1.5,
-                  py: 0.85,
-                  mb: 0.25,
-                  borderRadius: 2,
+                  py: 1.25,
+                  borderBottom: '1px solid color-mix(in srgb, var(--foreground) 8%, transparent)',
                   color: 'var(--foreground)',
-                  '&:hover': { bgcolor: 'var(--surface-2)' },
                 }}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
-                  <HandMetal size={20} style={{ flexShrink: 0, transform: navHandedness === 'left' ? 'scaleX(-1)' : 'none' }} />
+                  <HandMetal
+                    size={18}
+                    style={{
+                      flexShrink: 0,
+                      color: 'var(--text-muted)',
+                      transform: navHandedness === 'left' ? 'scaleX(-1)' : 'none',
+                    }}
+                  />
                   <Typography sx={{ fontSize: '0.875rem', fontWeight: 500 }}>
                     {t.nav.rightHandedMode}
                   </Typography>
@@ -3820,33 +3957,222 @@ export default function HomePage() {
                 />
               </Box>
 
-              <Divider sx={{ my: 1.5, borderColor: 'var(--glass-border)' }} />
-              <Button
-                fullWidth
-                onClick={() => { setSidebarOpen(false); setLogoutConfirmOpen(true); }}
+              {/* Language */}
+              <Box
                 sx={{
-                  ...sidebarMenuRowSx,
-                  color: '#ff3b30',
-                  '&:hover': { bgcolor: 'rgba(255,59,48,0.08)' },
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 1.5,
+                  py: 1.25,
+                  borderBottom: '1px solid color-mix(in srgb, var(--foreground) 8%, transparent)',
                 }}
-                startIcon={<LogOut size={20} color="#ff3b30" />}
               >
-                {t.nav.logout}
-              </Button>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
+                  <Globe size={18} style={{ flexShrink: 0, color: 'var(--text-muted)' }} />
+                  <Typography sx={{ fontSize: '0.875rem', fontWeight: 500 }}>
+                    {t.misc.language}
+                  </Typography>
+                </Box>
+                <Box sx={{ ...sidebarSegmentTrackSx, width: 96 }} role="group" aria-label={t.misc.language}>
+                  {([
+                    { code: 'th' as const, label: 'TH' },
+                    { code: 'en' as const, label: 'EN' },
+                  ]).map(({ code, label }) => (
+                    <Box
+                      key={code}
+                      component="button"
+                      type="button"
+                      onClick={() => {
+                        setLanguage(code);
+                        try {
+                          document.documentElement.lang = code === 'th' ? 'th' : 'en';
+                        } catch { /* ignore */ }
+                      }}
+                      aria-pressed={lang === code}
+                      sx={sidebarSegmentSx(lang === code)}
+                    >
+                      {label}
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+
+              {/* Theme */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 1.5,
+                  py: 1.25,
+                  pb: 2,
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
+                  {resolvedThemeMode === 'dark'
+                    ? <Moon size={18} style={{ flexShrink: 0, color: 'var(--text-muted)' }} />
+                    : <Sun size={18} style={{ flexShrink: 0, color: 'var(--text-muted)' }} />}
+                  <Typography sx={{ fontSize: '0.875rem', fontWeight: 500 }}>
+                    {t.theme.label}
+                  </Typography>
+                </Box>
+                <Box sx={{ ...sidebarSegmentTrackSx, width: 168 }} role="group" aria-label={t.theme.label}>
+                  {([
+                    { mode: 'light' as const, label: t.theme.light },
+                    { mode: 'dark' as const, label: t.theme.dark },
+                    { mode: 'system' as const, label: t.theme.auto },
+                  ]).map(({ mode, label }) => (
+                    <Box
+                      key={mode}
+                      component="button"
+                      type="button"
+                      onClick={() => setThemeMode(mode)}
+                      aria-pressed={themeMode === mode}
+                      sx={sidebarSegmentSx(themeMode === mode)}
+                    >
+                      {label}
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
             </>
           ) : (
-            <Button
-              component={Link}
-              href="/"
-              fullWidth
-              onClick={() => setSidebarOpen(false)}
-              sx={sidebarMenuRowSx}
-              startIcon={<Home size={20} />}
-            >
-              {t.nav.home}
-            </Button>
+            <>
+              <Button
+                component={Link}
+                href="/"
+                fullWidth
+                onClick={() => setSidebarOpen(false)}
+                sx={{ ...sidebarMenuRowSx, mt: 1 }}
+                startIcon={<Home size={18} />}
+              >
+                {t.nav.home}
+              </Button>
+
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.75,
+                  pt: 2.5,
+                  pb: 0.75,
+                  borderTop: '1px solid color-mix(in srgb, var(--foreground) 8%, transparent)',
+                }}
+              >
+                <Settings size={12} color="var(--text-muted)" />
+                <Typography sx={sidebarSectionLabelSx}>{t.nav.settingsAndSystem}</Typography>
+              </Box>
+
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 1.5,
+                  py: 1.25,
+                  borderBottom: '1px solid color-mix(in srgb, var(--foreground) 8%, transparent)',
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
+                  <Globe size={18} style={{ flexShrink: 0, color: 'var(--text-muted)' }} />
+                  <Typography sx={{ fontSize: '0.875rem', fontWeight: 500 }}>
+                    {t.misc.language}
+                  </Typography>
+                </Box>
+                <Box sx={{ ...sidebarSegmentTrackSx, width: 96 }} role="group" aria-label={t.misc.language}>
+                  {([
+                    { code: 'th' as const, label: 'TH' },
+                    { code: 'en' as const, label: 'EN' },
+                  ]).map(({ code, label }) => (
+                    <Box
+                      key={code}
+                      component="button"
+                      type="button"
+                      onClick={() => {
+                        setLanguage(code);
+                        try {
+                          document.documentElement.lang = code === 'th' ? 'th' : 'en';
+                        } catch { /* ignore */ }
+                      }}
+                      aria-pressed={lang === code}
+                      sx={sidebarSegmentSx(lang === code)}
+                    >
+                      {label}
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 1.5,
+                  py: 1.25,
+                  mb: 2,
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
+                  {resolvedThemeMode === 'dark'
+                    ? <Moon size={18} style={{ flexShrink: 0, color: 'var(--text-muted)' }} />
+                    : <Sun size={18} style={{ flexShrink: 0, color: 'var(--text-muted)' }} />}
+                  <Typography sx={{ fontSize: '0.875rem', fontWeight: 500 }}>
+                    {t.theme.label}
+                  </Typography>
+                </Box>
+                <Box sx={{ ...sidebarSegmentTrackSx, width: 168 }} role="group" aria-label={t.theme.label}>
+                  {([
+                    { mode: 'light' as const, label: t.theme.light },
+                    { mode: 'dark' as const, label: t.theme.dark },
+                    { mode: 'system' as const, label: t.theme.auto },
+                  ]).map(({ mode, label }) => (
+                    <Box
+                      key={mode}
+                      component="button"
+                      type="button"
+                      onClick={() => setThemeMode(mode)}
+                      aria-pressed={themeMode === mode}
+                      sx={sidebarSegmentSx(themeMode === mode)}
+                    >
+                      {label}
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+            </>
           )}
         </Box>
+
+        {session ? (
+          <Box
+            sx={{
+              px: 2.5,
+              py: 1.5,
+              flexShrink: 0,
+              borderTop: '1px solid color-mix(in srgb, var(--foreground) 10%, transparent)',
+              bgcolor: 'var(--background)',
+            }}
+          >
+            <Button
+              fullWidth
+              onClick={() => { setSidebarOpen(false); setLogoutConfirmOpen(true); }}
+              sx={{
+                ...sidebarMenuRowSx,
+                borderBottom: 'none',
+                color: '#ff3b30',
+                justifyContent: 'flex-start',
+                py: 1.1,
+                '&:hover': { bgcolor: 'rgba(255,59,48,0.06)' },
+                '& .MuiButton-startIcon': { mr: 1.5, ml: 0, color: '#ff3b30' },
+              }}
+              startIcon={<LogOut size={18} />}
+            >
+              {t.nav.logout}
+            </Button>
+          </Box>
+        ) : null}
       </Drawer>
 
       <Box sx={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
