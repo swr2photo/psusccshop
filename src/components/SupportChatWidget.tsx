@@ -26,7 +26,7 @@ import {
   ListItemIcon,
   ListItemText,
 } from '@mui/material';
-import { Headphones as SupportAgentIcon, X as CloseIcon, Send as SendIcon, Clock as TimeIcon, CheckCircle2 as CheckCircleIcon, Star as StarIcon, Bot as ChatbotIcon, Check as DoneIcon, CheckCheck as DoneAllIcon, MessageCircle as ChatIcon, History as HistoryIcon, ArrowLeft as ArrowBackIcon, Plus as AddIcon, MoreVertical as MoreVertIcon, Trash2 as DeleteIcon, Reply as ReplyIcon, Receipt as ReceiptIcon, ShoppingBag as ShoppingBagIcon, Bell as BellIcon, BellOff as BellOffIcon } from 'lucide-react';
+import { Headphones as SupportAgentIcon, X as CloseIcon, Send as SendIcon, Clock as TimeIcon, CheckCircle2 as CheckCircleIcon, Star as StarIcon, Bot as ChatbotIcon, Check as DoneIcon, CheckCheck as DoneAllIcon, MessageCircle as ChatIcon, History as HistoryIcon, ArrowLeft as ArrowBackIcon, Plus as AddIcon, MoreVertical as MoreVertIcon, Trash2 as DeleteIcon, Reply as ReplyIcon, Receipt as ReceiptIcon, ShoppingBag as ShoppingBagIcon, Bell as BellIcon, BellOff as BellOffIcon, Settings as SettingsIcon } from 'lucide-react';
 import { useNotification } from './NotificationContext';
 import { usePushNotification } from '@/hooks/usePushNotification';
 import { useRealtimeChat } from '@/hooks/useRealtimeChat';
@@ -48,6 +48,13 @@ import { ChatImage } from '@/components/ui/chat-image';
 import { ChatComposer } from '@/components/ui/chat-composer';
 import { ChatSystemMarker } from '@/components/ui/chat-system-marker';
 import { VoiceMessage } from '@/components/ui/voice-message';
+import { SupportChatSettingsPanel } from '@/components/SupportChatSettingsPanel';
+import {
+  loadCustomerChatPrefs,
+  saveCustomerChatPrefs,
+  playChatMessageSound,
+  type CustomerChatPrefs,
+} from '@/lib/customer-chat-prefs';
 import {
   MessageScrollerProvider,
   MessageScroller,
@@ -148,6 +155,8 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
   const [pushBannerDismissed, setPushBannerDismissed] = useState(false);
   const [adminDisplayName, setAdminDisplayName] = useState(DEFAULT_ADMIN_NAME);
   const [fallbackTyping, setFallbackTyping] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [chatPrefs, setChatPrefs] = useState<CustomerChatPrefs>(() => loadCustomerChatPrefs());
   const chatEtagRef = useRef<string | null>(null);
   const lastMessageAtRef = useRef<string | null>(null);
   const loadingOlderRef = useRef(false);
@@ -238,6 +247,11 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
       .catch(() => {});
   }, []);
 
+  const updateChatPrefs = useCallback((next: CustomerChatPrefs) => {
+    setChatPrefs(next);
+    saveCustomerChatPrefs(next);
+  }, []);
+
   // Show browser Notification when tab is blurred and new admin message arrives
   useEffect(() => {
     if (!chat?.messages) return;
@@ -248,9 +262,13 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
     // Only notify for genuinely new messages (not on initial load)
     if (lastMessageCountRef.current > 0 && currentCount > lastMessageCountRef.current) {
       const latestMsg = adminMessages[adminMessages.length - 1];
+
+      if (open && chatPrefs.soundEnabled && !chatPrefs.muted) {
+        playChatMessageSound();
+      }
       
       // If tab is not focused or chat is not open, show browser notification
-      if (document.hidden || !open) {
+      if (!chatPrefs.muted && (document.hidden || !open)) {
         if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
           try {
             const notif = new Notification(`SCC Shop - ${t.supportChat.newMessage}`, {
@@ -271,7 +289,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
     }
     
     lastMessageCountRef.current = currentCount;
-  }, [chat?.messages, chat?.id, open]);
+  }, [chat?.messages, chat?.id, open, chatPrefs.muted, chatPrefs.soundEnabled, t.supportChat.newMessage]);
 
   // Scroll only the chat message pane (never the page behind the widget)
   const scrollToBottom = useCallback((force = false) => {
@@ -781,7 +799,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
   const handleSendVoice = async (payload: { base64: string; mime: string; duration: number }) => {
     if (!chat || sending || uploadingImage) return;
     const controller = beginUpload(
-      lang === 'en' ? 'Uploading voice...' : 'กำลังอัปโหลดเสียง...',
+      t.supportChat.uploadingVoice,
       1
     );
     try {
@@ -805,7 +823,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
       }
 
       if (!voiceUrl) {
-        throw new Error(t.supportChat.sendFailed);
+        throw new Error(t.supportChat.voiceUploadFailed);
       }
 
       setUploadProgress(100);
@@ -826,7 +844,7 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
       }
     } catch (error: any) {
       if (error?.name !== 'AbortError') {
-        toastError(error?.message || t.supportChat.sendFailed);
+        toastError(error?.message || t.supportChat.voiceUploadFailed);
       }
     } finally {
       endUpload();
@@ -1245,7 +1263,7 @@ ${getStatusLabel(order.status)}
         onChange={handleImageSelect}
       />
 
-      {/* Floating Chat Button — Modern Animated */}
+      {/* Floating Chat Button — clean primary FAB */}
       <Zoom in={!open}>
         <Box
           sx={{
@@ -1254,84 +1272,23 @@ ${getStatusLabel(order.status)}
             right: { xs: 16, sm: 24 },
             zIndex: 1200,
             display: hideMobileFab ? 'none' : 'block',
-            // Container for glow rings + button
-            width: { xs: 58, sm: 64 },
-            height: { xs: 58, sm: 64 },
           }}
         >
-          {/* Outer aurora glow ring — slow spin */}
-          <Box
-            sx={{
-              position: 'absolute',
-              inset: { xs: -5, sm: -7 },
-              borderRadius: '50%',
-              background: 'conic-gradient(from 0deg, #6366f1, #8b5cf6, #a78bfa, #c084fc, #e879f9, #f472b6, #fb7185, #f97316, #fbbf24, #34d399, #22d3ee, #60a5fa, #6366f1)',
-              opacity: unreadCount > 0 ? 0.85 : 0.35,
-              animation: 'chatGlowSpin 8s linear infinite',
-              filter: { xs: 'blur(6px)', sm: 'blur(10px)' },
-              willChange: 'transform',
-              '@keyframes chatGlowSpin': {
-                '0%': { transform: 'rotate(0deg)' },
-                '100%': { transform: 'rotate(360deg)' },
-              },
-            }}
-          />
-          {/* Inner accent ring — reverse spin, tighter */}
-          <Box
-            sx={{
-              position: 'absolute',
-              inset: { xs: -1, sm: -2 },
-              borderRadius: '50%',
-              background: 'conic-gradient(from 90deg, #818cf8 0%, #c084fc 25%, #f0abfc 50%, #818cf8 75%, #60a5fa 100%)',
-              opacity: unreadCount > 0 ? 0.7 : 0.25,
-              animation: 'chatGlowReverse 5s linear infinite',
-              willChange: 'transform',
-              '@keyframes chatGlowReverse': {
-                '0%': { transform: 'rotate(360deg)' },
-                '100%': { transform: 'rotate(0deg)' },
-              },
-            }}
-          />
-          {/* Pulse ring — expands outward when unread */}
-          {unreadCount > 0 && (
-            <Box
-              sx={{
-                position: 'absolute',
-                inset: 0,
-                borderRadius: '50%',
-                border: '2px solid rgba(139, 92, 246, 0.5)',
-                animation: 'chatPulseRing 2s cubic-bezier(0, 0, 0.2, 1) infinite',
-                '@keyframes chatPulseRing': {
-                  '0%': { transform: 'scale(1)', opacity: 0.6 },
-                  '100%': { transform: 'scale(1.6)', opacity: 0 },
-                },
-              }}
-            />
-          )}
           <Badge
             badgeContent={unreadCount}
             overlap="circular"
             sx={{
-              width: '100%',
-              height: '100%',
               '& .MuiBadge-badge': {
-                right: { xs: 4, sm: 6 },
-                top: { xs: 4, sm: 6 },
-                fontWeight: 800,
-                fontSize: '0.72rem',
-                minWidth: 21,
-                height: 21,
+                right: 4,
+                top: 4,
+                fontWeight: 700,
+                fontSize: '0.7rem',
+                minWidth: 20,
+                height: 20,
                 borderRadius: '50%',
-                background: 'linear-gradient(135deg, #ef4444 0%, #f97316 100%)',
+                bgcolor: 'var(--destructive, #ff3b30)',
                 color: '#fff',
                 border: '2px solid var(--background)',
-                boxShadow: '0 2px 12px rgba(239,68,68,0.6)',
-                animation: unreadCount > 0 ? 'chatBadgePop 1.8s ease-in-out infinite' : 'none',
-                '@keyframes chatBadgePop': {
-                  '0%, 100%': { transform: 'scale(1) translateY(0)' },
-                  '30%': { transform: 'scale(1.25) translateY(-2px)' },
-                  '60%': { transform: 'scale(0.95) translateY(0)' },
-                },
               },
             }}
           >
@@ -1339,56 +1296,22 @@ ${getStatusLabel(order.status)}
               onClick={handleOpenMenu}
               aria-label={t.supportChat.chatTitle}
               sx={{
-                position: 'relative',
-                width: '100%',
-                height: '100%',
-                background: 'linear-gradient(145deg, #7c3aed 0%, #6d28d9 40%, #5b21b6 100%)',
-                color: 'white',
-                boxShadow: '0 8px 30px rgba(109,40,217,0.5), 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255,255,255,0.2), inset 0 -1px 2px rgba(0,0,0,0.15)',
-                overflow: 'hidden',
+                width: { xs: 56, sm: 60 },
+                height: { xs: 56, sm: 60 },
+                bgcolor: 'var(--primary)',
+                color: 'var(--primary-foreground)',
+                boxShadow: '0 8px 24px color-mix(in srgb, var(--primary) 35%, transparent)',
                 borderRadius: '50%',
-                // Sheen sweep
-                '&::before': {
-                  content: '""',
-                  position: 'absolute',
-                  top: 0,
-                  left: '-150%',
-                  width: '80%',
-                  height: '100%',
-                  background: 'linear-gradient(105deg, transparent 20%, rgba(255,255,255,0.25) 50%, transparent 80%)',
-                  animation: 'chatSheen 4s ease-in-out infinite',
-                  pointerEvents: 'none',
-                  '@keyframes chatSheen': {
-                    '0%, 100%': { left: '-150%' },
-                    '40%': { left: '150%' },
-                    '41%': { left: '-150%' },
-                  },
-                },
-                // Top highlight arc
-                '&::after': {
-                  content: '""',
-                  position: 'absolute',
-                  top: 2,
-                  left: '20%',
-                  right: '20%',
-                  height: '40%',
-                  borderRadius: '50%',
-                  background: 'linear-gradient(180deg, rgba(255,255,255,0.2) 0%, transparent 100%)',
-                  pointerEvents: 'none',
-                },
+                border: '1px solid color-mix(in srgb, var(--primary) 70%, #000)',
                 '&:hover': {
-                  background: 'linear-gradient(145deg, #8b5cf6 0%, #7c3aed 40%, #6d28d9 100%)',
-                  transform: 'scale(1.1)',
-                  boxShadow: '0 12px 40px rgba(124,58,237,0.6), 0 4px 12px rgba(0,0,0,0.25), inset 0 1px 1px rgba(255,255,255,0.25)',
+                  bgcolor: 'color-mix(in srgb, var(--primary) 88%, #000)',
+                  transform: 'scale(1.05)',
                 },
-                '&:active': {
-                  transform: 'scale(0.92)',
-                  boxShadow: '0 4px 16px rgba(109,40,217,0.4), inset 0 2px 4px rgba(0,0,0,0.2)',
-                },
-                transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                '&:active': { transform: 'scale(0.96)' },
+                transition: 'transform 0.2s ease, background-color 0.2s ease',
               }}
             >
-              <ChatIcon size={26} strokeWidth={2.3} />
+              <ChatIcon size={24} strokeWidth={2.2} />
             </IconButton>
           </Badge>
         </Box>
@@ -1666,9 +1589,9 @@ ${getStatusLabel(order.status)}
           {/* Header */}
           <Box
             sx={{
-              bgcolor: '#18181b',
-              color: 'rgba(255,255,255,0.92)',
-              borderBottom: '1px solid rgba(255,255,255,0.08)',
+              bgcolor: 'var(--foreground)',
+              color: 'var(--background)',
+              borderBottom: '1px solid color-mix(in srgb, var(--background) 12%, transparent)',
               px: 2,
               py: 1.5,
               display: 'flex',
@@ -1677,24 +1600,41 @@ ${getStatusLabel(order.status)}
               flexShrink: 0,
             }}
           >
-            {showHistory && (
+            {showHistory || showSettings ? (
               <IconButton
-                onClick={() => { setShowHistory(false); fetchActiveChat(); }}
-                sx={{ color: 'rgba(255,255,255,0.85)', mr: -0.5 }}
+                onClick={() => {
+                  if (showSettings) {
+                    setShowSettings(false);
+                    return;
+                  }
+                  setShowHistory(false);
+                  fetchActiveChat();
+                }}
+                sx={{ color: 'inherit', mr: -0.5, opacity: 0.9 }}
                 size="small"
               >
-                <ArrowBackIcon size={24} />
+                <ArrowBackIcon size={22} />
               </IconButton>
-            )}
+            ) : null}
             <Avatar 
               src="/favicon.png" 
-              sx={{ bgcolor: 'rgba(255,255,255,0.08)', width: 40, height: 40, border: '1px solid rgba(255,255,255,0.1)' }}
+              sx={{
+                bgcolor: 'color-mix(in srgb, var(--background) 12%, transparent)',
+                width: 40,
+                height: 40,
+                border: '1px solid color-mix(in srgb, var(--background) 16%, transparent)',
+              }}
             />
-            <Box sx={{ flex: 1 }}>
-              <Typography sx={{ fontWeight: 700, fontSize: '1rem', color: 'rgba(255,255,255,0.95)' }}>
-                {showHistory ? t.supportChat.recentChats : displayAdminName}
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography sx={{ fontWeight: 700, fontSize: '1rem', color: 'inherit', lineHeight: 1.2 }}>
+                {showSettings
+                  ? t.supportChat.settingsTitle
+                  : showHistory
+                    ? t.supportChat.recentChats
+                    : displayAdminName}
               </Typography>
-              <Typography sx={{ fontSize: '0.75rem', opacity: 0.75, display: 'flex', alignItems: 'center', gap: 0.5, color: 'rgba(255,255,255,0.7)' }}>
+              {!showSettings && (
+              <Typography sx={{ fontSize: '0.75rem', opacity: 0.72, display: 'flex', alignItems: 'center', gap: 0.5, color: 'inherit' }}>
                 {/* Realtime connection indicator */}
                 {chat && !showHistory && (
                   <Box
@@ -1708,7 +1648,6 @@ ${getStatusLabel(order.status)}
                       bgcolor: connectionState === 'connected' ? '#30d158'
                         : connectionState === 'connecting' ? '#ff9f0a'
                         : '#ff453a',
-                      boxShadow: connectionState === 'connected' ? '0 0 6px rgba(48,209,88,0.7)' : 'none',
                       animation: connectionState === 'connecting' ? 'pulse 1.2s ease-in-out infinite' : 'none',
                       '@keyframes pulse': { '0%,100%': { opacity: 1 }, '50%': { opacity: 0.3 } },
                     }}
@@ -1726,47 +1665,96 @@ ${getStatusLabel(order.status)}
                   ? t.supportChat.chatEnded
                   : t.supportChat.connected}
               </Typography>
+              )}
             </Box>
-            {!showHistory && (
+            {!showHistory && !showSettings && (
               <IconButton
                 onClick={() => { fetchChatHistory(); setShowHistory(true); }}
-                sx={{ color: 'rgba(255,255,255,0.75)' }}
+                sx={{ color: 'inherit', opacity: 0.8 }}
                 title={t.supportChat.recentChats}
               >
-                <HistoryIcon size={24} />
+                <HistoryIcon size={22} />
               </IconButton>
             )}
-            {/* Push notification toggle */}
-            {pushSupported && !showHistory && (
+            {!showHistory && !showSettings && (
+              <IconButton
+                onClick={() => setShowSettings(true)}
+                sx={{ color: 'inherit', opacity: 0.8 }}
+                title={t.supportChat.settings}
+                aria-label={t.supportChat.settings}
+              >
+                <SettingsIcon size={20} />
+              </IconButton>
+            )}
+            {/* Push notification toggle — only when not muted via settings */}
+            {pushSupported && !showHistory && !showSettings && (
               <IconButton
                 onClick={async () => {
                   if (pushSubscribed) {
                     await pushUnsubscribe();
+                    updateChatPrefs({ ...chatPrefs, muted: true });
                   } else {
                     const ok = await pushSubscribe();
+                    if (ok) updateChatPrefs({ ...chatPrefs, muted: false });
                     if (!ok && pushPermission === 'denied') {
                       toastWarning(t.notification.deniedDesktop);
                     }
                   }
                 }}
                 disabled={pushLoading}
-                sx={{ color: 'rgba(255,255,255,0.75)', opacity: pushSubscribed ? 1 : 0.55 }}
-                title={pushSubscribed ? t.common.close : t.notification.enableNotification}
+                sx={{ color: 'inherit', opacity: pushSubscribed && !chatPrefs.muted ? 1 : 0.55 }}
+                title={pushSubscribed ? t.supportChat.muteNotifications : t.notification.enableNotification}
               >
-                {pushSubscribed ? <BellIcon size={20} /> : <BellOffIcon size={20} />}
+                {pushSubscribed && !chatPrefs.muted ? <BellIcon size={20} /> : <BellOffIcon size={20} />}
               </IconButton>
             )}
             <IconButton
-              onClick={() => setOpen(false)}
-              sx={{ color: 'rgba(255,255,255,0.75)' }}
+              onClick={() => { setOpen(false); setShowSettings(false); }}
+              sx={{ color: 'inherit', opacity: 0.8 }}
             >
-              <CloseIcon size={24} />
+              <CloseIcon size={22} />
             </IconButton>
           </Box>
 
           {/* Content */}
           <Box sx={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-            {loading ? (
+            {showSettings ? (
+              <SupportChatSettingsPanel
+                prefs={chatPrefs}
+                onPrefsChange={updateChatPrefs}
+                messages={chat?.messages || []}
+                onBack={() => setShowSettings(false)}
+                onMuteEnabled={() => {
+                  if (pushSubscribed) void pushUnsubscribe();
+                }}
+                pushLoading={pushLoading}
+                labels={{
+                  settingsTitle: t.supportChat.settingsTitle,
+                  sectionCustomize: t.supportChat.sectionCustomize,
+                  sectionMedia: t.supportChat.sectionMedia,
+                  sectionPrivacy: t.supportChat.sectionPrivacy,
+                  sectionHelp: t.supportChat.sectionHelp,
+                  muteNotifications: t.supportChat.muteNotifications,
+                  muteNotificationsDesc: t.supportChat.muteNotificationsDesc,
+                  soundToggle: t.supportChat.soundToggle,
+                  soundToggleDesc: t.supportChat.soundToggleDesc,
+                  compactDensity: t.supportChat.compactDensity,
+                  compactDensityDesc: t.supportChat.compactDensityDesc,
+                  primaryBubbles: t.supportChat.primaryBubbles,
+                  primaryBubblesDesc: t.supportChat.primaryBubblesDesc,
+                  mediaGallery: t.supportChat.mediaGallery,
+                  mediaGalleryDesc: t.supportChat.mediaGalleryDesc,
+                  noMedia: t.supportChat.noMedia,
+                  images: t.supportChat.images,
+                  voiceMessages: t.supportChat.voiceMessages,
+                  faqSupport: t.supportChat.faqSupport,
+                  faqSupportDesc: t.supportChat.faqSupportDesc,
+                  back: t.supportChat.settingsBack,
+                  on: t.supportChat.on,
+                  off: t.supportChat.off,
+                }}
+              />
+            ) : loading ? (
               <Box sx={{ flex: 1, overflow: 'hidden', p: 2 }}>
                 <div className="mb-4 flex flex-col gap-3">
                   {[0, 1, 2, 3, 4].map((i) => (
@@ -2195,9 +2183,9 @@ ${getStatusLabel(order.status)}
                 {chat.status === 'pending' && (
                   <Box sx={{ 
                     px: 2, 
-                    py: 1.5, 
-                    background: 'var(--surface-2)',
-                    border: '1px solid var(--warning)',
+                    py: 1, 
+                    bgcolor: 'color-mix(in srgb, var(--warning) 10%, var(--surface))',
+                    borderBottom: '1px solid color-mix(in srgb, var(--warning) 35%, var(--glass-border))',
                     flexShrink: 0,
                     display: 'flex',
                     alignItems: 'center',
@@ -2205,36 +2193,36 @@ ${getStatusLabel(order.status)}
                     gap: 1,
                   }}>
                     <Box sx={{
-                      width: 8,
-                      height: 8,
+                      width: 7,
+                      height: 7,
                       borderRadius: '50%',
                       bgcolor: 'var(--warning)',
                       animation: 'pulse 1.5s infinite',
                       '@keyframes pulse': {
-                        '0%': { opacity: 1, transform: 'scale(1)' },
-                        '50%': { opacity: 0.5, transform: 'scale(0.8)' },
-                        '100%': { opacity: 1, transform: 'scale(1)' },
+                        '0%': { opacity: 1 },
+                        '50%': { opacity: 0.4 },
+                        '100%': { opacity: 1 },
                       },
                     }} />
-                    <Typography sx={{ color: 'var(--warning)', fontSize: '0.85rem', fontWeight: 600 }}>
+                    <Typography sx={{ color: 'var(--foreground)', fontSize: '0.8rem', fontWeight: 550 }}>
                       {t.supportChat.connecting}
                     </Typography>
                   </Box>
                 )}
 
                 {/* Push Notification Banner */}
-                {pushSupported && !pushSubscribed && pushPermission !== 'denied' && !pushBannerDismissed && chat?.status !== 'closed' && (
+                {pushSupported && !pushSubscribed && !chatPrefs.muted && pushPermission !== 'denied' && !pushBannerDismissed && chat?.status !== 'closed' && (
                   <Box sx={{ 
                     px: 2, 
                     py: 1, 
-                    background: 'linear-gradient(135deg, rgba(0,113,227,0.08) 0%, rgba(191,90,242,0.08) 100%)',
+                    bgcolor: 'color-mix(in srgb, var(--primary) 8%, var(--surface))',
                     borderBottom: '1px solid var(--glass-border)',
                     display: 'flex',
                     alignItems: 'center',
                     gap: 1,
                     flexShrink: 0,
                   }}>
-                    <BellIcon size={16} color="#0071e3" />
+                    <BellIcon size={16} color="var(--primary)" />
                     <Typography sx={{ flex: 1, fontSize: '0.75rem', color: 'var(--foreground)', lineHeight: 1.3 }}>
                       {t.notification.description}
                     </Typography>
@@ -2244,6 +2232,7 @@ ${getStatusLabel(order.status)}
                       disabled={pushLoading}
                       onClick={async () => {
                         const ok = await pushSubscribe();
+                        if (ok) updateChatPrefs({ ...chatPrefs, muted: false });
                         if (!ok && typeof Notification !== 'undefined' && Notification.permission === 'denied') {
                           toastWarning(t.notification.deniedDesktop);
                         }
@@ -2254,9 +2243,10 @@ ${getStatusLabel(order.status)}
                         py: 0.3,
                         textTransform: 'none',
                         borderRadius: 2,
-                        background: '#0071e3',
+                        bgcolor: 'var(--primary)',
                         minWidth: 'auto',
-                        '&:hover': { background: '#1d4ed8' },
+                        boxShadow: 'none',
+                        '&:hover': { bgcolor: 'color-mix(in srgb, var(--primary) 85%, #000)' },
                       }}
                     >
                       {pushLoading ? <CircularProgress size={14} sx={{ color: 'white' }} /> : t.notification.enableNotification}
@@ -2281,7 +2271,7 @@ ${getStatusLabel(order.status)}
                   <MessageScrollerApiBridge apiRef={scrollApiRef} />
                   <MessageScroller className="min-h-0 flex-1 bg-[var(--surface-2)]">
                     <MessageScrollerViewport>
-                      <MessageScrollerContent className="gap-1 p-4">
+                      <MessageScrollerContent className={cn('gap-1 p-4', chatPrefs.compact && 'gap-0.5 p-3')}>
                   <MessageScrollerItem messageId="__load_older__">
                     <MessageScrollerLoadOlder
                       hasMore={hasMoreOlder}
@@ -2309,7 +2299,7 @@ ${getStatusLabel(order.status)}
                     const bubbleVariant = (msg as any)._failed
                       ? 'destructive'
                       : msg.sender === 'customer'
-                        ? 'default'
+                        ? (chatPrefs.primaryBubbles ? 'default' : 'tinted')
                         : 'secondary';
 
                     if (msg.sender === 'system') {
@@ -2328,7 +2318,7 @@ ${getStatusLabel(order.status)}
                       >
                       <Message
                         align={align}
-                        className={cn(showTime ? 'mb-2' : 'mb-0')}
+                        className={cn(showTime ? (chatPrefs.compact ? 'mb-1' : 'mb-2') : 'mb-0')}
                       >
                         <MessageAvatar className={!showTime ? 'invisible' : undefined}>
                           {msg.sender === 'admin' ? (
@@ -2354,13 +2344,15 @@ ${getStatusLabel(order.status)}
                             <VoiceMessage
                               src={voiceUrl!}
                               duration={voiceDuration}
+                              playLabel={t.supportChat.playVoice}
+                              pauseLabel={t.supportChat.pauseVoice}
                               className={cn((msg as any)._optimistic && 'opacity-60')}
                             />
                           ) : isVoiceBrokenOnly ? (
                             <Bubble variant={bubbleVariant} align={align}>
                               <BubbleContent>
                                 <Typography sx={{ fontSize: '0.85rem', opacity: 0.85 }}>
-                                  ข้อความเสียงไม่สมบูรณ์ กรุณาส่งใหม่
+                                  {t.supportChat.voiceBroken}
                                 </Typography>
                               </BubbleContent>
                             </Bubble>
@@ -2401,6 +2393,8 @@ ${getStatusLabel(order.status)}
                                   <VoiceMessage
                                     src={voiceUrl}
                                     duration={voiceDuration}
+                                    playLabel={t.supportChat.playVoice}
+                                    pauseLabel={t.supportChat.pauseVoice}
                                     className={cn((text || orderRef) && 'mt-1.5')}
                                   />
                                 )}
@@ -2637,6 +2631,25 @@ ${getStatusLabel(order.status)}
                           if (uploadingImage) return;
                           fileInputRef.current?.click();
                         }}
+                        onSendSticker={handleSendSticker}
+                        onSendVoice={handleSendVoice}
+                        showMic
+                        voiceLabels={{
+                          recordVoice: t.supportChat.recordVoice,
+                          sendVoice: t.supportChat.sendVoice,
+                          cancelRecording: t.supportChat.cancelRecording,
+                          stopRecording: t.supportChat.stopRecording,
+                          voiceTooShort: t.supportChat.voiceTooShort,
+                          micPermissionDenied: t.supportChat.micPermissionDenied,
+                          micNotFound: t.supportChat.micNotFound,
+                          micInUse: t.supportChat.micInUse,
+                          micUnsupported: t.supportChat.micUnsupported,
+                          micRecordUnsupported: t.supportChat.micRecordUnsupported,
+                          micHttpsRequired: t.supportChat.micHttpsRequired,
+                          micBlocked: t.supportChat.micBlocked,
+                          micFailed: t.supportChat.micFailed,
+                          micRecordFailed: t.supportChat.micRecordFailed,
+                        }}
                         placeholder={t.supportChat.typeMessage}
                         disabled={sending}
                         sending={sending}
@@ -2727,25 +2740,24 @@ ${getStatusLabel(order.status)}
                         setMessage('');
                         setSubject('');
                       }}
-                      sx={{
-                        background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
-                        py: 1.25,
-                        fontWeight: 600,
-                        borderRadius: 2,
-                        textTransform: 'none',
-                        boxShadow: '0 4px 14px rgba(0,113,227, 0.3)',
-                        '&:hover': { 
-                          background: 'linear-gradient(135deg, #1d4ed8 0%, #bf5af2 100%)',
-                          boxShadow: '0 6px 20px rgba(0,113,227, 0.4)',
-                          transform: 'translateY(-1px)',
-                        },
-                        transition: 'all 0.2s',
-                        '&.Mui-disabled': {
-                          background: 'var(--surface-2)',
-                          color: 'var(--text-muted)',
-                          boxShadow: 'none',
-                        },
-                      }}
+                        sx={{
+                          background: 'var(--primary)',
+                          py: 1.25,
+                          fontWeight: 600,
+                          borderRadius: 2,
+                          textTransform: 'none',
+                          boxShadow: '0 4px 14px color-mix(in srgb, var(--primary) 30%, transparent)',
+                          '&:hover': { 
+                            background: 'color-mix(in srgb, var(--primary) 88%, #000)',
+                            boxShadow: '0 6px 20px color-mix(in srgb, var(--primary) 35%, transparent)',
+                          },
+                          transition: 'all 0.2s',
+                          '&.Mui-disabled': {
+                            background: 'var(--surface-2)',
+                            color: 'var(--text-muted)',
+                            boxShadow: 'none',
+                          },
+                        }}
                     >
                       {t.supportChat.startNew}
                     </Button>

@@ -35,6 +35,23 @@ export type ChatComposerUploadState = {
   onCancel?: () => void;
 };
 
+export type ChatComposerVoiceLabels = {
+  recordVoice?: string;
+  sendVoice?: string;
+  cancelRecording?: string;
+  stopRecording?: string;
+  voiceTooShort?: string;
+  micPermissionDenied?: string;
+  micNotFound?: string;
+  micInUse?: string;
+  micUnsupported?: string;
+  micRecordUnsupported?: string;
+  micHttpsRequired?: string;
+  micBlocked?: string;
+  micFailed?: string;
+  micRecordFailed?: string;
+};
+
 const EMOJIS = [
   '😀', '😃', '😄', '😁', '😅', '😂', '🤣', '😊',
   '😇', '🙂', '😉', '😍', '🥰', '😘', '😋', '😜',
@@ -76,6 +93,8 @@ type ChatComposerProps = {
   isTouchDevice?: boolean;
   className?: string;
   showMic?: boolean;
+  /** TH/EN (or custom) strings for mic / recording UI */
+  voiceLabels?: ChatComposerVoiceLabels;
   /** Inline upload progress inside the composer shell (not a floating bubble) */
   upload?: ChatComposerUploadState | null;
 };
@@ -98,8 +117,10 @@ export function ChatComposer({
   isTouchDevice = false,
   className,
   showMic = false,
+  voiceLabels,
   upload = null,
 }: ChatComposerProps) {
+  const vl = voiceLabels || {};
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const gifInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -363,12 +384,12 @@ export function ChatComposer({
         : null);
 
     if (!mediaDevices?.getUserMedia) {
-      setMicError('เบราว์เซอร์นี้ไม่รองรับไมโครโฟน');
+      setMicError(vl.micUnsupported || 'เบราว์เซอร์นี้ไม่รองรับไมโครโฟน');
       return;
     }
 
     if (!window.isSecureContext) {
-      setMicError('ต้องใช้ HTTPS หรือ localhost ถึงจะเปิดไมค์ได้');
+      setMicError(vl.micHttpsRequired || 'ต้องใช้ HTTPS หรือ localhost ถึงจะเปิดไมค์ได้');
       return;
     }
 
@@ -390,7 +411,7 @@ export function ChatComposer({
       streamRef.current = stream;
       if (typeof MediaRecorder === 'undefined') {
         stopStream();
-        setMicError('เบราว์เซอร์นี้ไม่รองรับการอัดเสียง');
+        setMicError(vl.micRecordUnsupported || 'เบราว์เซอร์นี้ไม่รองรับการอัดเสียง');
         return;
       }
 
@@ -410,7 +431,7 @@ export function ChatComposer({
         if (ev.data.size > 0) chunksRef.current.push(ev.data);
       };
       recorder.onerror = () => {
-        setMicError('อัดเสียงล้มเหลว กรุณาลองใหม่');
+        setMicError(vl.micRecordFailed || 'Recording failed — please try again');
         resetVoice();
       };
       recorder.onstop = () => {
@@ -425,7 +446,7 @@ export function ChatComposer({
         if (blob.size < 200) {
           setPendingBlob(null);
           paintWaveBars(idleWaveBars());
-          setMicError('อัดเสียงสั้นเกินไป');
+          setMicError(vl.voiceTooShort || 'Recording too short');
           return;
         }
         // Freeze last live waveform for preview before send
@@ -452,15 +473,15 @@ export function ChatComposer({
     } catch (err: any) {
       const name = String(err?.name || '');
       if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
-        setMicError('ไม่อนุญาตไมโครโฟน — เปิดสิทธิ์ในเบราว์เซอร์แล้วลองใหม่');
+        setMicError(vl.micPermissionDenied || 'Microphone permission denied');
       } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
-        setMicError('ไม่พบไมโครโฟนในเครื่อง');
+        setMicError(vl.micNotFound || 'No microphone found');
       } else if (name === 'NotReadableError' || name === 'TrackStartError') {
-        setMicError('ไมโครโฟนถูกใช้งานโดยแอปอื่นอยู่');
+        setMicError(vl.micInUse || 'Microphone is in use by another app');
       } else if (name === 'SecurityError') {
-        setMicError('ถูกบล็อกโดยนโยบายความปลอดภัยของเว็บไซต์');
+        setMicError(vl.micBlocked || 'Blocked by site security policy');
       } else {
-        setMicError('ไม่สามารถเปิดไมโครโฟนได้');
+        setMicError(vl.micFailed || 'Could not open the microphone');
       }
       resetVoice();
     }
@@ -547,20 +568,20 @@ export function ChatComposer({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            aria-label="ยกเลิก"
+            aria-label={vl.cancelRecording || 'Cancel'}
             onClick={cancelVoice}
-            className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-zinc-200 transition hover:bg-zinc-700"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-[var(--glass-border)] bg-[var(--surface-2)] text-foreground transition hover:bg-[var(--surface-3)]"
           >
             <X className="size-3.5" />
           </button>
 
-          <div className="flex h-8 min-w-0 flex-1 items-center gap-1.5 rounded-lg bg-zinc-800 px-1.5 text-zinc-100">
+          <div className="flex h-9 min-w-0 flex-1 items-center gap-1.5 rounded-xl border border-[var(--glass-border)] bg-[var(--surface)] px-1.5 text-foreground">
             <button
               type="button"
-              aria-label={recording ? 'หยุดอัด' : 'อัดแล้ว'}
+              aria-label={recording ? (vl.stopRecording || 'Stop') : (vl.recordVoice || 'Recorded')}
               onClick={recording ? stopRecording : undefined}
               disabled={!recording}
-              className="flex size-6 shrink-0 items-center justify-center rounded-md bg-zinc-100 text-zinc-900 disabled:opacity-90"
+              className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-[var(--primary)] text-[var(--primary-foreground)] disabled:opacity-90"
             >
               <Square className="size-2.5 fill-current" />
             </button>
@@ -575,7 +596,9 @@ export function ChatComposer({
                     key={i}
                     className={cn(
                       'w-[2px] shrink-0 rounded-full',
-                      recording ? 'bg-zinc-100' : 'bg-zinc-500'
+                      recording
+                        ? 'bg-[var(--primary)]'
+                        : 'bg-[color-mix(in_srgb,var(--foreground)_35%,transparent)]'
                     )}
                     style={{
                       height: `${Math.round(Math.max(0.12, level) * 100)}%`,
@@ -585,17 +608,17 @@ export function ChatComposer({
                 ))}
               </div>
             </div>
-            <span className="shrink-0 px-1 text-[10px] tabular-nums text-zinc-400">
+            <span className="shrink-0 px-1 text-[10px] tabular-nums text-[var(--text-muted)]">
               {formatVoiceDuration(elapsed)}
             </span>
           </div>
 
           <button
             type="button"
-            aria-label="ส่งเสียง"
+            aria-label={vl.sendVoice || 'Send voice'}
             disabled={sending || (!recording && !pendingBlob)}
             onClick={() => void sendVoice()}
-            className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-zinc-100 transition hover:bg-zinc-700 disabled:opacity-50"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--primary)] text-[var(--primary-foreground)] transition hover:opacity-90 disabled:opacity-50"
           >
             {sending ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5 fill-current" />}
           </button>
@@ -815,8 +838,8 @@ export function ChatComposer({
                   <button
                     type="button"
                     disabled={disabled || sending}
-                    title="อัดข้อความเสียง"
-                    aria-label="อัดข้อความเสียง"
+                    title={vl.recordVoice || 'Record voice message'}
+                    aria-label={vl.recordVoice || 'Record voice message'}
                     onClick={() => void startRecording()}
                     className="flex size-9 items-center justify-center rounded-full text-foreground/80 transition hover:bg-muted disabled:opacity-40"
                   >

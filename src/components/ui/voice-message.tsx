@@ -9,6 +9,8 @@ type VoiceMessageProps = {
   src: string;
   duration?: number | null;
   className?: string;
+  playLabel?: string;
+  pauseLabel?: string;
 };
 
 const BAR_COUNT = 32;
@@ -102,7 +104,13 @@ function fallbackPeaks(seed: string): number[] {
   });
 }
 
-export function VoiceMessage({ src, duration, className }: VoiceMessageProps) {
+export function VoiceMessage({
+  src,
+  duration,
+  className,
+  playLabel = 'Play',
+  pauseLabel = 'Pause',
+}: VoiceMessageProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const ctxRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -327,7 +335,7 @@ export function VoiceMessage({ src, duration, className }: VoiceMessageProps) {
   return (
     <div
       className={cn(
-        'flex h-8 min-w-[180px] max-w-[240px] items-center gap-1.5 rounded-lg bg-zinc-800 px-1.5 text-zinc-200',
+        'flex h-9 min-w-[180px] max-w-[240px] items-center gap-1.5 rounded-xl border border-[var(--glass-border)] bg-[var(--surface)] px-1.5 text-foreground shadow-sm',
         className
       )}
     >
@@ -335,10 +343,12 @@ export function VoiceMessage({ src, duration, className }: VoiceMessageProps) {
         type="button"
         onClick={toggle}
         disabled={!ready || loadError}
-        aria-label={playing ? 'หยุด' : 'เล่น'}
+        aria-label={playing ? pauseLabel : playLabel}
         className={cn(
-          'flex size-6 shrink-0 items-center justify-center rounded-md transition disabled:opacity-50',
-          playing ? 'bg-zinc-100 text-zinc-900' : 'bg-zinc-700 text-zinc-100 hover:bg-zinc-600'
+          'flex size-7 shrink-0 items-center justify-center rounded-lg transition disabled:opacity-50',
+          playing
+            ? 'bg-[var(--primary)] text-[var(--primary-foreground)]'
+            : 'bg-[var(--surface-2)] text-foreground hover:bg-[var(--surface-3)]'
         )}
       >
         {playing ? <Pause className="size-3 fill-current" /> : <Play className="size-3 fill-current" />}
@@ -351,7 +361,7 @@ export function VoiceMessage({ src, duration, className }: VoiceMessageProps) {
           aria-valuemin={0}
           aria-valuemax={Math.round(total || 0)}
           aria-valuenow={Math.round(current)}
-          aria-label="คลื่นเสียง"
+          aria-label={playLabel}
           tabIndex={0}
           onClick={seek}
           className="flex h-5 cursor-pointer items-center gap-[2px]"
@@ -365,9 +375,9 @@ export function VoiceMessage({ src, duration, className }: VoiceMessageProps) {
                   'w-[2px] shrink-0 rounded-full transition-[height,background-color,opacity] duration-75',
                   playing
                     ? played
-                      ? 'bg-zinc-100'
-                      : 'bg-zinc-500'
-                    : 'bg-zinc-600'
+                      ? 'bg-[var(--primary)]'
+                      : 'bg-[color-mix(in_srgb,var(--foreground)_28%,transparent)]'
+                    : 'bg-[color-mix(in_srgb,var(--foreground)_35%,transparent)]'
                 )}
                 style={{ height: `${Math.round(level * 100)}%`, minHeight: 2 }}
               />
@@ -375,11 +385,11 @@ export function VoiceMessage({ src, duration, className }: VoiceMessageProps) {
           })}
         </div>
         {loadError && (
-          <p className="mt-0.5 text-[10px] text-zinc-400">เล่นไม่ได้</p>
+          <p className="mt-0.5 text-[10px] text-[var(--text-muted)]">—</p>
         )}
       </div>
 
-      <span className="shrink-0 px-1 text-[10px] tabular-nums text-zinc-400">
+      <span className="shrink-0 px-1 text-[10px] tabular-nums text-[var(--text-muted)]">
         {label}
       </span>
     </div>
