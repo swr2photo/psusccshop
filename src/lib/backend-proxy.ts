@@ -56,6 +56,7 @@ export const SESSION_BOUND_API_PREFIXES = [
   '/api/payment/create-charge',
   '/api/payment/verify',
   '/api/payment/stripe',
+  '/api/payment/webhook',
   '/api/payment/config',
   '/api/shipping',
   '/api/stock-alert',
@@ -80,7 +81,6 @@ export const WORKERS_PROXY_ALLOWLIST = [
   '/api/time',
   '/api/image',
   '/api/cron',
-  '/api/payment/webhook',
   // Public catalog reads (also under /api/shops which is session-bound —
   // session-bound wins; listed for documentation / future split)
   '/api/shops/catalog',
@@ -114,8 +114,7 @@ export function shouldKeepApiOnVercel(pathname: string): boolean {
   if (!isProxyAllEnabled()) {
     // Option A: also keep storefront helpers that were historically local
     if (matchesPrefix(pathname, KEEP_SAFE_DEFAULT)) return true;
-    // Webhook + cron intentionally leave Vercel even in Option A
-    if (pathname.startsWith('/api/payment/webhook')) return false;
+    // Cron intentionally leaves Vercel even in Option A
     if (pathname.startsWith('/api/cron')) return false;
   }
 
@@ -140,10 +139,7 @@ export function shouldProxyApiRoute(pathname: string, method = 'GET'): boolean {
   // Option A: only proxy GET/HEAD (plus webhook/cron writes)
   const verb = method.toUpperCase();
   if (verb !== 'GET' && verb !== 'HEAD') {
-    return (
-      pathname.startsWith('/api/payment/webhook') ||
-      pathname.startsWith('/api/cron')
-    );
+    return pathname.startsWith('/api/cron');
   }
   return true;
 }

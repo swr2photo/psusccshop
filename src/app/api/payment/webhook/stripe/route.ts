@@ -9,7 +9,6 @@ import { eq, and } from 'drizzle-orm';
 import { verifyStripeWebhook } from '@/lib/payment-server';
 import { fetchStripeReceiptUrl, mergeStripeReceiptSlipData } from '@/lib/stripe-receipt';
 import { webhookSecretMissingResponse } from '@/lib/api-helpers';
-import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -25,7 +24,7 @@ export async function POST(request: NextRequest) {
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
     if (!webhookSecret || !(await verifyStripeWebhook(payload, signature))) {
       console.error('[Webhook] Invalid Stripe signature');
-      return await secureJsonResponse(
+      return NextResponse.json(
         { success: false, error: 'Invalid signature' },
         { status: 400 }
       );
@@ -56,11 +55,11 @@ export async function POST(request: NextRequest) {
         console.log('[Webhook] Unhandled Stripe event:', event.type);
     }
 
-    return await secureJsonResponse({ success: true });
+    return NextResponse.json({ success: true });
 
   } catch (error) {
     console.error('[Webhook] Stripe error:', error);
-    return await secureJsonResponse(
+    return NextResponse.json(
       { success: false, error: 'Webhook processing failed' },
       { status: 500 }
     );

@@ -1379,6 +1379,24 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
 
   const commitCartItem = useCallback((item: NonNullable<ReturnType<typeof buildCartItem>>, options?: { goCheckout?: boolean }) => {
     const productName = selectedProduct ? getProductName(selectedProduct, lang) : item.name;
+
+    if (selectedProduct) {
+      const variantId = item.selectedVariant?.id || (item as any).options?.variantId;
+      const stockLimit = getAvailableStock(selectedProduct, variantId);
+      if (stockLimit !== null) {
+        const existingQty = cart
+          .filter((c: any) => c.productId === item.productId && ((c as any).selectedVariant?.id === variantId || c.options?.variantId === variantId))
+          .reduce((sum: number, c: any) => sum + (c.qty || c.quantity || 0), 0);
+        
+        if (existingQty + (item.qty || 1) > stockLimit) {
+          showToast('warning', lang === 'en' 
+            ? `Cannot add: only ${stockLimit} items available (you have ${existingQty} in cart).` 
+            : `ไม่สามารถเพิ่มได้: สินค้ามีเพียง ${stockLimit} ชิ้น (คุณมีในตะกร้าแล้ว ${existingQty} ชิ้น)`);
+          return;
+        }
+      }
+    }
+
     addToCart(item);
     showToast(
       'success',
@@ -1388,7 +1406,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
     if (options?.goCheckout) {
       setCheckoutOpen(true);
     }
-  }, [addToCart, showToast, t.cart.addedGoCheckout, t.cart.addedToCart, resetProductDialog, selectedProduct, lang]);
+  }, [addToCart, showToast, t.cart.addedGoCheckout, t.cart.addedToCart, resetProductDialog, selectedProduct, lang, cart]);
 
   const handleAddToCart = useCallback(() => {
     const item = buildCartItem();
@@ -1803,7 +1821,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                   {items.map((product, productIdx) => {
                     const productStatus = getProductStatus(product, now);
                     const isProductAvailable = productStatus === 'OPEN' && isShopOpen;
-                    const isProductClosed = productStatus !== 'OPEN';
+                    const isProductClosed = productStatus !== 'OPEN' || !isShopOpen;
                     const eventDiscount = getEventDiscount(product.id, events);
 
                     return (

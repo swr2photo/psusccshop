@@ -418,9 +418,13 @@ export const CONFIG_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 export const clampQty = (value: number) => Math.min(99, Math.max(1, value));
 
 export const isValidDate = (dateString?: string): boolean => {
-  if (!dateString) return false;
-  const date = new Date(dateString);
-  return !isNaN(date.getTime());
+  if (!dateString || dateString.trim() === '') return false;
+  try {
+    const date = parseThailandDateTime(dateString, false);
+    return !isNaN(date.getTime());
+  } catch {
+    return false;
+  }
 };
 
 export const parseThailandDateTime = (dateString: string, isEnd: boolean): Date => {

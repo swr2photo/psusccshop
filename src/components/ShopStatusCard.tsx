@@ -75,8 +75,12 @@ export const SHOP_STATUS_CONFIG: Record<ShopStatusType, Omit<ShopStatusInfo, 'ty
 // Helper to check if a date string is valid
 const isValidDate = (dateString?: string): boolean => {
   if (!dateString || dateString.trim() === '') return false;
-  const date = new Date(dateString);
-  return !isNaN(date.getTime());
+  try {
+    const date = parseThailandDateTime(dateString, false);
+    return !isNaN(date.getTime());
+  } catch {
+    return false;
+  }
 };
 
 // Helper to determine shop status

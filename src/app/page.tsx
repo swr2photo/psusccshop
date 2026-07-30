@@ -205,6 +205,7 @@ import {
   ensureUniqueCartLineIds,
   CONFIG_CACHE_KEY,
   CONFIG_CACHE_TTL,
+  getAvailableStock,
 } from '@/lib/shop-constants';
 import { getClientReservationExpiryMs } from '@/components/OrderCountdown';
 
@@ -1468,9 +1469,16 @@ export default function HomePage() {
         : 0;
 
       const correctPrice = basePrice + longSleeveFee;
-      if (item.unitPrice !== correctPrice) {
+      let newQty = item.quantity || (item as any).qty || 1;
+      const variantId = item.options?.variantId || (item as any).selectedVariant?.id;
+      const stockLimit = getAvailableStock(product, variantId);
+      if (stockLimit !== null && newQty > stockLimit) {
+        newQty = Math.max(1, stockLimit);
+      }
+
+      if (item.unitPrice !== correctPrice || item.quantity !== newQty) {
         needsUpdate = true;
-        return { ...item, unitPrice: correctPrice };
+        return { ...item, unitPrice: correctPrice, quantity: newQty, qty: newQty };
       }
       return item;
     });
@@ -1537,9 +1545,17 @@ export default function HomePage() {
   }, [orderData]);
 
   // Unified product select handler — batches all state into one render
-  const handleSelectProduct = useCallback((product: Product, shopContext?: { shopId?: string; shopSlug?: string }) => {
+  const handleSelectProduct = useCallback((product: Product, shopContext?: { shopId?: string; shopSlug?: string; isOpen?: boolean }) => {
     const status = getProductStatus(product, now);
     const outOfStock = isProductOutOfStock(product);
+    
+    const shopIsOpen = shopContext && shopContext.isOpen !== undefined ? shopContext.isOpen : isShopOpen;
+    
+    if (!shopIsOpen) {
+      showToast('warning', t.checkout.shopClosedWarning);
+      return;
+    }
+    
     if (status !== 'OPEN' || outOfStock) {
       const toast = getProductUnavailableToast({
         status,
@@ -1565,7 +1581,7 @@ export default function HomePage() {
     setProductDialogOpen(true);
     // Track recently viewed
     recentlyViewedStore.addItem(product.id);
-  }, [t, lang, now, showToast]);
+  }, [t, lang, now, showToast, isShopOpen]);
 
   const catalogContext = useMemo(() => {
     if (activeShopMenu === 'main') {
@@ -2188,6 +2204,23 @@ export default function HomePage() {
       showToast('warning', t.storefront.mixedCartWarning);
       return;
     }
+
+    if (selectedProduct) {
+      const variantId = item.options?.variantId || (item as any).selectedVariant?.id;
+      const stockLimit = getAvailableStock(selectedProduct, variantId);
+      if (stockLimit !== null) {
+        const existingQty = cart
+          .filter(c => c.productId === item.productId && (c.options?.variantId === variantId || (c as any).selectedVariant?.id === variantId))
+          .reduce((sum, c) => sum + (c.quantity || (c as any).qty || 0), 0);
+        if (existingQty + (item.quantity || 1) > stockLimit) {
+          showToast('warning', lang === 'en' 
+            ? `Cannot add: only ${stockLimit} items available (you have ${existingQty} in cart).` 
+            : `ไม่สามารถเพิ่มได้: สินค้ามีเพียง ${stockLimit} ชิ้น (คุณมีในตะกร้าแล้ว ${existingQty} ชิ้น)`);
+          return;
+        }
+      }
+    }
+
     const newCart = [...cart, item];
     saveCart(newCart);
     showToast('success', options?.goCheckout ? t.cart.addedGoCheckout : t.cart.addedToCart);
@@ -2288,6 +2321,20 @@ export default function HomePage() {
       shopId: shopContext?.shopId ?? catalogContext.shopId,
       shopSlug: shopContext?.shopSlug ?? catalogContext.shopSlug,
     };
+
+    const stockLimit = getAvailableStock(product, variantId);
+    if (stockLimit !== null) {
+      const existingQty = cart
+        .filter(c => c.productId === item.productId && (c.options?.variantId === variantId || (c as any).selectedVariant?.id === variantId))
+        .reduce((sum, c) => sum + (c.quantity || (c as any).qty || 0), 0);
+      if (existingQty + (item.quantity || 1) > stockLimit) {
+        showToast('warning', lang === 'en' 
+          ? `Cannot add: only ${stockLimit} items available (you have ${existingQty} in cart).` 
+          : `ไม่สามารถเพิ่มได้: สินค้ามีเพียง ${stockLimit} ชิ้น (คุณมีในตะกร้าแล้ว ${existingQty} ชิ้น)`);
+        return;
+      }
+    }
+
     saveCart([...cart, item]);
     showToast('success', t.cart.addedToCart);
   }, [
@@ -2438,7 +2485,20 @@ export default function HomePage() {
   };
 
   const updateCartItem = (id: string, updates: Partial<CartItem>) => {
-    const newCart = cart.map((item) => (item.id === id ? { ...item, ...updates } : item));
+    const newCart = cart.map((item) => {
+      if (item.id !== id) return item;
+      const updatedItem = { ...item, ...updates };
+      const product = config?.products?.find((p) => p.id === updatedItem.productId);
+      if (product) {
+        const variantId = updatedItem.options?.variantId || (updatedItem as any).selectedVariant?.id;
+        const limit = getAvailableStock(product, variantId);
+        if (limit !== null && updatedItem.quantity > limit) {
+          updatedItem.quantity = Math.max(1, limit);
+          (updatedItem as any).qty = updatedItem.quantity;
+        }
+      }
+      return updatedItem;
+    });
     saveCart(newCart);
     setEditingCartItem(null);
     showToast('success', t.cart.updated);
@@ -4459,7 +4519,7 @@ export default function HomePage() {
                     {items.map((product, productIdx) => {
                       const productStatus = getProductStatus(product, now);
                       const outOfStock = isProductOutOfStock(product);
-                      const isProductUnavailable = productStatus !== 'OPEN' || outOfStock;
+                      const isProductUnavailable = productStatus !== 'OPEN' || outOfStock || !catalogContext.isOpen;
                       const isProductAvailable = productStatus === 'OPEN' && !outOfStock && catalogContext.isOpen;
                       const isProductClosed = isProductUnavailable;
                       const eventDiscount = getEventDiscount(product.id, catalogContext.events);
@@ -4499,6 +4559,7 @@ export default function HomePage() {
                             handleSelectProduct(product, {
                               shopId: catalogContext.shopId,
                               shopSlug: catalogContext.shopSlug,
+                              isOpen: catalogContext.isOpen,
                             });
                           }}
                           sx={{
@@ -4907,6 +4968,7 @@ export default function HomePage() {
                                     handleSelectProduct(product, {
                                       shopId: catalogContext.shopId,
                                       shopSlug: catalogContext.shopSlug,
+                                      isOpen: catalogContext.isOpen,
                                     });
                                   }}
                                   sx={{

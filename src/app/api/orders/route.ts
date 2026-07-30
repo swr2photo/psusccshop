@@ -124,8 +124,12 @@ export async function GET(req: NextRequest) {
 
 const isValidDate = (dateString?: string): boolean => {
   if (!dateString || dateString.trim() === '') return false;
-  const date = new Date(dateString);
-  return !isNaN(date.getTime());
+  try {
+    const date = parseThailandDate(dateString, false);
+    return !isNaN(date.getTime());
+  } catch {
+    return false;
+  }
 };
 
 // Helper to parse date string in Thailand timezone (GMT+7)
