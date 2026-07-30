@@ -9,13 +9,11 @@ import {
   Send,
   Loader2,
   Receipt,
-  Upload,
   X,
   Square,
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { CHAT_STICKERS, type ChatSticker } from '@/lib/chat-stickers';
 import { formatVoiceDuration } from '@/lib/chat-voice';
 import {
   buildQuickReplySlashItems,
@@ -24,56 +22,7 @@ import {
   type QuickReplySlashItem,
 } from '@/lib/chat-slash-replies';
 import { Progress } from '@/components/ui/progress';
-
-function StickerPickerCell({
-  sticker,
-  disabled,
-  onSend,
-}: {
-  sticker: ChatSticker;
-  disabled?: boolean;
-  onSend: () => void;
-}) {
-  const [failed, setFailed] = useState(false);
-  const [loaded, setLoaded] = useState(false);
-
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      title={sticker.label}
-      onClick={onSend}
-      className="group relative flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-muted/40 transition hover:bg-muted disabled:opacity-40"
-    >
-      {!failed ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={sticker.src}
-          alt={sticker.label}
-          className={cn(
-            'size-[78%] object-contain transition-opacity',
-            loaded ? 'opacity-100' : 'opacity-0'
-          )}
-          draggable={false}
-          onLoad={() => setLoaded(true)}
-          onError={() => setFailed(true)}
-        />
-      ) : null}
-      {!loaded && !failed ? (
-        <span className="absolute inset-2 animate-pulse rounded-lg bg-muted" aria-hidden />
-      ) : null}
-      <span
-        className={cn(
-          'absolute text-[1.35rem] leading-none transition',
-          failed || !loaded ? 'opacity-100' : 'right-1 bottom-1 text-[11px] opacity-70'
-        )}
-        aria-hidden
-      >
-        {sticker.emoji}
-      </span>
-    </button>
-  );
-}
+import { TenorGifPicker, type TenorGifPickerLabels } from '@/components/ui/tenor-gif-picker';
 
 export type ChatComposerUploadState = {
   /** 0–100; omit / null for indeterminate */
@@ -147,6 +96,8 @@ type ChatComposerProps = {
   voiceLabels?: ChatComposerVoiceLabels;
   /** Inline upload progress inside the composer shell (not a floating bubble) */
   upload?: ChatComposerUploadState | null;
+  /** GIF picker labels (Tenor) */
+  gifLabels?: TenorGifPickerLabels;
 };
 
 export function ChatComposer({
@@ -169,6 +120,7 @@ export function ChatComposer({
   showMic = false,
   voiceLabels,
   upload = null,
+  gifLabels,
 }: ChatComposerProps) {
   const vl = voiceLabels || {};
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -934,32 +886,29 @@ export function ChatComposer({
                   <PopoverContent
                     align="end"
                     side="top"
-                    className="w-[300px] p-2"
+                    className="w-[320px] p-2.5"
                     onOpenAutoFocus={(e) => e.preventDefault()}
                   >
-                    <div className="mb-1.5 flex items-center justify-between px-1">
-                      <p className="text-xs font-medium text-muted-foreground">สติกเกอร์ GIF</p>
-                      <button
-                        type="button"
-                        disabled={disabled || sending}
-                        onClick={() => gifInputRef.current?.click()}
-                        className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-blue-600 transition hover:bg-blue-50"
-                      >
-                        <Upload className="size-3" />
-                        อัปโหลด GIF
-                      </button>
-                    </div>
-
-                    <div className="grid max-h-[220px] overflow-y-auto grid-cols-4 gap-1.5">
-                      {CHAT_STICKERS.map((sticker) => (
-                        <StickerPickerCell
-                          key={sticker.id}
-                          sticker={sticker}
-                          disabled={disabled || sending}
-                          onSend={() => sendSticker(sticker.src)}
-                        />
-                      ))}
-                    </div>
+                    <TenorGifPicker
+                      labels={
+                        gifLabels || {
+                          title: 'GIF',
+                          searchPlaceholder: 'Search GIFs...',
+                          uploadGif: 'Upload GIF',
+                          trending: 'Trending',
+                          empty: 'No GIFs found',
+                          loadError: 'Could not load GIFs',
+                          missingKey: 'Set TENOR_API_KEY on the server',
+                          loading: 'Loading...',
+                        }
+                      }
+                      disabled={disabled || sending}
+                      onUploadClick={() => gifInputRef.current?.click()}
+                      onPick={(url) => {
+                        sendSticker(url);
+                        setStickerOpen(false);
+                      }}
+                    />
                   </PopoverContent>
                 </Popover>
                 )}

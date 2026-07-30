@@ -26,7 +26,10 @@ export function isChatStickerUrl(url: string): boolean {
 }
 
 export function isAnimatedImageUrl(url: string): boolean {
-  return /\.gif($|\?|#)/i.test(url) || isChatStickerUrl(url);
+  if (/\.gif($|\?|#)/i.test(url) || isChatStickerUrl(url)) return true;
+  // Tenor / Giphy CDN often serves GIF without .gif in the path
+  if (/tenor\.com/i.test(url) || /giphy\.com/i.test(url)) return true;
+  return false;
 }
 
 /** Message token for GIF stickers (keeps animation even via /api/image proxy) */

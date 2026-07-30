@@ -26,7 +26,7 @@ import {
   ListItemIcon,
   ListItemText,
 } from '@mui/material';
-import { Headphones as SupportAgentIcon, X as CloseIcon, Send as SendIcon, Clock as TimeIcon, CheckCircle2 as CheckCircleIcon, Star as StarIcon, Bot as ChatbotIcon, Check as DoneIcon, CheckCheck as DoneAllIcon, MessageCircle as ChatIcon, History as HistoryIcon, ArrowLeft as ArrowBackIcon, Plus as AddIcon, MoreVertical as MoreVertIcon, Trash2 as DeleteIcon, Reply as ReplyIcon, Receipt as ReceiptIcon, ShoppingBag as ShoppingBagIcon, Bell as BellIcon, BellOff as BellOffIcon, Settings as SettingsIcon, Maximize2 as MaximizeIcon } from 'lucide-react';
+import { Headphones as SupportAgentIcon, X as CloseIcon, Send as SendIcon, Clock as TimeIcon, CheckCircle2 as CheckCircleIcon, Star as StarIcon, Bot as ChatbotIcon, Check as DoneIcon, CheckCheck as DoneAllIcon, MessageCircle as ChatIcon, History as HistoryIcon, ArrowLeft as ArrowBackIcon, Plus as AddIcon, MoreVertical as MoreVertIcon, Trash2 as DeleteIcon, Reply as ReplyIcon, Pencil as EditIcon, Receipt as ReceiptIcon, ShoppingBag as ShoppingBagIcon, Bell as BellIcon, BellOff as BellOffIcon, Settings as SettingsIcon, Maximize2 as MaximizeIcon } from 'lucide-react';
 import { useNotification } from './NotificationContext';
 import { usePushNotification } from '@/hooks/usePushNotification';
 import { useRealtimeChat } from '@/hooks/useRealtimeChat';
@@ -35,10 +35,12 @@ import { chatMessagesChanged, getDbTypingFromSession } from '@/lib/support-chat-
 import { fetchChatSync, mergeChatMessages, mergeNewestWindow, fetchOlderChatMessages, getChatPollIntervalMs } from '@/lib/support-chat-sync';
 import { formatStickerMessage } from '@/lib/chat-stickers';
 import { formatVoiceMessage, VOICE_DATA_URL_FALLBACK_MAX } from '@/lib/chat-voice';
-import { parseChatMessage } from '@/lib/chat-message';
+import { formatReplyPrefix, parseChatMessage } from '@/lib/chat-message';
 import { cn } from '@/lib/utils';
 import {
   chatBubbleContentStyle,
+  chatThemeChromeStyle,
+  chatThemeCssVars,
   chatThemeSurfaceStyle,
   getChatTheme,
   type ChatThemeId,
@@ -172,7 +174,10 @@ export default function SupportChatWidget({
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const [unsending, setUnsending] = useState(false);
   const [replyToMessage, setReplyToMessage] = useState<{ id: string; text: string; sender: string } | null>(null);
-  const [orderHistory, setOrderHistory] = useState<any[]>([]);
+  const [editingMessage, setEditingMessage] = useState<{ id: string; text: string } | null>(null);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+  const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const orderHistory, setOrderHistory] = useState<any[]>([]);
   const [showOrderPicker, setShowOrderPicker] = useState(false);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [pushBannerDismissed, setPushBannerDismissed] = useState(false);
@@ -762,7 +767,8 @@ export default function SupportChatWidget({
   const handleSendSticker = async (src: string) => {
     if (!chat || sending || uploadingImage) return;
 
-    if (src.startsWith('/chat-stickers/')) {
+    // Local stickers or remote Tenor/Giphy HTTPS URLs — send path directly
+    if (src.startsWith('/chat-stickers/') || /^https?:\/\//i.test(src)) {
       const msgContent = formatStickerMessage(src);
       const tempId = `temp_sticker_${Date.now()}`;
       addOptimisticMessage(tempId, msgContent, session?.user?.name || undefined, session?.user?.image || undefined);
@@ -968,6 +974,12 @@ export default function SupportChatWidget({
 
   // Send message
   const handleSendMessage = async () => {
+    // If editing an existing message, save edit instead of sending new
+    if (editingMessage) {
+      await handleSaveEdit();
+      return;
+    }
+
     // If there's a preview image, send with image
     if (previewImage) {
       await handleSendWithImage();
@@ -985,7 +997,7 @@ export default function SupportChatWidget({
         const replyPreview = replyToMessage.text.length > 50 
           ? replyToMessage.text.substring(0, 50) + '...' 
           : replyToMessage.text;
-        finalMessage = `[ตอบกลับ: "${replyPreview}"]\n${finalMessage}`;
+        finalMessage = formatReplyPrefix(replyToMessage.id, replyPreview) + finalMessage;
       }
       
       // Optimistic UI: show message instantly
@@ -1027,7 +1039,10 @@ export default function SupportChatWidget({
       .replace(/\[เสียง: [^\]]+\]/g, '[ข้อความเสียง]')
       .replace(/\[สติกเกอร์: [^\]]+\]/g, `[${t.supportChat.image}]`)
       .replace(/\[รูปภาพ: [^\]]+\]/g, `[${t.supportChat.image}]`)
+      .replace(/\[ตอบกลับ[^\]]*\]\n?/g, '')
+      .replace(/\[#edited#\]/g, '')
       .trim() || `[${t.supportChat.image}]`;
+    setEditingMessage(null);
     setReplyToMessage({
       id: msg.id,
       text: previewText,
@@ -1035,6 +1050,79 @@ export default function SupportChatWidget({
     });
     setMessageMenuAnchor(null);
     setSelectedMessageId(null);
+  };
+
+  const jumpToMessage = useCallback((messageId: string) => {
+    const el = document.getElementById(`chat-msg-${messageId}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setHighlightedMessageId(messageId);
+    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+    highlightTimerRef.current = setTimeout(() => setHighlightedMessageId(null), 1600);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+    };
+  }, []);
+
+  const handleStartEditMessage = (msg: ChatMessage) => {
+    const parsed = parseChatMessage(msg.message);
+    if (parsed.voiceUrl || parsed.voiceBroken || parsed.imageUrl || parsed.orderRef) {
+      setMessageMenuAnchor(null);
+      setSelectedMessageId(null);
+      return;
+    }
+    setReplyToMessage(null);
+    setEditingMessage({ id: msg.id, text: parsed.text });
+    setMessage(parsed.text);
+    setMessageMenuAnchor(null);
+    setSelectedMessageId(null);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessage(null);
+    setMessage('');
+  };
+
+  const handleSaveEdit = async () => {
+    if (!chat || !editingMessage || sending) return;
+    const next = message.trim();
+    if (!next) return;
+    setSending(true);
+    try {
+      const res = await apiFetch(`/api/support-chat/${chat.id}/message/${editingMessage.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: next }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success && data.message) {
+        setChat((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            messages: prev.messages.map((m) =>
+              m.id === editingMessage.id ? { ...m, ...data.message } : m
+            ),
+          };
+        });
+        setRealtimeMessages((prev: any[]) =>
+          prev.map((m) => (m.id === editingMessage.id ? { ...m, ...data.message } : m))
+        );
+        setEditingMessage(null);
+        setMessage('');
+      } else {
+        toastError(data?.error || t.supportChat.editFailed);
+      }
+    } catch {
+      toastError(t.supportChat.editFailed);
+    } finally {
+      setSending(false);
+      setMessageMenuAnchor(null);
+      setSelectedMessageId(null);
+    }
   };
 
   // Unsend/Delete message (IG-style) - completely removes message
@@ -1432,6 +1520,8 @@ ${getStatusLabel(order.status)}
           },
         }}
       >
+        {selectedMessageId &&
+          chat?.messages?.find((m) => m.id === selectedMessageId)?.sender === 'customer' && (
         <MenuItem 
           onClick={() => selectedMessageId && handleUnsendMessage(selectedMessageId)}
           disabled={unsending}
@@ -1453,8 +1543,40 @@ ${getStatusLabel(order.status)}
             primaryTypographyProps={{ sx: { fontWeight: 500 } }}
           />
         </MenuItem>
+        )}
+        {selectedMessageId && chat?.messages && (() => {
+          const msg = chat.messages.find((m) => m.id === selectedMessageId);
+          if (!msg || msg.sender !== 'customer') return null;
+          const parsed = parseChatMessage(msg.message);
+          const canEdit =
+            chat.status !== 'closed' &&
+            !parsed.voiceUrl &&
+            !parsed.voiceBroken &&
+            !parsed.imageUrl &&
+            !parsed.orderRef &&
+            Boolean(parsed.text);
+          if (!canEdit) return null;
+          return (
+            <MenuItem
+              onClick={() => handleStartEditMessage(msg)}
+              sx={{
+                py: 1.5,
+                color: 'var(--foreground)',
+                '&:hover': { bgcolor: 'var(--surface-2)' },
+              }}
+            >
+              <ListItemIcon>
+                <EditIcon size={20} color="var(--foreground)" />
+              </ListItemIcon>
+              <ListItemText
+                primary={t.supportChat.editMessage}
+                primaryTypographyProps={{ sx: { fontWeight: 500 } }}
+              />
+            </MenuItem>
+          );
+        })()}
         {/* Reply option */}
-        {selectedMessageId && chat?.messages && (
+        {selectedMessageId && chat?.messages && chat.status !== 'closed' && (
           <MenuItem 
             onClick={() => {
               const msg = chat.messages.find(m => m.id === selectedMessageId);
@@ -1623,23 +1745,32 @@ ${getStatusLabel(order.status)}
             width: isPage ? '100%' : { xs: '100%', sm: 400 },
             height: isPage ? '100dvh' : { xs: '100dvh', sm: 550 },
             maxHeight: isPage ? '100dvh' : { xs: '100dvh', sm: 'calc(100vh - 48px)' },
-            maxWidth: isPage ? 920 : undefined,
+            maxWidth: isPage ? 1200 : undefined,
             mx: isPage ? 'auto' : undefined,
             display: open ? 'flex' : 'none',
-            flexDirection: 'column',
+            flexDirection: isPage ? { xs: 'column', md: 'row' } : 'column',
             borderRadius: isPage ? 0 : { xs: 0, sm: 3 },
             overflow: 'hidden',
             zIndex: isPage ? 1 : 1300,
             bgcolor: 'var(--surface)',
             border: isPage ? '1px solid var(--glass-border)' : undefined,
+            ...chatThemeCssVars(chatTheme),
           }}
         >
+          <Box
+            sx={{
+              flex: 1,
+              minWidth: 0,
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
           {/* Header */}
           <Box
             sx={{
-              bgcolor: 'var(--foreground)',
-              color: 'var(--background)',
-              borderBottom: '1px solid color-mix(in srgb, var(--background) 12%, transparent)',
+              ...chatThemeChromeStyle(chatTheme),
+              borderBottom: '1px solid var(--chat-chrome-border)',
               px: 2,
               py: 1.5,
               display: 'flex',
@@ -1727,7 +1858,11 @@ ${getStatusLabel(order.status)}
             {!showHistory && !showSettings && (
               <IconButton
                 onClick={() => setShowSettings(true)}
-                sx={{ color: 'inherit', opacity: 0.8 }}
+                sx={{
+                  color: 'inherit',
+                  opacity: 0.8,
+                  display: isPage ? { xs: 'inline-flex', md: 'none' } : 'inline-flex',
+                }}
                 title={t.supportChat.settings}
                 aria-label={t.supportChat.settings}
               >
@@ -2365,12 +2500,23 @@ ${getStatusLabel(order.status)}
                     ) {
                       return null;
                     }
-                    const { text, imageUrl, orderRef, animated, voiceUrl, voiceDuration, voiceBroken } = parseMessage(msg.message);
+                    const { text, imageUrl, orderRef, animated, voiceUrl, voiceDuration, voiceBroken, replyToId, replyPreview, edited } = parseMessage(msg.message);
                     const isImageOnly = Boolean(imageUrl && !text && !orderRef && !voiceUrl && !voiceBroken);
                     const isVoiceOnly = Boolean(voiceUrl && !text && !orderRef && !imageUrl);
                     const isVoiceBrokenOnly = Boolean(voiceBroken && !text && !orderRef && !imageUrl && !voiceUrl);
                     const showTime = isLastInGroup(filteredMessages, index);
                     const canUnsend = msg.sender === 'customer' && chat.status !== 'closed';
+                    const canReply = chat.status !== 'closed';
+                    const canEditText =
+                      canUnsend &&
+                      Boolean(text) &&
+                      !voiceUrl &&
+                      !voiceBroken &&
+                      !imageUrl &&
+                      !orderRef;
+                    const openMsgMenu = canUnsend || canReply
+                      ? (e: React.MouseEvent<HTMLElement>) => handleMessageMenu(e, msg.id)
+                      : undefined;
                     const isLastCustomerMessage = msg.sender === 'customer' &&
                       index === filteredMessages.map(m => m.sender).lastIndexOf('customer');
                     const align = msg.sender === 'customer' ? 'end' : 'start';
@@ -2386,6 +2532,7 @@ ${getStatusLabel(order.status)}
                             chatTheme,
                             msg.sender === 'customer' ? 'outgoing' : 'incoming'
                           );
+                    const isHighlighted = highlightedMessageId === msg.id;
 
                     if (msg.sender === 'system') {
                       return (
@@ -2399,6 +2546,13 @@ ${getStatusLabel(order.status)}
                       <MessageScrollerItem
                         key={msg.id}
                         messageId={msg.id}
+                      >
+                      <div
+                        id={`chat-msg-${msg.id}`}
+                        className={cn(
+                          'rounded-2xl transition-[box-shadow,background-color] duration-500',
+                          isHighlighted && 'bg-[color-mix(in_srgb,var(--chat-accent,#0071e3)_22%,transparent)] ring-2 ring-[color-mix(in_srgb,var(--chat-accent,#0071e3)_45%,transparent)]'
+                        )}
                       >
                       <Message
                         align={align}
@@ -2424,7 +2578,34 @@ ${getStatusLabel(order.status)}
                           )}
                         </MessageAvatar>
                         <MessageContent>
+                          {(replyPreview || replyToId) && (
+                            <button
+                              type="button"
+                              title={t.supportChat.jumpToReply}
+                              onClick={() => {
+                                if (replyToId) jumpToMessage(replyToId);
+                              }}
+                              disabled={!replyToId}
+                              className={cn(
+                                'mb-1 max-w-[min(280px,85%)] rounded-xl border border-white/15 bg-black/15 px-2.5 py-1.5 text-left transition',
+                                replyToId && 'cursor-pointer hover:bg-black/25',
+                                !replyToId && 'cursor-default opacity-80',
+                                align === 'end' ? 'ml-auto' : 'mr-auto'
+                              )}
+                            >
+                              <span className="block text-[10px] font-semibold opacity-80">
+                                {t.chatbot.reply}
+                              </span>
+                              <span className="line-clamp-2 block text-[11px] opacity-90">
+                                {replyPreview || '…'}
+                              </span>
+                            </button>
+                          )}
                           {isVoiceOnly ? (
+                            <div
+                              onContextMenu={openMsgMenu}
+                              onDoubleClick={openMsgMenu}
+                            >
                             <VoiceMessage
                               src={voiceUrl!}
                               duration={voiceDuration}
@@ -2432,8 +2613,14 @@ ${getStatusLabel(order.status)}
                               pauseLabel={t.supportChat.pauseVoice}
                               className={cn((msg as any)._optimistic && 'opacity-60')}
                             />
+                            </div>
                           ) : isVoiceBrokenOnly ? (
-                            <Bubble variant={bubbleVariant} align={align}>
+                            <Bubble
+                              variant={bubbleVariant}
+                              align={align}
+                              onContextMenu={openMsgMenu}
+                              onDoubleClick={openMsgMenu}
+                            >
                               <BubbleContent
                                 style={themedBubbleStyle}
                                 className={
@@ -2459,7 +2646,7 @@ ${getStatusLabel(order.status)}
                                 'rounded-[14px] shadow-md',
                                 (msg as any)._optimistic && 'opacity-60'
                               )}
-                              onContextMenu={canUnsend ? (e) => handleMessageMenu(e as React.MouseEvent<HTMLElement>, msg.id) : undefined}
+                              onContextMenu={openMsgMenu}
                             />
                           ) : (
                             <Bubble
@@ -2467,12 +2654,10 @@ ${getStatusLabel(order.status)}
                               align={align}
                               className={cn(
                                 (msg as any)._optimistic && 'opacity-60',
-                                canUnsend && 'cursor-pointer',
+                                (canUnsend || canReply) && 'cursor-pointer',
                               )}
-                              onContextMenu={canUnsend ? (e) => handleMessageMenu(e as any, msg.id) : undefined}
-                              onClick={canUnsend ? (e) => {
-                                if ((e as any).detail === 2) handleMessageMenu(e as any, msg.id);
-                              } : undefined}
+                              onContextMenu={openMsgMenu}
+                              onDoubleClick={openMsgMenu}
                             >
                               <BubbleContent
                                 style={themedBubbleStyle}
@@ -2487,6 +2672,14 @@ ${getStatusLabel(order.status)}
                                 {text && (
                                   <Typography sx={{ fontSize: '0.9rem', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>
                                     {text}
+                                    {edited ? (
+                                      <Box
+                                        component="span"
+                                        sx={{ ml: 0.75, fontSize: '0.68rem', opacity: 0.7, fontWeight: 500 }}
+                                      >
+                                        {t.supportChat.edited}
+                                      </Box>
+                                    ) : null}
                                   </Typography>
                                 )}
                                 {voiceUrl && (
@@ -2550,9 +2743,25 @@ ${getStatusLabel(order.status)}
                             </Bubble>
                           )}
 
+                          <div className={cn('mt-0.5 flex items-center gap-1', align === 'end' ? 'justify-end' : 'justify-start')}>
+                            {canReply || canEditText ? (
+                              <button
+                                type="button"
+                                aria-label="message actions"
+                                onClick={(e) => handleMessageMenu(e, msg.id)}
+                                className="flex size-6 items-center justify-center rounded-full text-[var(--chat-chrome-muted,var(--text-muted))] opacity-70 transition hover:bg-black/10 hover:opacity-100"
+                              >
+                                <MoreVertIcon size={14} />
+                              </button>
+                            ) : null}
+                          </div>
+
                           {showTime && (
                             <MessageFooter className="text-[0.65rem] text-muted-foreground">
                               <span className="tabular-nums">{formatTime(msg.created_at)}</span>
+                              {edited && !text ? (
+                                <span className="opacity-70">{t.supportChat.edited}</span>
+                              ) : null}
                               {isLastCustomerMessage && chat.status === 'active' && (
                                 <>
                                   {msg.is_read
@@ -2570,6 +2779,7 @@ ${getStatusLabel(order.status)}
                           )}
                         </MessageContent>
                       </Message>
+                      </div>
                       </MessageScrollerItem>
                     );
                   })}
@@ -2657,20 +2867,48 @@ ${getStatusLabel(order.status)}
                 {chat.status !== 'closed' ? (
                   <Box
                     sx={{
-                      borderTop: '1px solid var(--glass-border)',
-                      bgcolor: 'var(--surface)',
+                      borderTop: '1px solid var(--chat-chrome-border, var(--glass-border))',
+                      bgcolor: 'var(--chat-composer-bg, var(--surface))',
+                      color: 'var(--chat-chrome-fg, var(--foreground))',
                       flexShrink: 0,
                       boxShadow: '0 -4px 12px rgba(0,0,0,0.03)',
+                      backdropFilter: 'blur(12px)',
                     }}
                   >
-                    {/* Reply Preview */}
-                    {replyToMessage && (
+                    {/* Edit / Reply Preview */}
+                    {editingMessage && (
                       <Box
                         sx={{
                           px: 2,
                           py: 1,
-                          bgcolor: 'var(--surface-2)',
-                          borderBottom: '1px solid var(--glass-border)',
+                          bgcolor: 'color-mix(in srgb, var(--chat-accent, var(--primary)) 12%, transparent)',
+                          borderBottom: '1px solid var(--chat-chrome-border, var(--glass-border))',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1.5,
+                        }}
+                      >
+                        <EditIcon size={16} color="var(--chat-accent, var(--primary))" />
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography sx={{ fontSize: '0.7rem', color: 'var(--chat-accent, var(--primary))', fontWeight: 600 }}>
+                            {t.supportChat.editMessage}
+                          </Typography>
+                          <Typography sx={{ fontSize: '0.8rem', color: 'var(--chat-chrome-muted, var(--text-muted))', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {editingMessage.text}
+                          </Typography>
+                        </Box>
+                        <IconButton size="small" onClick={handleCancelEdit} sx={{ color: 'var(--chat-chrome-muted)' }}>
+                          <CloseIcon size={18} />
+                        </IconButton>
+                      </Box>
+                    )}
+                    {replyToMessage && !editingMessage && (
+                      <Box
+                        sx={{
+                          px: 2,
+                          py: 1,
+                          bgcolor: 'color-mix(in srgb, var(--chat-accent, var(--primary)) 10%, transparent)',
+                          borderBottom: '1px solid var(--chat-chrome-border, var(--glass-border))',
                           display: 'flex',
                           alignItems: 'center',
                           gap: 1.5,
@@ -2680,19 +2918,19 @@ ${getStatusLabel(order.status)}
                           sx={{
                             width: 3,
                             height: 36,
-                            bgcolor: '#0071e3',
+                            bgcolor: 'var(--chat-accent, #0071e3)',
                             borderRadius: 1,
                             flexShrink: 0,
                           }}
                         />
                         <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <Typography sx={{ fontSize: '0.7rem', color: '#0071e3', fontWeight: 600 }}>
+                          <Typography sx={{ fontSize: '0.7rem', color: 'var(--chat-accent, #0071e3)', fontWeight: 600 }}>
                             {t.chatbot.reply} {replyToMessage.sender === 'admin' ? t.supportChat.admin : t.supportChat.you}
                           </Typography>
                           <Typography 
                             sx={{ 
                               fontSize: '0.8rem', 
-                              color: 'var(--text-muted)',
+                              color: 'var(--chat-chrome-muted, var(--text-muted))',
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
                               whiteSpace: 'nowrap',
@@ -2705,8 +2943,7 @@ ${getStatusLabel(order.status)}
                           size="small"
                           onClick={() => setReplyToMessage(null)}
                           sx={{ 
-                            color: 'var(--text-muted)',
-                            '&:hover': { color: 'var(--text-muted)', bgcolor: 'rgba(0,0,0,0.05)' },
+                            color: 'var(--chat-chrome-muted, var(--text-muted))',
                           }}
                         >
                           <CloseIcon size={18} />
@@ -2719,24 +2956,24 @@ ${getStatusLabel(order.status)}
                       className="mobile-chat-input-bar"
                       sx={{
                         flexShrink: 0,
-                        bgcolor: 'var(--surface)',
-                        borderTop: '1px solid var(--glass-border)',
+                        bgcolor: 'transparent',
+                        borderTop: 'none',
                       }}
                     >
                       <ChatComposer
                         value={message}
                         onChange={(v) => {
                           setMessage(v);
-                          sendTypingIndicator();
+                          if (!editingMessage) sendTypingIndicator();
                         }}
                         onSend={handleSendMessage}
                         onAttachImage={() => {
-                          if (uploadingImage) return;
+                          if (uploadingImage || editingMessage) return;
                           fileInputRef.current?.click();
                         }}
-                        onSendSticker={handleSendSticker}
-                        onSendVoice={handleSendVoice}
-                        showMic
+                        onSendSticker={editingMessage ? undefined : handleSendSticker}
+                        onSendVoice={editingMessage ? undefined : handleSendVoice}
+                        showMic={!editingMessage}
                         voiceLabels={{
                           recordVoice: t.supportChat.recordVoice,
                           sendVoice: t.supportChat.sendVoice,
@@ -2753,7 +2990,17 @@ ${getStatusLabel(order.status)}
                           micFailed: t.supportChat.micFailed,
                           micRecordFailed: t.supportChat.micRecordFailed,
                         }}
-                        placeholder={t.supportChat.typeMessage}
+                        gifLabels={{
+                          title: t.supportChat.gifTitle,
+                          searchPlaceholder: t.supportChat.gifSearch,
+                          uploadGif: t.supportChat.gifUpload,
+                          trending: t.supportChat.gifTrending,
+                          empty: t.supportChat.gifEmpty,
+                          loadError: t.supportChat.gifLoadError,
+                          missingKey: t.supportChat.gifMissingKey,
+                          loading: t.supportChat.gifLoading,
+                        }}
+                        placeholder={editingMessage ? t.supportChat.editPlaceholder : t.supportChat.typeMessage}
                         disabled={sending}
                         sending={sending}
                         hasAttachment={Boolean(previewImage)}
@@ -2869,6 +3116,73 @@ ${getStatusLabel(order.status)}
               </>
             ) : null}
           </Box>
+          </Box>
+
+          {/* Desktop / iPad info sidebar (Messenger-style) */}
+          {isPage && !showHistory && !showNewChat && !showRating && (
+            <Box
+              sx={{
+                display: { xs: 'none', md: 'flex' },
+                width: 320,
+                flexShrink: 0,
+                flexDirection: 'column',
+                minHeight: 0,
+                borderLeft: '1px solid var(--chat-chrome-border, var(--glass-border))',
+                bgcolor: 'var(--surface-2)',
+              }}
+            >
+              <SupportChatSettingsPanel
+                sidebar
+                prefs={chatPrefs}
+                onPrefsChange={updateChatPrefs}
+                messages={chat?.messages || []}
+                onBack={() => undefined}
+                onChangeTheme={() => setShowThemePicker(true)}
+                onMuteEnabled={() => {
+                  if (pushSubscribed) void pushUnsubscribe();
+                }}
+                pushLoading={pushLoading}
+                profile={{
+                  name: displayAdminName,
+                  avatarUrl: '/favicon.png',
+                  status:
+                    chat?.status === 'active'
+                      ? `${t.supportChat.activeChats} - ${chat.admin_name || t.supportChat.admin}`
+                      : chat?.status === 'pending'
+                        ? t.supportChat.connecting
+                        : t.supportChat.connected,
+                }}
+                labels={{
+                  settingsTitle: t.supportChat.settingsTitle,
+                  sectionCustomize: t.supportChat.sectionCustomize,
+                  sectionMedia: t.supportChat.sectionMedia,
+                  sectionPrivacy: t.supportChat.sectionPrivacy,
+                  sectionHelp: t.supportChat.sectionHelp,
+                  muteNotifications: t.supportChat.muteNotifications,
+                  muteNotificationsDesc: t.supportChat.muteNotificationsDesc,
+                  soundToggle: t.supportChat.soundToggle,
+                  soundToggleDesc: t.supportChat.soundToggleDesc,
+                  compactDensity: t.supportChat.compactDensity,
+                  compactDensityDesc: t.supportChat.compactDensityDesc,
+                  primaryBubbles: t.supportChat.primaryBubbles,
+                  primaryBubblesDesc: t.supportChat.primaryBubblesDesc,
+                  changeTheme: t.supportChat.changeTheme,
+                  changeThemeDesc: t.supportChat.changeThemeDesc,
+                  currentTheme: lang === 'en' ? chatTheme.nameEn : chatTheme.nameTh,
+                  mediaGallery: t.supportChat.mediaGallery,
+                  mediaGalleryDesc: t.supportChat.mediaGalleryDesc,
+                  noMedia: t.supportChat.noMedia,
+                  images: t.supportChat.images,
+                  voiceMessages: t.supportChat.voiceMessages,
+                  faqSupport: t.supportChat.faqSupport,
+                  faqSupportDesc: t.supportChat.faqSupportDesc,
+                  back: t.supportChat.settingsBack,
+                  on: t.supportChat.on,
+                  off: t.supportChat.off,
+                }}
+              />
+            </Box>
+          )}
         </Paper>
       </Fade>
 

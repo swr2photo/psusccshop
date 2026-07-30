@@ -335,7 +335,7 @@ export function VoiceMessage({
   return (
     <div
       className={cn(
-        'flex h-9 min-w-[180px] max-w-[240px] items-center gap-1.5 rounded-xl border border-[var(--glass-border)] bg-[var(--surface)] px-1.5 text-foreground shadow-sm',
+        'flex h-8 min-h-[40px] min-w-[150px] max-w-[200px] items-center gap-1 rounded-xl border border-[var(--glass-border)] bg-[var(--surface)] px-1 text-foreground shadow-sm sm:h-9 sm:min-w-[180px] sm:max-w-[240px] sm:gap-1.5 sm:px-1.5',
         className
       )}
     >
@@ -345,7 +345,7 @@ export function VoiceMessage({
         disabled={!ready || loadError}
         aria-label={playing ? pauseLabel : playLabel}
         className={cn(
-          'flex size-7 shrink-0 items-center justify-center rounded-lg transition disabled:opacity-50',
+          'flex size-8 shrink-0 items-center justify-center rounded-lg transition disabled:opacity-50 sm:size-7',
           playing
             ? 'bg-[var(--primary)] text-[var(--primary-foreground)]'
             : 'bg-[var(--surface-2)] text-foreground hover:bg-[var(--surface-3)]'
@@ -364,7 +364,7 @@ export function VoiceMessage({
           aria-label={playLabel}
           tabIndex={0}
           onClick={seek}
-          className="flex h-5 cursor-pointer items-center gap-[2px]"
+          className="flex h-4 cursor-pointer items-center gap-px sm:h-5 sm:gap-[2px]"
         >
           {levels.map((level, i) => {
             const played = i / BAR_COUNT <= progress;

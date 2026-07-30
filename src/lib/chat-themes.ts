@@ -166,13 +166,40 @@ export function getChatTheme(id: string | null | undefined): ChatTheme {
   return CHAT_THEMES.find((t) => t.id === id) ?? CHAT_THEMES[0];
 }
 
-export function chatThemeSurfaceStyle(theme: ChatTheme): CSSProperties {
-  const vars = {
+const DARK_THEME_IDS: ChatThemeId[] = ['night-market', 'sunset-run', 'matchday'];
+
+export function isDarkChatTheme(theme: ChatTheme): boolean {
+  return DARK_THEME_IDS.includes(theme.id);
+}
+
+/** CSS vars shared by bubbles, header, and composer */
+export function chatThemeCssVars(theme: ChatTheme): CSSProperties {
+  const dark = isDarkChatTheme(theme);
+  return {
     ['--chat-out-bg' as string]: theme.outgoingBg,
     ['--chat-out-fg' as string]: theme.outgoingFg,
     ['--chat-in-bg' as string]: theme.incomingBg,
     ['--chat-in-fg' as string]: theme.incomingFg,
+    ['--chat-accent' as string]: theme.swatch,
+    ['--chat-chrome-fg' as string]: dark ? '#f5f5f7' : '#1d1d1f',
+    ['--chat-chrome-muted' as string]: dark ? 'rgba(245,245,247,0.72)' : 'rgba(29,29,31,0.62)',
+    ['--chat-chrome-bg' as string]: dark
+      ? `color-mix(in srgb, ${theme.swatch} 22%, rgba(18,14,16,0.78))`
+      : `color-mix(in srgb, ${theme.swatch} 16%, rgba(255,255,255,0.86))`,
+    ['--chat-chrome-border' as string]: dark
+      ? 'rgba(255,255,255,0.12)'
+      : 'rgba(0,0,0,0.08)',
+    ['--chat-composer-bg' as string]: dark
+      ? `color-mix(in srgb, ${theme.swatch} 14%, rgba(22,16,18,0.88))`
+      : `color-mix(in srgb, ${theme.swatch} 10%, rgba(255,255,255,0.92))`,
+    ['--chat-input-bg' as string]: dark
+      ? 'rgba(255,255,255,0.10)'
+      : 'rgba(0,0,0,0.05)',
   };
+}
+
+export function chatThemeSurfaceStyle(theme: ChatTheme): CSSProperties {
+  const vars = chatThemeCssVars(theme);
   if (theme.pattern) {
     return {
       backgroundImage: `${theme.pattern}, ${theme.background}`,
@@ -182,6 +209,18 @@ export function chatThemeSurfaceStyle(theme: ChatTheme): CSSProperties {
   return {
     background: theme.background,
     ...vars,
+  };
+}
+
+/** Translucent header / chrome bar tinted by the active theme */
+export function chatThemeChromeStyle(theme: ChatTheme): CSSProperties {
+  return {
+    ...chatThemeCssVars(theme),
+    background: 'var(--chat-chrome-bg)',
+    color: 'var(--chat-chrome-fg)',
+    borderColor: 'var(--chat-chrome-border)',
+    backdropFilter: 'blur(14px)',
+    WebkitBackdropFilter: 'blur(14px)',
   };
 }
 

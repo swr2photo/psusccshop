@@ -72,6 +72,10 @@ type SupportChatSettingsPanelProps = {
   /** When mute turns on — optional side effect (e.g. unsubscribe push) */
   onMuteEnabled?: () => void;
   pushLoading?: boolean;
+  /** Desktop sidebar: hide back chevron / use compact title */
+  sidebar?: boolean;
+  /** Optional profile header (name + avatar) for Messenger-style info pane */
+  profile?: { name: string; avatarUrl?: string | null; status?: string };
 };
 
 function SettingsRow({
@@ -179,6 +183,8 @@ export function SupportChatSettingsPanel({
   onChangeTheme,
   onMuteEnabled,
   pushLoading,
+  sidebar = false,
+  profile,
 }: SupportChatSettingsPanelProps) {
   const [customizeOpen, setCustomizeOpen] = useState(true);
   const [mediaOpen, setMediaOpen] = useState(true);
@@ -279,17 +285,38 @@ export function SupportChatSettingsPanel({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--surface-2)]">
-      <div className="flex shrink-0 items-center gap-2 border-b border-[var(--glass-border)] bg-[var(--surface)] px-3 py-2.5">
-        <button
-          type="button"
-          aria-label={labels.back}
-          onClick={onBack}
-          className="flex size-9 items-center justify-center rounded-full text-foreground transition hover:bg-[var(--surface-2)]"
-        >
-          <ArrowLeft className="size-5" />
-        </button>
-        <p className="truncate text-[0.95rem] font-semibold text-foreground">{labels.settingsTitle}</p>
-      </div>
+      {!sidebar ? (
+        <div className="flex shrink-0 items-center gap-2 border-b border-[var(--glass-border)] bg-[var(--surface)] px-3 py-2.5">
+          <button
+            type="button"
+            aria-label={labels.back}
+            onClick={onBack}
+            className="flex size-9 items-center justify-center rounded-full text-foreground transition hover:bg-[var(--surface-2)]"
+          >
+            <ArrowLeft className="size-5" />
+          </button>
+          <p className="truncate text-[0.95rem] font-semibold text-foreground">{labels.settingsTitle}</p>
+        </div>
+      ) : profile ? (
+        <div className="flex shrink-0 flex-col items-center gap-2 border-b border-[var(--glass-border)] bg-[var(--surface)] px-4 py-5 text-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={profile.avatarUrl || '/favicon.png'}
+            alt=""
+            className="size-16 rounded-full object-cover ring-1 ring-[var(--glass-border)]"
+          />
+          <div className="min-w-0">
+            <p className="truncate text-[1rem] font-semibold text-foreground">{profile.name}</p>
+            {profile.status ? (
+              <p className="text-[0.75rem] text-[var(--text-muted)]">{profile.status}</p>
+            ) : null}
+          </div>
+        </div>
+      ) : (
+        <div className="flex shrink-0 items-center border-b border-[var(--glass-border)] bg-[var(--surface)] px-3 py-2.5">
+          <p className="truncate text-[0.95rem] font-semibold text-foreground">{labels.settingsTitle}</p>
+        </div>
+      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         <Section

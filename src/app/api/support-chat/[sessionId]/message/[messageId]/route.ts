@@ -1,12 +1,10 @@
 // src/app/api/support-chat/[sessionId]/message/[messageId]/route.ts
-// Delete/Unsend a message (IG-style)
+// Unsend (DELETE) + edit text (PATCH)
 
 import { NextRequest, NextResponse } from 'next/server';
 import { isResourceOwner, getSession } from '@/lib/auth';
-import { 
-  getChatSession,
-  unsendChatMessage
-} from '@/lib/support-chat';
+import { getChatSession, unsendChatMessage } from '@/lib/support-chat';
+import { editChatMessage } from '@/lib/support-chat-edit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -15,57 +13,99 @@ interface Params {
   params: Promise<{ sessionId: string; messageId: string }>;
 }
 
-// DELETE: Unsend/Delete a message
 export async function DELETE(request: NextRequest, { params }: Params) {
   try {
     const { sessionId, messageId } = await params;
     const session = await getSession(request);
-    
+
     if (!session?.user?.email) {
       return NextResponse.json('Unauthorized', { status: 401 });
     }
-    
+
     const chat = await getChatSession(sessionId);
-    
+
     if (!chat) {
       return NextResponse.json({ error: 'Chat not found' }, { status: 404 });
     }
-    
-    // Check if chat is closed
+
     if (chat.status === 'closed') {
       return NextResponse.json(
         { error: 'ไม่สามารถยกเลิกข้อความได้เนื่องจากการสนทนาปิดแล้ว' },
         { status: 400 }
       );
     }
-    
-    // Only the message owner can unsend
+
     const isOwner = isResourceOwner(chat.customer_email, session.user.email);
-    
+
     if (!isOwner) {
       return NextResponse.json(
         { error: 'คุณสามารถยกเลิกได้เฉพาะข้อความของตัวเองเท่านั้น' },
         { status: 403 }
       );
     }
-    
-    // Call the unsend function
+
     const result = await unsendChatMessage(sessionId, messageId, session.user.email);
-    
+
     if (!result.success) {
       return NextResponse.json(
         { error: result.error || 'ไม่สามารถยกเลิกข้อความได้' },
         { status: 400 }
       );
     }
-    
-    return NextResponse.json({ 
+
+    return NextResponse.json({
       success: true,
-      message: 'ยกเลิกข้อความเรียบร้อยแล้ว'
+      message: 'ยกเลิกข้อความเรียบร้อยแล้ว',
     });
-    
   } catch (error: any) {
     console.error('[support-chat/message/delete] error:', error);
+    return NextResponse.json(
+      { error: error.message || 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(request: NextRequest, { params }: Params) {
+  try {
+    const { sessionId, messageId } = await params;
+    const session = await getSession(request);
+
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const chat = await getChatSession(sessionId);
+    if (!chat) {
+      return NextResponse.json({ error: 'Chat not found' }, { status: 404 });
+    }
+
+    if (chat.status === 'closed') {
+      return NextResponse.json(
+        { error: 'ไม่สามารถแก้ไขข้อความได้เนื่องจากการสนทนาปิดแล้ว' },
+        { status: 400 }
+      );
+    }
+
+    const isOwner = isResourceOwner(chat.customer_email, session.user.email);
+    if (!isOwner) {
+      return NextResponse.json(
+        { error: 'แก้ไขได้เฉพาะข้อความของตัวเอง' },
+        { status: 403 }
+      );
+    }
+
+    const body = await request.json().catch(() => ({}));
+    const message = typeof body.message === 'string' ? body.message : '';
+
+    const result = await editChatMessage(sessionId, messageId, session.user.email, message);
+    if (!result.success) {
+      return NextResponse.json({ error: result.error || 'แก้ไขไม่สำเร็จ' }, { status: 400 });
+    }
+
+    return NextResponse.json({ success: true, message: result.message });
+  } catch (error: any) {
+    console.error('[support-chat/message/edit] error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }
