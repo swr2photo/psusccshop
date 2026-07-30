@@ -101,6 +101,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
   const [orderStatus, setOrderStatus] = useState<string>('PENDING');
   const [orderDate, setOrderDate] = useState<string | null>(null);
   const [taxId, setTaxId] = useState<string>('');
+  const [isQueued, setIsQueued] = useState(false);
 
   const [paymentEnabled, setPaymentEnabled] = useState(true);
   const [paymentDisabledMessage, setPaymentDisabledMessage] = useState<string | null>(null);
@@ -185,7 +186,44 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
   }, [isSwipeDragging, swipeDragOffset, onClose]);
 
   useEffect(() => {
-    fetchPaymentInfo();
+    let pollInterval: NodeJS.Timeout;
+
+    const checkStatus = async () => {
+      try {
+         const res = await apiFetch(`/api/orders/${encodeURIComponent(orderRef)}/status`);
+         const data = await res.json();
+         if (data.status === 'ready_for_payment') {
+            clearInterval(pollInterval);
+            setIsQueued(false);
+            fetchPaymentInfo();
+         }
+      } catch (e) {
+         // ignore
+      }
+    };
+
+    const initialFetch = async () => {
+      setLoading(true);
+      try {
+        const res = await apiFetch(`/api/orders/${encodeURIComponent(orderRef)}/status`);
+        const data = await res.json();
+        if (data.status === 'ready_for_payment') {
+           fetchPaymentInfo();
+        } else {
+           setIsQueued(true);
+           setLoading(false);
+           pollInterval = setInterval(checkStatus, 2000);
+        }
+      } catch (e) {
+        fetchPaymentInfo(); // Fallback
+      }
+    };
+
+    initialFetch();
+
+    return () => {
+       if (pollInterval) clearInterval(pollInterval);
+    };
   }, [orderRef]);
 
   const fetchPaymentInfo = async () => {
@@ -664,6 +702,17 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
         ref={scrollContainerRef}
         sx={{ flex: 1, overflow: 'auto', WebkitOverflowScrolling: 'touch', px: { xs: 2, sm: 2.5 }, py: 2 }}
       >
+        {isQueued ? (
+           <Box sx={{ p: 4, mt: 8, textAlign: 'center' }}>
+              <Loader2 size={48} className="animate-spin mx-auto mb-4" style={{ color: NAVY }} />
+              <Typography variant="h6" fontWeight={700} color="text.primary" gutterBottom>
+                 กำลังเข้าคิวทำรายการ...
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 280, mx: 'auto' }}>
+                 กรุณารอสักครู่ ระบบกำลังจัดสรรคิวและตรวจสอบสต็อกสินค้าของคุณ
+              </Typography>
+           </Box>
+        ) : (
         <Box
           ref={printRegionRef}
           className="payment-notice-print"
@@ -1047,7 +1096,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                         cursor: 'pointer',
                         fontSize: '0.78rem',
                         fontWeight: 700,
-                        transition: 'all 0.2s ease',
+                        transition: 'all 0.2s',
                         color: active ? '#fff' : 'var(--text-muted)',
                         background: active
                           ? (m.key === 'stripe' ? NAVY : EMERALD)
@@ -1874,6 +1923,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
             </Box>
           )}
         </Box>
+        )}
       </Box>
     </Drawer>
   );

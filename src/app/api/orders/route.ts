@@ -18,6 +18,8 @@ import { computePromoDiscount } from '@/lib/promo';
 import { dispatchNotification } from '@/lib/notifications';
 import { isValidTransition, dispatchWebhook, OrderStatus } from '@/lib/order-state-machine';
 import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
+import { getQStashClient } from '@/lib/qstash';
+import { deductStockAtomic, restoreStockAtomic } from '@/lib/stock';
 
 // Helper to save user log server-side
 async function saveUserLogServer(log: {
@@ -342,30 +344,82 @@ export async function POST(req: NextRequest) {
     const key = orderKey(ref, now);
     
     // Deduct stock before saving
+    let allStockDeducted = true;
+    const deductedItems: { key: string, qty: number }[] = [];
+    
     for (const item of cartItems) {
       const size = item.size || 'FREE';
       const qty = Number(item.quantity || item.qty || 1);
       const prodId = item.productId || item.id;
       if (prodId) {
         try {
-          const deductRes: any = await db.execute(sql`SELECT deduct_stock(${prodId}, ${size}, ${qty}) as success`);
-          const rows = deductRes.rows || deductRes;
-          if (!rows[0]?.success) {
-            console.warn(`[Orders API] Stock deduction failed for ${prodId} size ${size}`);
-            // If strictly enforcing: throw new Error(`สินค้า ${item.productName || prodId} สต็อกไม่เพียงพอ`);
+          const stockKey = `stock:${sanitizedBody.shopId || 'main'}:${prodId}:${size}`;
+          const redisDeduct = await deductStockAtomic(stockKey, qty).catch((e) => {
+             console.warn('[Orders API] Redis deduct failed or not configured, fallback to SQL:', e);
+             return -2;
+          });
+          
+          if (redisDeduct === -1) {
+            allStockDeducted = false;
+            break; // Stop deducting, we will rollback
+          } else if (redisDeduct >= 0) {
+            deductedItems.push({ key: stockKey, qty });
           } else {
-            // Log the inventory change
-            await db.execute(sql`
-              INSERT INTO inventory_logs (product_id, size, previous_quantity, new_quantity, change_type, order_ref, changed_by)
-              VALUES (${prodId}, ${size}, 0, 0, 'ORDER_DEDUCT', ${ref}, ${customerEmail})
-            `);
+             // Fallback to SQL
+             const deductRes: any = await db.execute(sql`SELECT deduct_stock(${prodId}, ${size}, ${qty}) as success`);
+             const rows = deductRes.rows || deductRes;
+             if (!rows[0]?.success) {
+               console.warn(`[Orders API] Stock deduction failed for ${prodId} size ${size}`);
+             } else {
+               await db.execute(sql`
+                 INSERT INTO inventory_logs (product_id, size, previous_quantity, new_quantity, change_type, order_ref, changed_by)
+                 VALUES (${prodId}, ${size}, 0, 0, 'ORDER_DEDUCT', ${ref}, ${customerEmail})
+               `);
+             }
           }
         } catch (e) {
           console.error('[Orders API] Error deducting stock:', e);
         }
       }
     }
+    
+    if (!allStockDeducted) {
+       // Rollback Redis stock
+       for (const { key, qty } of deductedItems) {
+          await restoreStockAtomic(key, qty).catch(() => {});
+       }
+       return await secureJsonResponse(
+          { status: 'error', message: 'สินค้าบางรายการสต็อกไม่เพียงพอ' },
+          { status: 400, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
+       );
+    }
 
+    const qstash = getQStashClient();
+    if (qstash) {
+      // Enqueue job to QStash
+      const protocol = req.headers.get('x-forwarded-proto') || 'https';
+      const host = req.headers.get('host') || 'sccshop.psuscc.club';
+      await qstash.publishJSON({
+        url: `${protocol}://${host}/api/workers/process-order`,
+        body: { order, ref, key },
+        retries: 3,
+      });
+
+      // Dispatch LINE Notification early for queued order
+      dispatchNotification({
+        shopId: sanitizedBody.shopId,
+        type: 'NEW_ORDER',
+        title: '📦 Order Queued!',
+        message: `Ref: ${ref}\nName: ${order.customerName}\nAmount: ฿${totalAmount.toLocaleString()}`,
+      }).catch(e => console.error('[Orders API] Notification error:', e));
+
+      return await secureJsonResponse(
+        { status: 'success', ref, queued: true },
+        { status: 202, headers: { 'Content-Type': 'application/json; charset=utf-8' } } // HTTP 202 Accepted
+      );
+    }
+
+    // Fallback: Synchronous save if QStash is not configured
     await putJson(key, order);
     if (order.customerEmail) {
       await upsertIndexEntry(order.customerEmail, order);
