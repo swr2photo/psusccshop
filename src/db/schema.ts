@@ -1,7 +1,7 @@
 // src/db/schema.ts
 // กำหนด schema สำหรับ Drizzle ORM — ครอบคลุม 18 ตารางที่เคยใช้งานใน Prisma
 
-import { pgTable, uuid, text, timestamp, boolean, integer, doublePrecision, jsonb, uniqueIndex } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, timestamp, boolean, integer, doublePrecision, jsonb, uniqueIndex, index } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 // ==================== CONFIG ====================
@@ -237,7 +237,9 @@ export const shops = pgTable('shops', {
   sortOrder: integer('sort_order').default(0).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  activeSortIdx: index('idx_shops_active_sort').on(table.isActive, table.sortOrder, table.name)
+}));
 
 export const shopAdmins = pgTable('shop_admins', {
   id: uuid('id').defaultRandom().primaryKey(),

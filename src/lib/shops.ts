@@ -309,7 +309,16 @@ export function invalidatePublicShopCatalogCache() {
 export async function listActivePublicShopCatalog() {
   return getCached(PUBLIC_SHOP_CATALOG_CACHE_KEY, CACHE_TTL.catalog, async () => {
     try {
-      const data = await db.select()
+      const data = await db.select({
+        id: shops.id,
+        slug: shops.slug,
+        name: shops.name,
+        nameEn: shops.nameEn,
+        logoUrl: shops.logoUrl,
+        settings: shops.settings,
+        products: shops.products,
+        config: shops.config,
+      })
         .from(shops)
         .where(eq(shops.isActive, true))
         .orderBy(shops.sortOrder, shops.name);
