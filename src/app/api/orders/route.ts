@@ -137,51 +137,6 @@ const parseThailandDate = (dateString: string, isEnd: boolean): Date => {
   let normalized = trimmed.replace(' ', 'T');
   const hasTime = normalized.includes('T');
   if (!hasTime) {
-    if (isEnd) {
-      normalized += 'T23:59:59.999+07:00';
-    } else {
-      normalized += 'T00:00:00.000+07:00';
-    }
-  } else {
-    normalized += '+07:00';
-  }
-  const date = new Date(normalized);
-  if (isNaN(date.getTime())) {
-    return new Date(dateString);
-  }
-  return date;
-};
-
-export async function POST(req: NextRequest) {
-  const start = Date.now();
-  // Rate limiting สำหรับ order submission
-  const rateLimitResult = await checkCombinedRateLimitAsync(req, RATE_LIMITS.order);
-  if (!rateLimitResult.allowed) {
-    return await secureJsonResponse(
-      { status: 'error', message: 'คุณส่งคำสั่งซื้อเร็วเกินไป กรุณารอสักครู่' },
-      { 
-        status: 429, 
-        headers: { 
-          'Content-Type': 'application/json; charset=utf-8',
-          ...getRateLimitHeaders(rateLimitResult),
-        } 
-      }
-    );
-  }
-
-  try {
-    const body = await secureJsonRequest(req);
-    
-    // ตรวจสอบ Turnstile token (ป้องกันบอท)
-    const turnstileToken = body?.turnstileToken;
-    const clientIP = getClientIP(req);
-    const turnstileResult = await verifyTurnstileToken(turnstileToken, clientIP);
-    
-    if (!turnstileResult.success) {
-      return await secureJsonResponse(
-        { status: 'error', message: turnstileResult.error || 'กรุณายืนยันว่าคุณไม่ใช่บอท' },
-        { status: 400, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
-      );
     }
     
     // Sanitize UTF-8 input ก่อนบันทึก (และลบ turnstileToken ออก)
