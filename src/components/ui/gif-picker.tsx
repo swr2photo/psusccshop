@@ -152,9 +152,9 @@ export function GifPicker({
             </p>
           ) : null}
           <div className="grid max-h-[240px] grid-cols-3 gap-1.5 overflow-y-auto">
-            {visible.map((gif) => (
+            {visible.map((gif, index) => (
               <button
-                key={gif.id}
+                key={`${gif.id}-${index}`}
                 type="button"
                 disabled={disabled}
                 title={gif.title}
@@ -165,7 +165,7 @@ export function GifPicker({
                 <img
                   src={gif.previewUrl}
                   alt={gif.title}
-                  className="size-full object-cover"
+                  className="absolute inset-0 size-full object-cover"
                   loading="lazy"
                   draggable={false}
                   onError={() => {

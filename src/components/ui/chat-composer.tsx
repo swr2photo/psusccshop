@@ -100,6 +100,8 @@ type ChatComposerProps = {
   upload?: ChatComposerUploadState | null;
   /** GIF picker labels (Giphy) */
   gifLabels?: GifPickerLabels;
+  /** Accent color for the send button */
+  accentColor?: string;
 };
 
 export function ChatComposer({
@@ -123,6 +125,7 @@ export function ChatComposer({
   voiceLabels,
   upload = null,
   gifLabels,
+  accentColor,
 }: ChatComposerProps) {
   const vl = voiceLabels || {};
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -814,7 +817,7 @@ export function ChatComposer({
             <PopoverContent
               align="start"
               side="top"
-              className="w-[280px] p-2"
+              className="w-[calc(100vw-32px)] max-w-[280px] p-2"
               onOpenAutoFocus={(e) => e.preventDefault()}
             >
               <div className="grid grid-cols-8 gap-0.5">
@@ -888,7 +891,7 @@ export function ChatComposer({
                   <PopoverContent
                     align="end"
                     side="top"
-                    className="w-[320px] p-2.5"
+                    className="w-[calc(100vw-32px)] max-w-[320px] p-2.5"
                     onOpenAutoFocus={(e) => e.preventDefault()}
                   >
                     <GifPicker
@@ -923,10 +926,11 @@ export function ChatComposer({
                 onClick={onSend}
                 className={cn(
                   'flex size-9 items-center justify-center rounded-full transition',
-                  canSend
-                    ? 'bg-blue-600 text-white hover:bg-blue-700'
-                    : 'text-muted-foreground opacity-40'
+                  canSend && !accentColor && 'bg-blue-600 text-white hover:bg-blue-700',
+                  canSend && accentColor && 'text-white hover:brightness-110',
+                  !canSend && 'text-muted-foreground opacity-40'
                 )}
+                style={canSend && accentColor ? { backgroundColor: accentColor } : undefined}
               >
                 {sending ? (
                   <Loader2 className="size-4 animate-spin" />

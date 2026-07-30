@@ -2328,14 +2328,13 @@ ${getStatusLabel(order.status)}
                     }}
                   />
 
-                  {/* Submit Button */}
                   <Button
                     fullWidth
                     variant="contained"
                     onClick={handleCreateChat}
                     disabled={!message.trim() || sending}
                     sx={{
-                      background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
+                      background: chatTheme.outgoingBg,
                       py: 1.5,
                       fontWeight: 600,
                       fontSize: '0.95rem',
@@ -2343,8 +2342,8 @@ ${getStatusLabel(order.status)}
                       textTransform: 'none',
                       boxShadow: '0 4px 14px rgba(0,113,227, 0.4)',
                       '&:hover': { 
-                        background: 'linear-gradient(135deg, #1d4ed8 0%, #bf5af2 100%)',
-                        boxShadow: '0 6px 20px rgba(0,113,227, 0.5)',
+                        filter: 'brightness(1.1)',
+                        boxShadow: `0 6px 20px color-mix(in srgb, ${chatTheme.swatch} 50%, transparent)`,
                       },
                       '&.Mui-disabled': {
                         background: 'var(--surface-2)',
@@ -3006,6 +3005,7 @@ ${getStatusLabel(order.status)}
                         sending={sending}
                         hasAttachment={Boolean(previewImage)}
                         isTouchDevice={isTouchDevice}
+                        accentColor={chatTheme.swatch}
                         upload={
                           uploadingImage
                             ? {

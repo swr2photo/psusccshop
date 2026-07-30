@@ -10,6 +10,7 @@ import {
   chatThemeSurfaceStyle,
   chatThemeChromeStyle,
   getChatTheme,
+  isDarkChatTheme,
   type ChatThemeId,
 } from '@/lib/chat-themes';
 
@@ -41,6 +42,54 @@ export function ChatThemePicker({
 }: ChatThemePickerProps) {
   const [draftId, setDraftId] = useState<ChatThemeId>(currentThemeId);
   const draft = getChatTheme(draftId);
+
+  const lightThemes = CHAT_THEMES.filter((t) => !isDarkChatTheme(t));
+  const darkThemes = CHAT_THEMES.filter((t) => isDarkChatTheme(t));
+
+  const renderTheme = (theme: typeof CHAT_THEMES[0]) => {
+    const selected = theme.id === draftId;
+    const name = lang === 'en' ? theme.nameEn : theme.nameTh;
+    const subtitle = lang === 'en' ? theme.subtitleEn : theme.subtitleTh;
+    return (
+      <li key={theme.id}>
+        <button
+          type="button"
+          onClick={() => setDraftId(theme.id)}
+          className={cn(
+            'group flex w-full items-center gap-3.5 rounded-2xl px-3.5 py-3 text-left transition-all duration-300',
+            selected
+              ? 'bg-white/15 shadow-lg ring-1 ring-white/30'
+              : 'hover:bg-white/5 hover:scale-[1.01]'
+          )}
+        >
+          <span
+            className={cn(
+              "size-11 shrink-0 rounded-full shadow-inner transition-transform duration-300",
+              selected ? "ring-2 ring-white scale-105" : "ring-1 ring-white/15 group-hover:scale-105"
+            )}
+            style={{
+              background: `linear-gradient(135deg, ${theme.swatch} 0 52%, ${theme.swatchSecondary || theme.swatch} 52% 100%)`,
+            }}
+            aria-hidden
+          />
+          <span className="min-w-0 flex-1">
+            <span className={cn(
+              "block truncate text-[0.95rem] font-semibold transition-colors duration-200",
+              selected ? "text-white" : "text-white/80 group-hover:text-white"
+            )}>{name}</span>
+            {subtitle ? (
+              <span className={cn(
+                "mt-0.5 block truncate text-[0.75rem] transition-colors duration-200",
+                selected ? "text-white/70" : "text-white/50 group-hover:text-white/60"
+              )}>
+                {subtitle}
+              </span>
+            ) : null}
+          </span>
+        </button>
+      </li>
+    );
+  };
 
   useEffect(() => {
     if (open) setDraftId(currentThemeId);
@@ -93,52 +142,24 @@ export function ChatThemePicker({
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">
           {/* Left panel: Theme List */}
           <div className="order-2 md:order-1 flex-1 md:w-[280px] lg:w-[320px] md:flex-none min-h-0 overflow-y-auto border-t border-white/10 bg-black/10 md:border-t-0 md:border-r custom-scrollbar">
-            <ul className="p-3 space-y-1.5">
-              {CHAT_THEMES.map((theme) => {
-                const selected = theme.id === draftId;
-                const name = lang === 'en' ? theme.nameEn : theme.nameTh;
-                const subtitle = lang === 'en' ? theme.subtitleEn : theme.subtitleTh;
-                return (
-                  <li key={theme.id}>
-                    <button
-                      type="button"
-                      onClick={() => setDraftId(theme.id)}
-                      className={cn(
-                        'group flex w-full items-center gap-3.5 rounded-2xl px-3.5 py-3 text-left transition-all duration-300',
-                        selected
-                          ? 'bg-white/15 shadow-lg ring-1 ring-white/30'
-                          : 'hover:bg-white/5 hover:scale-[1.01]'
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "size-11 shrink-0 rounded-full shadow-inner transition-transform duration-300",
-                          selected ? "ring-2 ring-white scale-105" : "ring-1 ring-white/15 group-hover:scale-105"
-                        )}
-                        style={{
-                          background: `linear-gradient(135deg, ${theme.swatch} 0 52%, ${theme.swatchSecondary || theme.swatch} 52% 100%)`,
-                        }}
-                        aria-hidden
-                      />
-                      <span className="min-w-0 flex-1">
-                        <span className={cn(
-                          "block truncate text-[0.95rem] font-semibold transition-colors duration-200",
-                          selected ? "text-white" : "text-white/80 group-hover:text-white"
-                        )}>{name}</span>
-                        {subtitle ? (
-                          <span className={cn(
-                            "mt-0.5 block truncate text-[0.75rem] transition-colors duration-200",
-                            selected ? "text-white/70" : "text-white/50 group-hover:text-white/60"
-                          )}>
-                            {subtitle}
-                          </span>
-                        ) : null}
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+            <div className="p-3 space-y-6">
+              <div>
+                <h3 className="mb-2 px-3 text-xs font-bold uppercase tracking-wider text-white/50">
+                  {lang === 'en' ? 'Light Themes' : 'ธีมสว่าง'}
+                </h3>
+                <ul className="space-y-1.5">
+                  {lightThemes.map(renderTheme)}
+                </ul>
+              </div>
+              <div>
+                <h3 className="mb-2 px-3 text-xs font-bold uppercase tracking-wider text-white/50">
+                  {lang === 'en' ? 'Dark Themes' : 'ธีมมืด'}
+                </h3>
+                <ul className="space-y-1.5">
+                  {darkThemes.map(renderTheme)}
+                </ul>
+              </div>
+            </div>
           </div>
 
           {/* Right panel: Realistic Preview */}
