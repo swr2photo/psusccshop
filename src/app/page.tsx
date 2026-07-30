@@ -631,6 +631,11 @@ function getProductLink(product: Product): string {
 
 export default function HomePage() {
   const now = useCurrentTime(5000);
+  const shopStatusType = useMemo(
+    () => getShopStatus(config?.isOpen ?? false, config?.closeDate, config?.openDate, now),
+    [config, now]
+  );
+  const isShopOpen = shopStatusType === 'OPEN';
   const { data: session, status } = useSession();
   const isMobile = useMediaQuery('(max-width:600px)');
   const theme = useTheme();
@@ -850,11 +855,6 @@ export default function HomePage() {
   const [showAnnouncementPopup, setShowAnnouncementPopup] = useState(true); // For floating popup
   const [currentAnnouncementIndex, setCurrentAnnouncementIndex] = useState(0); // For cycling announcements
   const [showAnnouncementImage, setShowAnnouncementImage] = useState(false); // For image lightbox
-  const [isShopOpen, setIsShopOpen] = useState(() => {
-    const cached = readCachedShopConfig();
-    if (!cached) return true;
-    return getShopStatus(cached.isOpen, cached.closeDate, cached.openDate) === 'OPEN';
-  });
   // Health of the public config realtime channel — gates fallback polling.
   // (realtimeConnected from useRealtimeOrders only reflects the orders channel)
   const [configRealtimeOk, setConfigRealtimeOk] = useState(false);
@@ -1004,7 +1004,7 @@ export default function HomePage() {
 
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [inlineNotice, setInlineNotice] = useState<Toast | null>(null);
-  const toastTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const toastTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>> (new Map());
   const ToastTransition = (props: any) => <Slide {...props} direction="down" />;
 
   // Live stream status for navbar indicator (shared SWR — no duplicate /api/live polling)
@@ -1104,8 +1104,6 @@ export default function HomePage() {
     if (!cached) return;
     setConfig(cached as unknown as ShopConfig);
     setAnnouncements(cached.announcements || []);
-    const shopStatus = getShopStatus(cached.isOpen, cached.closeDate, cached.openDate);
-    setIsShopOpen(shopStatus === 'OPEN');
     setLoading(false);
 
     const imageUrls = (cached.products || [])
@@ -1238,10 +1236,6 @@ export default function HomePage() {
             const prevJson = JSON.stringify(prev);
             return prevJson === nextJson ? prev : (cfg.announcementHistory || []);
           });
-          // Calculate actual shop open status based on isOpen flag AND closeDate
-          const shopStatus = getShopStatus(cfg.isOpen, cfg.closeDate, cfg.openDate);
-          const actuallyOpen = shopStatus === 'OPEN';
-          setIsShopOpen(prev => prev === actuallyOpen ? prev : actuallyOpen);
           lastConfigRefreshAt.current = Date.now();
         } else {
           console.warn('No config returned from getPublicConfig');
@@ -2453,29 +2447,27 @@ export default function HomePage() {
     setEditingCartItem(item);
   };
 
-  const stopProductHold = () => {
-    if (productHoldTimer.current) {
-      clearInterval(productHoldTimer.current);
-      productHoldTimer.current = null;
-    }
-  };
+  const updateDrawerCartQuantity = useCallback((id: string, quantity: number, maxLimit?: number | null) => {
+    const item = cart.find(i => i.id === id);
+    if (!item) return;
+    const finalQty = maxLimit !== undefined && maxLimit !== null ? Math.min(quantity, maxLimit) : quantity;
+    updateCartQuantity(id, finalQty);
+  }, [cart]);
 
-  const startProductHold = (delta: number) => {
-    stopProductHold();
-    productHoldTimer.current = setInterval(() => {
-      setProductOptions((prev) => ({ ...prev, quantity: clampQty(prev.quantity + delta) }));
-    }, 200);
-  };
+  const removeDrawerCartItem = useCallback((id: string) => {
+    removeFromCart(id);
+    showToast('success', lang === 'en' ? 'Removed from cart' : 'ลบสินค้าออกจากตะกร้าแล้ว');
+  }, [removeFromCart, showToast, lang]);
 
-  const stopCartHold = (id: string) => {
+  const stopCartHold = useCallback((id: string) => {
     const timer = cartHoldTimers.current[id];
     if (timer) {
       clearInterval(timer);
       cartHoldTimers.current[id] = null;
     }
-  };
+  }, []);
 
-  const startCartHold = (id: string, delta: number) => {
+  const startCartHold = useCallback((id: string, delta: number, maxLimit?: number | null) => {
     stopCartHold(id);
     cartHoldTimers.current[id] = setInterval(() => {
       const target = cartRef.current.find((item) => item.id === id);
@@ -2483,9 +2475,14 @@ export default function HomePage() {
         stopCartHold(id);
         return;
       }
-      updateCartQuantity(id, target.quantity + delta);
+      const nextQty = target.quantity + delta;
+      if (maxLimit !== undefined && maxLimit !== null && nextQty > maxLimit) {
+        stopCartHold(id);
+        return;
+      }
+      updateDrawerCartQuantity(id, nextQty, maxLimit);
     }, 200);
-  };
+  }, [stopCartHold, updateDrawerCartQuantity]);
 
   const getTotalPrice = useCallback(() => {
     return cart.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
@@ -5062,8 +5059,8 @@ export default function HomePage() {
           setCartPromo(null);
           showToast('success', t.cart.cleared);
         }}
-        onUpdateQuantity={(itemId, quantity) => updateCartQuantity(itemId, quantity)}
-        onRemoveItem={(itemId) => removeFromCart(itemId)}
+        onUpdateQuantity={(itemId, quantity, maxLimit) => updateDrawerCartQuantity(itemId, quantity, maxLimit)}
+        onRemoveItem={(itemId) => removeDrawerCartItem(itemId)}
         onEditItem={(item) => openEditCartItem(item)}
         onCheckout={(promo) => {
           if (!requireProfileBeforeCheckout()) return;
@@ -5071,7 +5068,7 @@ export default function HomePage() {
           setShowCart(false);
           setShowOrderDialog(true);
         }}
-        onStartHold={(itemId, direction) => startCartHold(itemId, direction)}
+        onStartHold={(itemId, direction, maxLimit) => startCartHold(itemId, direction, maxLimit)}
         onStopHold={(itemId) => stopCartHold(itemId)}
         onGoHome={() => { setShowCart(false); setActiveTab('home'); }}
         getTotalPrice={getTotalPrice}

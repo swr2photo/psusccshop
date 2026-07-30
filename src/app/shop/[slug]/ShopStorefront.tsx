@@ -932,10 +932,11 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
     return cart.findIndex((c) => c.id === id && c.shopSlug === shopSlug);
   }, [cart, shopSlug]);
 
-  const updateDrawerCartQuantity = useCallback((id: string, quantity: number) => {
+  const updateDrawerCartQuantity = useCallback((id: string, quantity: number, maxLimit?: number | null) => {
     const idx = findCartIndexById(id);
     if (idx < 0) return;
-    handleUpdateCartQty(idx, quantity);
+    const finalQty = maxLimit !== undefined && maxLimit !== null ? Math.min(quantity, maxLimit) : quantity;
+    handleUpdateCartQty(idx, finalQty);
   }, [findCartIndexById, handleUpdateCartQty]);
 
   const removeDrawerCartItem = useCallback((id: string) => {
@@ -951,7 +952,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
     }
   }, []);
 
-  const startCartHold = useCallback((id: string, delta: number) => {
+  const startCartHold = useCallback((id: string, delta: number, maxLimit?: number | null) => {
     stopCartHold(id);
     cartHoldTimers.current[id] = setInterval(() => {
       const target = shopCartRef.current.find((item) => item.id === id);
@@ -959,7 +960,12 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
         stopCartHold(id);
         return;
       }
-      updateDrawerCartQuantity(id, target.qty + delta);
+      const nextQty = target.qty + delta;
+      if (maxLimit !== undefined && maxLimit !== null && nextQty > maxLimit) {
+        stopCartHold(id);
+        return;
+      }
+      updateDrawerCartQuantity(id, nextQty, maxLimit);
     }, 200);
   }, [stopCartHold, updateDrawerCartQuantity]);
 

@@ -55,11 +55,11 @@ interface CartDrawerProps {
   shippingConfig?: ShippingConfig | null;
   isShopOpen: boolean;
   onClearCart: () => void;
-  onUpdateQuantity: (itemId: string, quantity: number) => void;
+  onUpdateQuantity: (itemId: string, quantity: number, maxLimit?: number | null) => void;
   onRemoveItem: (itemId: string) => void;
   onEditItem: (item: CartItem) => void;
   onCheckout: (promo?: CartPromoResult) => void;
-  onStartHold: (itemId: string, direction: number) => void;
+  onStartHold: (itemId: string, direction: number, maxLimit?: number | null) => void;
   onStopHold: (itemId: string) => void;
   onGoHome: () => void;
   getTotalPrice: () => number;
@@ -588,11 +588,11 @@ export default function CartDrawer(props: CartDrawerProps) {
                           }}>
                             <IconButton
                               size="small"
-                              onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
-                              onMouseDown={() => onStartHold(item.id, -1)}
+                              onClick={() => onUpdateQuantity(item.id, item.quantity - 1, itemStockLimit)}
+                              onMouseDown={() => onStartHold(item.id, -1, itemStockLimit)}
                               onMouseUp={() => onStopHold(item.id)}
                               onMouseLeave={() => onStopHold(item.id)}
-                              onTouchStart={() => onStartHold(item.id, -1)}
+                              onTouchStart={() => onStartHold(item.id, -1, itemStockLimit)}
                               onTouchEnd={() => onStopHold(item.id)}
                               sx={{ color: 'var(--foreground)', p: 0.7, borderRadius: 0, '&:hover': { bgcolor: 'var(--surface)' } }}
                             >
@@ -612,11 +612,11 @@ export default function CartDrawer(props: CartDrawerProps) {
                             </Typography>
                             <IconButton
                               size="small"
-                              onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
-                              onMouseDown={() => !atStockLimit && onStartHold(item.id, 1)}
+                              onClick={() => onUpdateQuantity(item.id, item.quantity + 1, itemStockLimit)}
+                              onMouseDown={() => !atStockLimit && onStartHold(item.id, 1, itemStockLimit)}
                               onMouseUp={() => onStopHold(item.id)}
                               onMouseLeave={() => onStopHold(item.id)}
-                              onTouchStart={() => !atStockLimit && onStartHold(item.id, 1)}
+                              onTouchStart={() => !atStockLimit && onStartHold(item.id, 1, itemStockLimit)}
                               onTouchEnd={() => onStopHold(item.id)}
                               disabled={atStockLimit}
                               sx={{ 
@@ -1168,32 +1168,6 @@ export default function CartDrawer(props: CartDrawerProps) {
                     </Box>
                   </Box>
                 )}
-
-                <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', mb: 1 }}>{t.cart.quantity}</Typography>
-                <Box sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  bgcolor: 'var(--glass-bg)',
-                  borderRadius: '12px',
-                  border: '1px solid var(--glass-border)',
-                  width: 'fit-content',
-                }}>
-                  <IconButton
-                    onClick={() => onSetEditingCartItem({ ...editingCartItem, quantity: Math.max(1, editingCartItem.quantity - 1) })}
-                    sx={{ color: 'var(--text-muted)', p: 1.5 }}
-                  >
-                    <Minus size={18} />
-                  </IconButton>
-                  <Typography sx={{ color: 'var(--foreground)', minWidth: 48, textAlign: 'center', fontWeight: 800, fontSize: '1.1rem' }}>
-                    {editingCartItem.quantity}
-                  </Typography>
-                  <IconButton
-                    onClick={() => onSetEditingCartItem({ ...editingCartItem, quantity: Math.min(99, editingCartItem.quantity + 1) })}
-                    sx={{ color: 'var(--text-muted)', p: 1.5 }}
-                  >
-                    <Plus size={18} />
-                  </IconButton>
-                </Box>
               </DialogContent>
               <DialogActions sx={{ p: 3, borderTop: '1px solid var(--glass-border)' }}>
                 <Button onClick={() => onSetEditingCartItem(null)} sx={{ color: 'var(--text-muted)' }}>
