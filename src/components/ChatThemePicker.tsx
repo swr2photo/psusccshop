@@ -90,9 +90,9 @@ export function ChatThemePicker({
           </button>
         </div>
 
-        <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[280px_minmax(0,1fr)] lg:grid-cols-[320px_minmax(0,1fr)]">
+        <div className="flex min-h-0 flex-1 flex-col md:flex-row">
           {/* Left panel: Theme List */}
-          <div className="min-h-0 overflow-y-auto border-b border-white/10 bg-black/10 md:border-b-0 md:border-r custom-scrollbar">
+          <div className="order-2 md:order-1 flex-1 md:w-[280px] lg:w-[320px] md:flex-none min-h-0 overflow-y-auto border-t border-white/10 bg-black/10 md:border-t-0 md:border-r custom-scrollbar">
             <ul className="p-3 space-y-1.5">
               {CHAT_THEMES.map((theme) => {
                 const selected = theme.id === draftId;
@@ -142,10 +142,10 @@ export function ChatThemePicker({
           </div>
 
           {/* Right panel: Realistic Preview */}
-          <div className="flex min-h-[320px] items-center justify-center p-4 sm:p-6 md:p-8 bg-black/5">
+          <div className="order-1 md:order-2 flex shrink-0 md:flex-1 items-center justify-center p-4 sm:p-6 md:p-8 bg-black/5">
             <div
-              className="relative flex w-full max-w-[340px] shrink-0 flex-col overflow-hidden rounded-[2.5rem] border-[6px] border-black/80 bg-black shadow-2xl transition-all duration-500"
-              style={{ height: '600px', ...chatThemeSurfaceStyle(draft) }}
+              className="relative flex h-[240px] w-full max-w-[340px] shrink-0 flex-col overflow-hidden rounded-[2rem] border-[4px] border-black/80 bg-black shadow-2xl transition-all duration-500 sm:h-[300px] md:h-[600px] md:rounded-[2.5rem] md:border-[6px]"
+              style={chatThemeSurfaceStyle(draft)}
             >
               {/* Mock Chat Header */}
               <div 

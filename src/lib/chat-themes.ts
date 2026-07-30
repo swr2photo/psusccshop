@@ -10,7 +10,8 @@ export type ChatThemeId =
   | 'campus-green'
   | 'sunset-run'
   | 'lavender-mist'
-  | 'matchday';
+  | 'matchday'
+  | 'spiderman-bnd';
 
 export type ChatTheme = {
   id: ChatThemeId;
@@ -153,6 +154,22 @@ export const CHAT_THEMES: ChatTheme[] = [
     nameEn: 'Match Day',
     subtitleTh: 'เข้ม ลุ้น เต็มที่',
     subtitleEn: 'Bold game-day energy',
+  },
+  {
+    id: 'spiderman-bnd',
+    swatch: '#E60012',
+    swatchSecondary: '#0047BB',
+    background: 'linear-gradient(180deg, #F8FAFC 0%, #FFFFFF 100%)',
+    pattern:
+      'radial-gradient(circle at top left, rgba(230,0,18,0.08) 0%, transparent 40%), radial-gradient(circle at bottom right, rgba(0,71,187,0.08) 0%, transparent 40%), repeating-linear-gradient(45deg, rgba(230,0,18,0.04) 0px, rgba(230,0,18,0.04) 1.5px, transparent 1.5px, transparent 20px), repeating-linear-gradient(-45deg, rgba(0,71,187,0.04) 0px, rgba(0,71,187,0.04) 1.5px, transparent 1.5px, transparent 20px)',
+    outgoingBg: 'linear-gradient(135deg, #E60012 0%, #B3000E 100%)',
+    outgoingFg: '#ffffff',
+    incomingBg: '#ffffff',
+    incomingFg: '#003380',
+    nameTh: 'สไปเดอร์-แมน BND',
+    nameEn: 'Spider-Man BND',
+    subtitleTh: 'แดงน้ำเงิน พลังแมงมุม',
+    subtitleEn: 'Web-slinger red & blue',
   },
 ];
 
