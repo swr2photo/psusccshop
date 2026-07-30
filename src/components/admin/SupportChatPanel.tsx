@@ -890,7 +890,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
         const data = await res.json();
         if (data.success && data.message) resolveOptimistic(tempId, data.message);
         else resolveOptimistic(tempId, null);
-      } catch (error: unknown) {
+      } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
         if (error?.name !== 'AbortError') {
           toastError('ส่งสติกเกอร์ไม่สำเร็จ');
         }
@@ -948,7 +948,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
         resolveOptimistic(tempId, null);
         toastError(data?.error || 'ส่งข้อความเสียงไม่สำเร็จ');
       }
-    } catch (error: unknown) {
+    } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       if (error?.name !== 'AbortError') {
         toastError(error?.message || 'ส่งข้อความเสียงไม่สำเร็จ');
       }
@@ -1025,7 +1025,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
       } else {
         toastError('ไม่สามารถอัปโหลดรูปภาพได้');
       }
-    } catch (error: unknown) {
+    } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       if (error?.name === 'AbortError') {
         // cancelled by user
       } else {

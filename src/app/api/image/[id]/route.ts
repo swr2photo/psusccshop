@@ -55,7 +55,7 @@ async function getFromCache(cacheKey: string): Promise<{ buffer: Buffer; content
       buffer: Buffer.concat(chunks),
       contentType: response.ContentType || 'image/jpeg',
     };
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     if (error?.$metadata?.httpStatusCode === 404) return null;
     return null;
   }
@@ -371,7 +371,7 @@ export async function GET(
       },
     });
 
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Image Proxy] Error:', error?.message || error);
     
     if (error?.name === 'AbortError') {

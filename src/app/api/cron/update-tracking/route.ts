@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
           .set(updateData)
           .where(eq(orders.ref, order.ref));
         await new Promise(resolve => setTimeout(resolve, 500));
-      } catch (orderError: unknown) {
+      } catch (orderError: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
         results.errors.push(`${order.ref}: ${orderError.message}`);
         console.error(`[Tracking] Error processing ${order.ref}:`, orderError);
       }
@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
 
     console.log(`[Tracking Cron] Processed: ${results.processed}, Updated: ${results.updated}, Delivered: ${results.delivered}`);
     return NextResponse.json({ success: true, ...results });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Tracking Cron] Error:', error);
     Sentry.captureException(error);
     const message = error instanceof Error ? error.message : 'Unknown error';

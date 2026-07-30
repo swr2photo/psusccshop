@@ -102,7 +102,7 @@ export async function GET(req: NextRequest) {
       { status: 'success', data: { history: sanitizedHistory, hasMore, total } },
       { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Content-Type': 'application/json; charset=utf-8' } }
     );
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Orders API] GET failed:', error?.message || error);
     // Never mask failures as empty history — clients would wipe a previously loaded list
     return NextResponse.json(
@@ -292,7 +292,7 @@ export async function POST(req: NextRequest) {
       const built = buildValidatedCart(cartItems, products);
       validatedCart = built.cart;
       subtotal = built.subtotal;
-    } catch (pricingError: unknown) {
+    } catch (pricingError: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       return NextResponse.json(
         { status: 'error', message: pricingError?.message || 'ไม่สามารถคำนวณราคาได้' },
         { status: 400, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
@@ -413,7 +413,7 @@ export async function POST(req: NextRequest) {
       { status: 'success', ref },
       { headers: { 'Content-Type': 'application/json; charset=utf-8' } }
     );
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     recordOrderCreated('failed', Date.now() - start);
     return NextResponse.json(
       { status: 'error', message: error?.message || 'submit failed' },
@@ -536,7 +536,7 @@ export async function PUT(req: NextRequest) {
       { status: 'success', data: sanitizedResponse },
       { headers: { 'Content-Type': 'application/json; charset=utf-8' } }
     );
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     return NextResponse.json(
       { status: 'error', message: error?.message || 'update failed' },
       { status: 500, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
@@ -644,7 +644,7 @@ export async function DELETE(req: NextRequest) {
       { status: 'success', message: 'cancelled' },
       { headers: { 'Content-Type': 'application/json; charset=utf-8' } }
     );
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     return NextResponse.json(
       { status: 'error', message: error?.message || 'cancel failed' },
       { status: 500, headers: { 'Content-Type': 'application/json; charset=utf-8' } }

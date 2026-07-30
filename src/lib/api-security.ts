@@ -243,7 +243,7 @@ export function withSecurity(
 
       return response;
 
-    } catch (error: unknown) {
+    } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       // Log error
       logSecurityEvent('api_error', {
         ip: clientIP,

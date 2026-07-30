@@ -161,7 +161,7 @@ export async function POST(req: NextRequest) {
         updatedOrders: updatedCount,
       },
     });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Pickup Enable API] Error:', error);
     return NextResponse.json(
       { status: 'error', message: error?.message || 'Failed to update pickup' },

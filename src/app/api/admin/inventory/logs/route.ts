@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
       status: 'success',
       data: logs,
     });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Inventory Logs API] Error:', error);
     return NextResponse.json(
       { status: 'error', message: 'Failed to fetch inventory logs' },

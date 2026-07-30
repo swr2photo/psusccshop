@@ -389,7 +389,7 @@ export const AnnouncementsView = React.memo(function AnnouncementsView({
         });
         showToast('success', 'อัพโหลดรูปภาพสำเร็จ');
       }
-    } catch (err: unknown) {
+    } catch (err: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       const message = err instanceof Error ? err.message : 'อัพโหลดรูปภาพล้มเหลว';
       showToast('error', message);
     } finally {

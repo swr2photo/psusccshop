@@ -50,7 +50,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       message: 'ปิดการสนทนาสำเร็จ'
     });
     
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[support-chat/close] POST error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },

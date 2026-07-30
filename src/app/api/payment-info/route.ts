@@ -136,7 +136,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(responseData, {
       headers: { 'Content-Type': 'application/json; charset=utf-8' }
     });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[payment-info] error', error);
     return NextResponse.json({
       status: 'error',

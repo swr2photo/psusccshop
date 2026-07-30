@@ -46,7 +46,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     
     return NextResponse.json({ success: true });
     
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[support-chat/typing] POST error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
@@ -101,7 +101,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     
     return NextResponse.json({ isTyping: otherTyping });
     
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[support-chat/typing] GET error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },

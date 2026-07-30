@@ -317,7 +317,7 @@ export const EventsView = React.memo(function EventsView({
         setEditingEvent((prev) => (prev ? { ...prev, imageUrl: url } : null));
         showToast('success', 'อัปโหลดรูปสำเร็จ');
       }
-    } catch (err: unknown) {
+    } catch (err: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       const message = err instanceof Error ? err.message : 'อัปโหลดรูปไม่สำเร็จ';
       showToast('error', message);
     } finally {

@@ -335,7 +335,7 @@ export default function StripeSettings({ config, onUpdate, onBack, onSave, savin
       } else {
         setStatusError(data.error || 'Failed to fetch status');
       }
-    } catch (err: unknown) {
+    } catch (err: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       const message = err instanceof Error ? err.message : 'Network error';
       setStatusError(message);
     } finally {

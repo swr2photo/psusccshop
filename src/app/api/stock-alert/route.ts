@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true, alert: resultData });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('POST /api/stock-alert error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -104,7 +104,7 @@ export async function DELETE(request: NextRequest) {
       );
 
     return NextResponse.json({ success: true });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('DELETE /api/stock-alert error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -135,7 +135,7 @@ export async function GET(request: NextRequest) {
         createdAt: toIsoString(a.createdAt) || undefined,
       })),
     });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('GET /api/stock-alert error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

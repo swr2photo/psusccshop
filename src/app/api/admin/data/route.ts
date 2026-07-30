@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
       },
       { headers: { 'Content-Type': 'application/json; charset=utf-8' } }
     );
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     return NextResponse.json({ status: 'error', message: error?.message || 'load failed' }, { status: 500 });
   }
 }

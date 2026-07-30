@@ -2560,7 +2560,7 @@ export default function HomePage() {
       } else {
         showToast('error', res.message || t.orderHistory.cancelFailed);
       }
-    } catch (error: unknown) {
+    } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       showToast('error', error.message || t.orderHistory.cancelFailed);
     } finally {
       setCancellingRef(null);
@@ -2717,7 +2717,7 @@ export default function HomePage() {
         setTurnstileToken('');
         throw new Error(res.message || t.common.error);
       }
-    } catch (error: unknown) {
+    } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       setTurnstileToken('');
       showToast('error', error.message || t.checkout.orderError);
     } finally {
@@ -2907,7 +2907,7 @@ export default function HomePage() {
         setShowOrderDialog(true);
         setPendingCheckout(false);
       }
-    } catch (error: unknown) {
+    } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       showToast('error', error.message || t.profile.saveProfileFailed);
     } finally {
       setSavingProfile(false);

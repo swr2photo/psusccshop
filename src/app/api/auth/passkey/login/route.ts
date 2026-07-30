@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     try {
       const { options, challengeId } = await generatePasskeyAuthenticationOptions(req.url);
       return NextResponse.json({ options, challengeId });
-    } catch (err: unknown) {
+    } catch (err: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       console.error('[Passkey] Login options error:', err);
       const message = err instanceof Error ? err.message : String(err);
       return NextResponse.json({ error: message }, { status: 500 });
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
         verified: false,
         error: result.error || 'Authentication failed',
       }, { status: 401 });
-    } catch (err: unknown) {
+    } catch (err: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       console.error('[Passkey] Login verify error:', err);
       const message = err instanceof Error ? err.message : String(err);
       return NextResponse.json({ error: message }, { status: 400 });

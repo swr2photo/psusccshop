@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
         timestamp: r.createdAt,
       })),
     });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[admin/audit] GET', error);
     return NextResponse.json({ error: error?.message || 'failed' }, { status: 500 });
   }
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ success: true });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[admin/audit] POST', error);
     return NextResponse.json({ error: error?.message || 'failed' }, { status: 500 });
   }

@@ -171,7 +171,7 @@ export default function UserLogsView({ showToast }: Props) {
 
       setLogs(data.logs || []);
       setStats(data.stats || null);
-    } catch (error: unknown) {
+    } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       console.error('Failed to fetch user logs:', error);
       showToast('error', 'ไม่สามารถโหลดประวัติผู้ใช้ได้');
     } finally {
@@ -193,7 +193,7 @@ export default function UserLogsView({ showToast }: Props) {
       if (!res.ok) throw new Error(data.error || 'failed');
       setTimelineEvents(data.events || []);
       setRetentionDays(data.retentionDays || 730);
-    } catch (e: unknown) {
+    } catch (e: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       showToast('error', e?.message || 'โหลดไทม์ไลน์ไม่สำเร็จ');
       setTimelineEvents([]);
     } finally {

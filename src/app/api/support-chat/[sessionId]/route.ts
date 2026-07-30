@@ -109,7 +109,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       { chat: chatPayload, sync: 'full', hasMore },
       { headers: { ETag: etag } }
     );
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[support-chat/sessionId] GET error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },

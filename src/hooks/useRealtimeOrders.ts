@@ -289,7 +289,7 @@ export function useRealtimeOrders(options: UseRealtimeOrdersOptions = {}) {
         });
 
       return channel;
-    } catch (err: unknown) {
+    } catch (err: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       console.error('[Realtime] Subscribe error:', err);
       updateState({
         connectionState: 'error',

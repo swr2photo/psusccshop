@@ -54,7 +54,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     }
 
     return NextResponse.json({ status: 'success', products: shop.products });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     return NextResponse.json({ status: 'error', message: error?.message || 'เกิดข้อผิดพลาด' }, { status: 500 });
   }
 }

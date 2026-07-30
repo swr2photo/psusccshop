@@ -244,7 +244,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ success: b
 
     console.log('[Email] Sent successfully:', { to, subject: options.subject, id: result.id });
     return { success: true, id: logId };
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     log.status = 'failed';
     log.error = error.message;
     await persistLog();
@@ -794,7 +794,7 @@ export async function sendChatReplyEmail(options: {
       type: 'custom',
       metadata: { chatId: options.chatId, trigger: 'admin_chat_reply' },
     });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Email] Chat reply email failed:', error);
     return { success: false, error: error.message };
   }

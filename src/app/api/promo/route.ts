@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
         ? `ลด ${promo.discountValue}%${promo.maxDiscount ? ` (สูงสุด ฿${promo.maxDiscount})` : ''}`
         : `ลด ฿${promo.discountValue}`),
     });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Promo API] Error:', error);
     return NextResponse.json({ error: 'เกิดข้อผิดพลาด' }, { status: 500 });
   }

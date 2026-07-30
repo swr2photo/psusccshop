@@ -154,7 +154,7 @@ export async function GET(request: NextRequest) {
         'Cache-Control': API_CACHE.private,
       },
     });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     const message = error instanceof Error ? error.message : 'Invoice error';
     console.error('GET /api/invoice error:', error);
     return NextResponse.json({ error: message }, { status: 500 });

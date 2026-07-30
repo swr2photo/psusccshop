@@ -69,7 +69,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       message: 'ขอบคุณสำหรับการให้คะแนน'
     });
     
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[support-chat/rate] POST error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },

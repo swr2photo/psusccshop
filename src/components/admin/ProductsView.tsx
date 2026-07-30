@@ -2131,7 +2131,7 @@ export function ProductsView({
               }
 
               setPickupSettingProduct(null);
-            } catch (err: unknown) {
+            } catch (err: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
               const message = err instanceof Error ? err.message : 'เกิดข้อผิดพลาด';
               showToast('error', message);
             } finally {

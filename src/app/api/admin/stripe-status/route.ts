@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
           const err = await res.json().catch(() => ({}));
           verifyError = err?.error?.message || `HTTP ${res.status}`;
         }
-      } catch (e: unknown) {
+      } catch (e: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
         verifyError = e?.message || 'Network error';
       }
     }

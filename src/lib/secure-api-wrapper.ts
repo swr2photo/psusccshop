@@ -326,7 +326,7 @@ export function withSecureAPI(
 
       return response;
 
-    } catch (error: unknown) {
+    } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       // Log error
       await logSecurityEvent('api_error', {
         severity: 'medium',

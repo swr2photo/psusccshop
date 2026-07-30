@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
         withSlip: ordersWithSlip.length,
       },
     });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[slip-import] GET error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -161,7 +161,7 @@ export async function POST(request: NextRequest) {
           .where(eq(orders.ref, matchedOrder.ref));
 
         results.matched.push({ orderRef: matchedOrder.ref, imageUrl: log.imageUrl, matchedBy });
-      } catch (err: unknown) {
+      } catch (err: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
         results.errors.push({ orderRef: matchedOrder.ref, error: err.message });
       }
     }
@@ -177,7 +177,7 @@ export async function POST(request: NextRequest) {
         errors: results.errors.length,
       },
     });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[slip-import] POST error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -234,7 +234,7 @@ export async function PUT(request: NextRequest) {
           .where(eq(orders.ref, update.orderRef));
 
         results.success.push(update.orderRef);
-      } catch (err: unknown) {
+      } catch (err: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
         results.errors.push({ orderRef: update.orderRef, error: err.message });
       }
     }
@@ -244,7 +244,7 @@ export async function PUT(request: NextRequest) {
       results,
       summary: { total: updates.length, success: results.success.length, errors: results.errors.length },
     });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[slip-import] PUT error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

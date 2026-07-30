@@ -474,7 +474,7 @@ export function ChatComposer({
           stopRecording();
         }
       }, 200);
-    } catch (err: unknown) {
+    } catch (err: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       const name = String(err?.name || '');
       if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
         setMicError(vl.micPermissionDenied || 'Microphone permission denied');

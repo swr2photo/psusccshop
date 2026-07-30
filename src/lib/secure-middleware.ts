@@ -168,7 +168,7 @@ async function parseRequestBody(
     }
     
     return { body: null };
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     return { body: null, error: error.message || 'Failed to parse request body' };
   }
 }
@@ -452,7 +452,7 @@ export function withSecureMiddleware(
       
       return response;
       
-    } catch (error: unknown) {
+    } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       // ==================== Error Handling ====================
       console.error(`[Secure Middleware] Error in ${pathname}:`, error);
       

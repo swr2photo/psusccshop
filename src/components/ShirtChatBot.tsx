@@ -370,7 +370,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
         };
         
         setMessages((prev) => [...prev, botMsg]);
-      } catch (e: unknown) {
+      } catch (e: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
         const isTimeout = e?.name === 'AbortError';
         const errorMsg: ChatMessage = {
           id: generateId(),
@@ -433,7 +433,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
       };
       
       setMessages((prev) => [...prev, botMsg]);
-    } catch (e: unknown) {
+    } catch (e: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       const isTimeout = e?.name === 'AbortError';
       const errorMsg: ChatMessage = {
         id: generateId(),

@@ -233,7 +233,7 @@ export async function GET(
       status: 200,
       headers: { 'Content-Type': 'text/html; charset=utf-8' },
     });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[slip] error', error);
     return NextResponse.json(
       { status: 'error', message: error?.message || 'failed to get slip' },

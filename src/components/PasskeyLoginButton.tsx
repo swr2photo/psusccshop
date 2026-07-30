@@ -80,7 +80,7 @@ export default function PasskeyLoginButton({
       // Success — reload to get session
       onSuccess?.();
       window.location.href = result?.url || '/';
-    } catch (err: unknown) {
+    } catch (err: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       setLoading(false);
       if (err.name === 'NotAllowedError') {
         // User cancelled the prompt

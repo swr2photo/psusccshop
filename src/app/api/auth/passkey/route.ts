@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
         req.url,
       );
       return NextResponse.json({ options, challengeId });
-    } catch (err: unknown) {
+    } catch (err: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       if (isPasskeySchemaMissingError(err)) {
         return NextResponse.json({ error: SCHEMA_MIGRATION_HINT }, { status: 503 });
       }
@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ verified: true });
       }
       return NextResponse.json({ verified: false, error: 'Verification failed' }, { status: 400 });
-    } catch (err: unknown) {
+    } catch (err: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       if (isPasskeySchemaMissingError(err)) {
         return NextResponse.json({ error: SCHEMA_MIGRATION_HINT }, { status: 503 });
       }

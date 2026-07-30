@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       });
 
     return NextResponse.json({ success: true, action: 'subscribed' });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[push-subscription] Error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

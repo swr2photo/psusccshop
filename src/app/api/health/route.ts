@@ -19,7 +19,7 @@ export async function GET() {
       status: 'up',
       latencyMs: Date.now() - start,
     };
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     checks.db = {
       status: 'down',
       error: error?.message || 'Database connection failed',

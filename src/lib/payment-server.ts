@@ -343,7 +343,7 @@ export async function createStripePaymentIntentDetailed(
         nextAction: data.next_action || null,
       },
     };
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Payment] Stripe PaymentIntent error:', error);
     return {
       ok: false,

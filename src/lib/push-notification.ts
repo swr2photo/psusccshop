@@ -74,7 +74,7 @@ export async function sendPushNotification(
         { TTL: 3600 }
       );
       sent++;
-    } catch (err: unknown) {
+    } catch (err: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       failed++;
       if (err?.statusCode === 404 || err?.statusCode === 410) {
         expiredEndpoints.push(sub.endpoint);

@@ -465,7 +465,7 @@ export async function POST(req: NextRequest) {
         transRef: slipCheck.slipData?.transRef,
       },
     });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[payment-verify] error', error);
     return NextResponse.json({
       status: 'error',

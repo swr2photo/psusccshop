@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
       { status: 'success', data: { isOpen } },
       { headers: { 'Content-Type': 'application/json; charset=utf-8' } }
     );
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Toggle Shop API] Error:', error);
     return NextResponse.json(
       { status: 'error', message: error?.message || 'Failed to toggle shop status' },

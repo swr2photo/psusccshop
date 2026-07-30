@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ status: 'success', shop }, { status: 201 });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     return NextResponse.json({ status: 'error', message: error?.message || 'เกิดข้อผิดพลาด' }, { status: 500 });
   }
 }

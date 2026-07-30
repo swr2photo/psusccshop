@@ -109,7 +109,7 @@ async function GETHandler(request: NextRequest) {
         },
       }
     );
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('GET /api/reviews error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -166,7 +166,7 @@ export async function POST(request: NextRequest) {
     invalidateCachePrefix('reviews:');
 
     return NextResponse.json({ success: true, review: resultData });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('POST /api/reviews error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -208,7 +208,7 @@ export async function PUT(request: NextRequest) {
 
     invalidateCachePrefix('reviews:');
     return NextResponse.json(updated[0]);
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('PUT /api/reviews error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -234,7 +234,7 @@ export async function DELETE(request: NextRequest) {
 
     invalidateCachePrefix('reviews:');
     return NextResponse.json({ success: true });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('DELETE /api/reviews error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

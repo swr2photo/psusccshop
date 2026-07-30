@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ logs, total: logs.length });
 
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Email API] Error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -195,7 +195,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
 
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Email API] Error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

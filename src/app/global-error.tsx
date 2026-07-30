@@ -30,8 +30,8 @@ export default function GlobalError({
           }, 10000);
           window.location.reload();
         }
-      } catch (_e) {
-        console.error('Failed to reload page:', e);
+      } catch (e) {
+        console.error('Failed to clear session storage:', e);
       }
     }
   }, [error]);

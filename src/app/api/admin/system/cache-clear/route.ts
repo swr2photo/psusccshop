@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
       status: 'success',
       message: 'System caches cleared successfully.',
     });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Cache Clear API] Error:', error);
     return NextResponse.json(
       { status: 'error', message: 'Failed to clear cache' },

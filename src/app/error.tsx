@@ -32,7 +32,7 @@ export default function Error({
           }, 10000);
           window.location.reload();
         }
-      } catch (_e) {
+      } catch (e) {
         console.error('Failed to reload page:', e);
       }
     }

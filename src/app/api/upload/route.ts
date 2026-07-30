@@ -153,7 +153,7 @@ export async function POST(req: NextRequest) {
       status: 'success',
       data: { url, path, size: buffer.length },
     });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[upload] error', error);
     const raw = String(error?.message || 'Upload failed');
     const friendly =
@@ -248,7 +248,7 @@ export async function PUT(req: NextRequest) {
         // Upload to Supabase Storage
         const { url, path } = await uploadImageToStorage(buffer, fileName, contentType);
         results.push({ url, path, originalIndex: i });
-      } catch (err: unknown) {
+      } catch (err: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
         errors.push({ index: i, message: err?.message || 'Upload failed' });
       }
     }
@@ -257,7 +257,7 @@ export async function PUT(req: NextRequest) {
       status: 'success',
       data: { uploaded: results, errors },
     });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[upload-batch] error', error);
     return NextResponse.json({
       status: 'error',

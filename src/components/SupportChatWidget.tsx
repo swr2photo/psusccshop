@@ -834,7 +834,7 @@ export default function SupportChatWidget({
           resolveOptimistic(tempId, null);
           toastError(data?.error || t.supportChat.sendFailed);
         }
-      } catch (error: unknown) {
+      } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
         if (error?.name !== 'AbortError') {
           toastError(error?.message || t.supportChat.imageUploadFailed);
         }
@@ -890,7 +890,7 @@ export default function SupportChatWidget({
         resolveOptimistic(tempId, null);
         toastError(data?.error || t.supportChat.sendFailed);
       }
-    } catch (error: unknown) {
+    } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       if (error?.name !== 'AbortError') {
         toastError(error?.message || t.supportChat.voiceUploadFailed);
       }
@@ -960,7 +960,7 @@ export default function SupportChatWidget({
       } else {
         throw new Error(uploadData.message || t.supportChat.imageUploadFailed);
       }
-    } catch (error: unknown) {
+    } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       if (error?.name !== 'AbortError') {
         console.error('Error uploading image:', error);
         toastError(error?.message || t.supportChat.imageUploadFailed);

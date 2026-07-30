@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
       try {
         const res = await cancelExpired(req);
         results.cancelExpired = await res.json().catch(() => ({ status: 'unknown_response' }));
-      } catch (err: unknown) {
+      } catch (err: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
         hasError = true;
         const message = err instanceof Error ? err.message : String(err);
         results.cancelExpired = { status: 'error', error: message };
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
       try {
         const res = await updateTracking(req);
         results.updateTracking = await res.json().catch(() => ({ status: 'unknown_response' }));
-      } catch (err: unknown) {
+      } catch (err: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
         hasError = true;
         const message = err instanceof Error ? err.message : String(err);
         results.updateTracking = { status: 'error', error: message };
@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
       try {
         const res = await cleanup(req);
         results.cleanup = await res.json().catch(() => ({ status: 'unknown_response' }));
-      } catch (err: unknown) {
+      } catch (err: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
         hasError = true;
         const message = err instanceof Error ? err.message : String(err);
         results.cleanup = { status: 'error', error: message };

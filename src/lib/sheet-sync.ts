@@ -45,7 +45,7 @@ export async function syncNow(baseUrl?: string): Promise<{ success: boolean; mes
     await performSync(baseUrl);
     lastSyncTime = Date.now();
     return { success: true, message: 'Synced successfully' };
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[sheet-sync] Sync failed:', error);
     return { success: false, message: error?.message || 'Sync failed' };
   }

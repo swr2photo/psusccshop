@@ -131,7 +131,7 @@ export async function GET(request: NextRequest) {
           { status: 400 }
         );
     }
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Security API] Error:', error);
     return NextResponse.json(
       { status: 'error', message: error.message || 'Internal server error' },
@@ -202,7 +202,7 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
     }
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Security API] Error:', error);
     return NextResponse.json(
       { status: 'error', message: error.message || 'Internal server error' },

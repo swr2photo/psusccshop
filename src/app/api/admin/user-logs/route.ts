@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ logs, stats });
 
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[UserLogs API] Error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
 
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[UserLogs API] Error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

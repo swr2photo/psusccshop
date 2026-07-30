@@ -145,7 +145,7 @@ export default function EmailManagement({ showToast }: Props) {
     try {
       const logsRes = await apiFetch('/api/admin/email?action=logs&limit=200').then((r) => r.json());
       setLogs(logsRes.logs || []);
-    } catch (error: unknown) {
+    } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       console.error('Failed to fetch email logs:', error);
       showToast('error', 'ไม่สามารถโหลดประวัติอีเมลได้');
     } finally {
@@ -158,7 +158,7 @@ export default function EmailManagement({ showToast }: Props) {
     try {
       const statsRes = await apiFetch('/api/admin/email?action=stats').then((r) => r.json());
       setStats(statsRes.stats || null);
-    } catch (error: unknown) {
+    } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       console.error('Failed to fetch email stats:', error);
     }
   }, [stats]);
@@ -168,7 +168,7 @@ export default function EmailManagement({ showToast }: Props) {
     try {
       const customersRes = await apiFetch('/api/admin/email?action=customers').then((r) => r.json());
       setCustomers(customersRes.customers || []);
-    } catch (error: unknown) {
+    } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       console.error('Failed to fetch email customers:', error);
     }
   }, [customers.length]);
@@ -265,7 +265,7 @@ export default function EmailManagement({ showToast }: Props) {
         resetCompose();
         fetchData();
       }
-    } catch (error: unknown) {
+    } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       showToast('error', error.message);
     } finally {
       setSending(false);

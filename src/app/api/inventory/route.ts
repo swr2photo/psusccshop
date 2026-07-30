@@ -61,7 +61,7 @@ async function GETHandler(request: NextRequest) {
         },
       }
     );
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('GET /api/inventory error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
         updated_at: toIsoString(resultData.updatedAt) || undefined,
       },
     });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('POST /api/inventory error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

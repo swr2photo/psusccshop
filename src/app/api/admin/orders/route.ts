@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
       message: 'Please provide ref or email parameter' 
     }, { status: 400 });
 
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[admin/orders] GET error:', error);
     return NextResponse.json({ 
       status: 'error', 

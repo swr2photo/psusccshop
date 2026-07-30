@@ -118,7 +118,7 @@ export async function GET(req: NextRequest) {
     
     return NextResponse.json(result);
     
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Cron] Fatal error:', error);
     Sentry.captureException(error);
     const message = error instanceof Error ? error.message : 'Cron job failed';

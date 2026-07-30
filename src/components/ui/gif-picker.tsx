@@ -86,7 +86,7 @@ export function GifPicker({
           )
         : [];
       setGifs(list);
-    } catch (e: unknown) {
+    } catch (e: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       if ((e as { name?: string })?.name === 'AbortError') return;
       setError(labels.loadError);
       setGifs([]);

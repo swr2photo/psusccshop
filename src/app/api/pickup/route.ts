@@ -230,7 +230,7 @@ export async function GET(req: NextRequest) {
       { status: 'error', message: 'Missing ref or search parameter' },
       { status: 400 }
     );
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Pickup API] Error:', error);
     return NextResponse.json(
       { status: 'error', message: error?.message || 'Failed to get pickup info' },
@@ -369,7 +369,7 @@ export async function POST(req: NextRequest) {
       { status: 'error', message: 'Invalid action' },
       { status: 400 }
     );
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Pickup API] Error:', error);
     return NextResponse.json(
       { status: 'error', message: error?.message || 'Failed to update pickup' },

@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
       { status: 'success', data: { config: sanitizedConfig } },
       { headers: { 'Content-Type': 'application/json; charset=utf-8' } },
     );
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[admin/config] failed:', formatDbError(error));
     const merged = mergeConfigAdminEmails(DEFAULT_ADMIN_CONFIG as ShopConfig);
     const sanitizedConfig = sanitizeConfigForAdmin(merged as ShopConfig);

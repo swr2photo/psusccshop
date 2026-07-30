@@ -137,7 +137,7 @@ export async function GET(request: NextRequest) {
     
     return NextResponse.json({ chats, stats });
     
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[admin/support-chat] GET error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },

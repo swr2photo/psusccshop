@@ -436,7 +436,7 @@ export async function verifyPasskeyAuthentication(
       userEmail: verification.verified ? storedCred.user_email : null,
       error: verification.verified ? undefined : 'verification_failed',
     };
-  } catch (err: unknown) {
+  } catch (err: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Passkey] verifyAuthenticationResponse exception:', err);
     throw err;
   }

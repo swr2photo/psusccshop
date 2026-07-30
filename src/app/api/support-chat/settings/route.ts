@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
     const settings = await getStoredSupportChatSettings();
     return NextResponse.json({ settings });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[support-chat/settings] GET error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const settings = await saveStoredSupportChatSettings(normalizeSupportChatSettings(body));
     return NextResponse.json({ success: true, settings });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[support-chat/settings] POST error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },

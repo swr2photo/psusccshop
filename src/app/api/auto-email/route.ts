@@ -197,7 +197,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true, emailId: result.id });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('POST /api/auto-email error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

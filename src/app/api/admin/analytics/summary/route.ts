@@ -137,7 +137,7 @@ export async function GET(req: NextRequest) {
         }
       }
     });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Analytics API] Error:', error);
     return NextResponse.json({ status: 'error', message: 'Failed to fetch analytics' }, { status: 500 });
   }

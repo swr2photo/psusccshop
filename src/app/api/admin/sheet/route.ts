@@ -178,7 +178,7 @@ export async function POST(req: NextRequest) {
       },
       message: created ? 'สร้าง Sheet และซิงก์ข้อมูลแล้ว' : 'ซิงก์ข้อมูลล่าสุดแล้ว',
     });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('Sheet sync error:', error);
     let message = error?.message || 'sync failed';
     if (message.includes('invalid_grant') || message.includes('Invalid JWT')) {

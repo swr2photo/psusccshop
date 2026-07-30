@@ -45,7 +45,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       reader
     });
     
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[support-chat/read] POST error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },

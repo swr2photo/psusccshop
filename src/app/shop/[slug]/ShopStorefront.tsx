@@ -876,7 +876,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       } else {
         showToast('error', res.message || (lang === 'en' ? 'Cancel failed' : 'ยกเลิกไม่สำเร็จ'));
       }
-    } catch (error: unknown) {
+    } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       showToast('error', error.message || (lang === 'en' ? 'Cancel failed' : 'ยกเลิกไม่สำเร็จ'));
     } finally {
       setCancellingRef(null);
@@ -1028,7 +1028,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
         setCheckoutOpen(true);
         setPendingCheckout(false);
       }
-    } catch (error: unknown) {
+    } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       showToast('error', error.message || (lang === 'en' ? 'Save failed' : 'บันทึกข้อมูลไม่สำเร็จ'));
     } finally {
       setSavingProfile(false);
@@ -1152,7 +1152,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
         setTurnstileToken('');
         showToast('error', (res as any).message || (lang === 'en' ? 'Order failed' : 'สั่งซื้อไม่สำเร็จ'));
       }
-    } catch (err: unknown) {
+    } catch (err: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       setTurnstileToken('');
       showToast('error', err.message || (lang === 'en' ? 'Error' : 'เกิดข้อผิดพลาด'));
     } finally {

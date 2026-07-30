@@ -60,7 +60,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       chat: transferred,
       message: `โอนเคสให้ ${toName} แล้ว`,
     });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[support-chat/transfer] POST error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },

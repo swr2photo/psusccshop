@@ -57,7 +57,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       success: true,
       message: 'ยกเลิกข้อความเรียบร้อยแล้ว',
     });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[support-chat/message/delete] error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
@@ -104,7 +104,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     }
 
     return NextResponse.json({ success: true, message: result.message });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[support-chat/message/edit] error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },

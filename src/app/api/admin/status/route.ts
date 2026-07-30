@@ -267,7 +267,7 @@ export async function POST(req: NextRequest) {
     }
     
     return NextResponse.json({ status: 'success' });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     return NextResponse.json({ status: 'error', message: error?.message || 'update failed' }, { status: 500 });
   }
 }

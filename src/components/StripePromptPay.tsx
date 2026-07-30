@@ -206,7 +206,7 @@ export default function StripePromptPay({
 
       setQrCode(qr);
       setPhase('qr');
-    } catch (err: unknown) {
+    } catch (err: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       if (!mountedRef.current) return;
       console.error('[StripePromptPay]', err);
       setErrorMsg(err?.message || t.payment.stripeError);

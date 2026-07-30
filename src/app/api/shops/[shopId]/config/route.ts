@@ -157,7 +157,7 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
     }
 
     return NextResponse.json({ status: 'success', message: 'อัพเดทสำเร็จ' });
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[shop-config] PUT error:', error);
     return NextResponse.json({ status: 'error', message: error?.message || 'เกิดข้อผิดพลาด' }, { status: 500 });
   }

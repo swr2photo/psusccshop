@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
       },
       { headers: { 'Content-Type': 'application/json; charset=utf-8' } },
     );
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[orders-list] failed:', formatDbError(error));
     return NextResponse.json(
       {

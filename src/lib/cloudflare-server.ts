@@ -99,7 +99,7 @@ export async function verifyTurnstileToken(
     }
 
     return { success: true };
-  } catch (error: unknown) {
+  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Turnstile] Verification error:', error);
     return { success: false, error: 'Turnstile verification service unavailable' };
   }

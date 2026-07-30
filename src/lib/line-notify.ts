@@ -22,7 +22,7 @@ export async function sendLineNotify(token: string, message: string): Promise<bo
     }
 
     return true;
-  } catch (err: unknown) {
+  } catch (err: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[line-notify] Network error:', err.message);
     return false;
   }
