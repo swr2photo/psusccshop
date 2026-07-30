@@ -1771,6 +1771,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
           </Box>
         )}
         </Box>
+        )}
       </Box>
 
       {/* Footer — Cancel left | Confirm right */}
@@ -1923,7 +1924,6 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
             </Box>
           )}
         </Box>
-        )}
       </Box>
     </Drawer>
   );

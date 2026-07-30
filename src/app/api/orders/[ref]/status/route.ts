@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getRedisClient } from '@/lib/redis';
 import { getOrderByRef } from '@/lib/filebase';
 
-export const runtime = 'edge';
-
 export async function GET(req: NextRequest, { params }: { params: { ref: string } }) {
   const { ref } = params;
   if (!ref) {
