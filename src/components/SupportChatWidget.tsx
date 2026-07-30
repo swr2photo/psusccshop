@@ -177,7 +177,7 @@ export default function SupportChatWidget({
   const [editingMessage, setEditingMessage] = useState<{ id: string; text: string } | null>(null);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const orderHistory, setOrderHistory] = useState<any[]>([]);
+  const [orderHistory, setOrderHistory] = useState<any[]>([]);
   const [showOrderPicker, setShowOrderPicker] = useState(false);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [pushBannerDismissed, setPushBannerDismissed] = useState(false);
@@ -767,7 +767,7 @@ export default function SupportChatWidget({
   const handleSendSticker = async (src: string) => {
     if (!chat || sending || uploadingImage) return;
 
-    // Local stickers or remote Tenor/Giphy HTTPS URLs — send path directly
+    // Local stickers or remote Giphy HTTPS URLs — send path directly
     if (src.startsWith('/chat-stickers/') || /^https?:\/\//i.test(src)) {
       const msgContent = formatStickerMessage(src);
       const tempId = `temp_sticker_${Date.now()}`;

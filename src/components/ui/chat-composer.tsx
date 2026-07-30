@@ -22,7 +22,7 @@ import {
   type QuickReplySlashItem,
 } from '@/lib/chat-slash-replies';
 import { Progress } from '@/components/ui/progress';
-import { TenorGifPicker, type TenorGifPickerLabels } from '@/components/ui/tenor-gif-picker';
+import { GifPicker, type GifPickerLabels } from '@/components/ui/gif-picker';
 
 export type ChatComposerUploadState = {
   /** 0–100; omit / null for indeterminate */
@@ -96,8 +96,8 @@ type ChatComposerProps = {
   voiceLabels?: ChatComposerVoiceLabels;
   /** Inline upload progress inside the composer shell (not a floating bubble) */
   upload?: ChatComposerUploadState | null;
-  /** GIF picker labels (Tenor) */
-  gifLabels?: TenorGifPickerLabels;
+  /** GIF picker labels (Giphy) */
+  gifLabels?: GifPickerLabels;
 };
 
 export function ChatComposer({
@@ -889,7 +889,7 @@ export function ChatComposer({
                     className="w-[320px] p-2.5"
                     onOpenAutoFocus={(e) => e.preventDefault()}
                   >
-                    <TenorGifPicker
+                    <GifPicker
                       labels={
                         gifLabels || {
                           title: 'GIF',
@@ -898,7 +898,7 @@ export function ChatComposer({
                           trending: 'Trending',
                           empty: 'No GIFs found',
                           loadError: 'Could not load GIFs',
-                          missingKey: 'Set TENOR_API_KEY on the server',
+                          missingKey: 'Set GIPHY_API_KEY on the server',
                           loading: 'Loading...',
                         }
                       }

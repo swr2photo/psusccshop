@@ -43,6 +43,15 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'platform-lookaside.fbsbx.com' },
       { protocol: 'https', hostname: '**.fbcdn.net' },
       { protocol: 'https', hostname: 'graph.microsoft.com' },
+      // Giphy CDN (chat GIF picker)
+      { protocol: 'https', hostname: 'media.giphy.com' },
+      { protocol: 'https', hostname: 'i.giphy.com' },
+      { protocol: 'https', hostname: 'media0.giphy.com' },
+      { protocol: 'https', hostname: 'media1.giphy.com' },
+      { protocol: 'https', hostname: 'media2.giphy.com' },
+      { protocol: 'https', hostname: 'media3.giphy.com' },
+      { protocol: 'https', hostname: 'media4.giphy.com' },
+      { protocol: 'https', hostname: '**.giphy.com' },
     ],
     // Performance: aggressive image caching (31 days)
     minimumCacheTTL: 2678400,
@@ -102,7 +111,7 @@ const nextConfig: NextConfig = {
             // 'unsafe-eval' needed for Next.js (both dev HMR and production hydration in some cases)
             "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://static.cloudflareinsights.com https://connect.facebook.net https://cdn.jsdelivr.net https://js.stripe.com https://*.js.stripe.com https://m.stripe.network;",
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;",
-            "img-src 'self' data: blob: https://*.filebase.io https://*.filebase.com https://*.googleusercontent.com https://ui-avatars.com https://*.supabase.co https://profile.line-scdn.net https://platform-lookaside.fbsbx.com https://*.fbcdn.net https://graph.microsoft.com https://i.ytimg.com https://*.ggpht.com https://*.stripe.com https://*.tenor.com https://media.tenor.com https://c.tenor.com https://*.giphy.com;",
+            "img-src 'self' data: blob: https://*.filebase.io https://*.filebase.com https://*.googleusercontent.com https://ui-avatars.com https://*.supabase.co https://profile.line-scdn.net https://platform-lookaside.fbsbx.com https://*.fbcdn.net https://graph.microsoft.com https://i.ytimg.com https://*.ggpht.com https://*.stripe.com https://*.giphy.com https://media.giphy.com https://i.giphy.com https://media0.giphy.com https://media1.giphy.com https://media2.giphy.com https://media3.giphy.com https://media4.giphy.com;",
             "font-src 'self' https://fonts.gstatic.com;",
             `connect-src 'self' blob: data:${apiConnectSrc()} https://*.filebase.com https://*.filebase.io https://challenges.cloudflare.com https://*.supabase.co wss://*.supabase.co https://*.googlevideo.com https://*.youtube.com https://*.facebook.com https://api.stripe.com https://js.stripe.com https://r.stripe.com https://q.stripe.com https://m.stripe.com https://m.stripe.network https://errors.stripe.com https://merchant-ui-api.stripe.com https://*.ingest.sentry.io https://*.sentry.io;`,
             "media-src 'self' blob: data: https://*.supabase.co https://*.filebase.io https://*.filebase.com https://*.cdn.jsdelivr.net https://*.cloudflarestream.com;",

@@ -27,8 +27,8 @@ export function isChatStickerUrl(url: string): boolean {
 
 export function isAnimatedImageUrl(url: string): boolean {
   if (/\.gif($|\?|#)/i.test(url) || isChatStickerUrl(url)) return true;
-  // Tenor / Giphy CDN often serves GIF without .gif in the path
-  if (/tenor\.com/i.test(url) || /giphy\.com/i.test(url)) return true;
+  // Giphy CDN often serves GIF without .gif in the path (legacy Tenor URLs still accepted)
+  if (/giphy\.com/i.test(url) || /tenor\.com/i.test(url)) return true;
   return false;
 }
 

@@ -823,7 +823,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
   const handleSendSticker = async (src: string) => {
     if (!selectedChat || sending || uploadingImage) return;
 
-    // Built-in / remote Tenor GIF — send path directly (animated)
+    // Built-in / remote Giphy GIF — send path directly (animated)
     if (src.startsWith('/chat-stickers/') || /^https?:\/\//i.test(src)) {
       const msgContent = formatStickerMessage(src);
       const tempId = `opt_sticker_${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -2087,7 +2087,7 @@ ${provider ? `ผู้ให้บริการ: ${provider}` : ''}
                       trending: 'ยอดนิยม',
                       empty: 'ไม่พบ GIF',
                       loadError: 'โหลด GIF ไม่สำเร็จ',
-                      missingKey: 'ตั้งค่า TENOR_API_KEY ในเซิร์ฟเวอร์',
+                      missingKey: 'ตั้งค่า GIPHY_API_KEY ในเซิร์ฟเวอร์',
                       loading: 'กำลังโหลด...',
                     }}
                     placeholder="ส่งข้อความ... (Ctrl+Enter หรือ /)"

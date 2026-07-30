@@ -4,14 +4,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, Search, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export type TenorGifItem = {
+export type GifItem = {
   id: string;
   title: string;
   previewUrl: string;
   url: string;
 };
 
-export type TenorGifPickerLabels = {
+export type GifPickerLabels = {
   title: string;
   searchPlaceholder: string;
   uploadGif: string;
@@ -22,27 +22,28 @@ export type TenorGifPickerLabels = {
   loading: string;
 };
 
-type TenorGifPickerProps = {
-  labels: TenorGifPickerLabels;
+type GifPickerProps = {
+  labels: GifPickerLabels;
   disabled?: boolean;
   onPick: (url: string) => void;
   onUploadClick?: () => void;
   className?: string;
 };
 
-export function TenorGifPicker({
+export function GifPicker({
   labels,
   disabled,
   onPick,
   onUploadClick,
   className,
-}: TenorGifPickerProps) {
+}: GifPickerProps) {
   const [query, setQuery] = useState('');
   const [debounced, setDebounced] = useState('');
-  const [gifs, setGifs] = useState<TenorGifItem[]>([]);
+  const [gifs, setGifs] = useState<GifItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [configured, setConfigured] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [brokenIds, setBrokenIds] = useState<Set<string>>(() => new Set());
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -56,6 +57,7 @@ export function TenorGifPicker({
     abortRef.current = controller;
     setLoading(true);
     setError(null);
+    setBrokenIds(new Set());
     try {
       const params = new URLSearchParams({ limit: '24' });
       if (q) params.set('q', q);
@@ -63,7 +65,11 @@ export function TenorGifPicker({
         signal: controller.signal,
       });
       const data = await res.json().catch(() => ({}));
-      if (data.configured === false || data.error === 'TENOR_API_KEY_MISSING') {
+      if (
+        data.configured === false ||
+        data.error === 'GIPHY_API_KEY_MISSING' ||
+        data.error === 'TENOR_API_KEY_MISSING'
+      ) {
         setConfigured(false);
         setGifs([]);
         return;
@@ -74,7 +80,12 @@ export function TenorGifPicker({
         setGifs([]);
         return;
       }
-      setGifs(Array.isArray(data.gifs) ? data.gifs : []);
+      const list = Array.isArray(data.gifs)
+        ? (data.gifs as GifItem[]).filter(
+            (g) => g?.id && g?.previewUrl && g?.url
+          )
+        : [];
+      setGifs(list);
     } catch (e: unknown) {
       if ((e as { name?: string })?.name === 'AbortError') return;
       setError(labels.loadError);
@@ -88,6 +99,8 @@ export function TenorGifPicker({
     void load(debounced);
     return () => abortRef.current?.abort();
   }, [debounced, load]);
+
+  const visible = gifs.filter((g) => !brokenIds.has(g.id));
 
   return (
     <div className={cn('flex w-full flex-col gap-2', className)}>
@@ -122,14 +135,14 @@ export function TenorGifPicker({
         <p className="px-1 py-6 text-center text-[12px] leading-relaxed text-muted-foreground">
           {labels.missingKey}
         </p>
-      ) : loading && gifs.length === 0 ? (
+      ) : loading && visible.length === 0 ? (
         <div className="flex items-center justify-center gap-2 py-10 text-xs text-muted-foreground">
           <Loader2 className="size-4 animate-spin" />
           {labels.loading}
         </div>
       ) : error ? (
         <p className="px-1 py-6 text-center text-[12px] text-muted-foreground">{error}</p>
-      ) : gifs.length === 0 ? (
+      ) : visible.length === 0 ? (
         <p className="px-1 py-6 text-center text-[12px] text-muted-foreground">{labels.empty}</p>
       ) : (
         <>
@@ -139,7 +152,7 @@ export function TenorGifPicker({
             </p>
           ) : null}
           <div className="grid max-h-[240px] grid-cols-3 gap-1.5 overflow-y-auto">
-            {gifs.map((gif) => (
+            {visible.map((gif) => (
               <button
                 key={gif.id}
                 type="button"
@@ -155,6 +168,14 @@ export function TenorGifPicker({
                   className="size-full object-cover"
                   loading="lazy"
                   draggable={false}
+                  onError={() => {
+                    setBrokenIds((prev) => {
+                      if (prev.has(gif.id)) return prev;
+                      const next = new Set(prev);
+                      next.add(gif.id);
+                      return next;
+                    });
+                  }}
                 />
               </button>
             ))}
@@ -164,3 +185,8 @@ export function TenorGifPicker({
     </div>
   );
 }
+
+/** @deprecated Use GifPicker — kept for any leftover imports during migration */
+export const GiphyGifPicker = GifPicker;
+export type GiphyGifPickerLabels = GifPickerLabels;
+export type GiphyGifItem = GifItem;
