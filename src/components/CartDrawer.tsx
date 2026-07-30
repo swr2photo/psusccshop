@@ -21,7 +21,7 @@ import {
   Minus,
   Palette,
   Plus,
-  ShoppingCart,
+  ShoppingBag,
   Tag,
   Ticket,
   Truck,
@@ -293,14 +293,6 @@ export default function CartDrawer(props: CartDrawerProps) {
   const promoDiscount = promoResult?.discount || 0;
   const displayTotal = Math.max(0, cartTotal - promoDiscount);
 
-  const chipSx = {
-    px: 1,
-    py: 0.2,
-    borderRadius: '6px',
-    bgcolor: 'var(--surface)',
-    border: '1px solid var(--glass-border)',
-  } as const;
-
   return (
     <>
       <Drawer
@@ -316,14 +308,15 @@ export default function CartDrawer(props: CartDrawerProps) {
               height: isMobile ? { xs: '90vh', sm: '80vh' } : '100vh',
               maxHeight: isMobile ? '90vh' : '100vh',
             },
-            width: isMobile ? '100%' : { xs: '100%', sm: '440px' },
+            width: isMobile ? '100%' : { xs: '100%', sm: '420px' },
             maxWidth: '100vw',
             boxSizing: 'border-box',
-            borderTopLeftRadius: isMobile ? { xs: 20, sm: 24 } : { xs: 0, sm: 24 },
-            borderTopRightRadius: isMobile ? { xs: 20, sm: 24 } : 0,
-            borderBottomLeftRadius: isMobile ? 0 : { xs: 0, sm: 24 },
+            borderTopLeftRadius: isMobile ? 12 : 0,
+            borderTopRightRadius: isMobile ? 12 : 0,
+            borderBottomLeftRadius: 0,
             bgcolor: 'var(--background)',
             color: 'var(--foreground)',
+            boxShadow: isMobile ? '0 -4px 24px rgba(0,0,0,0.08)' : '-4px 0 24px rgba(0,0,0,0.08)',
             overflow: 'hidden',
             display: 'flex',
             flexDirection: 'column',
@@ -332,12 +325,13 @@ export default function CartDrawer(props: CartDrawerProps) {
           },
         }}
       >
-        {/* Header */}
+        {/* Header — PCD-style: uppercase title, thin close */}
         <Box sx={{
-          px: { xs: 2, sm: 3 },
-          py: { xs: 1.5, sm: 2 },
-          borderBottom: '1px solid var(--glass-border)',
-          background: 'var(--glass-strong)',
+          px: { xs: 2.5, sm: 3 },
+          pt: isMobile ? 0.5 : 2,
+          pb: 1.75,
+          borderBottom: '1px solid color-mix(in srgb, var(--foreground) 10%, transparent)',
+          bgcolor: 'var(--background)',
           position: 'sticky',
           top: 0,
           zIndex: 10,
@@ -348,35 +342,42 @@ export default function CartDrawer(props: CartDrawerProps) {
               onTouchStart={handleSwipeStart}
               onTouchMove={handleSwipeMove}
               onTouchEnd={handleSwipeEnd}
-              sx={{ width: '100%', display: 'flex', justifyContent: 'center', py: 0.5, cursor: 'grab', touchAction: 'none' }}
+              sx={{ width: '100%', display: 'flex', justifyContent: 'center', py: 0.75, cursor: 'grab', touchAction: 'none' }}
             >
-              <Box sx={{ width: isDragging ? 48 : 36, height: 4, bgcolor: isDragging ? 'var(--text-muted)' : 'var(--glass-bg)', borderRadius: 2, transition: 'all 0.2s ease' }} />
+              <Box sx={{
+                width: isDragging ? 48 : 36,
+                height: 3,
+                bgcolor: isDragging ? 'var(--text-muted)' : 'color-mix(in srgb, var(--foreground) 18%, transparent)',
+                borderRadius: 2,
+                transition: 'all 0.2s ease',
+              }} />
             </Box>
           )}
 
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Box sx={{
-                width: 44,
-                height: 44,
-                borderRadius: '14px',
-                bgcolor: 'var(--surface-2)',
-                border: '1px solid var(--glass-border)',
-                display: 'grid',
-                placeItems: 'center',
+          <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
+            <Box sx={{ minWidth: 0, pt: 0.25 }}>
+              <Typography sx={{
+                fontSize: '0.95rem',
+                fontWeight: 700,
+                color: 'var(--foreground)',
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                lineHeight: 1.3,
               }}>
-                <ShoppingCart size={22} style={{ color: 'var(--foreground)' }} />
-              </Box>
-              <Box>
-                <Typography sx={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--foreground)' }}>
-                  {t.cart.title}
-                </Typography>
-                <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                {t.cart.title}
+              </Typography>
+              {cart.length > 0 && (
+                <Typography sx={{
+                  mt: 0.35,
+                  fontSize: '0.72rem',
+                  color: 'var(--text-muted)',
+                  letterSpacing: '0.04em',
+                }}>
                   {cart.length} {t.common.items} · {cart.reduce((sum, item) => sum + item.quantity, 0)} {t.common.pieces}
                 </Typography>
-              </Box>
+              )}
             </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25, flexShrink: 0 }}>
               {cart.length > 0 && (
                 <Button
                   size="small"
@@ -398,17 +399,28 @@ export default function CartDrawer(props: CartDrawerProps) {
                   }}
                   sx={{
                     color: 'var(--text-muted)',
-                    fontSize: '0.75rem',
-                    textTransform: 'none',
-                    fontWeight: 500,
-                    '&:hover': { color: 'var(--foreground)', bgcolor: 'var(--surface-2)' },
+                    fontSize: '0.68rem',
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                    fontWeight: 600,
+                    minWidth: 0,
+                    px: 1,
+                    '&:hover': { color: 'var(--foreground)', bgcolor: 'transparent' },
                   }}
                 >
                   {t.cart.clearAll}
                 </Button>
               )}
-              <IconButton onClick={onClose} sx={{ color: 'var(--text-muted)', bgcolor: 'var(--glass-bg)', '&:hover': { bgcolor: 'var(--surface-2)' } }}>
-                <X size={20} />
+              <IconButton
+                onClick={onClose}
+                aria-label="Close cart"
+                sx={{
+                  color: 'var(--foreground)',
+                  p: 0.75,
+                  '&:hover': { bgcolor: 'transparent', opacity: 0.65 },
+                }}
+              >
+                <X size={20} strokeWidth={1.5} />
               </IconButton>
             </Box>
           </Box>
@@ -417,39 +429,62 @@ export default function CartDrawer(props: CartDrawerProps) {
         {/* Content */}
         <Box sx={{ flex: 1, overflow: 'auto', WebkitOverflowScrolling: 'touch', minHeight: 0 }}>
           {cart.length === 0 ? (
-            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 10, gap: 2 }}>
-              <Box sx={{
-                width: 80,
-                height: 80,
-                borderRadius: '50%',
-                bgcolor: 'var(--surface-2)',
-                display: 'grid',
-                placeItems: 'center',
+            <Box sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              px: 3,
+              py: { xs: 8, sm: 10 },
+              textAlign: 'center',
+              minHeight: '100%',
+            }}>
+              <ShoppingBag
+                size={72}
+                strokeWidth={1}
+                style={{ color: 'var(--foreground)', marginBottom: 20, opacity: 0.9 }}
+              />
+              <Typography sx={{
+                color: 'var(--foreground)',
+                fontSize: '1.05rem',
+                fontWeight: 700,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                mb: 1.5,
               }}>
-                <ShoppingCart size={36} style={{ color: 'var(--text-muted)' }} />
-              </Box>
-              <Typography sx={{ color: 'var(--text-muted)', fontSize: '1rem', fontWeight: 600 }}>{t.cart.empty}</Typography>
-              <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{t.cart.emptyDesc}</Typography>
+                {t.cart.empty}
+              </Typography>
+              <Typography sx={{
+                color: 'var(--text-muted)',
+                fontSize: '0.85rem',
+                lineHeight: 1.65,
+                maxWidth: 300,
+                mb: 3,
+              }}>
+                {t.cart.emptyDesc}
+              </Typography>
               <Button
                 onClick={onGoHome}
                 sx={{
-                  mt: 1,
-                  px: 3,
-                  py: 1,
-                  borderRadius: '12px',
-                  bgcolor: 'var(--surface-2)',
-                  border: '1px solid var(--glass-border)',
-                  color: 'var(--foreground)',
-                  fontWeight: 600,
-                  textTransform: 'none',
-                  '&:hover': { bgcolor: 'var(--surface)' },
+                  px: 3.5,
+                  py: 1.25,
+                  minHeight: 44,
+                  borderRadius: '4px',
+                  bgcolor: 'var(--primary)',
+                  color: '#fff',
+                  fontWeight: 700,
+                  fontSize: '0.78rem',
+                  letterSpacing: '0.12em',
+                  textTransform: 'uppercase',
+                  boxShadow: 'none',
+                  '&:hover': { bgcolor: 'var(--primary)', filter: 'brightness(0.92)', boxShadow: 'none' },
                 }}
               >
-                {t.cart.shopNow}
+                {t.cart.returnToShop || t.cart.shopNow}
               </Button>
             </Box>
           ) : (
-            <Box sx={{ px: { xs: 2, sm: 3 }, py: 2 }}>
+            <Box sx={{ px: { xs: 2.5, sm: 3 }, py: 0 }}>
               {cart.map((item) => {
                 const product = resolveProduct(item);
                 const issue = lineIssues.get(item.id);
@@ -457,139 +492,159 @@ export default function CartDrawer(props: CartDrawerProps) {
                   <Box
                     key={item.id}
                     sx={{
-                      p: 2,
-                      mb: 1.5,
-                      borderRadius: '16px',
-                      bgcolor: 'var(--surface-2)',
-                      border: issue ? '1px solid rgba(148,163,184,0.45)' : '1px solid var(--glass-border)',
-                      transition: 'background-color 0.2s ease, transform 0.2s ease',
+                      py: 2.25,
+                      borderBottom: '1px solid color-mix(in srgb, var(--foreground) 10%, transparent)',
+                      opacity: issue ? 0.85 : 1,
                     }}
                   >
                     <Box sx={{ display: 'flex', gap: 2 }}>
                       {product?.images?.[0] && (
                         <Box sx={{
-                          width: 60,
-                          height: 60,
-                          borderRadius: '12px',
+                          width: 88,
+                          height: 88,
+                          borderRadius: '2px',
                           overflow: 'hidden',
                           flexShrink: 0,
-                          border: '1px solid var(--glass-border)',
+                          bgcolor: 'var(--surface)',
                           opacity: issue ? 0.65 : 1,
                         }}>
                           <OptimizedImage
                             src={product.images[0]}
                             alt={item.productName}
-                            width={60}
-                            height={60}
+                            width={88}
+                            height={88}
                             objectFit="cover"
                             placeholder="skeleton"
                           />
                         </Box>
                       )}
 
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--foreground)', mb: 0.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {item.productName}
-                        </Typography>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.6, mb: 1.5 }}>
-                          <Box sx={chipSx}>
-                            <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-muted)' }}>{item.size}</Typography>
-                          </Box>
+                      <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1, mb: 0.5 }}>
+                          <Typography sx={{
+                            fontSize: '0.9rem',
+                            fontWeight: 600,
+                            color: 'var(--foreground)',
+                            lineHeight: 1.35,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                          }}>
+                            {item.productName}
+                          </Typography>
+                          <Typography sx={{
+                            fontSize: '0.9rem',
+                            fontWeight: 700,
+                            color: 'var(--foreground)',
+                            flexShrink: 0,
+                            whiteSpace: 'nowrap',
+                          }}>
+                            ฿{(item.unitPrice * item.quantity).toLocaleString()}
+                          </Typography>
+                        </Box>
+
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 1.25 }}>
+                          <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                            {item.size}
+                          </Typography>
                           {item.options?.isLongSleeve && (
-                            <Box sx={chipSx}>
-                              <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-muted)' }}>{t.common.longSleeve}</Typography>
-                            </Box>
+                            <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                              · {t.common.longSleeve}
+                            </Typography>
                           )}
                           {item.options?.customName && (
-                            <Box sx={chipSx}>
-                              <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-muted)' }}>{item.options.customName}</Typography>
-                            </Box>
+                            <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                              · {item.options.customName}
+                            </Typography>
                           )}
                           {item.options?.customNumber && (
-                            <Box sx={chipSx}>
-                              <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-muted)' }}>#{item.options.customNumber}</Typography>
-                            </Box>
+                            <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                              · #{item.options.customNumber}
+                            </Typography>
                           )}
                           {item.options?.pattern && (
-                            <Box sx={chipSx}>
-                              <Typography sx={{ fontSize: '0.65rem', fontWeight: 600, color: 'var(--text-muted)' }}>{item.options.pattern}</Typography>
-                            </Box>
+                            <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                              · {item.options.pattern}
+                            </Typography>
                           )}
                         </Box>
 
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Box sx={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              bgcolor: 'var(--glass-bg)',
-                              borderRadius: '10px',
-                              border: '1px solid var(--glass-border)',
+                        <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', mb: 1.25 }}>
+                          ฿{item.unitPrice.toLocaleString()}
+                        </Typography>
+
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 'auto' }}>
+                          <Box sx={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            border: '1px solid color-mix(in srgb, var(--foreground) 14%, transparent)',
+                            borderRadius: '2px',
+                          }}>
+                            <IconButton
+                              size="small"
+                              onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
+                              onMouseDown={() => onStartHold(item.id, -1)}
+                              onMouseUp={() => onStopHold(item.id)}
+                              onMouseLeave={() => onStopHold(item.id)}
+                              onTouchStart={() => onStartHold(item.id, -1)}
+                              onTouchEnd={() => onStopHold(item.id)}
+                              sx={{ color: 'var(--foreground)', p: 0.7, borderRadius: 0, '&:hover': { bgcolor: 'var(--surface)' } }}
+                            >
+                              <Minus size={13} strokeWidth={2} />
+                            </IconButton>
+                            <Typography sx={{
+                              color: 'var(--foreground)',
+                              minWidth: 32,
+                              textAlign: 'center',
+                              fontWeight: 600,
+                              fontSize: '0.85rem',
+                              borderLeft: '1px solid color-mix(in srgb, var(--foreground) 14%, transparent)',
+                              borderRight: '1px solid color-mix(in srgb, var(--foreground) 14%, transparent)',
+                              py: 0.55,
                             }}>
-                              <IconButton
-                                size="small"
-                                onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
-                                onMouseDown={() => onStartHold(item.id, -1)}
-                                onMouseUp={() => onStopHold(item.id)}
-                                onMouseLeave={() => onStopHold(item.id)}
-                                onTouchStart={() => onStartHold(item.id, -1)}
-                                onTouchEnd={() => onStopHold(item.id)}
-                                sx={{ color: 'var(--text-muted)', p: 0.8, '&:hover': { color: 'var(--foreground)' } }}
-                              >
-                                <Minus size={14} />
-                              </IconButton>
-                              <Typography sx={{ color: 'var(--foreground)', minWidth: 28, textAlign: 'center', fontWeight: 700, fontSize: '0.85rem' }}>
-                                {item.quantity}
-                              </Typography>
-                              <IconButton
-                                size="small"
-                                onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
-                                onMouseDown={() => onStartHold(item.id, 1)}
-                                onMouseUp={() => onStopHold(item.id)}
-                                onMouseLeave={() => onStopHold(item.id)}
-                                onTouchStart={() => onStartHold(item.id, 1)}
-                                onTouchEnd={() => onStopHold(item.id)}
-                                sx={{ color: 'var(--text-muted)', p: 0.8, '&:hover': { color: 'var(--foreground)' } }}
-                              >
-                                <Plus size={14} />
-                              </IconButton>
-                            </Box>
-                            <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>× ฿{item.unitPrice.toLocaleString()}</Typography>
+                              {item.quantity}
+                            </Typography>
+                            <IconButton
+                              size="small"
+                              onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
+                              onMouseDown={() => onStartHold(item.id, 1)}
+                              onMouseUp={() => onStopHold(item.id)}
+                              onMouseLeave={() => onStopHold(item.id)}
+                              onTouchStart={() => onStartHold(item.id, 1)}
+                              onTouchEnd={() => onStopHold(item.id)}
+                              sx={{ color: 'var(--foreground)', p: 0.7, borderRadius: 0, '&:hover': { bgcolor: 'var(--surface)' } }}
+                            >
+                              <Plus size={13} strokeWidth={2} />
+                            </IconButton>
                           </Box>
 
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
                             <IconButton
                               size="small"
                               onClick={() => onEditItem(item)}
-                              sx={{ color: 'var(--text-muted)', p: 0.6, '&:hover': { color: 'var(--foreground)', bgcolor: 'var(--surface)' } }}
+                              aria-label="Edit item"
+                              sx={{ color: 'var(--text-muted)', p: 0.6, '&:hover': { color: 'var(--foreground)', bgcolor: 'transparent' } }}
                             >
-                              <Edit size={14} />
+                              <Edit size={15} strokeWidth={1.75} />
                             </IconButton>
                             <IconButton
                               size="small"
                               onClick={() => onRemoveItem(item.id)}
-                              sx={{ color: 'var(--text-muted)', p: 0.6, '&:hover': { color: 'var(--foreground)', bgcolor: 'var(--surface)' } }}
+                              aria-label="Remove item"
+                              sx={{ color: 'var(--text-muted)', p: 0.6, '&:hover': { color: 'var(--foreground)', bgcolor: 'transparent' } }}
                             >
-                              <X size={14} />
+                              <X size={15} strokeWidth={1.75} />
                             </IconButton>
                           </Box>
                         </Box>
-                      </Box>
-
-                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', justifyContent: 'center', minWidth: 70 }}>
-                        <Typography sx={{ fontSize: '1rem', fontWeight: 800, color: 'var(--foreground)' }}>
-                          ฿{(item.unitPrice * item.quantity).toLocaleString()}
-                        </Typography>
                       </Box>
                     </Box>
 
                     {issue && (
                       <Box sx={{
                         mt: 1.5,
-                        p: 1.2,
-                        borderRadius: '10px',
-                        bgcolor: 'var(--surface)',
-                        border: '1px solid var(--glass-border)',
                         display: 'flex',
                         gap: 1,
                         alignItems: 'flex-start',
@@ -604,24 +659,28 @@ export default function CartDrawer(props: CartDrawerProps) {
                 );
               })}
 
-              {/* Coupon */}
+              {/* Promo — flat, hairline bordered */}
               <Box sx={{
-                p: 1.5,
+                py: 2.5,
                 mb: 1,
-                borderRadius: '14px',
-                bgcolor: 'var(--surface-2)',
-                border: '1px solid var(--glass-border)',
+                borderBottom: '1px solid color-mix(in srgb, var(--foreground) 10%, transparent)',
               }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                  <Ticket size={15} style={{ color: 'var(--text-muted)' }} />
-                  <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--foreground)' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.25 }}>
+                  <Ticket size={14} strokeWidth={1.75} style={{ color: 'var(--text-muted)' }} />
+                  <Typography sx={{
+                    fontSize: '0.72rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.1em',
+                    textTransform: 'uppercase',
+                    color: 'var(--foreground)',
+                  }}>
                     {t.checkout.promoCode}
                   </Typography>
                 </Box>
                 {promoResult ? (
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
-                      <Tag size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                      <Tag size={14} style={{ color: 'var(--primary)', flexShrink: 0 }} />
                       <Box sx={{ minWidth: 0 }}>
                         <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>
                           {promoResult.code}
@@ -631,8 +690,8 @@ export default function CartDrawer(props: CartDrawerProps) {
                         </Typography>
                       </Box>
                     </Box>
-                    <IconButton size="small" onClick={clearPromo} sx={{ color: 'var(--text-muted)' }}>
-                      <X size={16} />
+                    <IconButton size="small" onClick={clearPromo} sx={{ color: 'var(--text-muted)', '&:hover': { bgcolor: 'transparent', color: 'var(--foreground)' } }}>
+                      <X size={16} strokeWidth={1.5} />
                     </IconButton>
                   </Box>
                 ) : (
@@ -647,11 +706,14 @@ export default function CartDrawer(props: CartDrawerProps) {
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           color: 'var(--foreground)',
-                          borderRadius: '10px',
-                          bgcolor: 'var(--surface)',
+                          borderRadius: '2px',
+                          bgcolor: 'transparent',
                           fontSize: '0.85rem',
+                          height: 40,
                         },
-                        '& fieldset': { borderColor: 'var(--glass-border)' },
+                        '& fieldset': { borderColor: 'color-mix(in srgb, var(--foreground) 14%, transparent)' },
+                        '&:hover fieldset': { borderColor: 'color-mix(in srgb, var(--foreground) 28%, transparent) !important' },
+                        '& .Mui-focused fieldset': { borderColor: 'var(--primary) !important', borderWidth: '1px !important' },
                       }}
                     />
                     <Button
@@ -659,20 +721,29 @@ export default function CartDrawer(props: CartDrawerProps) {
                       disabled={!promoInput.trim() || promoLoading}
                       sx={{
                         px: 2,
-                        borderRadius: '10px',
-                        textTransform: 'none',
-                        fontWeight: 600,
-                        fontSize: '0.8rem',
-                        bgcolor: 'var(--surface)',
-                        border: '1px solid var(--glass-border)',
-                        color: promoInput.trim() ? 'var(--foreground)' : 'var(--text-muted)',
+                        borderRadius: '2px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.08em',
+                        fontWeight: 700,
+                        fontSize: '0.72rem',
+                        bgcolor: promoInput.trim() ? 'var(--primary)' : 'transparent',
+                        border: promoInput.trim()
+                          ? '1px solid var(--primary)'
+                          : '1px solid color-mix(in srgb, var(--foreground) 14%, transparent)',
+                        color: promoInput.trim() ? '#fff' : 'var(--text-muted)',
                         whiteSpace: 'nowrap',
-                        minWidth: 72,
-                        '&:hover': { bgcolor: 'var(--glass-bg)' },
+                        minWidth: 80,
+                        height: 40,
+                        boxShadow: 'none',
+                        '&:hover': {
+                          bgcolor: promoInput.trim() ? 'var(--primary)' : 'transparent',
+                          filter: promoInput.trim() ? 'brightness(0.92)' : 'none',
+                          boxShadow: 'none',
+                        },
                         '&:disabled': { color: 'var(--text-muted)' },
                       }}
                     >
-                      {promoLoading ? <CircularProgress size={16} sx={{ color: 'var(--text-muted)' }} /> : t.checkout.applyCode}
+                      {promoLoading ? <CircularProgress size={16} sx={{ color: 'inherit' }} /> : t.checkout.applyCode}
                     </Button>
                   </Box>
                 )}
@@ -686,14 +757,13 @@ export default function CartDrawer(props: CartDrawerProps) {
           )}
         </Box>
 
-        {/* Sticky bottom: summary + primary CTA only */}
+        {/* Sticky bottom: shipping progress + summary + checkout */}
         {cart.length > 0 && (
           <Box sx={{
-            px: { xs: 2, sm: 3 },
+            px: { xs: 2.5, sm: 3 },
             pt: 2,
-            borderTop: '1px solid var(--glass-border)',
-            background: 'var(--glass-strong)',
-            backdropFilter: 'blur(20px)',
+            borderTop: '1px solid color-mix(in srgb, var(--foreground) 10%, transparent)',
+            bgcolor: 'var(--background)',
             // Extra inset so the CTA stays tappable above iPad home indicator / Safari chrome
             paddingBottom: 'max(20px, calc(env(safe-area-inset-bottom, 0px) + 16px))',
             flexShrink: 0,
@@ -701,52 +771,61 @@ export default function CartDrawer(props: CartDrawerProps) {
             bottom: 0,
             zIndex: 11,
           }}>
-            {/* Shipping note / free-shipping progress */}
-            <Box sx={{
-              p: 1.5,
-              mb: 1.5,
-              borderRadius: '12px',
-              bgcolor: 'var(--surface-2)',
-              border: '1px solid var(--glass-border)',
-            }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                <Truck size={15} style={{ color: 'var(--text-muted)' }} />
-                <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--foreground)' }}>
+            {/* Shipping / free-shipping progress */}
+            <Box sx={{ mb: 1.75 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.85, mb: 0.6 }}>
+                <Truck size={14} strokeWidth={1.75} style={{ color: 'var(--text-muted)' }} />
+                <Typography sx={{
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  color: 'var(--foreground)',
+                }}>
                   {t.cart.shippingFee}
                 </Typography>
               </Box>
               {hasFreeShipping ? (
-                <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                <Typography sx={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
                   {t.cart.freeShippingUnlocked}
                 </Typography>
               ) : remainingForFreeShipping != null && remainingForFreeShipping > 0 ? (
-                <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  {t.cart.orderMoreForFree.replace('{amount}', remainingForFreeShipping.toLocaleString())}
-                </Typography>
+                <>
+                  <Typography sx={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.45, mb: 0.85 }}>
+                    {t.cart.orderMoreForFree.replace('{amount}', remainingForFreeShipping.toLocaleString())}
+                  </Typography>
+                  <Box sx={{
+                    height: 3,
+                    borderRadius: 1,
+                    bgcolor: 'color-mix(in srgb, var(--foreground) 10%, transparent)',
+                    overflow: 'hidden',
+                  }}>
+                    <Box sx={{
+                      height: '100%',
+                      width: `${Math.min(100, (cartTotal / (freeShippingMinimum || 1)) * 100)}%`,
+                      bgcolor: 'var(--primary)',
+                      transition: 'width 0.3s ease',
+                    }} />
+                  </Box>
+                </>
               ) : (
-                <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                <Typography sx={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
                   {t.cart.shippingNextStep}
                 </Typography>
               )}
             </Box>
 
-            {/* Summary */}
-            <Box sx={{
-              p: 2,
-              mb: 2,
-              borderRadius: '14px',
-              bgcolor: 'var(--surface-2)',
-              border: '1px solid var(--glass-border)',
-            }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: promoDiscount > 0 ? 1 : 0 }}>
-                <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{t.cart.subtotal}</Typography>
+            {/* Summary rows — flat, no nested cards */}
+            <Box sx={{ mb: 2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.75 }}>
+                <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{t.cart.subtotal}</Typography>
                 <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--foreground)' }}>
                   ฿{cartTotal.toLocaleString()}
                 </Typography>
               </Box>
               {promoDiscount > 0 && (
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                  <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.75 }}>
+                  <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                     {t.checkout.discount} ({promoResult?.code})
                   </Typography>
                   <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>
@@ -754,15 +833,27 @@ export default function CartDrawer(props: CartDrawerProps) {
                   </Typography>
                 </Box>
               )}
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pt: promoDiscount > 0 ? 1 : 0, borderTop: promoDiscount > 0 ? '1px solid var(--glass-border)' : 'none' }}>
-                <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--foreground)' }}>
+              <Box sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'baseline',
+                pt: 1,
+                borderTop: '1px solid color-mix(in srgb, var(--foreground) 10%, transparent)',
+              }}>
+                <Typography sx={{
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  color: 'var(--foreground)',
+                }}>
                   {t.cart.total}
                 </Typography>
-                <Typography sx={{ fontSize: '1.35rem', fontWeight: 900, color: 'var(--foreground)' }}>
+                <Typography sx={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--foreground)' }}>
                   ฿{displayTotal.toLocaleString()}
                 </Typography>
               </Box>
-              <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', mt: 0.5 }}>
+              <Typography sx={{ fontSize: '0.68rem', color: 'var(--text-muted)', mt: 0.5 }}>
                 {t.cart.shippingCalcNote}
               </Typography>
             </Box>
@@ -778,24 +869,23 @@ export default function CartDrawer(props: CartDrawerProps) {
               onClick={() => onCheckout(promoResult || undefined)}
               disabled={!canCheckout}
               sx={{
-                py: { xs: 1.5, sm: 1.6 },
+                py: { xs: 1.45, sm: 1.55 },
                 minHeight: 48,
-                borderRadius: '14px',
-                background: canCheckout
-                  ? 'linear-gradient(135deg, #34c759 0%, #30b350 100%)'
-                  : 'rgba(100,116,139,0.2)',
-                color: canCheckout ? 'white' : 'var(--text-muted)',
-                fontSize: { xs: '0.95rem', sm: '1rem' },
+                borderRadius: '4px',
+                bgcolor: canCheckout ? 'var(--primary)' : 'color-mix(in srgb, var(--foreground) 12%, transparent)',
+                color: canCheckout ? '#fff' : 'var(--text-muted)',
+                fontSize: '0.8rem',
                 fontWeight: 700,
-                textTransform: 'none',
-                boxShadow: canCheckout ? '0 4px 20px rgba(52,199,89,0.28)' : 'none',
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                boxShadow: 'none',
                 '&:hover': {
-                  background: canCheckout
-                    ? 'linear-gradient(135deg, #30b350 0%, #28a745 100%)'
-                    : 'rgba(100,116,139,0.3)',
+                  bgcolor: canCheckout ? 'var(--primary)' : 'color-mix(in srgb, var(--foreground) 12%, transparent)',
+                  filter: canCheckout ? 'brightness(0.92)' : 'none',
+                  boxShadow: 'none',
                 },
                 '&:disabled': {
-                  background: 'rgba(100,116,139,0.2)',
+                  bgcolor: 'color-mix(in srgb, var(--foreground) 12%, transparent)',
                   color: 'var(--text-muted)',
                 },
               }}

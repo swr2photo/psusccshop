@@ -6173,13 +6173,68 @@ export default function HomePage() {
         </DialogContent>
       </Dialog>
 
+      {/* PCD-style Chat pill — opens chatbot / support menu */}
+      <Box
+        component="button"
+        type="button"
+        aria-label={t.nav.chat}
+        onClick={(e: React.MouseEvent<HTMLElement>) => setChatMenuAnchor(e.currentTarget)}
+        sx={{
+          position: 'fixed',
+          right: { xs: 12, sm: 20 },
+          bottom: {
+            xs: 'calc(4.75rem + env(safe-area-inset-bottom) + 10px)',
+            md: 24,
+          },
+          zIndex: 1150,
+          display: hideNavBars ? 'none' : 'inline-flex',
+          alignItems: 'center',
+          gap: 0.85,
+          px: 1.75,
+          py: 1.05,
+          borderRadius: '999px',
+          border: '1px solid var(--glass-border)',
+          bgcolor: 'var(--background)',
+          color: 'var(--foreground)',
+          boxShadow: (theme) =>
+            theme.palette.mode === 'dark'
+              ? '0 6px 20px rgba(0,0,0,0.45)'
+              : '0 6px 18px rgba(0,0,0,0.1)',
+          cursor: 'pointer',
+          touchAction: 'manipulation',
+          WebkitTapHighlightColor: 'transparent',
+          fontFamily: 'inherit',
+          transition: 'transform 0.18s ease, box-shadow 0.18s ease',
+          '&:hover': {
+            boxShadow: (theme) =>
+              theme.palette.mode === 'dark'
+                ? '0 8px 24px rgba(0,0,0,0.55)'
+                : '0 8px 22px rgba(0,0,0,0.14)',
+          },
+          '&:active': { transform: 'scale(0.97)' },
+        }}
+      >
+        <ChatIcon size={18} strokeWidth={1.75} />
+        <Box
+          component="span"
+          sx={{
+            fontSize: '0.82rem',
+            fontWeight: 650,
+            letterSpacing: '0.01em',
+            lineHeight: 1,
+          }}
+        >
+          {t.nav.chat}
+        </Box>
+      </Box>
+
       {/* Chat Selection Popover */}
       <Popover
         open={Boolean(chatMenuAnchor)}
         anchorEl={chatMenuAnchor}
         onClose={() => setChatMenuAnchor(null)}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-        transformOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         transitionDuration={{ enter: 150, exit: 100 }}
         disableScrollLock
         slotProps={{

@@ -1253,7 +1253,7 @@ ${getStatusLabel(order.status)}
             bottom: { xs: 20, sm: 24 },
             right: { xs: 16, sm: 24 },
             zIndex: 1200,
-            display: hideMobileFab ? { xs: 'none', md: 'block' } : 'block',
+            display: hideMobileFab ? 'none' : 'block',
             // Container for glow rings + button
             width: { xs: 58, sm: 64 },
             height: { xs: 58, sm: 64 },
