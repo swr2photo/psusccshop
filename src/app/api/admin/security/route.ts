@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/session-from-request';
 import { isAdminEmailAsync } from '@/lib/auth';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 import {
   getSecurityAuditLogs,
   getSecurityMetrics,
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
     const userEmail = session?.user?.email;
     
     if (!userEmail) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { status: 'error', message: 'Unauthorized' },
         { status: 401 }
       );
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
     
     const isAdmin = await isAdminEmailAsync(userEmail);
     if (!isAdmin) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { status: 'error', message: 'Forbidden' },
         { status: 403 }
       );
@@ -51,7 +52,7 @@ export async function GET(request: NextRequest) {
         
         const metrics = await getSecurityMetrics(startDate, endDate);
         
-        return NextResponse.json({
+        return await secureJsonResponse({
           status: 'success',
           metrics,
         });
@@ -80,7 +81,7 @@ export async function GET(request: NextRequest) {
         
         const { logs, total } = await getSecurityAuditLogs(query);
         
-        return NextResponse.json({
+        return await secureJsonResponse({
           status: 'success',
           logs,
           total,
@@ -93,7 +94,7 @@ export async function GET(request: NextRequest) {
         const limit = parseInt(searchParams.get('limit') || '50');
         const alerts = await getSecurityAlerts(limit);
         
-        return NextResponse.json({
+        return await secureJsonResponse({
           status: 'success',
           alerts,
         });
@@ -103,7 +104,7 @@ export async function GET(request: NextRequest) {
         // Check for active threats
         const threatStatus = await checkActiveThreats();
         
-        return NextResponse.json({
+        return await secureJsonResponse({
           status: 'success',
           ...threatStatus,
         });
@@ -117,7 +118,7 @@ export async function GET(request: NextRequest) {
           checkActiveThreats(),
         ]);
         
-        return NextResponse.json({
+        return await secureJsonResponse({
           status: 'success',
           metrics,
           recentAlerts: alerts,
@@ -126,14 +127,14 @@ export async function GET(request: NextRequest) {
       }
       
       default:
-        return NextResponse.json(
+        return await secureJsonResponse(
           { status: 'error', message: 'Invalid action' },
           { status: 400 }
         );
     }
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Security API] Error:', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message: error.message || 'Internal server error' },
       { status: 500 }
     );
@@ -148,7 +149,7 @@ export async function POST(request: NextRequest) {
     const userEmail = session?.user?.email;
     
     if (!userEmail) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { status: 'error', message: 'Unauthorized' },
         { status: 401 }
       );
@@ -156,13 +157,13 @@ export async function POST(request: NextRequest) {
     
     const isAdmin = await isAdminEmailAsync(userEmail);
     if (!isAdmin) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { status: 'error', message: 'Forbidden' },
         { status: 403 }
       );
     }
     
-    const { action, ...params } = await request.json();
+    const { action, ...params } = await secureJsonRequest(request);
     
     switch (action) {
       case 'cleanup': {
@@ -170,7 +171,7 @@ export async function POST(request: NextRequest) {
         const _retentionDays = params.retentionDays || 90;
         const deletedCount = await cleanupOldAuditLogs();
         
-        return NextResponse.json({
+        return await secureJsonResponse({
           status: 'success',
           message: `Cleaned up ${deletedCount} old logs`,
           deletedCount,
@@ -188,7 +189,7 @@ export async function POST(request: NextRequest) {
         
         const { logs, total } = await getSecurityAuditLogs(query);
         
-        return NextResponse.json({
+        return await secureJsonResponse({
           status: 'success',
           logs,
           total,
@@ -197,14 +198,14 @@ export async function POST(request: NextRequest) {
       }
       
       default:
-        return NextResponse.json(
+        return await secureJsonResponse(
           { status: 'error', message: 'Invalid action' },
           { status: 400 }
         );
     }
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Security API] Error:', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message: error.message || 'Internal server error' },
       { status: 500 }
     );

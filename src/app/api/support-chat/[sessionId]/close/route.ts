@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdminEmailAsync, getSession } from '@/lib/auth';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 import { 
   getChatSession,
   closeChatSession 
@@ -22,22 +23,22 @@ export async function POST(request: NextRequest, { params }: Params) {
     const session = await getSession(request);
     
     if (!session?.user?.email) {
-      return NextResponse.json('Unauthorized', { status: 401 });
+      return await secureJsonResponse('Unauthorized', { status: 401 });
     }
     
     // Only admin can close chats
     if (!(await isAdminEmailAsync(session.user.email))) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return await secureJsonResponse({ error: 'Forbidden' }, { status: 403 });
     }
     
     const chat = await getChatSession(sessionId);
     
     if (!chat) {
-      return NextResponse.json({ error: 'Chat not found' }, { status: 404 });
+      return await secureJsonResponse({ error: 'Chat not found' }, { status: 404 });
     }
     
     if (chat.status === 'closed') {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { error: 'การสนทนานี้ปิดแล้ว' },
         { status: 400 }
       );
@@ -45,14 +46,14 @@ export async function POST(request: NextRequest, { params }: Params) {
     
     const closedChat = await closeChatSession(sessionId);
     
-    return NextResponse.json({ 
+    return await secureJsonResponse({ 
       chat: closedChat,
       message: 'ปิดการสนทนาสำเร็จ'
     });
     
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[support-chat/close] POST error:', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { error: error.message || 'Internal server error' },
       { status: 500 }
     );

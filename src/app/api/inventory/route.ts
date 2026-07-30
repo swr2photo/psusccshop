@@ -9,6 +9,7 @@ import { API_CACHE, API_CDN_HEADERS } from '@/lib/api-helpers';
 import { getCached, invalidateCachePrefix, CACHE_TTL } from '@/lib/server-cache';
 import { groupInventoryRows, toPublicInventory } from '@/lib/inventory-public';
 import { toIsoString } from '@/lib/safe-date';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 type InventoryDbRow = typeof inventory.$inferSelect;
 
@@ -52,7 +53,7 @@ async function GETHandler(request: NextRequest) {
       return adminView ? grouped : toPublicInventory(grouped);
     });
 
-    return NextResponse.json(
+    return await secureJsonResponse(
       { inventory: payload, view: adminView ? 'admin' : 'public' },
       {
         headers: {
@@ -63,7 +64,7 @@ async function GETHandler(request: NextRequest) {
     );
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('GET /api/inventory error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return await secureJsonResponse({ error: error.message }, { status: 500 });
   }
 }
 
@@ -75,11 +76,11 @@ export async function POST(request: NextRequest) {
   if (authResult instanceof NextResponse) return authResult;
 
   try {
-    const body = await request.json();
+    const body = await secureJsonRequest(request);
     const { productId, size, quantity, lowStockThreshold } = body;
 
     if (!productId) {
-      return NextResponse.json({ error: 'Missing productId' }, { status: 400 });
+      return await secureJsonResponse({ error: 'Missing productId' }, { status: 400 });
     }
 
     const existing = await db
@@ -122,7 +123,7 @@ export async function POST(request: NextRequest) {
 
     invalidateCachePrefix('inventory:');
 
-    return NextResponse.json({
+    return await secureJsonResponse({
       success: true,
       inventory: {
         product_id: resultData.productId,
@@ -135,6 +136,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('POST /api/inventory error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return await secureJsonResponse({ error: error.message }, { status: 500 });
   }
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { Readable } from 'stream';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -52,20 +53,20 @@ export async function GET(
 ) {
   try {
     if (!bucket || !accessKeyId || !secretAccessKey) {
-      return NextResponse.json({ error: 'Voice storage not configured' }, { status: 503 });
+      return await secureJsonResponse({ error: 'Voice storage not configured' }, { status: 503 });
     }
     if (!isAllowedVoiceRequest(req)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return await secureJsonResponse({ error: 'Forbidden' }, { status: 403 });
     }
 
     const { key: rawKey } = await params;
     if (!rawKey) {
-      return NextResponse.json({ error: 'Missing key' }, { status: 400 });
+      return await secureJsonResponse({ error: 'Missing key' }, { status: 400 });
     }
 
     const key = decodeVoiceKey(rawKey);
     if (!key) {
-      return NextResponse.json({ error: 'Invalid key' }, { status: 400 });
+      return await secureJsonResponse({ error: 'Invalid key' }, { status: 400 });
     }
 
     const response = await s3Client.send(
@@ -76,7 +77,7 @@ export async function GET(
     );
 
     if (!response.Body) {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      return await secureJsonResponse({ error: 'Not found' }, { status: 404 });
     }
 
     const buffer = await streamToBuffer(response.Body as Readable);
@@ -94,7 +95,7 @@ export async function GET(
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     const status = error?.$metadata?.httpStatusCode === 404 ? 404 : 500;
     console.error('[voice] GET error', error?.message || error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { error: status === 404 ? 'Not found' : 'Failed to load voice' },
       { status }
     );

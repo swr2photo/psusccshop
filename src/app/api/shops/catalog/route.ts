@@ -3,6 +3,7 @@ import { withBackendProxy } from '@/lib/backend-proxy';
 import { supabase } from '@/lib/supabase-client';
 import { getCached, CACHE_TTL } from '@/lib/server-cache';
 import { API_CACHE, API_CDN_HEADERS } from '@/lib/api-helpers';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
@@ -43,7 +44,7 @@ async function GETHandler(_req: NextRequest) {
       }));
   });
 
-  return NextResponse.json(
+  return await secureJsonResponse(
     { status: 'success', shops },
     {
       headers: {

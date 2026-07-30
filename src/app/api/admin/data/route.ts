@@ -4,6 +4,7 @@ import { ShopConfig } from '@/lib/config';
 import { requireAdmin } from '@/lib/auth';
 import { sanitizeConfigForAdmin, sanitizeOrdersForAdmin } from '@/lib/sanitize';
 import { mergeConfigAdminEmails, resolveAdminSession } from '@/lib/admin-context';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 // Ensure Node runtime (uses Supabase client) and skip static caching
 export const runtime = 'nodejs';
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
     
     const session = await resolveAdminSession(authResult.email);
     if (session.userRole === 'shopAdmin') {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { status: 'error', message: 'แอดมินร้านย่อยใช้ API แยกตามร้านที่ได้รับมอบหมาย' },
         { status: 403 },
       );
@@ -53,7 +54,7 @@ export async function GET(req: NextRequest) {
     const sanitizedConfig = sanitizeConfigForAdmin(mergedCfg as ShopConfig);
     const sanitizedOrders = sanitizeOrdersForAdmin(orders);
     
-    return NextResponse.json(
+    return await secureJsonResponse(
       { 
         status: 'success', 
         data: { 
@@ -70,6 +71,6 @@ export async function GET(req: NextRequest) {
       { headers: { 'Content-Type': 'application/json; charset=utf-8' } }
     );
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
-    return NextResponse.json({ status: 'error', message: error?.message || 'load failed' }, { status: 500 });
+    return await secureJsonResponse({ status: 'error', message: error?.message || 'load failed' }, { status: 500 });
   }
 }

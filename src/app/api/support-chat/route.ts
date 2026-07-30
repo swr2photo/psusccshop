@@ -16,6 +16,7 @@ import {
   getStoredSupportChatSettings,
 } from '@/lib/support-chat-settings-db';
 import { resolveAutoReplyMessage } from '@/lib/support-chat-settings';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
     const session = await getSession(request);
     
     if (!session?.user?.email) {
-      return NextResponse.json('Unauthorized', { status: 401 });
+      return await secureJsonResponse('Unauthorized', { status: 401 });
     }
     
     const { searchParams } = new URL(request.url);
@@ -35,13 +36,13 @@ export async function GET(request: NextRequest) {
     if (action === 'history') {
       // Get customer's chat history
       const chats = await getCustomerChats(session.user.email);
-      return NextResponse.json({ chats });
+      return await secureJsonResponse({ chats });
     }
     
     // Get active chat (pending or active)
     const activeChat = await getCustomerActiveChat(session.user.email);
     if (!activeChat) {
-      return NextResponse.json({ chat: null });
+      return await secureJsonResponse({ chat: null });
     }
 
     const withMessages = searchParams.get('withMessages') === '1';
@@ -53,17 +54,17 @@ export async function GET(request: NextRequest) {
       }
       const chat = await getChatSessionWithMessages(activeChat.id);
       if (!chat) {
-        return NextResponse.json({ chat: null });
+        return await secureJsonResponse({ chat: null });
       }
       const { hasMore, ...chatPayload } = chat;
-      return NextResponse.json({ chat: chatPayload, hasMore });
+      return await secureJsonResponse({ chat: chatPayload, hasMore });
     }
 
-    return NextResponse.json({ chat: activeChat });
+    return await secureJsonResponse({ chat: activeChat });
     
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[support-chat] GET error:', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { error: error.message || 'Internal server error' },
       { status: 500 }
     );
@@ -76,7 +77,7 @@ export async function POST(request: NextRequest) {
     const session = await getSession(request);
     
     if (!session?.user?.email) {
-      return NextResponse.json('Unauthorized', { status: 401 });
+      return await secureJsonResponse('Unauthorized', { status: 401 });
     }
     
     // Check if customer already has an active chat
@@ -85,22 +86,22 @@ export async function POST(request: NextRequest) {
       const chat = await getChatSessionWithMessages(existingChat.id);
       if (chat) {
         const { hasMore: _hasMore, ...chatPayload } = chat;
-        return NextResponse.json({ 
+        return await secureJsonResponse({ 
           chat: chatPayload,
           message: 'คุณมีการสนทนาที่กำลังดำเนินอยู่แล้ว'
         });
       }
-      return NextResponse.json({ 
+      return await secureJsonResponse({ 
         chat: existingChat,
         message: 'คุณมีการสนทนาที่กำลังดำเนินอยู่แล้ว'
       });
     }
     
-    const body = await request.json();
+    const body = await secureJsonRequest(request);
     const { subject, message, shopId, shopName } = body;
     
     if (!message?.trim()) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { error: 'กรุณาระบุข้อความ' },
         { status: 400 }
       );
@@ -143,14 +144,14 @@ export async function POST(request: NextRequest) {
       ? (({ hasMore: _h, ...rest }) => rest)(withMessages)
       : created;
     
-    return NextResponse.json({ 
+    return await secureJsonResponse({ 
       chat,
       message: 'เริ่มการสนทนาสำเร็จ รอแอดมินรับเคส'
     });
     
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[support-chat] POST error:', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { error: error.message || 'Internal server error' },
       { status: 500 }
     );

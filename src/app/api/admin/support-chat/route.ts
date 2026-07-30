@@ -18,6 +18,7 @@ import {
   ChatSession
 } from '@/lib/support-chat';
 import { getStoredSupportChatSettings } from '@/lib/support-chat-settings-db';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -43,11 +44,11 @@ export async function GET(request: NextRequest) {
     const session = await getSessionFromRequest(request);
     
     if (!session?.user?.email) {
-      return NextResponse.json('Unauthorized', { status: 401 });
+      return await secureJsonResponse('Unauthorized', { status: 401 });
     }
     
     if (!(await isAdminEmailAsync(session.user.email))) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return await secureJsonResponse({ error: 'Forbidden' }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -57,7 +58,7 @@ export async function GET(request: NextRequest) {
         email,
         name: email.split('@')[0] || email,
       }));
-      return NextResponse.json({ admins });
+      return await secureJsonResponse({ admins });
     }
 
     try {
@@ -132,14 +133,14 @@ export async function GET(request: NextRequest) {
         }).length,
         avgRating: stats.avgRating,
       };
-      return NextResponse.json({ chats, stats: filteredStats });
+      return await secureJsonResponse({ chats, stats: filteredStats });
     }
     
-    return NextResponse.json({ chats, stats });
+    return await secureJsonResponse({ chats, stats });
     
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[admin/support-chat] GET error:', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { error: error.message || 'Internal server error' },
       { status: 500 }
     );

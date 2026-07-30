@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/auth';
 import { checkCombinedRateLimitAsync, RATE_LIMITS, getRateLimitHeaders } from '@/lib/rate-limit';
 import { putJson, uploadImageToStorage } from '@/lib/supabase';
 import { validateImageBuffer, isAllowedPassThroughImageUrl } from '@/lib/upload-validation';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -68,7 +69,7 @@ export async function POST(req: NextRequest) {
   // Rate limiting สำหรับ upload
   const rateLimitResult = await checkCombinedRateLimitAsync(req, RATE_LIMITS.upload);
   if (!rateLimitResult.allowed) {
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message: 'คุณอัปโหลดไฟล์เร็วเกินไป กรุณารอสักครู่' },
       { 
         status: 429, 
@@ -87,18 +88,18 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const body = await req.json();
+    const body = await secureJsonRequest(req);
     const { base64, filename, mime } = body;
 
     if (!base64) {
-      return NextResponse.json({ status: 'error', message: 'Missing base64 data' }, { status: 400 });
+      return await secureJsonResponse({ status: 'error', message: 'Missing base64 data' }, { status: 400 });
     }
 
     // Validate mime type - only allow images
     const allowedMimes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
     const contentTypeHint = mime || 'image/png';
     if (!allowedMimes.includes(contentTypeHint)) {
-      return NextResponse.json({ status: 'error', message: 'Invalid file type. Only images allowed.' }, { status: 400 });
+      return await secureJsonResponse({ status: 'error', message: 'Invalid file type. Only images allowed.' }, { status: 400 });
     }
 
     // Extract base64 data (remove data:image/xxx;base64, prefix if present)
@@ -106,7 +107,7 @@ export async function POST(req: NextRequest) {
     
     // Validate base64 format
     if (!/^[A-Za-z0-9+/=]+$/.test(base64Data)) {
-      return NextResponse.json({ status: 'error', message: 'Invalid base64 data' }, { status: 400 });
+      return await secureJsonResponse({ status: 'error', message: 'Invalid base64 data' }, { status: 400 });
     }
 
     const buffer = Buffer.from(base64Data, 'base64');
@@ -114,12 +115,12 @@ export async function POST(req: NextRequest) {
     // Check file size (max 5MB)
     const MAX_SIZE = 5 * 1024 * 1024;
     if (buffer.length > MAX_SIZE) {
-      return NextResponse.json({ status: 'error', message: 'File too large (max 5MB)' }, { status: 413 });
+      return await secureJsonResponse({ status: 'error', message: 'File too large (max 5MB)' }, { status: 413 });
     }
 
     const validated = validateImageBuffer(buffer, mime);
     if (!validated.ok) {
-      return NextResponse.json({ status: 'error', message: validated.message }, { status: 400 });
+      return await secureJsonResponse({ status: 'error', message: validated.message }, { status: 400 });
     }
     const contentType = validated.contentType;
 
@@ -149,7 +150,7 @@ export async function POST(req: NextRequest) {
     });
 
     // Return public URL directly (no encryption needed, permanent URL)
-    return NextResponse.json({
+    return await secureJsonResponse({
       status: 'success',
       data: { url, path, size: buffer.length },
     });
@@ -162,7 +163,7 @@ export async function POST(req: NextRequest) {
       )
         ? 'อัปโหลดไม่สำเร็จ: ที่เก็บรูปตั้งค่าไม่ตรงโปรเจกต์ (SERVICE_ROLE_KEY) กรุณาติดต่อแอดมิน'
         : 'อัปโหลดไม่สำเร็จ กรุณาลองใหม่';
-    return NextResponse.json({
+    return await secureJsonResponse({
       status: 'error',
       message: process.env.NODE_ENV === 'production' ? friendly : raw,
     }, { status: 500 });
@@ -173,7 +174,7 @@ export async function POST(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   const rateLimitResult = await checkCombinedRateLimitAsync(req, RATE_LIMITS.upload);
   if (!rateLimitResult.allowed) {
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message: 'คุณอัปโหลดไฟล์เร็วเกินไป กรุณารอสักครู่' },
       {
         status: 429,
@@ -192,11 +193,11 @@ export async function PUT(req: NextRequest) {
   }
 
   try {
-    const body = await req.json();
+    const body = await secureJsonRequest(req);
     const { images } = body; // Array of { base64, filename, mime }
 
     if (!Array.isArray(images) || images.length === 0) {
-      return NextResponse.json({ status: 'error', message: 'No images provided' }, { status: 400 });
+      return await secureJsonResponse({ status: 'error', message: 'No images provided' }, { status: 400 });
     }
 
     const MAX_SIZE = 5 * 1024 * 1024;
@@ -253,13 +254,13 @@ export async function PUT(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({
+    return await secureJsonResponse({
       status: 'success',
       data: { uploaded: results, errors },
     });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[upload-batch] error', error);
-    return NextResponse.json({
+    return await secureJsonResponse({
       status: 'error',
       message: error?.message || 'Batch upload failed',
     }, { status: 500 });

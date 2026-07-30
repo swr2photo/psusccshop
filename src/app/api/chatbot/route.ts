@@ -8,6 +8,7 @@ import { checkCombinedRateLimitAsync } from '@/lib/rate-limit';
 import { API_CACHE } from '@/lib/api-helpers';
 import { getSession } from '@/lib/auth';
 import { recordChatbotRequest } from '@/lib/sentry-metrics';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -26,7 +27,7 @@ export async function POST(req: NextRequest) {
   });
   if (!rateLimitResult.allowed) {
     recordChatbotRequest('rate_limit');
-    return NextResponse.json({ 
+    return await secureJsonResponse({ 
       answer: 'คุณส่งคำถามเร็วเกินไป กรุณารอสักครู่แล้วลองใหม่ค่ะ',
       source: 'rate-limit',
       suggestions: QUICK_QUESTIONS,
@@ -34,7 +35,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const body = await req.json();
+    const body = await secureJsonRequest(req);
     const { message, conversationHistory, image, conversationId } = body;
 
     if (typeof conversationId === 'string' && conversationId.trim()) {
@@ -70,7 +71,7 @@ export async function POST(req: NextRequest) {
       );
       if (!turnstileResult.success) {
         recordChatbotRequest('error');
-        return NextResponse.json(
+        return await secureJsonResponse(
           {
             answer: 'กรุณายืนยันว่าคุณไม่ใช่บอทก่อนใช้แชทบอทค่ะ',
             source: 'turnstile',
@@ -83,7 +84,7 @@ export async function POST(req: NextRequest) {
 
     // Image uploads require login
     if (image && !userEmail) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         {
           answer: 'กรุณาเข้าสู่ระบบก่อนส่งรูปภาพในแชทค่ะ',
           source: 'auth-required',
@@ -99,7 +100,7 @@ export async function POST(req: NextRequest) {
     
     // Allow empty message if image is provided
     if ((!message || typeof message !== 'string') && !image) {
-      return NextResponse.json({ 
+      return await secureJsonResponse({ 
         answer: 'กรุณาพิมพ์คำถามเกี่ยวกับสินค้าหรือบริการของร้านค่ะ', 
         source: 'validation',
         suggestions: QUICK_QUESTIONS,
@@ -110,7 +111,7 @@ export async function POST(req: NextRequest) {
     const trimmedMessage = (message || 'ช่วยดูรูปนี้ให้หน่อยค่ะ').trim().slice(0, 1000);
     
     if (trimmedMessage.length < 2) {
-      return NextResponse.json({ 
+      return await secureJsonResponse({ 
         answer: 'กรุณาพิมพ์คำถามให้ชัดเจนกว่านี้ค่ะ', 
         source: 'validation',
         suggestions: QUICK_QUESTIONS,
@@ -137,7 +138,7 @@ export async function POST(req: NextRequest) {
     );
 
     recordChatbotRequest('success');
-    return NextResponse.json({
+    return await secureJsonResponse({
       answer: result.answer,
       source: result.source,
       matched: result.source !== 'fallback',
@@ -153,7 +154,7 @@ export async function POST(req: NextRequest) {
     console.error('Chatbot API error:', error);
     Sentry.captureException(error);
     recordChatbotRequest('error');
-    return NextResponse.json({ 
+    return await secureJsonResponse({ 
       answer: 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้งค่ะ', 
       source: 'error',
       suggestions: QUICK_QUESTIONS,
@@ -172,7 +173,7 @@ export async function GET(req: NextRequest) {
     prefix: 'chatbot-get',
   });
   if (!rateLimitResult.allowed) {
-    return NextResponse.json(
+    return await secureJsonResponse(
       { quickQuestions: QUICK_QUESTIONS, categories: [], totalFAQs: SHIRT_FAQ.length, shopStatus: 'unknown', aiEnabled: false, shopInfo: null },
       { status: 429 }
     );
@@ -184,7 +185,7 @@ export async function GET(req: NextRequest) {
     // Get current shop data
     const shopData = await getShopData();
     
-    return NextResponse.json({
+    return await secureJsonResponse({
       quickQuestions: QUICK_QUESTIONS,
       categories,
       totalFAQs: SHIRT_FAQ.length,
@@ -201,7 +202,7 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error('Chatbot GET error:', error);
     Sentry.captureException(error);
-    return NextResponse.json({
+    return await secureJsonResponse({
       quickQuestions: QUICK_QUESTIONS,
       categories: [],
       totalFAQs: SHIRT_FAQ.length,
@@ -219,7 +220,7 @@ export async function OPTIONS(request: NextRequest) {
   const origin = request.headers.get('origin') || '';
   const allowedOrigin = origin.endsWith('.psusci.club') || origin.startsWith('http://localhost:') || origin.endsWith('.app.github.dev')
     ? origin : 'https://sccshop.psusci.club';
-  return NextResponse.json({}, {
+  return await secureJsonResponse({}, {
     headers: {
       'Access-Control-Allow-Origin': allowedOrigin,
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',

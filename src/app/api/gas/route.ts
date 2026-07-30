@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, isAdminEmailAsync } from '@/lib/auth';
 import { rateLimitOrNull } from '@/lib/api-helpers';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 const GAS_URL = process.env.GAS_SCRIPT_URL;
 const GAS_AUTH_TOKEN = process.env.GAS_AUTH_TOKEN;
@@ -40,14 +41,14 @@ async function assertActionAllowed(action: string, email: string): Promise<NextR
   if (ADMIN_GAS_ACTIONS.has(action)) {
     const isAdmin = await isAdminEmailAsync(email);
     if (!isAdmin) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { status: 'error', message: 'Forbidden' },
         { status: 403 }
       );
     }
     return null;
   }
-  return NextResponse.json(
+  return await secureJsonResponse(
     { status: 'error', message: 'Action not allowed' },
     { status: 403 }
   );
@@ -85,7 +86,7 @@ async function handleGasRequest(
 
   const gasUrl = buildGasUrl(action);
   if (!gasUrl) {
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message: 'GAS_SCRIPT_URL is not configured' },
       { status: 503 }
     );
@@ -120,7 +121,7 @@ async function handleGasRequest(
     }
 
     const data = await response.json();
-    return NextResponse.json(data, {
+    return await secureJsonResponse(data, {
       status: 200,
       headers: {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -136,7 +137,7 @@ export async function GET(request: NextRequest) {
   try {
     const action = sanitizeAction(request.nextUrl.searchParams.get('action'));
     if (!action) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { status: 'error', message: 'Missing or invalid action parameter' },
         { status: 400 }
       );
@@ -145,7 +146,7 @@ export async function GET(request: NextRequest) {
     return await handleGasRequest(request, 'GET', action);
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[GAS-API] GET Error:', error?.message || error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message: process.env.NODE_ENV === 'production' ? 'Internal server error' : (error?.message || 'Internal server error') },
       { status: 500 }
     );
@@ -156,17 +157,17 @@ export async function POST(request: NextRequest) {
   try {
     const action = sanitizeAction(request.nextUrl.searchParams.get('action'));
     if (!action) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { status: 'error', message: 'Missing or invalid action parameter' },
         { status: 400 }
       );
     }
 
-    const body = await request.json().catch(() => ({}));
+    const body = await secureJsonRequest(request).catch(() => ({}));
     return await handleGasRequest(request, 'POST', action, body);
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[GAS-API] POST Error:', error?.message || error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message: process.env.NODE_ENV === 'production' ? 'Internal server error' : (error?.message || 'Internal server error') },
       { status: 500 }
     );
@@ -177,7 +178,7 @@ export async function OPTIONS(request: NextRequest) {
   const origin = request.headers.get('origin') || '';
   const allowedOrigin = origin.endsWith('.psusci.club') || origin.startsWith('http://localhost:') || origin.endsWith('.app.github.dev')
     ? origin : 'https://sccshop.psusci.club';
-  return NextResponse.json(
+  return await secureJsonResponse(
     { status: 'ok' },
     {
       status: 200,

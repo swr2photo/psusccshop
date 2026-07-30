@@ -10,6 +10,7 @@ import { requireSuperAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { orders } from '@/db/schema';
 import { eq, desc } from 'drizzle-orm';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 interface SlipOKLogEntry {
   id?: string;
@@ -31,7 +32,7 @@ interface SlipOKLogEntry {
 export async function GET(request: NextRequest) {
   try {
     const admin = await requireSuperAdmin(request);
-    if (!admin) return NextResponse.json('Unauthorized', { status: 401 });
+    if (!admin) return await secureJsonResponse('Unauthorized', { status: 401 });
 
     const fetchedOrders = await db.select({
       ref: orders.ref,
@@ -56,7 +57,7 @@ export async function GET(request: NextRequest) {
       return slip && (slip.imageUrl || slip.base64);
     });
 
-    return NextResponse.json({
+    return await secureJsonResponse({
       ordersWithoutSlip: ordersWithoutSlip.map((o: any) => ({
         ref: o.ref,
         amount: o.total_amount,
@@ -81,7 +82,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[slip-import] GET error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return await secureJsonResponse({ error: error.message }, { status: 500 });
   }
 }
 
@@ -89,16 +90,16 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const admin = await requireSuperAdmin(request);
-    if (!admin) return NextResponse.json('Unauthorized', { status: 401 });
+    if (!admin) return await secureJsonResponse('Unauthorized', { status: 401 });
 
-    const body = await request.json();
+    const body = await secureJsonRequest(request);
     const { slipokLogs, matchBy = 'transRef' } = body as {
       slipokLogs: SlipOKLogEntry[];
       matchBy?: 'transRef' | 'amount' | 'manual';
     };
 
     if (!slipokLogs || !Array.isArray(slipokLogs)) {
-      return NextResponse.json({ error: 'slipokLogs array is required' }, { status: 400 });
+      return await secureJsonResponse({ error: 'slipokLogs array is required' }, { status: 400 });
     }
 
     const fetchedOrders = await db.select({
@@ -166,7 +167,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({
+    return await secureJsonResponse({
       success: true,
       results,
       summary: {
@@ -179,7 +180,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[slip-import] POST error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return await secureJsonResponse({ error: error.message }, { status: 500 });
   }
 }
 
@@ -187,13 +188,13 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const admin = await requireSuperAdmin(request);
-    if (!admin) return NextResponse.json('Unauthorized', { status: 401 });
+    if (!admin) return await secureJsonResponse('Unauthorized', { status: 401 });
 
-    const body = await request.json();
+    const body = await secureJsonRequest(request);
     const { updates } = body as { updates: { orderRef: string; imageUrl: string; slipData?: any }[] };
 
     if (!updates || !Array.isArray(updates)) {
-      return NextResponse.json({ error: 'updates array is required' }, { status: 400 });
+      return await secureJsonResponse({ error: 'updates array is required' }, { status: 400 });
     }
 
     const results: { success: string[]; errors: { orderRef: string; error: string }[] } = {
@@ -239,14 +240,14 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({
+    return await secureJsonResponse({
       success: true,
       results,
       summary: { total: updates.length, success: results.success.length, errors: results.errors.length },
     });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[slip-import] PUT error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return await secureJsonResponse({ error: error.message }, { status: 500 });
   }
 }
 

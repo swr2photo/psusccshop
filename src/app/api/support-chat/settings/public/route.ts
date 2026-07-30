@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server';
 import { API_CACHE } from '@/lib/api-helpers';
 import { formatDbError, getConfigValueCached } from '@/lib/config-db';
 import { CACHE_TTL } from '@/lib/server-cache';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,7 +20,7 @@ export async function GET() {
       CACHE_TTL.chatSettings,
     );
 
-    return NextResponse.json(
+    return await secureJsonResponse(
       {
         admin_display_name:
           (settings?.admin_display_name as string) || FALLBACK.admin_display_name,
@@ -28,7 +29,7 @@ export async function GET() {
     );
   } catch (error) {
     console.error('[support-chat/public] fallback:', formatDbError(error));
-    return NextResponse.json(FALLBACK, {
+    return await secureJsonResponse(FALLBACK, {
       headers: { 'Cache-Control': 'no-store' },
     });
   }

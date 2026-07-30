@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireSuperAdmin } from '@/lib/auth';
 import { getUserTimeline } from '@/lib/audit';
 import { RETENTION_DAYS } from '@/lib/retention';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -14,13 +15,13 @@ export async function GET(request: NextRequest) {
 
   const email = new URL(request.url).searchParams.get('email')?.trim();
   if (!email) {
-    return NextResponse.json({ error: 'email required' }, { status: 400 });
+    return await secureJsonResponse({ error: 'email required' }, { status: 400 });
   }
 
   const limit = parseInt(new URL(request.url).searchParams.get('limit') || '200', 10);
   try {
     const { events, retentionDays } = await getUserTimeline(email, { limit });
-    return NextResponse.json({
+    return await secureJsonResponse({
       success: true,
       email: email.trim().toLowerCase(),
       events,
@@ -34,6 +35,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[user-timeline]', error);
-    return NextResponse.json({ error: error?.message || 'timeline failed' }, { status: 500 });
+    return await secureJsonResponse({ error: error?.message || 'timeline failed' }, { status: 500 });
   }
 }

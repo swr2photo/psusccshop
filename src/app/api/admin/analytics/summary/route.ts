@@ -4,6 +4,7 @@ import { requireAdmin } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { orders } from '@/db/schema';
 import { eq } from 'drizzle-orm';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -110,7 +111,7 @@ export async function GET(req: NextRequest) {
     const totalShortSleeve = Object.values(sizeShortSleeveCount).reduce((a, b) => a + b, 0);
     const totalLongSleeve = Object.values(sizeLongSleeveCount).reduce((a, b) => a + b, 0);
 
-    return NextResponse.json({
+    return await secureJsonResponse({
       status: 'success',
       data: {
         totalSales,
@@ -139,6 +140,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Analytics API] Error:', error);
-    return NextResponse.json({ status: 'error', message: 'Failed to fetch analytics' }, { status: 500 });
+    return await secureJsonResponse({ status: 'error', message: 'Failed to fetch analytics' }, { status: 500 });
   }
 }

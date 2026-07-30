@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdminEmailAsync, isResourceOwner, getSession } from '@/lib/auth';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 import {
   getChatSession,
   getChatSessionWithMessages,
@@ -34,19 +35,19 @@ export async function GET(request: NextRequest, { params }: Params) {
     const session = await getSession(request);
 
     if (!session?.user?.email) {
-      return NextResponse.json('Unauthorized', { status: 401 });
+      return await secureJsonResponse('Unauthorized', { status: 401 });
     }
 
     const chatSession = await getChatSession(sessionId);
     if (!chatSession) {
-      return NextResponse.json({ error: 'Chat not found' }, { status: 404 });
+      return await secureJsonResponse({ error: 'Chat not found' }, { status: 404 });
     }
 
     const isAdminUser = await isAdminEmailAsync(session.user.email);
     const isOwner = isResourceOwner(chatSession.customer_email, session.user.email);
 
     if (!isAdminUser && !isOwner) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return await secureJsonResponse({ error: 'Forbidden' }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -59,7 +60,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     // Older history page (infinite scroll up)
     if (beforeParam && !sinceParam) {
       const page = await getMessagesBefore(sessionId, beforeParam, limit, beforeId);
-      return NextResponse.json({
+      return await secureJsonResponse({
         messages: page.messages,
         hasMore: page.hasMore,
         sync: 'older',
@@ -88,7 +89,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       const sinceDate = new Date(sinceParam);
       if (!Number.isNaN(sinceDate.getTime())) {
         const deltaMessages = await getMessagesSince(sessionId, sinceDate);
-        return NextResponse.json(
+        return await secureJsonResponse(
           {
             chat: { ...sessionForResponse, messages: deltaMessages },
             sync: 'delta',
@@ -101,17 +102,17 @@ export async function GET(request: NextRequest, { params }: Params) {
 
     const chat = await getChatSessionWithMessages(sessionId, limit);
     if (!chat) {
-      return NextResponse.json({ error: 'Chat not found' }, { status: 404 });
+      return await secureJsonResponse({ error: 'Chat not found' }, { status: 404 });
     }
 
     const { hasMore, ...chatPayload } = chat;
-    return NextResponse.json(
+    return await secureJsonResponse(
       { chat: chatPayload, sync: 'full', hasMore },
       { headers: { ETag: etag } }
     );
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[support-chat/sessionId] GET error:', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { error: error.message || 'Internal server error' },
       { status: 500 }
     );

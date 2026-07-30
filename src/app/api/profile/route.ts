@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getJson, putJson } from '@/lib/filebase';
 import crypto from 'crypto';
 import { requireAuth, isResourceOwner, isAdminEmailAsync } from '@/lib/auth';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 const emailHash = (email: string) => crypto.createHash('sha256').update(email.toLowerCase()).digest('hex');
 const profileKey = (email: string) => `users/${emailHash(email)}.json`;
@@ -44,11 +45,11 @@ export async function GET(req: NextRequest) {
     }
 
     const email = req.nextUrl.searchParams.get('email');
-    if (!email) return NextResponse.json({ status: 'error', message: 'missing email' }, { status: 400 });
+    if (!email) return await secureJsonResponse({ status: 'error', message: 'missing email' }, { status: 400 });
 
     const currentEmail = authResult.email;
     if (!isResourceOwner(email, currentEmail) && !(await isAdminEmailAsync(currentEmail))) {
-      return NextResponse.json({ status: 'error', message: 'ไม่มีสิทธิ์เข้าถึงข้อมูลนี้' }, { status: 403 });
+      return await secureJsonResponse({ status: 'error', message: 'ไม่มีสิทธิ์เข้าถึงข้อมูลนี้' }, { status: 403 });
     }
 
     const data = await getJson(profileKey(email));
@@ -57,11 +58,11 @@ export async function GET(req: NextRequest) {
       extras = (await getJson(profileExtrasKey(email))) || {};
     } catch { /* ignore - extras may not exist */ }
     const merged = { ...(data || {}), ...extras };
-    return NextResponse.json({ status: 'success', data: { profile: merged } });
+    return await secureJsonResponse({ status: 'success', data: { profile: merged } });
   } catch (error) {
     console.error('[Profile API] GET error:', error);
     // Never mask failures as empty profile — clients would wipe cached contact data
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message: 'Failed to load profile' },
       { status: 500 },
     );
@@ -76,15 +77,15 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const body = await req.json();
+    const body = await secureJsonRequest(req);
     const email = body?.email as string | undefined;
     const data = body?.data;
-    if (!email || !data) return NextResponse.json({ status: 'error', message: 'missing email/data' }, { status: 400 });
+    if (!email || !data) return await secureJsonResponse({ status: 'error', message: 'missing email/data' }, { status: 400 });
 
     // ตรวจสอบว่าเป็นเจ้าของหรือเป็น admin
     const currentEmail = authResult.email;
     if (!isResourceOwner(email, currentEmail) && !(await isAdminEmailAsync(currentEmail))) {
-      return NextResponse.json({ status: 'error', message: 'ไม่มีสิทธิ์แก้ไขข้อมูลนี้' }, { status: 403 });
+      return await secureJsonResponse({ status: 'error', message: 'ไม่มีสิทธิ์แก้ไขข้อมูลนี้' }, { status: 403 });
     }
 
     // Separate profile table fields from extra fields
@@ -136,9 +137,9 @@ export async function POST(req: NextRequest) {
       userAgent,
     });
     
-    return NextResponse.json({ status: 'success', data: { profile: merged } });
+    return await secureJsonResponse({ status: 'success', data: { profile: merged } });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
-    return NextResponse.json({
+    return await secureJsonResponse({
       status: 'error',
       message: error?.message || 'save failed',
       error: typeof error === 'object' ? error : { detail: String(error) },

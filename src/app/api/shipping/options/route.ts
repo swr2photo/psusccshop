@@ -9,13 +9,14 @@ import { db } from '@/lib/db';
 import { config } from '@/db/schema';
 import { CACHE_TTL } from '@/lib/server-cache';
 import { ShippingConfig, DEFAULT_SHIPPING_CONFIG, toPublicShippingConfig } from '@/lib/shipping';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const CONFIG_KEY = 'shipping_config';
 
-function publicJson(cfg: ShippingConfig, cacheControl: string, cdnMaxAge = 300) {
-  return NextResponse.json(
+async function publicJson(cfg: ShippingConfig, cacheControl: string, cdnMaxAge = 300) {
+  return await secureJsonResponse(
     { success: true, data: toPublicShippingConfig(cfg) },
     {
       headers: {
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest) {
       return publicJson(source, 'public, s-maxage=300, stale-while-revalidate=600');
     }
 
-    return NextResponse.json(
+    return await secureJsonResponse(
       { success: true, data: source },
       { headers: { 'Cache-Control': 'private, no-cache' } },
     );
@@ -65,14 +66,14 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getSessionFromRequest(request);
     if (!session?.user?.email || !(await isAdminEmailAsync(session.user.email))) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+      return await secureJsonResponse({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json();
+    const body = await secureJsonRequest(request);
     const newConfig: ShippingConfig = body.config;
 
     if (!newConfig || !Array.isArray(newConfig.options)) {
-      return NextResponse.json({ success: false, error: 'Invalid shipping config' }, { status: 400 });
+      return await secureJsonResponse({ success: false, error: 'Invalid shipping config' }, { status: 400 });
     }
 
     await db.insert(config)
@@ -84,9 +85,9 @@ export async function POST(request: NextRequest) {
 
     invalidateConfigCache(CONFIG_KEY);
 
-    return NextResponse.json({ success: true, message: 'Shipping config updated successfully' });
+    return await secureJsonResponse({ success: true, message: 'Shipping config updated successfully' });
   } catch (error) {
     console.error('[API] Update shipping options error:', formatDbError(error));
-    return NextResponse.json({ success: false, error: 'Failed to update shipping options' }, { status: 500 });
+    return await secureJsonResponse({ success: false, error: 'Failed to update shipping options' }, { status: 500 });
   }
 }

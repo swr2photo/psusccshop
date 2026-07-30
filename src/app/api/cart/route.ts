@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getJson, putJson } from '@/lib/filebase';
 import crypto from 'crypto';
 import { requireAuth, isResourceOwner, isAdminEmailAsync } from '@/lib/auth';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 const cartKey = (email: string) => `carts/${crypto.createHash('sha256').update(email.toLowerCase()).digest('hex')}.json`;
 
@@ -37,21 +38,21 @@ export async function GET(req: NextRequest) {
   }
 
   const email = req.nextUrl.searchParams.get('email');
-  if (!email) return NextResponse.json({ status: 'error', message: 'missing email' }, { status: 400 });
+  if (!email) return await secureJsonResponse({ status: 'error', message: 'missing email' }, { status: 400 });
 
   // ตรวจสอบว่าเป็นเจ้าของหรือเป็น admin
   const currentEmail = authResult.email;
   if (!isResourceOwner(email, currentEmail) && !(await isAdminEmailAsync(currentEmail))) {
-    return NextResponse.json({ status: 'error', message: 'ไม่มีสิทธิ์เข้าถึงข้อมูลนี้' }, { status: 403 });
+    return await secureJsonResponse({ status: 'error', message: 'ไม่มีสิทธิ์เข้าถึงข้อมูลนี้' }, { status: 403 });
   }
 
   try {
     const data = await getJson(cartKey(email));
-    return NextResponse.json({ status: 'success', data: { cart: data || [] } });
+    return await secureJsonResponse({ status: 'success', data: { cart: data || [] } });
   } catch (error) {
     console.error('[Cart API] GET failed:', error);
     // Never mask failures as empty cart — clients would wipe a non-empty local cart
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message: 'Failed to load cart' },
       { status: 500 },
     );
@@ -66,15 +67,15 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const body = await req.json();
+    const body = await secureJsonRequest(req);
     const email = body?.email as string | undefined;
     const cart = body?.cart as any[] | undefined;
-    if (!email || !cart) return NextResponse.json({ status: 'error', message: 'missing email/cart' }, { status: 400 });
+    if (!email || !cart) return await secureJsonResponse({ status: 'error', message: 'missing email/cart' }, { status: 400 });
 
     // ตรวจสอบว่าเป็นเจ้าของหรือเป็น admin
     const currentEmail = authResult.email;
     if (!isResourceOwner(email, currentEmail) && !(await isAdminEmailAsync(currentEmail))) {
-      return NextResponse.json({ status: 'error', message: 'ไม่มีสิทธิ์แก้ไขข้อมูลนี้' }, { status: 403 });
+      return await secureJsonResponse({ status: 'error', message: 'ไม่มีสิทธิ์แก้ไขข้อมูลนี้' }, { status: 403 });
     }
 
     // Get old cart for comparison
@@ -105,9 +106,9 @@ export async function POST(req: NextRequest) {
       });
     }
     
-    return NextResponse.json({ status: 'success' });
+    return await secureJsonResponse({ status: 'success' });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
-    return NextResponse.json({
+    return await secureJsonResponse({
       status: 'error',
       message: error?.message || 'save failed',
       error: typeof error === 'object' ? error : { detail: String(error) },

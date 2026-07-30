@@ -17,6 +17,7 @@ import { buildValidatedCart, clampShippingFee } from '@/lib/order-pricing';
 import { computePromoDiscount } from '@/lib/promo';
 import { dispatchNotification } from '@/lib/notifications';
 import { isValidTransition, dispatchWebhook, OrderStatus } from '@/lib/order-state-machine';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 // Helper to save user log server-side
 async function saveUserLogServer(log: {
@@ -98,14 +99,14 @@ export async function GET(req: NextRequest) {
     // Sanitize: ลบ slip data และ sensitive fields ออกก่อนส่ง
     const sanitizedHistory = sanitizeOrdersForUser(orders);
 
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'success', data: { history: sanitizedHistory, hasMore, total } },
       { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Content-Type': 'application/json; charset=utf-8' } }
     );
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Orders API] GET failed:', error?.message || error);
     // Never mask failures as empty history — clients would wipe a previously loaded list
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message: 'Failed to load orders', data: { history: null } },
       {
         status: 500,
@@ -154,7 +155,7 @@ export async function POST(req: NextRequest) {
   // Rate limiting สำหรับ order submission
   const rateLimitResult = await checkCombinedRateLimitAsync(req, RATE_LIMITS.order);
   if (!rateLimitResult.allowed) {
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message: 'คุณส่งคำสั่งซื้อเร็วเกินไป กรุณารอสักครู่' },
       { 
         status: 429, 
@@ -167,7 +168,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const body = await req.json();
+    const body = await secureJsonRequest(req);
     
     // ตรวจสอบ Turnstile token (ป้องกันบอท)
     const turnstileToken = body?.turnstileToken;
@@ -175,7 +176,7 @@ export async function POST(req: NextRequest) {
     const turnstileResult = await verifyTurnstileToken(turnstileToken, clientIP);
     
     if (!turnstileResult.success) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { status: 'error', message: turnstileResult.error || 'กรุณายืนยันว่าคุณไม่ใช่บอท' },
         { status: 400, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
       );
@@ -210,7 +211,7 @@ export async function POST(req: NextRequest) {
         shopCloseDate = settings.closeDate ?? '';
         shopOpenDate = settings.openDate ?? '';
       } else {
-        return NextResponse.json(
+        return await secureJsonResponse(
           { status: 'error', message: 'ไม่พบข้อมูลร้านค้า' },
           { status: 404, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
         );
@@ -243,7 +244,7 @@ export async function POST(req: NextRequest) {
       const message = shopStatus === 'ORDER_ENDED' 
         ? 'ร้านค้าปิดรับออเดอร์แล้ว ไม่สามารถสั่งซื้อได้' 
         : 'ร้านค้าปิดให้บริการชั่วคราว ไม่สามารถสั่งซื้อได้';
-      return NextResponse.json(
+      return await secureJsonResponse(
         { status: 'error', message },
         { status: 400, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
       );
@@ -254,7 +255,7 @@ export async function POST(req: NextRequest) {
     for (const item of cartItems) {
       const prod = products.find(p => p.id === item.productId);
       if (!prod) {
-        return NextResponse.json(
+        return await secureJsonResponse(
           { status: 'error', message: `สินค้า "${item.productName || 'ไม่ระบุชื่อ'}" ไม่มีอยู่ในระบบแล้ว` },
           { status: 400, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
         );
@@ -267,7 +268,7 @@ export async function POST(req: NextRequest) {
       
       const isClosed = !isActive || (start && nowTime < start) || (end && nowTime > end);
       if (isClosed) {
-        return NextResponse.json(
+        return await secureJsonResponse(
           { status: 'error', message: `สินค้า "${item.productName || prod.name}" ปิดการขายแล้ว` },
           { status: 400, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
         );
@@ -279,7 +280,7 @@ export async function POST(req: NextRequest) {
         (prod.variants && prod.variants.length > 0 && prod.variants.every((v: any) => v.stock !== null && v.stock !== undefined && v.stock <= 0))
       );
       if (isOutOfStock) {
-        return NextResponse.json(
+        return await secureJsonResponse(
           { status: 'error', message: `สินค้า "${item.productName || prod.name}" หมดชั่วคราว` },
           { status: 400, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
         );
@@ -293,7 +294,7 @@ export async function POST(req: NextRequest) {
       validatedCart = built.cart;
       subtotal = built.subtotal;
     } catch (pricingError: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { status: 'error', message: pricingError?.message || 'ไม่สามารถคำนวณราคาได้' },
         { status: 400, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
       );
@@ -409,13 +410,13 @@ export async function POST(req: NextRequest) {
     // Auto sync to Google Sheets
     triggerSheetSync().catch(() => {});
     recordOrderCreated('success', Date.now() - start);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'success', ref },
       { headers: { 'Content-Type': 'application/json; charset=utf-8' } }
     );
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     recordOrderCreated('failed', Date.now() - start);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message: error?.message || 'submit failed' },
       { status: 500, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
     );
@@ -432,11 +433,11 @@ export async function PUT(req: NextRequest) {
   const isAdmin = await isAdminEmailAsync(currentUserEmail);
 
   try {
-    const body = await req.json();
+    const body = await secureJsonRequest(req);
     const ref = sanitizeUtf8Input(body?.ref) as string | undefined;
     const updates = body?.data as Record<string, any> | undefined;
     if (!ref || !updates) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { status: 'error', message: 'missing ref/data' },
         { status: 400, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
       );
@@ -445,7 +446,7 @@ export async function PUT(req: NextRequest) {
     const existing = (await getOrderByRef(ref)) || {};
 
     if (!existing || !(existing as { ref?: string }).ref) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { status: 'error', message: 'order not found' },
         { status: 404, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
       );
@@ -454,7 +455,7 @@ export async function PUT(req: NextRequest) {
     // ตรวจสอบว่าเป็นเจ้าของ order หรือเป็น admin
     const orderEmail = existing.customerEmail || existing.email;
     if (!isResourceOwner(orderEmail, currentUserEmail) && !isAdmin) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { status: 'error', message: 'ไม่มีสิทธิ์แก้ไข order นี้' },
         { status: 403, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
       );
@@ -505,7 +506,7 @@ export async function PUT(req: NextRequest) {
     // State machine check if status changed
     if (sanitizedUpdates.status && sanitizedUpdates.status !== existing.status) {
       if (!isValidTransition(existing.status as OrderStatus, sanitizedUpdates.status as OrderStatus, isAdmin)) {
-        return NextResponse.json(
+        return await secureJsonResponse(
           { status: 'error', message: `Invalid status transition from ${existing.status} to ${sanitizedUpdates.status}` },
           { status: 400, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
         );
@@ -532,12 +533,12 @@ export async function PUT(req: NextRequest) {
     // Sanitize response - ไม่ส่ง slip data กลับ
     const sanitizedResponse = sanitizeOrderForUser(next);
     
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'success', data: sanitizedResponse },
       { headers: { 'Content-Type': 'application/json; charset=utf-8' } }
     );
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message: error?.message || 'update failed' },
       { status: 500, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
     );
@@ -557,7 +558,7 @@ export async function DELETE(req: NextRequest) {
   const hard = req.nextUrl.searchParams.get('hard') === 'true';
   
   if (!ref) {
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message: 'missing ref' },
       { status: 400, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
     );
@@ -565,7 +566,7 @@ export async function DELETE(req: NextRequest) {
 
   // Hard delete ทำได้เฉพาะ admin
   if (hard && !isAdmin) {
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message: 'เฉพาะ admin เท่านั้นที่ลบถาวรได้' },
       { status: 403, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
     );
@@ -574,7 +575,7 @@ export async function DELETE(req: NextRequest) {
   try {
     const existing = await getOrderByRef(ref);
     if (!existing) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { status: 'error', message: 'order not found' },
         { status: 404, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
       );
@@ -584,7 +585,7 @@ export async function DELETE(req: NextRequest) {
 
     // ตรวจสอบสิทธิ์
     if (!isResourceOwner(orderEmail, currentUserEmail) && !isAdmin) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { status: 'error', message: 'ไม่มีสิทธิ์ลบ order นี้' },
         { status: 403, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
       );
@@ -608,7 +609,7 @@ export async function DELETE(req: NextRequest) {
       }
       await deleteOrderByRef(ref);
       triggerSheetSync().catch(() => {});
-      return NextResponse.json(
+      return await secureJsonResponse(
         { status: 'success', message: 'deleted' },
         { headers: { 'Content-Type': 'application/json; charset=utf-8' } }
       );
@@ -640,12 +641,12 @@ export async function DELETE(req: NextRequest) {
     }
     // Auto sync to Google Sheets
     triggerSheetSync().catch(() => {});
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'success', message: 'cancelled' },
       { headers: { 'Content-Type': 'application/json; charset=utf-8' } }
     );
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message: error?.message || 'cancel failed' },
       { status: 500, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
     );

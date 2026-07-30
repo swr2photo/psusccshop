@@ -8,6 +8,8 @@
  * Server-side may use API_INTERNAL_URL or NEXT_PUBLIC_API_URL for direct backend calls.
  */
 
+import { encryptPayload, decryptPayload } from './payload-crypto';
+
 const API_PREFIX = '/api';
 
 function normalizePath(path: string): string {
@@ -267,7 +269,7 @@ async function fetchJson<T = any>(path: string, opts?: FetchOptions): Promise<AP
       },
       ...(isRead ? {} : { cache: 'no-store' as RequestCache }),
       ...rest,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: body !== undefined ? JSON.stringify({ _e: await encryptPayload(body) }) : undefined,
     };
 
     const res = await apiFetch(path, init);
@@ -277,7 +279,8 @@ async function fetchJson<T = any>(path: string, opts?: FetchOptions): Promise<AP
       let extractedMessage = '';
       try {
         const parsed = JSON.parse(text);
-        extractedMessage = parsed.message || parsed.error?.message || parsed.error || '';
+        const data = parsed._e ? await decryptPayload(parsed._e) : parsed;
+        extractedMessage = data.message || data.error?.message || data.error || '';
       } catch (e) {
         // Not JSON
       }
@@ -308,7 +311,11 @@ async function fetchJson<T = any>(path: string, opts?: FetchOptions): Promise<AP
         error: { code: 'INVALID_RESPONSE' }
       } as APIResponse<T>;
     }
-    return await res.json();
+    const rawJson = await res.json();
+    if (rawJson && rawJson._e) {
+      return await decryptPayload(rawJson._e);
+    }
+    return rawJson;
   } catch (error) {
     if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
       console.warn('[API] Network error - offline or server unreachable');

@@ -4,6 +4,7 @@
 // POST { action: 'login-verify', challengeId, assertion } → verify & return token
 
 import { NextRequest, NextResponse } from 'next/server';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 import {
   generatePasskeyAuthenticationOptions,
   verifyPasskeyAuthentication,
@@ -14,18 +15,18 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
+  const body = await secureJsonRequest(req);
   const { action } = body;
 
   // Step 1: Generate authentication options
   if (action === 'login-options') {
     try {
       const { options, challengeId } = await generatePasskeyAuthenticationOptions(req.url);
-      return NextResponse.json({ options, challengeId });
+      return await secureJsonResponse({ options, challengeId });
     } catch (err: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       console.error('[Passkey] Login options error:', err);
       const message = err instanceof Error ? err.message : String(err);
-      return NextResponse.json({ error: message }, { status: 500 });
+      return await secureJsonResponse({ error: message }, { status: 500 });
     }
   }
 
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
   if (action === 'login-verify') {
     const { challengeId, assertion } = body;
     if (!challengeId || !assertion) {
-      return NextResponse.json({ error: 'Missing challengeId or assertion' }, { status: 400 });
+      return await secureJsonResponse({ error: 'Missing challengeId or assertion' }, { status: 400 });
     }
 
     try {
@@ -43,23 +44,23 @@ export async function POST(req: NextRequest) {
         // Create a short-lived token for NextAuth CredentialsProvider
         const token = await createPasskeyLoginToken(result.userEmail);
 
-        return NextResponse.json({
+        return await secureJsonResponse({
           verified: true,
           token,
           email: result.userEmail,
         });
       }
 
-      return NextResponse.json({
+      return await secureJsonResponse({
         verified: false,
         error: result.error || 'Authentication failed',
       }, { status: 401 });
     } catch (err: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       console.error('[Passkey] Login verify error:', err);
       const message = err instanceof Error ? err.message : String(err);
-      return NextResponse.json({ error: message }, { status: 400 });
+      return await secureJsonResponse({ error: message }, { status: 400 });
     }
   }
 
-  return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+  return await secureJsonResponse({ error: 'Invalid action' }, { status: 400 });
 }

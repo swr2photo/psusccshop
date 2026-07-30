@@ -6,6 +6,7 @@ import { ShopConfig } from '@/lib/config';
 import { requireAdmin, isSuperAdminEmail } from '@/lib/auth';
 import { sanitizeConfigForPublic, sanitizeObjectUtf8 } from '@/lib/sanitize';
 import { saveAllAdminPermissionsToDB, getAllAdminPermissionsFromDB, deleteAdminPermissionsFromDB } from '@/lib/supabase';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 import {
   getCached,
   invalidateCacheKey,
@@ -90,7 +91,7 @@ async function GETHandler() {
     return { status: 'success' as const, data: sanitizedConfig };
   });
 
-  return NextResponse.json(
+  return await secureJsonResponse(
     payload,
     {
       headers: {
@@ -111,16 +112,16 @@ async function POSTHandler(req: NextRequest) {
   }
 
   try {
-    const body = await req.json();
+    const body = await secureJsonRequest(req);
     const config = body?.config as ShopConfig | undefined;
-    if (!config) return NextResponse.json({ status: 'error', message: 'missing config' }, { status: 400 });
+    if (!config) return await secureJsonResponse({ status: 'error', message: 'missing config' }, { status: 400 });
     
     // ⚠️ Safety: prevent saving config with empty products if DB already has products
     // This prevents accidental data wipe from race conditions or stale client state
     const currentConfig = await getJson<ShopConfig>(CONFIG_KEY);
     if (currentConfig && (currentConfig.products?.length ?? 0) > 0 && (!config.products || config.products.length === 0)) {
       console.error(`[config] BLOCKED: attempted to save 0 products when DB has ${currentConfig.products?.length}. User: ${authResult.email}`);
-      return NextResponse.json(
+      return await secureJsonResponse(
         { status: 'error', message: 'ไม่สามารถบันทึกได้: กรุณาโหลดข้อมูลสินค้าก่อนบันทึก (ป้องกันข้อมูลหาย)' },
         { status: 409 }
       );
@@ -214,12 +215,12 @@ async function POSTHandler(req: NextRequest) {
       request: req,
     });
     
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'success', data: sanitizedConfig },
       { headers: { 'Content-Type': 'application/json; charset=utf-8' } }
     );
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
-    return NextResponse.json({
+    return await secureJsonResponse({
       status: 'error',
       message: error?.message || 'save failed',
       error: typeof error === 'object' ? error : { detail: String(error) },

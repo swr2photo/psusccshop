@@ -13,6 +13,7 @@ import {
 import { isAdminEmailAsync, getSession } from '@/lib/auth';
 import { userOwnsTrackingNumber } from '@/lib/order-lookup';
 import { rateLimitOrNull } from '@/lib/api-helpers';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -27,7 +28,7 @@ async function assertTrackingAccess(email: string, trackingNumber: string): Prom
   const isAdmin = await isAdminEmailAsync(email);
   const allowed = await userOwnsTrackingNumber(email, trackingNumber, isAdmin);
   if (!allowed) {
-    return NextResponse.json(
+    return await secureJsonResponse(
       { success: false, error: 'ไม่มีสิทธิ์ติดตามพัสดุนี้', errorCode: 'FORBIDDEN' },
       { status: 403 }
     );
@@ -49,24 +50,24 @@ export async function POST(request: NextRequest) {
 
   const session = await requireSession(request);
   if (!session?.user?.email) {
-    return NextResponse.json({ success: false, error: 'Unauthorized', errorCode: 'AUTH_REQUIRED' }, { status: 401 });
+    return await secureJsonResponse({ success: false, error: 'Unauthorized', errorCode: 'AUTH_REQUIRED' }, { status: 401 });
   }
 
   try {
-    const body: TrackRequest = await request.json();
+    const body: TrackRequest = await secureJsonRequest(request);
     const { provider, trackingNumber, trackingNumbers, courierCode, useFallback = true } = body;
     const isAdmin = await isAdminEmailAsync(session.user.email);
 
     if (trackingNumbers && Array.isArray(trackingNumbers) && trackingNumbers.length > 0) {
       if (!isAdmin) {
-        return NextResponse.json(
+        return await secureJsonResponse(
           { success: false, error: 'Batch tracking requires admin', errorCode: 'FORBIDDEN' },
           { status: 403 }
         );
       }
       const cleanedNumbers = trackingNumbers.map((n) => n.trim().toUpperCase());
       const results = await trackMultipleShipments(cleanedNumbers);
-      return NextResponse.json({
+      return await secureJsonResponse({
         success: true,
         data: Object.fromEntries(results),
         count: results.size,
@@ -74,14 +75,14 @@ export async function POST(request: NextRequest) {
     }
 
     if (!trackingNumber) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { success: false, error: 'กรุณาระบุเลขพัสดุ', errorCode: 'MISSING_PARAMS' },
         { status: 400 }
       );
     }
 
     if (provider && !SHIPPING_PROVIDERS[provider]) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { success: false, error: 'ไม่พบผู้ให้บริการขนส่งที่ระบุ', errorCode: 'INVALID_PROVIDER' },
         { status: 400 }
       );
@@ -98,7 +99,7 @@ export async function POST(request: NextRequest) {
     if (!trackingInfo) {
       const trackingUrl = provider ? getTrackingUrl(provider, cleanedTrackingNumber) : '';
       const track123Url = getTrack123Url(cleanedTrackingNumber);
-      return NextResponse.json({
+      return await secureJsonResponse({
         success: true,
         data: {
           provider: provider || 'custom',
@@ -114,10 +115,10 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({ success: true, data: trackingInfo });
+    return await secureJsonResponse({ success: true, data: trackingInfo });
   } catch (error) {
     console.error('[API] Shipping track error:', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { success: false, error: 'เกิดข้อผิดพลาดในการติดตามพัสดุ', errorCode: 'INTERNAL_ERROR' },
       { status: 500 }
     );
@@ -130,7 +131,7 @@ export async function GET(request: NextRequest) {
 
   const session = await requireSession(request);
   if (!session?.user?.email) {
-    return NextResponse.json({ success: false, error: 'Unauthorized', errorCode: 'AUTH_REQUIRED' }, { status: 401 });
+    return await secureJsonResponse({ success: false, error: 'Unauthorized', errorCode: 'AUTH_REQUIRED' }, { status: 401 });
   }
 
   try {
@@ -140,14 +141,14 @@ export async function GET(request: NextRequest) {
     const courierCode = searchParams.get('courier') || searchParams.get('courierCode');
 
     if (!trackingNumber) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { success: false, error: 'กรุณาระบุ tracking parameter', errorCode: 'MISSING_PARAMS' },
         { status: 400 }
       );
     }
 
     if (provider && !SHIPPING_PROVIDERS[provider]) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { success: false, error: 'ไม่พบผู้ให้บริการขนส่งที่ระบุ', errorCode: 'INVALID_PROVIDER' },
         { status: 400 }
       );
@@ -167,7 +168,7 @@ export async function GET(request: NextRequest) {
     const track123Url = getTrack123Url(cleanedTrackingNumber);
 
     if (!trackingInfo) {
-      return NextResponse.json({
+      return await secureJsonResponse({
         success: true,
         data: {
           provider: provider || 'custom',
@@ -183,10 +184,10 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({ success: true, data: trackingInfo });
+    return await secureJsonResponse({ success: true, data: trackingInfo });
   } catch (error) {
     console.error('[API] Shipping track GET error:', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { success: false, error: 'เกิดข้อผิดพลาดในการติดตามพัสดุ', errorCode: 'INTERNAL_ERROR' },
       { status: 500 }
     );

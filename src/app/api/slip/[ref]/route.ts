@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveOrderByRef } from '@/lib/order-lookup';
 import { isAdminEmailAsync, getSession } from '@/lib/auth';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export async function GET(
   req: NextRequest,
@@ -31,12 +32,12 @@ export async function GET(
     const { ref } = await params;
     
     if (!ref) {
-      return NextResponse.json({ status: 'error', message: 'missing ref' }, { status: 400 });
+      return await secureJsonResponse({ status: 'error', message: 'missing ref' }, { status: 400 });
     }
 
     const order = await resolveOrderByRef(ref);
     if (!order) {
-      return NextResponse.json({ status: 'error', message: 'order not found' }, { status: 404 });
+      return await secureJsonResponse({ status: 'error', message: 'order not found' }, { status: 404 });
     }
 
     // Support both 'slip' and 'slipData' field names (backward compatibility)
@@ -235,7 +236,7 @@ export async function GET(
     });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[slip] error', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message: error?.message || 'failed to get slip' },
       { status: 500 }
     );

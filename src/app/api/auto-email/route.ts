@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sendEmail, getOrderRecipientEmail, generateCustomEmail } from '@/lib/email';
 import { requireInternalSecret } from '@/lib/api-helpers';
 import { requireAdmin } from '@/lib/auth';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -133,20 +134,20 @@ export async function POST(request: NextRequest) {
     // Fallback to checking admin session
     const adminAuth = await requireAdmin(request);
     if (adminAuth instanceof NextResponse) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return await secureJsonResponse({ error: 'Unauthorized' }, { status: 401 });
     }
   }
 
   try {
-    const body = await request.json();
+    const body = await secureJsonRequest(request);
     const { type, order, trackingNumber, lang = 'th' } = body;
 
     if (!type) {
-      return NextResponse.json({ error: 'Missing type' }, { status: 400 });
+      return await secureJsonResponse({ error: 'Missing type' }, { status: 400 });
     }
 
     if (type !== 'custom' && !order) {
-      return NextResponse.json({ error: 'Missing order' }, { status: 400 });
+      return await secureJsonResponse({ error: 'Missing order' }, { status: 400 });
     }
 
     let template: { subject: string; body?: string; html?: string; text?: string };
@@ -163,7 +164,7 @@ export async function POST(request: NextRequest) {
       case 'custom':
         const { to: customTo, subject: customSubject, message: customMessage } = body;
         if (!customTo || !customSubject || !customMessage) {
-          return NextResponse.json({ error: 'Missing custom email fields' }, { status: 400 });
+          return await secureJsonResponse({ error: 'Missing custom email fields' }, { status: 400 });
         }
         template = generateCustomEmail({
           customerName: body.customerName || 'ลูกค้า',
@@ -172,12 +173,12 @@ export async function POST(request: NextRequest) {
         });
         break;
       default:
-        return NextResponse.json({ error: 'Unknown email type' }, { status: 400 });
+        return await secureJsonResponse({ error: 'Unknown email type' }, { status: 400 });
     }
 
     const email = type === 'custom' ? body.to : getOrderRecipientEmail(order);
     if (!email) {
-      return NextResponse.json({ error: 'No email address' }, { status: 400 });
+      return await secureJsonResponse({ error: 'No email address' }, { status: 400 });
     }
 
     const htmlBody = (template.html || template.body || '').replace(/\n/g, '<br>');
@@ -193,12 +194,12 @@ export async function POST(request: NextRequest) {
     });
 
     if (!result.success) {
-      return NextResponse.json({ error: result.error || 'Failed to send email' }, { status: 500 });
+      return await secureJsonResponse({ error: result.error || 'Failed to send email' }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, emailId: result.id });
+    return await secureJsonResponse({ success: true, emailId: result.id });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('POST /api/auto-email error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return await secureJsonResponse({ error: error.message }, { status: 500 });
   }
 }

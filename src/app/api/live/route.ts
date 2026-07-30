@@ -3,6 +3,7 @@ import { getJson, putJson } from '@/lib/filebase';
 import { requireAdmin } from '@/lib/auth';
 import type { ShopConfig } from '@/lib/config';
 import type { LiveStreamData } from '@/lib/live-stream';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 import {
   getCached,
   invalidateCacheKey,
@@ -44,10 +45,10 @@ const LIVE_CACHE_HEADERS = {
 export async function GET() {
   try {
     const body = await getLiveResponseBody();
-    return NextResponse.json(body, { headers: LIVE_CACHE_HEADERS });
+    return await secureJsonResponse(body, { headers: LIVE_CACHE_HEADERS });
   } catch (error) {
     console.error('[API/live] GET error, falling back to no-live state:', error);
-    return NextResponse.json({ live: null }, {
+    return await secureJsonResponse({ live: null }, {
       headers: { 'Cache-Control': 'no-store' },
     });
   }
@@ -59,11 +60,11 @@ export async function POST(request: Request) {
     const auth = await requireAdmin(request);
     if (auth instanceof NextResponse) return auth;
 
-    const body = await request.json();
+    const body = await secureJsonRequest(request);
     const { liveStream } = body;
 
     if (!liveStream || typeof liveStream !== 'object') {
-      return NextResponse.json({ error: 'Invalid liveStream data' }, { status: 400 });
+      return await secureJsonResponse({ error: 'Invalid liveStream data' }, { status: 400 });
     }
 
     const config = await getJson<ShopConfig>(CONFIG_KEY) || {} as ShopConfig;
@@ -88,12 +89,12 @@ export async function POST(request: Request) {
     await putJson(CONFIG_KEY, config);
     invalidateCacheKey(LIVE_CACHE_KEY);
 
-    return NextResponse.json({ 
+    return await secureJsonResponse({ 
       success: true, 
       liveStream: config.liveStream,
     });
   } catch (error) {
     console.error('[API/live] POST error:', error);
-    return NextResponse.json({ error: 'Failed to update live stream' }, { status: 500 });
+    return await secureJsonResponse({ error: 'Failed to update live stream' }, { status: 500 });
   }
 }

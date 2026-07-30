@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 // Returns a list of enabled OAuth provider IDs based on env vars
 export async function GET() {
@@ -17,5 +18,5 @@ export async function GET() {
     providers.push('line');
   }
 
-  return NextResponse.json({ providers });
+  return await secureJsonResponse({ providers });
 }

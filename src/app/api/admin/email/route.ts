@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminWithPermission } from '@/lib/auth';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 import {
   sendEmail,
   getEmailLogsByOrder,
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
   try {
     const admin = await requireAdminWithPermission('canSendEmail', request);
     if (!admin || admin instanceof NextResponse) {
-      return admin instanceof NextResponse ? admin : NextResponse.json('Unauthorized', { status: 401 });
+      return admin instanceof NextResponse ? admin : await secureJsonResponse('Unauthorized', { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -51,23 +52,23 @@ export async function GET(request: NextRequest) {
 
       case 'stats': {
         const stats = await getEmailLogStats();
-        return NextResponse.json({ stats });
+        return await secureJsonResponse({ stats });
       }
 
       case 'customers': {
         const { customers, totalCustomers } = await getOrderCustomerAggregates(500);
-        return NextResponse.json({ customers, totalCustomers });
+        return await secureJsonResponse({ customers, totalCustomers });
       }
 
       default:
-        return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+        return await secureJsonResponse({ error: 'Invalid action' }, { status: 400 });
     }
 
-    return NextResponse.json({ logs, total: logs.length });
+    return await secureJsonResponse({ logs, total: logs.length });
 
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Email API] Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return await secureJsonResponse({ error: error.message }, { status: 500 });
   }
 }
 
@@ -76,17 +77,17 @@ export async function POST(request: NextRequest) {
   try {
     const admin = await requireAdminWithPermission('canSendEmail', request);
     if (!admin || admin instanceof NextResponse) {
-      return admin instanceof NextResponse ? admin : NextResponse.json('Unauthorized', { status: 401 });
+      return admin instanceof NextResponse ? admin : await secureJsonResponse('Unauthorized', { status: 401 });
     }
 
-    const body = await request.json();
+    const body = await secureJsonRequest(request);
     const { action, to, subject, message, type: _type, orderRef, recipients } = body;
 
     switch (action) {
       case 'send_custom':
         // Send custom email to single recipient
         if (!to || !subject || !message) {
-          return NextResponse.json({ error: 'Missing required fields: to, subject, message' }, { status: 400 });
+          return await secureJsonResponse({ error: 'Missing required fields: to, subject, message' }, { status: 400 });
         }
 
         const template = generateCustomEmail({
@@ -105,16 +106,16 @@ export async function POST(request: NextRequest) {
           metadata: { sentBy: admin },
         });
 
-        return NextResponse.json(result);
+        return await secureJsonResponse(result);
 
       case 'send_broadcast':
         // Send email to multiple recipients
         if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
-          return NextResponse.json({ error: 'No recipients specified' }, { status: 400 });
+          return await secureJsonResponse({ error: 'No recipients specified' }, { status: 400 });
         }
 
         if (!subject || !message) {
-          return NextResponse.json({ error: 'Missing subject or message' }, { status: 400 });
+          return await secureJsonResponse({ error: 'Missing subject or message' }, { status: 400 });
         }
 
         const results = {
@@ -156,47 +157,47 @@ export async function POST(request: NextRequest) {
           await new Promise(resolve => setTimeout(resolve, 100));
         }
 
-        return NextResponse.json(results);
+        return await secureJsonResponse(results);
 
       case 'send_order_status':
         // Manually trigger order status email
         if (!orderRef) {
-          return NextResponse.json({ error: 'Missing orderRef' }, { status: 400 });
+          return await secureJsonResponse({ error: 'Missing orderRef' }, { status: 400 });
         }
 
         const order = await getOrderByRef(orderRef);
 
         if (!order) {
-          return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+          return await secureJsonResponse({ error: 'Order not found' }, { status: 404 });
         }
 
         const status = body.status || order.status;
         await sendOrderStatusEmail(order, status);
 
-        return NextResponse.json({ success: true, message: `Email sent for order ${orderRef} with status ${status}` });
+        return await secureJsonResponse({ success: true, message: `Email sent for order ${orderRef} with status ${status}` });
 
       case 'resend':
         // Resend a failed email
         const { logId } = body;
         if (!logId) {
-          return NextResponse.json({ error: 'Missing logId' }, { status: 400 });
+          return await secureJsonResponse({ error: 'Missing logId' }, { status: 400 });
         }
 
         const log = await getJson<EmailLog>(`email-logs/${logId}.json`);
         if (!log) {
-          return NextResponse.json({ error: 'Email log not found' }, { status: 404 });
+          return await secureJsonResponse({ error: 'Email log not found' }, { status: 404 });
         }
 
         // Note: We can't resend the exact email since we don't store the full HTML
         // Instead, this would need to regenerate the email based on order data
-        return NextResponse.json({ error: 'Resend not implemented - regenerate from order instead' }, { status: 501 });
+        return await secureJsonResponse({ error: 'Resend not implemented - regenerate from order instead' }, { status: 501 });
 
       default:
-        return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+        return await secureJsonResponse({ error: 'Invalid action' }, { status: 400 });
     }
 
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Email API] Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return await secureJsonResponse({ error: error.message }, { status: 500 });
   }
 }

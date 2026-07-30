@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdminEmailAsync, getSession } from '@/lib/auth';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 import { 
   getChatSession,
   acceptChatSession 
@@ -22,27 +23,27 @@ export async function POST(request: NextRequest, { params }: Params) {
     const session = await getSession(request);
     
     if (!session?.user?.email) {
-      return NextResponse.json('Unauthorized', { status: 401 });
+      return await secureJsonResponse('Unauthorized', { status: 401 });
     }
     
     if (!(await isAdminEmailAsync(session.user.email))) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return await secureJsonResponse({ error: 'Forbidden' }, { status: 403 });
     }
     
     const chat = await getChatSession(sessionId);
     
     if (!chat) {
-      return NextResponse.json({ error: 'Chat not found' }, { status: 404 });
+      return await secureJsonResponse({ error: 'Chat not found' }, { status: 404 });
     }
 
     if (chat.status === 'closed') {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { error: 'การสนทนานี้ปิดแล้ว' },
         { status: 400 }
       );
     }
 
-    const body = await request.json().catch(() => ({} as { force?: boolean }));
+    const body = await secureJsonRequest(request).catch(() => ({} as { force?: boolean }));
     const adminEmail = (chat.admin_email || '').toLowerCase();
     const actorEmail = session.user.email.toLowerCase();
     const force =
@@ -51,19 +52,19 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     if (chat.status === 'active' && !force) {
       if (adminEmail && adminEmail === actorEmail) {
-        return NextResponse.json({
+        return await secureJsonResponse({
           chat,
           message: 'คุณดูแลเคสนี้อยู่แล้ว',
         });
       }
-      return NextResponse.json(
+      return await secureJsonResponse(
         { error: 'การสนทนานี้ถูกรับไปแล้ว' },
         { status: 400 }
       );
     }
 
     if (chat.status !== 'pending' && chat.status !== 'active') {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { error: 'ไม่สามารถรับเคสนี้ได้' },
         { status: 400 }
       );
@@ -76,14 +77,14 @@ export async function POST(request: NextRequest, { params }: Params) {
       { force }
     );
     
-    return NextResponse.json({ 
+    return await secureJsonResponse({ 
       chat: acceptedChat,
       message: force ? 'โอนเคสสำเร็จ' : 'รับเคสสำเร็จ'
     });
     
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[support-chat/accept] POST error:', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { error: error.message || 'Internal server error' },
       { status: 500 }
     );

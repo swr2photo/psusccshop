@@ -15,6 +15,7 @@ import {
 import { buildGetTokenReq } from '@/lib/session-from-request';
 import { getSharedCookieDomain } from '@/lib/cookie-domain';
 import { SESSION_MAX_AGE_SECONDS, getSessionTokenCookieOptions } from '@/lib/session-cookie';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 import {
   chunkSessionCookieValue,
   sessionCookieNamesToClear,
@@ -66,7 +67,7 @@ function buildClearCookie(name: string, domain?: string): string {
 export async function POST(req: NextRequest) {
   const secret = process.env.NEXTAUTH_SECRET;
   if (!secret) {
-    return NextResponse.json({ status: 'error', message: 'misconfigured' }, { status: 500 });
+    return await secureJsonResponse({ status: 'error', message: 'misconfigured' }, { status: 500 });
   }
 
   let token: JWT | null = null;
@@ -86,14 +87,14 @@ export async function POST(req: NextRequest) {
   }
 
   if (!token) {
-    return NextResponse.json({ status: 'error', message: 'no session' }, { status: 401 });
+    return await secureJsonResponse({ status: 'error', message: 'no session' }, { status: 401 });
   }
 
   const email =
     (typeof token.email === 'string' && token.email) ||
     (token.user as { email?: string } | undefined)?.email;
   if (!email) {
-    return NextResponse.json({ status: 'error', message: 'no email in session' }, { status: 401 });
+    return await secureJsonResponse({ status: 'error', message: 'no email in session' }, { status: 401 });
   }
 
   const sessionToken = await encode({
@@ -105,7 +106,7 @@ export async function POST(req: NextRequest) {
   const chunks = chunkSessionCookieValue(sessionCookieName, sessionToken);
   const opts = getSessionTokenCookieOptions();
 
-  const response = NextResponse.json({
+  const response = await secureJsonResponse({
     status: 'success',
     domain: sharedCookieDomain || null,
     maxAge: SESSION_MAX_AGE_SECONDS,

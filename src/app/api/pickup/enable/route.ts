@@ -6,6 +6,7 @@ import { ShopConfig } from '@/lib/config';
 import { sendOrderStatusEmail } from '@/lib/email';
 import { sendPushNotification } from '@/lib/push-notification';
 import crypto from 'crypto';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const body = await req.json();
+    const body = await secureJsonRequest(req);
     const productId = body?.productId as string;
     const autoUpdateOrders = body?.autoUpdateOrders !== false; // Default true
     const pickupSettings = body?.pickup as {
@@ -54,7 +55,7 @@ export async function POST(req: NextRequest) {
     };
 
     if (!productId) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { status: 'error', message: 'Missing productId' },
         { status: 400 }
       );
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest) {
     // Get config and update product pickup settings
     const config = await getJson<ShopConfig>(CONFIG_KEY);
     if (!config) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { status: 'error', message: 'Config not found' },
         { status: 404 }
       );
@@ -71,7 +72,7 @@ export async function POST(req: NextRequest) {
 
     const productIndex = config.products?.findIndex(p => p.id === productId);
     if (productIndex === undefined || productIndex === -1) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { status: 'error', message: 'Product not found' },
         { status: 404 }
       );
@@ -149,7 +150,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({
+    return await secureJsonResponse({
       status: 'success',
       message: pickupSettings.enabled 
         ? `เปิดรับสินค้าสำเร็จ อัปเดต ${updatedCount} คำสั่งซื้อเป็น "พร้อมรับ"` 
@@ -163,7 +164,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Pickup Enable API] Error:', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message: error?.message || 'Failed to update pickup' },
       { status: 500 }
     );

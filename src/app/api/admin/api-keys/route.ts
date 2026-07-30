@@ -11,6 +11,7 @@ import {
   getExpiringKeys,
 } from '@/lib/api-key-rotation';
 import { logSecurityEvent } from '@/lib/supabase';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -30,15 +31,15 @@ export async function GET(req: NextRequest) {
     if (expiringSoon) {
       const days = parseInt(searchParams.get('days') || '7');
       const keys = await getExpiringKeys(days);
-      return NextResponse.json({ keys, expiringWithinDays: days });
+      return await secureJsonResponse({ keys, expiringWithinDays: days });
     }
     
     const keys = await listAPIKeys({ includeInactive });
     
-    return NextResponse.json({ keys });
+    return await secureJsonResponse({ keys });
   } catch (error) {
     console.error('[API Keys] List error:', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { error: 'Failed to list API keys' },
       { status: 500 }
     );
@@ -53,11 +54,11 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const body = await req.json();
+    const body = await secureJsonRequest(req);
     const { name, permissions, expiresInDays, type, rateLimit } = body;
     
     if (!name || !permissions || !Array.isArray(permissions)) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { error: 'Name and permissions are required' },
         { status: 400 }
       );
@@ -66,7 +67,7 @@ export async function POST(req: NextRequest) {
     // Validate type
     const validTypes = ['admin', 'user', 'cron', 'webhook'];
     if (type && !validTypes.includes(type)) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { error: `Invalid type. Must be one of: ${validTypes.join(', ')}` },
         { status: 400 }
       );
@@ -88,7 +89,7 @@ export async function POST(req: NextRequest) {
       details: { keyId: result.keyId, name },
     });
     
-    return NextResponse.json({
+    return await secureJsonResponse({
       success: true,
       keyId: result.keyId,
       key: result.key, // Only shown once!
@@ -96,7 +97,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error('[API Keys] Create error:', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { error: 'Failed to create API key' },
       { status: 500 }
     );
@@ -111,11 +112,11 @@ export async function PUT(req: NextRequest) {
   }
 
   try {
-    const body = await req.json();
+    const body = await secureJsonRequest(req);
     const { keyId } = body;
     
     if (!keyId) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { error: 'keyId is required' },
         { status: 400 }
       );
@@ -123,7 +124,7 @@ export async function PUT(req: NextRequest) {
     
     const result = await rotateAPIKey(keyId, adminResult.email);
     
-    return NextResponse.json({
+    return await secureJsonResponse({
       success: true,
       newKeyId: result.newKeyId,
       newKey: result.newKey, // Only shown once!
@@ -131,7 +132,7 @@ export async function PUT(req: NextRequest) {
     });
   } catch (error) {
     console.error('[API Keys] Rotate error:', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { error: 'Failed to rotate API key' },
       { status: 500 }
     );
@@ -151,7 +152,7 @@ export async function DELETE(req: NextRequest) {
     const reason = searchParams.get('reason') || 'Revoked by admin';
     
     if (!keyId) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { error: 'keyId is required' },
         { status: 400 }
       );
@@ -159,13 +160,13 @@ export async function DELETE(req: NextRequest) {
     
     await revokeAPIKey(keyId, adminResult.email, reason);
     
-    return NextResponse.json({
+    return await secureJsonResponse({
       success: true,
       message: 'API key revoked successfully',
     });
   } catch (error) {
     console.error('[API Keys] Revoke error:', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { error: 'Failed to revoke API key' },
       { status: 500 }
     );

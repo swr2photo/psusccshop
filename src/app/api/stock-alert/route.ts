@@ -8,6 +8,7 @@ import { createHash } from 'crypto';
 import { requireAuth } from '@/lib/auth';
 import { rateLimitOrNull } from '@/lib/api-helpers';
 import { toIsoString } from '@/lib/safe-date';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -25,11 +26,11 @@ export async function POST(request: NextRequest) {
   if (authResult instanceof NextResponse) return authResult;
 
   try {
-    const body = await request.json();
+    const body = await secureJsonRequest(request);
     const { productId, size } = body;
 
     if (!productId) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+      return await secureJsonResponse({ error: 'Missing required fields' }, { status: 400 });
     }
 
     const emailHash = hashEmail(authResult.email);
@@ -72,10 +73,10 @@ export async function POST(request: NextRequest) {
       resultData = inserted[0];
     }
 
-    return NextResponse.json({ success: true, alert: resultData });
+    return await secureJsonResponse({ success: true, alert: resultData });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('POST /api/stock-alert error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return await secureJsonResponse({ error: error.message }, { status: 500 });
   }
 }
 
@@ -85,11 +86,11 @@ export async function DELETE(request: NextRequest) {
   if (authResult instanceof NextResponse) return authResult;
 
   try {
-    const body = await request.json();
+    const body = await secureJsonRequest(request);
     const { productId } = body;
 
     if (!productId) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+      return await secureJsonResponse({ error: 'Missing required fields' }, { status: 400 });
     }
 
     const emailHash = hashEmail(authResult.email);
@@ -103,10 +104,10 @@ export async function DELETE(request: NextRequest) {
         )
       );
 
-    return NextResponse.json({ success: true });
+    return await secureJsonResponse({ success: true });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('DELETE /api/stock-alert error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return await secureJsonResponse({ error: error.message }, { status: 500 });
   }
 }
 
@@ -128,7 +129,7 @@ export async function GET(request: NextRequest) {
         )
       );
 
-    return NextResponse.json({
+    return await secureJsonResponse({
       alerts: (data || []).map((a: any) => ({
         productId: a.productId,
         size: a.size,
@@ -137,6 +138,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('GET /api/stock-alert error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return await secureJsonResponse({ error: error.message }, { status: 500 });
   }
 }

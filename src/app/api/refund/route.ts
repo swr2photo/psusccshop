@@ -8,6 +8,7 @@ import { and, eq, desc, isNotNull } from 'drizzle-orm';
 import { triggerSheetSync } from '@/lib/sheet-sync';
 import { sendPushNotification } from '@/lib/push-notification';
 import { packRefundDetails, type RefundPayoutMethod } from '@/lib/refund-details';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -165,10 +166,10 @@ export async function GET(req: NextRequest) {
         };
       });
 
-      return NextResponse.json({ orders: ordersList });
+      return await secureJsonResponse({ orders: ordersList });
     } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
       console.error('[Refund API] Admin list error:', error);
-      return NextResponse.json({ error: error?.message || 'Internal server error' }, { status: 500 });
+      return await secureJsonResponse({ error: error?.message || 'Internal server error' }, { status: 500 });
     }
   }
 
@@ -177,17 +178,17 @@ export async function GET(req: NextRequest) {
   if (authResult instanceof NextResponse) return authResult;
 
   const ref = req.nextUrl.searchParams.get('ref');
-  if (!ref) return NextResponse.json({ error: 'Missing ref parameter' }, { status: 400 });
+  if (!ref) return await secureJsonResponse({ error: 'Missing ref parameter' }, { status: 400 });
 
   try {
     const order = await getOrderByRef(ref);
-    if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+    if (!order) return await secureJsonResponse({ error: 'Order not found' }, { status: 404 });
     if (!isResourceOwner(order.customerEmail, authResult.email)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return await secureJsonResponse({ error: 'Forbidden' }, { status: 403 });
     }
 
     const { refundStatus, refundData } = getRefundInfo(order);
-    return NextResponse.json({
+    return await secureJsonResponse({
       ref: order.ref,
       status: order.status,
       totalAmount: order.totalAmount || order.amount,
@@ -204,7 +205,7 @@ export async function GET(req: NextRequest) {
     });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Refund API] GET error:', error);
-    return NextResponse.json({ error: error?.message || 'Internal server error' }, { status: 500 });
+    return await secureJsonResponse({ error: error?.message || 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -213,7 +214,7 @@ export async function POST(req: NextRequest) {
   if (authResult instanceof NextResponse) return authResult;
 
   try {
-    const body = await req.json();
+    const body = await secureJsonRequest(req);
     const {
       ref,
       reason,
@@ -239,14 +240,14 @@ export async function POST(req: NextRequest) {
     };
 
     if (!ref || !reason || !bankName || !bankAccount || !accountName) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+      return await secureJsonResponse({ error: 'Missing required fields' }, { status: 400 });
     }
 
     const method: RefundPayoutMethod = payoutMethod === 'promptpay' ? 'promptpay' : 'bank';
     if (method === 'promptpay') {
       const digits = String(bankAccount).replace(/\D/g, '');
       if (digits.length < 10 || digits.length > 13) {
-        return NextResponse.json({ error: 'หมายเลขพร้อมเพย์ไม่ถูกต้อง' }, { status: 400 });
+        return await secureJsonResponse({ error: 'หมายเลขพร้อมเพย์ไม่ถูกต้อง' }, { status: 400 });
       }
     }
 
@@ -255,25 +256,25 @@ export async function POST(req: NextRequest) {
       : [];
 
     const order = await getOrderByRef(ref);
-    if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+    if (!order) return await secureJsonResponse({ error: 'Order not found' }, { status: 404 });
     if (!isResourceOwner(order.customerEmail, authResult.email)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return await secureJsonResponse({ error: 'Forbidden' }, { status: 403 });
     }
 
     const orderStatus = (order.status || '').toUpperCase();
     if (!REFUNDABLE_STATUSES.includes(orderStatus)) {
-      return NextResponse.json({ error: 'คำสั่งซื้อนี้ไม่สามารถขอคืนเงินได้ (สถานะไม่อนุญาต)' }, { status: 400 });
+      return await secureJsonResponse({ error: 'คำสั่งซื้อนี้ไม่สามารถขอคืนเงินได้ (สถานะไม่อนุญาต)' }, { status: 400 });
     }
 
     const { refundStatus: existingRefund } = getRefundInfo(order);
     if (existingRefund) {
-      return NextResponse.json({ error: 'คุณได้ส่งคำขอคืนเงินไปแล้ว' }, { status: 400 });
+      return await secureJsonResponse({ error: 'คุณได้ส่งคำขอคืนเงินไปแล้ว' }, { status: 400 });
     }
 
     const orderTotal = order.totalAmount || order.amount || 0;
     const refundAmount = amount ? Math.min(Number(amount), orderTotal) : orderTotal;
     if (refundAmount <= 0) {
-      return NextResponse.json({ error: 'จำนวนเงินไม่ถูกต้อง' }, { status: 400 });
+      return await secureJsonResponse({ error: 'จำนวนเงินไม่ถูกต้อง' }, { status: 400 });
     }
 
     const resolvedBankName = method === 'promptpay' ? 'พร้อมเพย์' : bankName;
@@ -332,14 +333,14 @@ export async function POST(req: NextRequest) {
       request: req,
     });
 
-    return NextResponse.json({
+    return await secureJsonResponse({
       success: true,
       message: 'ส่งคำขอคืนเงินเรียบร้อยแล้ว รอการตรวจสอบจากแอดมิน',
       refundStatus: 'REQUESTED',
     });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Refund API] POST error:', error);
-    return NextResponse.json({ error: error?.message || 'Internal server error' }, { status: 500 });
+    return await secureJsonResponse({ error: error?.message || 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -348,16 +349,16 @@ export async function PUT(req: NextRequest) {
   if (authResult instanceof NextResponse) return authResult;
 
   try {
-    const body = await req.json();
+    const body = await secureJsonRequest(req);
     const { ref, action, adminNote } = body;
 
-    if (!ref || !action) return NextResponse.json({ error: 'Missing ref or action' }, { status: 400 });
+    if (!ref || !action) return await secureJsonResponse({ error: 'Missing ref or action' }, { status: 400 });
     if (!['approve', 'reject', 'complete'].includes(action)) {
-      return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+      return await secureJsonResponse({ error: 'Invalid action' }, { status: 400 });
     }
 
     const order = await getOrderByRef(ref);
-    if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+    if (!order) return await secureJsonResponse({ error: 'Order not found' }, { status: 404 });
 
     const { refundStatus } = getRefundInfo(order);
     let newRefundStatus: string;
@@ -365,20 +366,20 @@ export async function PUT(req: NextRequest) {
 
     switch (action) {
       case 'approve':
-        if (refundStatus !== 'REQUESTED') return NextResponse.json({ error: 'ไม่สามารถอนุมัติได้' }, { status: 400 });
+        if (refundStatus !== 'REQUESTED') return await secureJsonResponse({ error: 'ไม่สามารถอนุมัติได้' }, { status: 400 });
         newRefundStatus = 'APPROVED';
         break;
       case 'reject':
-        if (!['REQUESTED', 'APPROVED'].includes(refundStatus || '')) return NextResponse.json({ error: 'ไม่สามารถปฏิเสธได้' }, { status: 400 });
+        if (!['REQUESTED', 'APPROVED'].includes(refundStatus || '')) return await secureJsonResponse({ error: 'ไม่สามารถปฏิเสธได้' }, { status: 400 });
         newRefundStatus = 'REJECTED';
         break;
       case 'complete':
-        if (refundStatus !== 'APPROVED') return NextResponse.json({ error: 'ต้องอนุมัติก่อน' }, { status: 400 });
+        if (refundStatus !== 'APPROVED') return await secureJsonResponse({ error: 'ต้องอนุมัติก่อน' }, { status: 400 });
         newRefundStatus = 'COMPLETED';
         newOrderStatus = 'REFUNDED';
         break;
       default:
-        return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+        return await secureJsonResponse({ error: 'Invalid action' }, { status: 400 });
     }
 
     const updateData: any = {
@@ -438,9 +439,9 @@ export async function PUT(req: NextRequest) {
       complete: 'คืนเงินเรียบร้อย',
     };
 
-    return NextResponse.json({ success: true, message: actionLabels[action], refundStatus: newRefundStatus });
+    return await secureJsonResponse({ success: true, message: actionLabels[action], refundStatus: newRefundStatus });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Refund API] PUT error:', error);
-    return NextResponse.json({ error: error?.message || 'Internal server error' }, { status: 500 });
+    return await secureJsonResponse({ error: error?.message || 'Internal server error' }, { status: 500 });
   }
 }

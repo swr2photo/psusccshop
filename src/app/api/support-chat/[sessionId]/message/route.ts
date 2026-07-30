@@ -10,6 +10,7 @@ import {
 import { sendChatReplyEmail } from '@/lib/email';
 import { sendPushNotification } from '@/lib/push-notification';
 import { getProfileName } from '@/lib/profile-utils';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -25,18 +26,18 @@ export async function POST(request: NextRequest, { params }: Params) {
     const session = await getSession(request);
     
     if (!session?.user?.email) {
-      return NextResponse.json('Unauthorized', { status: 401 });
+      return await secureJsonResponse('Unauthorized', { status: 401 });
     }
     
     const chat = await getChatSession(sessionId);
     
     if (!chat) {
-      return NextResponse.json({ error: 'Chat not found' }, { status: 404 });
+      return await secureJsonResponse({ error: 'Chat not found' }, { status: 404 });
     }
     
     // Check if chat is still open
     if (chat.status === 'closed') {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { error: 'การสนทนานี้ปิดแล้ว' },
         { status: 400 }
       );
@@ -50,7 +51,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     if (isOwner) {
       // Customer can only send messages if chat is pending or active
       if (chat.status !== 'pending' && chat.status !== 'active') {
-        return NextResponse.json(
+        return await secureJsonResponse(
           { error: 'ไม่สามารถส่งข้อความได้ในขณะนี้' },
           { status: 403 }
         );
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     } else if (isAdminUser) {
       // Admin (not owner) - check if they are assigned to this chat
       if (chat.status === 'active' && chat.admin_email && chat.admin_email !== session.user.email) {
-        return NextResponse.json(
+        return await secureJsonResponse(
           { error: 'คุณไม่ได้รับมอบหมายให้ดูแลการสนทนานี้' },
           { status: 403 }
         );
@@ -67,14 +68,14 @@ export async function POST(request: NextRequest, { params }: Params) {
       // Admin is assigned or chat is pending, continue to send message
     } else {
       // Not owner and not admin
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return await secureJsonResponse({ error: 'Forbidden' }, { status: 403 });
     }
     
-    const body = await request.json();
+    const body = await secureJsonRequest(request);
     const { message } = body;
     
     if (!message?.trim()) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { error: 'กรุณาระบุข้อความ' },
         { status: 400 }
       );
@@ -150,14 +151,14 @@ export async function POST(request: NextRequest, { params }: Params) {
       }
     }
     
-    return NextResponse.json({ 
+    return await secureJsonResponse({ 
       message: newMessage,
       success: true
     });
     
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[support-chat/message] POST error:', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { error: error.message || 'Internal server error' },
       { status: 500 }
     );

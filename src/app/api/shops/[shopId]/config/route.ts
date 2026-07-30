@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, isSuperAdminEmail } from '@/lib/auth';
 import { getShopById, updateShop, getShopAdminRole } from '@/lib/shops';
 import type { ShopLocalConfig } from '@/lib/shops';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -24,13 +25,13 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
   if (!isSuperAdmin) {
     const role = await getShopAdminRole(shopId, authResult.email);
     if (!role) {
-      return NextResponse.json({ status: 'error', message: 'ไม่มีสิทธิ์เข้าถึงร้านค้านี้' }, { status: 403 });
+      return await secureJsonResponse({ status: 'error', message: 'ไม่มีสิทธิ์เข้าถึงร้านค้านี้' }, { status: 403 });
     }
   }
 
   const shop = await getShopById(shopId);
   if (!shop) {
-    return NextResponse.json({ status: 'error', message: 'ไม่พบร้านค้า' }, { status: 404 });
+    return await secureJsonResponse({ status: 'error', message: 'ไม่พบร้านค้า' }, { status: 404 });
   }
 
   // Return a ShopConfig-compatible object from shop data
@@ -69,7 +70,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
     shopName: shop.name,
   };
 
-  return NextResponse.json({ status: 'success', config: shopConfig });
+  return await secureJsonResponse({ status: 'success', config: shopConfig });
 }
 
 /** PUT /api/shops/[shopId]/config — Update shop config */
@@ -84,12 +85,12 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
   if (!isSuperAdmin) {
     const role = await getShopAdminRole(shopId, authResult.email);
     if (!role) {
-      return NextResponse.json({ status: 'error', message: 'ไม่มีสิทธิ์เข้าถึงร้านค้านี้' }, { status: 403 });
+      return await secureJsonResponse({ status: 'error', message: 'ไม่มีสิทธิ์เข้าถึงร้านค้านี้' }, { status: 403 });
     }
   }
 
   try {
-    const body = await req.json();
+    const body = await secureJsonRequest(req);
     const updates: any = {};
 
     // Extract settings fields
@@ -148,17 +149,17 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
     }
 
     if (Object.keys(updates).length === 0) {
-      return NextResponse.json({ status: 'error', message: 'ไม่มีข้อมูลที่ต้องอัพเดท' }, { status: 400 });
+      return await secureJsonResponse({ status: 'error', message: 'ไม่มีข้อมูลที่ต้องอัพเดท' }, { status: 400 });
     }
 
     const updated = await updateShop(shopId, updates);
     if (!updated) {
-      return NextResponse.json({ status: 'error', message: 'อัพเดทไม่สำเร็จ' }, { status: 500 });
+      return await secureJsonResponse({ status: 'error', message: 'อัพเดทไม่สำเร็จ' }, { status: 500 });
     }
 
-    return NextResponse.json({ status: 'success', message: 'อัพเดทสำเร็จ' });
+    return await secureJsonResponse({ status: 'success', message: 'อัพเดทสำเร็จ' });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[shop-config] PUT error:', error);
-    return NextResponse.json({ status: 'error', message: error?.message || 'เกิดข้อผิดพลาด' }, { status: 500 });
+    return await secureJsonResponse({ status: 'error', message: error?.message || 'เกิดข้อผิดพลาด' }, { status: 500 });
   }
 }

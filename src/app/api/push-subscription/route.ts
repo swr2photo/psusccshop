@@ -6,6 +6,7 @@ import { getSession } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { pushSubscriptions } from '@/db/schema';
 import { and, eq } from 'drizzle-orm';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -15,10 +16,10 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getSession(request);
     if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return await secureJsonResponse({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json();
+    const body = await secureJsonRequest(request);
     const { subscription, action } = body;
 
     if (action === 'unsubscribe') {
@@ -29,11 +30,11 @@ export async function POST(request: NextRequest) {
             eq(pushSubscriptions.endpoint, subscription?.endpoint || '')
           )
         );
-      return NextResponse.json({ success: true, action: 'unsubscribed' });
+      return await secureJsonResponse({ success: true, action: 'unsubscribed' });
     }
 
     if (!subscription?.endpoint || !subscription?.keys) {
-      return NextResponse.json({ error: 'Invalid subscription data' }, { status: 400 });
+      return await secureJsonResponse({ error: 'Invalid subscription data' }, { status: 400 });
     }
 
     await db.insert(pushSubscriptions)
@@ -52,9 +53,9 @@ export async function POST(request: NextRequest) {
         },
       });
 
-    return NextResponse.json({ success: true, action: 'subscribed' });
+    return await secureJsonResponse({ success: true, action: 'subscribed' });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[push-subscription] Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return await secureJsonResponse({ error: error.message }, { status: 500 });
   }
 }

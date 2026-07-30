@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdminEmailAsync, isResourceOwner, getSession } from '@/lib/auth';
 import { markMessagesAsRead, getChatSession } from '@/lib/support-chat';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,13 +20,13 @@ export async function POST(request: NextRequest, { params }: Params) {
     const session = await getSession(request);
     
     if (!session?.user?.email) {
-      return NextResponse.json('Unauthorized', { status: 401 });
+      return await secureJsonResponse('Unauthorized', { status: 401 });
     }
     
     // Get chat to check if user is the owner (customer)
     const chat = await getChatSession(sessionId);
     if (!chat) {
-      return NextResponse.json({ error: 'Chat not found' }, { status: 404 });
+      return await secureJsonResponse({ error: 'Chat not found' }, { status: 404 });
     }
     
     // Determine reader type:
@@ -39,7 +40,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     
     await markMessagesAsRead(sessionId, reader);
     
-    return NextResponse.json({ 
+    return await secureJsonResponse({ 
       success: true,
       message: 'Messages marked as read',
       reader
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[support-chat/read] POST error:', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { error: error.message || 'Internal server error' },
       { status: 500 }
     );

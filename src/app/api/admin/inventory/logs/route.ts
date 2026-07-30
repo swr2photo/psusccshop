@@ -3,6 +3,7 @@ import { requireAdminWithPermission } from '@/lib/auth';
 import { db } from '@/lib/db';
 import { inventoryLogs } from '@/db/schema';
 import { desc } from 'drizzle-orm';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -23,13 +24,13 @@ export async function GET(req: NextRequest) {
       .orderBy(desc(inventoryLogs.createdAt))
       .limit(limit);
 
-    return NextResponse.json({
+    return await secureJsonResponse({
       status: 'success',
       data: logs,
     });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Inventory Logs API] Error:', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message: 'Failed to fetch inventory logs' },
       { status: 500 }
     );

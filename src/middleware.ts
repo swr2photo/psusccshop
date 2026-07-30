@@ -117,6 +117,7 @@ const STRICT_RATE_LIMIT_ROUTES = [
   '/api/upload',
   '/api/auto-email',
   '/api/gas',
+  '/api/auth/passkey', // ป้องกันการโจมตี (Brute-force/Spam) ไปที่ระบบ Passkey
 ];
 
 const MODERATE_RATE_LIMIT_ROUTES = [
@@ -210,7 +211,8 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  if (!pathname.startsWith('/api/auth/') && !isAllowedOrigin(origin)) {
+  const isNextAuthRoute = pathname.startsWith('/api/auth/') && !pathname.startsWith('/api/auth/passkey');
+  if (!isNextAuthRoute && !isAllowedOrigin(origin)) {
     return NextResponse.json(
       { status: 'error', message: 'CORS policy: This origin is not allowed' },
       { status: 403 }

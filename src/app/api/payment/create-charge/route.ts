@@ -20,6 +20,7 @@ import {
 import { isResourceOwner } from '@/lib/auth';
 import { rateLimitOrNull } from '@/lib/api-helpers';
 import { RATE_LIMITS } from '@/lib/rate-limit';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -47,18 +48,18 @@ export async function POST(request: NextRequest) {
     // User must be logged in
     const session = await getSession(request);
     if (!session?.user?.email) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { success: false, error: 'กรุณาเข้าสู่ระบบ' },
         { status: 401 }
       );
     }
 
-    const body: CreateChargeRequest = await request.json();
+    const body: CreateChargeRequest = await secureJsonRequest(request);
     const { orderId, amount, gateway, method, token, phoneNumber, installmentTerm, returnUrl } = body;
 
     // Validate input
     if (!orderId || !amount || !gateway) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { success: false, error: 'Missing required fields' },
         { status: 400 }
       );
@@ -73,14 +74,14 @@ export async function POST(request: NextRequest) {
     const order = orderData[0];
  
     if (!order) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { success: false, error: 'ไม่พบรายการสั่งซื้อ' },
         { status: 404 }
       );
     }
 
     if (!isResourceOwner(order.customerEmail, session.user.email)) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { success: false, error: 'ไม่มีสิทธิ์ชำระเงินสำหรับออเดอร์นี้' },
         { status: 403 }
       );
@@ -88,13 +89,13 @@ export async function POST(request: NextRequest) {
 
     const expectedAmount = Number(order.totalAmount) || 0;
     if (expectedAmount < 1) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { success: false, error: 'ยอดชำระไม่ถูกต้อง' },
         { status: 400 }
       );
     }
     if (Math.abs(Number(amount) - expectedAmount) > 0.01) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { success: false, error: 'ยอดชำระไม่ตรงกับคำสั่งซื้อ' },
         { status: 400 }
       );
@@ -123,14 +124,14 @@ export async function POST(request: NextRequest) {
         email: session.user.email,
       });
     } else {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { success: false, error: 'ไม่รองรับ Payment Gateway นี้' },
         { status: 400 }
       );
     }
 
     if (!chargeResult.success) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { success: false, error: chargeResult.error || 'Failed to create charge' },
         { status: 400 }
       );
@@ -152,7 +153,7 @@ export async function POST(request: NextRequest) {
       rawResponse: chargeResult.rawResponse,
     });
 
-    return NextResponse.json({
+    return await secureJsonResponse({
       success: true,
       data: {
         transactionId,
@@ -166,7 +167,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('[API] Create charge error:', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { success: false, error: 'เกิดข้อผิดพลาดในการสร้างรายการชำระเงิน' },
       { status: 500 }
     );

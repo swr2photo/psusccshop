@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/auth';
 import { getShopConfig } from '@/lib/filebase';
 import { getShopById } from '@/lib/shops';
 import { rateLimitOrNull } from '@/lib/api-helpers';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -20,11 +21,11 @@ export async function POST(req: NextRequest) {
   if (authResult instanceof NextResponse) return authResult;
 
   try {
-    const body = await req.json();
+    const body = await secureJsonRequest(req);
     const { code, subtotal, shopId } = body;
 
     if (!code || typeof code !== 'string') {
-      return NextResponse.json({ error: 'กรุณากรอกรหัสส่วนลด' }, { status: 400 });
+      return await secureJsonResponse({ error: 'กรุณากรอกรหัสส่วนลด' }, { status: 400 });
     }
 
     let promoCodes: Array<{ code: string; enabled: boolean; [key: string]: any }> = [];
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!promoCodes.length) {
-      return NextResponse.json({ error: 'รหัสส่วนลดไม่ถูกต้อง' }, { status: 400 });
+      return await secureJsonResponse({ error: 'รหัสส่วนลดไม่ถูกต้อง' }, { status: 400 });
     }
 
     const normalizedCode = code.trim().toUpperCase();
@@ -46,23 +47,23 @@ export async function POST(req: NextRequest) {
     );
 
     if (!promo) {
-      return NextResponse.json({ error: 'รหัสส่วนลดไม่ถูกต้อง' }, { status: 400 });
+      return await secureJsonResponse({ error: 'รหัสส่วนลดไม่ถูกต้อง' }, { status: 400 });
     }
 
     // Check expiry
     if (promo.expiresAt && new Date(promo.expiresAt) < new Date()) {
-      return NextResponse.json({ error: 'รหัสส่วนลดหมดอายุแล้ว' }, { status: 400 });
+      return await secureJsonResponse({ error: 'รหัสส่วนลดหมดอายุแล้ว' }, { status: 400 });
     }
 
     // Check usage limit
     if (promo.usageLimit != null && (promo.usageCount || 0) >= promo.usageLimit) {
-      return NextResponse.json({ error: 'รหัสส่วนลดถูกใช้ครบจำนวนแล้ว' }, { status: 400 });
+      return await secureJsonResponse({ error: 'รหัสส่วนลดถูกใช้ครบจำนวนแล้ว' }, { status: 400 });
     }
 
     // Check minimum order amount
     const orderSubtotal = Number(subtotal) || 0;
     if (promo.minOrderAmount && orderSubtotal < promo.minOrderAmount) {
-      return NextResponse.json({
+      return await secureJsonResponse({
         error: `ยอดสั่งซื้อขั้นต่ำ ฿${promo.minOrderAmount.toLocaleString()} เพื่อใช้รหัสนี้`,
       }, { status: 400 });
     }
@@ -81,7 +82,7 @@ export async function POST(req: NextRequest) {
     // Never more than subtotal
     discount = Math.min(discount, orderSubtotal);
 
-    return NextResponse.json({
+    return await secureJsonResponse({
       valid: true,
       code: promo.code,
       discountType: promo.discountType,
@@ -93,6 +94,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Promo API] Error:', error);
-    return NextResponse.json({ error: 'เกิดข้อผิดพลาด' }, { status: 500 });
+    return await secureJsonResponse({ error: 'เกิดข้อผิดพลาด' }, { status: 500 });
   }
 }

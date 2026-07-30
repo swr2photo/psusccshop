@@ -7,6 +7,7 @@ import { db } from '@/lib/db';
 import { supportChats } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { getCached, invalidateCacheKey, CACHE_TTL } from '@/lib/server-cache';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -22,10 +23,10 @@ export async function POST(request: NextRequest, { params }: Params) {
     const session = await getSession(request);
     
     if (!session?.user?.email) {
-      return NextResponse.json('Unauthorized', { status: 401 });
+      return await secureJsonResponse('Unauthorized', { status: 401 });
     }
     
-    const { isTyping } = await request.json();
+    const { isTyping } = await secureJsonRequest(request);
     const isAdmin = await isAdminEmailAsync(session.user.email);
     
     // Do not bump updatedAt — typing must not invalidate chat ETags / force full syncs
@@ -44,11 +45,11 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     invalidateCacheKey(`chat:typing:${sessionId}`);
     
-    return NextResponse.json({ success: true });
+    return await secureJsonResponse({ success: true });
     
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[support-chat/typing] POST error:', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { error: error.message || 'Internal server error' },
       { status: 500 }
     );
@@ -62,7 +63,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     const session = await getSession(request);
     
     if (!session?.user?.email) {
-      return NextResponse.json('Unauthorized', { status: 401 });
+      return await secureJsonResponse('Unauthorized', { status: 401 });
     }
     
     const cacheKey = `chat:typing:${sessionId}`;
@@ -80,7 +81,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     });
     
     if (!data) {
-      return NextResponse.json({ isTyping: false });
+      return await secureJsonResponse({ isTyping: false });
     }
     
     const now = new Date().getTime();
@@ -99,11 +100,11 @@ export async function GET(request: NextRequest, { params }: Params) {
       }
     }
     
-    return NextResponse.json({ isTyping: otherTyping });
+    return await secureJsonResponse({ isTyping: otherTyping });
     
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[support-chat/typing] GET error:', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { error: error.message || 'Internal server error' },
       { status: 500 }
     );

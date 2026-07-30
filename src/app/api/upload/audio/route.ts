@@ -3,6 +3,7 @@ import { requireAuth } from '@/lib/auth';
 import { checkCombinedRateLimitAsync, RATE_LIMITS, getRateLimitHeaders } from '@/lib/rate-limit';
 import { detectAudioContentType } from '@/lib/chat-voice';
 import { S3Client, PutObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -96,7 +97,7 @@ async function uploadVoiceToFilebase(
 export async function POST(req: NextRequest) {
   const rateLimitResult = await checkCombinedRateLimitAsync(req, RATE_LIMITS.upload);
   if (!rateLimitResult.allowed) {
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message: 'คุณอัปโหลดไฟล์เร็วเกินไป กรุณาลองใหม่' },
       {
         status: 429,
@@ -112,7 +113,7 @@ export async function POST(req: NextRequest) {
   if (authResult instanceof NextResponse) return authResult;
 
   try {
-    const body = await req.json();
+    const body = await secureJsonRequest(req);
     const { base64, mime, duration } = body as {
       base64?: string;
       mime?: string;
@@ -120,7 +121,7 @@ export async function POST(req: NextRequest) {
     };
 
     if (!base64 || typeof base64 !== 'string') {
-      return NextResponse.json({ status: 'error', message: 'Missing audio data' }, { status: 400 });
+      return await secureJsonResponse({ status: 'error', message: 'Missing audio data' }, { status: 400 });
     }
 
     const hint = (mime || 'audio/webm').split(';')[0].trim().toLowerCase();
@@ -129,30 +130,30 @@ export async function POST(req: NextRequest) {
       !hint.startsWith('audio/') &&
       hint !== 'video/webm'
     ) {
-      return NextResponse.json({ status: 'error', message: `Invalid audio type: ${hint}` }, { status: 400 });
+      return await secureJsonResponse({ status: 'error', message: `Invalid audio type: ${hint}` }, { status: 400 });
     }
 
     if (typeof duration === 'number' && (duration < 0 || duration > MAX_DURATION_SEC)) {
-      return NextResponse.json({ status: 'error', message: 'Invalid duration' }, { status: 400 });
+      return await secureJsonResponse({ status: 'error', message: 'Invalid duration' }, { status: 400 });
     }
 
     const base64Data = (base64.includes(',') ? base64.split(',')[1] : base64).replace(/\s/g, '');
     if (!base64Data || base64Data.length < 32) {
-      return NextResponse.json({ status: 'error', message: 'Invalid audio payload' }, { status: 400 });
+      return await secureJsonResponse({ status: 'error', message: 'Invalid audio payload' }, { status: 400 });
     }
 
     let buffer: Buffer;
     try {
       buffer = Buffer.from(base64Data, 'base64');
     } catch {
-      return NextResponse.json({ status: 'error', message: 'Invalid base64 data' }, { status: 400 });
+      return await secureJsonResponse({ status: 'error', message: 'Invalid base64 data' }, { status: 400 });
     }
 
     if (buffer.length < 64) {
-      return NextResponse.json({ status: 'error', message: 'Audio too short' }, { status: 400 });
+      return await secureJsonResponse({ status: 'error', message: 'Audio too short' }, { status: 400 });
     }
     if (buffer.length > MAX_SIZE) {
-      return NextResponse.json({ status: 'error', message: 'File too large (max 5MB)' }, { status: 413 });
+      return await secureJsonResponse({ status: 'error', message: 'File too large (max 5MB)' }, { status: 413 });
     }
 
     const detected = detectAudioContentType(buffer);
@@ -164,7 +165,7 @@ export async function POST(req: NextRequest) {
 
     const uploaded = await uploadVoiceToFilebase(buffer, fileName, logicalType);
 
-    return NextResponse.json({
+    return await secureJsonResponse({
       status: 'success',
       data: {
         url: uploaded.url,
@@ -176,7 +177,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[upload-audio] error', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       {
         status: 'error',
         message: process.env.NODE_ENV === 'production'

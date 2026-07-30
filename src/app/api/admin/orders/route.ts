@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminWithPermission } from '@/lib/auth';
 import { getOrdersByEmail } from '@/lib/supabase';
 import { getOrderByRef } from '@/lib/order-lookup';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 // Ensure Node runtime and skip static caching
 export const runtime = 'nodejs';
@@ -37,13 +38,13 @@ export async function GET(req: NextRequest) {
             hasBase64: true,
           };
         }
-        return NextResponse.json({
+        return await secureJsonResponse({
           status: 'success',
           data: sanitized,
         });
       }
 
-      return NextResponse.json({
+      return await secureJsonResponse({
         status: 'error',
         message: 'Order not found',
       }, { status: 404 });
@@ -64,20 +65,20 @@ export async function GET(req: NextRequest) {
         return sanitized;
       });
 
-      return NextResponse.json({
+      return await secureJsonResponse({
         status: 'success',
         data: sanitizedOrders,
       });
     }
 
-    return NextResponse.json({ 
+    return await secureJsonResponse({ 
       status: 'error', 
       message: 'Please provide ref or email parameter' 
     }, { status: 400 });
 
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[admin/orders] GET error:', error);
-    return NextResponse.json({ 
+    return await secureJsonResponse({ 
       status: 'error', 
       message: error?.message || 'Search failed' 
     }, { status: 500 });

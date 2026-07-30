@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { isResourceOwner, getSession } from '@/lib/auth';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 import { 
   getChatSession,
   rateChatSession 
@@ -22,23 +23,23 @@ export async function POST(request: NextRequest, { params }: Params) {
     const session = await getSession(request);
     
     if (!session?.user?.email) {
-      return NextResponse.json('Unauthorized', { status: 401 });
+      return await secureJsonResponse('Unauthorized', { status: 401 });
     }
     
     const chat = await getChatSession(sessionId);
     
     if (!chat) {
-      return NextResponse.json({ error: 'Chat not found' }, { status: 404 });
+      return await secureJsonResponse({ error: 'Chat not found' }, { status: 404 });
     }
     
     // Only the customer can rate
     if (!isResourceOwner(chat.customer_email, session.user.email)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return await secureJsonResponse({ error: 'Forbidden' }, { status: 403 });
     }
     
     // Can only rate closed chats
     if (chat.status !== 'closed') {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { error: 'สามารถให้คะแนนได้เมื่อการสนทนาสิ้นสุดแล้ว' },
         { status: 400 }
       );
@@ -46,17 +47,17 @@ export async function POST(request: NextRequest, { params }: Params) {
     
     // Check if already rated
     if (chat.rating) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { error: 'คุณได้ให้คะแนนไปแล้ว' },
         { status: 400 }
       );
     }
     
-    const body = await request.json();
+    const body = await secureJsonRequest(request);
     const { rating, comment } = body;
     
     if (!rating || typeof rating !== 'number' || rating < 1 || rating > 5) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { error: 'กรุณาให้คะแนน 1-5' },
         { status: 400 }
       );
@@ -64,14 +65,14 @@ export async function POST(request: NextRequest, { params }: Params) {
     
     const ratedChat = await rateChatSession(sessionId, rating, comment);
     
-    return NextResponse.json({ 
+    return await secureJsonResponse({ 
       chat: ratedChat,
       message: 'ขอบคุณสำหรับการให้คะแนน'
     });
     
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[support-chat/rate] POST error:', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { error: error.message || 'Internal server error' },
       { status: 500 }
     );

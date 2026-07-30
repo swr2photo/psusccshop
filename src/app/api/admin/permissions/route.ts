@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireSuperAdmin, requireAdmin } from '@/lib/auth';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 import { 
   getAdminPermissionsFromDB, 
   getAllAdminPermissionsFromDB, 
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
 
     if (email) {
       const perms = await getAdminPermissionsFromDB(email);
-      return NextResponse.json({ status: 'success', data: perms });
+      return await secureJsonResponse({ status: 'success', data: perms });
     }
 
     // Get all - super admin only
@@ -39,14 +40,14 @@ export async function GET(req: NextRequest) {
     if (superCheck instanceof NextResponse) {
       // Not super admin - return only own perms
       const perms = await getAdminPermissionsFromDB(adminResult.email);
-      return NextResponse.json({ status: 'success', data: { [adminResult.email]: perms || {} } });
+      return await secureJsonResponse({ status: 'success', data: { [adminResult.email]: perms || {} } });
     }
 
     const allPerms = await getAllAdminPermissionsFromDB();
-    return NextResponse.json({ status: 'success', data: allPerms });
+    return await secureJsonResponse({ status: 'success', data: allPerms });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[admin/permissions] GET error:', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message: error?.message || 'Failed to get permissions' },
       { status: 500 }
     );
@@ -64,7 +65,7 @@ export async function POST(req: NextRequest) {
   if (superCheck instanceof NextResponse) return superCheck;
 
   try {
-    const body = await req.json();
+    const body = await secureJsonRequest(req);
     
     const { writeAuditTrail, writeUserActivityLog } = await import('@/lib/audit');
 
@@ -88,7 +89,7 @@ export async function POST(req: NextRequest) {
         metadata: { emails: Object.keys(body.permissions) },
         request: req,
       });
-      return NextResponse.json({ status: 'success', message: 'Permissions saved' });
+      return await secureJsonResponse({ status: 'success', message: 'Permissions saved' });
     }
 
     // Single save: { email: "...", permissions: { ... } }
@@ -116,16 +117,16 @@ export async function POST(req: NextRequest) {
         metadata: { before, after: body.permissions, adminEmail: superCheck.email },
         request: req,
       });
-      return NextResponse.json({ status: 'success', message: 'Permissions saved' });
+      return await secureJsonResponse({ status: 'success', message: 'Permissions saved' });
     }
 
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message: 'Invalid request body' },
       { status: 400 }
     );
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[admin/permissions] POST error:', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message: error?.message || 'Failed to save permissions' },
       { status: 500 }
     );
@@ -142,9 +143,9 @@ export async function DELETE(req: NextRequest) {
   if (superCheck instanceof NextResponse) return superCheck;
 
   try {
-    const body = await req.json();
+    const body = await secureJsonRequest(req);
     if (!body.email) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { status: 'error', message: 'Missing email' },
         { status: 400 }
       );
@@ -153,10 +154,10 @@ export async function DELETE(req: NextRequest) {
     const ok = await deleteAdminPermissionsFromDB(body.email);
     if (!ok) throw new Error('Failed to delete permissions from database');
     
-    return NextResponse.json({ status: 'success', message: 'Permissions deleted' });
+    return await secureJsonResponse({ status: 'success', message: 'Permissions deleted' });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[admin/permissions] DELETE error:', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message: error?.message || 'Failed to delete permissions' },
       { status: 500 }
     );

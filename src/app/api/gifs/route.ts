@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest) {
   try {
     const key = getApiKey();
     if (!key) {
-      return NextResponse.json({ configured: false, error: 'GIPHY_API_KEY_MISSING', gifs: [] });
+      return await secureJsonResponse({ configured: false, error: 'GIPHY_API_KEY_MISSING', gifs: [] });
     }
 
     const { searchParams } = new URL(request.url);
@@ -63,7 +64,7 @@ export async function GET(request: NextRequest) {
 
     if (!res.ok) {
       console.error('[api/gifs] Giphy error', res.status);
-      return NextResponse.json(
+      return await secureJsonResponse(
         { configured: true, error: 'GIPHY_FETCH_FAILED', gifs: [] },
         { status: 502 }
       );
@@ -109,9 +110,9 @@ export async function GET(request: NextRequest) {
         ? String(data.pagination.offset + data.pagination.count)
         : null;
 
-    return NextResponse.json({ configured: true, gifs, next: nextOffset });
+    return await secureJsonResponse({ configured: true, gifs, next: nextOffset });
   } catch (error) {
     console.error('[api/gifs]', error);
-    return NextResponse.json({ configured: true, error: 'INTERNAL', gifs: [] }, { status: 500 });
+    return await secureJsonResponse({ configured: true, error: 'INTERNAL', gifs: [] }, { status: 500 });
   }
 }

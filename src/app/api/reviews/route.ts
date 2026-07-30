@@ -12,6 +12,7 @@ import { getCached, invalidateCachePrefix, CACHE_TTL } from '@/lib/server-cache'
 
 import { getOrdersByEmail } from '@/lib/supabase';
 import { toIsoString } from '@/lib/safe-date';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 const PAID_STATUSES = new Set(['PAID', 'COMPLETED', 'SHIPPED', 'READY']);
 
@@ -100,7 +101,7 @@ async function GETHandler(request: NextRequest) {
       };
     });
 
-    return NextResponse.json(
+    return await secureJsonResponse(
       { reviews: responseReviews },
       {
         headers: {
@@ -111,7 +112,7 @@ async function GETHandler(request: NextRequest) {
     );
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('GET /api/reviews error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return await secureJsonResponse({ error: error.message }, { status: 500 });
   }
 }
 
@@ -126,11 +127,11 @@ export async function POST(request: NextRequest) {
   if (authResult instanceof NextResponse) return authResult;
 
   try {
-    const body = await request.json();
+    const body = await secureJsonRequest(request);
     const { productId, rating, comment } = body;
 
     if (!productId || !rating) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+      return await secureJsonResponse({ error: 'Missing required fields' }, { status: 400 });
     }
 
     const email = authResult.email;
@@ -139,7 +140,7 @@ export async function POST(request: NextRequest) {
     const userImage = session?.user?.image || null;
 
     if (rating < 1 || rating > 5) {
-      return NextResponse.json({ error: 'Rating must be 1-5' }, { status: 400 });
+      return await secureJsonResponse({ error: 'Rating must be 1-5' }, { status: 400 });
     }
 
     const emailHash = hashEmail(email);
@@ -165,10 +166,10 @@ export async function POST(request: NextRequest) {
 
     invalidateCachePrefix('reviews:');
 
-    return NextResponse.json({ success: true, review: resultData });
+    return await secureJsonResponse({ success: true, review: resultData });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('POST /api/reviews error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return await secureJsonResponse({ error: error.message }, { status: 500 });
   }
 }
 
@@ -178,23 +179,23 @@ export async function PUT(request: NextRequest) {
   if (authResult instanceof NextResponse) return authResult;
 
   try {
-    const body = await request.json();
+    const body = await secureJsonRequest(request);
     const { id, rating, comment } = body;
 
     if (!id || !rating) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+      return await secureJsonResponse({ error: 'Missing required fields' }, { status: 400 });
     }
 
     if (rating < 1 || rating > 5) {
-      return NextResponse.json({ error: 'Rating must be 1-5' }, { status: 400 });
+      return await secureJsonResponse({ error: 'Rating must be 1-5' }, { status: 400 });
     }
 
     const emailHash = hashEmail(authResult.email);
 
     // Verify ownership
     const existing = await db.select().from(reviews).where(eq(reviews.id, id)).limit(1);
-    if (existing.length === 0) return NextResponse.json({ error: 'Review not found' }, { status: 404 });
-    if (existing[0].emailHash !== emailHash) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    if (existing.length === 0) return await secureJsonResponse({ error: 'Review not found' }, { status: 404 });
+    if (existing[0].emailHash !== emailHash) return await secureJsonResponse({ error: 'Unauthorized' }, { status: 403 });
 
     const updated = await db
       .update(reviews)
@@ -207,10 +208,10 @@ export async function PUT(request: NextRequest) {
       .returning();
 
     invalidateCachePrefix('reviews:');
-    return NextResponse.json(updated[0]);
+    return await secureJsonResponse(updated[0]);
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('PUT /api/reviews error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return await secureJsonResponse({ error: error.message }, { status: 500 });
   }
 }
 
@@ -221,21 +222,21 @@ export async function DELETE(request: NextRequest) {
 
   try {
     const id = request.nextUrl.searchParams.get('id');
-    if (!id) return NextResponse.json({ error: 'Missing review id' }, { status: 400 });
+    if (!id) return await secureJsonResponse({ error: 'Missing review id' }, { status: 400 });
 
     const emailHash = hashEmail(authResult.email);
 
     // Verify ownership
     const existing = await db.select().from(reviews).where(eq(reviews.id, id)).limit(1);
-    if (existing.length === 0) return NextResponse.json({ error: 'Review not found' }, { status: 404 });
-    if (existing[0].emailHash !== emailHash) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    if (existing.length === 0) return await secureJsonResponse({ error: 'Review not found' }, { status: 404 });
+    if (existing[0].emailHash !== emailHash) return await secureJsonResponse({ error: 'Unauthorized' }, { status: 403 });
 
     await db.delete(reviews).where(eq(reviews.id, id));
 
     invalidateCachePrefix('reviews:');
-    return NextResponse.json({ success: true });
+    return await secureJsonResponse({ success: true });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('DELETE /api/reviews error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return await secureJsonResponse({ error: error.message }, { status: 500 });
   }
 }

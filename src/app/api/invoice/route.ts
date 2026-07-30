@@ -8,6 +8,7 @@ import { isOrderPaidForReceipt } from '@/lib/shop-constants';
 import { absoluteUrl } from '@/lib/site';
 import { eq, desc } from 'drizzle-orm';
 import QRCode from 'qrcode';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -92,7 +93,7 @@ export async function GET(request: NextRequest) {
     const lang = langParam;
 
     if (!ref) {
-      return NextResponse.json({ error: 'Missing order reference' }, { status: 400 });
+      return await secureJsonResponse({ error: 'Missing order reference' }, { status: 400 });
     }
 
     let order: Record<string, unknown> | null = null;
@@ -107,17 +108,17 @@ export async function GET(request: NextRequest) {
     }
 
     if (!order) {
-      return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+      return await secureJsonResponse({ error: 'Order not found' }, { status: 404 });
     }
 
     const orderEmail = readOrderField(order, 'customerEmail', 'customer_email', 'email');
     const userEmail = authResult.email;
     if (!(await isAdminEmailAsync(userEmail)) && !isResourceOwner(orderEmail, userEmail)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return await secureJsonResponse({ error: 'Forbidden' }, { status: 403 });
     }
 
     if (!isOrderPaidForReceipt(order)) {
-      return NextResponse.json({ error: 'Receipt available after payment is confirmed' }, { status: 403 });
+      return await secureJsonResponse({ error: 'Receipt available after payment is confirmed' }, { status: 403 });
     }
 
     const isStripePaid =
@@ -157,7 +158,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     const message = error instanceof Error ? error.message : 'Invoice error';
     console.error('GET /api/invoice error:', error);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return await secureJsonResponse({ error: message }, { status: 500 });
   }
 }
 

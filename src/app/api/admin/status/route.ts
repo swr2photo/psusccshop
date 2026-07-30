@@ -9,6 +9,7 @@ import { sendOrderStatusEmail } from '@/lib/email';
 import { sendPushNotification } from '@/lib/push-notification';
 import { ShopConfig } from '@/lib/config';
 import crypto from 'crypto';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 // Helper to save user log server-side
 const userLogKey = (id: string) => `user-logs/${id}.json`;
@@ -79,20 +80,20 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const body = await req.json();
+    const body = await secureJsonRequest(req);
     const ref = body?.ref as string | undefined;
     const status = body?.status as string | undefined;
     const sendEmail = body?.sendEmail !== false; // Default to true
     
-    if (!ref || !status) return NextResponse.json({ status: 'error', message: 'missing ref/status' }, { status: 400 });
+    if (!ref || !status) return await secureJsonResponse({ status: 'error', message: 'missing ref/status' }, { status: 400 });
     const order = await getOrderByRef(ref);
-    if (!order) return NextResponse.json({ status: 'error', message: 'order not found' }, { status: 404 });
+    if (!order) return await secureJsonResponse({ status: 'error', message: 'order not found' }, { status: 404 });
 
     const session = await resolveAdminSession(authResult.email);
     if (session.userRole === 'shopAdmin') {
       const orderShopId = order.shopId || order.shop_id;
       if (!orderShopId || !assertShopAccess(session, orderShopId)) {
-        return NextResponse.json({ status: 'error', message: 'ไม่มีสิทธิ์จัดการออเดอร์ของร้านนี้' }, { status: 403 });
+        return await secureJsonResponse({ status: 'error', message: 'ไม่มีสิทธิ์จัดการออเดอร์ของร้านนี้' }, { status: 403 });
       }
     }
 
@@ -266,8 +267,8 @@ export async function POST(req: NextRequest) {
       }).catch((err) => console.error('[Status API] Push notification error:', err));
     }
     
-    return NextResponse.json({ status: 'success' });
+    return await secureJsonResponse({ status: 'success' });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
-    return NextResponse.json({ status: 'error', message: error?.message || 'update failed' }, { status: 500 });
+    return await secureJsonResponse({ status: 'error', message: error?.message || 'update failed' }, { status: 500 });
   }
 }

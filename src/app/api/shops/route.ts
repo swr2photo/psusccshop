@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, isSuperAdminEmail, isGlobalAdminEmailAsync } from '@/lib/auth';
 import { listAllShops, listActiveShops, createShop, getShopsForAdmin } from '@/lib/shops';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -14,7 +15,7 @@ export async function GET(req: NextRequest) {
   // Public mode: list active shops for storefront (no auth required)
   if (publicMode) {
     const shops = await listActiveShops();
-    return NextResponse.json({ status: 'success', shops });
+    return await secureJsonResponse({ status: 'success', shops });
   }
 
   // Admin mode: requires auth
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest) {
   if (isSuperAdmin) {
     // SuperAdmin sees all shops
     const shops = await listAllShops();
-    return NextResponse.json({ status: 'success', shops, role: 'superadmin' });
+    return await secureJsonResponse({ status: 'success', shops, role: 'superadmin' });
   }
 
   const isGlobal = await isGlobalAdminEmailAsync(authResult.email);
@@ -34,17 +35,17 @@ export async function GET(req: NextRequest) {
   const shops = shopRoles.map(sr => ({ ...sr.shop, role: sr.role, permissions: sr.permissions }));
 
   if (isGlobal) {
-    return NextResponse.json({ status: 'success', shops, role: 'admin' });
+    return await secureJsonResponse({ status: 'success', shops, role: 'admin' });
   }
 
   if (shops.length === 0) {
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message: 'ไม่มีร้านค้าที่ได้รับมอบหมาย' },
       { status: 403 },
     );
   }
 
-  return NextResponse.json({ status: 'success', shops, role: 'shopAdmin' });
+  return await secureJsonResponse({ status: 'success', shops, role: 'shopAdmin' });
 }
 
 /** POST /api/shops — Create a new shop (SuperAdmin only) */
@@ -53,21 +54,21 @@ export async function POST(req: NextRequest) {
   if (authResult instanceof NextResponse) return authResult;
 
   if (!isSuperAdminEmail(authResult.email)) {
-    return NextResponse.json({ status: 'error', message: 'เฉพาะ SuperAdmin เท่านั้น' }, { status: 403 });
+    return await secureJsonResponse({ status: 'error', message: 'เฉพาะ SuperAdmin เท่านั้น' }, { status: 403 });
   }
 
   try {
-    const body = await req.json();
+    const body = await secureJsonRequest(req);
     const { name, nameEn, slug, description, descriptionEn, paymentInfo, logoUrl } = body;
 
     if (!name || !slug) {
-      return NextResponse.json({ status: 'error', message: 'กรุณาระบุชื่อร้านและ slug' }, { status: 400 });
+      return await secureJsonResponse({ status: 'error', message: 'กรุณาระบุชื่อร้านและ slug' }, { status: 400 });
     }
 
     // Validate slug format
     const cleanSlug = slug.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
     if (!cleanSlug || cleanSlug.length < 2) {
-      return NextResponse.json({ status: 'error', message: 'slug ต้องมีอย่างน้อย 2 ตัวอักษร (a-z, 0-9, -)' }, { status: 400 });
+      return await secureJsonResponse({ status: 'error', message: 'slug ต้องมีอย่างน้อย 2 ตัวอักษร (a-z, 0-9, -)' }, { status: 400 });
     }
 
     const shop = await createShop({
@@ -82,11 +83,11 @@ export async function POST(req: NextRequest) {
     });
 
     if (!shop) {
-      return NextResponse.json({ status: 'error', message: 'สร้างร้านค้าไม่สำเร็จ (slug ซ้ำ?)' }, { status: 409 });
+      return await secureJsonResponse({ status: 'error', message: 'สร้างร้านค้าไม่สำเร็จ (slug ซ้ำ?)' }, { status: 409 });
     }
 
-    return NextResponse.json({ status: 'success', shop }, { status: 201 });
+    return await secureJsonResponse({ status: 'success', shop }, { status: 201 });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
-    return NextResponse.json({ status: 'error', message: error?.message || 'เกิดข้อผิดพลาด' }, { status: 500 });
+    return await secureJsonResponse({ status: 'error', message: error?.message || 'เกิดข้อผิดพลาด' }, { status: 500 });
   }
 }

@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { isResourceOwner, getSession } from '@/lib/auth';
 import { getChatSession, unsendChatMessage } from '@/lib/support-chat';
 import { editChatMessage } from '@/lib/support-chat-edit';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,17 +20,17 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     const session = await getSession(request);
 
     if (!session?.user?.email) {
-      return NextResponse.json('Unauthorized', { status: 401 });
+      return await secureJsonResponse('Unauthorized', { status: 401 });
     }
 
     const chat = await getChatSession(sessionId);
 
     if (!chat) {
-      return NextResponse.json({ error: 'Chat not found' }, { status: 404 });
+      return await secureJsonResponse({ error: 'Chat not found' }, { status: 404 });
     }
 
     if (chat.status === 'closed') {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { error: 'ไม่สามารถยกเลิกข้อความได้เนื่องจากการสนทนาปิดแล้ว' },
         { status: 400 }
       );
@@ -38,7 +39,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     const isOwner = isResourceOwner(chat.customer_email, session.user.email);
 
     if (!isOwner) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { error: 'คุณสามารถยกเลิกได้เฉพาะข้อความของตัวเองเท่านั้น' },
         { status: 403 }
       );
@@ -47,19 +48,19 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     const result = await unsendChatMessage(sessionId, messageId, session.user.email);
 
     if (!result.success) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { error: result.error || 'ไม่สามารถยกเลิกข้อความได้' },
         { status: 400 }
       );
     }
 
-    return NextResponse.json({
+    return await secureJsonResponse({
       success: true,
       message: 'ยกเลิกข้อความเรียบร้อยแล้ว',
     });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[support-chat/message/delete] error:', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { error: error.message || 'Internal server error' },
       { status: 500 }
     );
@@ -72,16 +73,16 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const session = await getSession(request);
 
     if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return await secureJsonResponse({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const chat = await getChatSession(sessionId);
     if (!chat) {
-      return NextResponse.json({ error: 'Chat not found' }, { status: 404 });
+      return await secureJsonResponse({ error: 'Chat not found' }, { status: 404 });
     }
 
     if (chat.status === 'closed') {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { error: 'ไม่สามารถแก้ไขข้อความได้เนื่องจากการสนทนาปิดแล้ว' },
         { status: 400 }
       );
@@ -89,24 +90,24 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     const isOwner = isResourceOwner(chat.customer_email, session.user.email);
     if (!isOwner) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { error: 'แก้ไขได้เฉพาะข้อความของตัวเอง' },
         { status: 403 }
       );
     }
 
-    const body = await request.json().catch(() => ({}));
+    const body = await secureJsonRequest(request).catch(() => ({}));
     const message = typeof body.message === 'string' ? body.message : '';
 
     const result = await editChatMessage(sessionId, messageId, session.user.email, message);
     if (!result.success) {
-      return NextResponse.json({ error: result.error || 'แก้ไขไม่สำเร็จ' }, { status: 400 });
+      return await secureJsonResponse({ error: result.error || 'แก้ไขไม่สำเร็จ' }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true, message: result.message });
+    return await secureJsonResponse({ success: true, message: result.message });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[support-chat/message/edit] error:', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { error: error.message || 'Internal server error' },
       { status: 500 }
     );

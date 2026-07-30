@@ -7,6 +7,7 @@ import { requireAuth } from '@/lib/auth';
 import { getJson, putJson, listKeys, deleteObject } from '@/lib/filebase';
 import { sendEmail } from '@/lib/email';
 import crypto from 'crypto';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -89,7 +90,7 @@ export async function GET(req: NextRequest) {
           }
         }
         
-        return NextResponse.json({
+        return await secureJsonResponse({
           status: 'success',
           data: {
             profile: profile || null,
@@ -115,21 +116,21 @@ export async function GET(req: NextRequest) {
         // Sort by date desc
         requests.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         
-        return NextResponse.json({
+        return await secureJsonResponse({
           status: 'success',
           data: { requests }
         });
       }
       
       default:
-        return NextResponse.json(
+        return await secureJsonResponse(
           { status: 'error', message: 'Invalid action' },
           { status: 400 }
         );
     }
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Privacy API] GET Error:', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message: error.message || 'เกิดข้อผิดพลาด' },
       { status: 500 }
     );
@@ -148,14 +149,14 @@ export async function POST(req: NextRequest) {
   const userEmail = authResult.email;
   
   try {
-    const body = await req.json();
+    const body = await secureJsonRequest(req);
     const { action, type, reason } = body;
     
     switch (action) {
       case 'request': {
         // Create a new data request
         if (!type || !['access', 'download', 'delete', 'rectification', 'restriction', 'objection'].includes(type)) {
-          return NextResponse.json(
+          return await secureJsonResponse(
             { status: 'error', message: 'ประเภทคำขอไม่ถูกต้อง' },
             { status: 400 }
           );
@@ -189,7 +190,7 @@ export async function POST(req: NextRequest) {
           type: 'custom',
         });
         
-        return NextResponse.json({
+        return await secureJsonResponse({
           status: 'success',
           message: 'ส่งคำขอเรียบร้อยแล้ว เราจะดำเนินการภายใน 30 วัน',
           data: { requestId }
@@ -228,7 +229,7 @@ export async function POST(req: NextRequest) {
           type: 'custom',
         });
         
-        return NextResponse.json({
+        return await secureJsonResponse({
           status: 'success',
           message: 'ลบข้อมูลโปรไฟล์และตะกร้าเรียบร้อยแล้ว',
           data: {
@@ -288,21 +289,21 @@ export async function POST(req: NextRequest) {
           processedAt: new Date().toISOString(),
         });
         
-        return NextResponse.json({
+        return await secureJsonResponse({
           status: 'success',
           data: exportData,
         });
       }
       
       default:
-        return NextResponse.json(
+        return await secureJsonResponse(
           { status: 'error', message: 'Invalid action' },
           { status: 400 }
         );
     }
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Privacy API] POST Error:', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message: error.message || 'เกิดข้อผิดพลาด' },
       { status: 500 }
     );

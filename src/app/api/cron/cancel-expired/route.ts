@@ -9,6 +9,7 @@ import { withCronMonitor } from '@/lib/sentry-cron';
 import { sendOrderCancelledEmail } from '@/lib/email';
 import { triggerSheetSync } from '@/lib/sheet-sync';
 import { verifyCronAuth } from '@/lib/cron-auth';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 import {
   getReservationHours,
   releaseOrderStock,
@@ -116,13 +117,13 @@ export async function GET(req: NextRequest) {
     
     console.log('[Cron] Complete:', result);
     
-    return NextResponse.json(result);
+    return await secureJsonResponse(result);
     
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Cron] Fatal error:', error);
     Sentry.captureException(error);
     const message = error instanceof Error ? error.message : 'Cron job failed';
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message },
       { status: 500 }
     );

@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireSuperAdmin } from '@/lib/auth';
 import { getSessionFromRequest } from '@/lib/session-from-request';
 import { putJson, getUserLogsPaginated } from '@/lib/filebase';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export interface UserLog {
   id: string;
@@ -60,7 +61,7 @@ export async function GET(request: NextRequest) {
   try {
     const admin = await requireSuperAdmin(request);
     if (!admin || admin instanceof NextResponse) {
-      return admin instanceof NextResponse ? admin : NextResponse.json('Unauthorized', { status: 401 });
+      return admin instanceof NextResponse ? admin : await secureJsonResponse('Unauthorized', { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
@@ -86,11 +87,11 @@ export async function GET(request: NextRequest) {
       stats.byAction[log.action] = (stats.byAction[log.action] || 0) + 1;
     });
 
-    return NextResponse.json({ logs, stats });
+    return await secureJsonResponse({ logs, stats });
 
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[UserLogs API] Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return await secureJsonResponse({ error: error.message }, { status: 500 });
   }
 }
 
@@ -99,17 +100,17 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getSessionFromRequest(request);
     if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return await secureJsonResponse({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json();
+    const body = await secureJsonRequest(request);
     const { action, details, metadata } = body;
 
     const email = session.user.email;
     const name = session.user.name || undefined;
 
     if (!action) {
-      return NextResponse.json({ error: 'Missing action' }, { status: 400 });
+      return await secureJsonResponse({ error: 'Missing action' }, { status: 400 });
     }
 
     const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
@@ -125,10 +126,10 @@ export async function POST(request: NextRequest) {
       userAgent: userAgent.substring(0, 200),
     });
 
-    return NextResponse.json({ success: true });
+    return await secureJsonResponse({ success: true });
 
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[UserLogs API] Error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return await secureJsonResponse({ error: error.message }, { status: 500 });
   }
 }

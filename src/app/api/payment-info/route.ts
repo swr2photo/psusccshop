@@ -8,6 +8,7 @@ import { sanitizeUtf8Input } from '@/lib/sanitize';
 import { getShopById } from '@/lib/shops';
 import { resolveOrderByRef } from '@/lib/order-lookup';
 import { getStripePromptPayEnabled } from '@/lib/payment-server';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 const maskAccountNumber = (accountNumber: string): string => {
   if (!accountNumber) return '';
@@ -30,7 +31,7 @@ export async function GET(req: NextRequest) {
     const sanitizedRef = sanitizeUtf8Input(ref || '');
     
     if (!sanitizedRef) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { status: 'error', message: 'missing ref' },
         { status: 400, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
       );
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest) {
 
     const order = await resolveOrderByRef(sanitizedRef);
     if (!order) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { status: 'error', message: 'order not found' },
         { status: 404, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
       );
@@ -47,7 +48,7 @@ export async function GET(req: NextRequest) {
     // ตรวจสอบว่าเป็นเจ้าของ order หรือเป็น admin
     const orderEmail = order.customerEmail || order.email;
     if (!isResourceOwner(orderEmail, currentUserEmail) && !(await isAdminEmailAsync(currentUserEmail))) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { status: 'error', message: 'ไม่มีสิทธิ์ดูข้อมูลการชำระเงินของ order นี้' },
         { status: 403, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
       );
@@ -133,12 +134,12 @@ export async function GET(req: NextRequest) {
       },
     };
 
-    return NextResponse.json(responseData, {
+    return await secureJsonResponse(responseData, {
       headers: { 'Content-Type': 'application/json; charset=utf-8' }
     });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[payment-info] error', error);
-    return NextResponse.json({
+    return await secureJsonResponse({
       status: 'error',
       message: error?.message || 'load failed',
     }, { 

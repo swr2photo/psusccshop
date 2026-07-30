@@ -11,6 +11,7 @@ import { rateLimitOrNull } from '@/lib/api-helpers';
 import { RATE_LIMITS } from '@/lib/rate-limit';
 import { dispatchNotification } from '@/lib/notifications';
 import crypto from 'crypto';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 // Helper to save user log server-side
 async function saveUserLogServer(log: {
@@ -256,40 +257,40 @@ export async function POST(req: NextRequest) {
       const config = await getJson<any>(CONFIG_KEY);
       if (config && config.paymentEnabled === false) {
         const message = config.paymentDisabledMessage || 'ระบบชำระเงินปิดให้บริการชั่วคราว กรุณารอการแจ้งเปิดจากแอดมิน';
-        return NextResponse.json(
+        return await secureJsonResponse(
           { status: 'error', message, code: 'PAYMENT_DISABLED' },
           { status: 503, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
         );
       }
     }
 
-    const { ref, base64, mime, name, receiptRequest } = await req.json();
+    const { ref, base64, mime, name, receiptRequest } = await secureJsonRequest(req);
     if (!ref || !base64) {
-      return NextResponse.json({ status: 'error', message: 'กรุณาอัพโหลดสลิปและระบุหมายเลขคำสั่งซื้อ' }, { status: 400 });
+      return await secureJsonResponse({ status: 'error', message: 'กรุณาอัพโหลดสลิปและระบุหมายเลขคำสั่งซื้อ' }, { status: 400 });
     }
 
     const order = await resolveOrderByRef(ref);
     if (!order) {
-      return NextResponse.json({ status: 'error', message: 'ไม่พบคำสั่งซื้อนี้ในระบบ' }, { status: 404 });
+      return await secureJsonResponse({ status: 'error', message: 'ไม่พบคำสั่งซื้อนี้ในระบบ' }, { status: 404 });
     }
 
     // ตรวจสอบว่าเป็นเจ้าของ order หรือเป็น admin
     const orderEmail = order.customerEmail || order.email;
     if (!isResourceOwner(orderEmail, currentUserEmail) && !isAdmin) {
-      return NextResponse.json({ status: 'error', message: 'ไม่มีสิทธิ์อัพโหลดสลิปสำหรับคำสั่งซื้อนี้' }, { status: 403 });
+      return await secureJsonResponse({ status: 'error', message: 'ไม่มีสิทธิ์อัพโหลดสลิปสำหรับคำสั่งซื้อนี้' }, { status: 403 });
     }
 
     // ตรวจสอบสถานะ order
     const orderStatus = (order.status || '').toUpperCase();
     if (['PAID', 'COMPLETED', 'SHIPPED', 'READY'].includes(orderStatus)) {
-      return NextResponse.json({ status: 'error', message: 'คำสั่งซื้อนี้ได้รับการชำระเงินแล้ว' }, { status: 400 });
+      return await secureJsonResponse({ status: 'error', message: 'คำสั่งซื้อนี้ได้รับการชำระเงินแล้ว' }, { status: 400 });
     }
 
     // คำนวณยอดเงินที่ต้องชำระ
     const expectedAmount = Number(order.totalAmount ?? order.amount ?? calculateOrderTotal(order.cart || [])) || 0;
 
     if (expectedAmount <= 0) {
-      return NextResponse.json({ status: 'error', message: 'ยอดเงินไม่ถูกต้อง กรุณาติดต่อแอดมิน' }, { status: 400 });
+      return await secureJsonResponse({ status: 'error', message: 'ยอดเงินไม่ถูกต้อง กรุณาติดต่อแอดมิน' }, { status: 400 });
     }
 
     // เรียก SlipOK API พร้อมเช็คสลิปซ้ำ + ยอดเงิน + บัญชีผู้รับ
@@ -307,7 +308,7 @@ export async function POST(req: NextRequest) {
         userMessage = 'สลิปนี้เคยใช้แล้ว กรุณาโอนเงินใหม่และอัพโหลดสลิปใหม่';
       }
 
-      return NextResponse.json({
+      return await secureJsonResponse({
         status: 'error',
         code: errorCode,
         message: userMessage,
@@ -453,7 +454,7 @@ export async function POST(req: NextRequest) {
     }).catch(e => console.error('[payment-verify] Notification error:', e));
 
     // ส่งข้อมูลกลับ
-    return NextResponse.json({
+    return await secureJsonResponse({
       status: 'success',
       message: 'ชำระเงินสำเร็จ',
       data: {
@@ -467,7 +468,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[payment-verify] error', error);
-    return NextResponse.json({
+    return await secureJsonResponse({
       status: 'error',
       message: error?.message || 'เกิดข้อผิดพลาดในการตรวจสอบสลิป กรุณาลองใหม่',
     }, { status: 500 });

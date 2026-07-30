@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, isSuperAdminEmail } from '@/lib/auth';
 import { getShopById, updateShop, getShopAdminRole } from '@/lib/shops';
 import { API_CACHE } from '@/lib/api-helpers';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -15,12 +16,12 @@ export async function GET(req: NextRequest, { params }: Params) {
   const { shopId } = await params;
   const shop = await getShopById(shopId);
   if (!shop || !shop.isActive) {
-    return NextResponse.json({ status: 'error', message: 'ไม่พบร้านค้า' }, { status: 404 });
+    return await secureJsonResponse({ status: 'error', message: 'ไม่พบร้านค้า' }, { status: 404 });
   }
 
   // Return only active products for public
   const products = (shop.products || []).filter((p: any) => p.isActive !== false);
-  return NextResponse.json(
+  return await secureJsonResponse(
     { status: 'success', products, shopName: shop.name },
     { headers: { 'Cache-Control': API_CACHE.medium } },
   );
@@ -36,25 +37,25 @@ export async function PUT(req: NextRequest, { params }: Params) {
   if (!isSuperAdmin) {
     const role = await getShopAdminRole(shopId, authResult.email);
     if (!role || !role.permissions.canManageProducts) {
-      return NextResponse.json({ status: 'error', message: 'ไม่มีสิทธิ์จัดการสินค้า' }, { status: 403 });
+      return await secureJsonResponse({ status: 'error', message: 'ไม่มีสิทธิ์จัดการสินค้า' }, { status: 403 });
     }
   }
 
   try {
-    const body = await req.json();
+    const body = await secureJsonRequest(req);
     const { products } = body;
 
     if (!Array.isArray(products)) {
-      return NextResponse.json({ status: 'error', message: 'products ต้องเป็น array' }, { status: 400 });
+      return await secureJsonResponse({ status: 'error', message: 'products ต้องเป็น array' }, { status: 400 });
     }
 
     const shop = await updateShop(shopId, { products });
     if (!shop) {
-      return NextResponse.json({ status: 'error', message: 'อัปเดตสินค้าไม่สำเร็จ' }, { status: 500 });
+      return await secureJsonResponse({ status: 'error', message: 'อัปเดตสินค้าไม่สำเร็จ' }, { status: 500 });
     }
 
-    return NextResponse.json({ status: 'success', products: shop.products });
+    return await secureJsonResponse({ status: 'success', products: shop.products });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
-    return NextResponse.json({ status: 'error', message: error?.message || 'เกิดข้อผิดพลาด' }, { status: 500 });
+    return await secureJsonResponse({ status: 'error', message: error?.message || 'เกิดข้อผิดพลาด' }, { status: 500 });
   }
 }

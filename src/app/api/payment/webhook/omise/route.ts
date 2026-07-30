@@ -8,6 +8,7 @@ import { orders, paymentTransactions } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { verifyOmiseWebhook } from '@/lib/payment-server';
 import { webhookSecretMissingResponse } from '@/lib/api-helpers';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -23,7 +24,7 @@ export async function POST(request: NextRequest) {
     const webhookSecret = process.env.OMISE_WEBHOOK_SECRET;
     if (!webhookSecret || !verifyOmiseWebhook(payload, signature)) {
       console.error('[Webhook] Invalid Omise signature');
-      return NextResponse.json(
+      return await secureJsonResponse(
         { success: false, error: 'Invalid signature' },
         { status: 400 }
       );
@@ -58,11 +59,11 @@ export async function POST(request: NextRequest) {
         console.log('[Webhook] Unhandled Omise event:', event.key);
     }
 
-    return NextResponse.json({ success: true });
+    return await secureJsonResponse({ success: true });
 
   } catch (error) {
     console.error('[Webhook] Omise error:', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { success: false, error: 'Webhook processing failed' },
       { status: 500 }
     );

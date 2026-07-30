@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { sql } from 'drizzle-orm';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -29,5 +30,5 @@ export async function GET() {
 
   // Determine overall HTTP status
   const statusCode = checks.status === 'healthy' ? 200 : 503;
-  return NextResponse.json(checks, { status: statusCode });
+  return await secureJsonResponse(checks, { status: statusCode });
 }

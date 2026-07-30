@@ -13,6 +13,7 @@ import { GET as updateTracking } from './update-tracking/route';
 import { withCronMonitor } from '@/lib/sentry-cron';
 import { recordCronRun } from '@/lib/sentry-metrics';
 import { verifyCronAuth } from '@/lib/cron-auth';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -70,11 +71,11 @@ export async function GET(req: NextRequest) {
 
       if (hasError) {
         recordCronRun('vercel-unified-cron', 'failed');
-        return NextResponse.json({ success: false, results }, { status: 500 });
+        return await secureJsonResponse({ success: false, results }, { status: 500 });
       }
 
       recordCronRun('vercel-unified-cron', 'success');
-      return NextResponse.json({
+      return await secureJsonResponse({
         success: true,
         results,
       });

@@ -8,6 +8,7 @@ import { requireAuth, requireAdminWithPermission, isAdminEmailAsync } from '@/li
 import { getOrderByRef, updateOrderByRef } from '@/lib/order-lookup';
 import { sanitizeUtf8Input } from '@/lib/sanitize';
 import crypto from 'crypto';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 // Helper to save user log server-side
 const userLogKey = (id: string) => `user-logs/${id}.json`;
@@ -114,7 +115,7 @@ export async function GET(req: NextRequest) {
             pickup: exactOrder.pickup,
             date: exactOrder.date,
           });
-          return NextResponse.json({ status: 'success', data: results });
+          return await secureJsonResponse({ status: 'success', data: results });
         }
       }
       
@@ -186,7 +187,7 @@ export async function GET(req: NextRequest) {
         }
       }
       
-      return NextResponse.json({ status: 'success', data: results });
+      return await secureJsonResponse({ status: 'success', data: results });
     }
 
     // Get single order pickup status - use getOrderByRef for speed
@@ -194,7 +195,7 @@ export async function GET(req: NextRequest) {
       const order = await getOrderByRef(ref);
       
       if (!order) {
-        return NextResponse.json(
+        return await secureJsonResponse(
           { status: 'error', message: 'Order not found' },
           { status: 404 }
         );
@@ -204,14 +205,14 @@ export async function GET(req: NextRequest) {
       if (!isAdmin) {
         const ownerEmail = (order.customerEmail || order.email || '').toLowerCase();
         if (ownerEmail !== authResult.email.toLowerCase()) {
-          return NextResponse.json(
+          return await secureJsonResponse(
             { status: 'error', message: 'Unauthorized' },
             { status: 403 }
           );
         }
       }
 
-      return NextResponse.json({
+      return await secureJsonResponse({
         status: 'success',
         data: {
           ref: order.ref,
@@ -226,13 +227,13 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message: 'Missing ref or search parameter' },
       { status: 400 }
     );
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Pickup API] Error:', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message: error?.message || 'Failed to get pickup info' },
       { status: 500 }
     );
@@ -247,14 +248,14 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const body = await req.json();
+    const body = await secureJsonRequest(req);
     const ref = sanitizeUtf8Input(body?.ref);
     const action = body?.action as 'pickup' | 'cancel';
     const notes = sanitizeUtf8Input(body?.notes);
     const condition = body?.condition as 'complete' | 'partial' | 'damaged' | undefined;
 
     if (!ref) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { status: 'error', message: 'Missing order ref' },
         { status: 400 }
       );
@@ -262,7 +263,7 @@ export async function POST(req: NextRequest) {
 
     const order = await getOrderByRef(ref);
     if (!order) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { status: 'error', message: 'Order not found' },
         { status: 404 }
       );
@@ -271,7 +272,7 @@ export async function POST(req: NextRequest) {
     // Check if order is eligible for pickup
     if (action === 'pickup') {
       if (!['READY', 'SHIPPED', 'PAID'].includes(order.status)) {
-        return NextResponse.json(
+        return await secureJsonResponse(
           { status: 'error', message: 'Order is not ready for pickup. Status must be READY, SHIPPED, or PAID.' },
           { status: 400 }
         );
@@ -317,7 +318,7 @@ export async function POST(req: NextRequest) {
         userAgent,
       });
 
-      return NextResponse.json({
+      return await secureJsonResponse({
         status: 'success',
         message: 'Order marked as picked up',
         data: {
@@ -355,7 +356,7 @@ export async function POST(req: NextRequest) {
         userAgent,
       });
 
-      return NextResponse.json({
+      return await secureJsonResponse({
         status: 'success',
         message: 'Pickup cancelled',
         data: {
@@ -365,13 +366,13 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message: 'Invalid action' },
       { status: 400 }
     );
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Pickup API] Error:', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message: error?.message || 'Failed to update pickup' },
       { status: 500 }
     );

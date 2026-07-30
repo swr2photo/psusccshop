@@ -8,6 +8,7 @@ import { config } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { PaymentConfig, DEFAULT_PAYMENT_CONFIG } from '@/lib/payment';
 import { invalidateConfigCache } from '@/lib/config-db';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
     const data = rows[0];
 
     if (!data) {
-      return NextResponse.json({ success: true, data: DEFAULT_PAYMENT_CONFIG });
+      return await secureJsonResponse({ success: true, data: DEFAULT_PAYMENT_CONFIG });
     }
 
     const paymentCfg = data.value as unknown as PaymentConfig;
@@ -37,13 +38,13 @@ export async function GET(request: NextRequest) {
           webhookEndpoint: undefined,
         })),
       };
-      return NextResponse.json({ success: true, data: publicConfig });
+      return await secureJsonResponse({ success: true, data: publicConfig });
     }
 
-    return NextResponse.json({ success: true, data: paymentCfg });
+    return await secureJsonResponse({ success: true, data: paymentCfg });
   } catch (error) {
     console.error('[API] Get payment config error:', error);
-    return NextResponse.json({ success: false, error: 'Failed to get payment config' }, { status: 500 });
+    return await secureJsonResponse({ success: false, error: 'Failed to get payment config' }, { status: 500 });
   }
 }
 
@@ -52,14 +53,14 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getSession(request);
     if (!session?.user?.email || !(await isAdminEmailAsync(session.user.email))) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+      return await secureJsonResponse({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json();
+    const body = await secureJsonRequest(request);
     const newConfig: PaymentConfig = body.config;
 
     if (!newConfig || !Array.isArray(newConfig.options)) {
-      return NextResponse.json({ success: false, error: 'Invalid payment config' }, { status: 400 });
+      return await secureJsonResponse({ success: false, error: 'Invalid payment config' }, { status: 400 });
     }
 
     await db.insert(config)
@@ -71,9 +72,9 @@ export async function POST(request: NextRequest) {
 
     invalidateConfigCache(CONFIG_KEY);
 
-    return NextResponse.json({ success: true, message: 'Payment config updated successfully' });
+    return await secureJsonResponse({ success: true, message: 'Payment config updated successfully' });
   } catch (error) {
     console.error('[API] Update payment config error:', error);
-    return NextResponse.json({ success: false, error: 'Failed to update payment config' }, { status: 500 });
+    return await secureJsonResponse({ success: false, error: 'Failed to update payment config' }, { status: 500 });
   }
 }

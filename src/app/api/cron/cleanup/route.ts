@@ -10,6 +10,7 @@ import { cleanupExpiredRateLimits } from '@/lib/rate-limit-supabase';
 import { autoRotateExpiringKeys, cleanupOldKeys } from '@/lib/api-key-rotation';
 import { cleanupOldChatImages } from '@/lib/support-chat';
 import { verifyCronAuth } from '@/lib/cron-auth';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -156,7 +157,7 @@ export async function GET(req: NextRequest) {
 
     console.log(`[Cron Cleanup] Completed in ${duration}ms`);
     
-    return NextResponse.json(results);
+    return await secureJsonResponse(results);
   } catch (error) {
     console.error('[Cron Cleanup] Fatal error:', error);
     Sentry.captureException(error);
@@ -169,7 +170,7 @@ export async function GET(req: NextRequest) {
       },
     });
     
-    return NextResponse.json(
+    return await secureJsonResponse(
       {
         status: 'error',
         message: error instanceof Error ? error.message : 'Unknown error',

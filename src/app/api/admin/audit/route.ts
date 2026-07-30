@@ -6,6 +6,7 @@ import { writeAuditTrail, writeUserActivityLog } from '@/lib/audit';
 import { db } from '@/lib/db';
 import { auditTrail } from '@/db/schema';
 import { desc, eq } from 'drizzle-orm';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -29,7 +30,7 @@ export async function GET(request: NextRequest) {
           .limit(limit)
       : await db.select().from(auditTrail).orderBy(desc(auditTrail.createdAt)).limit(limit);
 
-    return NextResponse.json({
+    return await secureJsonResponse({
       success: true,
       logs: rows.map((r) => ({
         id: r.id,
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[admin/audit] GET', error);
-    return NextResponse.json({ error: error?.message || 'failed' }, { status: 500 });
+    return await secureJsonResponse({ error: error?.message || 'failed' }, { status: 500 });
   }
 }
 
@@ -57,11 +58,11 @@ export async function POST(request: NextRequest) {
   if (admin instanceof NextResponse) return admin;
 
   try {
-    const body = await request.json();
+    const body = await secureJsonRequest(request);
     const action = String(body.action || '').trim();
     const detail = String(body.detail || body.details || '').trim();
     if (!action) {
-      return NextResponse.json({ error: 'action required' }, { status: 400 });
+      return await secureJsonResponse({ error: 'action required' }, { status: 400 });
     }
 
     const entityType = String(body.entityType || 'system');
@@ -96,9 +97,9 @@ export async function POST(request: NextRequest) {
       request,
     });
 
-    return NextResponse.json({ success: true });
+    return await secureJsonResponse({ success: true });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[admin/audit] POST', error);
-    return NextResponse.json({ error: error?.message || 'failed' }, { status: 500 });
+    return await secureJsonResponse({ error: error?.message || 'failed' }, { status: 500 });
   }
 }

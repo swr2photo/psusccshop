@@ -4,6 +4,7 @@ import { assertShopAccess, resolveAdminSession } from '@/lib/admin-context';
 import { getAllOrdersForAdminList } from '@/lib/filebase';
 import { sanitizeOrdersForAdmin } from '@/lib/sanitize';
 import { formatDbError } from '@/lib/db-query';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -26,14 +27,14 @@ export async function GET(req: NextRequest) {
 
     if (session.userRole === 'shopAdmin') {
       if (session.assignedShopIds.length === 0) {
-        return NextResponse.json(
+        return await secureJsonResponse(
           { status: 'error', message: 'ไม่มีร้านค้าที่ได้รับมอบหมาย' },
           { status: 403 },
         );
       }
       if (shopIdParam) {
         if (!assertShopAccess(session, shopIdParam)) {
-          return NextResponse.json({ status: 'error', message: 'ไม่มีสิทธิ์เข้าถึงร้านค้านี้' }, { status: 403 });
+          return await secureJsonResponse({ status: 'error', message: 'ไม่มีสิทธิ์เข้าถึงร้านค้านี้' }, { status: 403 });
         }
         shopIds = [shopIdParam];
       } else {
@@ -46,7 +47,7 @@ export async function GET(req: NextRequest) {
     const { orders, total } = await getAllOrdersForAdminList({ limit, offset, status, search, shopIds });
     const sanitizedOrders = sanitizeOrdersForAdmin(orders);
 
-    return NextResponse.json(
+    return await secureJsonResponse(
       {
         status: 'success',
         data: {
@@ -59,7 +60,7 @@ export async function GET(req: NextRequest) {
     );
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[orders-list] failed:', formatDbError(error));
-    return NextResponse.json(
+    return await secureJsonResponse(
       {
         status: 'success',
         data: { orders: [], total: 0, hasMore: false, dbError: true },

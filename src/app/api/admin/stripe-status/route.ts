@@ -4,6 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdminEmailAsync, getSession } from '@/lib/auth';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest) {
     // Admin only
     const session = await getSession(request);
     if (!session?.user?.email || !(await isAdminEmailAsync(session.user.email))) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+      return await secureJsonResponse({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
     const secretKey = process.env.STRIPE_SECRET_KEY || '';
@@ -109,7 +110,7 @@ export async function GET(request: NextRequest) {
       } catch { /* non-critical */ }
     }
 
-    return NextResponse.json({
+    return await secureJsonResponse({
       success: true,
       data: {
         // Key presence
@@ -151,6 +152,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('[API] Stripe status error:', error);
-    return NextResponse.json({ success: false, error: 'Failed to check Stripe status' }, { status: 500 });
+    return await secureJsonResponse({ success: false, error: 'Failed to check Stripe status' }, { status: 500 });
   }
 }

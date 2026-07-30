@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { webhookEndpoints } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import crypto from 'crypto';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -16,9 +17,9 @@ export async function GET(req: NextRequest) {
 
   try {
     const endpoints = await db.select().from(webhookEndpoints);
-    return NextResponse.json({ status: 'success', data: endpoints });
+    return await secureJsonResponse({ status: 'success', data: endpoints });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
-    return NextResponse.json({ status: 'error', message: error.message }, { status: 500 });
+    return await secureJsonResponse({ status: 'error', message: error.message }, { status: 500 });
   }
 }
 
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const body = await req.json();
+    const body = await secureJsonRequest(req);
     const secret = crypto.randomBytes(32).toString('hex');
     
     await db.insert(webhookEndpoints).values({
@@ -39,9 +40,9 @@ export async function POST(req: NextRequest) {
       shopId: body.shopId || null,
     });
 
-    return NextResponse.json({ status: 'success', message: 'Webhook endpoint created', secret });
+    return await secureJsonResponse({ status: 'success', message: 'Webhook endpoint created', secret });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
-    return NextResponse.json({ status: 'error', message: error.message }, { status: 500 });
+    return await secureJsonResponse({ status: 'error', message: error.message }, { status: 500 });
   }
 }
 
@@ -55,12 +56,12 @@ export async function DELETE(req: NextRequest) {
     const url = new URL(req.url);
     const id = url.searchParams.get('id');
     
-    if (!id) return NextResponse.json({ status: 'error', message: 'Missing ID' }, { status: 400 });
+    if (!id) return await secureJsonResponse({ status: 'error', message: 'Missing ID' }, { status: 400 });
 
     await db.delete(webhookEndpoints).where(eq(webhookEndpoints.id, id));
 
-    return NextResponse.json({ status: 'success', message: 'Webhook endpoint deleted' });
+    return await secureJsonResponse({ status: 'success', message: 'Webhook endpoint deleted' });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
-    return NextResponse.json({ status: 'error', message: error.message }, { status: 500 });
+    return await secureJsonResponse({ status: 'error', message: error.message }, { status: 500 });
   }
 }

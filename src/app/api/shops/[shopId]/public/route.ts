@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getShopById, toPublicShopData } from '@/lib/shops';
 import { API_CACHE } from '@/lib/api-helpers';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -16,7 +17,7 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
 
   const shop = await getShopById(shopId);
   if (!shop || !shop.isActive) {
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message: 'ไม่พบร้านค้า' },
       { status: 404 }
     );
@@ -24,7 +25,7 @@ export async function GET(_req: NextRequest, { params }: RouteParams) {
 
   const publicShop = toPublicShopData(shop);
 
-  return NextResponse.json(
+  return await secureJsonResponse(
     { status: 'success', shop: publicShop },
     {
       headers: {

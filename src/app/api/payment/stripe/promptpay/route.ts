@@ -21,6 +21,7 @@ import {
 } from '@/lib/payment-server';
 import { fetchStripeReceiptUrl, mergeStripeReceiptSlipData } from '@/lib/stripe-receipt';
 import { sanitizeUtf8Input } from '@/lib/sanitize';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -36,34 +37,34 @@ export async function POST(req: NextRequest) {
 
   try {
     if (!isStripeEnvConfigured()) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { status: 'error', message: 'Stripe PromptPay is not configured' },
         { status: 503 }
       );
     }
 
-    const body = await req.json();
+    const body = await secureJsonRequest(req);
     const ref = sanitizeUtf8Input(String(body?.ref || ''));
     if (!ref) {
-      return NextResponse.json({ status: 'error', message: 'missing ref' }, { status: 400 });
+      return await secureJsonResponse({ status: 'error', message: 'missing ref' }, { status: 400 });
     }
 
     const orderRows = await db.select().from(orders).where(eq(orders.ref, ref)).limit(1);
     const order = orderRows[0];
     if (!order) {
-      return NextResponse.json({ status: 'error', message: 'order not found' }, { status: 404 });
+      return await secureJsonResponse({ status: 'error', message: 'order not found' }, { status: 404 });
     }
 
     // Only the order owner (or an admin) can create a payment for it
     if (!isResourceOwner(order.customerEmail, userEmail) && !(await isAdminEmailAsync(userEmail))) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { status: 'error', message: 'ไม่มีสิทธิ์ชำระเงินสำหรับคำสั่งซื้อนี้' },
         { status: 403 }
       );
     }
 
     if (PAID_STATUSES.includes(order.status) || order.paymentVerified) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { status: 'error', message: 'คำสั่งซื้อนี้ชำระเงินแล้ว' },
         { status: 409 }
       );
@@ -138,7 +139,7 @@ export async function POST(req: NextRequest) {
                 .where(eq(orders.id, order.id));
             }
 
-            return NextResponse.json({
+            return await secureJsonResponse({
               status: 'success',
               data: {
                 clientSecret: intent.client_secret,
@@ -159,7 +160,7 @@ export async function POST(req: NextRequest) {
     const amountTHB = Number(order.totalAmount) || 0;
     if (amountTHB < 10) {
       // Stripe PromptPay minimum charge is 10 THB
-      return NextResponse.json(
+      return await secureJsonResponse(
         { status: 'error', message: 'ยอดชำระต่ำกว่าขั้นต่ำของ PromptPay (10 บาท)' },
         { status: 400 }
       );
@@ -167,7 +168,7 @@ export async function POST(req: NextRequest) {
 
     // Respect admin toggle + amount limits from Stripe settings
     if (!(await getStripePromptPayEnabled(amountTHB))) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { status: 'error', message: 'ระบบชำระเงิน PromptPay ผ่าน Stripe ปิดใช้งานอยู่ชั่วคราว' },
         { status: 503 }
       );
@@ -192,7 +193,7 @@ export async function POST(req: NextRequest) {
       const unavailable =
         created.code === 'payment_method_not_available' ||
         created.declineCode === 'payment_method_not_available';
-      return NextResponse.json(
+      return await secureJsonResponse(
         {
           status: 'error',
           code: created.code || created.declineCode,
@@ -217,7 +218,7 @@ export async function POST(req: NextRequest) {
       gatewayChargeId: intent.id,
     });
 
-    return NextResponse.json({
+    return await secureJsonResponse({
       status: 'success',
       data: {
         clientSecret: intent.clientSecret,
@@ -232,7 +233,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Stripe PromptPay] error:', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message: error?.message || 'failed to create payment' },
       { status: 500 }
     );
@@ -252,16 +253,16 @@ export async function GET(req: NextRequest) {
     const ref = sanitizeUtf8Input(req.nextUrl.searchParams.get('ref') || '');
     const intentId = sanitizeUtf8Input(req.nextUrl.searchParams.get('intent') || '');
     if (!ref || !intentId.startsWith('pi_')) {
-      return NextResponse.json({ status: 'error', message: 'missing ref/intent' }, { status: 400 });
+      return await secureJsonResponse({ status: 'error', message: 'missing ref/intent' }, { status: 400 });
     }
 
     const orderRows = await db.select().from(orders).where(eq(orders.ref, ref)).limit(1);
     const order = orderRows[0];
     if (!order) {
-      return NextResponse.json({ status: 'error', message: 'order not found' }, { status: 404 });
+      return await secureJsonResponse({ status: 'error', message: 'order not found' }, { status: 404 });
     }
     if (!isResourceOwner(order.customerEmail, userEmail) && !(await isAdminEmailAsync(userEmail))) {
-      return NextResponse.json({ status: 'error', message: 'forbidden' }, { status: 403 });
+      return await secureJsonResponse({ status: 'error', message: 'forbidden' }, { status: 403 });
     }
 
     // The intent must be one we created for this order
@@ -274,7 +275,7 @@ export async function GET(req: NextRequest) {
       ))
       .limit(1);
     if (!txRows[0]) {
-      return NextResponse.json({ status: 'error', message: 'unknown payment intent' }, { status: 404 });
+      return await secureJsonResponse({ status: 'error', message: 'unknown payment intent' }, { status: 404 });
     }
 
     // Verify the real status with Stripe using the secret key
@@ -282,7 +283,7 @@ export async function GET(req: NextRequest) {
       headers: { Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}` },
     });
     if (!res.ok) {
-      return NextResponse.json({ status: 'error', message: 'stripe lookup failed' }, { status: 502 });
+      return await secureJsonResponse({ status: 'error', message: 'stripe lookup failed' }, { status: 502 });
     }
     const intent = await res.json();
 
@@ -323,13 +324,13 @@ export async function GET(req: NextRequest) {
       console.log('[Stripe PromptPay] Poll detected payment success for order:', ref);
     }
 
-    return NextResponse.json({
+    return await secureJsonResponse({
       status: 'success',
       data: { intentStatus: intent.status },
     });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Stripe PromptPay] poll error:', error);
-    return NextResponse.json(
+    return await secureJsonResponse(
       { status: 'error', message: error?.message || 'poll failed' },
       { status: 500 }
     );

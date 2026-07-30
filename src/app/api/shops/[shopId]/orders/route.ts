@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, isSuperAdminEmail } from '@/lib/auth';
 import { getShopAdminRole, getShopOrders } from '@/lib/shops';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -18,7 +19,7 @@ export async function GET(req: NextRequest, { params }: Params) {
   if (!isSuperAdmin) {
     const role = await getShopAdminRole(shopId, authResult.email);
     if (!role || !role.permissions.canManageOrders) {
-      return NextResponse.json({ status: 'error', message: 'ไม่มีสิทธิ์ดูออเดอร์' }, { status: 403 });
+      return await secureJsonResponse({ status: 'error', message: 'ไม่มีสิทธิ์ดูออเดอร์' }, { status: 403 });
     }
   }
 
@@ -30,7 +31,7 @@ export async function GET(req: NextRequest, { params }: Params) {
 
   const { orders, total } = await getShopOrders(shopId, { limit, offset, status, search });
 
-  return NextResponse.json({
+  return await secureJsonResponse({
     status: 'success',
     orders,
     total,

@@ -3,6 +3,7 @@ import { smartDecryptUrl } from '@/lib/image-crypto';
 import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { Readable } from 'stream';
 import crypto from 'crypto';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 // Ensure Node runtime for fetch
 export const runtime = 'nodejs';
@@ -159,10 +160,10 @@ function isAllowedImageRequest(req: NextRequest): boolean {
  * Return an "Access Denied" image (PNG with text) instead of the real image.
  * This is displayed when someone directly navigates to the URL.
  */
-function accessDeniedResponse(): NextResponse {
+async function accessDeniedResponse(): Promise<NextResponse> {
   // 1×1 red pixel PNG as a simple visual indicator
   // In production, returning 403 JSON is cleaner + cheaper
-  return NextResponse.json(
+  return await secureJsonResponse(
     {
       error: 'Access Denied',
       message: 'ไม่สามารถเข้าถึงรูปภาพโดยตรงได้ กรุณาเข้าผ่านหน้าเว็บไซต์เท่านั้น',
@@ -268,7 +269,7 @@ export async function GET(
     const { id } = await params;
     
     if (!id) {
-      return NextResponse.json({ error: 'Missing image ID' }, { status: 400 });
+      return await secureJsonResponse({ error: 'Missing image ID' }, { status: 400 });
     }
 
     // ==================== ACCESS CONTROL ====================
@@ -301,7 +302,7 @@ export async function GET(
     // Validate URL is from allowed domains
     if (!isAllowedUrl(imageUrl)) {
       console.warn('[Image Proxy] Blocked URL:', imageUrl);
-      return NextResponse.json({ error: 'URL not allowed' }, { status: 403 });
+      return await secureJsonResponse({ error: 'URL not allowed' }, { status: 403 });
     }
 
     // Generate cache key
@@ -339,7 +340,7 @@ export async function GET(
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { error: 'Failed to fetch image' }, 
         { status: response.status }
       );
@@ -348,7 +349,7 @@ export async function GET(
     // Validate content type
     const contentType = response.headers.get('content-type') || 'image/jpeg';
     if (!contentType.startsWith('image/')) {
-      return NextResponse.json({ error: 'Invalid content type' }, { status: 400 });
+      return await secureJsonResponse({ error: 'Invalid content type' }, { status: 400 });
     }
 
     // Fetch image data as ArrayBuffer to avoid fragile Node/Web stream compatibility issues
@@ -375,10 +376,10 @@ export async function GET(
     console.error('[Image Proxy] Error:', error?.message || error);
     
     if (error?.name === 'AbortError') {
-      return NextResponse.json({ error: 'Request timeout' }, { status: 504 });
+      return await secureJsonResponse({ error: 'Request timeout' }, { status: 504 });
     }
     
-    return NextResponse.json(
+    return await secureJsonResponse(
       { error: 'Internal server error' }, 
       { status: 500 }
     );

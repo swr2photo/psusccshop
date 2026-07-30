@@ -4,6 +4,7 @@ import { getSheets } from '@/lib/google';
 import { getJson, listKeys } from '@/lib/filebase';
 import { requireAdminWithPermission } from '@/lib/auth';
 import type { Product } from '@/lib/config';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 import {
   ensureSheet,
   syncFactoryExportSheets,
@@ -17,11 +18,11 @@ const VENDOR_SHEET_TITLE = 'Orders Vendor';
 const CONFIG_KEY = 'config/shop-settings.json';
 
 export async function OPTIONS() {
-  return NextResponse.json({ status: 'ok' }, { status: 200 });
+  return await secureJsonResponse({ status: 'ok' }, { status: 200 });
 }
 
 export async function GET() {
-  return NextResponse.json({ status: 'error', message: 'Use POST to sync sheets' }, { status: 405 });
+  return await secureJsonResponse({ status: 'error', message: 'Use POST to sync sheets' }, { status: 405 });
 }
 
 const summarizeItems = (items: any[]): string => {
@@ -92,7 +93,7 @@ export async function POST(req: NextRequest) {
   if (authResult instanceof NextResponse) return authResult;
 
   try {
-    const body = await req.json();
+    const body = await secureJsonRequest(req);
     const mode = (body?.mode as 'create' | 'sync' | undefined) || 'sync';
     const config = await getJson<any>(CONFIG_KEY);
     const sheetSettings = config?.sheetSettings;
@@ -103,7 +104,7 @@ export async function POST(req: NextRequest) {
     const vendorSheetId: string | undefined = vendorSheetIdInput;
 
     if (!process.env.GOOGLE_CLIENT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY) {
-      return NextResponse.json(
+      return await secureJsonResponse(
         { status: 'error', message: 'Google service account env missing (GOOGLE_CLIENT_EMAIL / GOOGLE_PRIVATE_KEY)' },
         { status: 500 },
       );
@@ -125,7 +126,7 @@ export async function POST(req: NextRequest) {
       created = true;
     }
 
-    if (!sheetId) return NextResponse.json({ status: 'error', message: 'missing sheet id' }, { status: 400 });
+    if (!sheetId) return await secureJsonResponse({ status: 'error', message: 'missing sheet id' }, { status: 400 });
 
     await ensureSheet(sheets, sheetId, ORDERS_SHEET_TITLE);
     if (vendorSheetId) await ensureSheet(sheets, vendorSheetId, VENDOR_SHEET_TITLE);
@@ -165,7 +166,7 @@ export async function POST(req: NextRequest) {
       vendorSheetUrl = `https://docs.google.com/spreadsheets/d/${vendorSheetId}`;
     }
 
-    return NextResponse.json({
+    return await secureJsonResponse({
       status: 'success',
       data: {
         sheetId,
@@ -188,6 +189,6 @@ export async function POST(req: NextRequest) {
     } else if (message.includes('not found')) {
       message = 'ไม่พบ Google Sheet - ตรวจสอบ GOOGLE_SHEET_ID';
     }
-    return NextResponse.json({ status: 'error', message }, { status: 500 });
+    return await secureJsonResponse({ status: 'error', message }, { status: 500 });
   }
 }

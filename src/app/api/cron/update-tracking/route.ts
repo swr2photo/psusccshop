@@ -11,6 +11,7 @@ import { eq, and, desc, isNotNull } from 'drizzle-orm';
 import { TrackingStatus, ShippingProvider } from '@/lib/shipping';
 import { trackShipment } from '@/lib/shipping-server';
 import { verifyCronAuth } from '@/lib/cron-auth';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -50,7 +51,7 @@ export async function GET(request: NextRequest) {
     .limit(50);
 
     if (!fetchedOrders.length) {
-      return NextResponse.json({ success: true, message: 'No orders to check', processed: 0, updated: 0 });
+      return await secureJsonResponse({ success: true, message: 'No orders to check', processed: 0, updated: 0 });
     }
 
     const results = { processed: 0, updated: 0, delivered: 0, errors: [] as string[] };
@@ -94,12 +95,12 @@ export async function GET(request: NextRequest) {
     }
 
     console.log(`[Tracking Cron] Processed: ${results.processed}, Updated: ${results.updated}, Delivered: ${results.delivered}`);
-    return NextResponse.json({ success: true, ...results });
+    return await secureJsonResponse({ success: true, ...results });
   } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
     console.error('[Tracking Cron] Error:', error);
     Sentry.captureException(error);
     const message = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json({ success: false, error: message }, { status: 500 });
+    return await secureJsonResponse({ success: false, error: message }, { status: 500 });
   }
   });
 }
