@@ -18,7 +18,6 @@ import { signOutUser } from '@/lib/sign-out-client';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   Alert,
-  AppBar,
   Avatar,
   Backdrop,
   Badge,
@@ -45,7 +44,6 @@ import {
   Snackbar,
   Slide,
   TextField,
-  Toolbar,
   FormControlLabel,
   Switch,
   Typography,
@@ -117,6 +115,7 @@ import AnnouncementBar from '@/components/AnnouncementBar';
 import EventBanner, { type ShopEvent } from '@/components/EventBanner';
 import Footer from '@/components/Footer';
 import HomeHero from '@/components/HomeHero';
+import StorefrontNavbar from '@/components/StorefrontNavbar';
 import HomeTrustStrip from '@/components/HomeTrustStrip';
 import { FLAGSHIP_PRODUCTS, getFlagshipSlugForProduct } from '@/lib/flagship/config';
 import { flushFlagshipCartQueue } from '@/lib/flagship/cart-bridge';
@@ -1045,87 +1044,60 @@ export default function HomePage() {
   };
 
   const bottomTabs = useMemo(() => {
-    const leftTabs = [
-      { key: 'home', label: t.nav.home, icon: <Home size={24} />, center: false },
+    // PCD-style equal tabs: Shop · Wishlist · Cart · Account · Search
+    return [
+      {
+        key: 'home',
+        label: t.nav.shop,
+        icon: <StorefrontIcon size={22} strokeWidth={1.75} />,
+      },
+      {
+        key: 'wishlist',
+        label: t.nav.wishlist,
+        icon: (
+          <Badge
+            badgeContent={wishlistStore.items.length || undefined}
+            color="error"
+            max={99}
+            invisible={wishlistStore.items.length === 0}
+            sx={historyBadgeSx}
+          >
+            <Heart size={22} strokeWidth={1.75} />
+          </Badge>
+        ),
+      },
       {
         key: 'cart',
         label: t.nav.cart,
         icon: (
-          <Badge badgeContent={cart.length} color="error">
-            <ShoppingCart size={24} />
+          <Badge badgeContent={cart.length} color="error" max={99}>
+            <ShoppingCart size={22} strokeWidth={1.75} />
           </Badge>
         ),
-        center: false,
       },
-    ];
-    const centerTab = { key: 'chat', label: t.nav.chat, icon: <Headphones size={28} />, center: true };
-    const rightTabs = [
       {
-        key: 'history',
-        label: t.nav.history,
+        key: 'profile',
+        label: t.nav.profile,
+        icon: <User size={22} strokeWidth={1.75} />,
+      },
+      {
+        key: 'search',
+        label: t.nav.search,
         icon: (
           <Badge
-            badgeContent={pendingOrderCount > 0 ? pendingOrderCount : undefined}
+            badgeContent={activeFilterCount || undefined}
             color="warning"
-            max={99}
-            invisible={pendingOrderCount === 0}
+            invisible={activeFilterCount === 0}
             sx={historyBadgeSx}
           >
-            <History size={24} />
+            <Search size={22} strokeWidth={1.75} />
           </Badge>
         ),
-        center: false,
       },
-      { key: 'profile', label: t.nav.profile, icon: <User size={24} />, center: false },
     ];
-    // For left-handed: swap sides so primary actions are on the left
-    if (navHandedness === 'left') {
-      return [...rightTabs.reverse(), centerTab, ...leftTabs.reverse()];
-    }
-    return [...leftTabs, centerTab, ...rightTabs];
-  }, [cart.length, pendingOrderCount, navHandedness, t, lang]);
+  }, [cart.length, wishlistStore.items.length, activeFilterCount, t, historyBadgeSx]);
 
 
-  const BrandMark = ({ size = 36, showText = true }: { size?: number; showText?: boolean }) => (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-      <Box
-        sx={{
-          width: size,
-          height: size,
-          position: 'relative',
-          borderRadius: '12px',
-          overflow: 'hidden',
-          flexShrink: 0,
-        }}
-      >
-        <Image
-          src="/logo.png"
-          alt="PSU SCC Shop Logo"
-          fill
-          sizes="48px"
-          className="theme-logo"
-          style={{ objectFit: 'contain' }}
-          priority
-        />
-      </Box>
-      {showText && (
-        <Typography
-          variant="h6"
-          sx={{
-            fontWeight: 800,
-            letterSpacing: 0.5,
-            color: 'var(--foreground)',
-            textTransform: 'uppercase',
-            fontSize: { xs: '1rem', sm: '1.25rem' },
-          }}
-        >
-          SCC Shop
-        </Typography>
-      )}
-    </Box>
-  );
-
-  // ==================== SHOP STATUS CARD COMPONENT ====================
   // Hydrate lean config from sessionStorage before paint so remounts skip the skeleton
   useLayoutEffect(() => {
     const cached = readCachedShopConfig();
@@ -2943,17 +2915,38 @@ export default function HomePage() {
   };
 
   const handleTabChange = (tab: string) => {
+    if (tab === 'search') {
+      setShowSearchBar(true);
+      setShowCart(false);
+      setShowHistoryDialog(false);
+      setShowWishlistDrawer(false);
+      return;
+    }
+    if (tab === 'wishlist') {
+      setShowWishlistDrawer(true);
+      setShowCart(false);
+      setShowHistoryDialog(false);
+      setShowSearchBar(false);
+      setActiveTab('home');
+      return;
+    }
+
     setActiveTab(tab as any);
+    setShowSearchBar(false);
     if (tab === 'home') {
       setSidebarOpen(false);
       setShowCart(false);
       setShowHistoryDialog(false);
+      setShowWishlistDrawer(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else if (tab === 'cart') {
       setShowCart(true);
       setShowHistoryDialog(false);
+      setShowWishlistDrawer(false);
     } else if (tab === 'history') {
       setShowHistoryDialog(true);
       setShowCart(false);
+      setShowWishlistDrawer(false);
       // Only load if the full list was never fetched (locally-added orders
       // from checkout/realtime don't count as a loaded history)
       if (!historyLoadedRef.current) {
@@ -2963,13 +2956,12 @@ export default function HomePage() {
     } else if (tab === 'profile') {
       setSidebarOpen(false);
       setShowProfileModal(true);
+      setShowWishlistDrawer(false);
     } else if (tab === 'chat') {
       // Show chat selection menu - do nothing here, handled by onClick
       return;
     }
   };
-
-
 
   // Keyboard navigation for fullscreen lightbox on the main page
   useEffect(() => {
@@ -3254,343 +3246,57 @@ export default function HomePage() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh', bgcolor: 'var(--background)', pb: { xs: 'calc(4.75rem + env(safe-area-inset-bottom))', md: 0 } }}>
-      <AppBar
-        position="sticky"
-        elevation={0}
-        sx={{
-          bgcolor: 'color-mix(in srgb, var(--background) 82%, transparent)',
-          backgroundImage: 'none',
-          backdropFilter: 'blur(14px) saturate(1.2)',
-          WebkitBackdropFilter: 'blur(14px) saturate(1.2)',
-          boxShadow: 'none',
-          border: 'none',
-          borderBottom: '1px solid var(--glass-border)',
-          color: 'var(--foreground)',
-          transform: hideNavBars ? 'translateY(-110%)' : 'translateY(0)',
-          opacity: hideNavBars ? 0 : 1,
-          transition: 'transform 0.38s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.28s ease',
-          position: 'sticky',
-          top: 0,
-          zIndex: 1200,
-          overflow: 'visible',
-          pt: { xs: 'env(safe-area-inset-top)', md: 0 },
+      {/* Top promo — PCD-style, above sticky nav */}
+      <AnnouncementBar
+        announcements={announcements || []}
+        history={announcementHistory}
+        socialMediaNews={config?.socialMediaNews}
+        onProductClick={(productId) => {
+          const products = config?.products || [];
+          let product = null;
+          if (productId && productId !== '__default__') {
+            product = products.find(p => p.id === productId)
+              || products.find(p => p.id?.includes(productId) || productId?.includes(p.id));
+          }
+          if (!product && products.length > 0) {
+            product = products[0];
+          }
+          if (product) {
+            handleSelectProduct(product);
+          } else {
+            document.getElementById('product-grid')?.scrollIntoView({ behavior: 'smooth' });
+          }
         }}
-      >
-        {/* Mobile header */}
-        <Toolbar
-          sx={{
-            display: { xs: 'flex', md: 'none' },
-            minHeight: 52,
-            px: 1.25,
-            gap: 0.35,
-          }}
-        >
-            <BrandMark size={30} showText={false} />
-            <Typography
-              sx={{
-                fontWeight: 700,
-                fontSize: '1.05rem',
-                letterSpacing: '-0.02em',
-                color: 'var(--foreground)',
-                ml: 0.75,
-              }}
-            >
-              SCC Shop
-            </Typography>
-            <Box sx={{ flexGrow: 1 }} />
-            <IconButton
-              onClick={() => setShowSearchBar((v) => !v)}
-              sx={{
-                color: showSearchBar ? '#0071e3' : 'var(--foreground)',
-                bgcolor: 'transparent',
-                width: 36,
-                height: 36,
-                borderBottom: showSearchBar ? '2px solid #0071e3' : '2px solid transparent',
-                borderRadius: '8px',
-              }}
-            >
-              <Badge badgeContent={activeFilterCount || undefined} color="warning" invisible={activeFilterCount === 0}>
-                <Search size={19} />
-              </Badge>
-            </IconButton>
-            {isLiveActive && (
-              <IconButton
-                onClick={openLiveStream}
-                sx={{
-                  color: '#fff',
-                  bgcolor: '#ff3b30',
-                  width: 32,
-                  height: 32,
-                  animation: 'navLivePulse 2s ease-in-out infinite',
-                  '@keyframes navLivePulse': {
-                    '0%, 100%': { boxShadow: '0 0 0 0 rgba(255,59,48,0.4)' },
-                    '50%': { boxShadow: '0 0 0 6px rgba(255,59,48,0)' },
-                  },
-                  '&:hover': { bgcolor: '#e0342b' },
-                }}
-              >
-                <Radio size={16} />
-              </IconButton>
-            )}
-            {session ? (
-              <Avatar
-                src={orderData.profileImage || session?.user?.image || ''}
-                sx={{
-                  width: 28,
-                  height: 28,
-                  cursor: 'pointer',
-                  ml: 0.25,
-                  boxShadow: (theme) =>
-                    theme.palette.mode === 'dark'
-                      ? '0 0 0 1px rgba(255,255,255,0.12)'
-                      : '0 0 0 1px rgba(0,0,0,0.06)',
-                }}
-                onClick={() => setSidebarOpen(true)}
-              />
-            ) : (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
-                <LanguageToggle size="small" />
-                <ThemeToggle size="small" />
-              </Box>
-            )}
-        </Toolbar>
+      />
 
-        {/* Desktop header */}
-        <Toolbar
-          sx={{
-            display: { xs: 'none', md: 'flex' },
-            minHeight: 60,
-            px: 2.5,
-            gap: 0,
-          }}
-        >
-          <BrandMark />
-          <Box sx={{ flexGrow: 1 }} />
-
-          {/* Group 1: Primary nav — Home, History */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
-            {([
-              { key: 'home' as const, label: t.nav.home, icon: <Home size={16} /> },
-              {
-                key: 'history' as const,
-                label: t.nav.history,
-                icon: (
-                  <Badge
-                    badgeContent={pendingOrderCount > 0 ? pendingOrderCount : undefined}
-                    color="warning"
-                    max={99}
-                    invisible={pendingOrderCount === 0}
-                    sx={historyBadgeSx}
-                  >
-                    <History size={16} />
-                  </Badge>
-                ),
-              },
-            ]).map((item) => {
-              const active = activeTab === item.key;
-              return (
-                <Button
-                  key={item.key}
-                  variant="text"
-                  startIcon={item.icon}
-                  onClick={() => handleTabChange(item.key)}
-                  sx={{
-                    color: active ? '#0071e3' : 'var(--foreground)',
-                    bgcolor: 'transparent',
-                    boxShadow: 'none',
-                    textTransform: 'none',
-                    fontWeight: active ? 700 : 500,
-                    fontSize: '0.8125rem',
-                    letterSpacing: '-0.01em',
-                    borderRadius: 0,
-                    px: 1.5,
-                    py: 0.85,
-                    minHeight: 40,
-                    borderBottom: active ? '2px solid #0071e3' : '2px solid transparent',
-                    transition: 'color 0.2s ease, border-color 0.2s ease',
-                    '&:hover': {
-                      bgcolor: 'transparent',
-                      color: '#0071e3',
-                    },
-                  }}
-                >
-                  {item.label}
-                </Button>
-              );
-            })}
-          </Box>
-
-          <Box
-            aria-hidden
-            sx={{
-              width: '1px',
-              height: 22,
-              mx: 1.5,
-              bgcolor: 'var(--glass-border)',
-              flexShrink: 0,
-            }}
-          />
-
-          {/* Group 2: Search & Cart (+ Live) */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            <Button
-              variant="text"
-              startIcon={(
-                <Badge badgeContent={activeFilterCount || undefined} color="warning" invisible={activeFilterCount === 0}>
-                  <Search size={17} />
-                </Badge>
-              )}
-              onClick={() => setShowSearchBar((v) => !v)}
-              sx={{
-                color: showSearchBar ? '#0071e3' : 'var(--foreground)',
-                bgcolor: 'transparent',
-                textTransform: 'none',
-                fontWeight: showSearchBar ? 700 : 500,
-                fontSize: '0.8125rem',
-                borderRadius: 0,
-                px: 1.5,
-                py: 0.85,
-                minHeight: 40,
-                borderBottom: showSearchBar ? '2px solid #0071e3' : '2px solid transparent',
-                '&:hover': {
-                  bgcolor: 'transparent',
-                  color: '#0071e3',
-                },
-              }}
-            >
-              {t.nav.search}
-            </Button>
-            <Button
-              variant="text"
-              startIcon={(
-                <Badge badgeContent={cart.length} color="error">
-                  <ShoppingCart size={16} />
-                </Badge>
-              )}
-              onClick={() => handleTabChange('cart')}
-              sx={{
-                color: activeTab === 'cart' ? '#0071e3' : 'var(--foreground)',
-                bgcolor: 'transparent',
-                textTransform: 'none',
-                fontWeight: activeTab === 'cart' ? 700 : 500,
-                fontSize: '0.8125rem',
-                borderRadius: 0,
-                px: 1.5,
-                py: 0.85,
-                minHeight: 40,
-                borderBottom: activeTab === 'cart' ? '2px solid #0071e3' : '2px solid transparent',
-                '&:hover': {
-                  bgcolor: 'transparent',
-                  color: '#0071e3',
-                },
-              }}
-            >
-              {t.nav.cart}
-            </Button>
-            {session && (
-              <Button
-                variant="text"
-                startIcon={<User size={16} />}
-                onClick={() => handleTabChange('profile')}
-                sx={{
-                  color: activeTab === 'profile' ? '#0071e3' : 'var(--foreground)',
-                  bgcolor: 'transparent',
-                  textTransform: 'none',
-                  fontWeight: activeTab === 'profile' ? 700 : 500,
-                  fontSize: '0.8125rem',
-                  borderRadius: 0,
-                  px: 1.5,
-                  py: 0.85,
-                  minHeight: 40,
-                  borderBottom: activeTab === 'profile' ? '2px solid #0071e3' : '2px solid transparent',
-                  '&:hover': {
-                    bgcolor: 'transparent',
-                    color: '#0071e3',
-                  },
-                }}
-              >
-                {t.nav.profile}
-              </Button>
-            )}
-            {isLiveActive && (
-              <Button
-                variant="text"
-                startIcon={<Radio size={16} />}
-                onClick={openLiveStream}
-                sx={{
-                  color: '#fff',
-                  bgcolor: '#ff3b30',
-                  textTransform: 'none',
-                  borderRadius: '980px',
-                  px: 1.5,
-                  py: 0.65,
-                  minHeight: 34,
-                  fontWeight: 700,
-                  fontSize: '0.8125rem',
-                  ml: 0.5,
-                  position: 'relative',
-                  overflow: 'visible',
-                  animation: 'navLivePulse 2s ease-in-out infinite',
-                  '@keyframes navLivePulse': {
-                    '0%, 100%': { boxShadow: '0 0 0 0 rgba(255,59,48,0.35)' },
-                    '50%': { boxShadow: '0 0 0 7px rgba(255,59,48,0)' },
-                  },
-                  '&:hover': { bgcolor: '#e0342b' },
-                  '&::before': {
-                    content: '""',
-                    width: 7,
-                    height: 7,
-                    borderRadius: '50%',
-                    bgcolor: '#fff',
-                    position: 'absolute',
-                    top: 7,
-                    right: 8,
-                    animation: 'navLiveDot 1.5s ease-in-out infinite',
-                  },
-                  '@keyframes navLiveDot': {
-                    '0%, 100%': { opacity: 1 },
-                    '50%': { opacity: 0.35 },
-                  },
-                }}
-              >
-                {t.nav.live}
-              </Button>
-            )}
-          </Box>
-
-          <Box
-            aria-hidden
-            sx={{
-              width: '1px',
-              height: 22,
-              mx: 1.5,
-              bgcolor: 'var(--glass-border)',
-              flexShrink: 0,
-            }}
-          />
-
-          {/* Group 3: Personal settings */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-            <LanguageToggle size="small" />
-            <ThemeToggle size="small" />
-            {session && (
-              <Avatar
-                src={orderData.profileImage || session?.user?.image || ''}
-                sx={{
-                  width: 30,
-                  height: 30,
-                  cursor: 'pointer',
-                  boxShadow: (theme) =>
-                    theme.palette.mode === 'dark'
-                      ? '0 0 0 1px rgba(255,255,255,0.12)'
-                      : '0 0 0 1px rgba(0,0,0,0.06)',
-                }}
-                onClick={() => setSidebarOpen(true)}
-              />
-            )}
-          </Box>
-        </Toolbar>
-        {showSearchBar && (
+      <StorefrontNavbar
+        hidden={hideNavBars}
+        activeTab={activeTab}
+        pendingOrderCount={pendingOrderCount}
+        cartCount={cart.length}
+        wishlistCount={wishlistStore.items.length}
+        searchActive={showSearchBar}
+        filterCount={activeFilterCount}
+        isLiveActive={isLiveActive}
+        isAuthenticated={Boolean(session)}
+        avatarUrl={orderData.profileImage || session?.user?.image || undefined}
+        utilityLeft={t.nav.shopTitle}
+        utilityCenter={t.nav.utilityPromo}
+        languageToggle={<LanguageToggle size="small" />}
+        themeToggle={<ThemeToggle size="small" />}
+        onTabChange={(tab) => handleTabChange(tab)}
+        onSearchToggle={() => setShowSearchBar((v) => !v)}
+        onOpenSidebar={() => setSidebarOpen(true)}
+        onOpenWishlist={() => setShowWishlistDrawer(true)}
+        onOpenLive={openLiveStream}
+        onShopClick={() => {
+          setActiveTab('home');
+          document.getElementById('product-grid')?.scrollIntoView({ behavior: 'smooth' });
+        }}
+        onFlagshipClick={() => {
+          window.location.href = '/flagship/scc-jersey-2026';
+        }}
+        searchPanel={showSearchBar ? (
           <Box sx={{ px: { xs: 1.25, md: 3 }, pb: 2, pt: 0.5, position: 'relative', zIndex: 2 }}>
             <Box sx={{
               borderRadius: { xs: '18px', md: '20px' },
@@ -3914,30 +3620,7 @@ export default function HomePage() {
               )}
             </Box>
           </Box>
-        )}
-      </AppBar>
-
-      {/* Announcements — top of page, under sticky nav */}
-      <AnnouncementBar
-        announcements={announcements || []}
-        history={announcementHistory}
-        socialMediaNews={config?.socialMediaNews}
-        onProductClick={(productId) => {
-          const products = config?.products || [];
-          let product = null;
-          if (productId && productId !== '__default__') {
-            product = products.find(p => p.id === productId)
-              || products.find(p => p.id?.includes(productId) || productId?.includes(p.id));
-          }
-          if (!product && products.length > 0) {
-            product = products[0];
-          }
-          if (product) {
-            handleSelectProduct(product);
-          } else {
-            document.getElementById('product-grid')?.scrollIntoView({ behavior: 'smooth' });
-          }
-        }}
+        ) : null}
       />
 
       {/* Shop Status Banner - Shows different states (not open, coming soon, order ended, etc.) */}
@@ -5959,11 +5642,17 @@ export default function HomePage() {
 
       <MobileBottomNav
         tabs={bottomTabs}
-        activeKey={activeTab}
-        chatActive={chatbotOpen}
+        activeKey={
+          showSearchBar
+            ? 'search'
+            : showWishlistDrawer
+              ? 'wishlist'
+              : showCart
+                ? 'cart'
+                : activeTab
+        }
         hidden={hideNavBars}
         onTabClick={handleTabChange}
-        onChatClick={(el) => setChatMenuAnchor(el)}
       />
 
       {showRefreshDroplet && (
