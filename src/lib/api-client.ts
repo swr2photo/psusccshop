@@ -60,10 +60,38 @@ export async function apiFetch(
   const url = authRoute ? normalized : apiUrl(path);
   const useCredentials = !authRoute && Boolean(getPublicApiBaseUrl());
 
-  return fetch(url, {
+  const fetchInit = {
     ...init,
     credentials: useCredentials ? 'include' : init?.credentials ?? 'same-origin',
-  });
+  } as RequestInit;
+
+  // Intercept and encrypt outgoing JSON body
+  if (fetchInit.body && typeof fetchInit.body === 'string') {
+    try {
+      if (fetchInit.body.startsWith('{') || fetchInit.body.startsWith('[')) {
+        const parsed = JSON.parse(fetchInit.body);
+        if (!parsed._e) {
+          fetchInit.body = JSON.stringify({ _e: await encryptPayload(parsed) });
+        }
+      }
+    } catch (e) {
+      // Ignore
+    }
+  }
+
+  const res = await fetch(url, fetchInit);
+
+  // Intercept and decrypt incoming JSON response
+  const originalJson = res.json.bind(res);
+  res.json = async () => {
+    const raw = await originalJson();
+    if (raw && raw._e) {
+      return await decryptPayload(raw._e);
+    }
+    return raw;
+  };
+
+  return res;
 }
 
 async function syncAuthCookieQuiet(): Promise<void> {
