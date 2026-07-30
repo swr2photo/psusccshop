@@ -631,11 +631,6 @@ function getProductLink(product: Product): string {
 
 export default function HomePage() {
   const now = useCurrentTime(5000);
-  const shopStatusType = useMemo(
-    () => getShopStatus(config?.isOpen ?? false, config?.closeDate, config?.openDate, now),
-    [config, now]
-  );
-  const isShopOpen = shopStatusType === 'OPEN';
   const { data: session, status } = useSession();
   const isMobile = useMediaQuery('(max-width:600px)');
   const theme = useTheme();
@@ -660,6 +655,12 @@ export default function HomePage() {
     return cached ? (cached as unknown as ShopConfig) : null;
   });
   const [shippingConfig, setShippingConfig] = useState<ShippingConfig | null>(null);
+  
+  const shopStatusType = useMemo(
+    () => getShopStatus(config?.isOpen ?? false, config?.closeDate, config?.openDate, now),
+    [config, now]
+  );
+  const isShopOpen = shopStatusType === 'OPEN';
   
   // ==================== DEV MODE TEST PRODUCTS ====================
   const isDev = process.env.NODE_ENV === 'development';
