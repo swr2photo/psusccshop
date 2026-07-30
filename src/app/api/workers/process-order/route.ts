@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { sql } from 'drizzle-orm';
 import { getRedisClient } from '@/lib/redis';
 import { putJson } from '@/lib/filebase';
 import { triggerSheetSync } from '@/lib/sheet-sync';
@@ -17,16 +15,49 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
     }
 
+    const redis = getRedisClient();
+
+    // Update stage → validating_stock
+    if (redis) {
+      try {
+        const raw = await redis.get(`order_queue:${ref}`);
+        const meta = typeof raw === 'string' ? JSON.parse(raw) : raw ?? {};
+        meta.stage = 'validating_stock';
+        await redis.set(`order_queue:${ref}`, JSON.stringify(meta), { ex: 300 }).catch(() => {});
+      } catch (err) {
+        console.warn('[Worker API] Failed to update Redis (validating_stock):', err);
+      }
+    }
+
     // Insert to DB / Filebase
+    // Update stage → saving
+    if (redis) {
+      try {
+        const raw = await redis.get(`order_queue:${ref}`);
+        const meta = typeof raw === 'string' ? JSON.parse(raw) : raw ?? {};
+        meta.stage = 'saving';
+        await redis.set(`order_queue:${ref}`, JSON.stringify(meta), { ex: 300 }).catch(() => {});
+      } catch (err) {
+        console.warn('[Worker API] Failed to update Redis (saving):', err);
+      }
+    }
+
     await putJson(key, order);
     
     // Attempt sheet sync
     triggerSheetSync().catch(() => {});
 
-    // Update Redis Status
-    const redis = getRedisClient();
+    // ── Mark complete & cleanup queue tracking ──────────
     if (redis) {
-      await redis.set(`order_status:${ref}`, 'ready_for_payment', { ex: 3600 });
+      try {
+        await Promise.all([
+          redis.set(`order_status:${ref}`, 'ready_for_payment', { ex: 3600 }),
+          redis.del(`order_queue:${ref}`),
+          redis.decr('queue:active').catch(() => {}),
+        ]);
+      } catch (err) {
+        console.warn('[Worker API] Failed to update Redis (cleanup):', err);
+      }
     }
 
     return NextResponse.json({ success: true, ref });

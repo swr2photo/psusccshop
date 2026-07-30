@@ -8,11 +8,16 @@ let _redis: Redis | null = null;
  */
 export function getRedisClient(): Redis | null {
   if (_redis) return _redis;
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  let url = process.env.UPSTASH_REDIS_REST_URL?.trim();
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
   if (!url || !token || url.includes('placeholder') || token.includes('placeholder')) {
     return null;
   }
+  
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    url = `https://${url}`;
+  }
+
   _redis = new Redis({ url, token });
   return _redis;
 }

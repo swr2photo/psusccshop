@@ -18,7 +18,7 @@ export interface Env {
   [key: string]: unknown;
 }
 
-const app = createApiApp({ adapter: CloudflareAdapter }).compile();
+const app = createApiApp({ adapter: CloudflareAdapter });
 
 export default {
   async fetch(

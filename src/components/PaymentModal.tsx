@@ -102,6 +102,20 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
   const [orderDate, setOrderDate] = useState<string | null>(null);
   const [taxId, setTaxId] = useState<string>('');
   const [isQueued, setIsQueued] = useState(false);
+  const [queueInfo, setQueueInfo] = useState<{
+    position: number;
+    activeInQueue: number;
+    queuedAt: string;
+    elapsedMs: number;
+    estimatedTotalMs: number;
+    remainingMs: number;
+    stage: string;
+    stageLabel: string;
+  } | null>(null);
+  const [queueStages, setQueueStages] = useState<{ key: string; label: string; done?: boolean; active?: boolean }[]>([]);
+  const [queueProgress, setQueueProgress] = useState(0);
+  const queueStartRef = useRef<number>(0);
+  const queueEstimateRef = useRef<number>(6000);
 
   const [paymentEnabled, setPaymentEnabled] = useState(true);
   const [paymentDisabledMessage, setPaymentDisabledMessage] = useState<string | null>(null);
@@ -185,8 +199,36 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
     }
   }, [isSwipeDragging, swipeDragOffset, onClose]);
 
+  // ── Queue status polling with rich metadata ──────────
   useEffect(() => {
     let pollInterval: NodeJS.Timeout;
+    let progressRaf: number;
+
+    const updateProgress = () => {
+      if (!queueStartRef.current) return;
+      const elapsed = Date.now() - queueStartRef.current;
+      const est = queueEstimateRef.current || 6000;
+      // Smooth progress: fast at start, slows near 90%, never reaches 100% until done
+      const raw = elapsed / est;
+      const clamped = Math.min(raw, 0.95);
+      // Ease-out curve for natural feel
+      const eased = 1 - Math.pow(1 - clamped, 2.5);
+      setQueueProgress(Math.round(eased * 100));
+      progressRaf = requestAnimationFrame(updateProgress);
+    };
+
+    const parseQueueResponse = (data: any) => {
+      if (data.queue) {
+        setQueueInfo(data.queue);
+        if (!queueStartRef.current) {
+          queueStartRef.current = Date.now() - (data.queue.elapsedMs || 0);
+        }
+        queueEstimateRef.current = data.queue.estimatedTotalMs || 6000;
+      }
+      if (data.stages) {
+        setQueueStages(data.stages);
+      }
+    };
 
     const checkStatus = async () => {
       try {
@@ -194,8 +236,16 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
          const data = await res.json();
          if (data.status === 'ready_for_payment') {
             clearInterval(pollInterval);
-            setIsQueued(false);
-            fetchPaymentInfo();
+            if (progressRaf) cancelAnimationFrame(progressRaf);
+            setQueueProgress(100);
+            setQueueStages(data.stages || []);
+            // Brief pause at 100% for visual satisfaction
+            setTimeout(() => {
+              setIsQueued(false);
+              fetchPaymentInfo();
+            }, 600);
+         } else {
+            parseQueueResponse(data);
          }
       } catch (e) {
          // ignore
@@ -212,7 +262,10 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
         } else {
            setIsQueued(true);
            setLoading(false);
-           pollInterval = setInterval(checkStatus, 2000);
+           parseQueueResponse(data);
+           queueStartRef.current = queueStartRef.current || Date.now();
+           progressRaf = requestAnimationFrame(updateProgress);
+           pollInterval = setInterval(checkStatus, 1500);
         }
       } catch (e) {
         fetchPaymentInfo(); // Fallback
@@ -223,6 +276,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
 
     return () => {
        if (pollInterval) clearInterval(pollInterval);
+       if (progressRaf) cancelAnimationFrame(progressRaf);
     };
   }, [orderRef]);
 
@@ -703,14 +757,157 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
         sx={{ flex: 1, overflow: 'auto', WebkitOverflowScrolling: 'touch', px: { xs: 2, sm: 2.5 }, py: 2 }}
       >
         {isQueued ? (
-           <Box sx={{ p: 4, mt: 8, textAlign: 'center' }}>
-              <Loader2 size={48} className="animate-spin mx-auto mb-4" style={{ color: NAVY }} />
-              <Typography variant="h6" fontWeight={700} color="text.primary" gutterBottom>
-                 กำลังเข้าคิวทำรายการ...
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 280, mx: 'auto' }}>
-                 กรุณารอสักครู่ ระบบกำลังจัดสรรคิวและตรวจสอบสต็อกสินค้าของคุณ
-              </Typography>
+           <Box sx={{ p: { xs: 2, sm: 3 }, mt: { xs: 2, sm: 4 } }}>
+             {/* ── Queue Status Card ── */}
+             <Box sx={{
+               maxWidth: 420,
+               mx: 'auto',
+               borderRadius: '16px',
+               background: 'linear-gradient(135deg, rgba(30,58,95,0.04) 0%, rgba(30,58,95,0.01) 100%)',
+               border: '1px solid rgba(30,58,95,0.1)',
+               overflow: 'hidden',
+             }}>
+               {/* Position Header */}
+               <Box sx={{
+                 textAlign: 'center',
+                 pt: 3.5,
+                 pb: 2,
+                 px: 3,
+               }}>
+                 <Box sx={{
+                   display: 'inline-flex',
+                   alignItems: 'center',
+                   justifyContent: 'center',
+                   width: 56,
+                   height: 56,
+                   borderRadius: '50%',
+                   background: `linear-gradient(135deg, ${NAVY} 0%, rgba(30,58,95,0.8) 100%)`,
+                   mb: 1.5,
+                   boxShadow: `0 4px 20px rgba(30,58,95,0.25)`,
+                 }}>
+                   <Typography sx={{ fontSize: '1.3rem', fontWeight: 900, color: '#fff', lineHeight: 1 }}>
+                     {queueInfo?.position ? `#${queueInfo.position}` : '...'}
+                   </Typography>
+                 </Box>
+                 <Typography variant="h6" fontWeight={800} color="text.primary" sx={{ fontSize: '1.05rem' }}>
+                   {queueProgress >= 95 ? 'เกือบเสร็จแล้ว!' : 'กำลังดำเนินการ'}
+                 </Typography>
+                 <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontSize: '0.78rem' }}>
+                   {queueInfo?.position
+                     ? `ลำดับที่ ${queueInfo.position} · ${queueInfo.activeInQueue || 1} รายการในคิว`
+                     : 'กำลังจัดลำดับคิว...'}
+                 </Typography>
+               </Box>
+
+               {/* Progress Bar */}
+               <Box sx={{ px: 3, pb: 1.5 }}>
+                 <Box sx={{
+                   position: 'relative',
+                   height: 8,
+                   borderRadius: 4,
+                   bgcolor: 'rgba(30,58,95,0.08)',
+                   overflow: 'hidden',
+                 }}>
+                   <Box sx={{
+                     position: 'absolute',
+                     top: 0,
+                     left: 0,
+                     height: '100%',
+                     width: `${queueProgress}%`,
+                     borderRadius: 4,
+                     background: `linear-gradient(90deg, ${NAVY} 0%, #3b82f6 100%)`,
+                     transition: 'width 0.3s ease-out',
+                     '&::after': queueProgress < 100 ? {
+                       content: '""',
+                       position: 'absolute',
+                       top: 0,
+                       left: 0,
+                       right: 0,
+                       bottom: 0,
+                       background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%)',
+                       animation: 'shimmer 2s infinite',
+                     } : {},
+                   }} />
+                 </Box>
+                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.75 }}>
+                   <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary', fontWeight: 600 }}>
+                     {queueProgress}%
+                   </Typography>
+                   <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary', fontWeight: 600 }}>
+                     {queueInfo?.remainingMs !== undefined && queueInfo.remainingMs > 0
+                       ? `~${Math.ceil(queueInfo.remainingMs / 1000)} วินาที`
+                       : 'เกือบเสร็จแล้ว'}
+                   </Typography>
+                 </Box>
+               </Box>
+
+               {/* Steps / Stages */}
+               <Box sx={{ px: 3, pb: 3 }}>
+                 <Box sx={{ borderTop: '1px solid rgba(30,58,95,0.08)', pt: 2 }}>
+                   {queueStages.map((stage, i) => (
+                     <Box key={stage.key} sx={{
+                       display: 'flex',
+                       alignItems: 'center',
+                       gap: 1.5,
+                       py: 0.75,
+                       opacity: stage.done || stage.active ? 1 : 0.4,
+                     }}>
+                       <Box sx={{
+                         width: 22,
+                         height: 22,
+                         borderRadius: '50%',
+                         display: 'flex',
+                         alignItems: 'center',
+                         justifyContent: 'center',
+                         flexShrink: 0,
+                         ...(stage.done
+                           ? { bgcolor: '#059669', color: '#fff' }
+                           : stage.active
+                             ? { bgcolor: NAVY, color: '#fff' }
+                             : { bgcolor: 'rgba(30,58,95,0.08)', color: 'rgba(30,58,95,0.3)' }
+                         ),
+                       }}>
+                         {stage.done ? (
+                           <Check size={13} strokeWidth={3} />
+                         ) : stage.active ? (
+                           <Loader2 size={13} className="animate-spin" />
+                         ) : (
+                           <Typography sx={{ fontSize: '0.65rem', fontWeight: 700 }}>{i + 1}</Typography>
+                         )}
+                       </Box>
+                       <Typography sx={{
+                         fontSize: '0.8rem',
+                         fontWeight: stage.active ? 700 : stage.done ? 600 : 400,
+                         color: stage.active ? 'text.primary' : stage.done ? 'text.secondary' : 'text.disabled',
+                       }}>
+                         {stage.label}
+                       </Typography>
+                     </Box>
+                   ))}
+                 </Box>
+               </Box>
+
+               {/* Footer hint */}
+               <Box sx={{
+                 px: 3,
+                 py: 1.5,
+                 bgcolor: 'rgba(30,58,95,0.03)',
+                 borderTop: '1px solid rgba(30,58,95,0.06)',
+                 textAlign: 'center',
+               }}>
+                 <Typography sx={{ fontSize: '0.72rem', color: 'text.secondary' }}>
+                   💡 ระบบจะนำคุณไปหน้าชำระเงินอัตโนมัติเมื่อเสร็จสิ้น
+                 </Typography>
+               </Box>
+             </Box>
+
+             {/* Shimmer keyframes */}
+             <style>{`
+               @keyframes shimmer {
+                 0% { transform: translateX(-100%); }
+                 100% { transform: translateX(200%); }
+               }
+             `}</style>
            </Box>
         ) : (
         <Box
