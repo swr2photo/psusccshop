@@ -57,7 +57,7 @@ import {
 import { useGalleryImagePreload, isGalleryImageInRange } from '@/hooks/useGalleryImagePreload';
 import OptimizedImage from '@/components/OptimizedImage';
 import { type ShopEvent } from '@/components/EventBanner';
-import { resolveSizeMeasurement } from '@/lib/shop-constants';
+import { resolveSizeMeasurement, getAvailableStock, getCartItemCount } from '@/lib/shop-constants';
 
 const SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL', '7XL', '8XL', '9XL', '10XL'] as const;
 
@@ -207,6 +207,7 @@ interface ProductDetailsDialogProps {
   onEditReview?: (review: any) => void;
   onDeleteReview?: (id: string) => void;
   config: ShopConfig;
+  cart?: any[];
 }
 
 export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
@@ -244,7 +245,20 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
   onEditReview,
   onDeleteReview,
   config,
+  cart = [],
 }: ProductDetailsDialogProps) {
+
+  const maxAvailable = useMemo(() => {
+    if (!selectedProduct) return null;
+    return getAvailableStock(selectedProduct, productOptions.size);
+  }, [selectedProduct, productOptions.size]);
+
+  const maxSelectable = useMemo(() => {
+    if (maxAvailable === null || !selectedProduct) return null;
+    const countInCart = getCartItemCount(cart, selectedProduct.id, productOptions.size);
+    return Math.max(0, maxAvailable - countInCart);
+  }, [maxAvailable, selectedProduct, productOptions.size, cart]);
+
   
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
@@ -1683,17 +1697,24 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
                     </Typography>
                     <IconButton
                       onClick={() => setProductOptions({ ...productOptions, quantity: clampQty(productOptions.quantity + 1) })}
+                      disabled={maxSelectable !== null && productOptions.quantity >= maxSelectable}
                       sx={{
                         color: 'var(--foreground)',
                         p: 1.25,
                         borderRadius: 0,
                         '&:hover': { bgcolor: 'var(--surface-2)' },
+                        '&.Mui-disabled': { color: 'var(--text-muted)' },
                       }}
                     >
                       <Plus size={18} />
                     </IconButton>
                   </Box>
                 </Box>
+                {maxAvailable !== null && (
+                  <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'right', mt: 0.5 }}>
+                    {lang === 'en' ? 'Available:' : 'เหลือ'} {maxSelectable} / {maxAvailable} {lang === 'en' ? 'items' : 'ชิ้น'}
+                  </Typography>
+                )}
               </Box>
             </Box>
 

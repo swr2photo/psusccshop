@@ -72,6 +72,8 @@ import {
   resolveShopOpenFields, applyRealtimeShopRow,
   parseThailandDateTime,
   createCartLineId,
+  getAvailableStock,
+  getCartItemCount,
 } from '@/lib/shop-constants';
 import { getClientReservationExpiryMs } from '@/components/OrderCountdown';
 
@@ -255,6 +257,26 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
   const [customName, setCustomName] = useState('');
   const [customNumber, setCustomNumber] = useState('');
   const [isLongSleeve, setIsLongSleeve] = useState<boolean | null>(null);
+
+  const maxAvailable = useMemo(() => {
+    if (!selectedProduct) return null;
+    return getAvailableStock(selectedProduct, selectedSize);
+  }, [selectedProduct, selectedSize]);
+
+  const maxSelectable = useMemo(() => {
+    if (maxAvailable === null) return null;
+    if (!selectedProduct) return null;
+    const countInCart = getCartItemCount(shopCart, selectedProduct.id, selectedSize);
+    return Math.max(0, maxAvailable - countInCart);
+  }, [maxAvailable, selectedProduct, selectedSize, shopCart]);
+
+  // Adjust quantity if it exceeds maxSelectable
+  useEffect(() => {
+    if (maxSelectable !== null && quantity > maxSelectable) {
+      setQuantity(Math.max(1, maxSelectable));
+    }
+  }, [maxSelectable, quantity]);
+
   const customNameInputRef = useRef<HTMLInputElement>(null);
   const customNumberInputRef = useRef<HTMLInputElement>(null);
 
@@ -1269,6 +1291,12 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       showToast('warning', needsSize
         ? (lang === 'en' ? 'Please select a size' : 'กรุณาเลือกขนาดไซส์')
         : (lang === 'en' ? 'Please select an option' : 'กรุณาเลือกตัวเลือกสินค้า'));
+      return null;
+    }
+
+    // Stock validation
+    if (maxSelectable !== null && maxSelectable <= 0) {
+      showToast('warning', lang === 'en' ? 'This item is out of stock' : 'สินค้าหมดสต็อกแล้ว');
       return null;
     }
 
@@ -2968,12 +2996,24 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                           <IconButton
                             size="small"
                             onClick={() => setQuantity(quantity + 1)}
-                            sx={{ color: 'var(--foreground)', borderRadius: 0, px: 1.25, '&:hover': { bgcolor: 'var(--surface-2)' } }}
+                            disabled={maxSelectable !== null && quantity >= maxSelectable}
+                            sx={{ 
+                              color: 'var(--foreground)', 
+                              borderRadius: 0, 
+                              px: 1.25, 
+                              '&:hover': { bgcolor: 'var(--surface-2)' },
+                              '&.Mui-disabled': { color: 'var(--text-muted)' }
+                            }}
                           >
                             <Plus size={16} />
                           </IconButton>
                         </Box>
                       </Box>
+                      {maxAvailable !== null && (
+                        <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'right', mt: 1 }}>
+                          {lang === 'en' ? 'Available:' : 'เหลือ'} {maxSelectable} / {maxAvailable} {lang === 'en' ? 'items' : 'ชิ้น'}
+                        </Typography>
+                      )}
                     </Box>
 
                     {/* Desktop Actions */}

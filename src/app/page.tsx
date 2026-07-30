@@ -5144,6 +5144,7 @@ export default function HomePage() {
           }
         }}
         config={config!}
+        cart={cart}
       />
 
       {/* ===== Size Chart Dialog - Modern Design ===== */}

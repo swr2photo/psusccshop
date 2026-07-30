@@ -34,6 +34,7 @@ import {
   normalizeEngName,
   normalizeDigits99,
   type CartItem,
+  getAvailableStock,
 } from '@/lib/shop-constants';
 import { ShopConfig, Product, SIZES } from '@/lib/config';
 import { ShippingConfig } from '@/lib/shipping';
@@ -488,6 +489,9 @@ export default function CartDrawer(props: CartDrawerProps) {
               {cart.map((item) => {
                 const product = resolveProduct(item);
                 const issue = lineIssues.get(item.id);
+                const variantId = item.options?.variantId || (item as any).selectedVariant?.id;
+                const itemStockLimit = product ? getAvailableStock(product, variantId) : null;
+                const atStockLimit = itemStockLimit !== null && item.quantity >= itemStockLimit;
                 return (
                   <Box
                     key={item.id}
@@ -609,12 +613,19 @@ export default function CartDrawer(props: CartDrawerProps) {
                             <IconButton
                               size="small"
                               onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
-                              onMouseDown={() => onStartHold(item.id, 1)}
+                              onMouseDown={() => !atStockLimit && onStartHold(item.id, 1)}
                               onMouseUp={() => onStopHold(item.id)}
                               onMouseLeave={() => onStopHold(item.id)}
-                              onTouchStart={() => onStartHold(item.id, 1)}
+                              onTouchStart={() => !atStockLimit && onStartHold(item.id, 1)}
                               onTouchEnd={() => onStopHold(item.id)}
-                              sx={{ color: 'var(--foreground)', p: 0.7, borderRadius: 0, '&:hover': { bgcolor: 'var(--surface)' } }}
+                              disabled={atStockLimit}
+                              sx={{ 
+                                color: 'var(--foreground)', 
+                                p: 0.7, 
+                                borderRadius: 0, 
+                                '&:hover': { bgcolor: 'var(--surface)' },
+                                '&.Mui-disabled': { color: 'var(--text-muted)' },
+                              }}
                             >
                               <Plus size={13} strokeWidth={2} />
                             </IconButton>
@@ -639,6 +650,11 @@ export default function CartDrawer(props: CartDrawerProps) {
                             </IconButton>
                           </Box>
                         </Box>
+                        {itemStockLimit !== null && (
+                          <Typography sx={{ fontSize: '0.68rem', color: atStockLimit ? 'var(--warning, #ff9f0a)' : 'var(--text-muted)', mt: 0.5, textAlign: 'right' }}>
+                            {lang === 'en' ? `Stock: ${itemStockLimit}` : `สต็อก: ${itemStockLimit} ชิ้น`}
+                          </Typography>
+                        )}
                       </Box>
                     </Box>
 

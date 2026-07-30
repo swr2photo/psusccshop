@@ -42,6 +42,38 @@ export function resolveProductUnitPrice(
   return basePrice + sleeveFee;
 }
 
+/** 
+ * Returns the maximum available stock for a product, 
+ * factoring in variant-specific stock if applicable.
+ * Returns null if stock is unlimited.
+ */
+export function getAvailableStock(product: Product, variantId?: string): number | null {
+  if (!productRequiresSize(product) && product.variants?.length && variantId) {
+    const variant = product.variants.find((v) => v.id === variantId);
+    if (variant && variant.stock !== undefined && variant.stock !== null) {
+      return variant.stock;
+    }
+  }
+  return product.stock ?? null;
+}
+
+/** 
+ * Calculates how many items of this exact product/variant are already in the cart.
+ * Handles both page.tsx CartItem shape (options.variantId) and Zustand cart shape (selectedVariant.id / size).
+ */
+export function getCartItemCount(cart: any[], productId: string, variantId?: string): number {
+  return cart
+    .filter(item => {
+      const itemProductId = item.productId || item.id?.split('-')[0];
+      if (itemProductId !== productId) return false;
+      if (!variantId) return true;
+      // Match against both cart item shapes
+      const itemVariantId = item.options?.variantId || item.selectedVariant?.id || item.size;
+      return itemVariantId === variantId;
+    })
+    .reduce((acc, item) => acc + (item.quantity || item.qty || 0), 0);
+}
+
 export type ShopOpenFields = {
   isOpen: boolean;
   closeDate?: string;
