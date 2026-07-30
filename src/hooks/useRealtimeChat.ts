@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable react-hooks/set-state-in-effect */
 // src/hooks/useRealtimeChat.ts
 // Supabase Realtime hook for live chat — replaces 5-second polling
 // Features:

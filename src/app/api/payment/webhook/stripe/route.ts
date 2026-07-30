@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/app/api/payment/webhook/stripe/route.ts
 // Stripe webhook handler
 
@@ -75,7 +76,7 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
   }
 
   // Get card details from payment method
-  const paymentMethodId = paymentIntent.payment_method;
+  const _paymentMethodId = paymentIntent.payment_method;
   let cardLast4 = '';
   let cardBrand = '';
 

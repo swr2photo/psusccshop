@@ -1,9 +1,10 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // API route for product reviews
 import { NextRequest, NextResponse } from 'next/server';
 import { withBackendProxy } from '@/lib/backend-proxy';
 import { db } from '@/lib/db';
 import { reviews } from '@/db/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 import { createHash } from 'crypto';
 import { requireAuth, getSession } from '@/lib/auth';
 import { rateLimitOrNull, API_CACHE } from '@/lib/api-helpers';
@@ -108,7 +109,7 @@ async function GETHandler(request: NextRequest) {
         },
       }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('GET /api/reviews error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -165,7 +166,7 @@ export async function POST(request: NextRequest) {
     invalidateCachePrefix('reviews:');
 
     return NextResponse.json({ success: true, review: resultData });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('POST /api/reviews error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -207,7 +208,7 @@ export async function PUT(request: NextRequest) {
 
     invalidateCachePrefix('reviews:');
     return NextResponse.json(updated[0]);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('PUT /api/reviews error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -233,7 +234,7 @@ export async function DELETE(request: NextRequest) {
 
     invalidateCachePrefix('reviews:');
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('DELETE /api/reviews error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

@@ -2,9 +2,9 @@
 // AI-powered chatbot API with real-time database context + order lookup
 import { NextRequest, NextResponse } from 'next/server';
 import * as Sentry from '@sentry/nextjs';
-import { processChat, buildDetailedShopContext, getShopData, ChatMessage, getCurrentModelName } from '@/lib/ai-chatbot';
+import { processChat, getShopData, ChatMessage, getCurrentModelName } from '@/lib/ai-chatbot';
 import { QUICK_QUESTIONS, SHIRT_FAQ } from '@/lib/shirt-faq';
-import { checkCombinedRateLimitAsync, RATE_LIMITS } from '@/lib/rate-limit';
+import { checkCombinedRateLimitAsync } from '@/lib/rate-limit';
 import { API_CACHE } from '@/lib/api-helpers';
 import { getSession } from '@/lib/auth';
 import { recordChatbotRequest } from '@/lib/sentry-metrics';

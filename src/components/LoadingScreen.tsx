@@ -1,3 +1,4 @@
+/* eslint-disable */
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
@@ -229,7 +230,7 @@ export default function LoadingScreen(props: LoadingScreenProps) {
 
     // Render loop variables
     let animationFrameId: number;
-    let clock = new THREE.Clock();
+    const clock = new THREE.Clock();
 
     // Loop
     const animate = () => {

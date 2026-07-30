@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // Factory / production summary export for Google Sheets
 
 import type { Product } from '@/lib/config';

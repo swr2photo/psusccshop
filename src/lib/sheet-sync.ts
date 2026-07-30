@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/lib/sheet-sync.ts
 // Background sheet sync utility - auto-syncs orders to Google Sheets
 
@@ -44,7 +45,7 @@ export async function syncNow(baseUrl?: string): Promise<{ success: boolean; mes
     await performSync(baseUrl);
     lastSyncTime = Date.now();
     return { success: true, message: 'Synced successfully' };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[sheet-sync] Sync failed:', error);
     return { success: false, message: error?.message || 'Sync failed' };
   }

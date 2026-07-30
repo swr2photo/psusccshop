@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // API route for back-in-stock alerts
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true, alert: resultData });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('POST /api/stock-alert error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -103,7 +104,7 @@ export async function DELETE(request: NextRequest) {
       );
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('DELETE /api/stock-alert error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -134,7 +135,7 @@ export async function GET(request: NextRequest) {
         createdAt: toIsoString(a.createdAt) || undefined,
       })),
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('GET /api/stock-alert error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

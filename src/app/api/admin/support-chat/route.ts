@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/app/api/admin/support-chat/route.ts
 // Admin: Get all chat sessions — Drizzle ORM
 
@@ -136,7 +137,7 @@ export async function GET(request: NextRequest) {
     
     return NextResponse.json({ chats, stats });
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[admin/support-chat] GET error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },

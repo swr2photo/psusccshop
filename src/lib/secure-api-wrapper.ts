@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/lib/secure-api-wrapper.ts
 // Secure API Wrapper with full security features
 // ใช้ wrap API routes เพื่อเพิ่มความปลอดภัยอัตโนมัติ
@@ -325,7 +326,7 @@ export function withSecureAPI(
 
       return response;
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Log error
       await logSecurityEvent('api_error', {
         severity: 'medium',

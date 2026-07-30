@@ -81,7 +81,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       message: force ? 'โอนเคสสำเร็จ' : 'รับเคสสำเร็จ'
     });
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[support-chat/accept] POST error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },

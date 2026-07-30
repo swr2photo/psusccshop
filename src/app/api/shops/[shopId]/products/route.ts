@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // /api/shops/[shopId]/products — Get/Update shop products
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, isSuperAdminEmail } from '@/lib/auth';
@@ -53,7 +54,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     }
 
     return NextResponse.json({ status: 'success', products: shop.products });
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json({ status: 'error', message: error?.message || 'เกิดข้อผิดพลาด' }, { status: 500 });
   }
 }

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/lib/api-security.ts
 // Security wrapper for API routes
 
@@ -242,7 +243,7 @@ export function withSecurity(
 
       return response;
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Log error
       logSecurityEvent('api_error', {
         ip: clientIP,

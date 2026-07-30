@@ -13,6 +13,13 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Non-production utility / migration scripts:
+    "scratch/**",
+    "scripts/**",
+    "server/**",
+    "public/sw.js",
+    "next.config.ts",
+    "prisma.config.ts",
   ]),
 ]);
 

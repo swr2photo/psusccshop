@@ -99,7 +99,7 @@ export async function verifyTurnstileToken(
     }
 
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Turnstile] Verification error:', error);
     return { success: false, error: 'Turnstile verification service unavailable' };
   }

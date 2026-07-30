@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/lib/support-chat.ts
 // Support Chat System - Types and Drizzle ORM helpers
 

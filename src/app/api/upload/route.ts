@@ -1,14 +1,15 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth';
 import { checkCombinedRateLimitAsync, RATE_LIMITS, getRateLimitHeaders } from '@/lib/rate-limit';
-import { putJson, uploadImageToStorage, isSupabaseStorageUrl } from '@/lib/supabase';
+import { putJson, uploadImageToStorage } from '@/lib/supabase';
 import { validateImageBuffer, isAllowedPassThroughImageUrl } from '@/lib/upload-validation';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 // Helper to save user log server-side
-const userLogKey = (id: string) => `user-logs/${id}.json`;
+const _userLogKey = (id: string) => `user-logs/${id}.json`;
 interface LogEntry {
   id: string;
   email: string;
@@ -152,7 +153,7 @@ export async function POST(req: NextRequest) {
       status: 'success',
       data: { url, path, size: buffer.length },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[upload] error', error);
     const raw = String(error?.message || 'Upload failed');
     const friendly =
@@ -247,7 +248,7 @@ export async function PUT(req: NextRequest) {
         // Upload to Supabase Storage
         const { url, path } = await uploadImageToStorage(buffer, fileName, contentType);
         results.push({ url, path, originalIndex: i });
-      } catch (err: any) {
+      } catch (err: unknown) {
         errors.push({ index: i, message: err?.message || 'Upload failed' });
       }
     }
@@ -256,7 +257,7 @@ export async function PUT(req: NextRequest) {
       status: 'success',
       data: { uploaded: results, errors },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[upload-batch] error', error);
     return NextResponse.json({
       status: 'error',

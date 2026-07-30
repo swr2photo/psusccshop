@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
         commerceDays: RETENTION_DAYS.COMMERCE,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[user-timeline]', error);
     return NextResponse.json({ error: error?.message || 'timeline failed' }, { status: 500 });
   }

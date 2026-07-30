@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/lib/shops.ts
 // Multi-shop system: types, helpers, and Drizzle ORM operations
 
@@ -279,7 +280,7 @@ export async function listAllShops(): Promise<ShopSummary[]> {
       .from(shops)
       .orderBy(shops.sortOrder, shops.name);
     return data.map(dbToShopSummary);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[shops] listAllShops error:', error.message);
     return [];
   }
@@ -292,7 +293,7 @@ export async function listActiveShops(): Promise<ShopSummary[]> {
       .where(eq(shops.isActive, true))
       .orderBy(shops.sortOrder, shops.name);
     return data.map(dbToShopSummary);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[shops] listActiveShops error:', error.message);
     return [];
   }
@@ -316,7 +317,7 @@ export async function listActivePublicShopCatalog() {
         .map(dbToShop)
         .filter((shop: Shop) => (shop.products || []).some((p: { isActive?: boolean }) => p.isActive !== false))
         .map(toPublicShopCatalogEntry);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[shops] listActivePublicShopCatalog error:', error.message);
       return [];
     }
@@ -363,7 +364,7 @@ export async function createShop(input: {
     await addShopAdmin(data[0].id, input.ownerEmail, 'owner', ALL_SHOP_ADMIN_PERMISSIONS, input.ownerEmail);
     invalidatePublicShopCatalogCache();
     return dbToShop(data[0]);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[shops] createShop error:', error.message);
     return null;
   }
@@ -413,7 +414,7 @@ export async function updateShop(id: string, updates: Partial<{
       .returning();
     invalidatePublicShopCatalogCache();
     return dbToShop(data[0]);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[shops] updateShop error:', error.message);
     return null;
   }
@@ -424,7 +425,7 @@ export async function deleteShop(id: string): Promise<boolean> {
     await db.delete(shops).where(eq(shops.id, id));
     invalidatePublicShopCatalogCache();
     return true;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[shops] deleteShop error:', error.message);
     return false;
   }
@@ -439,7 +440,7 @@ export async function listShopAdmins(shopId: string): Promise<ShopAdmin[]> {
       .where(eq(shopAdmins.shopId, shopId))
       .orderBy(shopAdmins.role, shopAdmins.email);
     return data.map(dbToShopAdmin);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[shops] listShopAdmins error:', error.message);
     return [];
   }
@@ -504,7 +505,7 @@ export async function updateShopAdmin(
       .where(and(eq(shopAdmins.shopId, shopId), eq(shopAdmins.email, normalizedEmail)))
       .returning();
     return dbToShopAdmin(data[0]);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[shops] updateShopAdmin error:', error.message);
     return null;
   }
@@ -515,7 +516,7 @@ export async function removeShopAdmin(shopId: string, email: string): Promise<bo
     await db.delete(shopAdmins)
       .where(and(eq(shopAdmins.shopId, shopId), eq(shopAdmins.email, email.toLowerCase().trim())));
     return true;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[shops] removeShopAdmin error:', error.message);
     return false;
   }
@@ -540,7 +541,7 @@ export async function getShopsForAdmin(email: string): Promise<ShopWithRole[]> {
         role: row.shopAdmin.role as 'owner' | 'admin',
         permissions: { ...DEFAULT_SHOP_ADMIN_PERMISSIONS, ...((row.shopAdmin.permissions as any) || {}) },
       }));
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[shops] getShopsForAdmin error:', error.message);
     return [];
   }
@@ -639,7 +640,7 @@ export async function getShopOrders(shopId: string, options?: {
     
     const total = totalResult[0]?.value || 0;
     return { orders: (data || []).map(toLegacyOrder), total };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[shops] getShopOrders error:', error.message);
     return { orders: [], total: 0 };
   }

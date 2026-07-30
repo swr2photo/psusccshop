@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
 import { getJson, putJson } from '@/lib/filebase';
 import { resolveOrderByRef, updateOrderByRef } from '@/lib/order-lookup';
@@ -464,7 +465,7 @@ export async function POST(req: NextRequest) {
         transRef: slipCheck.slipData?.transRef,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[payment-verify] error', error);
     return NextResponse.json({
       status: 'error',

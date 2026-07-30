@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { smartDecryptUrl, encryptImageUrl } from '@/lib/image-crypto';
-import { S3Client, GetObjectCommand, PutObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { smartDecryptUrl } from '@/lib/image-crypto';
+import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { Readable } from 'stream';
 import crypto from 'crypto';
 
@@ -55,7 +55,7 @@ async function getFromCache(cacheKey: string): Promise<{ buffer: Buffer; content
       buffer: Buffer.concat(chunks),
       contentType: response.ContentType || 'image/jpeg',
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error?.$metadata?.httpStatusCode === 404) return null;
     return null;
   }
@@ -116,7 +116,7 @@ const ALLOWED_ORIGINS = [
 function isAllowedImageRequest(req: NextRequest): boolean {
   const secFetchDest = req.headers.get('sec-fetch-dest');
   const secFetchSite = req.headers.get('sec-fetch-site');
-  const secFetchMode = req.headers.get('sec-fetch-mode');
+  const _secFetchMode = req.headers.get('sec-fetch-mode');
   const referer = req.headers.get('referer');
   const host = req.headers.get('host') || '';
 
@@ -213,7 +213,7 @@ function isAllowedUrl(url: string): boolean {
       return false;
     }
     return true;
-  } catch (e) {
+  } catch (_e) {
     console.warn('[Image Proxy] Invalid URL:', url);
     return false;
   }
@@ -371,7 +371,7 @@ export async function GET(
       },
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Image Proxy] Error:', error?.message || error);
     
     if (error?.name === 'AbortError') {

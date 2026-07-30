@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/lib/ai-chatbot.ts
 // AI-powered chatbot using Google Gemini with real-time shop database context + order lookup
 
@@ -810,7 +811,7 @@ const GEMINI_MODELS = {
 
 // Track which model is currently active
 let currentModelTier: 'primary' | 'fallback' | 'lite' = 'primary';
-let modelErrorCount = { primary: 0, fallback: 0, lite: 0 };
+const modelErrorCount = { primary: 0, fallback: 0, lite: 0 };
 let lastUsedModel: string = GEMINI_MODELS.primary.name;
 const ERROR_THRESHOLD = 3; // Switch model after 3 consecutive errors
 

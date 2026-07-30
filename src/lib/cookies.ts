@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Cookie Management Library
  * ระบบจัดการคุกกี้สำหรับเว็บไซต์

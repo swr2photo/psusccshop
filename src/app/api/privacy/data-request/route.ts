@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/app/api/privacy/data-request/route.ts
 // API for handling PDPA data subject rights requests
 
@@ -126,7 +127,7 @@ export async function GET(req: NextRequest) {
           { status: 400 }
         );
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Privacy API] GET Error:', error);
     return NextResponse.json(
       { status: 'error', message: error.message || 'เกิดข้อผิดพลาด' },
@@ -299,7 +300,7 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Privacy API] POST Error:', error);
     return NextResponse.json(
       { status: 'error', message: error.message || 'เกิดข้อผิดพลาด' },

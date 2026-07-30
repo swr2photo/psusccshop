@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // ไฟล์: src/lib/google.ts
 import { google } from 'googleapis';
 

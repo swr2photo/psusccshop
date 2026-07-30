@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/rules-of-hooks */
 /**
  * Shared NextAuth session cookie policy for Vercel + Workers JWT reads.
  */

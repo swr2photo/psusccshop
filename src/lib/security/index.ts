@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/lib/security/index.ts
 // ===================================================================
 // SECURITY MODULE EXPORTS

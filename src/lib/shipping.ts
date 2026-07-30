@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/lib/shipping.ts
 // Client-safe shipping types, constants, and pure helpers.
 // Track123 / Thailand Post API I/O lives in `@/lib/shipping-server`.

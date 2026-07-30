@@ -1,8 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
-import { getJson, putJson, listKeys, deleteObject, getOrdersByEmail, getAllOrders, getOrderByRef, updateOrderByRef } from '@/lib/filebase';
+import { getJson, putJson, getOrdersByEmail, getOrderByRef, updateOrderByRef } from '@/lib/filebase';
 import { deleteOrderByRef } from '@/lib/order-lookup';
 import crypto from 'crypto';
-import { requireAuth, requireAdmin, isAdminEmailAsync, isResourceOwner, normalizeEmail as authNormalizeEmail } from '@/lib/auth';
+import { requireAuth, isAdminEmailAsync, isResourceOwner, normalizeEmail as authNormalizeEmail } from '@/lib/auth';
 import { triggerSheetSync } from '@/lib/sheet-sync';
 import { sanitizeOrderForUser, sanitizeOrdersForUser, sanitizeObjectUtf8, sanitizeUtf8Input } from '@/lib/sanitize';
 import { verifyTurnstileToken, getClientIP } from '@/lib/cloudflare-server';
@@ -58,12 +59,12 @@ const emailIndexKey = (email: string) => {
 
 // Index functions - now handled by Supabase automatically
 // These are kept for backward compatibility but don't do anything
-const upsertIndexEntry = async (email: string, order: any) => {
+const upsertIndexEntry = async (_email: string, _order: unknown) => {
   // Supabase automatically maintains indexes via email_hash column
   // No manual index management needed
 };
 
-const removeIndexEntry = async (email: string, ref: string) => {
+const removeIndexEntry = async (_email: string, _ref: string) => {
   // Supabase automatically handles this when order is deleted
 };
 
@@ -101,7 +102,7 @@ export async function GET(req: NextRequest) {
       { status: 'success', data: { history: sanitizedHistory, hasMore, total } },
       { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Content-Type': 'application/json; charset=utf-8' } }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Orders API] GET failed:', error?.message || error);
     // Never mask failures as empty history — clients would wipe a previously loaded list
     return NextResponse.json(
@@ -291,7 +292,7 @@ export async function POST(req: NextRequest) {
       const built = buildValidatedCart(cartItems, products);
       validatedCart = built.cart;
       subtotal = built.subtotal;
-    } catch (pricingError: any) {
+    } catch (pricingError: unknown) {
       return NextResponse.json(
         { status: 'error', message: pricingError?.message || 'ไม่สามารถคำนวณราคาได้' },
         { status: 400, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
@@ -412,7 +413,7 @@ export async function POST(req: NextRequest) {
       { status: 'success', ref },
       { headers: { 'Content-Type': 'application/json; charset=utf-8' } }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     recordOrderCreated('failed', Date.now() - start);
     return NextResponse.json(
       { status: 'error', message: error?.message || 'submit failed' },
@@ -535,7 +536,7 @@ export async function PUT(req: NextRequest) {
       { status: 'success', data: sanitizedResponse },
       { headers: { 'Content-Type': 'application/json; charset=utf-8' } }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
       { status: 'error', message: error?.message || 'update failed' },
       { status: 500, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
@@ -643,7 +644,7 @@ export async function DELETE(req: NextRequest) {
       { status: 'success', message: 'cancelled' },
       { headers: { 'Content-Type': 'application/json; charset=utf-8' } }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
       { status: 'error', message: error?.message || 'cancel failed' },
       { status: 500, headers: { 'Content-Type': 'application/json; charset=utf-8' } }

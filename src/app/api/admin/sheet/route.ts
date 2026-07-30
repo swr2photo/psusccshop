@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
 import { getSheets } from '@/lib/google';
 import { getJson, listKeys } from '@/lib/filebase';
@@ -99,7 +100,7 @@ export async function POST(req: NextRequest) {
 
     let sheetId: string | undefined = body?.sheetId ?? config?.sheetId ?? process.env.GOOGLE_SHEET_ID ?? undefined;
     const vendorSheetIdInput: string | undefined = body?.vendorSheetId ?? config?.vendorSheetId ?? process.env.VENDOR_SHEET_ID ?? undefined;
-    let vendorSheetId: string | undefined = vendorSheetIdInput;
+    const vendorSheetId: string | undefined = vendorSheetIdInput;
 
     if (!process.env.GOOGLE_CLIENT_EMAIL || !process.env.GOOGLE_PRIVATE_KEY) {
       return NextResponse.json(
@@ -177,7 +178,7 @@ export async function POST(req: NextRequest) {
       },
       message: created ? 'สร้าง Sheet และซิงก์ข้อมูลแล้ว' : 'ซิงก์ข้อมูลล่าสุดแล้ว',
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Sheet sync error:', error);
     let message = error?.message || 'sync failed';
     if (message.includes('invalid_grant') || message.includes('Invalid JWT')) {

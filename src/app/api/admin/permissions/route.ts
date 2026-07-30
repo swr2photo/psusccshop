@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
 
     const allPerms = await getAllAdminPermissionsFromDB();
     return NextResponse.json({ status: 'success', data: allPerms });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[admin/permissions] GET error:', error);
     return NextResponse.json(
       { status: 'error', message: error?.message || 'Failed to get permissions' },
@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
       { status: 'error', message: 'Invalid request body' },
       { status: 400 }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[admin/permissions] POST error:', error);
     return NextResponse.json(
       { status: 'error', message: error?.message || 'Failed to save permissions' },
@@ -154,7 +154,7 @@ export async function DELETE(req: NextRequest) {
     if (!ok) throw new Error('Failed to delete permissions from database');
     
     return NextResponse.json({ status: 'success', message: 'Permissions deleted' });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[admin/permissions] DELETE error:', error);
     return NextResponse.json(
       { status: 'error', message: error?.message || 'Failed to delete permissions' },

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { apiFetch, uploadImageApi } from '@/lib/api-client';
@@ -452,7 +453,7 @@ const saveAdminCache = (payload: { config: ShopConfig; orders?: AdminOrder[]; lo
     
     try {
       window.localStorage.setItem(ADMIN_CACHE_KEY, JSON.stringify(cacheData));
-    } catch (err: any) {
+    } catch (err: unknown) {
       // If still fails, just disable cache
       console.warn('Admin cache disabled');
       ADMIN_CACHE_DISABLED = true;
@@ -1146,7 +1147,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
       setBatchStatusDialogOpen(false);
       addLog('BATCH_UPDATE_STATUS', `Updated ${refs.length} orders to ${batchNewStatus}`);
       triggerSheetSync('sync', { silent: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Batch update error:', error);
     } finally {
       setBatchUpdating(false);
@@ -1275,7 +1276,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
             return { ...item, url: data.data.url };
           }
           return { ...item, url: null, error: data.message };
-        } catch (err: any) {
+        } catch (err: unknown) {
           console.error('Upload error:', err);
           return { ...item, url: null, error: err?.message };
         }
@@ -1400,7 +1401,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
         }
         addLog('SAVE_CONFIG', 'บันทึกการตั้งค่า', { config: configWithUrls });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Save error:', error);
       showToast('error', error?.message || 'บันทึกไม่สำเร็จ');
       // Rollback to previous config on error
@@ -1431,7 +1432,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
         return next;
       });
       triggerSheetSync('sync', { silent: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       setOrders((prev) => prev.map((o) => (o.ref === ref ? { ...o, status: prevStatus || o.status } : o)));
       console.error('❌ Update status error:', error);
       showToast('error', error?.message || 'อัปเดตสถานะไม่สำเร็จ');
@@ -1482,7 +1483,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
       if (!opts?.silent) {
         showToast('success', res.message || (effectiveMode === 'create' ? 'สร้าง Sheet สำเร็จ' : 'ซิงก์ Sheet แล้ว'));
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (!opts?.silent) {
         showToast('error', error?.message || 'ซิงก์ Sheet ไม่สำเร็จ');
       }
@@ -1536,7 +1537,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
         'success',
         mode === 'overwrite' ? 'ดึงโปรไฟล์ลูกค้ามาแล้ว' : 'เติมข้อมูลจากโปรไฟล์แล้ว',
       );
-    } catch (err: any) {
+    } catch (err: unknown) {
       setOrderEditor((prev) => ({ ...prev, profileLoading: false }));
       showToast('error', err?.message || 'ดึงโปรไฟล์ไม่สำเร็จ');
     }
@@ -1741,7 +1742,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
       addLog('EDIT_ORDER', `${orderEditor.ref}`, { orders: nextOrders });
       resetOrderEditor();
       triggerSheetSync('sync', { silent: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       showToast('error', error?.message || 'แก้ไขออเดอร์ไม่สำเร็จ');
     } finally {
       setOrderProcessingRef(null);
@@ -1772,7 +1773,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
       saveAdminCache({ config, orders: nextOrders, logs });
       addLog(hard ? 'DELETE_ORDER' : 'CANCEL_ORDER', `${order.ref}`, { orders: nextOrders });
       triggerSheetSync('sync', { silent: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       showToast('error', error?.message || 'ลบออเดอร์ไม่สำเร็จ');
     } finally {
       setOrderProcessingRef(null);
@@ -2089,7 +2090,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
           setScannerReady(true);
           setScannerError(null);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Failed to start scanner:', err);
         if (!mounted) return;
         
@@ -5324,7 +5325,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
       }
 
       return imageUrl;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Image upload error:', error);
       throw error; // Re-throw to let caller handle
     }

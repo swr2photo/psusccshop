@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       });
 
     return NextResponse.json({ success: true, action: 'subscribed' });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[push-subscription] Error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

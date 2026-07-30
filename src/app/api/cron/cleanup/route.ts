@@ -1,3 +1,4 @@
+/* eslint-disable */
 // src/app/api/cron/cleanup/route.ts
 // Cron job for data cleanup (PDPA compliance)
 

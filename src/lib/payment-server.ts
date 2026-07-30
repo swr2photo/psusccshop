@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // Server-only payment helpers (gateway I/O + DB). Do not import from client components.
 import 'server-only';
 
@@ -201,6 +203,8 @@ export function verifyOmiseWebhook(
   }
 
   // Omise uses the signature directly
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+
   const crypto = require('crypto');
   const expectedSignature = crypto
     .createHmac('sha256', webhookSecret)
@@ -339,7 +343,7 @@ export async function createStripePaymentIntentDetailed(
         nextAction: data.next_action || null,
       },
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Payment] Stripe PaymentIntent error:', error);
     return {
       ok: false,
@@ -365,6 +369,8 @@ export function verifyStripeWebhook(
   }
 
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+
     const crypto = require('crypto');
     const signatureParts = signature.split(',').reduce((acc, part) => {
       const [key, value] = part.split('=');

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { useEffect, useRef, useState, CSSProperties, useCallback } from 'react';
@@ -138,7 +139,7 @@ function poisonCanvas(canvas: HTMLCanvasElement) {
 let _devToolsListenerCount = 0;
 let _devToolsOpen = false;
 let _devToolsInterval: ReturnType<typeof setInterval> | null = null;
-let _devToolsListeners = new Set<(open: boolean) => void>();
+const _devToolsListeners = new Set<(open: boolean) => void>();
 
 function _startDevToolsDetection() {
   if (_devToolsInterval) return;
@@ -194,7 +195,7 @@ function useDevToolsDetection(enabled: boolean): boolean {
 let _captureListenerCount = 0;
 let _screenCaptured = false;
 let _captureInterval: ReturnType<typeof setInterval> | null = null;
-let _captureListeners = new Set<(captured: boolean) => void>();
+const _captureListeners = new Set<(captured: boolean) => void>();
 
 function _startCaptureDetection() {
   if (_captureInterval) return;

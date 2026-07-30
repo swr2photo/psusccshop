@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/app/api/admin/slip-import/route.ts
 // API สำหรับ import slip URL จาก SlipOK log — Drizzle ORM
 
@@ -78,7 +79,7 @@ export async function GET(request: NextRequest) {
         withSlip: ordersWithSlip.length,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[slip-import] GET error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -160,7 +161,7 @@ export async function POST(request: NextRequest) {
           .where(eq(orders.ref, matchedOrder.ref));
 
         results.matched.push({ orderRef: matchedOrder.ref, imageUrl: log.imageUrl, matchedBy });
-      } catch (err: any) {
+      } catch (err: unknown) {
         results.errors.push({ orderRef: matchedOrder.ref, error: err.message });
       }
     }
@@ -176,7 +177,7 @@ export async function POST(request: NextRequest) {
         errors: results.errors.length,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[slip-import] POST error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -233,7 +234,7 @@ export async function PUT(request: NextRequest) {
           .where(eq(orders.ref, update.orderRef));
 
         results.success.push(update.orderRef);
-      } catch (err: any) {
+      } catch (err: unknown) {
         results.errors.push({ orderRef: update.orderRef, error: err.message });
       }
     }
@@ -243,7 +244,7 @@ export async function PUT(request: NextRequest) {
       results,
       summary: { total: updates.length, success: results.success.length, errors: results.errors.length },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[slip-import] PUT error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

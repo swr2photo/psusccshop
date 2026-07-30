@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/lib/rate-limit-supabase.ts
 // Rate limiting with Drizzle ORM persistence for production use
 

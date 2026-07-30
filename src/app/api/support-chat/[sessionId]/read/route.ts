@@ -45,7 +45,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       reader
     });
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[support-chat/read] POST error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },

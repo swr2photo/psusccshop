@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/lib/sanitize.ts
 // Data sanitization utilities for API responses
 

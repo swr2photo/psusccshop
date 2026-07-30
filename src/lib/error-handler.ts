@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 export type ErrorSeverity = 'low' | 'medium' | 'high' | 'critical';

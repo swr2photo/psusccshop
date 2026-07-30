@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/app/api/cron/update-tracking/route.ts
 // Cron job to auto-update order status based on tracking information — Drizzle ORM
 
@@ -86,7 +87,7 @@ export async function GET(request: NextRequest) {
           .set(updateData)
           .where(eq(orders.ref, order.ref));
         await new Promise(resolve => setTimeout(resolve, 500));
-      } catch (orderError: any) {
+      } catch (orderError: unknown) {
         results.errors.push(`${order.ref}: ${orderError.message}`);
         console.error(`[Tracking] Error processing ${order.ref}:`, orderError);
       }

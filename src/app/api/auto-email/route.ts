@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // Automated email notification system
 // Sends transactional emails based on order status changes
 
@@ -127,7 +128,7 @@ ${trackingNumber ? `📦 เลขพัสดุ: ${trackingNumber}` : ''}
 
 // POST /api/auto-email - Send automated email based on event type (internal only)
 export async function POST(request: NextRequest) {
-  let authError = requireInternalSecret(request);
+  const authError = requireInternalSecret(request);
   if (authError) {
     // Fallback to checking admin session
     const adminAuth = await requireAdmin(request);
@@ -196,7 +197,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true, emailId: result.id });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('POST /api/auto-email error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

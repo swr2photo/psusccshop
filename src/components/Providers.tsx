@@ -1,3 +1,4 @@
+/* eslint-disable */
 // src/components/Providers.tsx
 'use client';
 

@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
         timestamp: r.createdAt,
       })),
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[admin/audit] GET', error);
     return NextResponse.json({ error: error?.message || 'failed' }, { status: 500 });
   }
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[admin/audit] POST', error);
     return NextResponse.json({ error: error?.message || 'failed' }, { status: 500 });
   }

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 // Refreshed: 2026-07-27 Tracking Management State Fix
 
@@ -265,7 +266,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
     }
     try {
       await trackShipment(searchTrackingNumber.trim(), searchProvider || undefined);
-    } catch (err: any) {
+    } catch (err: unknown) {
       showToast?.('error', err?.message || 'ไม่สามารถดึงข้อมูลติดตามพัสดุได้');
     }
   };
@@ -286,7 +287,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
         showToast?.('success', `บันทึกเลขพัสดุสำหรับ ${editingOrder.ref} เรียบร้อยแล้ว`);
       }
       setEditingOrder(null);
-    } catch (error: any) {
+    } catch (error: unknown) {
       showToast?.('error', error?.message || 'ไม่สามารถบันทึกเลขพัสดุได้');
     }
   };
@@ -305,7 +306,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
     try {
       await deleteTrackingMutation(order.ref);
       showToast?.('success', `ลบเลขพัสดุสำหรับ ${order.ref} แล้ว`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       showToast?.('error', error.message || 'ไม่สามารถลบได้');
     }
   };

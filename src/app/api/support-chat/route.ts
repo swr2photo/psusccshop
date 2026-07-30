@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ chat: activeChat });
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[support-chat] GET error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
       message: 'เริ่มการสนทนาสำเร็จ รอแอดมินรับเคส'
     });
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[support-chat] POST error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },

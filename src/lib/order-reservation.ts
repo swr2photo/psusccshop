@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Order reservation timeout — stock is hard-deducted on create (WAITING_PAYMENT).
  * When unpaid orders expire or are cancelled, stock must be restored exactly once.

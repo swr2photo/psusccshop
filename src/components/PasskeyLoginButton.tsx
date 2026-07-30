@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { apiFetch } from '@/lib/api-client';
@@ -79,7 +80,7 @@ export default function PasskeyLoginButton({
       // Success — reload to get session
       onSuccess?.();
       window.location.href = result?.url || '/';
-    } catch (err: any) {
+    } catch (err: unknown) {
       setLoading(false);
       if (err.name === 'NotAllowedError') {
         // User cancelled the prompt

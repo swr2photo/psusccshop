@@ -155,7 +155,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       success: true
     });
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[support-chat/message] POST error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },

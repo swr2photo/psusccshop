@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/lib/secure-middleware.ts
 // ===================================================================
 // SECURE API MIDDLEWARE - Maximum Security Wrapper
@@ -167,7 +168,7 @@ async function parseRequestBody(
     }
     
     return { body: null };
-  } catch (error: any) {
+  } catch (error: unknown) {
     return { body: null, error: error.message || 'Failed to parse request body' };
   }
 }
@@ -451,7 +452,7 @@ export function withSecureMiddleware(
       
       return response;
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       // ==================== Error Handling ====================
       console.error(`[Secure Middleware] Error in ${pathname}:`, error);
       

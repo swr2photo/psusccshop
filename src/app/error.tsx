@@ -28,11 +28,11 @@ export default function Error({
           setTimeout(() => {
             try {
               sessionStorage.removeItem('chunk_reload_attempted');
-            } catch (e) {}
+            } catch (_e) {}
           }, 10000);
           window.location.reload();
         }
-      } catch (e) {
+      } catch (_e) {
         console.error('Failed to reload page:', e);
       }
     }

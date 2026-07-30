@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/app/api/admin/security/route.ts
 // Security monitoring dashboard API for admins
 // Provides security metrics, alerts, and threat analysis
@@ -130,7 +131,7 @@ export async function GET(request: NextRequest) {
           { status: 400 }
         );
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Security API] Error:', error);
     return NextResponse.json(
       { status: 'error', message: error.message || 'Internal server error' },
@@ -166,7 +167,7 @@ export async function POST(request: NextRequest) {
     switch (action) {
       case 'cleanup': {
         // Clean up old audit logs
-        const retentionDays = params.retentionDays || 90;
+        const _retentionDays = params.retentionDays || 90;
         const deletedCount = await cleanupOldAuditLogs();
         
         return NextResponse.json({
@@ -201,7 +202,7 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Security API] Error:', error);
     return NextResponse.json(
       { status: 'error', message: error.message || 'Internal server error' },

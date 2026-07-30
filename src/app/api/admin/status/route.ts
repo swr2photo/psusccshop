@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
 import { getJson, putJson } from '@/lib/filebase';
 import { getOrderByRef, updateOrderByRef } from '@/lib/order-lookup';
@@ -266,7 +267,7 @@ export async function POST(req: NextRequest) {
     }
     
     return NextResponse.json({ status: 'success' });
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json({ status: 'error', message: error?.message || 'update failed' }, { status: 500 });
   }
 }

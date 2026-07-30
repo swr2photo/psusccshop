@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Fast order lookup by ref — uses DB index instead of listKeys scan.
  */

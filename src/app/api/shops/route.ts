@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ status: 'success', shop }, { status: 201 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json({ status: 'error', message: error?.message || 'เกิดข้อผิดพลาด' }, { status: 500 });
   }
 }

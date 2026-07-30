@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { apiFetch } from '@/lib/api-client';
@@ -369,7 +370,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
         };
         
         setMessages((prev) => [...prev, botMsg]);
-      } catch (e: any) {
+      } catch (e: unknown) {
         const isTimeout = e?.name === 'AbortError';
         const errorMsg: ChatMessage = {
           id: generateId(),
@@ -432,7 +433,7 @@ export default function ShirtChatBot({ open, setOpen }: ShirtChatBotProps) {
       };
       
       setMessages((prev) => [...prev, botMsg]);
-    } catch (e: any) {
+    } catch (e: unknown) {
       const isTimeout = e?.name === 'AbortError';
       const errorMsg: ChatMessage = {
         id: generateId(),

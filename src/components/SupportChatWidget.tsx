@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { apiFetch, uploadImageApi, uploadAudioApi } from '@/lib/api-client';
@@ -833,7 +834,7 @@ export default function SupportChatWidget({
           resolveOptimistic(tempId, null);
           toastError(data?.error || t.supportChat.sendFailed);
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (error?.name !== 'AbortError') {
           toastError(error?.message || t.supportChat.imageUploadFailed);
         }
@@ -889,7 +890,7 @@ export default function SupportChatWidget({
         resolveOptimistic(tempId, null);
         toastError(data?.error || t.supportChat.sendFailed);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error?.name !== 'AbortError') {
         toastError(error?.message || t.supportChat.voiceUploadFailed);
       }
@@ -959,7 +960,7 @@ export default function SupportChatWidget({
       } else {
         throw new Error(uploadData.message || t.supportChat.imageUploadFailed);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error?.name !== 'AbortError') {
         console.error('Error uploading image:', error);
         toastError(error?.message || t.supportChat.imageUploadFailed);

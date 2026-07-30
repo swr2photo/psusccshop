@@ -91,7 +91,7 @@ export async function GET(
         'X-Content-Type-Options': 'nosniff',
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     const status = error?.$metadata?.httpStatusCode === 404 ? 404 : 500;
     console.error('[voice] GET error', error?.message || error);
     return NextResponse.json(

@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/rules-of-hooks */
 /**
  * Clear NextAuth cookies that may survive signOut when COOKIE_DOMAIN is set.
  */

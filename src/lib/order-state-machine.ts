@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { db } from './db';
 import { webhookEndpoints, webhookDeliveries } from '@/db/schema';
 import { eq } from 'drizzle-orm';
@@ -25,7 +26,7 @@ export function isValidTransition(from: OrderStatus, to: OrderStatus, isAdminOve
 export async function dispatchWebhook(event: string, payload: any, shopId?: string) {
   try {
     // Get all active endpoints for this shop (or global ones if shopId is null)
-    let query = db.select().from(webhookEndpoints).where(eq(webhookEndpoints.isActive, true));
+    const query = db.select().from(webhookEndpoints).where(eq(webhookEndpoints.isActive, true));
     const endpoints = await query;
 
     const targetEndpoints = endpoints.filter(ep => 

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/app/api/payment/create-charge/route.ts
 // Create payment charge API (for card payments via Omise/Stripe)
 

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/app/api/admin/stripe-status/route.ts
 // Admin API — Stripe connection status check
 
@@ -62,7 +63,7 @@ export async function GET(request: NextRequest) {
           const err = await res.json().catch(() => ({}));
           verifyError = err?.error?.message || `HTTP ${res.status}`;
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         verifyError = e?.message || 'Network error';
       }
     }

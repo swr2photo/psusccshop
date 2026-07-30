@@ -1,9 +1,10 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
-import { getJson, putJson, listKeys, getAllOrders } from '@/lib/filebase';
+import { getJson, putJson, listKeys } from '@/lib/filebase';
 import { db } from '@/lib/db';
 import { orders } from '@/db/schema';
 import { and, or, eq, ilike } from 'drizzle-orm';
-import { requireAuth, requireAdmin, requireAdminWithPermission, isAdminEmailAsync } from '@/lib/auth';
+import { requireAuth, requireAdminWithPermission, isAdminEmailAsync } from '@/lib/auth';
 import { getOrderByRef, updateOrderByRef } from '@/lib/order-lookup';
 import { sanitizeUtf8Input } from '@/lib/sanitize';
 import crypto from 'crypto';
@@ -52,7 +53,7 @@ const saveUserLogServer = async (params: {
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const orderKey = (ref: string, date: Date) => {
+const _orderKey = (ref: string, date: Date) => {
   const yyyy = date.getFullYear();
   const mm = String(date.getMonth() + 1).padStart(2, '0');
   return `orders/${yyyy}-${mm}/${ref}.json`;
@@ -229,7 +230,7 @@ export async function GET(req: NextRequest) {
       { status: 'error', message: 'Missing ref or search parameter' },
       { status: 400 }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Pickup API] Error:', error);
     return NextResponse.json(
       { status: 'error', message: error?.message || 'Failed to get pickup info' },
@@ -368,7 +369,7 @@ export async function POST(req: NextRequest) {
       { status: 'error', message: 'Invalid action' },
       { status: 400 }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Pickup API] Error:', error);
     return NextResponse.json(
       { status: 'error', message: error?.message || 'Failed to update pickup' },

@@ -1,12 +1,12 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { apiFetch } from '@/lib/api-client';
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { useLiveStreamContext } from '@/context/LiveStreamProvider';
-import OptimizedImage, { preloadImages, OptimizedBackground } from '@/components/OptimizedImage';
-import { useGalleryImagePreload, isGalleryImageInRange } from '@/hooks/useGalleryImagePreload';
-import { Palette, MessageCircle as ChatIcon, Send as SendIcon, X as CloseIcon, Bot as SmartToyIcon, RotateCcw as RefreshIcon, Sparkles as AutoAwesomeIcon, Store as StorefrontIcon, Copy as ContentCopyIcon, Check as CheckIcon, Maximize2 as FullscreenIcon, Minimize2 as FullscreenExitIcon, ImagePlus as AddPhotoAlternateIcon, ShoppingCart as ShoppingCartOutlinedIcon, Coins as PaidOutlinedIcon, Ruler as StraightenOutlinedIcon, Truck as LocalShippingOutlinedIcon, Wallet as AccountBalanceWalletOutlinedIcon, HelpCircle as HelpOutlineOutlinedIcon, Image as ImageOutlinedIcon, User as PersonOutlineIcon, BadgeCheck as VerifiedIcon, BookOpen as MenuBookOutlinedIcon, Hand as WavingHandIcon, Reply as ReplyIcon, Pencil as EditIcon, ClipboardList as ClipboardListIcon, Tag as TagIcon, ChevronUp, ChevronDown } from 'lucide-react';
+import OptimizedImage, { preloadImages } from '@/components/OptimizedImage';
+import { MessageCircle as ChatIcon, Store as StorefrontIcon, Wallet as AccountBalanceWalletOutlinedIcon, HelpCircle as HelpOutlineOutlinedIcon, Image as ImageOutlinedIcon, User as PersonOutlineIcon, BadgeCheck as VerifiedIcon, BookOpen as MenuBookOutlinedIcon, Hand as WavingHandIcon, Reply as ReplyIcon, Pencil as EditIcon, ClipboardList as ClipboardListIcon, Tag as TagIcon, ChevronUp, ChevronDown } from 'lucide-react';
 
 import MobileBottomNav from '@/components/MobileBottomNav';
 
@@ -2560,7 +2560,7 @@ export default function HomePage() {
       } else {
         showToast('error', res.message || t.orderHistory.cancelFailed);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       showToast('error', error.message || t.orderHistory.cancelFailed);
     } finally {
       setCancellingRef(null);
@@ -2717,7 +2717,7 @@ export default function HomePage() {
         setTurnstileToken('');
         throw new Error(res.message || t.common.error);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       setTurnstileToken('');
       showToast('error', error.message || t.checkout.orderError);
     } finally {
@@ -2907,7 +2907,7 @@ export default function HomePage() {
         setShowOrderDialog(true);
         setPendingCheckout(false);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       showToast('error', error.message || t.profile.saveProfileFailed);
     } finally {
       setSavingProfile(false);

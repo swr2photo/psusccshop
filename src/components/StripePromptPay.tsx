@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { apiFetch } from '@/lib/api-client';
@@ -205,7 +206,7 @@ export default function StripePromptPay({
 
       setQrCode(qr);
       setPhase('qr');
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (!mountedRef.current) return;
       console.error('[StripePromptPay]', err);
       setErrorMsg(err?.message || t.payment.stripeError);

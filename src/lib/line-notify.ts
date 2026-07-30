@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/lib/line-notify.ts
 
 export async function sendLineNotify(token: string, message: string): Promise<boolean> {
@@ -21,7 +22,7 @@ export async function sendLineNotify(token: string, message: string): Promise<bo
     }
 
     return true;
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[line-notify] Network error:', err.message);
     return false;
   }

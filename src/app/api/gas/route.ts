@@ -143,7 +143,7 @@ export async function GET(request: NextRequest) {
     }
 
     return await handleGasRequest(request, 'GET', action);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[GAS-API] GET Error:', error?.message || error);
     return NextResponse.json(
       { status: 'error', message: process.env.NODE_ENV === 'production' ? 'Internal server error' : (error?.message || 'Internal server error') },
@@ -164,7 +164,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json().catch(() => ({}));
     return await handleGasRequest(request, 'POST', action, body);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[GAS-API] POST Error:', error?.message || error);
     return NextResponse.json(
       { status: 'error', message: process.env.NODE_ENV === 'production' ? 'Internal server error' : (error?.message || 'Internal server error') },

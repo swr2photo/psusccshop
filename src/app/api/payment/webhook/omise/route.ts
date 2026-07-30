@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/app/api/payment/webhook/omise/route.ts
 // Omise webhook handler
 

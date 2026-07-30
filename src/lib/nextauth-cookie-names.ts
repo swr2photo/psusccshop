@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 function getEnvValue(key: string): string | undefined {
   // Try globalThis.__CF_ENV__ first (Cloudflare Workers env bindings)
   const cfEnv = (globalThis as any).__CF_ENV__;

@@ -8,14 +8,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminWithPermission } from '@/lib/auth';
 import {
   sendEmail,
-  getEmailLogs,
   getEmailLogsByOrder,
   getEmailLogsByEmail,
   generateCustomEmail,
   sendOrderStatusEmail,
   EmailLog,
-  EmailType,
-} from '@/lib/email';
+  } from '@/lib/email';
 import {
   getEmailLogsFromDb,
   getEmailLogStats,
@@ -67,7 +65,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ logs, total: logs.length });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Email API] Error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -82,7 +80,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { action, to, subject, message, type, orderRef, recipients } = body;
+    const { action, to, subject, message, type: _type, orderRef, recipients } = body;
 
     switch (action) {
       case 'send_custom':
@@ -197,7 +195,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Email API] Error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

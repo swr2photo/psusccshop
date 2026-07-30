@@ -50,7 +50,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       message: 'ปิดการสนทนาสำเร็จ'
     });
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[support-chat/close] POST error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },

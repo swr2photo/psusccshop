@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/lib/push-notification.ts
 // Web Push notification sender (server-side) — using Drizzle ORM
 
@@ -73,7 +74,7 @@ export async function sendPushNotification(
         { TTL: 3600 }
       );
       sent++;
-    } catch (err: any) {
+    } catch (err: unknown) {
       failed++;
       if (err?.statusCode === 404 || err?.statusCode === 410) {
         expiredEndpoints.push(sub.endpoint);

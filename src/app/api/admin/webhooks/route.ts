@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   try {
     const endpoints = await db.select().from(webhookEndpoints);
     return NextResponse.json({ status: 'success', data: endpoints });
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json({ status: 'error', message: error.message }, { status: 500 });
   }
 }
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ status: 'success', message: 'Webhook endpoint created', secret });
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json({ status: 'error', message: error.message }, { status: 500 });
   }
 }
@@ -60,7 +60,7 @@ export async function DELETE(req: NextRequest) {
     await db.delete(webhookEndpoints).where(eq(webhookEndpoints.id, id));
 
     return NextResponse.json({ status: 'success', message: 'Webhook endpoint deleted' });
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json({ status: 'error', message: error.message }, { status: 500 });
   }
 }

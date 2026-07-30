@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // ==================== SHOP CONSTANTS & HELPERS ====================
 // Extracted from page.tsx for better code organization
 

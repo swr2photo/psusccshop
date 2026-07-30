@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // /api/shops/[shopId]/config — Get & Update shop-specific config
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, isSuperAdminEmail } from '@/lib/auth';
@@ -156,7 +157,7 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
     }
 
     return NextResponse.json({ status: 'success', message: 'อัพเดทสำเร็จ' });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[shop-config] PUT error:', error);
     return NextResponse.json({ status: 'error', message: error?.message || 'เกิดข้อผิดพลาด' }, { status: 500 });
   }

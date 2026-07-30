@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/lib/payment.ts
 // Client-safe payment types, constants, and pure helpers.
 // Secret-key gateway I/O lives in `@/lib/payment-server`.

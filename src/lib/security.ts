@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/lib/security.ts
 // Advanced security utilities for protection against common attacks
 // Maximum security implementation

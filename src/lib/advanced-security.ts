@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/lib/advanced-security.ts
 // ===================================================================
 // ADVANCED SECURITY MODULE - Maximum Protection Level

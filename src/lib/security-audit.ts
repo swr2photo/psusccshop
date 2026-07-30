@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/lib/security-audit.ts
 // Security Audit Logging System — Drizzle ORM
 // บันทึกกิจกรรมที่เกี่ยวข้องกับความปลอดภัยทั้งหมด

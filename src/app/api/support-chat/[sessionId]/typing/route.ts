@@ -46,7 +46,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     
     return NextResponse.json({ success: true });
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[support-chat/typing] POST error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
@@ -101,7 +101,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     
     return NextResponse.json({ isTyping: otherTyping });
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[support-chat/typing] GET error:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },

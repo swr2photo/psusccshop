@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/lib/passkey.ts
 // WebAuthn/Passkey server-side utilities — using Drizzle ORM
 // Uses @simplewebauthn/server v11 for registration & authentication

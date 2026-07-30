@@ -174,7 +174,7 @@ export async function POST(req: NextRequest) {
         duration: typeof duration === 'number' ? Math.max(1, Math.round(duration)) : null,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[upload-audio] error', error);
     return NextResponse.json(
       {

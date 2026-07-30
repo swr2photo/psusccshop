@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /** CJS default export interop for next-auth providers (Cloudflare Workers bundle). */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function oauthProvider(mod: unknown): any {

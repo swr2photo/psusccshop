@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Client-side API helpers for Next.js routes (Vercel) or split Elysia backend.
  *

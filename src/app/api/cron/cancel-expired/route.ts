@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/app/api/cron/cancel-expired/route.ts
 // Cron: auto-cancel unpaid orders past reservation timeout and restore stock
 

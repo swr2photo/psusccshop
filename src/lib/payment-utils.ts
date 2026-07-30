@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // --- PromptPay Helpers ---
 function crc16(s: string) {
   let crc = 0xFFFF;

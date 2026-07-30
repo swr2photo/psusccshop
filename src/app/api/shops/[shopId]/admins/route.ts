@@ -36,7 +36,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     const admin = await addShopAdmin(shopId, email, adminRole, permissions, authResult.email);
     return NextResponse.json({ status: 'success', admin }, { status: 201 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[shops/admins] POST error:', error?.message);
     const message = error?.message?.includes('shop_admins')
       ? 'ตาราง shop_admins ยังไม่ได้สร้างในฐานข้อมูล กรุณารัน migration scripts/supabase-multi-shop-schema.sql'
@@ -65,7 +65,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     }
 
     return NextResponse.json({ status: 'success', admin });
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json({ status: 'error', message: error?.message || 'เกิดข้อผิดพลาด' }, { status: 500 });
   }
 }

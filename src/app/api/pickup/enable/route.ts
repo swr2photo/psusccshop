@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
 import { getJson, putJson, listKeys } from '@/lib/filebase';
 import { requireAdminWithPermission } from '@/lib/auth';
@@ -160,7 +161,7 @@ export async function POST(req: NextRequest) {
         updatedOrders: updatedCount,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Pickup Enable API] Error:', error);
     return NextResponse.json(
       { status: 'error', message: error?.message || 'Failed to update pickup' },

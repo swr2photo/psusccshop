@@ -1,5 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth, requireAdmin } from '@/lib/auth';
+import { requireAuth } from '@/lib/auth';
 import { getShopConfig } from '@/lib/filebase';
 import { getShopById } from '@/lib/shops';
 import { rateLimitOrNull } from '@/lib/api-helpers';
@@ -90,7 +91,7 @@ export async function POST(req: NextRequest) {
         ? `ลด ${promo.discountValue}%${promo.maxDiscount ? ` (สูงสุด ฿${promo.maxDiscount})` : ''}`
         : `ลด ฿${promo.discountValue}`),
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Promo API] Error:', error);
     return NextResponse.json({ error: 'เกิดข้อผิดพลาด' }, { status: 500 });
   }

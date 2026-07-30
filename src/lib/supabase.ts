@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/lib/supabase.ts
 // Database operations using Drizzle ORM + Supabase Storage
 // Migrated from Prisma to Drizzle for all database queries
@@ -311,7 +312,7 @@ export async function getJson<T = any>(key: string): Promise<T | null> {
     const data = await db.select().from(keyValueStore).where(eq(keyValueStore.key, key)).limit(1);
     return (data[0]?.value as T) || null;
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[drizzle] getJson error', key, error);
     throw error;
   }
@@ -447,7 +448,7 @@ export async function putJson(key: string, data: any): Promise<void> {
         set: { value: data, updatedAt: new Date() },
       });
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[drizzle] putJson error', key, error);
     throw error;
   }
@@ -501,7 +502,7 @@ export async function listKeys(prefix: string): Promise<string[]> {
       .where(like(keyValueStore.key, `${prefix}%`));
     return (data || []).map((item: any) => item.key);
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[drizzle] listKeys error', prefix, error);
     throw error;
   }
@@ -534,7 +535,7 @@ export async function deleteObject(key: string): Promise<void> {
     // Generic key-value store fallback
     await db.delete(keyValueStore).where(eq(keyValueStore.key, key)).catch(() => {});
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[drizzle] deleteObject error', key, error);
     throw error;
   }

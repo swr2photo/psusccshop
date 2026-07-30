@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
       status: 'success',
       message: 'System caches cleared successfully.',
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Cache Clear API] Error:', error);
     return NextResponse.json(
       { status: 'error', message: 'Failed to clear cache' },

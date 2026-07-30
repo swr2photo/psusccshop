@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/lib/request-signing.ts
 // Request signing and validation for API security
 // ป้องกันการปลอมแปลง requests และ replay attacks

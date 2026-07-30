@@ -1,5 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth, requireAdmin, requireAdminWithPermission, isResourceOwner } from '@/lib/auth';
+import { requireAuth, requireAdminWithPermission, isResourceOwner } from '@/lib/auth';
 import { getOrderByRef } from '@/lib/supabase';
 import { db } from '@/lib/db';
 import { orders as ordersSchema } from '@/db/schema';
@@ -165,7 +166,7 @@ export async function GET(req: NextRequest) {
       });
 
       return NextResponse.json({ orders: ordersList });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[Refund API] Admin list error:', error);
       return NextResponse.json({ error: error?.message || 'Internal server error' }, { status: 500 });
     }
@@ -201,7 +202,7 @@ export async function GET(req: NextRequest) {
       reasons: REFUND_REASONS,
       banks: THAI_BANKS,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Refund API] GET error:', error);
     return NextResponse.json({ error: error?.message || 'Internal server error' }, { status: 500 });
   }
@@ -336,7 +337,7 @@ export async function POST(req: NextRequest) {
       message: 'ส่งคำขอคืนเงินเรียบร้อยแล้ว รอการตรวจสอบจากแอดมิน',
       refundStatus: 'REQUESTED',
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Refund API] POST error:', error);
     return NextResponse.json({ error: error?.message || 'Internal server error' }, { status: 500 });
   }
@@ -438,7 +439,7 @@ export async function PUT(req: NextRequest) {
     };
 
     return NextResponse.json({ success: true, message: actionLabels[action], refundStatus: newRefundStatus });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Refund API] PUT error:', error);
     return NextResponse.json({ error: error?.message || 'Internal server error' }, { status: 500 });
   }

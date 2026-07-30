@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { apiFetch } from '@/lib/api-client';
 // src/lib/user-log.ts
 // Helper for logging user actions to /api/admin/user-logs

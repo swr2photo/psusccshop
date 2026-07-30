@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/lib/api-key-rotation.ts
 // API Key management and rotation system — Drizzle ORM
 

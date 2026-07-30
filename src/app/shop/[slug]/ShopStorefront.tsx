@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/app/shop/[slug]/ShopStorefront.tsx
 // Client-side storefront for individual shops — matches main store design
 'use client';
@@ -875,7 +876,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
       } else {
         showToast('error', res.message || (lang === 'en' ? 'Cancel failed' : 'ยกเลิกไม่สำเร็จ'));
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       showToast('error', error.message || (lang === 'en' ? 'Cancel failed' : 'ยกเลิกไม่สำเร็จ'));
     } finally {
       setCancellingRef(null);
@@ -1027,7 +1028,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
         setCheckoutOpen(true);
         setPendingCheckout(false);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       showToast('error', error.message || (lang === 'en' ? 'Save failed' : 'บันทึกข้อมูลไม่สำเร็จ'));
     } finally {
       setSavingProfile(false);
@@ -1151,7 +1152,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
         setTurnstileToken('');
         showToast('error', (res as any).message || (lang === 'en' ? 'Order failed' : 'สั่งซื้อไม่สำเร็จ'));
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setTurnstileToken('');
       showToast('error', err.message || (lang === 'en' ? 'Error' : 'เกิดข้อผิดพลาด'));
     } finally {

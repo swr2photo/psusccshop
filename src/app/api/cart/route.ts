@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
 import { getJson, putJson } from '@/lib/filebase';
 import crypto from 'crypto';
@@ -105,7 +106,7 @@ export async function POST(req: NextRequest) {
     }
     
     return NextResponse.json({ status: 'success' });
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json({
       status: 'error',
       message: error?.message || 'save failed',

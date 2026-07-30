@@ -230,7 +230,7 @@ export async function POST(req: NextRequest) {
         intentStatus: intent.status,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Stripe PromptPay] error:', error);
     return NextResponse.json(
       { status: 'error', message: error?.message || 'failed to create payment' },
@@ -327,7 +327,7 @@ export async function GET(req: NextRequest) {
       status: 'success',
       data: { intentStatus: intent.status },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Stripe PromptPay] poll error:', error);
     return NextResponse.json(
       { status: 'error', message: error?.message || 'poll failed' },

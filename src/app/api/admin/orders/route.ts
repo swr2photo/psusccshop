@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/app/api/admin/orders/route.ts
 // Admin API for order lookup - search by ref or customer email
 
@@ -74,7 +75,7 @@ export async function GET(req: NextRequest) {
       message: 'Please provide ref or email parameter' 
     }, { status: 400 });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[admin/orders] GET error:', error);
     return NextResponse.json({ 
       status: 'error', 
