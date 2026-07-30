@@ -480,7 +480,7 @@ export default function CartDrawer(props: CartDrawerProps) {
                   '&:hover': { bgcolor: 'var(--primary)', filter: 'brightness(0.92)', boxShadow: 'none' },
                 }}
               >
-                {t.cart.returnToShop || t.cart.shopNow}
+                {t.cart.returnToShop}
               </Button>
             </Box>
           ) : (
