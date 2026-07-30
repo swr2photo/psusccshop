@@ -488,10 +488,18 @@ export default function CheckoutDialog({
 
   const sectionSx = {
     p: 2,
-    borderRadius: '16px',
+    borderRadius: '8px',
     bgcolor: 'var(--surface-2)',
-    border: '1px solid var(--glass-border)',
+    border: '1px solid color-mix(in srgb, var(--foreground) 10%, transparent)',
   } as const;
+
+  const sectionLabelSx = {
+    fontWeight: 700,
+    color: 'var(--foreground)',
+    fontSize: '0.72rem',
+    letterSpacing: '0.08em',
+    textTransform: 'uppercase' as const,
+  };
 
   return (
     <Dialog
@@ -506,8 +514,8 @@ export default function CheckoutDialog({
           maxWidth: 'calc(100% - 24px)',
           bgcolor: 'var(--background)',
           color: 'var(--foreground)',
-          borderRadius: isMobile ? 0 : '20px',
-          border: isMobile ? 'none' : '1px solid var(--glass-border)',
+          borderRadius: isMobile ? 0 : '10px',
+          border: isMobile ? 'none' : '1px solid color-mix(in srgb, var(--foreground) 12%, transparent)',
           maxHeight: isMobile ? '100vh' : '90vh',
           transform: dialogDragOffset > 0 ? `translateY(${dialogDragOffset}px) !important` : undefined,
           transition: isDialogDragging ? 'none !important' : 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1) !important',
@@ -519,7 +527,7 @@ export default function CheckoutDialog({
           onTouchStart={handleDialogSwipeStart}
           onTouchMove={handleDialogSwipeMove}
           onTouchEnd={handleDialogSwipeEnd}
-          sx={{ width: '100%', display: 'flex', justifyContent: 'center', pt: 1, pb: 0.5, cursor: 'grab', touchAction: 'none', bgcolor: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)' }}
+          sx={{ width: '100%', display: 'flex', justifyContent: 'center', pt: 1, pb: 0.5, cursor: 'grab', touchAction: 'none', bgcolor: 'var(--primary)' }}
         >
           <Box sx={{ width: isDialogDragging ? 48 : 36, height: 4, bgcolor: 'rgba(255,255,255,0.4)', borderRadius: 2, transition: 'all 0.2s ease' }} />
         </Box>
@@ -527,27 +535,34 @@ export default function CheckoutDialog({
 
       {/* Header */}
       <DialogTitle sx={{
-        background: 'linear-gradient(135deg, #0071e3 0%, #0077ED 100%)',
+        bgcolor: 'var(--primary)',
         color: 'white',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: 1.5,
-        py: 1.75,
+        py: 1.6,
         pr: 1.25,
+        borderBottom: '1px solid color-mix(in srgb, #000 12%, transparent)',
       }}>
         <Box sx={{ minWidth: 0 }}>
-          <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', lineHeight: 1.3 }}>
+          <Typography sx={{
+            fontWeight: 700,
+            fontSize: '0.78rem',
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
+            lineHeight: 1.35,
+          }}>
             {t.checkout.title}
-            <Box component="span" sx={{ fontWeight: 500, opacity: 0.9, ml: 0.75, fontSize: '0.95rem' }}>
-              ({itemCount} {t.common.items})
-            </Box>
+          </Typography>
+          <Typography sx={{ fontWeight: 500, opacity: 0.85, mt: 0.35, fontSize: '0.78rem' }}>
+            {itemCount} {t.common.items}
           </Typography>
         </Box>
         <IconButton
           onClick={onClose}
           aria-label={t.common.close}
-          sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.12)', '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' } }}
+          sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.12)', borderRadius: '6px', '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' } }}
         >
           <X size={20} />
         </IconButton>
@@ -595,23 +610,15 @@ export default function CheckoutDialog({
         <Box sx={sectionSx}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Package size={18} color="var(--text-muted)" />
-              <Typography sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '0.95rem' }}>
+              <Package size={16} color="var(--text-muted)" strokeWidth={1.75} />
+              <Typography sx={sectionLabelSx}>
                 {t.checkout.summary}
               </Typography>
-              <Box sx={{
-                px: 1,
-                py: 0.2,
-                borderRadius: '10px',
-                bgcolor: 'rgba(0,113,227,0.15)',
-                fontSize: '0.7rem',
-                fontWeight: 600,
-                color: 'var(--secondary)',
-              }}>
+              <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 500 }}>
                 {itemCount} {t.common.pieces}
-              </Box>
+              </Typography>
             </Box>
-            <Typography sx={{ fontWeight: 700, color: 'var(--success)', fontSize: '1rem' }}>
+            <Typography sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '0.95rem' }}>
               ฿{subtotal.toLocaleString()}
             </Typography>
           </Box>
@@ -627,20 +634,20 @@ export default function CheckoutDialog({
                   display: 'flex',
                   gap: 1.5,
                   p: 1.25,
-                  borderRadius: '12px',
+                  borderRadius: '6px',
                   bgcolor: 'var(--surface)',
-                  border: '1px solid var(--glass-border)',
+                  border: '1px solid color-mix(in srgb, var(--foreground) 8%, transparent)',
                 }}>
                   <Box sx={{
                     width: 56,
                     height: 56,
-                    borderRadius: '10px',
+                    borderRadius: '4px',
                     bgcolor: 'var(--surface-2)',
                     flexShrink: 0,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    border: '1px solid var(--glass-border)',
+                    border: '1px solid color-mix(in srgb, var(--foreground) 8%, transparent)',
                     overflow: 'hidden',
                   }}>
                     {productImage ? (
@@ -693,7 +700,7 @@ export default function CheckoutDialog({
                       </Typography>
                     )}
                   </Box>
-                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--success)', flexShrink: 0 }}>
+                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)', flexShrink: 0 }}>
                     ฿{(item.unitPrice * item.quantity).toLocaleString()}
                   </Typography>
                 </Box>
@@ -709,8 +716,8 @@ export default function CheckoutDialog({
           <Box sx={sectionSx}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Truck size={18} color="#64d2ff" />
-                <Typography sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '0.95rem' }}>
+                <Truck size={16} color="var(--text-muted)" strokeWidth={1.75} />
+                <Typography sx={sectionLabelSx}>
                   {t.checkout.shippingSection}
                 </Typography>
               </Box>
@@ -718,13 +725,15 @@ export default function CheckoutDialog({
                 size="small"
                 onClick={onEditProfile}
                 sx={{
-                  borderRadius: '8px',
+                  borderRadius: '4px',
                   px: 1.5,
-                  bgcolor: 'rgba(0,113,227,0.12)',
-                  color: 'var(--secondary)',
-                  fontSize: '0.75rem',
+                  bgcolor: 'color-mix(in srgb, var(--foreground) 6%, transparent)',
+                  color: 'var(--foreground)',
+                  fontSize: '0.72rem',
                   fontWeight: 600,
-                  '&:hover': { bgcolor: 'rgba(0,113,227,0.22)' },
+                  letterSpacing: '0.04em',
+                  textTransform: 'uppercase',
+                  '&:hover': { bgcolor: 'color-mix(in srgb, var(--foreground) 10%, transparent)' },
                 }}
               >
                 {t.common.edit}
@@ -1010,8 +1019,8 @@ export default function CheckoutDialog({
         {!loadingConfig && enabledPaymentOptions.length > 1 && (
           <Box sx={sectionSx}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.25 }}>
-              <CreditCard size={18} color="#34c759" />
-              <Typography sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '0.95rem' }}>
+              <CreditCard size={16} color="var(--text-muted)" strokeWidth={1.75} />
+              <Typography sx={sectionLabelSx}>
                 {t.checkout.paymentMethod}
               </Typography>
             </Box>
@@ -1157,9 +1166,9 @@ export default function CheckoutDialog({
         {/* Next step: PromptPay QR */}
         <Box sx={{
           p: 1.75,
-          borderRadius: '14px',
-          bgcolor: 'rgba(0,113,227,0.08)',
-          border: '1px solid rgba(0,113,227,0.22)',
+          borderRadius: '8px',
+          bgcolor: 'color-mix(in srgb, var(--foreground) 4%, transparent)',
+          border: '1px solid color-mix(in srgb, var(--foreground) 10%, transparent)',
           display: 'flex',
           gap: 1.25,
           alignItems: 'flex-start',
@@ -1167,21 +1176,21 @@ export default function CheckoutDialog({
           <Box sx={{
             width: 36,
             height: 36,
-            borderRadius: '10px',
-            bgcolor: 'rgba(0,113,227,0.15)',
+            borderRadius: '6px',
+            bgcolor: 'color-mix(in srgb, var(--foreground) 6%, transparent)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0,
-            color: '#2997ff',
+            color: 'var(--text-muted)',
           }}>
-            <QrCode size={18} />
+            <QrCode size={18} strokeWidth={1.75} />
           </Box>
           <Box>
-            <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)', lineHeight: 1.35 }}>
+            <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--foreground)', lineHeight: 1.35 }}>
               {t.checkout.nextStepQr}
             </Typography>
-            <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', mt: 0.35, lineHeight: 1.4 }}>
+            <Typography sx={{ fontSize: '0.74rem', color: 'var(--text-muted)', mt: 0.35, lineHeight: 1.45 }}>
               {t.checkout.nextStepQrHint}
             </Typography>
           </Box>
@@ -1202,7 +1211,7 @@ export default function CheckoutDialog({
                     ฿{selectedShippingOption.baseFee}
                   </Typography>
                 )}
-                <Typography sx={{ color: 'var(--success)', fontSize: '0.85rem', fontWeight: 600 }}>{t.common.free}</Typography>
+                <Typography sx={{ color: 'var(--foreground)', fontSize: '0.85rem', fontWeight: 600 }}>{t.common.free}</Typography>
               </Box>
             ) : (
               <Typography sx={{ color: 'var(--foreground)', fontSize: '0.85rem' }}>฿{shippingFee.toLocaleString()}</Typography>
@@ -1211,27 +1220,39 @@ export default function CheckoutDialog({
           {paymentFee > 0 && (
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
               <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{t.checkout.processingFee}</Typography>
-              <Typography sx={{ color: '#ff9f0a', fontSize: '0.85rem' }}>฿{paymentFee.toLocaleString()}</Typography>
+              <Typography sx={{ color: 'var(--foreground)', fontSize: '0.85rem' }}>฿{paymentFee.toLocaleString()}</Typography>
             </Box>
           )}
           {promoDiscount > 0 && (
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-              <Typography sx={{ color: 'var(--success)', fontSize: '0.85rem', fontWeight: 600 }}>
+              <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem', fontWeight: 600 }}>
                 {t.checkout.discount} ({promoResult?.code})
               </Typography>
-              <Typography sx={{ color: 'var(--success)', fontSize: '0.85rem', fontWeight: 700 }}>
+              <Typography sx={{ color: 'var(--foreground)', fontSize: '0.85rem', fontWeight: 700 }}>
                 -฿{promoDiscount.toLocaleString()}
               </Typography>
             </Box>
           )}
-          <Divider sx={{ my: 1.5, borderColor: 'var(--glass-border)' }} />
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '1rem' }}>{t.checkout.grandTotal}</Typography>
-            <Typography sx={{ fontWeight: 900, color: 'var(--success)', fontSize: '1.35rem' }}>
+          <Divider sx={{ my: 1.5, borderColor: 'color-mix(in srgb, var(--foreground) 10%, transparent)' }} />
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <Typography sx={{
+              fontWeight: 700,
+              color: 'var(--foreground)',
+              fontSize: '0.78rem',
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+            }}>
+              {t.checkout.grandTotal}
+            </Typography>
+            <Typography sx={{ fontWeight: 800, color: 'var(--foreground)', fontSize: '1.25rem' }}>
               ฿{total.toLocaleString()}
             </Typography>
           </Box>
         </Box>
+
+        <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: 1.45, px: 0.25 }}>
+          {t.checkout.confirmHint}
+        </Typography>
 
         {/* Turnstile — bottom-aligned, not a centered hero badge */}
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', pt: 0.5 }}>
@@ -1247,60 +1268,63 @@ export default function CheckoutDialog({
         </Box>
       </DialogContent>
 
-      {/* Footer: Cancel | Pay CTA */}
+      {/* Footer: Cancel | Confirm CTA */}
       <DialogActions sx={{
         p: 2,
         gap: 1.25,
-        borderTop: '1px solid var(--glass-border)',
+        flexDirection: 'column',
+        alignItems: 'stretch',
+        borderTop: '1px solid color-mix(in srgb, var(--foreground) 10%, transparent)',
         bgcolor: 'var(--background)',
-        justifyContent: 'space-between',
       }}>
-        <Button
-          onClick={onClose}
-          sx={{
-            py: 1.35,
-            px: 2,
-            color: 'var(--text-muted)',
-            borderRadius: '14px',
-            fontSize: '0.9rem',
-            fontWeight: 600,
-            flexShrink: 0,
-            '&:hover': { bgcolor: 'var(--glass-bg)' },
-          }}
-        >
-          {t.common.cancel}
-        </Button>
-        <Button
-          onClick={handleSubmit}
-          disabled={!canSubmit}
-          startIcon={processing ? <CircularProgress size={18} color="inherit" /> : <QrCode size={18} />}
-          sx={{
-            flex: 1,
-            maxWidth: '72%',
-            py: 1.45,
-            borderRadius: '14px',
-            fontSize: { xs: '0.82rem', sm: '0.92rem' },
-            fontWeight: 800,
-            letterSpacing: 0.1,
-            textTransform: 'none',
-            background: canSubmit
-              ? 'linear-gradient(135deg, #30d158 0%, #248a3d 100%)'
-              : 'linear-gradient(135deg, rgba(48,209,88,0.28) 0%, rgba(36,138,61,0.22) 100%)',
-            color: canSubmit ? '#fff' : 'rgba(255,255,255,0.55)',
-            boxShadow: canSubmit ? '0 6px 18px rgba(48,209,88,0.45)' : 'none',
-            border: canSubmit ? 'none' : '1px solid rgba(48,209,88,0.25)',
-            '&:hover': {
-              background: canSubmit
-                ? 'linear-gradient(135deg, #34c759 0%, #1f7a35 100%)'
-                : 'linear-gradient(135deg, rgba(48,209,88,0.28) 0%, rgba(36,138,61,0.22) 100%)',
-            },
-            '&.Mui-disabled': {
-              color: 'rgba(255,255,255,0.55)',
-            },
-          }}
-        >
-          {payCtaLabel}
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1.25, width: '100%', justifyContent: 'space-between' }}>
+          <Button
+            onClick={onClose}
+            sx={{
+              py: 1.35,
+              px: 2,
+              color: 'var(--text-muted)',
+              borderRadius: '4px',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              flexShrink: 0,
+              '&:hover': { bgcolor: 'color-mix(in srgb, var(--foreground) 6%, transparent)' },
+            }}
+          >
+            {t.common.cancel}
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={!canSubmit}
+            startIcon={processing ? <CircularProgress size={18} color="inherit" /> : <Check size={18} strokeWidth={2.25} />}
+            sx={{
+              flex: 1,
+              maxWidth: '78%',
+              py: 1.45,
+              minHeight: 48,
+              borderRadius: '4px',
+              fontSize: { xs: '0.72rem', sm: '0.78rem' },
+              fontWeight: 700,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              bgcolor: canSubmit ? 'var(--primary)' : 'color-mix(in srgb, var(--foreground) 12%, transparent)',
+              color: canSubmit ? '#fff' : 'var(--text-muted)',
+              boxShadow: 'none',
+              '&:hover': {
+                bgcolor: canSubmit ? 'var(--primary)' : 'color-mix(in srgb, var(--foreground) 12%, transparent)',
+                filter: canSubmit ? 'brightness(0.92)' : 'none',
+                boxShadow: 'none',
+              },
+              '&.Mui-disabled': {
+                color: 'var(--text-muted)',
+              },
+            }}
+          >
+            {payCtaLabel}
+          </Button>
+        </Box>
       </DialogActions>
     </Dialog>
   );
