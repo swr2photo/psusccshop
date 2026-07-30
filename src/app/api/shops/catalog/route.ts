@@ -4,7 +4,7 @@ import { withBackendProxy } from '@/lib/backend-proxy';
 import { listActivePublicShopCatalog } from '@/lib/shops';
 import { API_CACHE, API_CDN_HEADERS } from '@/lib/api-helpers';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 async function GETHandler(_req: NextRequest) {
