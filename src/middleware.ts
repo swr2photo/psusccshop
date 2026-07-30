@@ -164,6 +164,12 @@ function isCacheableApiPath(pathname: string): boolean {
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
+  const loadTestSecret = request.headers.get('x-load-test-secret');
+  if (loadTestSecret && loadTestSecret === process.env.LOAD_TEST_SECRET) {
+    // ข้ามการตรวจเช็ก Rate Limit
+    return NextResponse.next();
+  }
+
   // Bypass middleware for Sentry telemetry tunnel
   if (pathname === '/monitoring') {
     return NextResponse.next();
