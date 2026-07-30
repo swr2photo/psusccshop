@@ -204,22 +204,15 @@ export async function POST(req: NextRequest) {
     let shopOpenDate = '';
 
     if (sanitizedBody.shopId || sanitizedBody.shopSlug) {
-      // Multi-shop validation (MOCKED for load test)
-      // const shopResult = await db.select()
-      //   .from(shops)
-      //   .where(
-      //     sanitizedBody.shopId 
-      //       ? eq(shops.id, sanitizedBody.shopId) 
-      //       : eq(shops.slug, sanitizedBody.shopSlug)
-      //   )
-      //   .limit(1);
-        
-      const shopResult = [{
-        id: sanitizedBody.shopId,
-        slug: sanitizedBody.shopSlug,
-        products: [{ id: "prod_1785398885198", name: "Spider-Man: Brand New Day Topper Cup", price: 699, basePrice: 699, stock: 10000 }],
-        settings: { isOpen: true }
-      }];
+      // Multi-shop validation
+      const shopResult = await db.select()
+        .from(shops)
+        .where(
+          sanitizedBody.shopId 
+            ? eq(shops.id, sanitizedBody.shopId) 
+            : eq(shops.slug, sanitizedBody.shopSlug)
+        )
+        .limit(1);
         
       if (shopResult.length > 0) {
         const s = shopResult[0];
@@ -370,12 +363,11 @@ export async function POST(req: NextRequest) {
       if (prodId) {
         try {
           const stockKey = `stock:${sanitizedBody.shopId || 'main'}:${prodId}:${size}`;
-          // Mock Redis Deduct for Load test
-          // const redisDeduct = await deductStockAtomic(stockKey, qty).catch((e) => {
-          //    console.warn('[Orders API] Redis deduct failed or not configured, fallback to SQL:', e);
-          //    return -2;
-          // });
-          const redisDeduct: number = 1;
+          // Use Redis Deduct
+          const redisDeduct = await deductStockAtomic(stockKey, qty).catch((e) => {
+             console.warn('[Orders API] Redis deduct failed or not configured, fallback to SQL:', e);
+             return -2;
+          });
           
           if (redisDeduct === -1) {
             allStockDeducted = false;
@@ -415,17 +407,14 @@ export async function POST(req: NextRequest) {
     const qstash = getQStashClient();
     if (qstash) {
       try {
-        // Enqueue job to QStash (MOCKED for load test)
-        // const protocol = req.headers.get('x-forwarded-proto') || 'https';
-        // const host = req.headers.get('host') || 'sccshop.psuscc.club';
-        // await qstash.publishJSON({
-        //   url: `${protocol}://${host}/api/workers/process-order`,
-        //   body: { order, ref, key },
-        //   retries: 3,
-        // });
-        
-        // Mock network delay of calling Upstash (approx 10ms)
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        // Enqueue job to QStash
+        const protocol = req.headers.get('x-forwarded-proto') || 'https';
+        const host = req.headers.get('host') || 'sccshop.psuscc.club';
+        await qstash.publishJSON({
+          url: `${protocol}://${host}/api/workers/process-order`,
+          body: { order, ref, key },
+          retries: 3,
+        });
 
         // ── Queue Tracking ─────────────────────────────────
         // Record queue position and metadata in Redis so the

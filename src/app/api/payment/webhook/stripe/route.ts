@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     const signature = request.headers.get('stripe-signature') || '';
 
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-    if (!webhookSecret || !verifyStripeWebhook(payload, signature)) {
+    if (!webhookSecret || !(await verifyStripeWebhook(payload, signature))) {
       console.error('[Webhook] Invalid Stripe signature');
       return await secureJsonResponse(
         { success: false, error: 'Invalid signature' },

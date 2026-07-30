@@ -17,6 +17,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
 
   return new Elysia({
     prefix: '/api',
+    aot: false,
     ...(options.adapter ? { adapter: options.adapter } : {}),
   })
     .use(

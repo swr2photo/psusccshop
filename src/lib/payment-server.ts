@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // Server-only payment helpers (gateway I/O + DB). Do not import from client components.
-import 'server-only';
+// import 'server-only'; // Commented out for Cloudflare Worker compatibility
 
 import { getConfigValueCached } from '@/lib/config-db';
 import type {
@@ -191,10 +191,10 @@ export async function createOmiseSource(
 /**
  * Verify Omise webhook signature
  */
-export function verifyOmiseWebhook(
+export async function verifyOmiseWebhook(
   payload: string,
   signature: string
-): boolean {
+): Promise<boolean> {
   const webhookSecret = process.env.OMISE_WEBHOOK_SECRET;
 
   if (!webhookSecret) {
@@ -202,19 +202,29 @@ export function verifyOmiseWebhook(
     return false;
   }
 
-  // Omise uses the signature directly
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  try {
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(webhookSecret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify']
+    );
 
-  const crypto = require('crypto');
-  const expectedSignature = crypto
-    .createHmac('sha256', webhookSecret)
-    .update(payload)
-    .digest('base64');
-
-  return crypto.timingSafeEqual(
-    Buffer.from(signature),
-    Buffer.from(expectedSignature)
-  );
+    // Omise signature is base64
+    const sigBytes = Uint8Array.from(atob(signature), c => c.charCodeAt(0));
+    
+    return await crypto.subtle.verify(
+      'HMAC',
+      key,
+      sigBytes,
+      encoder.encode(payload)
+    );
+  } catch (error) {
+    console.error('[Payment] Omise webhook verification error:', error);
+    return false;
+  }
 }
 
 // ==================== STRIPE INTEGRATION ====================
@@ -356,11 +366,11 @@ export async function createStripePaymentIntentDetailed(
 /**
  * Verify Stripe webhook signature
  */
-export function verifyStripeWebhook(
+export async function verifyStripeWebhook(
   payload: string,
   signature: string,
   toleranceSeconds = 300,
-): boolean {
+): Promise<boolean> {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
   if (!webhookSecret) {
@@ -369,9 +379,6 @@ export function verifyStripeWebhook(
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-
-    const crypto = require('crypto');
     const signatureParts = signature.split(',').reduce((acc, part) => {
       const [key, value] = part.split('=');
       acc[key] = value;
@@ -392,16 +399,27 @@ export function verifyStripeWebhook(
     }
 
     const signedPayload = `${timestamp}.${payload}`;
-    const expectedSignature = crypto
-      .createHmac('sha256', webhookSecret)
-      .update(signedPayload)
-      .digest('hex');
+    
+    const encoder = new TextEncoder();
+    const key = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(webhookSecret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify']
+    );
 
-    const sigBuf = Buffer.from(sig, 'hex');
-    const expectedBuf = Buffer.from(expectedSignature, 'hex');
-    if (sigBuf.length !== expectedBuf.length) return false;
-
-    return crypto.timingSafeEqual(sigBuf, expectedBuf);
+    // Convert hex string to Uint8Array
+    const sigMatch = sig.match(/.{1,2}/g);
+    if (!sigMatch) return false;
+    const sigBytes = new Uint8Array(sigMatch.map(byte => parseInt(byte, 16)));
+    
+    return await crypto.subtle.verify(
+      'HMAC',
+      key,
+      sigBytes,
+      encoder.encode(signedPayload)
+    );
   } catch (error) {
     console.error('[Payment] Stripe webhook verification error:', error);
     return false;

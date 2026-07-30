@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     const signature = request.headers.get('x-omise-signature') || '';
 
     const webhookSecret = process.env.OMISE_WEBHOOK_SECRET;
-    if (!webhookSecret || !verifyOmiseWebhook(payload, signature)) {
+    if (!webhookSecret || !(await verifyOmiseWebhook(payload, signature))) {
       console.error('[Webhook] Invalid Omise signature');
       return await secureJsonResponse(
         { success: false, error: 'Invalid signature' },

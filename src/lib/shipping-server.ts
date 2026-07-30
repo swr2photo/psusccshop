@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // Server-only shipping / tracking API. Do not import from client components.
-import 'server-only';
+// import 'server-only'; // Commented out for Cloudflare Worker compatibility
 
 import {
   SHIPPING_PROVIDERS,

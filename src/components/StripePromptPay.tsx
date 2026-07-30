@@ -188,7 +188,7 @@ export default function StripePromptPay({
           /not available/i.test(error.message || '');
         throw new Error(
           unavailable
-            ? 'พร้อมเพย์อัตโนมัติยังไม่พร้อมใช้งานตอนนี้ กรุณาเลือก “โอนเอง + แนบสลิป”'
+            ? 'ธนาคารมักจะปิดปรับปรุงระบบช่วง 23:00 - 05:00 น. ทำให้ QR โค้ดอัตโนมัติใช้งานไม่ได้ชั่วคราว กรุณาเลือก “โอนเอง + แนบสลิป” แทนครับ'
             : error.message || t.payment.stripeError,
         );
       }

@@ -1,5 +1,4 @@
 // Server-only Cloudflare Turnstile verification. Do not import from client components.
-import 'server-only';
 
 /**
  * Cloudflare Turnstile Secret Key (private - ใช้ใน backend เท่านั้น)
