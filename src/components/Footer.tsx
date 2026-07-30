@@ -4,7 +4,6 @@ import {
   Facebook,
   Instagram,
   Mail,
-  Shield,
   Info,
   Lock,
   MapPin,
@@ -13,7 +12,7 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useState, type CSSProperties, type ReactNode } from 'react';
+import { useState, type CSSProperties, type MouseEvent, type ReactNode } from 'react';
 import { useTranslation } from '@/hooks/useTranslation';
 
 type TrustBadge =
@@ -26,24 +25,25 @@ const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || '2.1.0';
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const OPEN_SUPPORT_CHAT_EVENT = 'psuscc:open-support-chat';
 
-const FOOTER_BODY: CSSProperties = {
-  color: 'color-mix(in oklab, var(--foreground) 72%, var(--text-muted))',
+const MUTED: CSSProperties = {
+  color: 'color-mix(in oklab, var(--foreground) 68%, var(--text-muted))',
 };
 
-const FOOTER_LINK: CSSProperties = {
-  ...FOOTER_BODY,
+const LINK: CSSProperties = {
+  ...MUTED,
   textDecoration: 'none',
-  transition: 'color 0.2s ease',
+  transition: 'color 0.18s ease',
   fontSize: '0.875rem',
-  lineHeight: 1.5,
+  lineHeight: 1.45,
+  fontWeight: 500,
 };
 
-const SECTION_TITLE: CSSProperties = {
+const SECTION_LABEL: CSSProperties = {
   fontWeight: 800,
   color: 'var(--foreground)',
-  marginBottom: '1rem',
-  fontSize: '0.8125rem',
-  letterSpacing: '0.04em',
+  marginBottom: '1.1rem',
+  fontSize: '0.68rem',
+  letterSpacing: '0.14em',
   textTransform: 'uppercase',
 };
 
@@ -60,14 +60,14 @@ function FooterLink({
     el.style.color = 'var(--primary)';
   };
   const hoverOut = (el: HTMLElement) => {
-    el.style.color = FOOTER_BODY.color as string;
+    el.style.color = MUTED.color as string;
   };
 
   if (external) {
     return (
       <a
         href={href}
-        style={FOOTER_LINK}
+        style={LINK}
         target={href.startsWith('http') ? '_blank' : undefined}
         rel={href.startsWith('http') ? 'noopener noreferrer' : undefined}
         onMouseEnter={(e) => hoverIn(e.currentTarget)}
@@ -81,7 +81,7 @@ function FooterLink({
   return (
     <Link
       href={href}
-      style={FOOTER_LINK}
+      style={LINK}
       onMouseEnter={(e) => hoverIn(e.currentTarget)}
       onMouseLeave={(e) => hoverOut(e.currentTarget)}
     >
@@ -90,6 +90,31 @@ function FooterLink({
   );
 }
 
+function LinkList({ items }: { items: Array<{ href: string; label: string }> }) {
+  return (
+    <ul
+      style={{
+        listStyle: 'none',
+        padding: 0,
+        margin: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.7rem',
+      }}
+    >
+      {items.map(({ href, label }) => (
+        <li key={`${href}-${label}`}>
+          <FooterLink href={href}>{label}</FooterLink>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * Storefront footer inspired by Pop Culture Depot:
+ * brand strip, uppercase columns, hairline dividers, solid links.
+ */
 export default function Footer() {
   const { t } = useTranslation();
   const [showBuildInfo, setShowBuildInfo] = useState(false);
@@ -114,7 +139,7 @@ export default function Footer() {
     window.dispatchEvent(new CustomEvent(OPEN_SUPPORT_CHAT_EVENT));
   };
 
-  const navLinks = [
+  const shopLinks = [
     { href: '/', label: t.footer.home },
     { href: '/#product-grid', label: t.footer.allProducts },
     { href: '/#shop-section', label: t.footer.apparel },
@@ -122,11 +147,16 @@ export default function Footer() {
     { href: '/#events-section', label: t.footer.eventsCamps },
   ];
 
-  const serviceLinks = [
+  const helpLinks = [
+    { href: '/faq', label: t.footer.faq },
     { href: '/#history', label: t.footer.checkStatus },
     { href: '/#payment', label: t.footer.payment },
     { href: '/terms', label: t.footer.refund },
-    { href: '/privacy', label: t.footer.privacyPolicy, icon: true },
+  ];
+
+  const legalLinks = [
+    { href: '/privacy', label: t.footer.privacyPolicy },
+    { href: '/terms', label: t.footer.termsOfService },
   ];
 
   const trustItems: TrustBadge[] = [
@@ -150,40 +180,34 @@ export default function Footer() {
   const copyright = t.footer.copyright.replace('{year}', String(year));
   const envLabel = IS_PRODUCTION ? t.footer.production : t.footer.development;
 
+  const socialHover = (color: string) => ({
+    onMouseEnter: (e: MouseEvent<HTMLAnchorElement>) => {
+      e.currentTarget.style.color = color;
+    },
+    onMouseLeave: (e: MouseEvent<HTMLAnchorElement>) => {
+      e.currentTarget.style.color = MUTED.color as string;
+    },
+  });
+
   return (
     <footer
-      className="mt-auto border-t py-12"
+      className="mt-auto"
       style={{
         background: 'var(--surface)',
-        borderColor: 'var(--glass-border)',
+        borderTop: '1px solid var(--glass-border)',
+        color: 'var(--foreground)',
       }}
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
-        {/* 4-column grid: 1 col mobile → 2 sm → 4 md+ */}
-        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 md:grid-cols-4 md:gap-10">
-          {/* Brand */}
-          <div>
-            <h3
-              style={{
-                fontSize: '0.8125rem',
-                fontWeight: 800,
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase',
-                color: 'var(--foreground)',
-                marginBottom: '0.85rem',
-              }}
-            >
-              {t.footer.brandTitle}
-            </h3>
+        {/* Brand strip */}
+        <div
+          className="flex flex-col gap-5 py-9 sm:flex-row sm:items-center sm:justify-between sm:gap-8"
+          style={{ borderBottom: '1px solid var(--glass-border)' }}
+        >
+          <div className="min-w-0">
             <Link
               href="/"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.65rem',
-                textDecoration: 'none',
-                marginBottom: '0.75rem',
-              }}
+              className="mb-3 inline-flex items-center gap-3 no-underline"
             >
               <Image
                 src="/logo.png"
@@ -193,89 +217,122 @@ export default function Footer() {
                 className="theme-logo"
                 style={{ borderRadius: 10 }}
               />
-              <span className="text-gradient" style={{ fontSize: '1.2rem', fontWeight: 800 }}>
-                SCC SHOP
+              <span className="flex flex-col leading-none">
+                <span
+                  style={{
+                    fontWeight: 800,
+                    fontSize: '0.95rem',
+                    letterSpacing: '0.1em',
+                    textTransform: 'uppercase',
+                    color: 'var(--foreground)',
+                  }}
+                >
+                  SCC
+                </span>
+                <span
+                  style={{
+                    marginTop: 4,
+                    alignSelf: 'flex-start',
+                    padding: '2px 8px',
+                    borderRadius: 4,
+                    background: 'var(--primary)',
+                    color: '#fff',
+                    fontWeight: 800,
+                    fontSize: '0.62rem',
+                    letterSpacing: '0.14em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  Shop
+                </span>
               </span>
             </Link>
-            <p style={{ ...FOOTER_BODY, fontSize: '0.875rem', lineHeight: 1.65, margin: '0 0 0.75rem' }}>
-              {t.footer.description}
-            </p>
             <p
               style={{
-                ...FOOTER_BODY,
-                fontSize: '0.8125rem',
-                lineHeight: 1.5,
+                ...MUTED,
+                fontSize: '0.875rem',
+                lineHeight: 1.65,
                 margin: 0,
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '0.4rem',
+                maxWidth: 420,
               }}
             >
-              <MapPin size={14} style={{ marginTop: 2, flexShrink: 0, opacity: 0.85 }} />
-              <span>{t.footer.location}</span>
+              {t.footer.description}
             </p>
           </div>
 
-          {/* Navigation */}
+          <div className="flex flex-col gap-3 sm:items-end">
+            <span style={SECTION_LABEL}>{t.footer.followUs}</span>
+            <div className="flex items-center gap-4">
+              <a
+                href="https://facebook.com/psuscc"
+                title="Facebook"
+                aria-label="Facebook"
+                style={{ color: MUTED.color as string, display: 'flex', transition: 'color 0.18s ease' }}
+                {...socialHover('#1877f2')}
+              >
+                <Facebook size={20} />
+              </a>
+              <a
+                href="https://instagram.com/psuscc"
+                title="Instagram"
+                aria-label="Instagram"
+                style={{ color: MUTED.color as string, display: 'flex', transition: 'color 0.18s ease' }}
+                {...socialHover('#e1306c')}
+              >
+                <Instagram size={20} />
+              </a>
+              <a
+                href="mailto:psuscc@psusci.club"
+                title="Email"
+                aria-label="Email"
+                style={{ color: MUTED.color as string, display: 'flex', transition: 'color 0.18s ease' }}
+                {...socialHover('var(--success)')}
+              >
+                <Mail size={20} />
+              </a>
+            </div>
+          </div>
+        </div>
+
+        {/* Columns — Shop / Help / Legal / Contact */}
+        <div className="grid grid-cols-1 gap-10 py-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8">
           <div>
-            <h4 style={SECTION_TITLE}>{t.footer.menuTitle}</h4>
-            <ul
-              style={{
-                listStyle: 'none',
-                padding: 0,
-                margin: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.65rem',
-              }}
-            >
-              {navLinks.map(({ href, label }) => (
-                <li key={`${href}-${label}`}>
-                  <FooterLink href={href}>{label}</FooterLink>
-                </li>
-              ))}
-            </ul>
+            <h4 style={SECTION_LABEL}>{t.footer.menuTitle}</h4>
+            <LinkList items={shopLinks} />
           </div>
 
-          {/* Customer service */}
           <div>
-            <h4 style={SECTION_TITLE}>{t.footer.serviceTitle}</h4>
-            <ul
-              style={{
-                listStyle: 'none',
-                padding: 0,
-                margin: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.65rem',
-              }}
-            >
-              {serviceLinks.map(({ href, label, icon }) => (
-                <li key={href}>
-                  <FooterLink href={href}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                      {icon ? <Shield size={13} /> : null}
-                      {label}
-                    </span>
-                  </FooterLink>
-                </li>
-              ))}
-            </ul>
+            <h4 style={SECTION_LABEL}>{t.footer.serviceTitle}</h4>
+            <LinkList items={helpLinks} />
           </div>
 
-          {/* Contact */}
           <div>
-            <h4 style={SECTION_TITLE}>{t.footer.contactUs}</h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <h4 style={SECTION_LABEL}>{t.footer.brandTitle}</h4>
+            <LinkList items={legalLinks} />
+            <p
+              style={{
+                ...MUTED,
+                fontSize: '0.8125rem',
+                lineHeight: 1.6,
+                margin: '1.25rem 0 0',
+              }}
+            >
+              {t.footer.description}
+            </p>
+          </div>
+
+          <div>
+            <h4 style={SECTION_LABEL}>{t.footer.contactUs}</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               <FooterLink href="mailto:psuscc@psusci.club" external>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
                   <Mail size={14} />
                   psuscc@psusci.club
                 </span>
               </FooterLink>
               <p
                 style={{
-                  ...FOOTER_BODY,
+                  ...MUTED,
                   fontSize: '0.8125rem',
                   lineHeight: 1.5,
                   margin: 0,
@@ -287,56 +344,6 @@ export default function Footer() {
                 <MapPin size={14} style={{ marginTop: 2, flexShrink: 0, opacity: 0.85 }} />
                 <span>{t.footer.location}</span>
               </p>
-              <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'center' }}>
-                <a
-                  href="https://facebook.com/psuscc"
-                  title="Facebook"
-                  aria-label="Facebook"
-                  style={{ color: FOOTER_BODY.color as string, display: 'flex', transition: 'color 0.2s ease, transform 0.2s ease' }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.color = '#1877f2';
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.color = FOOTER_BODY.color as string;
-                    e.currentTarget.style.transform = 'translateY(0)';
-                  }}
-                >
-                  <Facebook size={20} />
-                </a>
-                <a
-                  href="https://instagram.com/psuscc"
-                  title="Instagram"
-                  aria-label="Instagram"
-                  style={{ color: FOOTER_BODY.color as string, display: 'flex', transition: 'color 0.2s ease, transform 0.2s ease' }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.color = '#e1306c';
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.color = FOOTER_BODY.color as string;
-                    e.currentTarget.style.transform = 'translateY(0)';
-                  }}
-                >
-                  <Instagram size={20} />
-                </a>
-                <a
-                  href="mailto:psuscc@psusci.club"
-                  title="Email"
-                  aria-label="Email"
-                  style={{ color: FOOTER_BODY.color as string, display: 'flex', transition: 'color 0.2s ease, transform 0.2s ease' }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.color = 'var(--success)';
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.color = FOOTER_BODY.color as string;
-                    e.currentTarget.style.transform = 'translateY(0)';
-                  }}
-                >
-                  <Mail size={20} />
-                </a>
-              </div>
               <button
                 type="button"
                 onClick={openSupportChat}
@@ -346,19 +353,20 @@ export default function Footer() {
                   alignItems: 'center',
                   gap: '0.45rem',
                   marginTop: '0.15rem',
-                  padding: '0.45rem 0.85rem',
-                  borderRadius: 10,
+                  padding: '0.5rem 0.9rem',
+                  borderRadius: 8,
                   border: '1px solid var(--glass-border)',
                   background: 'var(--surface-2)',
                   color: 'var(--foreground)',
                   fontSize: '0.8125rem',
-                  fontWeight: 600,
+                  fontWeight: 650,
                   cursor: 'pointer',
-                  transition: 'background 0.2s ease, border-color 0.2s ease',
+                  transition: 'background 0.18s ease, border-color 0.18s ease',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = 'var(--surface-3)';
-                  e.currentTarget.style.borderColor = 'color-mix(in oklab, var(--primary) 35%, var(--glass-border))';
+                  e.currentTarget.style.borderColor =
+                    'color-mix(in oklab, var(--primary) 35%, var(--glass-border))';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = 'var(--surface-2)';
@@ -372,9 +380,10 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* Trust capsules — Style A: original-color marks in muted pills */}
+        {/* Trust / payment marks */}
         <div
-          className="mt-10 flex flex-wrap items-center justify-center gap-2 sm:gap-2.5"
+          className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 py-6"
+          style={{ borderTop: '1px solid var(--glass-border)' }}
           role="list"
           aria-label="Trust badges"
         >
@@ -382,12 +391,8 @@ export default function Footer() {
             <span
               key={item.label}
               role="listitem"
-              className="inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold"
-              style={{
-                background: 'var(--surface-2)',
-                borderColor: 'var(--glass-border)',
-                color: 'var(--foreground)',
-              }}
+              className="inline-flex items-center gap-2 text-xs font-semibold"
+              style={{ color: MUTED.color as string }}
               aria-label={item.label}
             >
               {item.kind === 'logo' ? (
@@ -411,12 +416,12 @@ export default function Footer() {
           ))}
         </div>
 
-        {/* Copyright + version */}
+        {/* Copyright */}
         <div
-          className="mt-8 flex flex-col gap-3 border-t pt-5 sm:flex-row sm:items-center sm:justify-between"
-          style={{ borderColor: 'var(--glass-border)' }}
+          className="flex flex-col gap-3 py-5 sm:flex-row sm:items-center sm:justify-between"
+          style={{ borderTop: '1px solid var(--glass-border)' }}
         >
-          <p style={{ ...FOOTER_BODY, fontSize: '0.8125rem', margin: 0 }}>{copyright}</p>
+          <p style={{ ...MUTED, fontSize: '0.8125rem', margin: 0 }}>{copyright}</p>
 
           <div className="flex flex-wrap items-center gap-2 sm:justify-end">
             <button
@@ -427,23 +432,24 @@ export default function Footer() {
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '0.375rem',
-                color: FOOTER_BODY.color as string,
-                background: 'var(--surface-2)',
+                color: MUTED.color as string,
+                background: 'transparent',
                 border: '1px solid var(--glass-border)',
                 cursor: 'pointer',
                 fontSize: '0.75rem',
                 fontWeight: 600,
-                transition: 'color 0.2s ease, border-color 0.2s ease',
+                transition: 'color 0.18s ease, border-color 0.18s ease',
                 padding: '4px 10px',
-                borderRadius: 8,
+                borderRadius: 6,
                 fontFamily: 'var(--font-geist-mono, monospace)',
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.color = 'var(--foreground)';
-                e.currentTarget.style.borderColor = 'color-mix(in oklab, var(--primary) 30%, var(--glass-border))';
+                e.currentTarget.style.borderColor =
+                  'color-mix(in oklab, var(--primary) 30%, var(--glass-border))';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.color = FOOTER_BODY.color as string;
+                e.currentTarget.style.color = MUTED.color as string;
                 e.currentTarget.style.borderColor = 'var(--glass-border)';
               }}
             >
@@ -458,7 +464,7 @@ export default function Footer() {
                 className="animate-fade-in"
                 style={{
                   fontSize: '0.7rem',
-                  color: FOOTER_BODY.color as string,
+                  color: MUTED.color as string,
                   fontFamily: 'var(--font-geist-mono, monospace)',
                 }}
               >

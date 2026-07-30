@@ -55,24 +55,54 @@ function NavBadge({
   return (
     <Box
       component="span"
+      aria-hidden
       sx={{
         position: 'absolute',
-        top: -8,
-        right: -6,
-        px: 0.55,
-        py: 0.1,
+        top: 0,
+        right: 0,
+        // Sit outside the glyph box (top-right corner), never over the label
+        transform: 'translate(55%, -65%)',
+        px: 0.5,
+        py: 0.08,
         borderRadius: '4px',
         bgcolor: color,
         color: '#fff',
         fontSize: '0.55rem',
         fontWeight: 800,
         letterSpacing: '0.04em',
-        lineHeight: 1.4,
+        lineHeight: 1.25,
         pointerEvents: 'none',
         boxShadow: '0 1px 2px rgba(0,0,0,0.12)',
+        whiteSpace: 'nowrap',
+        zIndex: 1,
       }}
     >
       {label}
+    </Box>
+  );
+}
+
+/** Tight label wrapper so corner badges position relative to the text, not the Button. */
+function NavLabel({
+  children,
+  badge,
+}: {
+  children: ReactNode;
+  badge?: ReactNode;
+}) {
+  return (
+    <Box
+      component="span"
+      sx={{
+        position: 'relative',
+        display: 'inline-block',
+        lineHeight: 1.2,
+        // Reserve a little room so the badge doesn't collide with the next link
+        pr: badge ? 0.85 : 0,
+      }}
+    >
+      {children}
+      {badge}
     </Box>
   );
 }
@@ -191,9 +221,12 @@ export default function StorefrontNavbar({
     fontSize: '0.72rem',
     letterSpacing: '0.08em',
     borderRadius: 0,
-    px: 1.35,
-    py: 1.15,
+    px: 1.5,
+    // Extra top padding so corner badges clear the label + active underline
+    pt: 1.45,
+    pb: 1.15,
     minHeight: 48,
+    overflow: 'visible',
     borderBottom: active ? '2px solid var(--primary)' : '2px solid transparent',
     transition: 'color 0.18s ease, border-color 0.18s ease',
     '&:hover': {
@@ -335,6 +368,7 @@ export default function StorefrontNavbar({
           minHeight: 64,
           px: { md: 2.5, lg: 3.5 },
           gap: 1,
+          overflow: 'visible',
         }}
       >
         <Box
@@ -358,11 +392,12 @@ export default function StorefrontNavbar({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 0.15,
+            gap: 0.5,
             minWidth: 0,
-            overflowX: 'auto',
-            scrollbarWidth: 'none',
-            '&::-webkit-scrollbar': { display: 'none' },
+            // Prefer visible overflow — overflow-x:auto creates a scrollport that
+            // also clips vertical overflow and cuts corner badges into flat bars.
+            overflow: 'visible',
+            flexWrap: 'nowrap',
           }}
         >
           <Button
@@ -377,34 +412,37 @@ export default function StorefrontNavbar({
             {t.nav.shop}
           </Button>
 
-          <Button
-            variant="text"
-            onClick={onFlagshipClick}
-            sx={{ ...desktopLinkSx(false), overflow: 'visible' }}
-          >
-            {t.nav.flagship}
-            <NavBadge label={t.nav.badgeNew} color="#06b6d4" />
+          <Button variant="text" onClick={onFlagshipClick} sx={desktopLinkSx(false)}>
+            <NavLabel badge={<NavBadge label={t.nav.badgeNew} color="#06b6d4" />}>
+              {t.nav.flagship}
+            </NavLabel>
           </Button>
 
           <Button
             variant="text"
             onClick={() => onTabChange('history')}
-            sx={{ ...desktopLinkSx(activeTab === 'history'), overflow: 'visible' }}
+            sx={desktopLinkSx(activeTab === 'history')}
           >
-            {t.nav.history}
-            {pendingOrderCount > 0 && (
-              <NavBadge label={String(Math.min(pendingOrderCount, 99))} color="#f59e0b" />
-            )}
+            <NavLabel
+              badge={
+                pendingOrderCount > 0 ? (
+                  <NavBadge label={String(Math.min(pendingOrderCount, 99))} color="#f59e0b" />
+                ) : undefined
+              }
+            >
+              {t.nav.history}
+            </NavLabel>
           </Button>
 
           {isLiveActive && (
             <Button
               variant="text"
               onClick={onOpenLive}
-              sx={{ ...desktopLinkSx(false), overflow: 'visible', color: '#ff3b30' }}
+              sx={{ ...desktopLinkSx(false), color: '#ff3b30' }}
             >
-              {t.nav.live}
-              <NavBadge label="LIVE" color="#ff3b30" />
+              <NavLabel badge={<NavBadge label="LIVE" color="#ff3b30" />}>
+                {t.nav.live}
+              </NavLabel>
             </Button>
           )}
         </Box>
