@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getRedisClient } from '@/lib/redis';
 import { putJson } from '@/lib/filebase';
 import { triggerSheetSync } from '@/lib/sheet-sync';
-
+import { db } from '@/lib/db';
+import { shops } from '@/db/schema';
+import { eq } from 'drizzle-orm';
+import { invalidateCacheKey } from '@/lib/server-cache';
+import type { Product } from '@/lib/config';
 // Security: In a real app, verify QStash signature here using @upstash/qstash Receiver.
 // For now, we assume the POST comes from QStash or internal edge.
 
@@ -44,6 +48,49 @@ export async function POST(req: NextRequest) {
 
     await putJson(key, order);
     
+    // Deduct stock in DB (shops JSON) to trigger real-time updates and update persistent state
+    try {
+      const targetShopId = order.shopId;
+      const targetShopSlug = order.shopSlug;
+      let shopCondition;
+      if (targetShopId) shopCondition = eq(shops.id, targetShopId);
+      else if (targetShopSlug) shopCondition = eq(shops.slug, targetShopSlug);
+
+      if (shopCondition) {
+        const shopRow = await db.select({ products: shops.products, id: shops.id }).from(shops).where(shopCondition).limit(1).execute();
+        if (shopRow && shopRow.length > 0) {
+          const products = (shopRow[0].products as Product[]) || [];
+          let updated = false;
+
+          for (const item of order.cart || []) {
+            const prodId = item.productId || item.id;
+            const size = item.size || 'FREE';
+            const qty = Number(item.quantity || item.qty || 1);
+
+            const product = products.find(p => p.id === prodId);
+            if (product) {
+              if (product.variants && product.variants.length > 0) {
+                const variant = product.variants.find(v => v.id === size || v.name === size);
+                if (variant && typeof variant.stock === 'number') {
+                  variant.stock = Math.max(0, variant.stock - qty);
+                  updated = true;
+                }
+              } else if (typeof product.stock === 'number') {
+                product.stock = Math.max(0, product.stock - qty);
+                updated = true;
+              }
+            }
+          }
+
+          if (updated) {
+            await db.update(shops).set({ products, updatedAt: new Date() }).where(eq(shops.id, shopRow[0].id)).execute();
+            invalidateCacheKey('shops:public-catalog-v2');
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Worker API] Failed to update shops JSON for realtime stock:', err);
+    }
     // Attempt sheet sync
     triggerSheetSync().catch(() => {});
 
