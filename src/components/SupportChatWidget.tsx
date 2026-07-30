@@ -170,7 +170,7 @@ export default function SupportChatWidget({
   const [uploadLabel, setUploadLabel] = useState('กำลังอัปโหลดรูปภาพ...');
   const [uploadFileCount, setUploadFileCount] = useState(1);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const [messageMenuAnchor, setMessageMenuAnchor] = useState<null | HTMLElement>(null);
+  const [messageMenuAnchor, setMessageMenuAnchor] = useState<null | Element>(null);
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
   const [unsending, setUnsending] = useState(false);
   const [replyToMessage, setReplyToMessage] = useState<{ id: string; text: string; sender: string } | null>(null);
@@ -1157,7 +1157,7 @@ export default function SupportChatWidget({
   };
 
   // Open message context menu
-  const handleMessageMenu = (event: React.MouseEvent<HTMLElement>, messageId: string) => {
+  const handleMessageMenu = (event: React.MouseEvent<Element>, messageId: string) => {
     event.preventDefault();
     setSelectedMessageId(messageId);
     setMessageMenuAnchor(event.currentTarget);
@@ -2515,7 +2515,7 @@ ${getStatusLabel(order.status)}
                       !imageUrl &&
                       !orderRef;
                     const openMsgMenu = canUnsend || canReply
-                      ? (e: React.MouseEvent<HTMLElement>) => handleMessageMenu(e, msg.id)
+                      ? (e: React.MouseEvent<Element>) => handleMessageMenu(e, msg.id)
                       : undefined;
                     const isLastCustomerMessage = msg.sender === 'customer' &&
                       index === filteredMessages.map(m => m.sender).lastIndexOf('customer');
