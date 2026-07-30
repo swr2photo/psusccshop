@@ -34,26 +34,26 @@ export type ChatTheme = {
 export const CHAT_THEMES: ChatTheme[] = [
   {
     id: 'classic',
-    swatch: '#0071e3',
-    swatchSecondary: '#e8e8ed',
+    swatch: '#007aff',
+    swatchSecondary: '#34c759',
     background: 'var(--surface-2)',
-    outgoingBg: '#0071e3',
+    outgoingBg: 'linear-gradient(135deg, #007aff 0%, #005bb5 100%)',
     outgoingFg: '#ffffff',
-    incomingBg: '#e8e8ed',
-    incomingFg: '#1d1d1f',
+    incomingBg: '#e5e5ea',
+    incomingFg: '#000000',
     nameTh: 'คลาสสิก',
     nameEn: 'Classic',
-    subtitleTh: 'สีมาตรฐานของร้าน',
-    subtitleEn: 'Shop default colors',
+    subtitleTh: 'สีมาตรฐานเรียบง่าย',
+    subtitleEn: 'Standard clean colors',
   },
   {
     id: 'scc-blue',
     swatch: '#0a84ff',
-    swatchSecondary: '#d6ebff',
-    background: 'linear-gradient(180deg, #e8f3ff 0%, #f5f9ff 48%, #eef4fb 100%)',
+    swatchSecondary: '#64d2ff',
+    background: 'linear-gradient(180deg, #f0f7ff 0%, #ffffff 100%)',
     pattern:
-      'radial-gradient(circle at 12% 18%, rgba(10,132,255,0.12) 0 2px, transparent 3px), radial-gradient(circle at 78% 42%, rgba(10,132,255,0.1) 0 2px, transparent 3px)',
-    outgoingBg: '#0a84ff',
+      'radial-gradient(circle at 12% 18%, rgba(10,132,255,0.06) 0 2px, transparent 3px), radial-gradient(circle at 78% 42%, rgba(10,132,255,0.05) 0 2px, transparent 3px)',
+    outgoingBg: 'linear-gradient(135deg, #0a84ff 0%, #0066cc 100%)',
     outgoingFg: '#ffffff',
     incomingBg: '#ffffff',
     incomingFg: '#0b1f33',
@@ -64,10 +64,10 @@ export const CHAT_THEMES: ChatTheme[] = [
   },
   {
     id: 'soft-dawn',
-    swatch: '#ff8f6b',
-    swatchSecondary: '#ffe8d6',
-    background: 'linear-gradient(165deg, #fff6ef 0%, #ffe9dc 40%, #f7f0ff 100%)',
-    outgoingBg: '#ff7a59',
+    swatch: '#ff6b4a',
+    swatchSecondary: '#ffd166',
+    background: 'linear-gradient(165deg, #fff2eb 0%, #ffdfcc 40%, #f7e6ff 100%)',
+    outgoingBg: 'linear-gradient(135deg, #ff6b4a 0%, #ff4b2b 100%)',
     outgoingFg: '#ffffff',
     incomingBg: '#ffffff',
     incomingFg: '#3b2a22',
@@ -78,12 +78,12 @@ export const CHAT_THEMES: ChatTheme[] = [
   },
   {
     id: 'night-market',
-    swatch: '#ffd60a',
-    swatchSecondary: '#1c1c1e',
-    background: 'linear-gradient(180deg, #121212 0%, #1c1c1e 100%)',
+    swatch: '#ffcc00',
+    swatchSecondary: '#ff9500',
+    background: 'linear-gradient(180deg, #0d0d0d 0%, #1a1a1c 100%)',
     pattern:
-      'radial-gradient(circle at 20% 30%, rgba(255,214,10,0.08) 0 1.5px, transparent 2px), radial-gradient(circle at 70% 60%, rgba(255,255,255,0.06) 0 1.5px, transparent 2px)',
-    outgoingBg: '#ffd60a',
+      'radial-gradient(circle at 20% 30%, rgba(255,204,0,0.08) 0 1.5px, transparent 2px), radial-gradient(circle at 70% 60%, rgba(255,255,255,0.04) 0 1.5px, transparent 2px)',
+    outgoingBg: 'linear-gradient(135deg, #ffcc00 0%, #ff9500 100%)',
     outgoingFg: '#1c1c1e',
     incomingBg: '#2c2c2e',
     incomingFg: '#f5f5f7',
@@ -94,12 +94,12 @@ export const CHAT_THEMES: ChatTheme[] = [
   },
   {
     id: 'campus-green',
-    swatch: '#30d158',
-    swatchSecondary: '#e3f8e9',
-    background: 'linear-gradient(180deg, #eaf8ef 0%, #f4fbf6 100%)',
+    swatch: '#34c759',
+    swatchSecondary: '#30db5b',
+    background: 'linear-gradient(180deg, #e4f9eb 0%, #ffffff 100%)',
     pattern:
-      'linear-gradient(135deg, rgba(48,209,88,0.06) 25%, transparent 25%), linear-gradient(225deg, rgba(48,209,88,0.06) 25%, transparent 25%)',
-    outgoingBg: '#248a3d',
+      'linear-gradient(135deg, rgba(52,199,89,0.05) 25%, transparent 25%), linear-gradient(225deg, rgba(52,199,89,0.05) 25%, transparent 25%)',
+    outgoingBg: 'linear-gradient(135deg, #34c759 0%, #248a3d 100%)',
     outgoingFg: '#ffffff',
     incomingBg: '#ffffff',
     incomingFg: '#14301c',
@@ -110,12 +110,12 @@ export const CHAT_THEMES: ChatTheme[] = [
   },
   {
     id: 'sunset-run',
-    swatch: '#ff453a',
+    swatch: '#ff3b30',
     swatchSecondary: '#ff9f0a',
-    background: 'linear-gradient(160deg, #2a1030 0%, #4a1a2a 45%, #7a2e1a 100%)',
-    outgoingBg: '#ff6b4a',
+    background: 'linear-gradient(160deg, #1f0b24 0%, #3a1521 45%, #5a2213 100%)',
+    outgoingBg: 'linear-gradient(135deg, #ff453a 0%, #ff9f0a 100%)',
     outgoingFg: '#ffffff',
-    incomingBg: 'rgba(255,255,255,0.14)',
+    incomingBg: 'rgba(255,255,255,0.1)',
     incomingFg: '#fff5f0',
     nameTh: 'วิ่งยามเย็น',
     nameEn: 'Sunset Run',
@@ -124,12 +124,12 @@ export const CHAT_THEMES: ChatTheme[] = [
   },
   {
     id: 'lavender-mist',
-    swatch: '#bf5af2',
-    swatchSecondary: '#f3e8ff',
-    background: 'linear-gradient(180deg, #f7f0ff 0%, #eef2ff 100%)',
+    swatch: '#af52de',
+    swatchSecondary: '#ff2d55',
+    background: 'linear-gradient(180deg, #f4ebff 0%, #ffffff 100%)',
     pattern:
-      'radial-gradient(circle at 30% 20%, rgba(191,90,242,0.14) 0 18%, transparent 19%), radial-gradient(circle at 80% 70%, rgba(90,200,250,0.12) 0 16%, transparent 17%)',
-    outgoingBg: '#9b3fd4',
+      'radial-gradient(circle at 30% 20%, rgba(175,82,222,0.08) 0 18%, transparent 19%), radial-gradient(circle at 80% 70%, rgba(255,45,85,0.06) 0 16%, transparent 17%)',
+    outgoingBg: 'linear-gradient(135deg, #af52de 0%, #5e5ce6 100%)',
     outgoingFg: '#ffffff',
     incomingBg: '#ffffff',
     incomingFg: '#2a1840',
@@ -140,12 +140,12 @@ export const CHAT_THEMES: ChatTheme[] = [
   },
   {
     id: 'matchday',
-    swatch: '#ff375f',
+    swatch: '#ff2d55',
     swatchSecondary: '#111827',
-    background: 'linear-gradient(180deg, #0f172a 0%, #111827 55%, #1e293b 100%)',
+    background: 'linear-gradient(180deg, #09090b 0%, #111827 55%, #1e293b 100%)',
     pattern:
-      'repeating-linear-gradient(-12deg, transparent, transparent 14px, rgba(255,55,95,0.05) 14px, rgba(255,55,95,0.05) 15px)',
-    outgoingBg: '#ff375f',
+      'repeating-linear-gradient(-12deg, transparent, transparent 14px, rgba(255,45,85,0.05) 14px, rgba(255,45,85,0.05) 15px)',
+    outgoingBg: 'linear-gradient(135deg, #ff2d55 0%, #c10020 100%)',
     outgoingFg: '#ffffff',
     incomingBg: '#1f2937',
     incomingFg: '#f8fafc',
@@ -184,17 +184,17 @@ export function chatThemeCssVars(theme: ChatTheme): CSSProperties {
     ['--chat-chrome-fg' as string]: dark ? '#f5f5f7' : '#1d1d1f',
     ['--chat-chrome-muted' as string]: dark ? 'rgba(245,245,247,0.72)' : 'rgba(29,29,31,0.62)',
     ['--chat-chrome-bg' as string]: dark
-      ? `color-mix(in srgb, ${theme.swatch} 22%, rgba(18,14,16,0.78))`
-      : `color-mix(in srgb, ${theme.swatch} 16%, rgba(255,255,255,0.86))`,
+      ? `color-mix(in srgb, ${theme.swatch} 15%, rgba(15,15,15,0.85))`
+      : `color-mix(in srgb, ${theme.swatch} 5%, rgba(255,255,255,0.95))`,
     ['--chat-chrome-border' as string]: dark
-      ? 'rgba(255,255,255,0.12)'
-      : 'rgba(0,0,0,0.08)',
-    ['--chat-composer-bg' as string]: dark
-      ? `color-mix(in srgb, ${theme.swatch} 14%, rgba(22,16,18,0.88))`
-      : `color-mix(in srgb, ${theme.swatch} 10%, rgba(255,255,255,0.92))`,
-    ['--chat-input-bg' as string]: dark
-      ? 'rgba(255,255,255,0.10)'
+      ? 'rgba(255,255,255,0.08)'
       : 'rgba(0,0,0,0.05)',
+    ['--chat-composer-bg' as string]: dark
+      ? `color-mix(in srgb, ${theme.swatch} 10%, rgba(20,20,20,0.9))`
+      : `color-mix(in srgb, ${theme.swatch} 5%, rgba(255,255,255,0.98))`,
+    ['--chat-input-bg' as string]: dark
+      ? 'rgba(255,255,255,0.08)'
+      : 'rgba(0,0,0,0.04)',
   };
 }
 
@@ -219,8 +219,8 @@ export function chatThemeChromeStyle(theme: ChatTheme): CSSProperties {
     background: 'var(--chat-chrome-bg)',
     color: 'var(--chat-chrome-fg)',
     borderColor: 'var(--chat-chrome-border)',
-    backdropFilter: 'blur(14px)',
-    WebkitBackdropFilter: 'blur(14px)',
+    backdropFilter: 'blur(20px)',
+    WebkitBackdropFilter: 'blur(20px)',
   };
 }
 

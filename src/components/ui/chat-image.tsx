@@ -459,19 +459,20 @@ export function ChatImage({
 
   const openViewer = useCallback((e?: React.SyntheticEvent) => {
     e?.stopPropagation();
-    if (!loaded || failed) return;
+    if (!loaded || failed || animated) return;
     setOpen(true);
-  }, [loaded, failed]);
+  }, [loaded, failed, animated]);
 
   return (
     <>
       <div
         ref={thumbRef}
-        role="button"
-        tabIndex={0}
-        aria-label={`${alt} — กดเพื่อดูเต็ม`}
+        role={!animated ? "button" : undefined}
+        tabIndex={!animated ? 0 : undefined}
+        aria-label={!animated ? `${alt} — กดเพื่อดูเต็ม` : alt}
         className={cn(
-          'chat-zoom-image relative isolate cursor-zoom-in overflow-hidden select-none',
+          'chat-zoom-image relative isolate overflow-hidden select-none',
+          !animated && 'cursor-zoom-in',
           '[-webkit-touch-callout:none]',
           className
         )}
@@ -486,12 +487,12 @@ export function ChatImage({
         onDragStart={prevent}
         onClick={openViewer}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
+          if (!animated && (e.key === 'Enter' || e.key === ' ')) {
             e.preventDefault();
             openViewer(e);
           }
         }}
-        title="กดเพื่อดูรูปเต็ม"
+        title={!animated ? "กดเพื่อดูรูปเต็ม" : undefined}
       >
         {animated ? (
           // eslint-disable-next-line @next/next/no-img-element
