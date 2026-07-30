@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { CHAT_STICKERS } from '@/lib/chat-stickers';
+import { CHAT_STICKERS, type ChatSticker } from '@/lib/chat-stickers';
 import { formatVoiceDuration } from '@/lib/chat-voice';
 import {
   buildQuickReplySlashItems,
@@ -24,6 +24,56 @@ import {
   type QuickReplySlashItem,
 } from '@/lib/chat-slash-replies';
 import { Progress } from '@/components/ui/progress';
+
+function StickerPickerCell({
+  sticker,
+  disabled,
+  onSend,
+}: {
+  sticker: ChatSticker;
+  disabled?: boolean;
+  onSend: () => void;
+}) {
+  const [failed, setFailed] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      title={sticker.label}
+      onClick={onSend}
+      className="group relative flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-muted/40 transition hover:bg-muted disabled:opacity-40"
+    >
+      {!failed ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={sticker.src}
+          alt={sticker.label}
+          className={cn(
+            'size-[78%] object-contain transition-opacity',
+            loaded ? 'opacity-100' : 'opacity-0'
+          )}
+          draggable={false}
+          onLoad={() => setLoaded(true)}
+          onError={() => setFailed(true)}
+        />
+      ) : null}
+      {!loaded && !failed ? (
+        <span className="absolute inset-2 animate-pulse rounded-lg bg-muted" aria-hidden />
+      ) : null}
+      <span
+        className={cn(
+          'absolute text-[1.35rem] leading-none transition',
+          failed || !loaded ? 'opacity-100' : 'right-1 bottom-1 text-[11px] opacity-70'
+        )}
+        aria-hidden
+      >
+        {sticker.emoji}
+      </span>
+    </button>
+  );
+}
 
 export type ChatComposerUploadState = {
   /** 0–100; omit / null for indeterminate */
@@ -902,25 +952,12 @@ export function ChatComposer({
 
                     <div className="grid max-h-[220px] overflow-y-auto grid-cols-4 gap-1.5">
                       {CHAT_STICKERS.map((sticker) => (
-                        <button
+                        <StickerPickerCell
                           key={sticker.id}
-                          type="button"
+                          sticker={sticker}
                           disabled={disabled || sending}
-                          title={sticker.label}
-                          onClick={() => sendSticker(sticker.src)}
-                          className="group relative flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-muted/40 transition hover:bg-muted disabled:opacity-40"
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={sticker.src}
-                            alt={sticker.label}
-                            className="size-[72%] object-contain"
-                            draggable={false}
-                          />
-                          <span className="absolute right-1 bottom-1 text-[11px] opacity-80">
-                            {sticker.emoji}
-                          </span>
-                        </button>
+                          onSend={() => sendSticker(sticker.src)}
+                        />
                       ))}
                     </div>
                   </PopoverContent>

@@ -26,7 +26,7 @@ import {
   ListItemIcon,
   ListItemText,
 } from '@mui/material';
-import { Headphones as SupportAgentIcon, X as CloseIcon, Send as SendIcon, Clock as TimeIcon, CheckCircle2 as CheckCircleIcon, Star as StarIcon, Bot as ChatbotIcon, Check as DoneIcon, CheckCheck as DoneAllIcon, MessageCircle as ChatIcon, History as HistoryIcon, ArrowLeft as ArrowBackIcon, Plus as AddIcon, MoreVertical as MoreVertIcon, Trash2 as DeleteIcon, Reply as ReplyIcon, Receipt as ReceiptIcon, ShoppingBag as ShoppingBagIcon, Bell as BellIcon, BellOff as BellOffIcon, Settings as SettingsIcon } from 'lucide-react';
+import { Headphones as SupportAgentIcon, X as CloseIcon, Send as SendIcon, Clock as TimeIcon, CheckCircle2 as CheckCircleIcon, Star as StarIcon, Bot as ChatbotIcon, Check as DoneIcon, CheckCheck as DoneAllIcon, MessageCircle as ChatIcon, History as HistoryIcon, ArrowLeft as ArrowBackIcon, Plus as AddIcon, MoreVertical as MoreVertIcon, Trash2 as DeleteIcon, Reply as ReplyIcon, Receipt as ReceiptIcon, ShoppingBag as ShoppingBagIcon, Bell as BellIcon, BellOff as BellOffIcon, Settings as SettingsIcon, Maximize2 as MaximizeIcon } from 'lucide-react';
 import { useNotification } from './NotificationContext';
 import { usePushNotification } from '@/hooks/usePushNotification';
 import { useRealtimeChat } from '@/hooks/useRealtimeChat';
@@ -37,6 +37,14 @@ import { formatStickerMessage } from '@/lib/chat-stickers';
 import { formatVoiceMessage, VOICE_DATA_URL_FALLBACK_MAX } from '@/lib/chat-voice';
 import { parseChatMessage } from '@/lib/chat-message';
 import { cn } from '@/lib/utils';
+import {
+  chatBubbleContentStyle,
+  chatThemeSurfaceStyle,
+  getChatTheme,
+  type ChatThemeId,
+} from '@/lib/chat-themes';
+import { ChatThemePicker } from '@/components/ChatThemePicker';
+import { useRouter } from 'next/navigation';
 import {
   Message,
   MessageAvatar,
@@ -78,6 +86,10 @@ interface SupportChatWidgetProps {
   onExternalOpenHandled?: () => void;
   shopId?: string;
   shopName?: string;
+  /** Full-page conversation view (Messenger-style /messages) */
+  variant?: 'widget' | 'page';
+  /** Prefetch / open a specific session when known */
+  initialSessionId?: string;
 }
 
 interface ChatSession {
@@ -118,14 +130,25 @@ interface ChatWithMessages extends ChatSession {
   messages: ChatMessage[];
 }
 
-export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, externalOpen, onExternalOpenHandled, shopId, shopName }: SupportChatWidgetProps) {
+export default function SupportChatWidget({
+  onOpenChatbot,
+  hideMobileFab,
+  externalOpen,
+  onExternalOpenHandled,
+  shopId,
+  shopName,
+  variant = 'widget',
+  initialSessionId,
+}: SupportChatWidgetProps) {
+  const isPage = variant === 'page';
+  const router = useRouter();
   const { data: session, status: authStatus } = useSession();
   const isLoggedIn = !!session?.user?.email;
   const { t, lang } = useTranslation();
   const { warning: toastWarning, error: toastError } = useNotification();
   const { permission: pushPermission, isSupported: pushSupported, isSubscribed: pushSubscribed, loading: pushLoading, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotification();
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(isPage);
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [chat, setChat] = useState<ChatWithMessages | null>(null);
@@ -156,7 +179,9 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
   const [adminDisplayName, setAdminDisplayName] = useState(DEFAULT_ADMIN_NAME);
   const [fallbackTyping, setFallbackTyping] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showThemePicker, setShowThemePicker] = useState(false);
   const [chatPrefs, setChatPrefs] = useState<CustomerChatPrefs>(() => loadCustomerChatPrefs());
+  const chatTheme = getChatTheme(chatPrefs.themeId);
   const chatEtagRef = useRef<string | null>(null);
   const lastMessageAtRef = useRef<string | null>(null);
   const loadingOlderRef = useRef(false);
@@ -292,9 +317,14 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
   }, [chat?.messages, chat?.id, open, chatPrefs.muted, chatPrefs.soundEnabled, t.supportChat.newMessage]);
 
   // Scroll only the chat message pane (never the page behind the widget)
-  const scrollToBottom = useCallback((force = false) => {
-    if (!force) return;
-    scrollApiRef.current?.scrollToEnd({ behavior: 'smooth' });
+  const scrollToBottom = useCallback((_force = false) => {
+    // Defer until optimistic message is painted so MessageScroller can follow the live edge
+    requestAnimationFrame(() => {
+      scrollApiRef.current?.scrollToEnd({ behavior: 'smooth' });
+      requestAnimationFrame(() => {
+        scrollApiRef.current?.scrollToEnd({ behavior: 'auto' });
+      });
+    });
   }, []);
 
   // Fetch active chat (single request: metadata + recent messages)
@@ -595,10 +625,21 @@ export default function SupportChatWidget({ onOpenChatbot, hideMobileFab, extern
   useEffect(() => {
     if (open && session?.user?.email) {
       setLoading(true);
-      // Mark as read on first open
-      fetchActiveChat(true).finally(() => setLoading(false));
+      const boot = initialSessionId
+        ? viewChatHistory(initialSessionId)
+        : fetchActiveChat(true);
+      void boot.finally(() => setLoading(false));
     }
-  }, [open, session?.user?.email, fetchActiveChat]);
+  }, [open, session?.user?.email, fetchActiveChat, initialSessionId, viewChatHistory]);
+
+  // Full-page: keep Messenger-style URL in sync once the active thread is known
+  useEffect(() => {
+    if (!isPage || !chat?.id) return;
+    const target = `/messages/t/${chat.id}`;
+    if (typeof window !== 'undefined' && window.location.pathname !== target) {
+      router.replace(target);
+    }
+  }, [isPage, chat?.id, router]);
 
   // Create new chat
   const handleCreateChat = async () => {
@@ -1264,6 +1305,7 @@ ${getStatusLabel(order.status)}
       />
 
       {/* Floating Chat Button — clean primary FAB */}
+      {!isPage && (
       <Zoom in={!open}>
         <Box
           sx={{
@@ -1316,8 +1358,10 @@ ${getStatusLabel(order.status)}
           </Badge>
         </Box>
       </Zoom>
+      )}
 
       {/* Mode Selection Menu */}
+      {!isPage && (
       <Menu
         anchorEl={menuAnchor}
         open={Boolean(menuAnchor)}
@@ -1368,6 +1412,7 @@ ${getStatusLabel(order.status)}
           />
         </MenuItem>
       </Menu>
+      )}
 
       {/* Message Context Menu (IG-style unsend) */}
       <Menu
@@ -1570,20 +1615,23 @@ ${getStatusLabel(order.status)}
       {/* Support Chat Window */}
       <Fade in={open}>
         <Paper
-          elevation={8}
+          elevation={isPage ? 0 : 8}
           sx={{
-            position: 'fixed',
-            bottom: { xs: 0, sm: 24 },
-            right: { xs: 0, sm: 24 },
-            width: { xs: '100%', sm: 400 },
-            height: { xs: '100dvh', sm: 550 },
-            maxHeight: { xs: '100dvh', sm: 'calc(100vh - 48px)' },
+            position: isPage ? 'relative' : 'fixed',
+            bottom: isPage ? 'auto' : { xs: 0, sm: 24 },
+            right: isPage ? 'auto' : { xs: 0, sm: 24 },
+            width: isPage ? '100%' : { xs: '100%', sm: 400 },
+            height: isPage ? '100dvh' : { xs: '100dvh', sm: 550 },
+            maxHeight: isPage ? '100dvh' : { xs: '100dvh', sm: 'calc(100vh - 48px)' },
+            maxWidth: isPage ? 920 : undefined,
+            mx: isPage ? 'auto' : undefined,
             display: open ? 'flex' : 'none',
             flexDirection: 'column',
-            borderRadius: { xs: 0, sm: 3 },
+            borderRadius: isPage ? 0 : { xs: 0, sm: 3 },
             overflow: 'hidden',
-            zIndex: 1300,
+            zIndex: isPage ? 1 : 1300,
             bgcolor: 'var(--surface)',
+            border: isPage ? '1px solid var(--glass-border)' : undefined,
           }}
         >
           {/* Header */}
@@ -1686,6 +1734,20 @@ ${getStatusLabel(order.status)}
                 <SettingsIcon size={20} />
               </IconButton>
             )}
+            {!isPage && !showHistory && !showSettings && (
+              <IconButton
+                sx={{ color: 'inherit', opacity: 0.8 }}
+                title={t.supportChat.openFullPage}
+                aria-label={t.supportChat.openFullPage}
+                onClick={() => {
+                  const href = chat?.id ? `/messages/t/${chat.id}` : '/messages';
+                  setOpen(false);
+                  router.push(href);
+                }}
+              >
+                <MaximizeIcon size={18} />
+              </IconButton>
+            )}
             {/* Push notification toggle — only when not muted via settings */}
             {pushSupported && !showHistory && !showSettings && (
               <IconButton
@@ -1709,8 +1771,16 @@ ${getStatusLabel(order.status)}
               </IconButton>
             )}
             <IconButton
-              onClick={() => { setOpen(false); setShowSettings(false); }}
+              onClick={() => {
+                if (isPage) {
+                  router.push('/');
+                  return;
+                }
+                setOpen(false);
+                setShowSettings(false);
+              }}
               sx={{ color: 'inherit', opacity: 0.8 }}
+              aria-label={isPage ? t.supportChat.settingsBack : undefined}
             >
               <CloseIcon size={22} />
             </IconButton>
@@ -1724,6 +1794,7 @@ ${getStatusLabel(order.status)}
                 onPrefsChange={updateChatPrefs}
                 messages={chat?.messages || []}
                 onBack={() => setShowSettings(false)}
+                onChangeTheme={() => setShowThemePicker(true)}
                 onMuteEnabled={() => {
                   if (pushSubscribed) void pushUnsubscribe();
                 }}
@@ -1742,6 +1813,9 @@ ${getStatusLabel(order.status)}
                   compactDensityDesc: t.supportChat.compactDensityDesc,
                   primaryBubbles: t.supportChat.primaryBubbles,
                   primaryBubblesDesc: t.supportChat.primaryBubblesDesc,
+                  changeTheme: t.supportChat.changeTheme,
+                  changeThemeDesc: t.supportChat.changeThemeDesc,
+                  currentTheme: lang === 'en' ? chatTheme.nameEn : chatTheme.nameTh,
                   mediaGallery: t.supportChat.mediaGallery,
                   mediaGalleryDesc: t.supportChat.mediaGalleryDesc,
                   noMedia: t.supportChat.noMedia,
@@ -2265,11 +2339,15 @@ ${getStatusLabel(order.status)}
                 <MessageScrollerProvider
                   key={chat.id}
                   autoScroll
-                  defaultScrollPosition="last-anchor"
+                  defaultScrollPosition="end"
                   scrollPreviousItemPeek={40}
                 >
                   <MessageScrollerApiBridge apiRef={scrollApiRef} />
-                  <MessageScroller className="min-h-0 flex-1 bg-[var(--surface-2)]">
+                  <MessageScroller
+                    className="min-h-0 flex-1"
+                    style={chatThemeSurfaceStyle(chatTheme)}
+                    data-chat-theme={chatTheme.id}
+                  >
                     <MessageScrollerViewport>
                       <MessageScrollerContent className={cn('gap-1 p-4', chatPrefs.compact && 'gap-0.5 p-3')}>
                   <MessageScrollerItem messageId="__load_older__">
@@ -2299,8 +2377,15 @@ ${getStatusLabel(order.status)}
                     const bubbleVariant = (msg as any)._failed
                       ? 'destructive'
                       : msg.sender === 'customer'
-                        ? (chatPrefs.primaryBubbles ? 'default' : 'tinted')
+                        ? (chatPrefs.themeId === 'classic' && !chatPrefs.primaryBubbles ? 'tinted' : 'default')
                         : 'secondary';
+                    const themedBubbleStyle =
+                      (msg as any)._failed
+                        ? undefined
+                        : chatBubbleContentStyle(
+                            chatTheme,
+                            msg.sender === 'customer' ? 'outgoing' : 'incoming'
+                          );
 
                     if (msg.sender === 'system') {
                       return (
@@ -2312,9 +2397,8 @@ ${getStatusLabel(order.status)}
 
                     return (
                       <MessageScrollerItem
-                        key={`${msg.id}-${index}`}
+                        key={msg.id}
                         messageId={msg.id}
-                        scrollAnchor={msg.sender === 'customer'}
                       >
                       <Message
                         align={align}
@@ -2350,7 +2434,14 @@ ${getStatusLabel(order.status)}
                             />
                           ) : isVoiceBrokenOnly ? (
                             <Bubble variant={bubbleVariant} align={align}>
-                              <BubbleContent>
+                              <BubbleContent
+                                style={themedBubbleStyle}
+                                className={
+                                  msg.sender === 'customer'
+                                    ? '![background:var(--chat-out-bg)] ![color:var(--chat-out-fg)]'
+                                    : '![background:var(--chat-in-bg)] ![color:var(--chat-in-fg)]'
+                                }
+                              >
                                 <Typography sx={{ fontSize: '0.85rem', opacity: 0.85 }}>
                                   {t.supportChat.voiceBroken}
                                 </Typography>
@@ -2383,7 +2474,16 @@ ${getStatusLabel(order.status)}
                                 if ((e as any).detail === 2) handleMessageMenu(e as any, msg.id);
                               } : undefined}
                             >
-                              <BubbleContent>
+                              <BubbleContent
+                                style={themedBubbleStyle}
+                                className={
+                                  (msg as any)._failed
+                                    ? undefined
+                                    : msg.sender === 'customer'
+                                      ? '![background:var(--chat-out-bg)] ![color:var(--chat-out-fg)]'
+                                      : '![background:var(--chat-in-bg)] ![color:var(--chat-in-fg)]'
+                                }
+                              >
                                 {text && (
                                   <Typography sx={{ fontSize: '0.9rem', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>
                                     {text}
@@ -2485,8 +2585,11 @@ ${getStatusLabel(order.status)}
                       </MessageAvatar>
                       <MessageContent>
                         <Bubble variant="secondary" align="start">
-                          <BubbleContent>
-                            <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', mb: 0.5 }}>
+                          <BubbleContent
+                            style={chatBubbleContentStyle(chatTheme, 'incoming')}
+                            className="![background:var(--chat-in-bg)] ![color:var(--chat-in-fg)]"
+                          >
+                            <Typography sx={{ fontSize: '0.75rem', color: 'inherit', opacity: 0.75, mb: 0.5 }}>
                               {typingDisplay || `${chat?.admin_name || displayAdminName} กำลังพิมพ์...`}
                             </Typography>
                             <Box sx={{ display: 'flex', gap: 0.5 }}>
@@ -2768,6 +2871,24 @@ ${getStatusLabel(order.status)}
           </Box>
         </Paper>
       </Fade>
+
+      <ChatThemePicker
+        open={showThemePicker}
+        currentThemeId={chatPrefs.themeId}
+        lang={lang === 'en' ? 'en' : 'th'}
+        labels={{
+          title: t.supportChat.themePickerTitle,
+          cancel: t.supportChat.themeCancel,
+          select: t.supportChat.themeSelect,
+          previewOutgoing: t.supportChat.themePreviewOutgoing,
+          previewIncoming: t.supportChat.themePreviewIncoming,
+          close: t.supportChat.settingsBack,
+        }}
+        onClose={() => setShowThemePicker(false)}
+        onSelect={(themeId: ChatThemeId) => {
+          updateChatPrefs({ ...chatPrefs, themeId });
+        }}
+      />
     </>
   );
 }

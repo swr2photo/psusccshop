@@ -1,5 +1,11 @@
 /** Customer-side support chat preferences (localStorage). */
 
+import {
+  DEFAULT_CHAT_THEME_ID,
+  isChatThemeId,
+  type ChatThemeId,
+} from '@/lib/chat-themes';
+
 export type CustomerChatPrefs = {
   /** Suppress browser / in-app chat notifications */
   muted: boolean;
@@ -7,8 +13,10 @@ export type CustomerChatPrefs = {
   soundEnabled: boolean;
   /** Tighter message spacing */
   compact: boolean;
-  /** Customer bubbles use brand primary (off = calmer slate) */
+  /** Customer bubbles use brand primary (off = calmer slate) — used when theme is classic */
   primaryBubbles: boolean;
+  /** Visual chat theme id */
+  themeId: ChatThemeId;
 };
 
 export const DEFAULT_CUSTOMER_CHAT_PREFS: CustomerChatPrefs = {
@@ -16,6 +24,7 @@ export const DEFAULT_CUSTOMER_CHAT_PREFS: CustomerChatPrefs = {
   soundEnabled: true,
   compact: false,
   primaryBubbles: true,
+  themeId: DEFAULT_CHAT_THEME_ID,
 };
 
 const STORAGE_KEY = 'psuscc_customer_chat_prefs_v1';
@@ -31,6 +40,7 @@ export function loadCustomerChatPrefs(): CustomerChatPrefs {
       soundEnabled: parsed.soundEnabled !== false,
       compact: Boolean(parsed.compact),
       primaryBubbles: parsed.primaryBubbles !== false,
+      themeId: isChatThemeId(parsed.themeId) ? parsed.themeId : DEFAULT_CHAT_THEME_ID,
     };
   } catch {
     return { ...DEFAULT_CUSTOMER_CHAT_PREFS };

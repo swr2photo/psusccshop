@@ -46,6 +46,9 @@ export type SupportChatSettingsLabels = {
   compactDensityDesc: string;
   primaryBubbles: string;
   primaryBubblesDesc: string;
+  changeTheme: string;
+  changeThemeDesc: string;
+  currentTheme: string;
   mediaGallery: string;
   mediaGalleryDesc: string;
   noMedia: string;
@@ -64,6 +67,8 @@ type SupportChatSettingsPanelProps = {
   messages: ChatMessageLike[];
   labels: SupportChatSettingsLabels;
   onBack: () => void;
+  /** Open theme picker (Messenger-style preview modal) */
+  onChangeTheme?: () => void;
   /** When mute turns on — optional side effect (e.g. unsubscribe push) */
   onMuteEnabled?: () => void;
   pushLoading?: boolean;
@@ -171,6 +176,7 @@ export function SupportChatSettingsPanel({
   messages,
   labels,
   onBack,
+  onChangeTheme,
   onMuteEnabled,
   pushLoading,
 }: SupportChatSettingsPanelProps) {
@@ -315,18 +321,32 @@ export function SupportChatSettingsPanel({
               />
             }
           />
-          <SettingsRow
-            icon={<Palette className="size-4" />}
-            title={labels.primaryBubbles}
-            description={labels.primaryBubblesDesc}
-            trailing={
-              <Switch
-                checked={prefs.primaryBubbles}
-                onCheckedChange={(checked) => onPrefsChange({ ...prefs, primaryBubbles: checked })}
-                size="sm"
-              />
-            }
-          />
+          {onChangeTheme ? (
+            <SettingsRow
+              icon={<Palette className="size-4" />}
+              title={labels.changeTheme}
+              description={
+                labels.currentTheme
+                  ? `${labels.changeThemeDesc} · ${labels.currentTheme}`
+                  : labels.changeThemeDesc
+              }
+              trailing={<ChevronRight className="size-4 text-[var(--text-muted)]" />}
+              onClick={onChangeTheme}
+            />
+          ) : (
+            <SettingsRow
+              icon={<Palette className="size-4" />}
+              title={labels.primaryBubbles}
+              description={labels.primaryBubblesDesc}
+              trailing={
+                <Switch
+                  checked={prefs.primaryBubbles}
+                  onCheckedChange={(checked) => onPrefsChange({ ...prefs, primaryBubbles: checked })}
+                  size="sm"
+                />
+              }
+            />
+          )}
         </Section>
 
         <Section title={labels.sectionMedia} open={mediaOpen} onToggle={() => setMediaOpen((v) => !v)}>
