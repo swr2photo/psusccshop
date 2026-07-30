@@ -14,6 +14,7 @@
 
 import { getRedisClient } from '@/lib/redis';
 import { isCloudflareWorkersRuntime } from '@/lib/runtime-env';
+import { unstable_cache, revalidateTag } from 'next/cache';
 
 
 
@@ -160,49 +161,39 @@ async function redisDeletePrefix(prefix: string): Promise<void> {
 
 
 export async function getCached<T>(
-
   key: string,
-
   ttlMs: number,
-
   fetcher: () => Promise<T>
-
 ): Promise<T> {
+  const revalidateSeconds = Math.max(1, Math.floor(ttlMs / 1000));
+  const prefixTag = key.includes(':') ? key.substring(0, key.indexOf(':') + 1) : key;
+  const tags = prefixTag !== key ? [key, prefixTag] : [key];
 
-  const now = Date.now();
+  const cachedFn = unstable_cache(
+    async () => {
+      const now = Date.now();
+      const hit = store.get(key) as CacheEntry<T> | undefined;
+      if (hit && hit.expiresAt > now) {
+        return hit.value;
+      }
 
-  const hit = store.get(key) as CacheEntry<T> | undefined;
+      const fromRedis = await redisGet<T>(key);
+      if (fromRedis !== null) {
+        store.set(key, { value: fromRedis, expiresAt: now + ttlMs });
+        return fromRedis;
+      }
 
-  if (hit && hit.expiresAt > now) {
+      const value = await fetcher();
+      store.set(key, { value, expiresAt: now + ttlMs });
+      pruneIfNeeded();
+      void redisSet(key, value, ttlMs);
+      return value;
+    },
+    [key],
+    { revalidate: revalidateSeconds, tags }
+  );
 
-    return hit.value;
-
-  }
-
-
-
-  const fromRedis = await redisGet<T>(key);
-
-  if (fromRedis !== null) {
-
-    store.set(key, { value: fromRedis, expiresAt: now + ttlMs });
-
-    return fromRedis;
-
-  }
-
-
-
-  const value = await fetcher();
-
-  store.set(key, { value, expiresAt: now + ttlMs });
-
-  pruneIfNeeded();
-
-  void redisSet(key, value, ttlMs);
-
-  return value;
-
+  return cachedFn();
 }
 
 
@@ -232,25 +223,27 @@ export function setCached<T>(key: string, value: T, ttlMs: number) {
 
 
 export function invalidateCacheKey(key: string) {
-
   store.delete(key);
-
   void redisDeleteKey(key);
-
+  try {
+    // @ts-ignore: Next.js 16 types require a second argument but runtime doesn't
+    revalidateTag(key);
+  } catch (e) {
+    // Ignore context error outside next requests
+  }
 }
 
-
-
 export function invalidateCachePrefix(prefix: string) {
-
   for (const key of store.keys()) {
-
     if (key.startsWith(prefix)) store.delete(key);
-
   }
-
   void redisDeletePrefix(prefix);
-
+  try {
+    // @ts-ignore: Next.js 16 types require a second argument but runtime doesn't
+    revalidateTag(prefix);
+  } catch (e) {
+    // Ignore context error outside next requests
+  }
 }
 
 
