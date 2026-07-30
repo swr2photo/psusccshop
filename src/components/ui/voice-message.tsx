@@ -311,8 +311,9 @@ export function VoiceMessage({
       return;
     }
     try {
+      const playPromise = audio.play();
       await ensureGraph();
-      await audio.play();
+      await playPromise;
       setPlaying(true);
       stopRaf();
       rafRef.current = requestAnimationFrame(tickWave);
