@@ -1043,61 +1043,6 @@ export default function HomePage() {
     },
   };
 
-  const bottomTabs = useMemo(() => {
-    // PCD-style equal tabs: Shop · Wishlist · Cart · Account · Search
-    return [
-      {
-        key: 'home',
-        label: t.nav.shop,
-        icon: <StorefrontIcon size={22} strokeWidth={1.75} />,
-      },
-      {
-        key: 'wishlist',
-        label: t.nav.wishlist,
-        icon: (
-          <Badge
-            badgeContent={wishlistStore.items.length || undefined}
-            color="error"
-            max={99}
-            invisible={wishlistStore.items.length === 0}
-            sx={historyBadgeSx}
-          >
-            <Heart size={22} strokeWidth={1.75} />
-          </Badge>
-        ),
-      },
-      {
-        key: 'cart',
-        label: t.nav.cart,
-        icon: (
-          <Badge badgeContent={cart.length} color="error" max={99}>
-            <ShoppingCart size={22} strokeWidth={1.75} />
-          </Badge>
-        ),
-      },
-      {
-        key: 'profile',
-        label: t.nav.profile,
-        icon: <User size={22} strokeWidth={1.75} />,
-      },
-      {
-        key: 'search',
-        label: t.nav.search,
-        icon: (
-          <Badge
-            badgeContent={activeFilterCount || undefined}
-            color="warning"
-            invisible={activeFilterCount === 0}
-            sx={historyBadgeSx}
-          >
-            <Search size={22} strokeWidth={1.75} />
-          </Badge>
-        ),
-      },
-    ];
-  }, [cart.length, wishlistStore.items.length, activeFilterCount, t, historyBadgeSx]);
-
-
   // Hydrate lean config from sessionStorage before paint so remounts skip the skeleton
   useLayoutEffect(() => {
     const cached = readCachedShopConfig();
@@ -3196,6 +3141,60 @@ export default function HomePage() {
     if (sortBy !== 'default') count += 1;
     return count;
   }, [productSearch, categoryFilter, showOnlyAvailable, sortBy]);
+
+  const bottomTabs = useMemo(() => {
+    // PCD-style equal tabs: Shop · Wishlist · Cart · Account · Search
+    return [
+      {
+        key: 'home',
+        label: t.nav.shop,
+        icon: <StorefrontIcon size={22} strokeWidth={1.75} />,
+      },
+      {
+        key: 'wishlist',
+        label: t.nav.wishlist,
+        icon: (
+          <Badge
+            badgeContent={wishlistStore.items.length || undefined}
+            color="error"
+            max={99}
+            invisible={wishlistStore.items.length === 0}
+            sx={historyBadgeSx}
+          >
+            <Heart size={22} strokeWidth={1.75} />
+          </Badge>
+        ),
+      },
+      {
+        key: 'cart',
+        label: t.nav.cart,
+        icon: (
+          <Badge badgeContent={cart.length} color="error" max={99}>
+            <ShoppingCart size={22} strokeWidth={1.75} />
+          </Badge>
+        ),
+      },
+      {
+        key: 'profile',
+        label: t.nav.profile,
+        icon: <User size={22} strokeWidth={1.75} />,
+      },
+      {
+        key: 'search',
+        label: t.nav.search,
+        icon: (
+          <Badge
+            badgeContent={activeFilterCount || undefined}
+            color="warning"
+            invisible={activeFilterCount === 0}
+            sx={historyBadgeSx}
+          >
+            <Search size={22} strokeWidth={1.75} />
+          </Badge>
+        ),
+      },
+    ];
+  }, [cart.length, wishlistStore.items.length, activeFilterCount, t, historyBadgeSx]);
 
   const resetSearchFilters = useCallback(() => {
     setProductSearch('');
