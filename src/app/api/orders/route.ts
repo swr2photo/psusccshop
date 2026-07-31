@@ -372,11 +372,23 @@ export async function POST(req: NextRequest) {
              const prodIndex = products.findIndex(p => p.id === prodId);
              if (prodIndex >= 0) {
                const p = products[prodIndex];
-               if (p.sizes && typeof p.sizes === 'object') {
-                 const currentStock = Number(p.sizes[size]) || 0;
+               let currentStock: number | null | undefined = null;
+               let variantToUpdate: any = null;
+
+               if (p.variants && p.variants.length > 0) {
+                 variantToUpdate = p.variants.find((v: any) => v.id === size || v.name === size);
+                 if (variantToUpdate) {
+                   currentStock = variantToUpdate.stock;
+                 }
+               } else {
+                 currentStock = p.stock;
+               }
+
+               if (currentStock !== null && currentStock !== undefined) {
                  if (currentStock >= qty || currentStock < 0 /* unlimited */) {
                    if (currentStock >= 0) {
-                     p.sizes[size] = currentStock - qty;
+                     if (variantToUpdate) variantToUpdate.stock = currentStock - qty;
+                     else p.stock = currentStock - qty;
                    }
                    fallbackUsed = true;
                    deductedItems.push({ key: stockKey, qty, isFallback: true, prodId, size });
@@ -390,8 +402,9 @@ export async function POST(req: NextRequest) {
                    break;
                  }
                } else {
-                 allStockDeducted = false;
-                 break;
+                 // unlimited (null stock)
+                 fallbackUsed = true;
+                 deductedItems.push({ key: stockKey, qty, isFallback: true, prodId, size });
                }
              } else {
                allStockDeducted = false;
@@ -409,9 +422,16 @@ export async function POST(req: NextRequest) {
        for (const item of deductedItems) {
           if (item.isFallback && item.prodId && item.size) {
              const prodIndex = products.findIndex(p => p.id === item.prodId);
-             if (prodIndex >= 0 && products[prodIndex].sizes) {
+             if (prodIndex >= 0) {
                 const p = products[prodIndex];
-                p.sizes[item.size] = (Number(p.sizes[item.size]) || 0) + item.qty;
+                if (p.variants && p.variants.length > 0) {
+                   const variant = p.variants.find((v: any) => v.id === item.size || v.name === item.size);
+                   if (variant && variant.stock !== null && variant.stock !== undefined) {
+                     variant.stock += item.qty;
+                   }
+                } else if (p.stock !== null && p.stock !== undefined) {
+                   p.stock += item.qty;
+                }
              }
           } else {
              await restoreStockAtomic(item.key, item.qty).catch(() => {});

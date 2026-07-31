@@ -45,7 +45,6 @@ function isExpiredPublicProduct(product: Product, now = new Date()): boolean {
 
 export function sanitizePublicProducts(products: Product[] | null | undefined, now = new Date()): Product[] {
   return (products || [])
-    .filter((product) => !isExpiredPublicProduct(product, now))
     .map(sanitizeProductImages);
 }
 

@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRedisClient } from '@/lib/redis';
-import { putJson } from '@/lib/filebase';
+import { putJson, getJson } from '@/lib/filebase';
 import { triggerSheetSync } from '@/lib/sheet-sync';
 import { db } from '@/lib/db';
 import { shops } from '@/db/schema';
 import { eq } from 'drizzle-orm';
-import { invalidateCacheKey } from '@/lib/server-cache';
-import type { Product } from '@/lib/config';
+import { invalidateCacheKey, PUBLIC_CONFIG_CACHE_KEY } from '@/lib/server-cache';
+import type { Product, ShopConfig } from '@/lib/config';
 // Security: In a real app, verify QStash signature here using @upstash/qstash Receiver.
 // For now, we assume the POST comes from QStash or internal edge.
 
@@ -53,8 +53,8 @@ export async function POST(req: NextRequest) {
       const targetShopId = order.shopId;
       const targetShopSlug = order.shopSlug;
       let shopCondition;
-      if (targetShopId) shopCondition = eq(shops.id, targetShopId);
-      else if (targetShopSlug) shopCondition = eq(shops.slug, targetShopSlug);
+      if (targetShopId && targetShopId !== 'main') shopCondition = eq(shops.id, targetShopId);
+      else if (targetShopSlug && targetShopSlug !== 'main') shopCondition = eq(shops.slug, targetShopSlug);
 
       if (shopCondition) {
         const shopRow = await db.select({ products: shops.products, id: shops.id }).from(shops).where(shopCondition).limit(1).execute();
@@ -85,6 +85,35 @@ export async function POST(req: NextRequest) {
           if (updated) {
             await db.update(shops).set({ products, updatedAt: new Date() }).where(eq(shops.id, shopRow[0].id)).execute();
             invalidateCacheKey('shops:public-catalog-v2');
+          }
+        }
+      } else {
+        // Main shop deduction
+        const config = await getJson<ShopConfig>('config/shop-settings.json');
+        if (config && config.products) {
+          let updated = false;
+          for (const item of order.cart || []) {
+            const prodId = item.productId || item.id;
+            const size = item.size || 'FREE';
+            const qty = Number(item.quantity || item.qty || 1);
+
+            const product = config.products.find(p => p.id === prodId);
+            if (product) {
+              if (product.variants && product.variants.length > 0) {
+                const variant = product.variants.find(v => v.id === size || v.name === size);
+                if (variant && typeof variant.stock === 'number') {
+                  variant.stock = Math.max(0, variant.stock - qty);
+                  updated = true;
+                }
+              } else if (typeof product.stock === 'number') {
+                product.stock = Math.max(0, product.stock - qty);
+                updated = true;
+              }
+            }
+          }
+          if (updated) {
+            await putJson('config/shop-settings.json', config);
+            invalidateCacheKey(PUBLIC_CONFIG_CACHE_KEY);
           }
         }
       }
