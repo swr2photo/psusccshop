@@ -6,7 +6,7 @@ import { secureJsonResponse } from '@/lib/payload-crypto';
 import { sanitizePublicProducts } from '@/lib/sanitize';
 import type { Product } from '@/lib/config';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 type ShopCatalogRow = {
