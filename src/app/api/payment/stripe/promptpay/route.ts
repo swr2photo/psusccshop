@@ -174,20 +174,38 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create PaymentIntent WITHOUT confirm — server-side confirm+payment_method_data
-    // frequently returns payment_method_not_available for PromptPay. Client confirms
-    // via stripe.confirmPromptPayPayment(..., { handleActions: false }) to get the QR.
-    const created = await createStripePaymentIntentDetailed({
+    // Try server-side confirm first (Direct API) so next_action.promptpay_display_qr_code is generated immediately
+    let created = await createStripePaymentIntentDetailed({
       amount: Math.round(amountTHB * 100), // satang
       currency: 'thb',
       paymentMethodTypes: ['promptpay'],
-      confirm: false,
+      paymentMethodData: {
+        type: 'promptpay',
+        billingEmail: order.customerEmail,
+      },
+      confirm: true,
       description: `Order ${ref}`,
       metadata: {
         orderId: ref,
         email: order.customerEmail,
       },
     });
+
+    // Fallback: if server-side confirm returns error, try creating unconfirmed intent for client-side confirm
+    if (!created.ok) {
+      console.warn('[Stripe PromptPay] Server confirm fallback to unconfirmed intent:', created.message);
+      created = await createStripePaymentIntentDetailed({
+        amount: Math.round(amountTHB * 100),
+        currency: 'thb',
+        paymentMethodTypes: ['promptpay'],
+        confirm: false,
+        description: `Order ${ref}`,
+        metadata: {
+          orderId: ref,
+          email: order.customerEmail,
+        },
+      });
+    }
 
     if (!created.ok) {
       const unavailable =

@@ -24,6 +24,7 @@ interface StripePromptPayProps {
   orderDate?: string;
   onExpired?: () => void;
   onSuccess: () => void;
+  onSwitchToManual?: () => void;
   size?: number;
 }
 
@@ -81,6 +82,7 @@ export default function StripePromptPay({
   orderDate,
   onExpired,
   onSuccess,
+  onSwitchToManual,
   size = 232,
 }: StripePromptPayProps) {
   const { t, lang } = useTranslation();
@@ -359,18 +361,36 @@ export default function StripePromptPay({
         <Typography sx={{ fontWeight: 600, fontSize: '0.9rem', textAlign: 'center' }}>
           {phase === 'expired' ? t.payment.qrExpired : (errorMsg || t.payment.stripeError)}
         </Typography>
-        <Button
-          onClick={start}
-          startIcon={<RefreshCw size={16} />}
-          sx={{
-            mt: 0.5, px: 2.5, py: 1, borderRadius: 2.5, fontWeight: 700, textTransform: 'none',
-            bgcolor: 'rgba(6,182,212,0.12)', color: '#64d2ff',
-            border: '1px solid rgba(6,182,212,0.3)',
-            '&:hover': { bgcolor: 'rgba(6,182,212,0.2)' },
-          }}
-        >
-          {t.payment.createNewQR}
-        </Button>
+        <Typography sx={{ fontSize: '0.78rem', color: 'var(--text-muted, #94a3b8)', textAlign: 'center', maxWidth: 300 }}>
+          {phase === 'error' && 'หากระบบพร้อมเพย์อัตโนมัติไม่สมบูรณ์ ท่านสามารถเลือก "โอนเงินด้วยตนเอง + แนบสลิป" แทนได้ครับ'}
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', justifyContent: 'center', mt: 0.5 }}>
+          <Button
+            onClick={start}
+            startIcon={<RefreshCw size={16} />}
+            sx={{
+              px: 2.5, py: 1, borderRadius: 2.5, fontWeight: 700, textTransform: 'none',
+              bgcolor: 'rgba(6,182,212,0.12)', color: '#64d2ff',
+              border: '1px solid rgba(6,182,212,0.3)',
+              '&:hover': { bgcolor: 'rgba(6,182,212,0.2)' },
+            }}
+          >
+            {t.payment.createNewQR}
+          </Button>
+          {onSwitchToManual && (
+            <Button
+              onClick={onSwitchToManual}
+              sx={{
+                px: 2.5, py: 1, borderRadius: 2.5, fontWeight: 700, textTransform: 'none',
+                bgcolor: 'rgba(255,255,255,0.06)', color: 'var(--foreground, #f8fafc)',
+                border: '1px solid rgba(255,255,255,0.15)',
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.12)' },
+              }}
+            >
+              โอนเงินด้วยตนเอง + แนบสลิป
+            </Button>
+          )}
+        </Box>
       </Box>
     );
   }

@@ -1327,6 +1327,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                     orderDate={orderDate ?? undefined}
                     onExpired={handleReservationExpired}
                     onSuccess={handleStripeSuccess}
+                    onSwitchToManual={() => setPayMethod('manual')}
                   />
                 </Box>
               </Box>
