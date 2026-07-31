@@ -78,7 +78,7 @@ function getRpConfig(requestUrl?: string) {
   const allowedHostnames = [
     'localhost',
     '127.0.0.1',
-    'sccshop.psusci.club',
+    'sccshop.psuscc.club',
     'sccshop.psuscc.club',
   ];
   
@@ -98,7 +98,7 @@ function getRpConfig(requestUrl?: string) {
 
   const isAllowed =
     allowedHostnames.includes(hostname) ||
-    hostname.endsWith('.psusci.club') ||
+    hostname.endsWith('.psuscc.club') ||
     hostname.endsWith('.psuscc.club');
   if (!isAllowed) {
     // Fallback to NEXTAUTH_URL configuration

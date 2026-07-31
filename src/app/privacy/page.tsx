@@ -547,8 +547,8 @@ export default function PrivacyPolicyPage() {
               <p className="mb-2 text-sm font-bold">{c.s6.howToTitle}</p>
               <p className="text-sm leading-relaxed text-[var(--text-muted)] whitespace-pre-line">
                 {c.s6.howTo}{' '}
-                <a className="font-semibold text-[var(--foreground)] underline" href="mailto:psuscc@psusci.club">
-                  psuscc@psusci.club
+                <a className="font-semibold text-[var(--foreground)] underline" href="mailto:psuscc@psuscc.club">
+                  psuscc@psuscc.club
                 </a>{' '}
                 {c.s6.howToSuffix}
                 {'\n'}
@@ -663,14 +663,14 @@ export default function PrivacyPolicyPage() {
                 <li className="flex items-center gap-2">
                   <Mail size={15} className="text-[var(--text-muted)]" />
                   {c.s11.email}:{' '}
-                  <a href="mailto:psuscc@psusci.club" className="font-semibold underline">
-                    psuscc@psusci.club
+                  <a href="mailto:psuscc@psuscc.club" className="font-semibold underline">
+                    psuscc@psuscc.club
                   </a>
                 </li>
                 <li>
                   {c.s11.website}:{' '}
                   <Link href="/" className="font-semibold underline">
-                    sccshop.psusci.club
+                    sccshop.psuscc.club
                   </Link>
                 </li>
                 <li>Facebook: {c.s11.facebook}</li>

@@ -352,7 +352,7 @@ function AuthErrorContent() {
               ยังพบปัญหาอยู่?{' '}
               <Box
                 component="a"
-                href="mailto:psuscc@psusci.club"
+                href="mailto:psuscc@psuscc.club"
                 sx={{
                   color: '#2563eb',
                   textDecoration: 'none',

@@ -21,7 +21,7 @@ export const ISSUER = {
   addressTh: '15 ถ.กาญจนวณิชย์ ต.คอหงส์ อ.หาดใหญ่ จ.สงขลา 90110',
   addressEn: '15 Kanchanawanit Rd, Kho Hong, Hat Yai, Songkhla 90110, Thailand',
   phone: '063-092-7759',
-  email: 'psuscc@psusci.club',
+  email: 'psuscc@psuscc.club',
   vatNoteTh: 'ได้รับการยกเว้นภาษีมูลค่าเพิ่ม',
   vatNoteEn: 'VAT exempt',
 } as const;

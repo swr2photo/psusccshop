@@ -56,11 +56,11 @@ function getEmailFrom(): string {
 }
 
 function getShopUrl(): string {
-  return process.env.NEXT_PUBLIC_BASE_URL || 'https://sccshop.psusci.club';
+  return process.env.NEXT_PUBLIC_BASE_URL || 'https://sccshop.psuscc.club';
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const SUPPORT_EMAIL = 'psuscc@psusci.club';
+const SUPPORT_EMAIL = 'psuscc@psuscc.club';
 
 /** Extract no-reply mailbox from EMAIL_FROM for reply_to header. */
 function getNoReplyAddress(): string {

@@ -282,7 +282,7 @@ export default function Footer() {
                 <Instagram size={20} />
               </a>
               <a
-                href="mailto:psuscc@psusci.club"
+                href="mailto:psuscc@psuscc.club"
                 title="Email"
                 aria-label="Email"
                 style={{ color: MUTED.color as string, display: 'flex', transition: 'color 0.18s ease' }}
@@ -324,10 +324,10 @@ export default function Footer() {
           <div>
             <h4 style={SECTION_LABEL}>{t.footer.contactUs}</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-              <FooterLink href="mailto:psuscc@psusci.club" external>
+              <FooterLink href="mailto:psuscc@psuscc.club" external>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem' }}>
                   <Mail size={14} />
-                  psuscc@psusci.club
+                  psuscc@psuscc.club
                 </span>
               </FooterLink>
               <p

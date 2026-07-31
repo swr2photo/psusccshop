@@ -729,7 +729,7 @@ WAITING_PAYMENT=รอชำระเงิน, VERIFYING=ตรวจสอบ�
 [ช่องทางติดต่อ]
 • Facebook: ชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ ม.อ.
 • Instagram: @psuscc
-• Email: psuscc@psusci.club
+• Email: psuscc@psuscc.club
 • แชทกับทีมงาน: ผ่านปุ่มแชทในเว็บไซต์
 ═══════════════════════════════════════════════════════════════`;
 }
@@ -764,7 +764,7 @@ function getDefaultContext(): string {
 [ติดต่อ]
 • Facebook: ชุมนุมคอมพิวเตอร์ ม.อ.
 • Instagram: @psuscc
-• Email: psuscc@psusci.club
+• Email: psuscc@psuscc.club
 ═══════════════════════════════════════════════════════════════`;
 }
 

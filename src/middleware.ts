@@ -7,8 +7,8 @@ import { proxyToBackend, shouldProxyApiRoute } from '@/lib/backend-proxy';
 
 // --- CORS config ---
 const allowedOrigins = [
-  'https://sccshop.psusci.club',
-  'https://www.sccshop.psusci.club',
+  'https://sccshop.psuscc.club',
+  'https://www.sccshop.psuscc.club',
   'https://sccshop.psuscc.club',
   'https://www.sccshop.psuscc.club',
 ];
@@ -16,7 +16,7 @@ const allowedOrigins = [
 function isAllowedOrigin(origin: string | null): boolean {
   if (!origin) return true;
   if (allowedOrigins.includes(origin)) return true;
-  if (origin.endsWith('.psusci.club') || origin.endsWith('.psuscc.club')) return true;
+  if (origin.endsWith('.psuscc.club') || origin.endsWith('.psuscc.club')) return true;
   if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) return true;
   if (origin.endsWith('.app.github.dev')) return true;
   return false;

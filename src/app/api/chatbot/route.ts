@@ -218,8 +218,8 @@ export async function GET(req: NextRequest) {
  */
 export async function OPTIONS(request: NextRequest) {
   const origin = request.headers.get('origin') || '';
-  const allowedOrigin = origin.endsWith('.psusci.club') || origin.startsWith('http://localhost:') || origin.endsWith('.app.github.dev')
-    ? origin : 'https://sccshop.psusci.club';
+  const allowedOrigin = origin.endsWith('.psuscc.club') || origin.startsWith('http://localhost:') || origin.endsWith('.app.github.dev')
+    ? origin : 'https://sccshop.psuscc.club';
   return await secureJsonResponse({}, {
     headers: {
       'Access-Control-Allow-Origin': allowedOrigin,

@@ -7,7 +7,7 @@ function domainFromHostname(host: string): string | undefined {
   const h = host.trim().toLowerCase().replace(/\.$/, '');
   if (!h) return undefined;
   if (h === 'psuscc.club' || h.endsWith('.psuscc.club')) return '.psuscc.club';
-  if (h === 'psusci.club' || h.endsWith('.psusci.club')) return '.psusci.club';
+  if (h === 'psuscc.club' || h.endsWith('.psuscc.club')) return '.psuscc.club';
   return undefined;
 }
 

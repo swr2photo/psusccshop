@@ -184,7 +184,7 @@ export async function POST(req: NextRequest) {
         
         // Notify admin
         await sendEmail({
-          to: 'psuscc@psusci.club',
+          to: 'psuscc@psuscc.club',
           subject: `[PDPA] คำขอใช้สิทธิ์ข้อมูลใหม่ - ${type} - ${userEmail}`,
           html: generateAdminNotificationEmail(dataRequest),
           type: 'custom',
@@ -373,7 +373,7 @@ function generateRequestConfirmationEmail(request: DataRequest): string {
           </div>
           
           <p style="color:#64748b;font-size:13px;text-align:center;margin-top:30px;">
-            หากมีคำถามเพิ่มเติม กรุณาติดต่อ psuscc@psusci.club
+            หากมีคำถามเพิ่มเติม กรุณาติดต่อ psuscc@psuscc.club
           </p>
         </div>
       </div>

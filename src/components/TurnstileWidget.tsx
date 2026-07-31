@@ -125,7 +125,7 @@ export default function TurnstileWidget({
   const hasSiteKey = !!TURNSTILE_SITE_KEY;
   
   // Check if we're in development (GitHub Codespaces, localhost, etc.)
-  // Production domain: sccshop.psusci.club - should use real Turnstile
+  // Production domain: sccshop.psuscc.club - should use real Turnstile
   const isDevelopment = typeof window !== 'undefined' && (
     process.env.NODE_ENV === 'development' &&
     (

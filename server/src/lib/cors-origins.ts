@@ -10,8 +10,8 @@ export function getApiCorsOrigins(): string[] {
     process.env.NEXT_PUBLIC_APP_URL,
     'https://sccshop.psuscc.club',
     'https://www.sccshop.psuscc.club',
-    'https://sccshop.psusci.club',
-    'https://www.sccshop.psusci.club',
+    'https://sccshop.psuscc.club',
+    'https://www.sccshop.psuscc.club',
   ].filter(Boolean) as string[];
 
   if (process.env.NODE_ENV !== 'production') {

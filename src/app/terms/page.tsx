@@ -40,7 +40,7 @@ const CONTENT = {
     subtitle: 'Terms of Service',
     updatedLabel: 'อัปเดตล่าสุด',
     versionLabel: 'เวอร์ชัน',
-    intro: 'ข้อกำหนดการใช้งานฉบับนี้ ("ข้อกำหนด") กำหนดเงื่อนไขการใช้บริการเว็บไซต์ SCC Shop (https://sccshop.psusci.club) ซึ่งดำเนินการโดยชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ มหาวิทยาลัยสงขลานครินทร์ ("เรา") การเข้าใช้งานเว็บไซต์ถือว่าท่านยอมรับข้อกำหนดเหล่านี้',
+    intro: 'ข้อกำหนดการใช้งานฉบับนี้ ("ข้อกำหนด") กำหนดเงื่อนไขการใช้บริการเว็บไซต์ SCC Shop (https://sccshop.psuscc.club) ซึ่งดำเนินการโดยชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ มหาวิทยาลัยสงขลานครินทร์ ("เรา") การเข้าใช้งานเว็บไซต์ถือว่าท่านยอมรับข้อกำหนดเหล่านี้',
     sections: [
       {
         icon: 'FileText',
@@ -149,7 +149,7 @@ const CONTENT = {
     subtitle: 'Terms of Service',
     updatedLabel: 'Last Updated',
     versionLabel: 'Version',
-    intro: 'These Terms of Service ("Terms") govern your use of the SCC Shop website (https://sccshop.psusci.club), operated by the Science Computer Club, Faculty of Science, Prince of Songkla University ("we", "us"). By accessing or using our website, you agree to these Terms.',
+    intro: 'These Terms of Service ("Terms") govern your use of the SCC Shop website (https://sccshop.psuscc.club), operated by the Science Computer Club, Faculty of Science, Prince of Songkla University ("we", "us"). By accessing or using our website, you agree to these Terms.',
     sections: [
       {
         icon: 'FileText',
@@ -412,7 +412,7 @@ export default function TermsPage() {
               {c.contact.email}: doralaikon.th@gmail.com
             </Typography>
             <Typography sx={{ fontSize: '0.85rem', color: THEME.textSecondary }}>
-              {c.contact.website}: https://sccshop.psusci.club
+              {c.contact.website}: https://sccshop.psuscc.club
             </Typography>
           </Box>
         </Paper>

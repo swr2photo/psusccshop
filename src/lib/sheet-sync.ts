@@ -216,7 +216,7 @@ async function performSync(baseUrl?: string): Promise<void> {
   console.log('[sheet-sync] Starting sync to sheet:', sheetId);
 
   const sheets = await getSheets();
-  const url = baseUrl || process.env.NEXT_PUBLIC_BASE_URL || 'https://sccshop.psusci.club';
+  const url = baseUrl || process.env.NEXT_PUBLIC_BASE_URL || 'https://sccshop.psuscc.club';
 
   await ensureSheet(sheets, sheetId, ORDERS_SHEET_TITLE);
 

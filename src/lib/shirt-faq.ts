@@ -187,7 +187,7 @@ export const SHIRT_FAQ: ShirtFAQ[] = [
   {
     id: 'contact-info',
     question: 'สอบถามเพิ่มเติมได้ที่ไหน?',
-    answer: 'ช่องทางติดต่อทีมงานค่ะ\n\n• **Facebook** — ชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ ม.อ.\n• **Instagram** — @psuscc\n• **Email** — psuscc@psusci.club\n• **แชทในเว็บ** — กดปุ่มแชทด้านล่างขวาได้เลย\n\nทีมงานพร้อมช่วยเหลือเสมอค่ะ',
+    answer: 'ช่องทางติดต่อทีมงานค่ะ\n\n• **Facebook** — ชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ ม.อ.\n• **Instagram** — @psuscc\n• **Email** — psuscc@psuscc.club\n• **แชทในเว็บ** — กดปุ่มแชทด้านล่างขวาได้เลย\n\nทีมงานพร้อมช่วยเหลือเสมอค่ะ',
     keywords: ['สอบถาม', 'ติดต่อ', 'facebook', 'instagram', 'ถาม', 'line', 'โทร', 'contact'],
     category: 'contact',
     priority: 8,

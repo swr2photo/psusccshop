@@ -444,7 +444,7 @@ export default function PrivacyPolicyPage() {
                 วิธีการใช้สิทธิ์:
               </Typography>
               <Typography sx={{ color: THEME.textSecondary, lineHeight: 1.8 }}>
-                ส่งคำขอมาที่อีเมล <Box component="span" sx={{ color: '#a78bfa', fontWeight: 600 }}>psuscc@psusci.club</Box> 
+                ส่งคำขอมาที่อีเมล <Box component="span" sx={{ color: '#a78bfa', fontWeight: 600 }}>psuscc@psuscc.club</Box> 
                 {' '}พร้อมระบุชื่อ-อีเมลที่ใช้สั่งซื้อ และสิทธิ์ที่ต้องการใช้ 
                 เราจะดำเนินการภายใน <strong>30 วัน</strong> นับจากวันที่ได้รับคำขอ
               </Typography>
@@ -714,7 +714,7 @@ export default function PrivacyPolicyPage() {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Mail size={18} color="#a78bfa" />
                 <Typography sx={{ color: THEME.text }}>
-                  อีเมล: <Box component="span" sx={{ color: '#a78bfa', fontWeight: 600 }}>psuscc@psusci.club</Box>
+                  อีเมล: <Box component="span" sx={{ color: '#a78bfa', fontWeight: 600 }}>psuscc@psuscc.club</Box>
                 </Typography>
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>

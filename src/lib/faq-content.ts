@@ -217,8 +217,8 @@ export const FAQ_ITEMS: FaqItem[] = [
       en: 'How can I contact the team?',
     },
     answer: {
-      th: '• Email: psuscc@psusci.club\n• Facebook / Instagram: @psuscc\n• แชทในเว็บ: ปุ่มแชทด้านล่างขวา หรือ “แชทกับทีมงาน” ในส่วนท้ายเว็บ',
-      en: '• Email: psuscc@psusci.club\n• Facebook / Instagram: @psuscc\n• On-site chat: the chat button (bottom right) or “Chat with Support” in the footer',
+      th: '• Email: psuscc@psuscc.club\n• Facebook / Instagram: @psuscc\n• แชทในเว็บ: ปุ่มแชทด้านล่างขวา หรือ “แชทกับทีมงาน” ในส่วนท้ายเว็บ',
+      en: '• Email: psuscc@psuscc.club\n• Facebook / Instagram: @psuscc\n• On-site chat: the chat button (bottom right) or “Chat with Support” in the footer',
     },
   },
   {
