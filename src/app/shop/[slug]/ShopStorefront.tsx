@@ -3081,6 +3081,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
 
       {/* ==================== CART DRAWER (same as main store) ==================== */}
       <CartDrawer
+        now={now}
         open={cartOpen}
         onClose={() => setCartOpen(false)}
         cart={drawerCart}

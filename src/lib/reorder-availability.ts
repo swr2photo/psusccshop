@@ -26,7 +26,8 @@ function isStockUnavailable(stock: number | null | undefined, qty: number): bool
 export function evaluateReorderItem(
   item: Record<string, unknown>,
   products: Product[] | undefined,
-  lang: 'th' | 'en' = 'th'
+  lang: 'th' | 'en' = 'th',
+  now?: Date
 ): ReorderItemEval {
   const qty = Math.max(1, Number(item.qty ?? item.quantity ?? 1) || 1);
   const productId = item.productId != null ? String(item.productId) : '';
@@ -43,7 +44,7 @@ export function evaluateReorderItem(
     return { ok: false, reason: 'missing', name, qty };
   }
 
-  const status = getProductStatus(product);
+  const status = getProductStatus(product, now);
   if (status === 'ORDER_ENDED') return { ok: false, reason: 'ended', name, product, qty };
   if (status === 'COMING_SOON') return { ok: false, reason: 'upcoming', name, product, qty };
   if (status === 'TEMPORARILY_CLOSED') return { ok: false, reason: 'inactive', name, product, qty };

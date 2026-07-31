@@ -98,7 +98,7 @@ export function useHomePageCatalog({
       shopId: shop.id,
       shopSlug: shop.slug,
       shopName: lang === 'en' && shop.nameEn ? shop.nameEn : shop.name,
-      products: (shop.products || []).filter((p) => p.isActive !== false) as Product[],
+      products: (shop.products || []) as Product[],
       events: shop.events as ShopEvent[] | undefined,
       isOpen: getShopStatus(
         shop.isOpen ?? shop.settings?.isOpen ?? true,

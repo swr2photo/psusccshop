@@ -5153,6 +5153,7 @@ export default function HomePage() {
 
       {/* ===== Cart Drawer with Edit Dialog ===== */}
       <CartDrawer
+        now={now}
         open={showCart}
         onClose={() => setShowCart(false)}
         cart={cart}

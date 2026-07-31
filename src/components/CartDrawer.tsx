@@ -71,6 +71,7 @@ interface CartDrawerProps {
   editingCartItem: CartItem | null;
   onSetEditingCartItem: (item: CartItem | null) => void;
   onUpdateCartItem: (itemId: string, item: CartItem) => void;
+  now: Date;
 }
 
 function lineIssueMessage(reason: ReorderBlockReason | undefined, lang: 'th' | 'en'): string {
@@ -124,6 +125,7 @@ export default function CartDrawer(props: CartDrawerProps) {
     editingCartItem,
     onSetEditingCartItem,
     onUpdateCartItem,
+    now,
   } = props;
 
   const { t, lang } = useTranslation();
@@ -164,13 +166,14 @@ export default function CartDrawer(props: CartDrawerProps) {
         },
         products,
         lang,
+        now
       );
       if (!evalResult.ok) {
         map.set(item.id, lineIssueMessage(evalResult.reason, lang));
       }
     }
     return map;
-  }, [cart, resolveProduct, config?.products, lang]);
+  }, [cart, resolveProduct, config?.products, lang, now]);
 
   const hasInvalidLines = lineIssues.size > 0;
   const canCheckout = isShopOpen && !hasInvalidLines;

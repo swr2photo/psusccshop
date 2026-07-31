@@ -346,7 +346,8 @@ export async function POST(req: NextRequest) {
     
     // Deduct stock before saving
     let allStockDeducted = true;
-    const deductedItems: { key: string, qty: number }[] = [];
+    let fallbackUsed = false;
+    const deductedItems: { key: string, qty: number, isFallback?: boolean, prodId?: string, size?: string }[] = [];
     
     for (const item of cartItems) {
       const size = item.size || 'FREE';
@@ -367,16 +368,34 @@ export async function POST(req: NextRequest) {
           } else if (redisDeduct >= 0) {
             deductedItems.push({ key: stockKey, qty });
           } else {
-             // Fallback to SQL
-             const deductRes: any = await db.execute(sql`SELECT deduct_stock(${prodId}, ${size}, ${qty}) as success`);
-             const rows = deductRes.rows || deductRes;
-             if (!rows[0]?.success) {
-               console.warn(`[Orders API] Stock deduction failed for ${prodId} size ${size}`);
+             // Fallback to JSON-based stock
+             const prodIndex = products.findIndex(p => p.id === prodId);
+             if (prodIndex >= 0) {
+               const p = products[prodIndex];
+               if (p.sizes && typeof p.sizes === 'object') {
+                 const currentStock = Number(p.sizes[size]) || 0;
+                 if (currentStock >= qty || currentStock < 0 /* unlimited */) {
+                   if (currentStock >= 0) {
+                     p.sizes[size] = currentStock - qty;
+                   }
+                   fallbackUsed = true;
+                   deductedItems.push({ key: stockKey, qty, isFallback: true, prodId, size });
+                   // Log
+                   await db.execute(sql`
+                     INSERT INTO inventory_logs (product_id, size, previous_quantity, new_quantity, change_type, order_ref, changed_by)
+                     VALUES (${prodId}, ${size}, ${currentStock}, ${currentStock - qty}, 'ORDER_DEDUCT', ${ref}, ${customerEmail})
+                   `).catch(() => {});
+                 } else {
+                   allStockDeducted = false;
+                   break;
+                 }
+               } else {
+                 allStockDeducted = false;
+                 break;
+               }
              } else {
-               await db.execute(sql`
-                 INSERT INTO inventory_logs (product_id, size, previous_quantity, new_quantity, change_type, order_ref, changed_by)
-                 VALUES (${prodId}, ${size}, 0, 0, 'ORDER_DEDUCT', ${ref}, ${customerEmail})
-               `);
+               allStockDeducted = false;
+               break;
              }
           }
         } catch (e) {
@@ -387,13 +406,40 @@ export async function POST(req: NextRequest) {
     
     if (!allStockDeducted) {
        // Rollback Redis stock
-       for (const { key, qty } of deductedItems) {
-          await restoreStockAtomic(key, qty).catch(() => {});
+       for (const item of deductedItems) {
+          if (item.isFallback && item.prodId && item.size) {
+             const prodIndex = products.findIndex(p => p.id === item.prodId);
+             if (prodIndex >= 0 && products[prodIndex].sizes) {
+                const p = products[prodIndex];
+                p.sizes[item.size] = (Number(p.sizes[item.size]) || 0) + item.qty;
+             }
+          } else {
+             await restoreStockAtomic(item.key, item.qty).catch(() => {});
+          }
        }
        return await secureJsonResponse(
           { status: 'error', message: 'สินค้าบางรายการสต็อกไม่เพียงพอ' },
           { status: 400, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
        );
+    }
+
+    if (fallbackUsed && allStockDeducted) {
+      try {
+        if (sanitizedBody.shopId || sanitizedBody.shopSlug) {
+          const shopIdToUpdate = sanitizedBody.shopId || (await db.select().from(shops).where(eq(shops.slug, sanitizedBody.shopSlug)).limit(1))[0]?.id;
+          if (shopIdToUpdate) {
+            await db.update(shops).set({ products }).where(eq(shops.id, shopIdToUpdate));
+          }
+        } else {
+           const cfg = await getJson<any>('config/shop-settings.json');
+           if (cfg) {
+             cfg.products = products;
+             await putJson('config/shop-settings.json', cfg);
+           }
+        }
+      } catch (err) {
+        console.error('[Orders API] Failed to save fallback stock:', err);
+      }
     }
 
     const qstash = getQStashClient();
