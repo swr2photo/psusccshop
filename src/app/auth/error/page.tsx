@@ -13,9 +13,9 @@ import {
   WifiOff,
   KeyRound,
   UserX,
-  ServerCrash,
-  LucideIcon
+  ServerCrash
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 // ==================== ERROR TYPES ====================
 interface AuthErrorInfo {

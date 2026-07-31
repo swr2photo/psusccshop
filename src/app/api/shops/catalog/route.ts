@@ -9,7 +9,7 @@ export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
 async function GETHandler(_req: NextRequest) {
-  const shops = await getCached('shops:public-catalog-v2', CACHE_TTL.catalog, async () => {
+  const shops = await getCached('shops:public-catalog-v3', CACHE_TTL.catalog, async () => {
     // Fetch directly using Supabase JS (Edge Compatible, uses fetch under the hood)
     const { data, error } = await supabase
       .from('shops')
@@ -33,7 +33,13 @@ async function GETHandler(_req: NextRequest) {
         nameEn: shop.name_en,
         logoUrl: shop.logo_url,
         isOpen: shop.settings?.isOpen ?? true,
-        settings: shop.settings ? { isOpen: shop.settings.isOpen ?? true } : undefined,
+        openDate: shop.settings?.openDate,
+        closeDate: shop.settings?.closeDate,
+        settings: shop.settings ? { 
+          isOpen: shop.settings.isOpen ?? true,
+          openDate: shop.settings.openDate,
+          closeDate: shop.settings.closeDate
+        } : undefined,
         products: (shop.products || []).filter((p: any) => p.isActive !== false),
         events: shop.config?.events || [],
         shirtNameConfig: shop.config?.shirtNameConfig,
