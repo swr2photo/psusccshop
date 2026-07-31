@@ -660,7 +660,7 @@ export default function HomePage() {
   const [shippingConfig, setShippingConfig] = useState<ShippingConfig | null>(null);
   
   const shopStatusType = useMemo(
-    () => getShopStatus(config?.isOpen ?? false, config?.closeDate, config?.openDate, now),
+    () => getShopStatus(config?.isOpen ?? true, config?.closeDate, config?.openDate, now),
     [config, now]
   );
   const isShopOpen = shopStatusType === 'OPEN';
@@ -1608,7 +1608,7 @@ export default function HomePage() {
         shopName: '',
         products: [] as Product[],
         events: undefined as ShopEvent[] | undefined,
-        isOpen: false,
+        isOpen: true,
         shirtNameConfig: undefined,
         nameValidation: undefined,
         shippingOptions: undefined,
