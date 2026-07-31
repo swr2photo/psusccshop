@@ -127,6 +127,9 @@ import { ShopStatusBanner, getProductStatus, getShopStatus, getProductUnavailabl
 import type { SavedAddress } from '@/components/ProfileModal';
 import { useTheme } from '@mui/material';
 import { formatFriendlyError } from '@/utils/error';
+import { useHomePageCatalog } from '@/hooks/useHomePageCatalog';
+import { useHomePageDialogs } from '@/hooks/useHomePageDialogs';
+import { ProductGridSection } from '@/components/storefront/ProductGridSection';
 
 // ==================== DYNAMIC IMPORTS (Code Splitting) ====================
 // Heavy components loaded on-demand to reduce initial bundle size
