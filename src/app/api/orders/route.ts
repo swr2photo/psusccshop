@@ -247,12 +247,10 @@ export async function POST(req: NextRequest) {
     let shopStatus = 'OPEN';
     if (!isShopOpen) {
       shopStatus = 'TEMPORARILY_CLOSED';
-    } else if (isValidDate(shopOpenDate)) {
-      const open = parseThailandDate(shopOpenDate, false);
-      if (nowTime < open) shopStatus = 'WAITING_TO_OPEN';
-    } else if (isValidDate(shopCloseDate)) {
-      const close = parseThailandDate(shopCloseDate, true);
-      if (nowTime > close) shopStatus = 'ORDER_ENDED';
+    } else if (isValidDate(shopOpenDate) && nowTime < parseThailandDate(shopOpenDate, false)) {
+      shopStatus = 'WAITING_TO_OPEN';
+    } else if (isValidDate(shopCloseDate) && nowTime > parseThailandDate(shopCloseDate, true)) {
+      shopStatus = 'ORDER_ENDED';
     }
 
     if (shopStatus !== 'OPEN') {

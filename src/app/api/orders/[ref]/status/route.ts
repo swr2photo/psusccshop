@@ -134,8 +134,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ ref:
     return NextResponse.json({ 
       error: 'Failed to fetch status', 
       details: error.message, 
-      cause: error.cause?.message || String(error.cause),
-      url 
+      cause: error.cause?.message || String(error.cause)
     }, { status: 500 });
   }
 }
