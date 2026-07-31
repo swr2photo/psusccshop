@@ -603,9 +603,9 @@ const getBasePrice = (p: Product) => {
 };
 
 /** คำนวณราคาส่วนลดจากอีเวนต์ที่กำลังดำเนินอยู่ */
-function getEventDiscount(productId: string, events: ShopEvent[] | undefined): { discountedPrice: (original: number) => number; discountLabel: string; eventTitle: string; discountType?: 'percent' | 'fixed'; discountValue?: number } | null {
+function getEventDiscount(productId: string, events: ShopEvent[] | undefined, nowOverride?: Date): { discountedPrice: (original: number) => number; discountLabel: string; eventTitle: string; discountType?: 'percent' | 'fixed'; discountValue?: number } | null {
   if (!events?.length) return null;
-  const now = new Date();
+  const now = nowOverride || new Date();
   const active = events.find(e => 
     e.enabled && 
     e.linkedProducts?.includes(productId) &&
@@ -1492,7 +1492,7 @@ export default function HomePage() {
       }
 
       // Apply event discount if still active
-      const discount = getEventDiscount(product.id, events);
+      const discount = getEventDiscount(product.id, events, now);
       if (discount) {
         basePrice = discount.discountedPrice(basePrice);
       }
@@ -2006,6 +2006,22 @@ export default function HomePage() {
   useEffect(() => {
     if (!supabase) return undefined;
 
+    let debounceTimer: NodeJS.Timeout | null = null;
+    const refreshCatalogRealtime = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(async () => {
+        try {
+          const res = await apiFetch(`/api/shops/catalog?v=${Date.now()}`, { cache: 'no-store' });
+          if (res.ok) {
+            const data = await res.json();
+            mutate(PAGE_CACHE_KEYS.CATALOG, data, false);
+          }
+        } catch (e) {
+          console.error('[Realtime] Failed to refresh catalog', e);
+        }
+      }, 500);
+    };
+
     console.log('[Realtime] Initializing guest/public config subscription');
     const channel = supabase
       .channel('public-config-changes')
@@ -2033,7 +2049,7 @@ export default function HomePage() {
         },
         (payload) => {
           console.log('[Realtime] Public shops change payload:', payload);
-          mutate(PAGE_CACHE_KEYS.CATALOG);
+          refreshCatalogRealtime();
         }
       )
       .on(
@@ -2045,7 +2061,7 @@ export default function HomePage() {
         },
         (payload) => {
           console.log('[Realtime] Public products change payload:', payload);
-          mutate(PAGE_CACHE_KEYS.CATALOG);
+          refreshCatalogRealtime();
         }
       )
       .on(
@@ -2057,7 +2073,7 @@ export default function HomePage() {
         },
         (payload) => {
           console.log('[Realtime] Public categories change payload:', payload);
-          mutate(PAGE_CACHE_KEYS.CATALOG);
+          refreshCatalogRealtime();
         }
       )
       .subscribe((status) => {
@@ -2066,6 +2082,7 @@ export default function HomePage() {
       });
 
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       setConfigRealtimeOk(false);
       channel.unsubscribe();
     };
@@ -2212,7 +2229,7 @@ export default function HomePage() {
       : 0;
 
     // Apply event discount to base price before adding fees
-    const discount = getEventDiscount(selectedProduct.id, activeProductCatalog.events);
+    const discount = getEventDiscount(selectedProduct.id, activeProductCatalog.events, now);
     if (discount) {
       basePrice = discount.discountedPrice(basePrice);
     }
@@ -2341,7 +2358,7 @@ export default function HomePage() {
       basePrice = variants[0].price || product.basePrice;
     }
 
-    const discount = getEventDiscount(product.id, catalogContext.events);
+    const discount = getEventDiscount(product.id, catalogContext.events, now);
     if (discount) basePrice = discount.discountedPrice(basePrice);
 
     const incomingShop = shopContext?.shopSlug || catalogContext.shopSlug || '';
@@ -2431,7 +2448,7 @@ export default function HomePage() {
     const assignments = bulkAssignments.length ? bulkAssignments : bulkBuildAssignments();
     if (!assignments.length) return;
 
-    const discount = getEventDiscount(selectedProduct.id, activeProductCatalog.events);
+    const discount = getEventDiscount(selectedProduct.id, activeProductCatalog.events, now);
     const longSleeveFee = selectedProduct.options?.hasLongSleeve && bulkLongSleeve
       ? (selectedProduct.options?.longSleevePrice ?? 50) : 0;
 
@@ -2617,7 +2634,7 @@ export default function HomePage() {
     }
     
     // Apply event discount
-    const discount = getEventDiscount(selectedProduct.id, activeProductCatalog.events);
+    const discount = getEventDiscount(selectedProduct.id, activeProductCatalog.events, now);
     if (discount) {
       basePrice = discount.discountedPrice(basePrice);
     }
@@ -3654,7 +3671,7 @@ export default function HomePage() {
                       <Box sx={{ px: 1, pb: 1.5 }}>
                         {previewItems.map((product) => {
                           const img = product.coverImage || product.images?.[0];
-                          const eventDisc = getEventDiscount(product.id, config?.events as ShopEvent[] | undefined);
+                          const eventDisc = getEventDiscount(product.id, config?.events as ShopEvent[] | undefined, now);
                           return (
                             <Box
                               key={product.id}
@@ -4566,7 +4583,7 @@ export default function HomePage() {
                       const isProductUnavailable = productStatus !== 'OPEN' || outOfStock || !catalogContext.isOpen;
                       const isProductAvailable = productStatus === 'OPEN' && !outOfStock && catalogContext.isOpen;
                       const isProductClosed = isProductUnavailable;
-                      const eventDiscount = getEventDiscount(product.id, catalogContext.events);
+                      const eventDiscount = getEventDiscount(product.id, catalogContext.events, now);
                       const quickAdd = canQuickAddToCart(product);
                       
                       return (
@@ -4729,7 +4746,7 @@ export default function HomePage() {
                                 zIndex: 2,
                               }}>
                                 {/* Countdown timer if has endDate */}
-                                {product.endDate && new Date(product.endDate) > new Date() && (
+                                {product.endDate && new Date(product.endDate) > now && (
                                   <Box sx={{
                                     px: 0.8,
                                     py: 0.4,
@@ -4745,8 +4762,8 @@ export default function HomePage() {
                                     <Clock size={10} />
                                     {(() => {
                                       const end = new Date(product.endDate!);
-                                      const now = new Date();
-                                      const diff = end.getTime() - now.getTime();
+                                      const localNow = now;
+                                      const diff = end.getTime() - localNow.getTime();
                                       const days = Math.floor(diff / (1000 * 60 * 60 * 24));
                                       const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
                                       if (days > 0) return `${t.common.remaining} ${days} ${t.common.days}`;
@@ -5574,7 +5591,7 @@ export default function HomePage() {
               {wishlistStore.items.map((productId) => {
                 const product = Object.values(allGroupedProducts).flat().find((p) => p.id === productId);
                 if (!product) return null;
-                const eventDiscount = getEventDiscount(product.id, config?.events as ShopEvent[] | undefined);
+                const eventDiscount = getEventDiscount(product.id, config?.events as ShopEvent[] | undefined, now);
                 const productStatus = getProductStatus(product, now);
                 const statusLabelsMap: Record<ShopStatusType, string> = {
                   OPEN: t.shopStatus.open,

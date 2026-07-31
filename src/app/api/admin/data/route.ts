@@ -5,6 +5,7 @@ import { requireAdmin } from '@/lib/auth';
 import { sanitizeConfigForAdmin, sanitizeOrdersForAdmin } from '@/lib/sanitize';
 import { mergeConfigAdminEmails, resolveAdminSession } from '@/lib/admin-context';
 import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
+import { mergeRealtimeStock } from '@/lib/redis-stock-merge';
 
 // Ensure Node runtime (uses Supabase client) and skip static caching
 export const runtime = 'nodejs';
@@ -38,7 +39,8 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const mergedCfg = mergeConfigAdminEmails(cfg as ShopConfig);
+    const stockMergedCfg = await mergeRealtimeStock(cfg as ShopConfig);
+    const mergedCfg = mergeConfigAdminEmails(stockMergedCfg);
 
     // Get pagination params
     const url = new URL(req.url);

@@ -7,6 +7,7 @@ import { requireAdmin, isSuperAdminEmail } from '@/lib/auth';
 import { sanitizeConfigForPublic, sanitizeObjectUtf8 } from '@/lib/sanitize';
 import { saveAllAdminPermissionsToDB, getAllAdminPermissionsFromDB, deleteAdminPermissionsFromDB } from '@/lib/supabase';
 import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
+import { mergeRealtimeStock } from '@/lib/redis-stock-merge';
 import {
   getCached,
   invalidateCacheKey,
@@ -87,7 +88,8 @@ async function GETHandler() {
       console.error('[Config API] Failed to load config from database, falling back to default:', error);
     }
 
-    const sanitizedConfig = sanitizeConfigForPublic(cfg);
+    const mergedCfg = await mergeRealtimeStock(cfg);
+    const sanitizedConfig = sanitizeConfigForPublic(mergedCfg);
     return { status: 'success' as const, data: sanitizedConfig };
   });
 

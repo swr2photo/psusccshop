@@ -1870,8 +1870,6 @@ export function ProductsView({
   const filteredProducts = useMemo(() => {
     const term = searchTerm.toLowerCase().trim();
     return config.products.filter((p) => {
-      const { status } = isProductOpen(p);
-      if (status === 'ended') return false;
       // Category filter
       if (selectedCategory !== 'ALL') {
         const pCat = p.category || (p.type === 'OTHER' ? 'OTHER' : 'APPAREL');
@@ -1889,7 +1887,7 @@ export function ProductsView({
   }, [searchTerm, selectedCategory, config.products]);
 
   const visibleProducts = useMemo(
-    () => config.products.filter((p) => isProductOpen(p).status !== 'ended'),
+    () => config.products,
     [config.products],
   );
 

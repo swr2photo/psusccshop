@@ -10,7 +10,7 @@ import { verifyTurnstileToken, getClientIP } from '@/lib/cloudflare-server';
 import { checkCombinedRateLimitAsync, RATE_LIMITS, getRateLimitHeaders } from '@/lib/rate-limit';
 import { sendOrderConfirmationEmail } from '@/lib/email';
 import { db } from '@/lib/db';
-import { shops } from '@/db/schema';
+import { shops, config } from '@/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { recordOrderCreated } from '@/lib/sentry-metrics';
 import { buildValidatedCart, clampShippingFee } from '@/lib/order-pricing';
@@ -460,6 +460,19 @@ export async function POST(req: NextRequest) {
       } catch (err) {
         console.error('[Orders API] Failed to save fallback stock:', err);
       }
+    }
+
+    // --- REALTIME STOCK SIGNAL ---
+    // Instantly trigger Supabase Realtime so clients fetch the new Redis stock
+    try {
+      await db.insert(config)
+        .values({ key: 'config-version', value: { updatedAt: new Date().toISOString() } })
+        .onConflictDoUpdate({
+          target: config.key,
+          set: { value: { updatedAt: new Date().toISOString() }, updatedAt: new Date() },
+        });
+    } catch (signalErr) {
+      console.warn('[Orders API] Failed to trigger realtime signal:', signalErr);
     }
 
     const qstash = getQStashClient();
