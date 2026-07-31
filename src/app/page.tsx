@@ -2282,7 +2282,27 @@ export default function HomePage() {
       }
     }
 
-    const newCart = [...cart, item];
+    const existingIndex = cart.findIndex((c) =>
+      c.productId === item.productId &&
+      c.size === item.size &&
+      c.options?.variantId === item.options?.variantId &&
+      c.options?.customName === item.options?.customName &&
+      c.options?.customNumber === item.options?.customNumber &&
+      c.options?.pattern === item.options?.pattern &&
+      !!c.options?.isLongSleeve === !!item.options?.isLongSleeve
+    );
+
+    let newCart: CartItem[];
+    if (existingIndex >= 0) {
+      newCart = [...cart];
+      newCart[existingIndex] = {
+        ...newCart[existingIndex],
+        quantity: newCart[existingIndex].quantity + (item.quantity || 1),
+      };
+    } else {
+      newCart = [...cart, item];
+    }
+
     saveCart(newCart);
     showToast('success', options?.goCheckout ? t.cart.addedGoCheckout : t.cart.addedToCart);
     resetProductDialog();
@@ -2396,7 +2416,28 @@ export default function HomePage() {
       }
     }
 
-    saveCart([...cart, item]);
+    const existingIndex = cart.findIndex((c) =>
+      c.productId === item.productId &&
+      c.size === item.size &&
+      c.options?.variantId === item.options?.variantId &&
+      c.options?.customName === item.options?.customName &&
+      c.options?.customNumber === item.options?.customNumber &&
+      c.options?.pattern === item.options?.pattern &&
+      !!c.options?.isLongSleeve === !!item.options?.isLongSleeve
+    );
+
+    let newCart: CartItem[];
+    if (existingIndex >= 0) {
+      newCart = [...cart];
+      newCart[existingIndex] = {
+        ...newCart[existingIndex],
+        quantity: newCart[existingIndex].quantity + (item.quantity || 1),
+      };
+    } else {
+      newCart = [...cart, item];
+    }
+
+    saveCart(newCart);
     showToast('success', t.cart.addedToCart);
   }, [
     catalogContext.isOpen,

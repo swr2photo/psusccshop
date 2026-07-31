@@ -494,7 +494,15 @@ export default function CartDrawer(props: CartDrawerProps) {
                 const issue = lineIssues.get(item.id);
                 const variantId = item.options?.variantId || (item as any).selectedVariant?.id;
                 const itemStockLimit = product ? getAvailableStock(product, variantId) : null;
-                const atStockLimit = itemStockLimit !== null && item.quantity >= itemStockLimit;
+                
+                let maxAllowedForThisLine = itemStockLimit;
+                if (itemStockLimit !== null) {
+                  const qtyInOtherLines = cart
+                    .filter(c => c.id !== item.id && c.productId === item.productId && (c.options?.variantId === variantId || (c as any).selectedVariant?.id === variantId))
+                    .reduce((sum, c) => sum + (c.quantity || (c as any).qty || 0), 0);
+                  maxAllowedForThisLine = Math.max(0, itemStockLimit - qtyInOtherLines);
+                }
+                const atStockLimit = maxAllowedForThisLine !== null && item.quantity >= maxAllowedForThisLine;
                 return (
                   <Box
                     key={item.id}
@@ -591,11 +599,11 @@ export default function CartDrawer(props: CartDrawerProps) {
                           }}>
                             <IconButton
                               size="small"
-                              onClick={() => onUpdateQuantity(item.id, item.quantity - 1, itemStockLimit)}
-                              onMouseDown={() => onStartHold(item.id, -1, itemStockLimit)}
+                              onClick={() => onUpdateQuantity(item.id, item.quantity - 1, maxAllowedForThisLine)}
+                              onMouseDown={() => onStartHold(item.id, -1, maxAllowedForThisLine)}
                               onMouseUp={() => onStopHold(item.id)}
                               onMouseLeave={() => onStopHold(item.id)}
-                              onTouchStart={() => onStartHold(item.id, -1, itemStockLimit)}
+                              onTouchStart={() => onStartHold(item.id, -1, maxAllowedForThisLine)}
                               onTouchEnd={() => onStopHold(item.id)}
                               sx={{ color: 'var(--foreground)', p: 0.7, borderRadius: 0, '&:hover': { bgcolor: 'var(--surface)' } }}
                             >
@@ -615,15 +623,15 @@ export default function CartDrawer(props: CartDrawerProps) {
                             </Typography>
                             <IconButton
                               size="small"
-                              onClick={() => onUpdateQuantity(item.id, item.quantity + 1, itemStockLimit)}
-                              onMouseDown={() => !atStockLimit && onStartHold(item.id, 1, itemStockLimit)}
+                              disabled={atStockLimit}
+                              onClick={() => onUpdateQuantity(item.id, item.quantity + 1, maxAllowedForThisLine)}
+                              onMouseDown={() => !atStockLimit && onStartHold(item.id, 1, maxAllowedForThisLine)}
                               onMouseUp={() => onStopHold(item.id)}
                               onMouseLeave={() => onStopHold(item.id)}
-                              onTouchStart={() => !atStockLimit && onStartHold(item.id, 1, itemStockLimit)}
+                              onTouchStart={() => !atStockLimit && onStartHold(item.id, 1, maxAllowedForThisLine)}
                               onTouchEnd={() => onStopHold(item.id)}
-                              disabled={atStockLimit}
                               sx={{ 
-                                color: 'var(--foreground)', 
+                                color: atStockLimit ? 'var(--text-muted)' : 'var(--foreground)', 
                                 p: 0.7, 
                                 borderRadius: 0, 
                                 '&:hover': { bgcolor: 'var(--surface)' },
@@ -654,7 +662,7 @@ export default function CartDrawer(props: CartDrawerProps) {
                           </Box>
                         </Box>
                         {itemStockLimit !== null && (
-                          <Typography sx={{ fontSize: '0.68rem', color: atStockLimit ? 'var(--warning, #ff9f0a)' : 'var(--text-muted)', mt: 0.5, textAlign: 'right' }}>
+                          <Typography sx={{ fontSize: '0.72rem', color: atStockLimit ? '#ef4444' : 'var(--text-muted)', mt: 1 }}>
                             {lang === 'en' ? `Stock: ${itemStockLimit}` : `สต็อก: ${itemStockLimit} ชิ้น`}
                           </Typography>
                         )}

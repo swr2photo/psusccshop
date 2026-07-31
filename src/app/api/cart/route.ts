@@ -145,26 +145,9 @@ export async function POST(req: NextRequest) {
     for (const item of cart) {
       const products = await resolveProductsForCartItem(item, catalogCache);
       const prod = products.find((p) => p.id === item.productId);
-      if (!prod) {
-        return await secureJsonResponse(
-          { status: 'error', message: `สินค้า "${item.productName || item.name || 'ไม่ระบุชื่อ'}" ไม่มีอยู่ในระบบแล้ว` },
-          { status: 400 },
-        );
-      }
-
-      if (!isProductCurrentlyOpen(prod, now)) {
-        return await secureJsonResponse(
-          { status: 'error', message: `สินค้า "${item.productName || prod.name}" หมดอายุหรือปิดการขายแล้ว` },
-          { status: 400 },
-        );
-      }
-
-      if (isProductOutOfStock(prod)) {
-        return await secureJsonResponse(
-          { status: 'error', message: `สินค้า "${item.productName || prod.name}" หมดชั่วคราว` },
-          { status: 400 },
-        );
-      }
+      // We no longer block saving the cart if an item is expired, missing, or out of stock.
+      // The frontend UI handles displaying these states (e.g. disabled, "out of stock" label).
+      // Validation for purchasing happens in the checkout route (POST /api/orders).
     }
 
     // Get old cart for comparison
