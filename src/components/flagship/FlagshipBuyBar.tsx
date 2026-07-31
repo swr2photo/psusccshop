@@ -255,7 +255,7 @@ export default function FlagshipBuyBar({
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{t.product.totalPrice}</div>
               <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--foreground)' }}>
-                ฿{unitPrice.toLocaleString()}
+                ฿{unitPrice?.toLocaleString()}
               </div>
             </div>
             <button

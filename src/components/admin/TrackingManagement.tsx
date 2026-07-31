@@ -973,7 +973,7 @@ export default function TrackingManagement({ showToast, selectedShopId }: Tracki
                               )}
                             >
                               <span className="min-w-[90px] text-[0.75rem] text-[var(--text-muted)]">
-                                {new Date(event.timestamp).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}
+                                {new Date(event.timestamp)?.toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}
                               </span>
                               <span className="flex-1 text-[0.8rem] text-[var(--foreground)]">
                                 {event.descriptionThai || event.description}

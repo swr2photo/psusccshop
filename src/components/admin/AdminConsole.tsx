@@ -2566,7 +2566,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                           border: '1px solid rgba(16, 185, 129, 0.2)',
                         }}>
                           <Typography sx={{ fontSize: '0.75rem', color: '#10b981' }}>
-                            ✓ รับแล้วเมื่อ {new Date(order.pickup.pickedUpAt).toLocaleString('th-TH')}
+                            ✓ รับแล้วเมื่อ {new Date(order.pickup.pickedUpAt)?.toLocaleString('th-TH')}
                           </Typography>
                           {order.pickup.notes && (
                             <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', mt: 0.5 }}>
@@ -2580,7 +2580,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                     {/* Amount & Action */}
                     <Box sx={{ textAlign: 'right' }}>
                       <Typography sx={{ fontSize: '1.1rem', fontWeight: 700, color: '#10b981' }}>
-                        ฿{Number(order.amount).toLocaleString()}
+                        ฿{Number(order.amount)?.toLocaleString()}
                       </Typography>
                       {canPickup && (
                         <Button
@@ -2688,7 +2688,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                         </Box>
                         <Box sx={{ textAlign: 'right' }}>
                           <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#10b981' }}>
-                            ฿{Number(order.amount).toLocaleString()}
+                            ฿{Number(order.amount)?.toLocaleString()}
                           </Typography>
                           <Chip
                             size="small"
@@ -2756,14 +2756,14 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                               </Typography>
                               {pickup?.pickedUpAt && (
                                 <Typography sx={{ fontSize: '0.7rem', color: '#10b981' }}>
-                                  ✓ {new Date(pickup.pickedUpAt).toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                  ✓ {new Date(pickup.pickedUpAt)?.toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                                   {pickup.notes ? ` · ${pickup.notes}` : ''}
                                 </Typography>
                               )}
                             </Box>
                           </Box>
                           <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#10b981' }}>
-                            ฿{Number(order.amount).toLocaleString()}
+                            ฿{Number(order.amount)?.toLocaleString()}
                           </Typography>
                         </Box>
                       </Box>
@@ -3298,7 +3298,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                           color: '#10b981',
                           ml: 2,
                         }}>
-                          ฿{(item.quantity * item.unitPrice).toLocaleString()}
+                          ฿{(item.quantity * item.unitPrice)?.toLocaleString()}
                         </Typography>
                       </Box>
                     </Box>
@@ -3315,7 +3315,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                 }}>
                   <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--foreground)' }}>รวมทั้งหมด</Typography>
                   <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#10b981' }}>
-                    ฿{Number(pickupSelectedOrder.amount).toLocaleString()}
+                    ฿{Number(pickupSelectedOrder.amount)?.toLocaleString()}
                   </Typography>
                 </Box>
               </Box>
@@ -3938,7 +3938,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
               ยอดขายรวม
             </Typography>
             <Typography sx={{ fontSize: '1.2rem', fontWeight: 800, color: '#38bdf8' }}>
-              ฿{scopedKpis.revenue.toLocaleString()}
+              ฿{scopedKpis.revenue?.toLocaleString()}
             </Typography>
           </Box>
         </Box>
@@ -4038,7 +4038,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                       color: '#10b981',
                       whiteSpace: 'nowrap',
                     }}>
-                      ฿{Number(order.amount).toLocaleString()}
+                      ฿{Number(order.amount)?.toLocaleString()}
                     </Typography>
                   </Box>
 
@@ -4226,7 +4226,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                                   </Typography>
                                 </Box>
                                 <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: '#10b981', whiteSpace: 'nowrap' }}>
-                                  ฿{(item.quantity * item.unitPrice).toLocaleString()}
+                                  ฿{(item.quantity * item.unitPrice)?.toLocaleString()}
                                 </Typography>
                               </Box>
                             );
@@ -4632,11 +4632,11 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                 ยอดชำระ (คำนวณจากตะกร้า)
               </Typography>
               <Typography sx={{ fontSize: '1.25rem', fontWeight: 700, color: '#10b981' }}>
-                ฿{orderEditor.cart.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0).toLocaleString()}
+                ฿{orderEditor.cart.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0)?.toLocaleString()}
               </Typography>
               {orderEditor.amount > 0 && orderEditor.amount !== orderEditor.cart.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0) && (
                 <Typography sx={{ fontSize: '0.7rem', color: '#f59e0b', mt: 0.5 }}>
-                  ยอดเดิม: ฿{orderEditor.amount.toLocaleString()}
+                  ยอดเดิม: ฿{orderEditor.amount?.toLocaleString()}
                 </Typography>
               )}
             </Box>
@@ -4707,7 +4707,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                 fontWeight: 700, 
                 color: '#10b981',
               }}>
-                รวม ฿{orderEditor.cart.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0).toLocaleString()}
+                รวม ฿{orderEditor.cart.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0)?.toLocaleString()}
               </Typography>
             </Box>
           </Box>
@@ -4800,7 +4800,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                         )}
                         {activeCatalogProducts.map((p) => (
                           <option key={p.id} value={p.id}>
-                            {p.name} — ฿{Number(p.basePrice || 0).toLocaleString()}
+                            {p.name} — ฿{Number(p.basePrice || 0)?.toLocaleString()}
                           </option>
                         ))}
                       </TextField>
@@ -4839,7 +4839,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                         ราคาในออเดอร์
                       </Typography>
                       <Typography sx={{ fontSize: '1rem', fontWeight: 800, color: 'var(--foreground)' }}>
-                        ฿{orderedPrice.toLocaleString()}
+                        ฿{orderedPrice?.toLocaleString()}
                       </Typography>
                     </Box>
                     <Box>
@@ -4847,7 +4847,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                         ราคาปัจจุบันในระบบ
                       </Typography>
                       <Typography sx={{ fontSize: '1rem', fontWeight: 800, color: product ? '#38bdf8' : '#94a3b8' }}>
-                        {product ? `฿${catalogPrice.toLocaleString()}` : '—'}
+                        {product ? `฿${catalogPrice?.toLocaleString()}` : '—'}
                       </Typography>
                     </Box>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.6, alignItems: { xs: 'stretch', sm: 'flex-end' } }}>
@@ -4858,7 +4858,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                             fontWeight: 700,
                             color: priceDiff > 0 ? '#f59e0b' : '#34d399',
                           }}>
-                            ส่วนต่าง {priceDiff > 0 ? '+' : ''}฿{priceDiff.toLocaleString()}
+                            ส่วนต่าง {priceDiff > 0 ? '+' : ''}฿{priceDiff?.toLocaleString()}
                           </Typography>
                           <Button
                             size="small"
@@ -5056,10 +5056,10 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                     alignItems: 'center',
                   }}>
                     <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      {item.quantity} × ฿{orderedPrice.toLocaleString()}
+                      {item.quantity} × ฿{orderedPrice?.toLocaleString()}
                     </Typography>
                     <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#10b981' }}>
-                      ฿{(item.quantity * orderedPrice).toLocaleString()}
+                      ฿{(item.quantity * orderedPrice)?.toLocaleString()}
                     </Typography>
                   </Box>
                 </Box>
@@ -5098,7 +5098,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                 <option value="">-- เลือกสินค้าเพื่อเพิ่ม --</option>
                 {activeCatalogProducts.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.name} — ฿{Number(p.basePrice || 0).toLocaleString()}
+                    {p.name} — ฿{Number(p.basePrice || 0)?.toLocaleString()}
                   </option>
                 ))}
               </TextField>
@@ -5521,7 +5521,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                       fontSize: '0.65rem', 
                       color: 'var(--text-muted)',
                     }}>
-                      {log[0] ? new Date(log[0]).toLocaleString('th-TH', {
+                      {log[0] ? new Date(log[0])?.toLocaleString('th-TH', {
                         day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
                       }) : '-'}
                     </Typography>
@@ -6077,14 +6077,14 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
               )}
               {slipViewerData.slip.uploadedAt && (
                 <p className="mt-4 text-sm text-[var(--text-muted)]">
-                  อัพโหลดเมื่อ: {new Date(slipViewerData.slip.uploadedAt).toLocaleString('th-TH')}
+                  อัพโหลดเมื่อ: {new Date(slipViewerData.slip.uploadedAt)?.toLocaleString('th-TH')}
                 </p>
               )}
               {slipViewerData.slip.slipData && (
                 <div className="mt-4 rounded-xl bg-emerald-500/10 p-4 text-left">
                   <p className="mb-2 flex items-center gap-1 font-semibold text-emerald-500"><ClipboardList size={16} /> ข้อมูลจากสลิป</p>
                   {slipViewerData.slip.slipData.amount && (
-                    <p className="flex items-center gap-1 text-sm text-[var(--foreground)]"><Banknote size={14} /> จำนวนเงิน: ฿{Number(slipViewerData.slip.slipData.amount).toLocaleString()}</p>
+                    <p className="flex items-center gap-1 text-sm text-[var(--foreground)]"><Banknote size={14} /> จำนวนเงิน: ฿{Number(slipViewerData.slip.slipData.amount)?.toLocaleString()}</p>
                   )}
                   {(slipViewerData.slip.slipData.senderName || slipViewerData.slip.slipData.senderFullName || slipViewerData.slip.slipData.senderDisplayName) && (
                     <div className="mt-2">

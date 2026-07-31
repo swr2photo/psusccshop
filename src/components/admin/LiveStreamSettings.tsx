@@ -414,7 +414,7 @@ export default function LiveStreamSettings({ config, saveConfig, showToast, user
               <p className="text-sm font-semibold text-red-300">กำลังไลฟ์สดอยู่</p>
               <p className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Clock size={12} />
-                เริ่มเมื่อ {new Date(config.liveStream.startedAt).toLocaleString('th-TH')}
+                เริ่มเมื่อ {new Date(config.liveStream.startedAt)?.toLocaleString('th-TH')}
                 {config.liveStream.updatedBy && ` • โดย ${config.liveStream.updatedBy}`}
               </p>
             </div>

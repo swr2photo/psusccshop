@@ -417,7 +417,7 @@ function generateAdminNotificationEmail(request: DataRequest): string {
           </tr>
           <tr style="border-bottom:1px solid #e2e8f0;">
             <td style="padding:12px 0;color:#64748b;">วันที่ยื่น:</td>
-            <td style="padding:12px 0;">${new Date(request.createdAt).toLocaleString('th-TH')}</td>
+            <td style="padding:12px 0;">${new Date(request.createdAt)?.toLocaleString('th-TH')}</td>
           </tr>
           ${request.reason ? `
           <tr>

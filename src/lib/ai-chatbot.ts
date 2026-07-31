@@ -302,7 +302,7 @@ export async function lookupOrdersByEmail(email: string): Promise<string> {
     orders.forEach((o: any) => {
       const date = new Date(o.createdAt || o.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
       const statusThai = getStatusThai(o.status);
-      result += `| ${o.ref} | ${date} | ${statusThai} | ${(o.totalAmount || 0).toLocaleString()}฿ |\n`;
+      result += `| ${o.ref} | ${date} | ${statusThai} | ${(o.totalAmount || 0)?.toLocaleString()}฿ |\n`;
     });
     
     return result;
@@ -327,7 +327,7 @@ function formatOrderForChat(order: any): string {
   result += `| หมายเลข | ${order.ref} |\n`;
   result += `| วันที่สั่ง | ${date} |\n`;
   result += `| สถานะ | ${statusThai} |\n`;
-  result += `| ยอดรวม | ${(order.totalAmount || 0).toLocaleString()} บาท |\n`;
+  result += `| ยอดรวม | ${(order.totalAmount || 0)?.toLocaleString()} บาท |\n`;
   
   if (order.paymentMethod) {
     result += `| วิธีชำระ | ${order.paymentMethod} |\n`;
@@ -355,7 +355,7 @@ function formatOrderForChat(order: any): string {
     const refundStatusThai = getRefundStatusThai(order.refundStatus);
     result += `| การคืนเงิน | ${refundStatusThai} |\n`;
     if (order.refundAmount) {
-      result += `| จำนวนคืน | ${order.refundAmount.toLocaleString()} บาท |\n`;
+      result += `| จำนวนคืน | ${order.refundAmount?.toLocaleString()} บาท |\n`;
     }
   }
   
@@ -374,7 +374,7 @@ function formatOrderForChat(order: any): string {
       if (item.options?.customNumber) extras.push(`เบอร์: ${item.options.customNumber}`);
       if (item.options?.isLongSleeve) extras.push('แขนยาว');
       const extraText = extras.length > 0 ? ` (${extras.join(', ')})` : '';
-      result += `| ${name}${extraText} | ${size} | ${qty} | ${price.toLocaleString()}฿ |\n`;
+      result += `| ${name}${extraText} | ${size} | ${qty} | ${price?.toLocaleString()}฿ |\n`;
     });
   }
   

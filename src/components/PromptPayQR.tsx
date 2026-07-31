@@ -112,7 +112,7 @@ export default function PromptPayQR({ payload, amount, size = 256 }: PromptPayQR
             textShadow: '0 1px 2px rgba(0,0,0,0.3)',
           }}
         >
-          ฿{amount.toLocaleString(lang === 'th' ? 'th-TH' : 'en-US', { minimumFractionDigits: 2 })}
+          ฿{amount?.toLocaleString(lang === 'th' ? 'th-TH' : 'en-US', { minimumFractionDigits: 2 })}
         </Typography>
       </Box>
 

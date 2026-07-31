@@ -122,7 +122,7 @@ export default function Footer() {
   const formatBuildTime = (iso: string) => {
     try {
       const date = new Date(iso);
-      return date.toLocaleString('th-TH', {
+      return date?.toLocaleString('th-TH', {
         day: '2-digit',
         month: 'short',
         year: 'numeric',

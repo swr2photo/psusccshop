@@ -1159,7 +1159,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                               {orderItems.length > 1 ? ` · +${orderItems.length - 1}` : ''}
                             </Typography>
                             <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--foreground)', mt: 0.35 }}>
-                              ฿{(firstItemPrice ?? 0).toLocaleString()}
+                              ฿{(firstItemPrice ?? 0)?.toLocaleString()}
                             </Typography>
                           </Box>
                         </Box>
@@ -1358,7 +1358,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                             </Typography>
                             {order.refundAmount && (
                               <Typography sx={{ fontSize: '0.73rem', fontWeight: 700, color: 'var(--warning)', ml: 0.5 }}>
-                                ฿{order.refundAmount.toLocaleString()}
+                                ฿{order.refundAmount?.toLocaleString()}
                               </Typography>
                             )}
                           </Box>
@@ -1508,7 +1508,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                                     </Box>
                                     
                                     <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--success)', mt: 'auto' }}>
-                                      ฿{itemSubtotal.toLocaleString()}
+                                      ฿{itemSubtotal?.toLocaleString()}
                                     </Typography>
                                   </Box>
                                 </Box>
@@ -1988,7 +1988,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                         </Typography>
                       </Box>
                       <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--foreground)', whiteSpace: 'nowrap' }}>
-                        ฿{lineAmt.toLocaleString()}
+                        ฿{lineAmt?.toLocaleString()}
                       </Typography>
                     </Box>
                   );
@@ -2015,7 +2015,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                 {t.orderHistory.refundAmountAuto}
               </Typography>
               <Typography sx={{ fontSize: '0.95rem', fontWeight: 800, color: '#059669' }}>
-                ฿{refundComputedAmount.toLocaleString()}
+                ฿{refundComputedAmount?.toLocaleString()}
               </Typography>
             </Box>
           </Box>
@@ -2333,7 +2333,7 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                 {t.orderHistory.submitting}
               </Box>
             ) : (
-              `${t.orderHistory.submitRefund} ฿${refundComputedAmount.toLocaleString()}`
+              `${t.orderHistory.submitRefund} ฿${refundComputedAmount?.toLocaleString()}`
             )}
           </Button>
         </DialogActions>

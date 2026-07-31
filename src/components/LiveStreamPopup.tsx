@@ -251,7 +251,7 @@ export default function LiveStreamPopup() {
           {live.description && <p className={liveStreamStyles.desc}>{live.description}</p>}
           {live.startedAt && (
             <p className={liveStreamStyles.startedAt}>
-              เริ่มเมื่อ {new Date(live.startedAt).toLocaleString('th-TH')}
+              เริ่มเมื่อ {new Date(live.startedAt)?.toLocaleString('th-TH')}
             </p>
           )}
         </div>

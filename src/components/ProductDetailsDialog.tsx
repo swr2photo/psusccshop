@@ -1364,7 +1364,7 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
                               color: 'var(--foreground)',
                               pr: 1,
                             }}>
-                              ฿{price.toLocaleString()}
+                              ฿{price?.toLocaleString()}
                             </Typography>
                           </Box>
                         );
@@ -1452,7 +1452,7 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
                               {variant.name}
                             </Typography>
                             <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: active ? 'var(--secondary)' : 'var(--text-muted)' }}>
-                              ฿{(variant.price || selectedProduct.basePrice).toLocaleString()}
+                              ฿{(variant.price || selectedProduct.basePrice)?.toLocaleString()}
                             </Typography>
                             {variant.stock !== null && variant.stock !== undefined && variant.stock > 0 && (
                               <Typography sx={{ fontSize: '0.6rem', color: 'var(--text-muted)', mt: 0.3 }}>
@@ -1750,7 +1750,7 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
                       lineHeight: 1,
                       letterSpacing: '-0.03em',
                     }}>
-                      ฿{getCurrentPrice().toLocaleString()}
+                      ฿{getCurrentPrice()?.toLocaleString()}
                     </Typography>
                   </Box>
                   <Box sx={{ textAlign: 'right' }}>
@@ -1911,7 +1911,7 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
             }}>
               <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
                 <Typography sx={{ fontSize: '1.3rem', fontWeight: 900, color: 'var(--foreground)', lineHeight: 1 }}>
-                  ฿{getCurrentPrice().toLocaleString()}
+                  ฿{getCurrentPrice()?.toLocaleString()}
                 </Typography>
                 <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>
                   {productOptions.size} × {productOptions.quantity}
@@ -1956,7 +1956,7 @@ export const ProductDetailsDialog = React.memo(function ProductDetailsDialog({
                   lineHeight: 1,
                   letterSpacing: '-0.03em',
                 }}>
-                  ฿{getCurrentPrice().toLocaleString()}
+                  ฿{getCurrentPrice()?.toLocaleString()}
                 </Typography>
               </Box>
               <Box sx={{ textAlign: 'right' }}>

@@ -903,7 +903,7 @@ export const SettingsView = React.memo(function SettingsView({
             }}
           />
           <p className="text-[0.85rem] text-[var(--text-muted)]">
-            {hasChanges ? 'มีการเปลี่ยนแปลงที่ยังไม่บันทึก' : 'บันทึกล่าสุด: ' + (lastSavedTime ? lastSavedTime.toLocaleString('th-TH') : '-')}
+            {hasChanges ? 'มีการเปลี่ยนแปลงที่ยังไม่บันทึก' : 'บันทึกล่าสุด: ' + (lastSavedTime ? lastSavedTime?.toLocaleString('th-TH') : '-')}
           </p>
         </div>
         <Button

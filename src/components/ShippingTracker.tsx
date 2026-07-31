@@ -242,7 +242,7 @@ export default function ShippingTracker({
                       </Typography>
                     </Box>
                     <Typography variant="caption" color="textSecondary">
-                      {t.shipping.lastUpdate}: {new Date(trackingInfo.lastUpdate).toLocaleString(lang === 'th' ? 'th-TH' : 'en-US')}
+                      {t.shipping.lastUpdate}: {new Date(trackingInfo.lastUpdate)?.toLocaleString(lang === 'th' ? 'th-TH' : 'en-US')}
                     </Typography>
                   </Box>
 
@@ -326,7 +326,7 @@ export default function ShippingTracker({
                             {event.descriptionThai || event.description}
                           </Typography>
                           <Typography variant="caption" color="textSecondary">
-                            {new Date(event.timestamp).toLocaleString(lang === 'th' ? 'th-TH' : 'en-US')}
+                            {new Date(event.timestamp)?.toLocaleString(lang === 'th' ? 'th-TH' : 'en-US')}
                             {event.location && ` • ${event.location}`}
                           </Typography>
                         </Box>

@@ -159,7 +159,7 @@ export const DashboardView = React.memo(function DashboardView({
   const statsData = [
     {
       label: 'ยอดขายรวม',
-      value: `฿${totalSales.toLocaleString()}`,
+      value: `฿${totalSales?.toLocaleString()}`,
       subtitle: `${validOrders.length} ออเดอร์`,
       gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
       iconBg: 'rgba(16,185,129,0.2)',
@@ -324,7 +324,7 @@ export const DashboardView = React.memo(function DashboardView({
                             d.revenue > 0 ? 'opacity-100' : 'opacity-0',
                           )}
                         >
-                          ฿{d.revenue >= 1000 ? `${(d.revenue / 1000).toFixed(1)}k` : d.revenue.toLocaleString()}
+                          ฿{d.revenue >= 1000 ? `${(d.revenue / 1000).toFixed(1)}k` : d.revenue?.toLocaleString()}
                         </span>
                         <div
                           className="w-full min-h-1 rounded-t-md rounded-b-sm transition-[height] duration-500 ease-out"
@@ -466,7 +466,7 @@ export const DashboardView = React.memo(function DashboardView({
                         {product.count} pcs
                       </p>
                       <p className="text-[0.6rem] text-[var(--success)]">
-                        ฿{product.revenue.toLocaleString()}
+                        ฿{product.revenue?.toLocaleString()}
                       </p>
                     </div>
                   </div>
@@ -766,7 +766,7 @@ export const DashboardView = React.memo(function DashboardView({
                     </TableCell>
                     <TableCell className="border-[var(--border)] text-right">
                       <span className="text-[0.9rem] font-bold text-[var(--success)]">
-                        ฿{Number(order.amount).toLocaleString()}
+                        ฿{Number(order.amount)?.toLocaleString()}
                       </span>
                     </TableCell>
                     <TableCell className="border-[var(--border)]">

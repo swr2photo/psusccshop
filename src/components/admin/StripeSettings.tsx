@@ -490,7 +490,7 @@ export default function StripeSettings({ config, onUpdate, onBack, onSave, savin
                             <div key={`avl-${i}`}>
                               <p className="text-[0.7rem] text-green-500">พร้อมใช้</p>
                               <p className="text-base font-bold text-[var(--foreground)]">
-                                ฿{b.amount.toLocaleString()}
+                                ฿{b.amount?.toLocaleString()}
                               </p>
                             </div>
                           ))}
@@ -498,7 +498,7 @@ export default function StripeSettings({ config, onUpdate, onBack, onSave, savin
                             <div key={`pnd-${i}`}>
                               <p className="text-[0.7rem] text-amber-500">รอดำเนินการ</p>
                               <p className="text-base font-bold text-[var(--foreground)]">
-                                ฿{b.amount.toLocaleString()}
+                                ฿{b.amount?.toLocaleString()}
                               </p>
                             </div>
                           ))}

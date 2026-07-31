@@ -36,7 +36,7 @@ function escapeHtml(value: unknown): string {
 
 function formatMoney(amount: number, lang: InvoiceLang): string {
   const n = Number.isFinite(amount) ? amount : 0;
-  return `฿${n.toLocaleString(lang === 'th' ? 'th-TH' : 'en-US', {
+  return `฿${n?.toLocaleString(lang === 'th' ? 'th-TH' : 'en-US', {
     minimumFractionDigits: n % 1 === 0 ? 0 : 2,
     maximumFractionDigits: 2,
   })}`;
@@ -50,7 +50,7 @@ function formatDateTime(iso: Date | string, lang: InvoiceLang): string {
   try {
     const date = typeof iso === 'string' ? new Date(iso) : iso;
     if (Number.isNaN(date.getTime())) return String(iso);
-    return date.toLocaleString(invoiceLocale(lang), {
+    return date?.toLocaleString(invoiceLocale(lang), {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -181,7 +181,7 @@ export function bahtTextThai(amount: number): string {
 
 export function bahtTextEnglish(amount: number): string {
   const n = Math.abs(Number(amount) || 0);
-  const formatted = n.toLocaleString('en-US', {
+  const formatted = n?.toLocaleString('en-US', {
     minimumFractionDigits: n % 1 === 0 ? 0 : 2,
     maximumFractionDigits: 2,
   });

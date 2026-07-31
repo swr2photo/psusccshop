@@ -151,7 +151,7 @@ const isProductOpen = (product: Product): { isOpen: boolean; status: 'upcoming' 
 const formatDateTime = (dateStr: string | undefined): string => {
   if (!dateStr) return '-';
   const date = new Date(dateStr);
-  return date.toLocaleString('th-TH', {
+  return date?.toLocaleString('th-TH', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
@@ -270,7 +270,7 @@ const ProductCardItem = ({
               {product.name || 'ไม่มีชื่อสินค้า'}
             </h3>
             <span className="whitespace-nowrap text-lg font-black text-emerald-400">
-              ฿{Number(product.basePrice || 0).toLocaleString()}
+              ฿{Number(product.basePrice || 0)?.toLocaleString()}
             </span>
           </div>
 
@@ -1051,7 +1051,7 @@ const ProductEditDialog = ({
                           onClick={() => handleSizePriceChange(size, product.basePrice || 0)}
                         >
                           {product.sizePricing?.[size]
-                            ? `${size}: ${product.sizePricing[size].toLocaleString()}฿`
+                            ? `${size}: ${product.sizePricing[size]?.toLocaleString()}฿`
                             : `ตั้งราคา ${size}`}
                         </Badge>
                       ))}
@@ -1801,7 +1801,7 @@ const ProductEditDialog = ({
                     {product.name || 'ชื่อสินค้า'}
                   </p>
                   <p className="text-xl font-bold text-emerald-500">
-                    ฿{(product.basePrice || 0).toLocaleString()}
+                    ฿{(product.basePrice || 0)?.toLocaleString()}
                   </p>
                   {Object.keys(product.sizePricing || {}).length > 0 && (
                     <div className="flex flex-wrap gap-1">

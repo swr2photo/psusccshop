@@ -348,7 +348,7 @@ export function generateOrderConfirmationEmail(order: {
         ${item.options?.customName ? `<br><span style="font-size: 12px; color: #1e3a5f;">ชื่อ: ${item.options.customName}</span>` : ''}
         ${item.options?.customNumber ? `<span style="font-size: 12px; color: #1e3a5f;"> | เบอร์: ${item.options.customNumber}</span>` : ''}
       </div>
-      <div style="color: #1e3a5f; font-weight: 600;">฿${(item.unitPrice * (item.quantity || item.qty || 1)).toLocaleString()}</div>
+      <div style="color: #1e3a5f; font-weight: 600;">฿${(item.unitPrice * (item.quantity || item.qty || 1))?.toLocaleString()}</div>
     </div>
   `).join('');
 
@@ -368,7 +368,7 @@ export function generateOrderConfirmationEmail(order: {
       <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <span style="color: #6b7280;">ยอดรวมทั้งหมด</span>
-          <span class="total">฿${order.totalAmount.toLocaleString()}</span>
+          <span class="total">฿${order.totalAmount?.toLocaleString()}</span>
         </div>
       </div>
     </div>
@@ -386,7 +386,7 @@ export function generateOrderConfirmationEmail(order: {
   return {
     subject: `[${SHOP_NAME}] ยืนยันคำสั่งซื้อ #${order.ref}`,
     html: baseTemplate(content, `คำสั่งซื้อ #${order.ref} ได้รับการยืนยันแล้ว`),
-    text: `เรียน คุณ${order.customerName}\n\nยืนยันคำสั่งซื้อ #${order.ref}\nยอดรวม: ฿${order.totalAmount.toLocaleString()}\nกรุณาชำระเงินที่ ${getShopUrl()}\n\n(อีเมลฉบับนี้ส่งจากระบบอัตโนมัติ กรุณาอย่าตอบกลับ)`,
+    text: `เรียน คุณ${order.customerName}\n\nยืนยันคำสั่งซื้อ #${order.ref}\nยอดรวม: ฿${order.totalAmount?.toLocaleString()}\nกรุณาชำระเงินที่ ${getShopUrl()}\n\n(อีเมลฉบับนี้ส่งจากระบบอัตโนมัติ กรุณาอย่าตอบกลับ)`,
   };
 }
 
@@ -405,7 +405,7 @@ export function generatePaymentReceivedEmail(order: {
         <span class="status-badge status-success">ชำระเงินแล้ว</span>
         <p style="margin: 16px 0 0; color: #6b7280;">หมายเลขคำสั่งซื้อ</p>
         <p style="margin: 8px 0 0; font-size: 22px; font-weight: 700; color: #1e3a5f;">${order.ref}</p>
-        <p style="margin: 16px 0 0; color: #166534; font-size: 18px; font-weight: 700;">฿${order.totalAmount.toLocaleString()}</p>
+        <p style="margin: 16px 0 0; color: #166534; font-size: 18px; font-weight: 700;">฿${order.totalAmount?.toLocaleString()}</p>
       </div>
     </div>
     
@@ -426,7 +426,7 @@ export function generatePaymentReceivedEmail(order: {
   return {
     subject: `[${SHOP_NAME}] ชำระเงินสำเร็จ #${order.ref}`,
     html: baseTemplate(content, `การชำระเงินคำสั่งซื้อ #${order.ref} สำเร็จแล้ว`),
-    text: `ชำระเงินสำเร็จ! คำสั่งซื้อ: ${order.ref} ยอด: ฿${order.totalAmount.toLocaleString()} ติดตามสถานะที่ ${getShopUrl()}`,
+    text: `ชำระเงินสำเร็จ! คำสั่งซื้อ: ${order.ref} ยอด: ฿${order.totalAmount?.toLocaleString()} ติดตามสถานะที่ ${getShopUrl()}`,
   };
 }
 

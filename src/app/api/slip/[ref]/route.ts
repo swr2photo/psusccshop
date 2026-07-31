@@ -73,7 +73,7 @@ export async function GET(
         : `data:${mime};base64,${slip.base64}`;
     }
     
-    const uploadedAt = slip.uploadedAt ? new Date(slip.uploadedAt).toLocaleString('th-TH') : '-';
+    const uploadedAt = slip.uploadedAt ? new Date(slip.uploadedAt)?.toLocaleString('th-TH') : '-';
     // Support both 'slipCheck.success' (old format) and 'verified' (new format)
     const isVerified = slip.verified === true || slip.slipCheck?.success === true;
     const verified = isVerified ? 'ผ่านการตรวจสอบ' : 'รอตรวจสอบ';
@@ -220,7 +220,7 @@ export async function GET(
       ${slipData.receivingBank || slipData.receiverBank ? `<div class="row"><span class="label">ธนาคารผู้รับ</span><span class="value">${slipData.receivingBank || slipData.receiverBank}</span></div>` : ''}
       ${slipData.sender?.displayName || slipData.senderName ? `<div class="row"><span class="label">ชื่อผู้โอน</span><span class="value">${slipData.sender?.displayName || slipData.senderName}</span></div>` : ''}
       ${slipData.receiver?.displayName || slipData.receiverName ? `<div class="row"><span class="label">ชื่อผู้รับ</span><span class="value">${slipData.receiver?.displayName || slipData.receiverName}</span></div>` : ''}
-      ${slipData.amount ? `<div class="row"><span class="label">จำนวนเงิน</span><span class="value">฿${Number(slipData.amount).toLocaleString()}</span></div>` : ''}
+      ${slipData.amount ? `<div class="row"><span class="label">จำนวนเงิน</span><span class="value">฿${Number(slipData.amount)?.toLocaleString()}</span></div>` : ''}
       ${slipData.transDate ? `<div class="row"><span class="label">วันที่โอน</span><span class="value">${slipData.transDate}</span></div>` : ''}
       ${slipData.transTime ? `<div class="row"><span class="label">เวลา</span><span class="value">${slipData.transTime}</span></div>` : ''}
       ${slipData.transRef ? `<div class="row"><span class="label">เลขอ้างอิง</span><span class="value">${slipData.transRef}</span></div>` : ''}

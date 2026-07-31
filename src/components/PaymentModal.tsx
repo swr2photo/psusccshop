@@ -482,7 +482,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
           ctx.fillStyle = '#ffffff';
           ctx.font = 'bold 20px Arial, sans-serif';
           ctx.textAlign = 'center';
-          ctx.fillText(`฿${amount.toLocaleString(lang === 'th' ? 'th-TH' : 'en-US', { minimumFractionDigits: 2 })}`, totalSize / 2, totalSize + 35);
+          ctx.fillText(`฿${amount?.toLocaleString(lang === 'th' ? 'th-TH' : 'en-US', { minimumFractionDigits: 2 })}`, totalSize / 2, totalSize + 35);
 
           ctx.font = '12px Arial, sans-serif';
           ctx.fillStyle = 'rgba(255,255,255,0.7)';
@@ -530,7 +530,7 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
   };
 
   const formatMoney = (value: number) =>
-    `฿${value.toLocaleString(lang === 'th' ? 'th-TH' : 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    `฿${value?.toLocaleString(lang === 'th' ? 'th-TH' : 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const copyText = async (value: string, successTitle: string) => {
     if (!value) return;

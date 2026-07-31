@@ -484,7 +484,7 @@ export default function CheckoutDialog({
 
   const payCtaLabel = processing
     ? t.checkout.processing
-    : t.checkout.payScanQr.replace('{amount}', total.toLocaleString());
+    : t.checkout.payScanQr.replace('{amount}', total?.toLocaleString());
 
   const sectionSx = {
     p: 2,
@@ -619,7 +619,7 @@ export default function CheckoutDialog({
               </Typography>
             </Box>
             <Typography sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '0.95rem' }}>
-              ฿{subtotal.toLocaleString()}
+              ฿{subtotal?.toLocaleString()}
             </Typography>
           </Box>
 
@@ -701,7 +701,7 @@ export default function CheckoutDialog({
                     )}
                   </Box>
                   <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)', flexShrink: 0 }}>
-                    ฿{(item.unitPrice * item.quantity).toLocaleString()}
+                    ฿{(item.unitPrice * item.quantity)?.toLocaleString()}
                   </Typography>
                 </Box>
               );
@@ -859,7 +859,7 @@ export default function CheckoutDialog({
                             const fee = opt?.baseFee || 0;
                             const freeMin = shippingConfig?.globalFreeShippingMinimum || opt?.freeShippingMinimum;
                             if (freeMin && subtotal >= freeMin) return t.common.free;
-                            return fee > 0 ? `+฿${fee.toLocaleString()}` : t.common.free;
+                            return fee > 0 ? `+฿${fee?.toLocaleString()}` : t.common.free;
                           })()}
                         </Typography>
                       </Box>
@@ -900,7 +900,7 @@ export default function CheckoutDialog({
                                       )}
                                     </Box>
                                     <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: isFreeShipping ? 'var(--success)' : 'var(--foreground)' }}>
-                                      {isFreeShipping ? t.common.free : `฿${(option.baseFee || 0).toLocaleString()}`}
+                                      {isFreeShipping ? t.common.free : `฿${(option.baseFee || 0)?.toLocaleString()}`}
                                     </Typography>
                                   </Box>
                                 }
@@ -1200,7 +1200,7 @@ export default function CheckoutDialog({
         <Box sx={sectionSx}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
             <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{t.checkout.productPrice}</Typography>
-            <Typography sx={{ color: 'var(--foreground)', fontSize: '0.85rem' }}>฿{subtotal.toLocaleString()}</Typography>
+            <Typography sx={{ color: 'var(--foreground)', fontSize: '0.85rem' }}>฿{subtotal?.toLocaleString()}</Typography>
           </Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
             <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{t.checkout.shippingFee}</Typography>
@@ -1214,13 +1214,13 @@ export default function CheckoutDialog({
                 <Typography sx={{ color: 'var(--foreground)', fontSize: '0.85rem', fontWeight: 600 }}>{t.common.free}</Typography>
               </Box>
             ) : (
-              <Typography sx={{ color: 'var(--foreground)', fontSize: '0.85rem' }}>฿{shippingFee.toLocaleString()}</Typography>
+              <Typography sx={{ color: 'var(--foreground)', fontSize: '0.85rem' }}>฿{shippingFee?.toLocaleString()}</Typography>
             )}
           </Box>
           {paymentFee > 0 && (
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
               <Typography sx={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{t.checkout.processingFee}</Typography>
-              <Typography sx={{ color: 'var(--foreground)', fontSize: '0.85rem' }}>฿{paymentFee.toLocaleString()}</Typography>
+              <Typography sx={{ color: 'var(--foreground)', fontSize: '0.85rem' }}>฿{paymentFee?.toLocaleString()}</Typography>
             </Box>
           )}
           {promoDiscount > 0 && (
@@ -1229,7 +1229,7 @@ export default function CheckoutDialog({
                 {t.checkout.discount} ({promoResult?.code})
               </Typography>
               <Typography sx={{ color: 'var(--foreground)', fontSize: '0.85rem', fontWeight: 700 }}>
-                -฿{promoDiscount.toLocaleString()}
+                -฿{promoDiscount?.toLocaleString()}
               </Typography>
             </Box>
           )}
@@ -1245,7 +1245,7 @@ export default function CheckoutDialog({
               {t.checkout.grandTotal}
             </Typography>
             <Typography sx={{ fontWeight: 800, color: 'var(--foreground)', fontSize: '1.25rem' }}>
-              ฿{total.toLocaleString()}
+              ฿{total?.toLocaleString()}
             </Typography>
           </Box>
         </Box>

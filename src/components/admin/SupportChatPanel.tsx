@@ -1273,7 +1273,7 @@ export default function SupportChatPanel({ selectedShopId }: { selectedShopId?: 
 
     const orderMsg = `📦 อัปเดตสถานะออเดอร์ #${order.ref}
 สถานะ: ${getOrderStatusLabel(order.status)}
-${items ? `รายการ:\n${items}\n` : ''}ยอดรวม: ฿${(order.totalAmount || order.amount || 0).toLocaleString()}
+${items ? `รายการ:\n${items}\n` : ''}ยอดรวม: ฿${(order.totalAmount || order.amount || 0)?.toLocaleString()}
 ${tracking ? `เลขพัสดุ: ${tracking}` : 'เลขพัสดุ: ยังไม่มี'}
 ${provider ? `ผู้ให้บริการ: ${provider}` : ''}
 [ORDER_REF:${order.ref}]`.trim();

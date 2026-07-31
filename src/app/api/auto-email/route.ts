@@ -19,7 +19,7 @@ interface EmailTemplate {
 function getOrderConfirmationTemplate(order: any, lang: 'th' | 'en'): EmailTemplate {
   const cart = typeof order.cart === 'string' ? JSON.parse(order.cart) : order.cart || [];
   const itemList = cart.map((item: any) => 
-    `• ${item.name} (${item.size || '-'}) x${item.qty || 1} — ฿${(item.total || item.price || 0).toLocaleString()}`
+    `• ${item.name} (${item.size || '-'}) x${item.qty || 1} — ฿${(item.total || item.price || 0)?.toLocaleString()}`
   ).join('\n');
 
   if (lang === 'en') {
@@ -35,7 +35,7 @@ Your order has been received! Here's your order summary:
 Items:
 ${itemList}
 
-💰 Total: ฿${(order.total_amount || 0).toLocaleString()}
+💰 Total: ฿${(order.total_amount || 0)?.toLocaleString()}
 
 ${order.shipping_method ? `🚚 Shipping: ${order.shipping_method}` : ''}
 
@@ -57,7 +57,7 @@ Thank you for shopping with PSU SCC Shop! 🎉`,
 รายการสินค้า:
 ${itemList}
 
-💰 ยอดรวม: ฿${(order.total_amount || 0).toLocaleString()}
+💰 ยอดรวม: ฿${(order.total_amount || 0)?.toLocaleString()}
 
 ${order.shipping_method ? `🚚 การจัดส่ง: ${order.shipping_method}` : ''}
 
@@ -77,7 +77,7 @@ Your payment for order ${order.ref} has been verified! ✅
 
 We're preparing your order and will notify you when it's ready.
 
-💰 Amount: ฿${(order.total_amount || 0).toLocaleString()}
+💰 Amount: ฿${(order.total_amount || 0)?.toLocaleString()}
 
 Thank you! 🎉`,
     };
@@ -91,7 +91,7 @@ Thank you! 🎉`,
 
 กำลังเตรียมสินค้าให้คุณ จะแจ้งให้ทราบเมื่อพร้อมส่ง/รับ
 
-💰 ยอดชำระ: ฿${(order.total_amount || 0).toLocaleString()}
+💰 ยอดชำระ: ฿${(order.total_amount || 0)?.toLocaleString()}
 
 ขอบคุณค่ะ! 🎉`,
   };

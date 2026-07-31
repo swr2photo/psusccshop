@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
     const orderSubtotal = Number(subtotal) || 0;
     if (promo.minOrderAmount && orderSubtotal < promo.minOrderAmount) {
       return await secureJsonResponse({
-        error: `ยอดสั่งซื้อขั้นต่ำ ฿${promo.minOrderAmount.toLocaleString()} เพื่อใช้รหัสนี้`,
+        error: `ยอดสั่งซื้อขั้นต่ำ ฿${promo.minOrderAmount?.toLocaleString()} เพื่อใช้รหัสนี้`,
       }, { status: 400 });
     }
 

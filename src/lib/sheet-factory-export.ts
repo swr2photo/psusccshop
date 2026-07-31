@@ -209,7 +209,7 @@ export function buildFactoryExport(orders: any[], productTitle?: string) {
   const statsRow = [
     `จำนวนคำสั่งซื้อ: ${orders.length} รายการ`,
     `จำนวนชิ้นทั้งหมด: ${grandTotal} ชิ้น`,
-    `อัปเดตล่าสุด: ${new Date().toLocaleString('th-TH')}`,
+    `อัปเดตล่าสุด: ${new Date()?.toLocaleString('th-TH')}`,
     '',
   ];
 

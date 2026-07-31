@@ -306,7 +306,7 @@ export function CustomerContextPanel({
           <div className="mt-2 grid grid-cols-2 gap-1.5 text-[0.65rem]">
             <div className="rounded-md bg-white px-2 py-1.5 ring-1 ring-slate-200 dark:bg-white/5 dark:ring-white/10">
               <p className="text-muted-foreground">ยอดซื้อสะสม</p>
-              <p className="font-semibold text-foreground">฿{insights.spent.toLocaleString()}</p>
+              <p className="font-semibold text-foreground">฿{insights.spent?.toLocaleString()}</p>
             </div>
             <div className="rounded-md bg-white px-2 py-1.5 ring-1 ring-slate-200 dark:bg-white/5 dark:ring-white/10">
               <p className="text-muted-foreground">อัตราสำเร็จ</p>
@@ -538,7 +538,7 @@ export function CustomerContextPanel({
                     )}
 
                     <p className="mt-1.5 text-[0.7rem] font-medium">
-                      ยอดรวม: ฿{orderAmount(order).toLocaleString()}
+                      ยอดรวม: ฿{orderAmount(order)?.toLocaleString()}
                     </p>
 
                     {tracking ? (

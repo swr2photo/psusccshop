@@ -308,7 +308,7 @@ export default function EmailManagement({ showToast }: Props) {
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleString('th-TH', {
+    return date?.toLocaleString('th-TH', {
       day: '2-digit',
       month: 'short',
       year: '2-digit',
@@ -967,7 +967,7 @@ function StatCard({ icon, label, value, color }: { icon: ReactElement; label: st
               {label}
             </p>
             <p className="text-[1.25rem] font-bold text-[var(--foreground)]">
-              {value.toLocaleString()}
+              {value?.toLocaleString()}
             </p>
           </div>
         </div>

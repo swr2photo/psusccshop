@@ -218,7 +218,7 @@ export default function UserLogsView({ showToast }: Props) {
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleString('th-TH', {
+    return date?.toLocaleString('th-TH', {
       day: '2-digit',
       month: 'short',
       year: '2-digit',
@@ -520,7 +520,7 @@ function StatCard({ icon, label, value, color }: { icon: ReactElement; label: st
       <div className="mb-0.5 [&_svg]:mx-auto [&_svg]:size-[18px]" style={{ color }}>
         {icon}
       </div>
-      <p className="text-base font-bold text-[var(--foreground)]">{value.toLocaleString()}</p>
+      <p className="text-base font-bold text-[var(--foreground)]">{value?.toLocaleString()}</p>
       <p className="text-[0.6rem] text-[var(--muted-foreground)]">{label}</p>
     </div>
   );

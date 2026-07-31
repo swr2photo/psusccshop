@@ -72,7 +72,7 @@ const buildRows = (orders: any[], baseUrl: string) => {
     const itemSummary = typeof items === 'string' ? items : summarizeItems(items);
     const slip = o?.slip;
     const hasSlip = !!(slip && slip.base64);
-    const slipUploadedAt = slip?.uploadedAt ? new Date(slip.uploadedAt).toLocaleString('th-TH') : '';
+    const slipUploadedAt = slip?.uploadedAt ? new Date(slip.uploadedAt)?.toLocaleString('th-TH') : '';
     const slipVerified = slip?.slipData?.transRef ? 'ผ่าน' : (hasSlip ? 'รอตรวจสอบ' : '');
     const slipLink = hasSlip ? `${baseUrl}/api/slip/${o?.ref}` : '';
 

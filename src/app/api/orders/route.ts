@@ -511,7 +511,7 @@ export async function POST(req: NextRequest) {
         //   shopId: sanitizedBody.shopId,
         //   type: 'NEW_ORDER',
         //   title: '📦 Order Queued!',
-        //   message: `Ref: ${ref}\nName: ${order.customerName}\nAmount: ฿${totalAmount.toLocaleString()}`,
+        //   message: `Ref: ${ref}\nName: ${order.customerName}\nAmount: ฿${totalAmount?.toLocaleString()}`,
         // }).catch(e => console.error('[Orders API] Notification error:', e));
 
         return await secureJsonResponse(
@@ -535,7 +535,7 @@ export async function POST(req: NextRequest) {
       shopId: sanitizedBody.shopId,
       type: 'NEW_ORDER',
       title: '📦 New Order Received!',
-      message: `Ref: ${ref}\nName: ${order.customerName}\nAmount: ฿${totalAmount.toLocaleString()}`,
+      message: `Ref: ${ref}\nName: ${order.customerName}\nAmount: ฿${totalAmount?.toLocaleString()}`,
     }).catch(e => console.error('[Orders API] Notification error:', e));
     
     // Send order confirmation email

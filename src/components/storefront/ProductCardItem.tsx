@@ -186,7 +186,7 @@ export function ProductCardItem({
 
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 2 }}>
           <Typography sx={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--primary)' }}>
-            ฿{(product.basePrice || 0).toLocaleString()}
+            ฿{(product.basePrice || 0)?.toLocaleString()}
           </Typography>
 
           {isProductAvailable && onQuickAddToCart && (

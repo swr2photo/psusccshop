@@ -1449,7 +1449,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
 
   const handleShareProduct = useCallback(async (product: Product) => {
     const url = `${window.location.origin}/shop/${shopSlug}`;
-    const shareText = `${getProductName(product, lang)} - ฿${(product.basePrice || 0).toLocaleString()}`;
+    const shareText = `${getProductName(product, lang)} - ฿${(product.basePrice || 0)?.toLocaleString()}`;
     try {
       if (navigator.share) {
         await navigator.share({ title: getProductName(product, lang), text: shareText, url });
@@ -2011,10 +2011,10 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                               {eventDiscount && !isProductClosed ? (
                                 <>
                                   <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#86868b', textDecoration: 'line-through' }}>
-                                    ฿{(product.basePrice || 0).toLocaleString()}
+                                    ฿{(product.basePrice || 0)?.toLocaleString()}
                                   </Typography>
                                   <Typography sx={{ fontSize: '0.9rem', fontWeight: 800, color: '#ff453a' }}>
-                                    ฿{(eventDiscount.discountedPrice(product.basePrice || 0) || 0).toLocaleString()}
+                                    ฿{(eventDiscount.discountedPrice(product.basePrice || 0) || 0)?.toLocaleString()}
                                   </Typography>
                                 </>
                               ) : (
@@ -2022,7 +2022,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                                   fontSize: '0.9rem', fontWeight: 800,
                                   color: isProductClosed ? 'var(--text-muted)' : '#34c759',
                                 }}>
-                                  ฿{(product.basePrice || 0).toLocaleString()}
+                                  ฿{(product.basePrice || 0)?.toLocaleString()}
                                   {product.sizePricing && Object.keys(product.sizePricing).length > 0 && (
                                     <Typography component="span" sx={{ fontSize: '0.6rem', color: 'var(--text-muted)', ml: 0.3 }}>+</Typography>
                                   )}
@@ -2292,7 +2292,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                 >
                   {t.product.addToCart}
                   <Box component="span" sx={{ ml: 0.5, opacity: 0.85, fontSize: '0.82rem' }}>
-                    ฿{(currentUnitPrice * quantity).toLocaleString()}
+                    ฿{(currentUnitPrice * quantity)?.toLocaleString()}
                   </Box>
                 </Button>
                 <Button
@@ -2544,7 +2544,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                           zIndex: 5,
                         }}>
                           <Typography sx={{ fontSize: '1.2rem', fontWeight: 800, color: '#34c759' }}>
-                            ฿{currentUnitPrice.toLocaleString()}
+                            ฿{currentUnitPrice?.toLocaleString()}
                           </Typography>
                         </Box>
                       </Box>
@@ -2738,7 +2738,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                                       fontSize: '0.82rem', fontWeight: 700,
                                       color: isSelected ? 'var(--success)' : 'var(--foreground)', pr: 1,
                                     }}>
-                                      ฿{rowPrice.toLocaleString()}
+                                      ฿{rowPrice?.toLocaleString()}
                                     </Typography>
                                   </Box>
                                 );
@@ -2807,7 +2807,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                                       {variant.name}
                                     </Typography>
                                     <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: active ? 'var(--secondary)' : 'var(--text-muted)' }}>
-                                      ฿{(variant.price || selectedProduct.basePrice || 0).toLocaleString()}
+                                      ฿{(variant.price || selectedProduct.basePrice || 0)?.toLocaleString()}
                                     </Typography>
                                     {variant.stock !== null && variant.stock !== undefined && variant.stock > 0 && (
                                       <Typography sx={{ fontSize: '0.6rem', color: 'var(--text-muted)', mt: 0.3 }}>

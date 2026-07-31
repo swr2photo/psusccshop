@@ -345,7 +345,7 @@ export default function RefundManagement({ showToast, selectedShopId }: Props) {
                                       <p key={i} className="text-[0.72rem] text-muted-foreground">
                                         • {item.name}
                                         {item.size ? ` (${item.size})` : ''} ×{item.qty}
-                                        {item.amount > 0 ? ` — ฿${item.amount.toLocaleString()}` : ''}
+                                        {item.amount > 0 ? ` — ฿${item.amount?.toLocaleString()}` : ''}
                                       </p>
                                     ))}
                                   </div>

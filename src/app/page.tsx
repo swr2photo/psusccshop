@@ -2535,7 +2535,7 @@ export default function HomePage() {
 
   const handleShareProduct = async (product: Product) => {
     const url = getProductLink(product);
-    const shareText = `${getProductName(product, lang)} - ฿${(product.basePrice || 0).toLocaleString()}`;
+    const shareText = `${getProductName(product, lang)} - ฿${(product.basePrice || 0)?.toLocaleString()}`;
 
     // Try to fetch product image as a File for sharing
     const getImageFile = async (): Promise<File | null> => {
@@ -3760,15 +3760,15 @@ export default function HomePage() {
                                 {eventDisc ? (
                                   <>
                                     <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)', textDecoration: 'line-through' }}>
-                                      ฿{getBasePrice(product).toLocaleString()}
+                                      ฿{getBasePrice(product)?.toLocaleString()}
                                     </Typography>
                                     <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#ff453a' }}>
-                                      ฿{eventDisc.discountedPrice(getBasePrice(product)).toLocaleString()}
+                                      ฿{eventDisc.discountedPrice(getBasePrice(product))?.toLocaleString()}
                                     </Typography>
                                   </>
                                 ) : (
                                   <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#34c759' }}>
-                                    ฿{getBasePrice(product).toLocaleString()}
+                                    ฿{getBasePrice(product)?.toLocaleString()}
                                   </Typography>
                                 )}
                               </Box>
@@ -5016,7 +5016,7 @@ export default function HomePage() {
                                           lineHeight: 1,
                                           letterSpacing: '-0.02em',
                                         }}>
-                                          ฿{eventDiscount.discountedPrice(getBasePrice(product)).toLocaleString()}
+                                          ฿{eventDiscount.discountedPrice(getBasePrice(product))?.toLocaleString()}
                                         </Typography>
                                         <Typography sx={{
                                           fontSize: '0.68rem',
@@ -5024,7 +5024,7 @@ export default function HomePage() {
                                           textDecoration: 'line-through',
                                           lineHeight: 1,
                                         }}>
-                                          ฿{getBasePrice(product).toLocaleString()}
+                                          ฿{getBasePrice(product)?.toLocaleString()}
                                         </Typography>
                                       </Box>
                                     ) : (
@@ -5035,7 +5035,7 @@ export default function HomePage() {
                                         lineHeight: 1,
                                         letterSpacing: '-0.02em',
                                       }}>
-                                        ฿{getBasePrice(product).toLocaleString()}
+                                        ฿{getBasePrice(product)?.toLocaleString()}
                                       </Typography>
                                     )}
                                     {Object.keys(product.sizePricing || {}).length > 1 && (
@@ -5431,7 +5431,7 @@ export default function HomePage() {
                       {size}
                     </Box>
                     <Typography sx={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--success)' }}>
-                      {row ? `฿${row.price.toLocaleString()}` : '—'}
+                      {row ? `฿${row.price?.toLocaleString()}` : '—'}
                     </Typography>
                   </Box>
                   <Box sx={{ display: 'flex', gap: 1.5 }}>
@@ -5683,11 +5683,11 @@ export default function HomePage() {
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
                         {eventDiscount ? (
                           <>
-                            <Typography sx={{ fontSize: '0.75rem', color: '#86868b', textDecoration: 'line-through' }}>฿{(product.basePrice || 0).toLocaleString()}</Typography>
-                            <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#ff453a' }}>฿{(eventDiscount.discountedPrice(product.basePrice || 0) || 0).toLocaleString()}</Typography>
+                            <Typography sx={{ fontSize: '0.75rem', color: '#86868b', textDecoration: 'line-through' }}>฿{(product.basePrice || 0)?.toLocaleString()}</Typography>
+                            <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#ff453a' }}>฿{(eventDiscount.discountedPrice(product.basePrice || 0) || 0)?.toLocaleString()}</Typography>
                           </>
                         ) : (
-                          <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#34c759' }}>฿{(product.basePrice || 0).toLocaleString()}</Typography>
+                          <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#34c759' }}>฿{(product.basePrice || 0)?.toLocaleString()}</Typography>
                         )}
                       </Box>
                     </Box>
@@ -5793,7 +5793,7 @@ export default function HomePage() {
                         {getProductName(product, lang)}
                       </Typography>
                       <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#34c759', mt: 0.3 }}>
-                        ฿{(product.basePrice || 0).toLocaleString()}
+                        ฿{(product.basePrice || 0)?.toLocaleString()}
                       </Typography>
                     </Box>
                     <IconButton
@@ -5898,7 +5898,7 @@ export default function HomePage() {
                         }}>
                           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
                             <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--foreground)' }}>{size}</Typography>
-                            <Typography sx={{ fontSize: '0.7rem', color: '#34c759', fontWeight: 600 }}>฿{price.toLocaleString()}</Typography>
+                            <Typography sx={{ fontSize: '0.7rem', color: '#34c759', fontWeight: 600 }}>฿{price?.toLocaleString()}</Typography>
                           </Box>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <IconButton
@@ -6031,7 +6031,7 @@ export default function HomePage() {
                             ))}
                           </select>
                           <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#34c759', minWidth: 55, textAlign: 'right' }}>
-                            ฿{(price + longFee).toLocaleString()}
+                            ฿{(price + longFee)?.toLocaleString()}
                           </Typography>
                         </Box>
                       );
@@ -6049,7 +6049,7 @@ export default function HomePage() {
                           const price = selectedProduct.sizePricing?.[a.size] ?? selectedProduct.basePrice;
                           const longFee = selectedProduct.options?.hasLongSleeve && bulkLongSleeve ? (selectedProduct.options?.longSleevePrice ?? 50) : 0;
                           return s + price + longFee;
-                        }, 0).toLocaleString()}
+                        }, 0)?.toLocaleString()}
                       </Typography>
                     </Box>
                     <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', mt: 0.3 }}>

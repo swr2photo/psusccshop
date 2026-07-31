@@ -556,7 +556,7 @@ export default function CartDrawer(props: CartDrawerProps) {
                             flexShrink: 0,
                             whiteSpace: 'nowrap',
                           }}>
-                            ฿{(item.unitPrice * item.quantity).toLocaleString()}
+                            ฿{(item.unitPrice * item.quantity)?.toLocaleString()}
                           </Typography>
                         </Box>
 
@@ -587,7 +587,7 @@ export default function CartDrawer(props: CartDrawerProps) {
                         </Box>
 
                         <Typography sx={{ fontSize: '0.72rem', color: 'var(--text-muted)', mb: 1.25 }}>
-                          ฿{item.unitPrice.toLocaleString()}
+                          ฿{item.unitPrice?.toLocaleString()}
                         </Typography>
 
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 'auto' }}>
@@ -713,7 +713,7 @@ export default function CartDrawer(props: CartDrawerProps) {
                           {promoResult.code}
                         </Typography>
                         <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                          {promoResult.description || `-฿${promoResult.discount.toLocaleString()}`}
+                          {promoResult.description || `-฿${promoResult.discount?.toLocaleString()}`}
                         </Typography>
                       </Box>
                     </Box>
@@ -819,7 +819,7 @@ export default function CartDrawer(props: CartDrawerProps) {
               ) : remainingForFreeShipping != null && remainingForFreeShipping > 0 ? (
                 <>
                   <Typography sx={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.45, mb: 0.85 }}>
-                    {t.cart.orderMoreForFree.replace('{amount}', remainingForFreeShipping.toLocaleString())}
+                    {t.cart.orderMoreForFree.replace('{amount}', remainingForFreeShipping?.toLocaleString())}
                   </Typography>
                   <Box sx={{
                     height: 3,
@@ -847,7 +847,7 @@ export default function CartDrawer(props: CartDrawerProps) {
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.75 }}>
                 <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{t.cart.subtotal}</Typography>
                 <Typography sx={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--foreground)' }}>
-                  ฿{cartTotal.toLocaleString()}
+                  ฿{cartTotal?.toLocaleString()}
                 </Typography>
               </Box>
               {promoDiscount > 0 && (
@@ -856,7 +856,7 @@ export default function CartDrawer(props: CartDrawerProps) {
                     {t.checkout.discount} ({promoResult?.code})
                   </Typography>
                   <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>
-                    -฿{promoDiscount.toLocaleString()}
+                    -฿{promoDiscount?.toLocaleString()}
                   </Typography>
                 </Box>
               )}
@@ -877,7 +877,7 @@ export default function CartDrawer(props: CartDrawerProps) {
                   {t.cart.total}
                 </Typography>
                 <Typography sx={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--foreground)' }}>
-                  ฿{displayTotal.toLocaleString()}
+                  ฿{displayTotal?.toLocaleString()}
                 </Typography>
               </Box>
               <Typography sx={{ fontSize: '0.68rem', color: 'var(--text-muted)', mt: 0.5 }}>
