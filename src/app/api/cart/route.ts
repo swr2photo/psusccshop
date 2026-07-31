@@ -1,11 +1,51 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
-import { getJson, putJson } from '@/lib/filebase';
+import { getJson, putJson, getShopConfig } from '@/lib/filebase';
 import crypto from 'crypto';
 import { requireAuth, isResourceOwner, isAdminEmailAsync } from '@/lib/auth';
 import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
+import { getShopById, getShopBySlug } from '@/lib/shops';
+import { isProductCurrentlyOpen, isProductOutOfStock } from '@/lib/shop-constants';
+import type { Product } from '@/lib/config';
 
 const cartKey = (email: string) => `carts/${crypto.createHash('sha256').update(email.toLowerCase()).digest('hex')}.json`;
+type CartItemLike = {
+  productId?: string;
+  productName?: string;
+  name?: string;
+  shopId?: string;
+  shopSlug?: string;
+};
+
+async function resolveProductsForCartItem(
+  item: CartItemLike,
+  cache: Map<string, Product[]>,
+): Promise<Product[]> {
+  const key = item.shopId ? `id:${item.shopId}` : item.shopSlug ? `slug:${item.shopSlug}` : 'main';
+  const cached = cache.get(key);
+  if (cached) return cached;
+
+  let products: Product[] = [];
+  if (item.shopId) {
+    const shop = await getShopById(item.shopId);
+    if (!shop) {
+      throw new Error('ไม่พบข้อมูลร้านค้า');
+    }
+    products = shop.products || [];
+  } else if (item.shopSlug) {
+    const shop = await getShopBySlug(item.shopSlug);
+    if (!shop) {
+      throw new Error('ไม่พบข้อมูลร้านค้า');
+    }
+    products = shop.products || [];
+  } else {
+    const cfg = await getShopConfig();
+    products = (cfg?.products || []) as Product[];
+  }
+
+  cache.set(key, products);
+  return products;
+}
 
 // Helper to save user log server-side
 async function saveUserLogServer(log: {
@@ -47,8 +87,29 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const data = await getJson(cartKey(email));
-    return await secureJsonResponse({ status: 'success', data: { cart: data || [] } });
+    const data = (await getJson(cartKey(email))) || [];
+    if (!Array.isArray(data) || data.length === 0) {
+      return await secureJsonResponse({ status: 'success', data: { cart: [] } });
+    }
+
+    const now = new Date();
+    const catalogCache = new Map<string, Product[]>();
+    const cleanedCart: CartItemLike[] = [];
+
+    for (const item of data as CartItemLike[]) {
+      const products = await resolveProductsForCartItem(item, catalogCache);
+      const prod = products.find((p) => p.id === item.productId);
+      if (!prod) continue;
+      if (!isProductCurrentlyOpen(prod, now)) continue;
+      if (isProductOutOfStock(prod)) continue;
+      cleanedCart.push(item);
+    }
+
+    if (cleanedCart.length !== data.length) {
+      await putJson(cartKey(email), cleanedCart);
+    }
+
+    return await secureJsonResponse({ status: 'success', data: { cart: cleanedCart } });
   } catch (error) {
     console.error('[Cart API] GET failed:', error);
     // Never mask failures as empty cart — clients would wipe a non-empty local cart
@@ -69,8 +130,8 @@ export async function POST(req: NextRequest) {
   try {
     const body = await secureJsonRequest(req);
     const email = body?.email as string | undefined;
-    const cart = body?.cart as any[] | undefined;
-    if (!email || !cart) return await secureJsonResponse({ status: 'error', message: 'missing email/cart' }, { status: 400 });
+    const cart = body?.cart as CartItemLike[] | undefined;
+    if (!email || !Array.isArray(cart)) return await secureJsonResponse({ status: 'error', message: 'missing email/cart' }, { status: 400 });
 
     // ตรวจสอบว่าเป็นเจ้าของหรือเป็น admin
     const currentEmail = authResult.email;
@@ -78,9 +139,37 @@ export async function POST(req: NextRequest) {
       return await secureJsonResponse({ status: 'error', message: 'ไม่มีสิทธิ์แก้ไขข้อมูลนี้' }, { status: 403 });
     }
 
+    const now = new Date();
+    const catalogCache = new Map<string, Product[]>();
+
+    for (const item of cart) {
+      const products = await resolveProductsForCartItem(item, catalogCache);
+      const prod = products.find((p) => p.id === item.productId);
+      if (!prod) {
+        return await secureJsonResponse(
+          { status: 'error', message: `สินค้า "${item.productName || item.name || 'ไม่ระบุชื่อ'}" ไม่มีอยู่ในระบบแล้ว` },
+          { status: 400 },
+        );
+      }
+
+      if (!isProductCurrentlyOpen(prod, now)) {
+        return await secureJsonResponse(
+          { status: 'error', message: `สินค้า "${item.productName || prod.name}" หมดอายุหรือปิดการขายแล้ว` },
+          { status: 400 },
+        );
+      }
+
+      if (isProductOutOfStock(prod)) {
+        return await secureJsonResponse(
+          { status: 'error', message: `สินค้า "${item.productName || prod.name}" หมดชั่วคราว` },
+          { status: 400 },
+        );
+      }
+    }
+
     // Get old cart for comparison
     const oldCart = (await getJson(cartKey(email))) || [];
-    
+
     await putJson(cartKey(email), cart);
     
     // Log cart change (only if items changed significantly)
@@ -107,11 +196,11 @@ export async function POST(req: NextRequest) {
     }
     
     return await secureJsonResponse({ status: 'success' });
-  } catch (error: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
+  } catch (error: unknown) {
     return await secureJsonResponse({
       status: 'error',
-      message: error?.message || 'save failed',
-      error: typeof error === 'object' ? error : { detail: String(error) },
+      message: error instanceof Error ? error.message : 'save failed',
+      error: typeof error === 'object' && error !== null ? error : { detail: String(error) },
     }, { status: 500 });
   }
 }

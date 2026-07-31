@@ -280,8 +280,7 @@ export const CACHE_TTL = {
 
 
 
-export const PUBLIC_CONFIG_CACHE_KEY = 'config:public-v2';
+export const PUBLIC_CONFIG_CACHE_KEY = 'config:public-v3';
 
 export const LIVE_CACHE_KEY = 'live:public';
-
 

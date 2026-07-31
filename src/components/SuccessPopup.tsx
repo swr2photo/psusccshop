@@ -5,6 +5,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { Box, Typography, Grow } from '@mui/material';
 import { CheckCircle2, PartyPopper, Sparkles, Heart, ShoppingBag, CreditCard } from 'lucide-react';
 import { useTranslation } from '@/hooks/useTranslation';
+import { getNotificationPalette } from '@/components/notification-presets';
 
 // ============== TYPES ==============
 
@@ -29,6 +30,14 @@ const SUCCESS_ICONS = {
   cart: <PartyPopper size={40} />,
 };
 
+const SUCCESS_TONES = {
+  general: 'info',
+  order: 'guide',
+  payment: 'success',
+  profile: 'neutral',
+  cart: 'success',
+} as const;
+
 // ============== COMPONENT ==============
 
 export default function SuccessPopup({
@@ -44,6 +53,7 @@ export default function SuccessPopup({
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const startY = useRef(0);
+  const palette = getNotificationPalette(SUCCESS_TONES[type]);
 
   useEffect(() => {
     if (show) {
@@ -100,9 +110,12 @@ export default function SuccessPopup({
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 99999,
-        bgcolor: 'rgba(0,0,0, 0.85)',
-        backdropFilter: 'blur(12px)',
-        animation: 'fadeIn 0.3s ease',
+        px: 2,
+        pb: { xs: 3, sm: 4 },
+        bgcolor: 'rgba(0,0,0, 0.34)',
+        backdropFilter: 'blur(18px)',
+        WebkitBackdropFilter: 'blur(18px)',
+        animation: 'fadeIn 0.35s ease',
         opacity: isDragging ? Math.max(0.3, 1 - Math.abs(dragOffset) / 150) : 1,
         transition: isDragging ? 'none' : 'opacity 0.3s ease',
         '@keyframes fadeIn': {
@@ -118,32 +131,62 @@ export default function SuccessPopup({
       <Grow in={visible} timeout={400}>
         <Box
           sx={{
+            position: 'relative',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             gap: 2,
             p: 4,
-            maxWidth: 320,
+            width: 'min(100%, 360px)',
             textAlign: 'center',
             transform: dragOffset !== 0 ? `translateY(${dragOffset}px)` : undefined,
             transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)',
+            borderRadius: 4,
+            border: `1px solid ${palette.ring}`,
+            background: palette.shell,
+            boxShadow: palette.glow,
+            overflow: 'hidden',
+            backdropFilter: 'blur(24px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(24px) saturate(180%)',
           }}
+          onClick={(e) => e.stopPropagation()}
         >
+          <Box
+            aria-hidden
+            sx={{
+              position: 'absolute',
+              inset: 0,
+              background: 'linear-gradient(180deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.06) 100%)',
+              pointerEvents: 'none',
+            }}
+          />
+          <Box
+            aria-hidden
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 3,
+              background: palette.accent,
+            }}
+          />
+
           {/* Animated Icon Container */}
           <Box
             sx={{
               width: 100,
               height: 100,
               borderRadius: '50%',
-              background: 'linear-gradient(135deg, #34c759 0%, #34c759 100%)',
+              background: `linear-gradient(135deg, ${palette.accent} 0%, ${palette.accent} 100%)`,
               display: 'grid',
               placeItems: 'center',
               color: 'white',
-              boxShadow: '0 8px 40px rgba(16, 185, 129, 0.4)',
-              animation: 'successPulse 1s ease-in-out infinite',
+              boxShadow: `0 16px 40px ${palette.accentSoft}`,
+              animation: 'successPulse 1.8s ease-in-out infinite',
               '@keyframes successPulse': {
-                '0%, 100%': { transform: 'scale(1)', boxShadow: '0 8px 40px rgba(16, 185, 129, 0.4)' },
-                '50%': { transform: 'scale(1.05)', boxShadow: '0 12px 50px rgba(16, 185, 129, 0.5)' },
+                '0%, 100%': { transform: 'scale(1)', boxShadow: `0 16px 40px ${palette.accentSoft}` },
+                '50%': { transform: 'scale(1.04)', boxShadow: `0 20px 52px ${palette.accentSoft}` },
               },
             }}
           >
@@ -154,25 +197,25 @@ export default function SuccessPopup({
           <Box
             sx={{
               position: 'absolute',
-              width: 160,
-              height: 160,
-              animation: 'sparkleRotate 8s linear infinite',
+              width: 140,
+              height: 140,
+              animation: 'sparkleRotate 12s linear infinite',
               '@keyframes sparkleRotate': {
                 '0%': { transform: 'rotate(0deg)' },
                 '100%': { transform: 'rotate(360deg)' },
               },
             }}
           >
-            {[0, 72, 144, 216, 288].map((angle, i) => (
+          {[0, 120, 240].map((angle, i) => (
               <Box
                 key={i}
                 sx={{
                   position: 'absolute',
                   top: '50%',
                   left: '50%',
-                  transform: `rotate(${angle}deg) translateY(-70px)`,
-                  color: '#30d158',
-                  opacity: 0.7,
+                transform: `rotate(${angle}deg) translateY(-56px)`,
+                color: palette.accent,
+                opacity: 0.5,
                 }}
               >
                 <Sparkles size={14} />
@@ -208,9 +251,9 @@ export default function SuccessPopup({
           {/* Progress Bar */}
           <Box
             sx={{
-              width: '80%',
+              width: '84%',
               height: 4,
-              bgcolor: 'rgba(255, 255, 255, 0.1)',
+              bgcolor: 'rgba(255, 255, 255, 0.16)',
               borderRadius: 2,
               overflow: 'hidden',
               mt: 2,
@@ -219,7 +262,7 @@ export default function SuccessPopup({
             <Box
               sx={{
                 height: '100%',
-                bgcolor: '#34c759',
+                bgcolor: palette.accent,
                 borderRadius: 2,
                 animation: `progressShrink ${duration}ms linear`,
                 '@keyframes progressShrink': {

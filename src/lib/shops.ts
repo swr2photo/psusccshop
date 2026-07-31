@@ -12,6 +12,7 @@ import {
   ALL_SHOP_ADMIN_PERMISSIONS,
 } from './admin-permissions';
 import { getCached, invalidateCacheKey, CACHE_TTL } from './server-cache';
+import { sanitizePublicProducts } from './sanitize';
 
 export type { ShopAdminPermissions } from './admin-permissions';
 export { DEFAULT_SHOP_ADMIN_PERMISSIONS, ALL_SHOP_ADMIN_PERMISSIONS } from './admin-permissions';
@@ -100,7 +101,7 @@ export function toPublicShopData(shop: Shop) {
     contactEmail: shop.contactEmail,
     contactPhone: shop.contactPhone,
     socialLinks: shop.socialLinks,
-    products: shop.products || [],
+    products: sanitizePublicProducts(shop.products),
     announcements: shop.config?.announcements || [],
     announcementHistory: shop.config?.announcementHistory || [],
     announcement: shop.config?.announcement,
@@ -151,7 +152,7 @@ export function toPublicShopCatalogEntry(shop: Shop) {
       openDate: shop.settings.openDate,
       closeDate: shop.settings.closeDate
     } : undefined,
-    products: (shop.products || []).filter((p) => p.isActive !== false),
+    products: sanitizePublicProducts(shop.products),
     events: shop.config?.events || [],
     shirtNameConfig: shop.config?.shirtNameConfig,
     nameValidation: shop.config?.nameValidation,
@@ -660,4 +661,3 @@ export async function getShopOrders(shopId: string, options?: {
     return { orders: [], total: 0 };
   }
 }
-

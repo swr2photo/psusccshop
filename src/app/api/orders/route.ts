@@ -21,6 +21,7 @@ import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 import { getQStashClient } from '@/lib/qstash';
 import { deductStockAtomic, restoreStockAtomic } from '@/lib/stock';
 import { getRedisClient } from '@/lib/redis';
+import { isProductCurrentlyOpen, isProductOutOfStock } from '@/lib/shop-constants';
 
 // Helper to save user log server-side
 async function saveUserLogServer(log: {
@@ -274,25 +275,14 @@ export async function POST(req: NextRequest) {
         );
       }
       
-      // Check product status (active, start/end dates)
-      const isActive = prod.isActive !== false;
-      const start = isValidDate(prod.startDate) ? parseThailandDate(prod.startDate, false) : null;
-      const end = isValidDate(prod.endDate) ? parseThailandDate(prod.endDate, true) : null;
-      
-      const isClosed = !isActive || (start && nowTime < start) || (end && nowTime > end);
-      if (isClosed) {
+      if (!isProductCurrentlyOpen(prod, nowTime)) {
         return await secureJsonResponse(
-          { status: 'error', message: `สินค้า "${item.productName || prod.name}" ปิดการขายแล้ว` },
+          { status: 'error', message: `สินค้า "${item.productName || prod.name}" หมดอายุหรือปิดการขายแล้ว` },
           { status: 400, headers: { 'Content-Type': 'application/json; charset=utf-8' } }
         );
       }
 
-      // Check stock
-      const isOutOfStock = (
-        (prod.stock !== null && prod.stock !== undefined && prod.stock <= 0) ||
-        (prod.variants && prod.variants.length > 0 && prod.variants.every((v: any) => v.stock !== null && v.stock !== undefined && v.stock <= 0))
-      );
-      if (isOutOfStock) {
+      if (isProductOutOfStock(prod)) {
         return await secureJsonResponse(
           { status: 'error', message: `สินค้า "${item.productName || prod.name}" หมดชั่วคราว` },
           { status: 400, headers: { 'Content-Type': 'application/json; charset=utf-8' } }

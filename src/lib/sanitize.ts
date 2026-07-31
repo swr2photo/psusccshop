@@ -4,6 +4,7 @@
 
 import { ShopConfig, Product, NameValidationConfig, ShirtNameConfig } from './config';
 import { encryptImageUrl } from './image-crypto';
+import { isValidDate, parseThailandDateTime } from './shop-constants';
 
 // ==================== IMAGE URL PROXY ====================
 
@@ -35,6 +36,17 @@ function sanitizeProductImages(product: Product): Product {
     images: (product.images || []).map(encodeImageUrl),
     coverImage: encodeImageUrl(product.coverImage),
   };
+}
+
+function isExpiredPublicProduct(product: Product, now = new Date()): boolean {
+  if (!product.endDate || !isValidDate(product.endDate)) return false;
+  return now > parseThailandDateTime(product.endDate, true);
+}
+
+export function sanitizePublicProducts(products: Product[] | null | undefined, now = new Date()): Product[] {
+  return (products || [])
+    .filter((product) => !isExpiredPublicProduct(product, now))
+    .map(sanitizeProductImages);
 }
 
 // ==================== SENSITIVE FIELD DEFINITIONS ====================
@@ -254,7 +266,7 @@ export function sanitizeConfigForPublic(config: ShopConfig | null): PublicShopCo
     paymentDisabledMessage: config.paymentDisabledMessage,
     nameValidation: config.nameValidation,
     shirtNameConfig: config.shirtNameConfig,
-    products: (config.products || []).map(sanitizeProductImages),
+    products: sanitizePublicProducts(config.products),
     // REMOVED: sheetUrl, vendorSheetUrl, adminEmails, adminPermissions - ไม่ส่งให้ frontend
   };
   

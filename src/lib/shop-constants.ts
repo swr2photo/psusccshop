@@ -461,6 +461,61 @@ export const isProductCurrentlyOpen = (product: { isActive?: boolean; startDate?
   return true;
 };
 
+export const isProductOutOfStock = (product: { stock?: number | null; variants?: Array<{ stock?: number | null; isActive?: boolean }> }): boolean => {
+  if (product.stock !== null && product.stock !== undefined) {
+    return product.stock <= 0;
+  }
+
+  if (Array.isArray(product.variants) && product.variants.length > 0) {
+    const activeVariants = product.variants.filter((variant) => variant.isActive !== false);
+    if (activeVariants.length === 0) return true;
+    return activeVariants.every((variant) => variant.stock !== null && variant.stock !== undefined && variant.stock <= 0);
+  }
+
+  return false;
+};
+
+export const isProductPurchasable = (
+  product: { isActive?: boolean; startDate?: string; endDate?: string; stock?: number | null; variants?: Array<{ stock?: number | null; isActive?: boolean }> },
+  nowOverride?: Date,
+): boolean => isProductCurrentlyOpen(product, nowOverride) && !isProductOutOfStock(product);
+
+export type CartItemAvailabilitySource = {
+  productId?: string;
+  shopSlug?: string;
+  shopId?: string;
+  options?: { variantId?: string };
+  selectedVariant?: { id?: string };
+  size?: string;
+};
+
+export function isCartLinePurchasable(
+  product: { isActive?: boolean; startDate?: string; endDate?: string; stock?: number | null; variants?: Array<{ stock?: number | null; isActive?: boolean; id?: string }> },
+  item?: CartItemAvailabilitySource,
+  nowOverride?: Date,
+): boolean {
+  if (!isProductCurrentlyOpen(product, nowOverride)) return false;
+  const variantId = item?.options?.variantId || item?.selectedVariant?.id || item?.size;
+  const stockLimit = getAvailableStock(product as Parameters<typeof getAvailableStock>[0], variantId);
+  return stockLimit === null || stockLimit > 0;
+}
+
+export function pruneUnavailableCartItems<T extends CartItemAvailabilitySource>(
+  cart: T[],
+  resolveProducts: (item: T) => Array<{ id: string; isActive?: boolean; startDate?: string; endDate?: string; stock?: number | null; variants?: Array<{ stock?: number | null; isActive?: boolean; id?: string }> }> | null | undefined,
+  nowOverride?: Date,
+): T[] {
+  const now = nowOverride || new Date();
+  return cart.filter((item) => {
+    const products = resolveProducts(item);
+    if (products == null) return true;
+    if (!item.productId) return false;
+    const product = products.find((p) => p.id === item.productId);
+    if (!product) return false;
+    return isCartLinePurchasable(product, item, now);
+  });
+}
+
 export const normalizeEngName = (value: string) => value.replace(/[^\x20-\x7E]/g, '').toUpperCase().slice(0, 7).trim();
 
 export const normalizeDigits99 = (value: string) => {

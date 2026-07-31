@@ -74,6 +74,7 @@ import {
   createCartLineId,
   getAvailableStock,
   getCartItemCount,
+  pruneUnavailableCartItems,
 } from '@/lib/shop-constants';
 import { getClientReservationExpiryMs } from '@/components/OrderCountdown';
 
@@ -618,6 +619,31 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
     loadCart();
     return () => { active = false; };
   }, [session?.user?.email]);
+
+  useEffect(() => {
+    if (cart.length === 0 || products.length === 0) return;
+
+    const cleanedCart = pruneUnavailableCartItems(cart, (item) => {
+      if (!item.shopSlug) return null;
+      if (item.shopSlug !== shopSlug) return null;
+      return products;
+    });
+
+    const uniqueCart = cleanedCart;
+    const isSame =
+      uniqueCart.length === cart.length &&
+      uniqueCart.every((item, index) => item.id === cart[index]?.id);
+
+    if (isSame) return;
+
+    useCartStore.getState().setCart(uniqueCart);
+    const email = session?.user?.email;
+    if (email) {
+      saveCartApi(email, uniqueCart).catch((err) => {
+        console.error('[Cart Sync] Failed to persist pruned cart:', err);
+      });
+    }
+  }, [cart, products, shopSlug, session?.user?.email]);
 
   // Sync local Zustand cart with database cart for logged-in users when it changes
   useEffect(() => {

@@ -209,6 +209,7 @@ import {
   CONFIG_CACHE_KEY,
   CONFIG_CACHE_TTL,
   getAvailableStock,
+  pruneUnavailableCartItems,
 } from '@/lib/shop-constants';
 import { getClientReservationExpiryMs } from '@/components/OrderCountdown';
 
@@ -1441,6 +1442,34 @@ export default function HomePage() {
       cancelled = true;
     };
   }, [session?.user?.email]);
+
+  useEffect(() => {
+    if (cart.length === 0) return;
+    if (!config?.products?.length && subShopCatalog.length === 0) return;
+
+    const cleanedCart = pruneUnavailableCartItems(cart, (item) => {
+      if (item.shopSlug) {
+        const shop = subShopCatalog.find((s) => s.slug === item.shopSlug);
+        return shop?.products || [];
+      }
+      return config?.products || [];
+    });
+    const uniqueCart = ensureUniqueCartLineIds(cleanedCart as CartItem[]);
+    const isSame =
+      uniqueCart.length === cart.length &&
+      uniqueCart.every((item, index) => item.id === cart[index]?.id);
+
+    if (isSame) return;
+
+    setCart(uniqueCart);
+    cartRef.current = uniqueCart;
+    const email = session?.user?.email;
+    if (email) {
+      saveCartApi(email, uniqueCart).catch((err) => {
+        console.error('Failed to persist pruned cart', err);
+      });
+    }
+  }, [cart, config?.products, subShopCatalog, session?.user?.email]);
 
   // Recalculate cart prices when events change (auto-revert discounts when event ends)
   useEffect(() => {

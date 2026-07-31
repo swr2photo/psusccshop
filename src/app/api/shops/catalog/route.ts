@@ -1,15 +1,38 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { withBackendProxy } from '@/lib/backend-proxy';
 import { supabase } from '@/lib/supabase-client';
 import { getCached, CACHE_TTL } from '@/lib/server-cache';
 import { API_CACHE, API_CDN_HEADERS } from '@/lib/api-helpers';
-import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
+import { secureJsonResponse } from '@/lib/payload-crypto';
+import { sanitizePublicProducts } from '@/lib/sanitize';
+import type { Product } from '@/lib/config';
 
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 
-async function GETHandler(_req: NextRequest) {
-  const shops = await getCached('shops:public-catalog-v3', CACHE_TTL.catalog, async () => {
+type ShopCatalogRow = {
+  id: string;
+  slug: string;
+  name: string;
+  name_en: string | null;
+  logo_url: string | null;
+  settings: {
+    isOpen?: boolean;
+    openDate?: string;
+    closeDate?: string;
+  } | null;
+  products: Product[] | null;
+  config: {
+    events?: unknown[];
+    shirtNameConfig?: unknown;
+    pickup?: unknown;
+    promoCodes?: unknown[];
+    nameValidation?: unknown;
+    shippingOptions?: unknown[];
+  } | null;
+};
+
+async function GETHandler() {
+  const shops = await getCached('shops:public-catalog-v4', CACHE_TTL.catalog, async () => {
     // Fetch directly using Supabase JS (Edge Compatible, uses fetch under the hood)
     const { data, error } = await supabase
       .from('shops')
@@ -24,30 +47,34 @@ async function GETHandler(_req: NextRequest) {
     }
 
     // Format to match the previous response (toPublicShopCatalogEntry equivalent)
-    return (data || [])
-      .filter((shop: any) => (shop.products || []).some((p: any) => p.isActive !== false))
-      .map((shop: any) => ({
-        id: shop.id,
-        slug: shop.slug,
-        name: shop.name,
-        nameEn: shop.name_en,
-        logoUrl: shop.logo_url,
-        isOpen: shop.settings?.isOpen ?? true,
-        openDate: shop.settings?.openDate,
-        closeDate: shop.settings?.closeDate,
-        settings: shop.settings ? { 
-          isOpen: shop.settings.isOpen ?? true,
-          openDate: shop.settings.openDate,
-          closeDate: shop.settings.closeDate
-        } : undefined,
-        products: (shop.products || []).filter((p: any) => p.isActive !== false),
-        events: shop.config?.events || [],
-        shirtNameConfig: shop.config?.shirtNameConfig,
-        pickup: shop.config?.pickup,
-        promoCodes: shop.config?.promoCodes || [],
-        nameValidation: shop.config?.nameValidation,
-        shippingOptions: shop.config?.shippingOptions || [],
-      }));
+    const rows = (data || []) as ShopCatalogRow[];
+    return rows
+      .map((shop) => {
+        const products = sanitizePublicProducts(shop.products);
+        return {
+          id: shop.id,
+          slug: shop.slug,
+          name: shop.name,
+          nameEn: shop.name_en,
+          logoUrl: shop.logo_url,
+          isOpen: shop.settings?.isOpen ?? true,
+          openDate: shop.settings?.openDate,
+          closeDate: shop.settings?.closeDate,
+          settings: shop.settings ? { 
+            isOpen: shop.settings.isOpen ?? true,
+            openDate: shop.settings.openDate,
+            closeDate: shop.settings.closeDate
+          } : undefined,
+          products,
+          events: shop.config?.events || [],
+          shirtNameConfig: shop.config?.shirtNameConfig,
+          pickup: shop.config?.pickup,
+          promoCodes: shop.config?.promoCodes || [],
+          nameValidation: shop.config?.nameValidation,
+          shippingOptions: shop.config?.shippingOptions || [],
+        };
+      })
+      .filter((shop) => shop.products.length > 0);
   });
 
   return await secureJsonResponse(

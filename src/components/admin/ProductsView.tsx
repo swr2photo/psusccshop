@@ -1870,6 +1870,8 @@ export function ProductsView({
   const filteredProducts = useMemo(() => {
     const term = searchTerm.toLowerCase().trim();
     return config.products.filter((p) => {
+      const { status } = isProductOpen(p);
+      if (status === 'ended') return false;
       // Category filter
       if (selectedCategory !== 'ALL') {
         const pCat = p.category || (p.type === 'OTHER' ? 'OTHER' : 'APPAREL');
@@ -1885,6 +1887,11 @@ export function ProductsView({
       );
     });
   }, [searchTerm, selectedCategory, config.products]);
+
+  const visibleProducts = useMemo(
+    () => config.products.filter((p) => isProductOpen(p).status !== 'ended'),
+    [config.products],
+  );
 
   const createNewProduct = () => {
     const now = new Date().toISOString();
@@ -1986,7 +1993,7 @@ export function ProductsView({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-xl font-extrabold text-[var(--foreground)] md:text-2xl">
-              จัดการสินค้า ({filteredProducts.length}/{config.products.length} รายการ)
+              จัดการสินค้า ({filteredProducts.length}/{visibleProducts.length} รายการ)
             </h2>
             <p className="text-xs text-[var(--text-muted)]">
               สร้าง แก้ไข และกำหนดค่าการขายสินค้าของร้านค้า
@@ -2035,7 +2042,9 @@ export function ProductsView({
             {categories.map((cat) => {
               const isActive = selectedCategory === cat;
               const label = cat === 'ALL' ? 'ทั้งหมด' : CATEGORY_LABELS[cat] || cat;
-              const count = cat === 'ALL' ? config.products.length : config.products.filter(p => (p.category || (p.type === 'OTHER' ? 'OTHER' : 'APPAREL')) === cat).length;
+              const count = cat === 'ALL'
+                ? visibleProducts.length
+                : visibleProducts.filter(p => (p.category || (p.type === 'OTHER' ? 'OTHER' : 'APPAREL')) === cat).length;
               return (
                 <button
                   key={cat}

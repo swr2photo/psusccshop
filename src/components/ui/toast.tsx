@@ -13,6 +13,7 @@ import {
 
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
+import { getNotificationPalette, type NotificationTone } from "@/components/notification-presets"
 
 const toast = ToastPrimitive.createToastManager()
 
@@ -32,7 +33,7 @@ function ToastViewport({
     <ToastPrimitive.Viewport
       data-slot="toast-viewport"
       className={cn(
-        "pointer-events-none fixed inset-x-4 top-4 z-[2147483646] mx-auto flex w-auto max-w-sm flex-col outline-none sm:inset-x-auto sm:right-4 sm:left-auto sm:mx-0 sm:w-full",
+        "pointer-events-none fixed inset-x-4 top-4 z-[2147483646] mx-auto flex w-auto max-w-sm flex-col gap-0 outline-none sm:inset-x-auto sm:right-4 sm:left-auto sm:mx-0 sm:w-full",
         className
       )}
       {...props}
@@ -40,38 +41,56 @@ function ToastViewport({
   )
 }
 
-function Toast({ className, ...props }: ToastPrimitive.Root.Props) {
+function Toast({
+  className,
+  tone = "info",
+  ...props
+}: ToastPrimitive.Root.Props & { tone?: NotificationTone }) {
+  const palette = getNotificationPalette(tone);
   return (
     <ToastPrimitive.Root
       data-slot="toast"
       className={cn(
-        "group/toast pointer-events-auto absolute right-0 top-0 z-[calc(1000-var(--toast-index))] w-full origin-top rounded-xl border bg-popover text-popover-foreground shadow-lg outline-none select-none will-change-transform focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
-        "[--gap:0.75rem] [--height:var(--toast-frontmost-height,var(--toast-height))] [--offset-y:calc(var(--toast-offset-y)+calc(var(--toast-index)*var(--gap))+var(--toast-swipe-movement-y))] [--peek:0.75rem] [--scale:calc(max(0,1-(var(--toast-index)*0.1)))] [--shrink:calc(1-var(--scale))]",
-        "h-(--height) [transform:translateX(var(--toast-swipe-movement-x))_translateY(calc(var(--toast-swipe-movement-y)+(var(--toast-index)*var(--peek))+(var(--shrink)*var(--height))))_scale(var(--scale))] [transition:transform_500ms_cubic-bezier(0.22,1,0.36,1),opacity_500ms,height_150ms]",
+        "group/toast pointer-events-auto absolute right-0 top-0 z-[calc(1000-var(--toast-index))] w-full origin-top rounded-[22px] border text-popover-foreground outline-none select-none will-change-transform focus-visible:ring-[3px] focus-visible:ring-ring/40 overflow-hidden",
+        "[--gap:0.625rem] [--height:var(--toast-frontmost-height,var(--toast-height))] [--offset-y:calc(var(--toast-offset-y)+calc(var(--toast-index)*var(--gap))+var(--toast-swipe-movement-y))] [--peek:0.45rem] [--scale:calc(max(0,1-(var(--toast-index)*0.08)))] [--shrink:calc(1-var(--scale))]",
+        "h-(--height) [transform:translateX(var(--toast-swipe-movement-x))_translateY(calc(var(--toast-swipe-movement-y)+(var(--toast-index)*var(--peek))+(var(--shrink)*var(--height))))_scale(var(--scale))] [transition:transform_620ms_cubic-bezier(0.22,1,0.36,1),opacity_520ms,height_150ms]",
         "after:absolute after:bottom-full after:left-0 after:h-[calc(var(--gap)+1px)] after:w-full after:content-['']",
         "data-expanded:h-(--toast-height) data-expanded:[transform:translateX(var(--toast-swipe-movement-x))_translateY(var(--offset-y))]",
-        "data-limited:opacity-0 data-starting-style:[transform:translateY(-150%)]",
-        "[&[data-ending-style]:not([data-limited]):not([data-swipe-direction])]:[transform:translateY(-150%)]",
-        "data-ending-style:data-[swipe-direction=down]:[transform:translateY(calc(var(--toast-swipe-movement-y)+150%))]",
-        "data-ending-style:data-[swipe-direction=left]:[transform:translateX(calc(var(--toast-swipe-movement-x)-150%))_translateY(var(--offset-y))]",
-        "data-ending-style:data-[swipe-direction=right]:[transform:translateX(calc(var(--toast-swipe-movement-x)+150%))_translateY(var(--offset-y))]",
-        "data-ending-style:data-[swipe-direction=up]:[transform:translateY(calc(var(--toast-swipe-movement-y)-150%))]",
+        "data-limited:opacity-0 data-starting-style:[transform:translateY(-24px)_scale(0.96)]",
+        "[&[data-ending-style]:not([data-limited]):not([data-swipe-direction])]:[transform:translateY(-24px)_scale(0.96)]",
+        "data-ending-style:data-[swipe-direction=down]:[transform:translateY(calc(var(--toast-swipe-movement-y)+120%))_scale(0.96)]",
+        "data-ending-style:data-[swipe-direction=left]:[transform:translateX(calc(var(--toast-swipe-movement-x)-120%))_translateY(var(--offset-y))]",
+        "data-ending-style:data-[swipe-direction=right]:[transform:translateX(calc(var(--toast-swipe-movement-x)+120%))_translateY(var(--offset-y))]",
+        "data-ending-style:data-[swipe-direction=up]:[transform:translateY(calc(var(--toast-swipe-movement-y)-120%))_scale(0.96)]",
         className
       )}
       swipeDirection={["up", "right", "left"]}
+      style={{
+        background: palette.shell,
+        boxShadow: palette.glow,
+        borderColor: palette.ring,
+      }}
       {...props}
     />
   )
 }
 
-function ToastContent({ className, ...props }: ToastPrimitive.Content.Props) {
+function ToastContent({
+  className,
+  ...props
+}: ToastPrimitive.Content.Props) {
   return (
     <ToastPrimitive.Content
       data-slot="toast-content"
       className={cn(
-        "flex h-full items-start gap-3 overflow-hidden p-4 transition-opacity duration-250 ease-[cubic-bezier(0.22,1,0.36,1)] data-behind:opacity-0 data-expanded:opacity-100",
+        "relative flex h-full items-start gap-3 overflow-hidden p-4 transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] data-behind:opacity-0 data-expanded:opacity-100",
         className
       )}
+      style={{
+        backgroundImage: 'linear-gradient(180deg, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.18) 100%)',
+        backdropFilter: 'blur(24px) saturate(180%)',
+        WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+      }}
       {...props}
     />
   )
@@ -160,8 +179,13 @@ function ToastList() {
   const { toasts } = ToastPrimitive.useToastManager()
 
   return toasts.map((toastItem) => (
-    <Toast key={toastItem.id} toast={toastItem}>
+    <Toast key={toastItem.id} toast={toastItem} tone={(toastItem.type as NotificationTone) || "info"}>
       <ToastContent>
+        <span
+          aria-hidden
+          className="absolute left-0 top-0 h-full w-[3px] rounded-r-full"
+          style={{ background: getNotificationPalette((toastItem.type as NotificationTone) || "info").accent }}
+        />
         <ToastIcon type={toastItem.type} />
         <div className="grid min-w-0 flex-1 gap-0.5">
           {toastItem.title ? <ToastTitle>{toastItem.title}</ToastTitle> : null}

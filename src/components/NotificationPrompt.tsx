@@ -11,7 +11,7 @@ import { apiFetch } from '@/lib/api-client';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
-import { Box, Typography, Button, IconButton, Slide } from '@mui/material';
+import { Box, Typography, Button, IconButton, Grow } from '@mui/material';
 import {
   Bell as BellIcon,
   X as CloseIcon,
@@ -19,6 +19,7 @@ import {
   Settings as SettingsIcon,
 } from 'lucide-react';
 import { useTranslation } from '@/hooks/useTranslation';
+import { getNotificationModeTone, getNotificationPalette } from '@/components/notification-presets';
 
 const DISMISS_KEY = 'scc-push-prompt-dismissed';
 const DISMISS_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -385,14 +386,16 @@ export default function NotificationPrompt() {
   const getGradient = (): string => {
     switch (promptMode) {
       case 'ios-guide': return 'linear-gradient(135deg, #5ac8fa 0%, #34c759 100%)';
-      case 'denied': return 'linear-gradient(135deg, #ff9500 0%, #ff3b30 100%)';
+      case 'denied': return 'linear-gradient(135deg, #ff9f0a 0%, #ff453a 100%)';
       case 'unsupported': return 'linear-gradient(135deg, #8e8e93 0%, #636366 100%)';
       default: return 'linear-gradient(135deg, #0071e3 0%, #5ac8fa 100%)';
     }
   };
 
+  const palette = getNotificationPalette(getNotificationModeTone(promptMode));
+
   return (
-    <Slide direction="up" in={show} mountOnEnter unmountOnExit>
+    <Grow in={show} timeout={420}>
       <Box
         sx={{
           position: 'fixed',
@@ -401,17 +404,40 @@ export default function NotificationPrompt() {
           right: { xs: 16, sm: 24 },
           maxWidth: { sm: 380 },
           zIndex: 1199,
-          bgcolor: 'var(--surface)',
-          border: '1px solid var(--glass-border)',
           borderRadius: 3,
-          boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+          border: `1px solid ${palette.ring}`,
+          boxShadow: palette.glow,
           p: 2,
           display: 'flex',
           alignItems: 'flex-start',
           gap: 1.5,
-          backdropFilter: 'blur(12px)',
+          background: palette.shell,
+          backdropFilter: 'blur(24px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+          overflow: 'hidden',
         }}
+        onClick={(e) => e.stopPropagation()}
       >
+        <Box
+          aria-hidden
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            background: 'linear-gradient(180deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.06) 100%)',
+            pointerEvents: 'none',
+          }}
+        />
+        <Box
+          aria-hidden
+          sx={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 3,
+            background: getGradient(),
+          }}
+        />
         <Box
           sx={{
             width: 40,
@@ -446,9 +472,10 @@ export default function NotificationPrompt() {
                   py: 0.5,
                   textTransform: 'none',
                   borderRadius: 2,
-                  background: '#0071e3',
+                  background: palette.accent,
                   fontWeight: 600,
-                  '&:hover': { background: '#1d4ed8' },
+                  '&:hover': { background: palette.accent },
+                  boxShadow: `0 10px 24px ${palette.accentSoft}`,
                 }}
               >
                 {loading ? t.notification.enabling : t.notification.enableNotification}
@@ -465,9 +492,10 @@ export default function NotificationPrompt() {
                   py: 0.5,
                   textTransform: 'none',
                   borderRadius: 2,
-                  background: '#ff9500',
+                  background: palette.accent,
                   fontWeight: 600,
-                  '&:hover': { background: '#e68900' },
+                  '&:hover': { background: palette.accent },
+                  boxShadow: `0 10px 24px ${palette.accentSoft}`,
                 }}
               >
                 {t.notification.retry}
@@ -489,10 +517,23 @@ export default function NotificationPrompt() {
             </Button>
           </Box>
         </Box>
-        <IconButton size="small" onClick={handleDismiss} sx={{ mt: -0.5, mr: -0.5 }}>
+        <IconButton
+          size="small"
+          onClick={handleDismiss}
+          sx={{
+            mt: -0.5,
+            mr: -0.5,
+            position: 'relative',
+            zIndex: 1,
+            background: 'rgba(255,255,255,0.16)',
+            border: '1px solid rgba(255,255,255,0.22)',
+            backdropFilter: 'blur(18px)',
+            '&:hover': { background: 'rgba(255,255,255,0.22)' },
+          }}
+        >
           <CloseIcon size={16} />
         </IconButton>
       </Box>
-    </Slide>
+    </Grow>
   );
 }
