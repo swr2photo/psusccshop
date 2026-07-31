@@ -1449,7 +1449,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
 
   const handleShareProduct = useCallback(async (product: Product) => {
     const url = `${window.location.origin}/shop/${shopSlug}`;
-    const shareText = `${getProductName(product, lang)} - ฿${product.basePrice.toLocaleString()}`;
+    const shareText = `${getProductName(product, lang)} - ฿${(product.basePrice || 0).toLocaleString()}`;
     try {
       if (navigator.share) {
         await navigator.share({ title: getProductName(product, lang), text: shareText, url });
@@ -2011,10 +2011,10 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                               {eventDiscount && !isProductClosed ? (
                                 <>
                                   <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#86868b', textDecoration: 'line-through' }}>
-                                    ฿{product.basePrice.toLocaleString()}
+                                    ฿{(product.basePrice || 0).toLocaleString()}
                                   </Typography>
                                   <Typography sx={{ fontSize: '0.9rem', fontWeight: 800, color: '#ff453a' }}>
-                                    ฿{eventDiscount.discountedPrice(product.basePrice).toLocaleString()}
+                                    ฿{(eventDiscount.discountedPrice(product.basePrice || 0) || 0).toLocaleString()}
                                   </Typography>
                                 </>
                               ) : (
@@ -2022,7 +2022,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                                   fontSize: '0.9rem', fontWeight: 800,
                                   color: isProductClosed ? 'var(--text-muted)' : '#34c759',
                                 }}>
-                                  ฿{product.basePrice.toLocaleString()}
+                                  ฿{(product.basePrice || 0).toLocaleString()}
                                   {product.sizePricing && Object.keys(product.sizePricing).length > 0 && (
                                     <Typography component="span" sx={{ fontSize: '0.6rem', color: 'var(--text-muted)', ml: 0.3 }}>+</Typography>
                                   )}
@@ -2807,7 +2807,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
                                       {variant.name}
                                     </Typography>
                                     <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: active ? 'var(--secondary)' : 'var(--text-muted)' }}>
-                                      ฿{(variant.price || selectedProduct.basePrice).toLocaleString()}
+                                      ฿{(variant.price || selectedProduct.basePrice || 0).toLocaleString()}
                                     </Typography>
                                     {variant.stock !== null && variant.stock !== undefined && variant.stock > 0 && (
                                       <Typography sx={{ fontSize: '0.6rem', color: 'var(--text-muted)', mt: 0.3 }}>

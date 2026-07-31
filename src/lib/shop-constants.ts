@@ -29,12 +29,12 @@ export function resolveProductUnitPrice(
   isLongSleeve: boolean | null,
 ): number {
   const hasVariants = !productRequiresSize(product) && !!product.variants?.length;
-  let basePrice = product.basePrice;
+  let basePrice = product.basePrice || 0;
   if (hasVariants && selectedSize) {
     const variant = product.variants!.find((v) => v.id === selectedSize);
-    if (variant) basePrice = variant.price || product.basePrice;
+    if (variant) basePrice = variant.price || product.basePrice || 0;
   } else if (productRequiresSize(product) && selectedSize) {
-    basePrice = product.sizePricing?.[selectedSize] ?? product.basePrice;
+    basePrice = product.sizePricing?.[selectedSize] ?? (product.basePrice || 0);
   }
   const sleeveFee = product.options?.hasLongSleeve && isLongSleeve === true
     ? (product.options?.longSleevePrice ?? 50)

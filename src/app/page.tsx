@@ -598,7 +598,7 @@ const isThaiText = (value: string) => /^[\u0E00-\u0E7F\s]+$/.test(value.trim());
 const onlyDigitsPhone = (value: string) => value.replace(/\D/g, '').slice(0, 12);
 const getBasePrice = (p: Product) => {
   const prices = Object.values(p.sizePricing || {});
-  if (prices.length === 0) return p.basePrice;
+  if (prices.length === 0) return p.basePrice || 0;
   return Math.min(...prices);
 };
 
@@ -2535,7 +2535,7 @@ export default function HomePage() {
 
   const handleShareProduct = async (product: Product) => {
     const url = getProductLink(product);
-    const shareText = `${getProductName(product, lang)} - ฿${product.basePrice.toLocaleString()}`;
+    const shareText = `${getProductName(product, lang)} - ฿${(product.basePrice || 0).toLocaleString()}`;
 
     // Try to fetch product image as a File for sharing
     const getImageFile = async (): Promise<File | null> => {
@@ -5683,11 +5683,11 @@ export default function HomePage() {
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
                         {eventDiscount ? (
                           <>
-                            <Typography sx={{ fontSize: '0.75rem', color: '#86868b', textDecoration: 'line-through' }}>฿{product.basePrice.toLocaleString()}</Typography>
-                            <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#ff453a' }}>฿{eventDiscount.discountedPrice(product.basePrice).toLocaleString()}</Typography>
+                            <Typography sx={{ fontSize: '0.75rem', color: '#86868b', textDecoration: 'line-through' }}>฿{(product.basePrice || 0).toLocaleString()}</Typography>
+                            <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#ff453a' }}>฿{(eventDiscount.discountedPrice(product.basePrice || 0) || 0).toLocaleString()}</Typography>
                           </>
                         ) : (
-                          <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#34c759' }}>฿{product.basePrice.toLocaleString()}</Typography>
+                          <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: '#34c759' }}>฿{(product.basePrice || 0).toLocaleString()}</Typography>
                         )}
                       </Box>
                     </Box>
@@ -5793,7 +5793,7 @@ export default function HomePage() {
                         {getProductName(product, lang)}
                       </Typography>
                       <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#34c759', mt: 0.3 }}>
-                        ฿{product.basePrice.toLocaleString()}
+                        ฿{(product.basePrice || 0).toLocaleString()}
                       </Typography>
                     </Box>
                     <IconButton
