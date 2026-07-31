@@ -29,7 +29,7 @@ export async function mergeRealtimeStock(config: ShopConfig, shopId: string = 'm
     
     if (product.variants && product.variants.length > 0) {
       for (let vIdx = 0; vIdx < product.variants.length; vIdx++) {
-        const variant = product.variants[vIdx];
+        const variant: any = product.variants[vIdx];
         if (typeof variant.stock === 'number' || variant.stock === null) {
           // Note: The key format matches src/app/api/orders/route.ts
           const size = variant.id || variant.name || 'FREE';
