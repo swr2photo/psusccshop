@@ -455,7 +455,9 @@ type PublicShopCatalogEntry = {
   nameValidation?: ShopConfig['nameValidation'];
   shippingOptions?: unknown[];
   promoCodes?: ShopConfig['promoCodes'];
-  settings?: { isOpen?: boolean };
+  openDate?: string;
+  closeDate?: string;
+  settings?: { isOpen?: boolean; openDate?: string; closeDate?: string };
 };
 
 type OrderHistoryItem = {
@@ -1621,8 +1623,8 @@ export default function HomePage() {
       events: shop.events as ShopEvent[] | undefined,
       isOpen: getShopStatus(
         shop.isOpen ?? shop.settings?.isOpen ?? true,
-        (shop as any).closeDate || shop.settings?.closeDate,
-        (shop as any).openDate || shop.settings?.openDate,
+        shop.closeDate || shop.settings?.closeDate,
+        shop.openDate || shop.settings?.openDate,
         now
       ) === 'OPEN',
       shirtNameConfig: shop.shirtNameConfig,
@@ -1641,8 +1643,8 @@ export default function HomePage() {
         products: (shop?.products || []) as Product[],
         isOpen: shop ? getShopStatus(
           shop.isOpen ?? shop.settings?.isOpen ?? true,
-          (shop as any).closeDate || shop.settings?.closeDate,
-          (shop as any).openDate || shop.settings?.openDate,
+          shop.closeDate || shop.settings?.closeDate,
+          shop.openDate || shop.settings?.openDate,
           now
         ) === 'OPEN' : true,
         shopId: shop?.id,
