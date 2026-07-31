@@ -144,7 +144,13 @@ export function toPublicShopCatalogEntry(shop: Shop) {
     nameEn: shop.nameEn,
     logoUrl: shop.logoUrl,
     isOpen: shop.settings?.isOpen ?? true,
-    settings: shop.settings ? { isOpen: shop.settings.isOpen ?? true } : undefined,
+    openDate: shop.settings?.openDate,
+    closeDate: shop.settings?.closeDate,
+    settings: shop.settings ? { 
+      isOpen: shop.settings.isOpen ?? true,
+      openDate: shop.settings.openDate,
+      closeDate: shop.settings.closeDate
+    } : undefined,
     products: (shop.products || []).filter((p) => p.isActive !== false),
     events: shop.config?.events || [],
     shirtNameConfig: shop.config?.shirtNameConfig,

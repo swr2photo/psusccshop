@@ -1619,13 +1619,18 @@ export default function HomePage() {
       shopName: lang === 'en' && shop.nameEn ? shop.nameEn : shop.name,
       products: (shop.products || []).filter((p) => p.isActive !== false) as Product[],
       events: shop.events as ShopEvent[] | undefined,
-      isOpen: shop.isOpen ?? shop.settings?.isOpen ?? true,
+      isOpen: getShopStatus(
+        shop.isOpen ?? shop.settings?.isOpen ?? true,
+        (shop as any).closeDate || shop.settings?.closeDate,
+        (shop as any).openDate || shop.settings?.openDate,
+        now
+      ) === 'OPEN',
       shirtNameConfig: shop.shirtNameConfig,
       nameValidation: shop.nameValidation,
       shippingOptions: shop.shippingOptions,
       promoCodes: shop.promoCodes,
     };
-  }, [activeShopMenu, config, subShopCatalog, lang, isShopOpen, t.storefront.mainShop]);
+  }, [activeShopMenu, config, subShopCatalog, lang, isShopOpen, t.storefront.mainShop, now]);
 
   const activeProductCatalog = useMemo(() => {
     if (selectedProductContext.shopSlug) {
@@ -1634,7 +1639,12 @@ export default function HomePage() {
         events: shop?.events as ShopEvent[] | undefined,
         shirtNameConfig: shop?.shirtNameConfig,
         products: (shop?.products || []) as Product[],
-        isOpen: shop?.isOpen ?? shop?.settings?.isOpen ?? true,
+        isOpen: shop ? getShopStatus(
+          shop.isOpen ?? shop.settings?.isOpen ?? true,
+          (shop as any).closeDate || shop.settings?.closeDate,
+          (shop as any).openDate || shop.settings?.openDate,
+          now
+        ) === 'OPEN' : true,
         shopId: shop?.id,
         shopSlug: shop?.slug,
       };
@@ -1647,7 +1657,7 @@ export default function HomePage() {
       shopId: undefined,
       shopSlug: undefined,
     };
-  }, [selectedProductContext.shopSlug, subShopCatalog, config?.events, config?.shirtNameConfig, config?.products, isShopOpen]);
+  }, [selectedProductContext.shopSlug, subShopCatalog, config?.events, config?.shirtNameConfig, config?.products, isShopOpen, now]);
 
   const allCatalogProducts = useMemo(() => {
     const main = config?.products || [];

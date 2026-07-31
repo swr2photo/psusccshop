@@ -72,17 +72,6 @@ const nextConfig: NextConfig = {
   // Tree-shake barrel exports for heavy packages
   // This dramatically reduces bundle size for MUI and lucide-react
   experimental: {
-    optimizePackageImports: [
-      '@mui/material',
-      '@mui/icons-material',
-      'lucide-react',
-      '@supabase/supabase-js',
-      'date-fns',
-      '@tanstack/react-query',
-      'swr',
-      'zustand',
-      'qrcode.react',
-    ],
     // Lower peak memory during OpenNext/Cloudflare CI builds
     ...(isWorkersBuild ? { cpus: 2, memoryBasedWorkersCount: false } : {}),
   },
