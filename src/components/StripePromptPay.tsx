@@ -164,19 +164,15 @@ export default function StripePromptPay({
 
       // Fallback: confirm client-side via Stripe.js (handleActions: false so we
       // render the QR ourselves). Guarded with a timeout because confirm can
-      // hang when a Stripe frame is blocked by extensions/CSP.
+      // hang when a Stripe frame is blocked 
       const stripe = await getStripe(publishableKey, lang === 'th' ? 'th' : 'en');
       stripeRef.current = stripe;
-      console.log('[StripePromptPay] No server QR — confirming via Stripe.js...');
-
       const confirmPromise = stripe.confirmPromptPayPayment(
         clientSecret,
         {
           payment_method: {
-            type: 'promptpay',
             billing_details: { email },
           },
-          return_url: typeof window !== 'undefined' ? window.location.href : undefined,
         },
         { handleActions: false }
       );
@@ -226,8 +222,7 @@ export default function StripePromptPay({
   useEffect(() => { start(); }, [start]);
 
   // ---- 3) Poll payment status while the QR is displayed ----
-  // Server poll is authoritative (marks order PAID). Client Stripe.js runs in parallel
-  // only to trigger an early server sync — never blocks the server poll loop.
+  // Server poll is authoritative (verifies status with Stripe & updates DB).
   useEffect(() => {
     if (phase !== 'qr') return;
     let cancelled = false;
@@ -241,67 +236,38 @@ export default function StripePromptPay({
       }
     };
 
-    const pollServer = async (): Promise<string | undefined> => {
+    const pollServer = async () => {
       if (cancelled || successNotified.current) return;
       const intentId = intentIdRef.current;
       if (!intentId) return;
 
-      const res = await apiFetch(
-        `/api/payment/stripe/promptpay?ref=${encodeURIComponent(orderRef)}&intent=${encodeURIComponent(intentId)}`,
-        { credentials: 'same-origin', headers: { Accept: 'application/json' } }
-      );
-      const json = await readApiJson(res);
-      if (json.status !== 'success') {
-        throw new Error(json.message || 'poll failed');
-      }
-      const status = json.data?.intentStatus as string | undefined;
-      applyIntentStatus(status);
-      return status;
-    };
-
-    const pollClient = async () => {
-      if (cancelled || successNotified.current) return;
-      const clientSecret = clientSecretRef.current;
-      const publishableKey = publishableKeyRef.current;
-      if (!clientSecret || !publishableKey) return;
-
       try {
-        const stripe =
-          stripeRef.current ?? (await getStripe(publishableKey, lang === 'th' ? 'th' : 'en'));
-        stripeRef.current = stripe;
-        const { paymentIntent } = await stripe.retrievePaymentIntent(clientSecret);
-        if (cancelled || successNotified.current) return;
-
-        if (paymentIntent?.status === 'succeeded') {
-          // Stripe confirmed — sync DB via server, then update UI
-          try {
-            await pollServer();
-          } catch {
-            // Server sync failed; server interval will retry
-          }
-        } else if (paymentIntent?.status === 'canceled') {
-          setPhase('expired');
+        const res = await apiFetch(
+          `/api/payment/stripe/promptpay?ref=${encodeURIComponent(orderRef)}&intent=${encodeURIComponent(intentId)}`,
+          { credentials: 'same-origin', headers: { Accept: 'application/json' } }
+        );
+        const json = await readApiJson(res);
+        if (json.status === 'success' && json.data?.intentStatus) {
+          applyIntentStatus(json.data.intentStatus);
         }
       } catch {
-        // Ad blockers / CSP — server poll handles verification
+        // Ignored - will retry on next tick
       }
     };
 
     void pollServer();
-    void pollClient();
 
-    const tick = () => {
-      if (document.visibilityState === 'hidden') return;
-      void pollServer();
-      void pollClient();
-    };
-    const serverTimer = setInterval(tick, SERVER_POLL_MS);
+    const serverTimer = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void pollServer();
+      }
+    }, SERVER_POLL_MS);
 
     return () => {
       cancelled = true;
       clearInterval(serverTimer);
     };
-  }, [phase, orderRef, markSucceeded, lang]);
+  }, [phase, orderRef, markSucceeded]);
 
   // ---- Countdown to QR expiry ----
   useEffect(() => {
@@ -329,9 +295,9 @@ export default function StripePromptPay({
 
   if (phase === 'creating') {
     return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, py: 5 }}>
-        <CircularProgress size={36} sx={{ color: '#64d2ff' }} />
-        <Typography sx={{ fontSize: '0.85rem', color: 'var(--muted-foreground, #86868b)' }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 4, gap: 1.5 }}>
+        <CircularProgress size={36} sx={{ color: '#1a237e' }} />
+        <Typography sx={{ fontSize: '0.85rem', color: 'var(--text-muted, #64748b)' }}>
           {t.payment.creatingQR}
         </Typography>
       </Box>
@@ -340,52 +306,66 @@ export default function StripePromptPay({
 
   if (phase === 'succeeded') {
     return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5, py: 4 }}>
-        <Box
-          sx={{
-            width: 72, height: 72, borderRadius: '50%',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-            boxShadow: '0 8px 32px rgba(16,185,129,0.4)',
-          }}
-        >
-          <CheckCircle2 size={40} color="#fff" />
-        </Box>
-        <Typography sx={{ fontWeight: 700, fontSize: '1.05rem', color: '#30d158' }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 3, gap: 1.5 }}>
+        <CheckCircle2 size={48} color="#16a34a" />
+        <Typography sx={{ fontWeight: 700, color: '#16a34a', fontSize: '1.1rem' }}>
           {t.payment.paymentDetected}
-        </Typography>
-        <Typography sx={{ fontSize: '0.8rem', color: 'var(--muted-foreground, #86868b)' }}>
-          {t.payment.paymentSuccessDesc}
         </Typography>
       </Box>
     );
   }
 
-  if (phase === 'expired' || phase === 'error') {
+  if (phase === 'expired') {
     return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5, py: 4 }}>
-        <AlertCircle size={40} color={phase === 'expired' ? '#f59e0b' : '#ef4444'} />
-        <Typography sx={{ fontWeight: 600, fontSize: '0.9rem', textAlign: 'center' }}>
-          {phase === 'expired' ? t.payment.qrExpired : (errorMsg || t.payment.stripeError)}
+      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 2, gap: 1.5 }}>
+        <Clock3 size={40} color="#eab308" />
+        <Typography sx={{ fontWeight: 700, color: 'var(--foreground, #0f172a)' }}>
+          {t.payment.qrExpired}
         </Typography>
-        <Typography sx={{ fontSize: '0.78rem', color: 'var(--text-muted, #94a3b8)', textAlign: 'center', maxWidth: 300 }}>
-          {phase === 'error' && 'หากระบบพร้อมเพย์อัตโนมัติไม่สมบูรณ์ ท่านสามารถเลือก "โอนเงินด้วยตนเอง + แนบสลิป" แทนได้ครับ'}
+        <Button
+          variant="contained"
+          onClick={() => {
+            setPhase('creating');
+            start();
+          }}
+          startIcon={<RefreshCw size={16} />}
+          sx={{
+            bgcolor: '#1a237e', '&:hover': { bgcolor: '#283593' },
+            borderRadius: 2, textTransform: 'none', px: 2.5, py: 1,
+          }}
+        >
+          สร้าง QR Code ใหม่
+        </Button>
+      </Box>
+    );
+  }
+
+  if (phase === 'error') {
+    return (
+      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 2, gap: 1.5 }}>
+        <AlertCircle size={40} color="#ef4444" />
+        <Typography sx={{ fontWeight: 700, color: '#ef4444', textAlign: 'center' }}>
+          {errorMsg || t.payment.stripeError}
         </Typography>
-        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', justifyContent: 'center', mt: 0.5 }}>
+        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: 'center' }}>
           <Button
-            onClick={start}
+            variant="contained"
+            onClick={() => {
+              setErrorMsg(null);
+              setPhase('creating');
+              start();
+            }}
             startIcon={<RefreshCw size={16} />}
             sx={{
-              px: 2.5, py: 1, borderRadius: 2.5, fontWeight: 700, textTransform: 'none',
-              bgcolor: 'rgba(6,182,212,0.12)', color: '#64d2ff',
-              border: '1px solid rgba(6,182,212,0.3)',
-              '&:hover': { bgcolor: 'rgba(6,182,212,0.2)' },
+              bgcolor: '#1a237e', '&:hover': { bgcolor: '#283593' },
+              borderRadius: 2, textTransform: 'none', px: 2, py: 0.75, fontSize: '0.825rem',
             }}
           >
-            {t.payment.createNewQR}
+            ลองใหม่อีกครั้ง
           </Button>
           {onSwitchToManual && (
             <Button
+              variant="outlined"
               onClick={onSwitchToManual}
               sx={{
                 px: 2.5, py: 1, borderRadius: 2.5, fontWeight: 700, textTransform: 'none',
@@ -432,10 +412,10 @@ export default function StripePromptPay({
         <Box sx={{ bgcolor: '#fff', p: 1.5, borderRadius: 2, lineHeight: 0, boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
           {qrCode?.data ? (
             <QRCodeSVG value={qrCode.data} size={size} level="M" bgColor="#ffffff" fgColor="#1a237e" />
-          ) : qrCode?.image_url_png ? (
+          ) : qrCode?.image_url_svg || qrCode?.image_url_png ? (
             // Fallback: Stripe-hosted QR image
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={qrCode.image_url_png} alt="PromptPay QR" width={size} height={size} />
+            <img src={qrCode.image_url_svg || qrCode.image_url_png} alt="PromptPay QR" width={size} height={size} />
           ) : null}
         </Box>
 
