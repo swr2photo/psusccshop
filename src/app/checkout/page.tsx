@@ -74,8 +74,17 @@ export default function StandaloneCheckoutPage() {
     }
   }, [session]);
 
-  const totalAmount = cart.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
-  const totalItems = cart.reduce((sum, item) => sum + (Number(item.qty) || 1), 0);
+  const getItemUnitPrice = (item: any) => Number(item.unitPrice ?? item.price ?? 0);
+  const getItemQty = (item: any) => Number(item.quantity ?? item.qty ?? 1);
+  const getItemTotal = (item: any) => {
+    if (item.total != null && Number(item.total) > 0) return Number(item.total);
+    if (item.subtotal != null && Number(item.subtotal) > 0) return Number(item.subtotal);
+    return getItemUnitPrice(item) * getItemQty(item);
+  };
+  const getItemName = (item: any) => item.productName || item.name || 'สินค้า';
+
+  const totalAmount = cart.reduce((sum, item) => sum + getItemTotal(item), 0);
+  const totalItems = cart.reduce((sum, item) => sum + getItemQty(item), 0);
 
   const handleApplyPromo = async () => {
     if (!promoCode.trim()) return;
@@ -123,6 +132,28 @@ export default function StandaloneCheckoutPage() {
     setErrorMsg(null);
 
     try {
+      const formattedCart = cart.map((item: any) => ({
+        productId: item.productId || item.id || '',
+        productName: getItemName(item),
+        name: getItemName(item),
+        size: item.size || '-',
+        quantity: getItemQty(item),
+        qty: getItemQty(item),
+        unitPrice: getItemUnitPrice(item),
+        price: getItemUnitPrice(item),
+        total: getItemTotal(item),
+        options: item.options || {
+          customName: item.customName,
+          customNumber: item.customNumber,
+          isLongSleeve: item.sleeve === 'LONG',
+          pattern: item.selectedPattern?.name || item.pattern,
+        },
+        pattern: item.selectedPattern?.name || item.pattern || item.options?.pattern,
+        customName: item.customName || item.options?.customName,
+        customNumber: item.customNumber || item.options?.customNumber,
+        sleeve: item.sleeve || (item.options?.isLongSleeve ? 'LONG' : undefined),
+      }));
+
       const payload = {
         customerName: customerName.trim(),
         customerEmail: customerEmail.trim().toLowerCase(),
@@ -133,7 +164,8 @@ export default function StandaloneCheckoutPage() {
         shippingOptionId: pickupLocation === 'DELIVERY' ? 'delivery' : 'pickup',
         paymentMethod: paymentGateway,
         turnstileToken: turnstileToken || 'dev-bypass',
-        cart,
+        cart: formattedCart,
+        totalAmount: finalTotal,
         promoCode: promoDiscount > 0 ? promoCode.trim() : undefined,
         promoDiscount: promoDiscount > 0 ? promoDiscount : undefined,
         receiptRequest: wantReceipt
@@ -435,17 +467,28 @@ export default function StandaloneCheckoutPage() {
               </Typography>
 
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, maxHeight: 260, overflowY: 'auto', pr: 0.5, mb: 2 }}>
-                {cart.map((item, i) => (
-                  <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
-                    <Box sx={{ pr: 1 }}>
-                      <Typography sx={{ fontWeight: 600, fontSize: '0.875rem' }}>{item.name}</Typography>
-                      <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>
-                        {item.size ? `ไซส์ ${item.size}` : ''} x {item.qty}
-                      </Typography>
+                {cart.map((item: any, i: number) => {
+                  const name = getItemName(item);
+                  const qty = getItemQty(item);
+                  const itemTotal = getItemTotal(item);
+                  const details = [
+                    item.size && item.size !== '-' ? `ไซส์ ${item.size}` : null,
+                    item.customName || item.options?.customName ? `สกรีนชื่อ: ${item.customName || item.options?.customName}` : null,
+                    item.customNumber || item.options?.customNumber ? `เบอร์: ${item.customNumber || item.options?.customNumber}` : null,
+                  ].filter(Boolean).join(' | ');
+
+                  return (
+                    <Box key={i} sx={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
+                      <Box sx={{ pr: 1 }}>
+                        <Typography sx={{ fontWeight: 600, fontSize: '0.875rem' }}>{name}</Typography>
+                        <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>
+                          {details ? `${details} • ` : ''}x{qty}
+                        </Typography>
+                      </Box>
+                      <Typography sx={{ fontWeight: 700 }}>฿{itemTotal.toLocaleString()}</Typography>
                     </Box>
-                    <Typography sx={{ fontWeight: 700 }}>฿{Number(item.total).toLocaleString()}</Typography>
-                  </Box>
-                ))}
+                  );
+                })}
               </Box>
 
               <Divider sx={{ my: 2 }} />
