@@ -9,6 +9,7 @@ import { eq, and } from 'drizzle-orm';
 import { verifyOmiseWebhook } from '@/lib/payment-server';
 import { webhookSecretMissingResponse } from '@/lib/api-helpers';
 import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
+import { sendPaymentReceivedEmail } from '@/lib/email';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -105,6 +106,15 @@ async function handleChargeComplete(charge: any) {
       updatedAt: new Date(),
     })
     .where(eq(orders.ref, orderId));
+
+  const omiseOrderRows = await db.select().from(orders).where(eq(orders.ref, orderId)).limit(1);
+  if (omiseOrderRows[0]) {
+    try {
+      await sendPaymentReceivedEmail(omiseOrderRows[0]);
+    } catch (emailErr) {
+      console.error('[Webhook] Failed to send payment received email for Omise:', emailErr);
+    }
+  }
 
   console.log('[Webhook] Charge complete for order:', orderId);
 }

@@ -394,9 +394,11 @@ export function generatePaymentReceivedEmail(order: {
   ref: string;
   customerName: string;
   totalAmount: number;
+  receiptUrl?: string;
 }): EmailTemplate {
+  const receiptLink = order.receiptUrl || `${getShopUrl()}/receipt/${encodeURIComponent(order.ref)}`;
   const content = `
-    <h2>แจ้งผลการชำระเงิน</h2>
+    <h2>แจ้งผลการชำระเงินและใบเสร็จรับเงิน</h2>
     <p>เรียน คุณ${order.customerName}</p>
     <p>ทางร้านได้รับการชำระเงินสำหรับคำสั่งซื้อของท่านเรียบร้อยแล้ว ขอขอบพระคุณที่ไว้วางใจ ${SHOP_NAME}</p>
     
@@ -409,6 +411,12 @@ export function generatePaymentReceivedEmail(order: {
       </div>
     </div>
     
+    <div class="box box-info" style="text-align: center;">
+      <p style="margin: 0 0 8px; color: #1e40af; font-weight: 700;">ใบเสร็จรับเงินอิเล็กทรอนิกส์ (E-Receipt)</p>
+      <p style="margin: 0 0 16px; color: #4b5563; font-size: 13px;">ท่านสามารถดู พิมพ์ หรือดาวน์โหลดใบเสร็จรับเงินอิเล็กทรอนิกส์ฉบับเต็มได้ทันทีผ่านลิงก์ด้านล่าง</p>
+      <a href="${receiptLink}" class="btn" style="background: #166534; color: #ffffff !important; display: inline-block;">ดูใบเสร็จรับเงิน (E-Receipt)</a>
+    </div>
+
     <h3>ขั้นตอนถัดไป</h3>
     <div class="box">
       <p style="margin: 0; color: #4b5563;">
@@ -424,9 +432,9 @@ export function generatePaymentReceivedEmail(order: {
   `;
 
   return {
-    subject: `[${SHOP_NAME}] ชำระเงินสำเร็จ #${order.ref}`,
-    html: baseTemplate(content, `การชำระเงินคำสั่งซื้อ #${order.ref} สำเร็จแล้ว`),
-    text: `ชำระเงินสำเร็จ! คำสั่งซื้อ: ${order.ref} ยอด: ฿${order.totalAmount?.toLocaleString()} ติดตามสถานะที่ ${getShopUrl()}`,
+    subject: `[${SHOP_NAME}] ชำระเงินสำเร็จ & ใบเสร็จรับเงิน #${order.ref}`,
+    html: baseTemplate(content, `ชำระเงินสำเร็จสำหรับคำสั่งซื้อ #${order.ref} — ดาวน์โหลดใบเสร็จรับเงินได้ทันที`),
+    text: `ชำระเงินสำเร็จ! คำสั่งซื้อ: ${order.ref} ยอด: ฿${order.totalAmount?.toLocaleString()}\nดูใบเสร็จรับเงิน E-Receipt ได้ที่: ${receiptLink}\nติดตามสถานะที่ ${getShopUrl()}`,
   };
 }
 
@@ -640,10 +648,16 @@ export async function sendPaymentReceivedEmail(order: any): Promise<void> {
     return;
   }
 
+  const receiptUrl =
+    order.stripeReceiptUrl ||
+    (order.slipData && typeof order.slipData === 'object' ? order.slipData.stripeReceiptUrl : undefined) ||
+    undefined;
+
   const template = generatePaymentReceivedEmail({
     ref: order.ref,
     customerName: order.customerName || order.name,
     totalAmount: order.totalAmount || order.amount || 0,
+    receiptUrl,
   });
 
   await sendEmail({

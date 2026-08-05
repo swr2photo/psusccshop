@@ -9,6 +9,7 @@ import { eq, and } from 'drizzle-orm';
 import { verifyStripeWebhook } from '@/lib/payment-server';
 import { fetchStripeReceiptUrl, mergeStripeReceiptSlipData } from '@/lib/stripe-receipt';
 import { webhookSecretMissingResponse } from '@/lib/api-helpers';
+import { sendPaymentReceivedEmail } from '@/lib/email';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -131,6 +132,15 @@ async function handlePaymentIntentSucceeded(paymentIntent: any) {
       ...(slipData ? { slipData } : {}),
     })
     .where(eq(orders.ref, orderId));
+
+  const updatedOrderRows = await db.select().from(orders).where(eq(orders.ref, orderId)).limit(1);
+  if (updatedOrderRows[0]) {
+    try {
+      await sendPaymentReceivedEmail(updatedOrderRows[0]);
+    } catch (emailErr) {
+      console.error('[Webhook] Failed to send payment received email:', emailErr);
+    }
+  }
 
   console.log('[Webhook] PaymentIntent succeeded for order:', orderId);
 }

@@ -22,6 +22,7 @@ import {
 import { fetchStripeReceiptUrl, mergeStripeReceiptSlipData } from '@/lib/stripe-receipt';
 import { sanitizeUtf8Input } from '@/lib/sanitize';
 import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
+import { sendPaymentReceivedEmail } from '@/lib/email';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -137,6 +138,17 @@ export async function POST(req: NextRequest) {
                   ...(slipData ? { slipData } : {}),
                 })
                 .where(eq(orders.id, order.id));
+
+              try {
+                await sendPaymentReceivedEmail({
+                  ...order,
+                  status: 'PAID',
+                  paymentVerified: true,
+                  stripeReceiptUrl: receiptUrl || undefined,
+                });
+              } catch (emailErr) {
+                console.error('[Stripe PromptPay] Email send error:', emailErr);
+              }
             }
 
             return await secureJsonResponse({
@@ -344,6 +356,17 @@ export async function GET(req: NextRequest) {
           ...(slipData ? { slipData } : {}),
         })
         .where(eq(orders.id, order.id));
+
+      try {
+        await sendPaymentReceivedEmail({
+          ...order,
+          status: 'PAID',
+          paymentVerified: true,
+          stripeReceiptUrl: receiptUrl || undefined,
+        });
+      } catch (emailErr) {
+        console.error('[Stripe PromptPay] Poll email send error:', emailErr);
+      }
 
       console.log('[Stripe PromptPay] Poll detected payment success for order:', ref);
     }
