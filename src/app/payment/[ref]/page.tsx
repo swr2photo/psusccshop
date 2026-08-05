@@ -21,6 +21,7 @@ import { ArrowLeft, QrCode, CreditCard, CheckCircle2, ShieldCheck, Upload, Build
 import StorefrontNavbar from '@/components/StorefrontNavbar';
 import MobileBottomNav from '@/components/MobileBottomNav';
 import StripePromptPay from '@/components/StripePromptPay';
+import StripeCardPayment from '@/components/StripeCardPayment';
 import { useTranslation } from '@/hooks/useTranslation';
 import { apiFetch } from '@/lib/api-client';
 
@@ -32,7 +33,7 @@ export default function StandalonePaymentPage() {
 
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [payMethod, setPayMethod] = useState<'promptpay' | 'manual'>('promptpay');
+  const [payMethod, setPayMethod] = useState<'promptpay' | 'card' | 'manual'>('promptpay');
   const [slipFile, setSlipFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
@@ -272,7 +273,8 @@ export default function StandalonePaymentPage() {
               sx={{ mb: 3, borderBottom: '1px solid #e2e8f0', '& .MuiTab-root': { fontWeight: 700, textTransform: 'none' } }}
             >
               <Tab icon={<QrCode size={18} />} iconPosition="start" label="Stripe PromptPay (AUTO)" value="promptpay" />
-              <Tab icon={<CreditCard size={18} />} iconPosition="start" label="โอนเงิน + แนบสลิป" value="manual" />
+              <Tab icon={<CreditCard size={18} />} iconPosition="start" label="บัตรเครดิต / เดบิต" value="card" />
+              <Tab icon={<Upload size={18} />} iconPosition="start" label="โอนเงิน + แนบสลิป" value="manual" />
             </Tabs>
 
             {payMethod === 'promptpay' ? (
@@ -283,6 +285,17 @@ export default function StandalonePaymentPage() {
                     router.push(`/orders/${encodeURIComponent(ref)}`);
                   }}
                   onSwitchToManual={() => setPayMethod('manual')}
+                />
+              </Box>
+            ) : payMethod === 'card' ? (
+              <Box sx={{ py: 2 }}>
+                <StripeCardPayment
+                  orderRef={ref}
+                  customerEmail={order?.customerEmail}
+                  customerName={order?.customerName}
+                  onSuccess={() => {
+                    router.push(`/orders/${encodeURIComponent(ref)}`);
+                  }}
                 />
               </Box>
             ) : (

@@ -4,8 +4,7 @@
 
 'use client';
 
-// ==================== MINIMAL STRIPE.JS TYPES ====================
-// Only the surface we use for the custom PromptPay flow.
+// ==================== STRIPE.JS TYPES ====================
 
 export interface StripePromptPayQrCode {
   /** Raw EMV payload — render with any QR library */
@@ -35,7 +34,29 @@ export interface StripePaymentIntentResult {
   last_payment_error?: { message?: string } | null;
 }
 
+export interface StripeCardElement {
+  mount(domElement: string | HTMLElement): void;
+  unmount(): void;
+  destroy(): void;
+  on(event: string, handler: (event: any) => void): void;
+}
+
+export interface StripeElements {
+  create(elementType: 'card', options?: any): StripeCardElement;
+}
+
 export interface StripeJS {
+  elements(options?: any): StripeElements;
+  confirmCardPayment(
+    clientSecret: string,
+    data?: {
+      payment_method?: {
+        card: StripeCardElement | { token: string };
+        billing_details?: { email?: string; name?: string };
+      };
+      return_url?: string;
+    }
+  ): Promise<{ paymentIntent?: StripePaymentIntentResult; error?: { message?: string; code?: string } }>;
   confirmPromptPayPayment(
     clientSecret: string,
     data?: {

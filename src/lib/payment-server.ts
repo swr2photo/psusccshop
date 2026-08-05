@@ -493,3 +493,29 @@ export async function getStripePromptPayEnabled(amountTHB?: number): Promise<boo
   const paymentConfig = await getConfigValueCached<PaymentConfig>(PAYMENT_CONFIG_KEY);
   return isStripePromptPayEnabled(paymentConfig, amountTHB);
 }
+
+/**
+ * Whether Stripe Credit/Debit Card payments should be offered to customers.
+ */
+export function isStripeCardEnabled(
+  paymentConfig: PaymentConfig | null | undefined,
+  amountTHB?: number,
+): boolean {
+  if (!isStripeEnvConfigured()) return false;
+
+  const stripe = resolveStripeSpecificConfig(paymentConfig);
+  // Default to enabled when Stripe keys are configured and enableCreditCard is not explicitly set to false
+  if (stripe.enableCreditCard === false) return false;
+
+  if (typeof amountTHB === 'number' && Number.isFinite(amountTHB)) {
+    if (amountTHB < 10) return false;
+  }
+
+  return true;
+}
+
+/** Load payment_config and evaluate Stripe Credit/Debit card availability. */
+export async function getStripeCardEnabled(amountTHB?: number): Promise<boolean> {
+  const paymentConfig = await getConfigValueCached<PaymentConfig>(PAYMENT_CONFIG_KEY);
+  return isStripeCardEnabled(paymentConfig, amountTHB);
+}

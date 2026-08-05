@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { getFlagshipConfig } from '@/lib/flagship/config';
+import { getFlagshipConfig, getMergedFlagshipConfig } from '@/lib/flagship/config';
 import FlagshipExperience, {
   resolveFlagshipProduct,
 } from '@/components/flagship/FlagshipExperience';
@@ -17,9 +17,12 @@ type Props = {
  * resolve against current shop config (incl. dev seed products on home).
  */
 export default function FlagshipExperienceClient({ slug }: Props) {
-  const config = getFlagshipConfig(slug);
   const [shop, setShop] = useState<ShopConfig | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const config = useMemo(() => {
+    return getMergedFlagshipConfig(slug, shop as any);
+  }, [slug, shop]);
 
   useEffect(() => {
     let cancelled = false;

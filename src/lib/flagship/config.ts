@@ -140,6 +140,40 @@ export function getFlagshipConfig(slug: string): FlagshipProductConfig | null {
   return FLAGSHIP_PRODUCTS[slug] ?? null;
 }
 
+/** Merge static defaults with dynamic shop config from admin */
+export function getMergedFlagshipConfig(
+  slug: string,
+  shopConfig?: { flagshipConfig?: Partial<FlagshipProductConfig>; flagshipConfigs?: Record<string, Partial<FlagshipProductConfig>> } | null
+): FlagshipProductConfig {
+  const base = FLAGSHIP_PRODUCTS[slug] || {
+    slug,
+    framesFolder: `/flagship/${slug}/frames`,
+    frameCount: 60,
+    frameExt: 'webp',
+    frameStep: 1,
+    mobileFrameStep: 2,
+    mobileMaxFrames: 28,
+    brandLabel: { th: 'SCC Flagship', en: 'SCC Flagship' },
+    stages: { th: [], en: [] },
+  };
+
+  const dynamicCfg = shopConfig?.flagshipConfigs?.[slug] || (shopConfig?.flagshipConfig?.slug === slug ? shopConfig?.flagshipConfig : null) || shopConfig?.flagshipConfig;
+  if (!dynamicCfg) return base;
+
+  return {
+    ...base,
+    ...dynamicCfg,
+    brandLabel: {
+      th: dynamicCfg.brandLabel?.th || base.brandLabel?.th || 'SCC Flagship',
+      en: dynamicCfg.brandLabel?.en || base.brandLabel?.en || 'SCC Flagship',
+    },
+    stages: {
+      th: dynamicCfg.stages?.th && dynamicCfg.stages.th.length > 0 ? dynamicCfg.stages.th : base.stages.th,
+      en: dynamicCfg.stages?.en && dynamicCfg.stages.en.length > 0 ? dynamicCfg.stages.en : base.stages.en,
+    },
+  };
+}
+
 export function listFlagshipSlugs(): string[] {
   return Object.keys(FLAGSHIP_PRODUCTS);
 }

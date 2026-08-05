@@ -23,6 +23,7 @@ import { supabase } from '@/lib/supabase-client';
 import { useAdminDataSWR } from '@/hooks/useAdminDataSWR';
 import { SettingsView } from '@/components/admin/SettingsView';
 import { DashboardView } from '@/components/admin/DashboardView';
+import FlagshipSettings from '@/components/admin/FlagshipSettings';
 
 import {
   Box,
@@ -5800,6 +5801,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
         { icon: <Sparkles size={18} />, label: t.admin.navEvents, idx: 14, color: '#fbbf24', show: Boolean(canManageEvents) },
         { icon: <Ticket size={18} />, label: t.admin.navPromo, idx: 15, color: '#34c759', show: Boolean(canManagePromoCodes) },
         { icon: <Radio size={18} />, label: t.admin.navLive, idx: 16, color: '#ef4444', show: Boolean(canManageLiveStream) },
+        { icon: <Sparkles size={18} />, label: 'หน้าสินค้า Flagship', idx: 18, color: '#8b5cf6', show: Boolean(canManageProducts || canManageShop || isSuperAdminUser) },
       ],
     },
     {
@@ -5916,6 +5918,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                   15: t.admin.navPromo,
                   16: t.admin.navLive,
                   17: t.admin.navShops,
+                  18: 'หน้าสินค้า Flagship',
                 } as Record<number, string>
               )[activeTab] || t.admin.navDashboard}
             </span>
@@ -6048,6 +6051,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
           {activeTab === 12 && (canManageTracking ? <TrackingManagement showToast={showToast} selectedShopId={isShopMode ? selectedShopId : undefined} /> : <NoPermissionView permission="ติดตามพัสดุ" />)}
           {activeTab === 13 && (canManageRefunds ? <RefundManagement showToast={showToast} selectedShopId={isShopMode ? selectedShopId : undefined} /> : <NoPermissionView permission="จัดการคืนเงิน" />)}
           {activeTab === 17 && (isSuperAdminUser ? <ShopManagement showToast={showToast} isSuperAdmin={isSuperAdminUser} userEmail={session?.user?.email || ''} /> : <NoPermissionView permission="จัดการร้านค้าย่อย" />)}
+          {activeTab === 18 && ((canManageProducts || canManageShop || isSuperAdminUser) ? <FlagshipSettings products={config?.products || []} currentConfig={config} onSaveSuccess={() => { showToast('success', 'บันทึกการตั้งค่า Flagship เรียบร้อยแล้ว'); fetchData({ silent: true }); }} /> : <NoPermissionView permission="ตั้งค่า Flagship" />)}
         </div>
       </AdminShell>
 

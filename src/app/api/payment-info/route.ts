@@ -7,8 +7,8 @@ import { requireAuth, isResourceOwner, isAdminEmailAsync } from '@/lib/auth';
 import { sanitizeUtf8Input } from '@/lib/sanitize';
 import { getShopById } from '@/lib/shops';
 import { resolveOrderByRef } from '@/lib/order-lookup';
-import { getStripePromptPayEnabled } from '@/lib/payment-server';
-import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
+import { getStripePromptPayEnabled, getStripeCardEnabled } from '@/lib/payment-server';
+import { secureJsonResponse } from '@/lib/payload-crypto';
 
 const maskAccountNumber = (accountNumber: string): string => {
   if (!accountNumber) return '';
@@ -131,6 +131,8 @@ export async function GET(req: NextRequest) {
         paymentDisabledMessage: paymentEnabled ? null : paymentDisabledMessage,
         // Stripe PromptPay (auto-verified QR) — respects admin enablePromptPay toggle
         stripePromptPayEnabled: await getStripePromptPayEnabled(finalAmount),
+        // Stripe Credit/Debit Card payment
+        stripeCardEnabled: await getStripeCardEnabled(finalAmount),
       },
     };
 
