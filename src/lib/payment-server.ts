@@ -242,6 +242,7 @@ export interface StripePaymentIntentParams {
   paymentMethodData?: {
     type: string;
     billingEmail?: string;
+    billingName?: string;
   };
 }
 
@@ -303,6 +304,9 @@ export async function createStripePaymentIntentDetailed(
       if (params.paymentMethodData.billingEmail) {
         body.append('payment_method_data[billing_details][email]', params.paymentMethodData.billingEmail);
         body.append('receipt_email', params.paymentMethodData.billingEmail);
+      }
+      if (params.paymentMethodData.billingName) {
+        body.append('payment_method_data[billing_details][name]', params.paymentMethodData.billingName);
       }
     }
 

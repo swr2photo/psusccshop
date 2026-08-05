@@ -174,6 +174,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const siteUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://sccshop.psuscc.club';
+    const returnUrl = `${siteUrl}/orders/${encodeURIComponent(ref)}`;
+
     // Try server-side confirm first (Direct API) so next_action.promptpay_display_qr_code is generated immediately
     let created = await createStripePaymentIntentDetailed({
       amount: Math.round(amountTHB * 100), // satang
@@ -182,8 +185,10 @@ export async function POST(req: NextRequest) {
       paymentMethodData: {
         type: 'promptpay',
         billingEmail: order.customerEmail,
+        billingName: order.customerName || 'Customer',
       },
       confirm: true,
+      returnUrl,
       description: `Order ${ref}`,
       metadata: {
         orderId: ref,
@@ -199,6 +204,7 @@ export async function POST(req: NextRequest) {
         currency: 'thb',
         paymentMethodTypes: ['promptpay'],
         confirm: false,
+        returnUrl,
         description: `Order ${ref}`,
         metadata: {
           orderId: ref,

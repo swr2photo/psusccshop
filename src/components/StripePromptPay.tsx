@@ -170,6 +170,7 @@ export default function StripePromptPay({
             type: 'promptpay',
             billing_details: { email },
           },
+          return_url: typeof window !== 'undefined' ? window.location.href : undefined,
         },
         { handleActions: false }
       );
