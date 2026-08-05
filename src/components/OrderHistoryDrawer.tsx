@@ -3,6 +3,7 @@
 
 import { apiFetch, uploadImageApi } from '@/lib/api-client';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import {
   Box,
   Button,
@@ -32,6 +33,7 @@ import {
   ExternalLink,
   Info,
   MapPin,
+  Maximize2,
   Package,
   FileText,
   RotateCcw,
@@ -843,9 +845,21 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
               </Typography>
             </Box>
           </Box>
-          <IconButton onClick={onClose} sx={{ color: 'var(--text-muted)' }}>
-            <X size={20} />
-          </IconButton>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <IconButton
+              component={Link}
+              href="/orders"
+              onClick={onClose}
+              aria-label="Expand to full page"
+              title="ขยายเต็มหน้า (Expand to full page)"
+              sx={{ color: 'var(--text-muted)', '&:hover': { color: 'var(--foreground)' } }}
+            >
+              <Maximize2 size={18} />
+            </IconButton>
+            <IconButton onClick={onClose} sx={{ color: 'var(--text-muted)' }}>
+              <X size={20} />
+            </IconButton>
+          </Box>
         </Box>
 
         {/* Filter Tabs — muted segmented control */}
@@ -1077,9 +1091,21 @@ export default function OrderHistoryDrawer(props: OrderHistoryDrawerProps) {
                       }}
                     >
                       <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1, mb: 0.6 }}>
-                        <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)', letterSpacing: '-0.01em' }}>
-                          #{order.ref}
-                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                          <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--foreground)', letterSpacing: '-0.01em' }}>
+                            #{order.ref}
+                          </Typography>
+                          <IconButton
+                            component={Link}
+                            href={`/orders/${encodeURIComponent(order.ref)}`}
+                            onClick={(e) => { e.stopPropagation(); onClose(); }}
+                            size="small"
+                            title="เปิดหน้าติดตามคำสั่งซื้อแบบเต็ม"
+                            sx={{ color: 'var(--text-muted)', p: 0.25, '&:hover': { color: 'var(--foreground)' } }}
+                          >
+                            <ExternalLink size={14} />
+                          </IconButton>
+                        </Box>
                         <Box sx={{
                           display: 'flex',
                           alignItems: 'center',

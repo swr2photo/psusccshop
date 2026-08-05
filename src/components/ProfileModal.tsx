@@ -1,8 +1,9 @@
 'use client';
 
 import { apiFetch, uploadImageApi } from '@/lib/api-client';
+import Link from 'next/link';
 import { useState, useEffect, useMemo, useCallback, useRef, type HTMLAttributes } from 'react';
-import { X, ShieldCheck, User, Phone, Instagram, AlertTriangle, MapPin, Check, ArrowRight, UserCircle, CheckCircle2, AlertCircle, Search, Camera, ZoomIn, ZoomOut, RotateCw, Move, Plus, Trash2, Star, Pencil, ExternalLink, FileText } from 'lucide-react';
+import { X, ShieldCheck, User, Phone, Instagram, AlertTriangle, MapPin, Check, ArrowRight, UserCircle, CheckCircle2, AlertCircle, Search, Camera, ZoomIn, ZoomOut, RotateCw, Move, Plus, Trash2, Star, Pencil, ExternalLink, FileText, Maximize2 } from 'lucide-react';
 import {
   Drawer, Box, Typography, Button, IconButton, TextField, InputAdornment,
   Slide, Avatar, Autocomplete, CircularProgress, Paper, Dialog, Slider, Chip,
@@ -930,16 +931,29 @@ export default function ProfileModal({ initialData, onClose, onSave, userImage, 
               </Typography>
             </Box>
           </Box>
-          <UiButton
-            type="button"
-            variant="outline"
-            size="icon-sm"
-            onClick={onClose}
-            aria-label="Close"
-            className="border-[var(--glass-border)] bg-transparent text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
-          >
-            <X className="size-4" />
-          </UiButton>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <IconButton
+              component={Link}
+              href="/orders"
+              onClick={onClose}
+              size="small"
+              aria-label="Expand to full page"
+              title="ขยายเต็มหน้า (Expand to full page)"
+              sx={{ color: 'var(--text-muted)', '&:hover': { color: 'var(--foreground)' } }}
+            >
+              <Maximize2 size={16} />
+            </IconButton>
+            <UiButton
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              onClick={onClose}
+              aria-label="Close"
+              className="border-[var(--glass-border)] bg-transparent text-[var(--text-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
+            >
+              <X className="size-4" />
+            </UiButton>
+          </Box>
         </Box>
 
         {/* Segmented tabs — formal, not pills */}

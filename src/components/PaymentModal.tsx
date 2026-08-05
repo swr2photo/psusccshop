@@ -2,11 +2,12 @@
 'use client';
 
 import { apiFetch } from '@/lib/api-client';
+import Link from 'next/link';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { JSX } from 'react';
 import {
   X, Upload, Check, Loader2, AlertCircle, CheckCircle2, Download,
-  Copy, Smartphone, Sparkles, AlertTriangle, Info, Mail, FileText, Printer, Headphones,
+  Copy, Smartphone, Sparkles, AlertTriangle, Info, Mail, FileText, Printer, Headphones, Maximize2,
 } from 'lucide-react';
 import { Drawer, Box, Typography, Button, IconButton, Skeleton, useMediaQuery, LinearProgress, Checkbox, FormControlLabel, TextField } from '@mui/material';
 import { QRCodeSVG } from 'qrcode.react';
@@ -735,6 +736,22 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
                 <Printer size={16} />
               </IconButton>
             )}
+            <IconButton
+              component={Link}
+              href={`/payment/${encodeURIComponent(orderRef)}`}
+              onClick={onClose}
+              size="small"
+              aria-label="Expand to full page"
+              title="ขยายเต็มหน้า (Expand to full page)"
+              sx={{
+                bgcolor: 'var(--glass-bg)',
+                color: 'var(--text-muted)',
+                border: '1px solid var(--glass-border)',
+                '&:hover': { bgcolor: 'var(--glass-bg)', color: 'var(--foreground)' },
+              }}
+            >
+              <Maximize2 size={16} />
+            </IconButton>
             <IconButton
               onClick={onClose}
               size="small"

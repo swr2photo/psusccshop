@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import {
   Box,
   Button,
@@ -18,6 +19,7 @@ import {
 import {
   AlertTriangle,
   Edit,
+  Maximize2,
   Minus,
   Palette,
   Plus,
@@ -415,6 +417,20 @@ export default function CartDrawer(props: CartDrawerProps) {
                   {t.cart.clearAll}
                 </Button>
               )}
+              <IconButton
+                component={Link}
+                href="/cart"
+                onClick={onClose}
+                aria-label="Expand to full page"
+                title="ขยายเต็มหน้า (Expand to full page)"
+                sx={{
+                  color: 'var(--foreground)',
+                  p: 0.75,
+                  '&:hover': { bgcolor: 'transparent', opacity: 0.65 },
+                }}
+              >
+                <Maximize2 size={18} strokeWidth={1.5} />
+              </IconButton>
               <IconButton
                 onClick={onClose}
                 aria-label="Close cart"

@@ -21,6 +21,7 @@ import {
   InputAdornment,
   IconButton,
 } from '@mui/material';
+import Link from 'next/link';
 import {
   Package,
   Truck,
@@ -36,6 +37,7 @@ import {
   X,
   Tag,
   QrCode,
+  Maximize2,
 } from 'lucide-react';
 import { ShippingConfig, ShippingOption } from '@/lib/shipping';
 import { PaymentConfig, PaymentOption } from '@/lib/payment';
@@ -559,13 +561,25 @@ export default function CheckoutDialog({
             {itemCount} {t.common.items}
           </Typography>
         </Box>
-        <IconButton
-          onClick={onClose}
-          aria-label={t.common.close}
-          sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.12)', borderRadius: '6px', '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' } }}
-        >
-          <X size={20} />
-        </IconButton>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <IconButton
+            component={Link}
+            href="/checkout"
+            onClick={onClose}
+            aria-label="Expand to full page"
+            title="ขยายเต็มหน้า (Expand to full page)"
+            sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.12)', borderRadius: '6px', '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' } }}
+          >
+            <Maximize2 size={18} />
+          </IconButton>
+          <IconButton
+            onClick={onClose}
+            aria-label={t.common.close}
+            sx={{ color: 'white', bgcolor: 'rgba(255,255,255,0.12)', borderRadius: '6px', '&:hover': { bgcolor: 'rgba(255,255,255,0.22)' } }}
+          >
+            <X size={20} />
+          </IconButton>
+        </Box>
       </DialogTitle>
 
       {processing && (
