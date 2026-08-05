@@ -1472,7 +1472,13 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'var(--background)', color: 'var(--foreground)' }}>
       {/* ==================== HEADER ==================== */}
-      <Box sx={{ position: 'sticky', top: 0, zIndex: 100, bgcolor: 'transparent' }}>
+      <Box sx={{ position: 'sticky', top: 0, zIndex: 100, bgcolor: 'var(--background)' }}>
+        <ServerStatusBanner
+          show={serverIssue}
+          onRetry={() => {
+            queryClient.invalidateQueries({ queryKey: [...queryKeys.shop.all, 'public', initialShop.id] });
+          }}
+        />
         <ProgressiveBlurChrome edge="bottom" fadeExtent={52} intensity="strong">
         <Box sx={{
           maxWidth: '1200px', mx: 'auto',
@@ -1589,13 +1595,6 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
         </Box>
         </ProgressiveBlurChrome>
       </Box>
-
-      <ServerStatusBanner
-        show={serverIssue}
-        onRetry={() => {
-          queryClient.invalidateQueries({ queryKey: [...queryKeys.shop.all, 'public', initialShop.id] });
-        }}
-      />
 
       <ShopStatusBanner
         isOpen={shopOpenFields.isOpen}

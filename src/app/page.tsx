@@ -3505,6 +3505,14 @@ export default function HomePage() {
         isLiveActive={isLiveActive}
         isAuthenticated={Boolean(session)}
         avatarUrl={orderData.profileImage || session?.user?.image || undefined}
+        serverStatusBanner={
+          <ServerStatusBanner
+            show={serverIssue || Boolean(realtimeError)}
+            onRetry={() => {
+              refreshConfig(true);
+            }}
+          />
+        }
         utilityLeft={t.nav.shopTitle}
         utilityCenter={t.nav.utilityPromo}
         languageToggle={<LanguageToggle size="small" />}
@@ -3846,14 +3854,6 @@ export default function HomePage() {
             </Box>
           </Box>
         ) : null}
-      />
-
-      {/* Server Connection Issue Banner */}
-      <ServerStatusBanner 
-        show={serverIssue || Boolean(realtimeError)} 
-        onRetry={() => {
-          refreshConfig(true);
-        }}
       />
 
       {/* Shop Status Banner - Shows different states (not open, coming soon, order ended, etc.) */}

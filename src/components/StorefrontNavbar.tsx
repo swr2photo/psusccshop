@@ -31,6 +31,7 @@ export type StorefrontNavbarProps = {
   isLiveActive: boolean;
   isAuthenticated: boolean;
   avatarUrl?: string;
+  serverStatusBanner?: ReactNode;
   utilityLeft?: string;
   utilityCenter?: ReactNode;
   searchPanel?: ReactNode;
@@ -188,6 +189,7 @@ export default function StorefrontNavbar({
   isLiveActive,
   isAuthenticated,
   avatarUrl,
+  serverStatusBanner,
   utilityLeft,
   utilityCenter,
   searchPanel,
@@ -255,6 +257,7 @@ export default function StorefrontNavbar({
         pt: { xs: 'env(safe-area-inset-top)', md: 0 },
       }}
     >
+      {serverStatusBanner}
       {/* Utility strip — desktop */}
       <Box
         sx={{
