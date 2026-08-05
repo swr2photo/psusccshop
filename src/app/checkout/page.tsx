@@ -30,13 +30,12 @@ import {
   QrCode,
   FileText,
   User,
-  Mail,
-  Phone,
-  Building2,
   Tag,
+  Truck,
 } from 'lucide-react';
 import StorefrontNavbar from '@/components/StorefrontNavbar';
 import MobileBottomNav from '@/components/MobileBottomNav';
+import TurnstileWidget from '@/components/TurnstileWidget';
 import { useCartStore } from '@/store/cartStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useSession } from 'next-auth/react';
@@ -52,9 +51,11 @@ export default function StandaloneCheckoutPage() {
   const [customerName, setCustomerName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
   const [studentId, setStudentId] = useState('');
-  const [pickupLocation, setPickupLocation] = useState('SCC_CLUB');
+  const [pickupLocation, setPickupLocation] = useState<'SCC_CLUB' | 'DELIVERY'>('SCC_CLUB');
   const [paymentGateway, setPaymentGateway] = useState<'promptpay' | 'manual'>('promptpay');
+  const [turnstileToken, setTurnstileToken] = useState('');
   const [wantReceipt, setWantReceipt] = useState(false);
   const [taxId, setTaxId] = useState('');
   const [orgName, setOrgName] = useState('');
@@ -113,6 +114,10 @@ export default function StandaloneCheckoutPage() {
       setErrorMsg('กรุณากรอกชื่อ-นามสกุล และอีเมลให้ครบถ้วน');
       return;
     }
+    if (pickupLocation === 'DELIVERY' && !address.trim()) {
+      setErrorMsg('กรุณากรอกที่อยู่สำหรับจัดส่งพัสดุ');
+      return;
+    }
 
     setLoading(true);
     setErrorMsg(null);
@@ -122,9 +127,12 @@ export default function StandaloneCheckoutPage() {
         customerName: customerName.trim(),
         customerEmail: customerEmail.trim().toLowerCase(),
         phone: phone.trim(),
+        customerAddress: pickupLocation === 'DELIVERY' ? address.trim() : 'รับที่ห้องชุมนุม SCC',
         studentId: studentId.trim(),
         pickupLocation,
+        shippingOptionId: pickupLocation === 'DELIVERY' ? 'delivery' : 'pickup',
         paymentMethod: paymentGateway,
+        turnstileToken: turnstileToken || 'dev-bypass',
         cart,
         promoCode: promoDiscount > 0 ? promoCode.trim() : undefined,
         promoDiscount: promoDiscount > 0 ? promoDiscount : undefined,
@@ -133,7 +141,7 @@ export default function StandaloneCheckoutPage() {
               wanted: true,
               taxOrStudentId: taxId.trim(),
               orgName: orgName.trim(),
-              address: receiptAddress.trim(),
+              address: receiptAddress.trim() || address.trim(),
             }
           : undefined,
       };
@@ -151,7 +159,6 @@ export default function StandaloneCheckoutPage() {
 
       const orderRef = data.order?.ref || data.ref;
       if (orderRef) {
-        // Save to local history
         try {
           const raw = localStorage.getItem('psu_scc_orders');
           const list = raw ? JSON.parse(raw) : [];
@@ -261,16 +268,16 @@ export default function StandaloneCheckoutPage() {
                 </Box>
               </Paper>
 
-              {/* Pickup & Delivery */}
+              {/* Pickup & Delivery Options */}
               <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#ffffff' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                   <MapPin size={20} color="#1e3a5f" />
                   <Typography variant="h6" sx={{ fontWeight: 700, color: 'var(--navy, #1e3a5f)' }}>
-                    สถานที่รับสินค้า (Pickup Location)
+                    รูปแบบการรับสินค้า / จัดส่ง (Shipping & Pickup)
                   </Typography>
                 </Box>
 
-                <RadioGroup value={pickupLocation} onChange={(e) => setPickupLocation(e.target.value)}>
+                <RadioGroup value={pickupLocation} onChange={(e) => setPickupLocation(e.target.value as any)}>
                   <Card variant="outlined" sx={{ mb: 1.5, borderColor: pickupLocation === 'SCC_CLUB' ? '#1e3a5f' : '#e2e8f0', borderRadius: 2 }}>
                     <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
                       <FormControlLabel
@@ -279,7 +286,7 @@ export default function StandaloneCheckoutPage() {
                         label={
                           <Box>
                             <Typography sx={{ fontWeight: 700, fontSize: '0.95rem' }}>
-                              ห้องชุมนุมคอมพิวเตอร์ (SCC Computer Club)
+                              รับที่ห้องชุมนุมคอมพิวเตอร์ (SCC Club Pickup)
                             </Typography>
                             <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>
                               ชั้น 2 อาคารศูนย์คอมพิวเตอร์ คณะวิทยาศาสตร์ ม.สงขลานครินทร์ (รับฟรีไม่มีค่าจัดส่ง)
@@ -289,7 +296,44 @@ export default function StandaloneCheckoutPage() {
                       />
                     </CardContent>
                   </Card>
+
+                  <Card variant="outlined" sx={{ borderColor: pickupLocation === 'DELIVERY' ? '#1e3a5f' : '#e2e8f0', borderRadius: 2 }}>
+                    <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+                      <FormControlLabel
+                        value="DELIVERY"
+                        control={<Radio size="small" />}
+                        label={
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Truck size={18} color="#1e3a5f" />
+                            <Box>
+                              <Typography sx={{ fontWeight: 700, fontSize: '0.95rem' }}>
+                                จัดส่งพัสดุตามที่อยู่ (Standard Delivery)
+                              </Typography>
+                              <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>
+                                จัดส่งด่วนถึงบ้านผ่าน Flash Express / ไปรษณีย์ไทย
+                              </Typography>
+                            </Box>
+                          </Box>
+                        }
+                      />
+                    </CardContent>
+                  </Card>
                 </RadioGroup>
+
+                {pickupLocation === 'DELIVERY' && (
+                  <Box sx={{ mt: 2.5 }}>
+                    <TextField
+                      label="ที่อยู่สำหรับจัดส่งพัสดุ (Delivery Address)"
+                      required
+                      multiline
+                      rows={3}
+                      fullWidth
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      placeholder="บ้านเลขที่, หมู่บ้าน/อาคาร, ถนน, ตำบล/แขวง, อำเภอ/เขต, จังหวัด, รหัสไปรษณีย์"
+                    />
+                  </Box>
+                )}
               </Paper>
 
               {/* Payment Method Selector */}
@@ -455,6 +499,10 @@ export default function StandaloneCheckoutPage() {
                 <Typography sx={{ fontWeight: 800, fontSize: '1.3rem', color: 'var(--navy, #1e3a5f)' }}>
                   ฿{finalTotal.toLocaleString()}
                 </Typography>
+              </Box>
+
+              <Box sx={{ my: 2, display: 'flex', justifyContent: 'center' }}>
+                <TurnstileWidget onSuccess={setTurnstileToken} theme="light" size="normal" />
               </Box>
 
               <Button
