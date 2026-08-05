@@ -240,7 +240,7 @@ export default function StandaloneOrdersPage() {
                         ดูรายละเอียดและติดตามสถานะ
                       </Button>
 
-                      {order.status?.toUpperCase() === 'PENDING' && (
+                      {['PENDING', 'WAITING_PAYMENT', 'UNPAID'].includes(order.status?.toUpperCase() || '') && (
                         <Button
                           component={Link}
                           href={`/payment/${encodeURIComponent(order.ref)}`}

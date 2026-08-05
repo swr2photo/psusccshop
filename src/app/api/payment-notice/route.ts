@@ -89,7 +89,11 @@ export async function GET(request: NextRequest) {
     }
 
     const verifyUrl = absoluteUrl(`/orders/${encodeURIComponent(ref)}?lang=${lang}`);
+    const paymentUrl = absoluteUrl(`/payment/${encodeURIComponent(ref)}`);
+
     let qrSvg: string | null = null;
+    let paymentQrSvg: string | null = null;
+
     try {
       qrSvg = await QRCode.toString(verifyUrl, {
         type: 'svg',
@@ -102,7 +106,19 @@ export async function GET(request: NextRequest) {
       console.error('[PaymentNotice] QR generate failed:', qrErr);
     }
 
-    const html = buildPaymentNoticeHtml(order, ref, lang, { qrSvg });
+    try {
+      paymentQrSvg = await QRCode.toString(paymentUrl, {
+        type: 'svg',
+        width: 130,
+        margin: 1,
+        errorCorrectionLevel: 'M',
+        color: { dark: '#047857', light: '#ffffff' },
+      });
+    } catch (pQrErr) {
+      console.error('[PaymentNotice] Payment QR generate failed:', pQrErr);
+    }
+
+    const html = buildPaymentNoticeHtml(order, ref, lang, { qrSvg, paymentQrSvg, paymentUrl });
 
     return new NextResponse(html, {
       headers: {

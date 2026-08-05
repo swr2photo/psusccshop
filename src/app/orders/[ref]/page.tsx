@@ -117,6 +117,8 @@ export default function StandaloneOrderDetailPage() {
 
   const currentStatus = order.status?.toUpperCase() || 'PENDING';
   const isPaid = currentStatus === 'PAID' || currentStatus === 'READY' || currentStatus === 'COMPLETED' || order.paymentVerified;
+  const isCancelled = currentStatus === 'CANCELLED';
+  const isExpired = currentStatus === 'EXPIRED';
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'var(--background, #f8fafc)', color: 'var(--foreground, #0f172a)', pb: 10 }}>
@@ -145,7 +147,7 @@ export default function StandaloneOrderDetailPage() {
             </Box>
 
             <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
-              {!isPaid && (
+              {!isPaid && !isCancelled && !isExpired && (
                 <Button
                   component={Link}
                   href={`/payment/${encodeURIComponent(order.ref)}`}

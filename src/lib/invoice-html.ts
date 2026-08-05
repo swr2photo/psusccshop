@@ -8,6 +8,10 @@ export interface InvoiceBuildOptions {
   stripeReceiptUrl?: string | null;
   /** Inline QR as SVG markup (preferred — works under CSP / srcDoc) */
   qrSvg?: string | null;
+  /** Direct payment QR SVG markup for payment notice */
+  paymentQrSvg?: string | null;
+  /** Direct payment link URL */
+  paymentUrl?: string | null;
   /** @deprecated use qrSvg */
   qrDataUrl?: string | null;
 }
@@ -1384,6 +1388,67 @@ export function buildPaymentNoticeHtml(
       font-weight: 800;
       color: var(--navy);
     }
+    .pay-notice-box {
+      margin-top: 16px;
+      border: 1.5px solid #059669;
+      border-radius: 8px;
+      background: #f0fdf4;
+      padding: 12px 14px;
+    }
+    .pay-notice-box.cancelled {
+      border-color: #dc2626;
+      background: #fef2f2;
+    }
+    .pay-notice-grid {
+      display: grid;
+      grid-template-columns: 130px 1fr;
+      gap: 16px;
+      align-items: center;
+    }
+    .pay-qr-wrapper {
+      text-align: center;
+    }
+    .pay-qr-svg {
+      display: inline-flex;
+      width: 120px;
+      height: 120px;
+      border: 1px solid #a7f3d0;
+      border-radius: 6px;
+      padding: 4px;
+      background: #ffffff;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.06);
+    }
+    .pay-qr-svg svg { width: 100%; height: 100%; display: block; }
+    .pay-qr-link {
+      display: inline-block;
+      margin-top: 4px;
+      font-size: 10.5px;
+      font-weight: 700;
+      color: #047857;
+      text-decoration: underline;
+    }
+    .pay-steps-title {
+      font-size: 12.5px;
+      font-weight: 800;
+      color: #065f46;
+      margin-bottom: 5px;
+    }
+    .pay-steps-list {
+      font-size: 11px;
+      color: #1e293b;
+      margin-left: 16px;
+      line-height: 1.45;
+    }
+    .pay-time-badge {
+      margin-top: 8px;
+      padding: 5px 8px;
+      border-radius: 5px;
+      background: #dcfce7;
+      border: 1px solid #86efac;
+      color: #14532d;
+      font-size: 10.5px;
+      font-weight: 700;
+    }
     .footer-grid {
       display: grid;
       grid-template-columns: 140px 1fr;
@@ -1579,8 +1644,8 @@ export function buildPaymentNoticeHtml(
           <div class="value">${escapeHtml(amountWords)}</div>
         </div>
         <div class="pay-meta">
-          <div><strong>ช่องทางชำระเงิน:</strong> Stripe PromptPay / โอนผ่านบัญชีธนาคารไทยพาณิชย์ (SCB)</div>
-          <div><strong>สถานะเอกสาร:</strong> ${escapeHtml(isPaid ? 'ชำระเงินเรียบร้อยแล้ว' : 'รอการชำระเงิน')}</div>
+          <div><strong>ช่องทางชำระเงิน:</strong> Stripe PromptPay / บัตรเครดิต/เดบิต / โอนผ่านธนาคาร</div>
+          <div><strong>สถานะเอกสาร:</strong> ${escapeHtml(isPaid ? 'ชำระเงินเรียบร้อยแล้ว' : status === 'CANCELLED' || status === 'EXPIRED' ? 'ยกเลิก / หมดอายุ' : 'รอการชำระเงิน')}</div>
         </div>
       </div>
       <div class="totals">
@@ -1598,6 +1663,48 @@ export function buildPaymentNoticeHtml(
         <div class="total-row grand"><span>${escapeHtml(L.grandTotal)}</span><span>${formatMoney(grandTotal, lang)}</span></div>
       </div>
     </section>
+
+    ${
+      !isPaid && (status === 'CANCELLED' || status === 'EXPIRED')
+        ? `<div class="pay-notice-box cancelled">
+            <div style="color: #991b1b; font-size: 13px; font-weight: 800; text-align: center;">
+              ❌ คำสั่งซื้อนี้ถูกยกเลิกหรือหมดอายุแล้ว (${escapeHtml(statusLabel(status, lang))})
+            </div>
+            <p style="color: #7f1d1d; font-size: 11px; text-align: center; margin-top: 4px;">
+              คำสั่งซื้อไม่สามารถชำระเงินได้อีก หากต้องการสินค้ากรุณาสร้างคำสั่งซื้อใหม่
+            </p>
+          </div>`
+        : !isPaid
+          ? `<div class="pay-notice-box">
+              <div class="pay-notice-grid">
+                <div class="pay-qr-wrapper">
+                  ${
+                    options.paymentQrSvg
+                      ? `<div class="pay-qr-svg">${options.paymentQrSvg}</div>`
+                      : `<div style="font-size:11px;color:#047857;font-weight:700;">PromptPay / Stripe</div>`
+                  }
+                  <div style="font-size:10px;font-weight:700;color:#047857;margin-top:4px;">สแกนเพื่อชำระเงิน</div>
+                  ${
+                    options.paymentUrl
+                      ? `<a class="pay-qr-link" href="${escapeHtml(options.paymentUrl)}" target="_blank" rel="noopener noreferrer">เปิดหน้าชำระเงิน →</a>`
+                      : ''
+                  }
+                </div>
+                <div>
+                  <div class="pay-steps-title">💳 ขั้นตอนการชำระเงิน (Stripe PromptPay / บัตรเครดิต)</div>
+                  <ol class="pay-steps-list">
+                    <li><strong>สแกน QR Code:</strong> ใช้แอปธนาคารสแกน QR Code ฝั่งซ้าย หรือกดลิงก์เพื่อชำระเงิน</li>
+                    <li><strong>ยอดสุทธิ:</strong> ชำระยอด <strong>${formatMoney(grandTotal, lang)}</strong> ให้ตรงกับจำนวน</li>
+                    <li><strong>ยืนยันอัตโนมัติ:</strong> ระบบ Stripe PromptPay และตัดบัตรจะยืนยันการชำระเงินอัตโนมัติทันที ไม่ต้องแนบสลิป</li>
+                  </ol>
+                  <div class="pay-time-badge">
+                    ⏳ <strong>ระยะเวลาชำระเงิน:</strong> กรุณาชำระเงินภายใน <strong>15 - 30 นาที</strong> (สำหรับ Stripe PromptPay QR) หรือไม่เกิน <strong>24 ชั่วโมง</strong> เพื่อรักษาสิทธิ์คำสั่งซื้อก่อนระบบยกเลิกอัตโนมัติ
+                  </div>
+                </div>
+              </div>
+            </div>`
+          : ''
+    }
 
     <section class="footer-grid">
       ${renderQrBlock(options, verifyUrl, noticeNo, 'สแกนเพื่อตรวจสอบหนังสือแจ้งชำระเงิน')}
