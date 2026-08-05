@@ -46,6 +46,14 @@ export async function GET(request: NextRequest) {
     let capabilities: Record<string, string> = {};
     let verifyError = '';
 
+    let accountId = '';
+    let payoutsEnabled = false;
+    let chargesEnabled = false;
+    let detailsSubmitted = false;
+    let currentlyDue: string[] = [];
+    let payoutSchedule: Record<string, any> | null = null;
+    let payoutBlockReasons: string[] = [];
+
     if (hasSecretKey) {
       try {
         const res = await fetch('https://api.stripe.com/v1/account', {
@@ -55,11 +63,17 @@ export async function GET(request: NextRequest) {
         if (res.ok) {
           const account = await res.json();
           accountVerified = true;
+          accountId = account.id || '';
           accountName = account.settings?.dashboard?.display_name || account.business_profile?.name || '';
           accountCountry = account.country || '';
           accountDefaultCurrency = account.default_currency || '';
           accountEmail = account.email || '';
           capabilities = account.capabilities || {};
+          payoutsEnabled = account.payouts_enabled ?? true;
+          chargesEnabled = account.charges_enabled ?? true;
+          detailsSubmitted = account.details_submitted ?? true;
+          currentlyDue = account.requirements?.currently_due || [];
+          payoutSchedule = account.settings?.payouts?.schedule || null;
         } else {
           const err = await res.json().catch(() => ({}));
           verifyError = err?.error?.message || `HTTP ${res.status}`;
@@ -90,6 +104,30 @@ export async function GET(request: NextRequest) {
           }));
         }
       } catch { /* non-critical */ }
+    }
+
+    // Build Payout Diagnostic Block Reasons
+    if (!hasSecretKey) {
+      payoutBlockReasons.push('ยังไม่ได้ตั้งค่า STRIPE_SECRET_KEY ในระบบ');
+    } else if (!accountVerified) {
+      payoutBlockReasons.push(`ไม่สามารถยืนยัน Stripe Account ได้: ${verifyError || 'API Key ไม่ถูกต้อง'}`);
+    } else {
+      if (isTestMode) {
+        payoutBlockReasons.push('ระบบกำลังเปิดใช้งาน Test Mode (sk_test_) — เงินทั้งหมดเป็นเงินทดลอง ไม่สามารถสั่งถอนจริงเข้าบัญชีธนาคารได้');
+      }
+      if (!payoutsEnabled) {
+        payoutBlockReasons.push('Stripe Account ของคุณปิดสิทธิ์ Payouts (payouts_enabled = false) — กรุณาตรวจสอบสถานะบัญชีใน Stripe Dashboard');
+      }
+      if (currentlyDue.length > 0) {
+        payoutBlockReasons.push(`Stripe ต้องการข้อมูล/เอกสารยืนยันตัวตนเพิ่มเติม: ${currentlyDue.slice(0, 5).join(', ')}`);
+      }
+      const totalAvail = balanceAvailable.reduce((sum, b) => sum + b.amount, 0);
+      const totalPending = balancePending.reduce((sum, b) => sum + b.amount, 0);
+      if (totalAvail === 0 && totalPending > 0) {
+        payoutBlockReasons.push('ยอดเงินคงเหลือยังอยู่ในสถานะ Pending Balance (รอระยะเวลาดำเนินการย้ายเข้า Available Balance ตามรอบ Payout)');
+      } else if (totalAvail === 0 && totalPending === 0) {
+        payoutBlockReasons.push('ยังไม่มีเงินคงเหลือในบัญชี Stripe (ยอด Available และ Pending เท่ากับ ฿0)');
+      }
     }
 
     // Recent webhook events count (last 24 hours)
@@ -124,11 +162,18 @@ export async function GET(request: NextRequest) {
 
         // Account verification
         accountVerified,
+        accountId,
         accountName,
         accountCountry,
         accountDefaultCurrency,
         accountEmail,
         capabilities,
+        payoutsEnabled,
+        chargesEnabled,
+        detailsSubmitted,
+        currentlyDue,
+        payoutSchedule,
+        payoutBlockReasons,
         verifyError,
 
         // Balance

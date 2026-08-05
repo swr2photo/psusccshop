@@ -8,10 +8,13 @@ export interface ShopAdminPermissions {
   canManageRefunds?: boolean;
   canManageAnnouncement?: boolean;
   canManageEvents?: boolean;
+  canManagePromoCodes?: boolean;
   canManageSupport?: boolean;
   canManageShop?: boolean;
   canManagePayment?: boolean;
   canManageShipping?: boolean;
+  canManageLiveStream?: boolean;
+  canSendEmail?: boolean;
   canAddAdmins?: boolean;
 }
 
@@ -23,10 +26,13 @@ export const DEFAULT_SHOP_ADMIN_PERMISSIONS: ShopAdminPermissions = {
   canManageRefunds: true,
   canManageAnnouncement: false,
   canManageEvents: false,
+  canManagePromoCodes: false,
   canManageSupport: true,
   canManageShop: false,
   canManagePayment: false,
   canManageShipping: false,
+  canManageLiveStream: false,
+  canSendEmail: false,
   canAddAdmins: false,
 };
 
@@ -38,10 +44,13 @@ export const ALL_SHOP_ADMIN_PERMISSIONS: ShopAdminPermissions = {
   canManageRefunds: true,
   canManageAnnouncement: true,
   canManageEvents: true,
+  canManagePromoCodes: true,
   canManageSupport: true,
   canManageShop: true,
   canManagePayment: true,
   canManageShipping: true,
+  canManageLiveStream: true,
+  canSendEmail: true,
   canAddAdmins: true,
 };
 
@@ -55,13 +64,13 @@ export function mapShopPermissionsToAdminPanel(perms: ShopAdminPermissions): Rec
     canManageProducts: perms.canManageProducts ?? true,
     canManagePickup: perms.canManagePickup ?? false,
     canManageEvents: perms.canManageEvents ?? false,
-    canManagePromoCodes: false,
+    canManagePromoCodes: perms.canManagePromoCodes ?? false,
     canManageRefunds: perms.canManageRefunds ?? false,
     canManageTracking: perms.canManageTracking ?? false,
     canManageShipping: perms.canManageShipping ?? false,
     canManagePayment: perms.canManagePayment ?? false,
     canManageSupport: perms.canManageSupport ?? false,
-    canManageLiveStream: false,
-    canSendEmail: false,
+    canManageLiveStream: perms.canManageLiveStream ?? false,
+    canSendEmail: perms.canSendEmail ?? false,
   };
 }

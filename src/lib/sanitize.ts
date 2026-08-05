@@ -237,7 +237,7 @@ interface PublicShopConfig {
  * Mask account number - แสดงแค่ 4 ตัวท้าย
  * เช่น 123-456789-0 → ***-******-0 (แสดง 4 ตัวสุดท้าย)
  */
-function maskAccountNumber(accountNumber: string | null | undefined): string {
+export function maskAccountNumber(accountNumber: string | null | undefined): string {
   if (!accountNumber) return '';
   const cleaned = accountNumber.replace(/\D/g, '');
   if (cleaned.length <= 4) return accountNumber;
@@ -434,11 +434,16 @@ export function sanitizeConfigForAdmin(config: ShopConfig | null): ShopConfig | 
 interface PublicOrder {
   ref: string;
   date: string;
+  createdAt?: string;
   status: string;
   customerName?: string;
+  customerEmail?: string;
   customerPhone?: string;
   customerAddress?: string;
   customerInstagram?: string;
+  studentId?: string;
+  shopSlug?: string;
+  shopName?: string;
   cart?: any[];
   items?: any[];
   totalAmount?: number;
@@ -478,7 +483,7 @@ export function sanitizeOrderForUser(order: any): PublicOrder | null {
       const qty = item.quantity || 1;
       return sum + (price * qty);
     }, 0);
-    const totalAmount = order.totalAmount || order.total_amount || order.amount || 0;
+    const totalAmount = order.totalAmount ?? order.total_amount ?? order.amount ?? 0;
     const calculatedFee = totalAmount - cartSubtotal;
     // Only set shipping fee if it's a positive value (difference indicates shipping)
     if (calculatedFee > 0 && calculatedFee < 200) { // Reasonable shipping fee range
@@ -488,20 +493,25 @@ export function sanitizeOrderForUser(order: any): PublicOrder | null {
   
   return {
     ref: order.ref,
-    date: order.date || order.createdAt,
+    date: order.date || order.createdAt || order.created_at,
+    createdAt: order.createdAt || order.created_at || order.date,
     status: order.status,
-    customerName: order.customerName || order.name,
-    customerPhone: order.customerPhone || order.phone,
-    customerAddress: order.customerAddress || order.address,
-    customerInstagram: order.customerInstagram || order.instagram,
-    cart: order.cart,
-    items: order.items,
-    totalAmount: order.totalAmount,
-    amount: order.amount,
-    baseAmount: order.baseAmount,
-    discount: order.discount,
+    customerName: order.customerName || order.customer_name || order.name,
+    customerEmail: order.customerEmail || order.customer_email || order.email,
+    customerPhone: order.customerPhone || order.customer_phone || order.phone,
+    customerAddress: order.customerAddress || order.customer_address || order.address,
+    customerInstagram: order.customerInstagram || order.customer_instagram || order.instagram,
+    studentId: order.studentId || order.student_id,
+    shopSlug: order.shopSlug || order.shop_slug,
+    shopName: order.shopName || order.shop_name,
+    cart: order.cart || order.items || [],
+    items: order.items || order.cart || [],
+    totalAmount: order.totalAmount ?? order.total_amount ?? order.amount ?? 0,
+    amount: order.amount ?? order.totalAmount ?? order.total_amount ?? 0,
+    baseAmount: order.baseAmount ?? order.base_amount,
+    discount: order.discount ?? 0,
     notes: order.notes,
-    verifiedAt: order.verifiedAt || order.paymentVerifiedAt,
+    verifiedAt: order.verifiedAt || order.paymentVerifiedAt || order.verified_at,
     paymentVerified: order.paymentVerified === true || order.payment_verified === true,
     paymentVerifiedAt: order.paymentVerifiedAt || order.payment_verified_at || order.verifiedAt,
     receiptIssuedAt: order.receiptIssuedAt || order.receipt_issued_at,
@@ -509,9 +519,9 @@ export function sanitizeOrderForUser(order: any): PublicOrder | null {
     refundStatus: order.refundStatus || order.refund_status || null,
     hasSlip: !!(order.slip && (order.slip.base64 || order.slip.imageUrl)) || !!order.hasSlip,
     // Include tracking info for shipped orders
-    trackingNumber: order.trackingNumber,
-    shippingProvider: order.shippingProvider,
-    shippingMethod: order.shippingMethod,
+    trackingNumber: order.trackingNumber || order.tracking_number,
+    shippingProvider: order.shippingProvider || order.shipping_provider,
+    shippingMethod: order.shippingMethod || order.shipping_method,
     // Include shipping info (calculated if not explicitly set)
     shippingFee: shippingFee,
     shippingOption: order.shippingOption || order.shipping_option,

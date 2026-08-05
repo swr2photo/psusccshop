@@ -63,17 +63,12 @@ export default function StandalonePaymentPage() {
             const dataPay = await resPay.json();
             const payOrder = dataPay.order || dataPay.data?.order;
             if (!found) found = payOrder;
-            if (active && dataPay.info) {
+            const payData = dataPay.data || dataPay.info || dataPay;
+            if (active && payData && (payData.bankName || payData.accountNumber)) {
               setBankInfo({
-                bankName: dataPay.info.bankName,
-                accountNumber: dataPay.info.accountNumber,
-                accountName: dataPay.info.accountName,
-              });
-            } else if (active && dataPay.bankName) {
-              setBankInfo({
-                bankName: dataPay.bankName,
-                accountNumber: dataPay.accountNumber,
-                accountName: dataPay.accountName,
+                bankName: payData.bankName,
+                accountNumber: payData.accountNumber,
+                accountName: payData.accountName,
               });
             }
           }

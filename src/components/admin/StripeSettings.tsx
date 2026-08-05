@@ -42,7 +42,25 @@ import {
   Settings2,
   Loader2,
   Info,
+  LifeBuoy,
+  Send,
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import {
   PaymentGatewayConfig,
   StripeSpecificConfig,
@@ -60,11 +78,18 @@ interface StripeStatusData {
   maskedPublishableKey: string;
   maskedSecretKey: string;
   accountVerified: boolean;
+  accountId?: string;
   accountName: string;
   accountCountry: string;
   accountDefaultCurrency: string;
   accountEmail: string;
   capabilities: Record<string, string>;
+  payoutsEnabled?: boolean;
+  chargesEnabled?: boolean;
+  detailsSubmitted?: boolean;
+  currentlyDue?: string[];
+  payoutSchedule?: Record<string, any> | null;
+  payoutBlockReasons?: string[];
   verifyError: string;
   balanceAvailable: { amount: number; currency: string }[];
   balancePending: { amount: number; currency: string }[];
@@ -313,6 +338,16 @@ export default function StripeSettings({ config, onUpdate, onBack, onSave, savin
   const [statusLoading, setStatusLoading] = useState(true);
   const [statusError, setStatusError] = useState<string | null>(null);
 
+  // States for Stripe Issue Report Modal
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [issueCategory, setIssueCategory] = useState('payout_blocked');
+  const [issueSubject, setIssueSubject] = useState('เบิกเงินจาก Stripe ไม่ได้ / Payout Blocked');
+  const [issueDescription, setIssueDescription] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [submittingReport, setSubmittingReport] = useState(false);
+  const [reportResult, setReportResult] = useState<{ reportText: string; stripeSupportUrl: string; message: string } | null>(null);
+  const [reportError, setReportError] = useState<string | null>(null);
+
   const stripeConfig: StripeSpecificConfig = {
     ...DEFAULT_STRIPE_CONFIG,
     ...(config?.stripeConfig || {}),
@@ -346,6 +381,34 @@ export default function StripeSettings({ config, onUpdate, onBack, onSave, savin
   useEffect(() => {
     fetchStatus();
   }, [fetchStatus]);
+
+  const handleSendReport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setSubmittingReport(true);
+      setReportError(null);
+      const res = await apiFetch('/api/admin/stripe-report-issue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          issueCategory,
+          subject: issueSubject,
+          description: issueDescription,
+          userContactEmail: contactEmail || status?.accountEmail || '',
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setReportResult(data.data);
+      } else {
+        setReportError(data.error || 'Failed to send issue report');
+      }
+    } catch (err: any) {
+      setReportError(err?.message || 'Network error');
+    } finally {
+      setSubmittingReport(false);
+    }
+  };
 
   const isConnected = status?.accountVerified ?? false;
   const isTestMode = config?.testMode ?? true;
@@ -503,6 +566,45 @@ export default function StripeSettings({ config, onUpdate, onBack, onSave, savin
                             </div>
                           ))}
                         </div>
+                      </div>
+                    )}
+
+                    {/* Payout Diagnostics Warning */}
+                    {status.payoutBlockReasons && status.payoutBlockReasons.length > 0 && (
+                      <div className="mt-4 border-t border-amber-500/20 pt-3">
+                        <Alert className="border border-amber-500/30 bg-amber-500/[0.08] text-[var(--foreground)]">
+                          <Warning className="size-4 text-amber-500" />
+                          <div className="flex-1">
+                            <AlertTitle className="text-[0.88rem] font-bold text-amber-600 dark:text-amber-400">
+                              ⚠️ วิเคราะห์สาเหตุที่เบิกเงินไม่ได้ (Payout Diagnostic Warnings):
+                            </AlertTitle>
+                            <AlertDescription className="mt-2 space-y-1 text-[0.8rem]">
+                              {status.payoutBlockReasons.map((reason, idx) => (
+                                <p key={idx} className="flex items-start gap-1.5">
+                                  <span className="font-semibold text-amber-500">•</span>
+                                  <span>{reason}</span>
+                                </p>
+                              ))}
+                            </AlertDescription>
+                            <div className="mt-3">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setIssueCategory('payout_blocked');
+                                  setIssueSubject('เบิกเงินจาก Stripe ไม่ได้ / Payout Blocked');
+                                  setIssueDescription(status.payoutBlockReasons?.join('\n') || '');
+                                  setReportModalOpen(true);
+                                }}
+                                className="h-7 border-amber-500/40 bg-amber-500/10 text-[0.75rem] font-bold text-amber-700 hover:bg-amber-500/20 dark:text-amber-300"
+                              >
+                                <LifeBuoy className="mr-1 size-3.5" />
+                                แจ้งปัญหาไปยัง Stripe Support
+                              </Button>
+                            </div>
+                          </div>
+                        </Alert>
                       </div>
                     )}
                   </div>
@@ -987,7 +1089,187 @@ export default function StripeSettings({ config, onUpdate, onBack, onSave, savin
               ))}
             </div>
           </SectionCard>
+
+          {/* ======== SECTION 9: Stripe Support & Issue Reporting ======== */}
+          <SectionCard
+            icon={<LifeBuoy size={18} />}
+            title="ระบบแจ้งปัญหาไปยัง Stripe"
+            subtitle="ส่งรายงานปัญหาและออก Diagnostic Ticket เพื่อรับการช่วยเหลือ"
+            accentColor="#ef4444"
+            defaultExpanded={true}
+          >
+            <div className="flex flex-col gap-3 rounded-xl border border-red-500/20 bg-gradient-to-br from-red-500/[0.04] to-pink-500/[0.02] p-4">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[0.95rem] font-bold text-[var(--foreground)]">
+                    พบปัญหาการเบิกเงิน การยืนยันตัวตน หรือการรับชำระเงิน?
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
+                    สามารถออกรายงาน Diagnostic รายงานปัญหาไปยังทีมแอดมิน และสร้าง Support Ticket สำหรับส่งให้ Stripe Support ได้ทันที
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  onClick={() => setReportModalOpen(true)}
+                  className="shrink-0 rounded-xl bg-gradient-to-r from-red-500 to-rose-600 font-bold text-white shadow-md hover:from-red-600 hover:to-rose-700"
+                >
+                  <LifeBuoy className="mr-1.5 size-4" />
+                  สร้างรายงานแจ้งปัญหา Stripe
+                </Button>
+              </div>
+            </div>
+          </SectionCard>
         </div>
+
+        {/* Modal Dialog for Stripe Issue Reporting */}
+        <Dialog open={reportModalOpen} onOpenChange={setReportModalOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-lg font-bold">
+                <LifeBuoy className="text-red-500" />
+                แจ้งปัญหาการใช้งาน Stripe / Payout Trouble Ticket
+              </DialogTitle>
+              <DialogDescription>
+                กรอกรายละเอียดปัญหา ระบบจะทำการดึงสถานะทางเทคนิคของ Stripe อัตโนมัติเพื่อใช้ในการตรวจสอบ
+              </DialogDescription>
+            </DialogHeader>
+
+            {reportResult ? (
+              <div className="space-y-4 py-2">
+                <Alert className="border-green-500/30 bg-green-500/10 text-green-700 dark:text-green-300">
+                  <CheckCircle className="size-4" />
+                  <AlertDescription className="font-semibold">
+                    {reportResult.message || 'บันทึกรายงานปัญหาสำเร็จ!'}
+                  </AlertDescription>
+                </Alert>
+
+                <div>
+                  <p className="mb-1.5 text-xs font-semibold text-[var(--text-muted)]">
+                    ข้อมูลรายงานทางเทคนิค (Diagnostic Support Report):
+                  </p>
+                  <Textarea
+                    readOnly
+                    value={reportResult.reportText}
+                    rows={9}
+                    className="font-mono text-xs"
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                  <CopyButton text={reportResult.reportText} label="คัดลอกรายงาน Diagnostic" />
+
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setReportResult(null);
+                        setReportModalOpen(false);
+                      }}
+                    >
+                      ปิดหน้าต่าง
+                    </Button>
+                    <Button
+                      type="button"
+                      asChild
+                      className="bg-[#635BFF] font-bold text-white hover:bg-[#635BFF]/90"
+                    >
+                      <a href={reportResult.stripeSupportUrl} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="mr-1.5 size-4" />
+                        ไปยัง Stripe Support Contact
+                      </a>
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleSendReport} className="space-y-4 py-2">
+                {reportError && (
+                  <Alert variant="destructive">
+                    <Warning className="size-4" />
+                    <AlertDescription>{reportError}</AlertDescription>
+                  </Alert>
+                )}
+
+                <div className="space-y-1.5">
+                  <Label>ประเภทปัญหา (Issue Category)</Label>
+                  <Select value={issueCategory} onValueChange={setIssueCategory}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="เลือกประเภทปัญหา" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="payout_blocked">เบิกเงินไม่ได้ / Payout Blocked</SelectItem>
+                      <SelectItem value="verification_needed">การยืนยันตัวตน / KYC Verification Needed</SelectItem>
+                      <SelectItem value="bank_error">ปัญหาบัญชีธนาคาร / Bank Account Error</SelectItem>
+                      <SelectItem value="webhook_error">Webhook ล้มเหลว / Webhook Failed</SelectItem>
+                      <SelectItem value="payment_failed">การชำระเงินล้มเหลว / Payment Failed</SelectItem>
+                      <SelectItem value="other">อื่นๆ / Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>หัวข้อปัญหา (Subject)</Label>
+                  <Input
+                    required
+                    value={issueSubject}
+                    onChange={(e) => setIssueSubject(e.target.value)}
+                    placeholder="เช่น ไม่สามารถถอนเงินเข้าบัญชีธนาคารได้"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>รายละเอียดปัญหา (Description)</Label>
+                  <Textarea
+                    required
+                    rows={4}
+                    value={issueDescription}
+                    onChange={(e) => setIssueDescription(e.target.value)}
+                    placeholder="อธิบายอาการที่พบ เช่น มียอดเงินในระบบแต่ปุ่ม payout ปิดใช้งาน หรือขึ้น error แนะนำข้อมูล"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>อีเมลติดต่อกลับ (Contact Email)</Label>
+                  <Input
+                    type="email"
+                    value={contactEmail}
+                    onChange={(e) => setContactEmail(e.target.value)}
+                    placeholder={status?.accountEmail || 'admin@example.com'}
+                  />
+                </div>
+
+                <DialogFooter className="pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setReportModalOpen(false)}
+                    disabled={submittingReport}
+                  >
+                    ยกเลิก
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={submittingReport}
+                    className="bg-red-600 font-bold text-white hover:bg-red-700"
+                  >
+                    {submittingReport ? (
+                      <>
+                        <Loader2 className="mr-1.5 size-4 animate-spin" />
+                        กำลังส่งรายงาน...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="mr-1.5 size-4" />
+                        ส่งรายงานปัญหา
+                      </>
+                    )}
+                  </Button>
+                </DialogFooter>
+              </form>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </TooltipProvider>
   );

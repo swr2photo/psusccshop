@@ -5799,7 +5799,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
         { icon: <Send size={18} />, label: t.admin.navEmail, idx: 7, color: '#10b981', show: Boolean(canSendEmail) },
         { icon: <Sparkles size={18} />, label: t.admin.navEvents, idx: 14, color: '#fbbf24', show: Boolean(canManageEvents) },
         { icon: <Ticket size={18} />, label: t.admin.navPromo, idx: 15, color: '#34c759', show: Boolean(canManagePromoCodes) },
-        { icon: <Radio size={18} />, label: t.admin.navLive, idx: 16, color: '#ef4444', show: true },
+        { icon: <Radio size={18} />, label: t.admin.navLive, idx: 16, color: '#ef4444', show: Boolean(canManageLiveStream) },
       ],
     },
     {
@@ -6018,23 +6018,27 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
             )
           )}
           {activeTab === 6 && (
-            <SettingsView
-              localConfig={settingsLocalConfig}
-              hasChanges={settingsHasChanges}
-              loading={loading}
-              lastSavedTime={lastSavedTime}
-              newAdminEmail={newAdminEmail}
-              userEmail={session?.user?.email}
-              sheetSyncing={sheetSyncing}
-              isSuperAdminUser={isSuperAdminUser}
-              onConfigChange={handleSettingsConfigChange}
-              onSave={handleSettingsSave}
-              onReset={handleSettingsReset}
-              onNewAdminEmailChange={handleNewAdminEmailChange}
-              showToast={showToast}
-              triggerSheetSync={triggerSheetSync}
-              onImageUpload={handleAnnouncementImageUpload}
-            />
+            (canManageShop || canManageSheet || isSuperAdminUser) ? (
+              <SettingsView
+                localConfig={settingsLocalConfig}
+                hasChanges={settingsHasChanges}
+                loading={loading}
+                lastSavedTime={lastSavedTime}
+                newAdminEmail={newAdminEmail}
+                userEmail={session?.user?.email}
+                sheetSyncing={sheetSyncing}
+                isSuperAdminUser={isSuperAdminUser}
+                onConfigChange={handleSettingsConfigChange}
+                onSave={handleSettingsSave}
+                onReset={handleSettingsReset}
+                onNewAdminEmailChange={handleNewAdminEmailChange}
+                showToast={showToast}
+                triggerSheetSync={triggerSheetSync}
+                onImageUpload={handleAnnouncementImageUpload}
+              />
+            ) : (
+              <NoPermissionView permission="ตั้งค่าร้านค้า" />
+            )
           )}
           {activeTab === 7 && (canSendEmail ? <EmailManagement showToast={showToast} /> : <NoPermissionView permission="ส่งอีเมล" />)}
           {activeTab === 8 && (isSuperAdminUser ? <UserLogsView showToast={showToast} /> : <NoPermissionView permission="ดูประวัติผู้ใช้" />)}

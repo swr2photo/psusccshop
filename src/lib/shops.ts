@@ -12,7 +12,7 @@ import {
   ALL_SHOP_ADMIN_PERMISSIONS,
 } from './admin-permissions';
 import { getCached, invalidateCacheKey, CACHE_TTL } from './server-cache';
-import { sanitizePublicProducts } from './sanitize';
+import { sanitizePublicProducts, maskAccountNumber } from './sanitize';
 
 export type { ShopAdminPermissions } from './admin-permissions';
 export { DEFAULT_SHOP_ADMIN_PERMISSIONS, ALL_SHOP_ADMIN_PERMISSIONS } from './admin-permissions';
@@ -118,7 +118,7 @@ export function toPublicShopData(shop: Shop) {
       ? {
           bankName: shop.paymentInfo.bankName,
           accountName: shop.paymentInfo.accountName,
-          accountNumber: shop.paymentInfo.accountNumber,
+          accountNumber: maskAccountNumber(shop.paymentInfo.accountNumber),
         }
       : undefined,
     paymentInfo: shop.paymentInfo
@@ -126,7 +126,7 @@ export function toPublicShopData(shop: Shop) {
           promptPayId: shop.paymentInfo.promptPayId,
           bankName: shop.paymentInfo.bankName,
           accountName: shop.paymentInfo.accountName,
-          accountNumber: shop.paymentInfo.accountNumber,
+          accountNumber: maskAccountNumber(shop.paymentInfo.accountNumber),
         }
       : undefined,
   };
