@@ -3,6 +3,7 @@
 
 import { useState, useRef, useEffect, CSSProperties, memo, useCallback } from 'react';
 import { Box, Skeleton, CircularProgress } from '@mui/material';
+import { ImageOff, RefreshCw } from 'lucide-react';
 import { useTranslation } from '@/hooks/useTranslation';
 
 interface OptimizedImageProps {
@@ -267,7 +268,7 @@ function OptimizedImageComponent({
     );
   }
 
-  // Error state — quiet brand placeholder (stable height, no loud error chrome)
+  // Error state — support chat style (ImageOff, "โหลดรูปไม่สำเร็จ", tap to retry with RefreshCw icon)
   if (error) {
     return (
       <Box
@@ -281,36 +282,37 @@ function OptimizedImageComponent({
         sx={{
           ...containerStyles,
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
+          gap: 0.75,
+          p: 1.5,
           bgcolor: (theme) =>
             theme.palette.mode === 'dark'
-              ? 'color-mix(in srgb, var(--surface-2) 90%, #1a1a1c)'
-              : '#ececef',
+              ? 'rgba(255, 255, 255, 0.05)'
+              : 'rgba(0, 0, 0, 0.04)',
+          border: '1px border-[var(--glass-border)]',
+          borderRadius: borderRadius || '12px',
           cursor: 'pointer',
           transition: 'background-color 0.2s ease',
           '&:hover': {
             bgcolor: (theme) =>
-              theme.palette.mode === 'dark' ? 'var(--surface-3)' : '#e4e4e8',
+              theme.palette.mode === 'dark'
+                ? 'rgba(255, 255, 255, 0.08)'
+                : 'rgba(0, 0, 0, 0.07)',
           },
         }}
-        title={t.misc.tapToRetry}
-        aria-label={t.misc.tapToRetry}
+        title={t.misc.tapToRetry || 'แตะเพื่อลองใหม่'}
+        aria-label={t.misc.tapToRetry || 'แตะเพื่อลองใหม่'}
       >
-        <Box
-          component="img"
-          src="/favicon.png"
-          alt="SCC Shop"
-          sx={{
-            width: 40,
-            height: 40,
-            objectFit: 'contain',
-            opacity: 0.4,
-            filter: 'grayscale(1)',
-            userSelect: 'none',
-            pointerEvents: 'none',
-          }}
-        />
+        <ImageOff style={{ width: 24, height: 24, opacity: 0.7, color: 'var(--text-muted, #64748b)' }} aria-hidden />
+        <span style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted, #64748b)', textAlign: 'center', lineHeight: 1.2 }}>
+          {t.misc.loadImageFailed || 'โหลดรูปไม่สำเร็จ'}
+        </span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.65rem', color: '#2563eb', fontWeight: 600 }}>
+          <RefreshCw style={{ width: 12, height: 12 }} aria-hidden />
+          {t.misc.tapToRetry || 'แตะเพื่อลองใหม่'}
+        </span>
       </Box>
     );
   }

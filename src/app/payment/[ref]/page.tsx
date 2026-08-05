@@ -17,7 +17,7 @@ import {
   TextField,
   Divider,
 } from '@mui/material';
-import { ArrowLeft, QrCode, CreditCard, CheckCircle2, ShieldCheck, Upload, Building2, Copy, Printer } from 'lucide-react';
+import { ArrowLeft, QrCode, CreditCard, CheckCircle2, ShieldCheck, Upload, Building2, Copy, Printer, XCircle, AlertTriangle } from 'lucide-react';
 import StorefrontNavbar from '@/components/StorefrontNavbar';
 import MobileBottomNav from '@/components/MobileBottomNav';
 import StripePromptPay from '@/components/StripePromptPay';
@@ -139,7 +139,10 @@ export default function StandalonePaymentPage() {
     );
   }
 
-  const isAlreadyPaid = order?.status?.toUpperCase() === 'PAID' || order?.paymentVerified;
+  const currentStatus = (order?.status || 'PENDING').toUpperCase();
+  const isAlreadyPaid = currentStatus === 'PAID' || currentStatus === 'READY' || currentStatus === 'SHIPPED' || currentStatus === 'COMPLETED' || order?.paymentVerified;
+  const isCancelled = currentStatus === 'CANCELLED';
+  const isExpired = currentStatus === 'EXPIRED';
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'var(--background, #f8fafc)', color: 'var(--foreground, #0f172a)', pb: 10 }}>
@@ -170,7 +173,7 @@ export default function StandalonePaymentPage() {
             <Box sx={{ textAlign: { xs: 'left', sm: 'right' }, display: 'flex', flexDirection: 'column', alignItems: { xs: 'flex-start', sm: 'flex-end' }, gap: 1 }}>
               <Box>
                 <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>ยอดชำระทั้งหมด</Typography>
-                <Typography variant="h4" sx={{ fontWeight: 800, color: '#166534' }}>
+                <Typography variant="h4" sx={{ fontWeight: 800, color: isCancelled ? '#dc2626' : isExpired ? '#d97706' : '#166534' }}>
                   ฿{Number(order?.totalAmount || order?.amount || 0).toLocaleString()}
                 </Typography>
               </Box>
@@ -199,7 +202,43 @@ export default function StandalonePaymentPage() {
           </Box>
         </Paper>
 
-        {isAlreadyPaid ? (
+        {isCancelled ? (
+          <Paper elevation={0} sx={{ p: 6, textAlign: 'center', borderRadius: 4, border: '1px solid #fca5a5', bgcolor: '#fef2f2' }}>
+            <XCircle size={56} color="#dc2626" style={{ marginBottom: 12 }} />
+            <Typography variant="h5" sx={{ fontWeight: 800, color: '#991b1b', mb: 1 }}>
+              คำสั่งซื้อนี้ถูกยกเลิกแล้ว
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#7f1d1d', mb: 3 }}>
+              คำสั่งซื้อได้รับการยกเลิกแล้ว ไม่สามารถทำรายการชำระเงินเพิ่มเติมได้
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
+              <Button component={Link} href={`/orders/${encodeURIComponent(ref)}`} variant="contained" sx={{ bgcolor: '#1e3a5f', borderRadius: 2.5, px: 3 }}>
+                ดูรายละเอียดคำสั่งซื้อ
+              </Button>
+              <Button component={Link} href="/" variant="outlined" sx={{ borderRadius: 2.5, px: 3 }}>
+                กลับสู่หน้าหลัก
+              </Button>
+            </Box>
+          </Paper>
+        ) : isExpired ? (
+          <Paper elevation={0} sx={{ p: 6, textAlign: 'center', borderRadius: 4, border: '1px solid #fcd34d', bgcolor: '#fffbeb' }}>
+            <AlertTriangle size={56} color="#d97706" style={{ marginBottom: 12 }} />
+            <Typography variant="h5" sx={{ fontWeight: 800, color: '#92400e', mb: 1 }}>
+              หมดเวลาชำระเงินสำหรับคำสั่งซื้อนี้
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#78350f', mb: 3 }}>
+              ระยะเวลาในการสั่งซื้อหรือการชำระเงินสิ้นสุดลงแล้ว ไม่สามารถทำรายการชำระเงินได้
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
+              <Button component={Link} href={`/orders/${encodeURIComponent(ref)}`} variant="contained" sx={{ bgcolor: '#1e3a5f', borderRadius: 2.5, px: 3 }}>
+                ดูรายละเอียดคำสั่งซื้อ
+              </Button>
+              <Button component={Link} href="/" variant="outlined" sx={{ borderRadius: 2.5, px: 3 }}>
+                สั่งซื้อสินค้าใหม่
+              </Button>
+            </Box>
+          </Paper>
+        ) : isAlreadyPaid ? (
           <Paper elevation={0} sx={{ p: 6, textAlign: 'center', borderRadius: 4, border: '1px solid #86efac', bgcolor: '#f0fdf4' }}>
             <CheckCircle2 size={56} color="#16a34a" style={{ marginBottom: 12 }} />
             <Typography variant="h5" sx={{ fontWeight: 800, color: '#166534', mb: 1 }}>

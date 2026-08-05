@@ -282,6 +282,12 @@ export async function POST(req: NextRequest) {
 
     // ตรวจสอบสถานะ order
     const orderStatus = (order.status || '').toUpperCase();
+    if (orderStatus === 'CANCELLED') {
+      return await secureJsonResponse({ status: 'error', message: 'คำสั่งซื้อนี้ถูกยกเลิกแล้ว ไม่สามารถอัปโหลดสลิปได้' }, { status: 400 });
+    }
+    if (orderStatus === 'EXPIRED') {
+      return await secureJsonResponse({ status: 'error', message: 'คำสั่งซื้อนี้หมดเวลาชำระเงินแล้ว ไม่สามารถอัปโหลดสลิปได้' }, { status: 400 });
+    }
     if (['PAID', 'COMPLETED', 'SHIPPED', 'READY'].includes(orderStatus)) {
       return await secureJsonResponse({ status: 'error', message: 'คำสั่งซื้อนี้ได้รับการชำระเงินแล้ว' }, { status: 400 });
     }

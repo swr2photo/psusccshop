@@ -87,6 +87,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const orderStatus = (order.status || '').toUpperCase();
+    if (orderStatus === 'CANCELLED' || orderStatus === 'EXPIRED') {
+      return await secureJsonResponse(
+        { success: false, error: 'คำสั่งซื้อนี้ถูกยกเลิกหรือหมดเวลาชำระเงินแล้ว ไม่สามารถทำการชำระเงินได้' },
+        { status: 400 }
+      );
+    }
+    if (['PAID', 'COMPLETED', 'SHIPPED', 'READY'].includes(orderStatus)) {
+      return await secureJsonResponse(
+        { success: false, error: 'คำสั่งซื้อนี้ได้รับการชำระเงินเรียบร้อยแล้ว' },
+        { status: 400 }
+      );
+    }
+
     const expectedAmount = Number(order.totalAmount) || 0;
     if (expectedAmount < 1) {
       return await secureJsonResponse(

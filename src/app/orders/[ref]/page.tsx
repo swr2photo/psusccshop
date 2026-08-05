@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import StorefrontNavbar from '@/components/StorefrontNavbar';
 import MobileBottomNav from '@/components/MobileBottomNav';
+import OrderFlowTimeline from '@/components/OrderFlowTimeline';
 import { useTranslation } from '@/hooks/useTranslation';
 import { apiFetch } from '@/lib/api-client';
 
@@ -170,42 +171,10 @@ export default function StandaloneOrderDetailPage() {
           </Box>
         </Paper>
 
-        {/* Status Timeline Card */}
-        <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#ffffff', mb: 3 }}>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: 'var(--navy, #1e3a5f)', mb: 3 }}>
-            สถานะการดำเนินการ (Order Tracking)
-          </Typography>
-
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(4, 1fr)' }, gap: 2 }}>
-            <Box sx={{ p: 2, borderRadius: 2, bgcolor: currentStatus === 'PENDING' ? '#fef3c7' : '#f8fafc', border: '1px solid #cbd5e1' }}>
-              <Typography sx={{ fontWeight: 700, fontSize: '0.875rem', color: currentStatus === 'PENDING' ? '#92400e' : '#64748b' }}>
-                1. สร้างคำสั่งซื้อ
-              </Typography>
-              <Typography sx={{ fontSize: '0.75rem', color: '#64748b', mt: 0.5 }}>รอการชำระเงิน</Typography>
-            </Box>
-
-            <Box sx={{ p: 2, borderRadius: 2, bgcolor: isPaid ? '#dcfce7' : '#f8fafc', border: '1px solid #cbd5e1' }}>
-              <Typography sx={{ fontWeight: 700, fontSize: '0.875rem', color: isPaid ? '#166534' : '#64748b' }}>
-                2. ยืนยันการชำระเงิน
-              </Typography>
-              <Typography sx={{ fontSize: '0.75rem', color: '#64748b', mt: 0.5 }}>ได้รับยอดแล้ว</Typography>
-            </Box>
-
-            <Box sx={{ p: 2, borderRadius: 2, bgcolor: currentStatus === 'READY' || currentStatus === 'COMPLETED' ? '#e0f2fe' : '#f8fafc', border: '1px solid #cbd5e1' }}>
-              <Typography sx={{ fontWeight: 700, fontSize: '0.875rem', color: currentStatus === 'READY' || currentStatus === 'COMPLETED' ? '#0369a1' : '#64748b' }}>
-                3. พร้อมรับสินค้า
-              </Typography>
-              <Typography sx={{ fontSize: '0.75rem', color: '#64748b', mt: 0.5 }}>รับ ณ ห้องชุมนุม</Typography>
-            </Box>
-
-            <Box sx={{ p: 2, borderRadius: 2, bgcolor: currentStatus === 'COMPLETED' ? '#f0fdf4' : '#f8fafc', border: '1px solid #cbd5e1' }}>
-              <Typography sx={{ fontWeight: 700, fontSize: '0.875rem', color: currentStatus === 'COMPLETED' ? '#15803d' : '#64748b' }}>
-                4. สำเร็จเรียบร้อย
-              </Typography>
-              <Typography sx={{ fontSize: '0.75rem', color: '#64748b', mt: 0.5 }}>รับสินค้าแล้ว</Typography>
-            </Box>
-          </Box>
-        </Paper>
+        {/* Status Flow Timeline Card */}
+        <Box sx={{ mb: 3 }}>
+          <OrderFlowTimeline order={order} lang={lang} />
+        </Box>
 
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 360px' }, gap: 3 }}>
           {/* Items Breakdown */}

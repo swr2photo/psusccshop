@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { isAdminEmailAsync, getSession } from '@/lib/auth';
-import { secureJsonResponse } from '@/lib/payload-crypto';
+import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
 import { db } from '@/lib/db';
 import { userLogs } from '@/db/schema';
 
@@ -20,7 +20,12 @@ export async function POST(request: NextRequest) {
       return await secureJsonResponse({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json().catch(() => ({}));
+    let body: any = {};
+    try {
+      body = await secureJsonRequest(request);
+    } catch {
+      body = await request.json().catch(() => ({}));
+    }
     const { issueCategory, subject, description, userContactEmail } = body;
 
     if (!subject || !description) {

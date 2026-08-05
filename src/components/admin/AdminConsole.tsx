@@ -6072,7 +6072,19 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
                 alt="สลิปการโอนเงิน"
                 onError={(e) => {
                   console.error('[SlipViewer] Image load error:', slipViewerData.slip?.imageUrl);
-                  (e.target as HTMLImageElement).style.display = 'none';
+                  const target = e.currentTarget;
+                  target.style.display = 'none';
+                  const parent = target.parentElement;
+                  if (parent && !parent.querySelector('.slip-error-fallback')) {
+                    const fallback = document.createElement('div');
+                    fallback.className = 'slip-error-fallback my-4 flex flex-col items-center justify-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 p-6 text-center text-red-400';
+                    fallback.innerHTML = `
+                      <svg class="size-8 opacity-80" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="2" x2="22" y2="22"/><path d="M10.41 10.41a2 2 0 1 1-2.83-2.83"/><line x1="13.5" y1="13.5" x2="16.5" y2="16.5"/><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m3 16 5-5c.9-.9 2.1-.9 3 0l.5.5"/></svg>
+                      <p class="text-sm font-bold">โหลดรูปไม่สำเร็จ</p>
+                      <p class="text-xs opacity-75">ไม่สามารถโหลดรูปภาพสลิปการโอนเงินได้</p>
+                    `;
+                    parent.appendChild(fallback);
+                  }
                 }}
                 className="mx-auto max-h-[70vh] max-w-full rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.3)]"
               />
