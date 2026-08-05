@@ -51,6 +51,7 @@ import { useNotification } from '@/components/NotificationContext';
 import {
   getProductStatus, getShopStatus, getProductUnavailableToast, SHOP_STATUS_CONFIG, ShopStatusBanner, type ShopStatusType,
 } from '@/components/ShopStatusCard';
+import ServerStatusBanner from '@/components/ServerStatusBanner';
 import type { Product, ShopConfig } from '@/lib/config';
 import type { ShippingConfig } from '@/lib/shipping';
 import type { CartItem as DrawerCartItem } from '@/lib/shop-constants';
@@ -212,6 +213,7 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
   const { confirm: showConfirm, ConfirmDialog } = useConfirmDialog();
   const { success: toastSuccess, error: toastError, warning: toastWarning, info: toastInfo } = useNotification();
   const isMobile = useMediaQuery('(max-width:600px)', { noSsr: true });
+  const [serverIssue, setServerIssue] = useState(false);
   const cart = useCartStore((s) => s.cart);
   const addToCart = useCartStore((s) => s.addToCart);
   const wishlistStore = useWishlistStore();
@@ -697,7 +699,14 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('[Realtime] Shop channel subscription status:', status, '(Server issue)');
+          setServerIssue(true);
+        } else if (status === 'SUBSCRIBED') {
+          setServerIssue(false);
+        }
+      });
 
     return () => {
       channel.unsubscribe();
@@ -1580,6 +1589,13 @@ export default function ShopStorefront({ shopSlug, initialShop }: ShopStorefront
         </Box>
         </ProgressiveBlurChrome>
       </Box>
+
+      <ServerStatusBanner
+        show={serverIssue}
+        onRetry={() => {
+          queryClient.invalidateQueries({ queryKey: [...queryKeys.shop.all, 'public', initialShop.id] });
+        }}
+      />
 
       <ShopStatusBanner
         isOpen={shopOpenFields.isOpen}

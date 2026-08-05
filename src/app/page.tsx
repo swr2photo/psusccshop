@@ -124,6 +124,7 @@ import { FLAGSHIP_PRODUCTS, getFlagshipSlugForProduct } from '@/lib/flagship/con
 import { flushFlagshipCartQueue } from '@/lib/flagship/cart-bridge';
 import TurnstileWidget from '@/components/TurnstileWidget';
 import { ShopStatusBanner, getProductStatus, getShopStatus, getProductUnavailableToast, SHOP_STATUS_CONFIG, type ShopStatusType } from '@/components/ShopStatusCard';
+import ServerStatusBanner from '@/components/ServerStatusBanner';
 import type { SavedAddress } from '@/components/ProfileModal';
 import { useTheme } from '@mui/material';
 import { formatFriendlyError } from '@/utils/error';
@@ -866,6 +867,7 @@ export default function HomePage() {
   // Health of the public config realtime channel — gates fallback polling.
   // (realtimeConnected from useRealtimeOrders only reflects the orders channel)
   const [configRealtimeOk, setConfigRealtimeOk] = useState(false);
+  const [serverIssue, setServerIssue] = useState(false);
   const configFetchInFlight = useRef(false);
   const configPollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastConfigRefreshAt = useRef(0);
@@ -2077,8 +2079,17 @@ export default function HomePage() {
         }
       )
       .subscribe((status) => {
-        console.log('[Realtime] Public config subscription status:', status);
-        setConfigRealtimeOk(status === 'SUBSCRIBED');
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('[Realtime] Public config subscription status:', status, '(Server issue, switching to polling mode)');
+          setConfigRealtimeOk(false);
+          setServerIssue(true);
+        } else if (status === 'SUBSCRIBED') {
+          console.log('[Realtime] Public config subscription status:', status);
+          setConfigRealtimeOk(true);
+          setServerIssue(false);
+        } else {
+          setConfigRealtimeOk(false);
+        }
       });
 
     return () => {
@@ -3835,6 +3846,14 @@ export default function HomePage() {
             </Box>
           </Box>
         ) : null}
+      />
+
+      {/* Server Connection Issue Banner */}
+      <ServerStatusBanner 
+        show={serverIssue || Boolean(realtimeError)} 
+        onRetry={() => {
+          refreshConfig(true);
+        }}
       />
 
       {/* Shop Status Banner - Shows different states (not open, coming soon, order ended, etc.) */}

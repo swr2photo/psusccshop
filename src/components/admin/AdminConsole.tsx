@@ -970,7 +970,11 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
           }).catch(err => console.warn('[Admin Realtime] Failed to refetch shops', err));
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('[Admin Realtime] Shops channel disconnected:', status);
+        }
+      });
 
     return () => {
       channel.unsubscribe();

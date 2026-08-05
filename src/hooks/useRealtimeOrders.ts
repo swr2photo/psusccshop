@@ -249,7 +249,11 @@ export function useRealtimeOrders(options: UseRealtimeOrdersOptions = {}) {
           }
         )
         .subscribe((status, err) => {
-          console.log('[Realtime] Subscription status:', status, err?.message || '');
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            console.warn('[Realtime] Subscription status:', status, err?.message || '(Transport issue, retrying)');
+          } else {
+            console.log('[Realtime] Subscription status:', status);
+          }
 
           switch (status) {
             case 'SUBSCRIBED':
@@ -271,7 +275,7 @@ export function useRealtimeOrders(options: UseRealtimeOrdersOptions = {}) {
               updateState({
                 connectionState: 'error',
                 isConnected: false,
-                error: err?.message || 'Connection failed',
+                error: err?.message || 'Server connection issue',
               });
               // eslint-disable-next-line react-hooks/immutability
 
