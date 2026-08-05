@@ -1102,3 +1102,521 @@ export function buildInvoiceHtml(
 </body>
 </html>`;
 }
+
+/**
+ * Builds the official Electronic Payment Notice (หนังสือแจ้งชำระเงินอิเล็กทรอนิกส์) HTML document.
+ * Formatted cleanly as an A4 institutional letterhead document with official stamp, QR verification, and zero print distortion.
+ */
+export function buildPaymentNoticeHtml(
+  order: Record<string, unknown>,
+  ref: string,
+  lang: InvoiceLang,
+  options: InvoiceBuildOptions = {}
+): string {
+  const L = resolveLabels(lang);
+  const cartRaw = order.cart;
+  const cart: Record<string, unknown>[] =
+    typeof cartRaw === 'string'
+      ? (JSON.parse(cartRaw) as Record<string, unknown>[])
+      : Array.isArray(cartRaw)
+        ? cartRaw
+        : [];
+
+  const orderDate =
+    readOrderField(order, 'createdAt', 'created_at', 'date') || new Date().toISOString();
+  const paidAt = readOrderField(order, 'paymentVerifiedAt', 'payment_verified_at', 'verifiedAt');
+  const status = readOrderField(order, 'status') || 'WAITING_PAYMENT';
+  const isPaid =
+    ['PAID', 'READY', 'SHIPPED', 'RECEIVED', 'COMPLETED'].includes(status.toUpperCase()) ||
+    order.paymentVerified === true;
+
+  const lineAmounts = cart.map((item) => resolveCartLineAmounts(item));
+  const subtotalFromCart = lineAmounts.reduce((sum, line) => sum + line.lineTotal, 0);
+  const orderSubtotal = Number(order.subtotal ?? 0) || 0;
+  const subtotal = subtotalFromCart > 0 ? subtotalFromCart : orderSubtotal;
+
+  const shippingFee = Number(order.shippingFee ?? order.shipping_fee ?? 0) || 0;
+  const discount = Number(order.discount ?? order.promoDiscount ?? 0) || 0;
+  const grandTotal =
+    Number(order.totalAmount ?? order.total_amount ?? 0) ||
+    Math.max(0, subtotal + shippingFee - discount);
+
+  const customerName = readOrderField(order, 'customerName', 'customer_name', 'name') || '-';
+  const customerEmail = readOrderField(order, 'customerEmail', 'customer_email', 'email') || '-';
+  const customerPhone = readOrderField(order, 'customerPhone', 'customer_phone', 'phone') || '-';
+  const studentId = readOrderField(order, 'studentId', 'student_id') || '';
+  const customerAddress = orderRequiresShippingAddress(order)
+    ? readOrderField(order, 'customerAddress', 'customer_address', 'address')
+    : '';
+
+  const noticeNo = buildPaymentNoticeNumber(ref, orderDate);
+  const verifyUrl = absoluteUrl(`/orders/${encodeURIComponent(ref)}?lang=${lang}`);
+  const amountWords = lang === 'th' ? bahtTextThai(grandTotal) : bahtTextEnglish(grandTotal);
+  const orgName = lang === 'th' ? ISSUER.nameTh : ISSUER.nameEn;
+  const orgAddress = lang === 'th' ? ISSUER.addressTh : ISSUER.addressEn;
+  const docTitle = lang === 'th' ? 'หนังสือแจ้งชำระเงินอิเล็กทรอนิกส์' : 'ELECTRONIC PAYMENT NOTICE';
+
+  const cartRows = cart
+    .map((item, index) => {
+      const { qty, unitPrice, lineTotal } = lineAmounts[index] || resolveCartLineAmounts(item);
+      const name = readOrderField(item as Record<string, unknown>, 'productName', 'name') || L.item;
+      const size = String(item.size || '-');
+      const meta = formatCartLineMeta(item, lang);
+      const titleWithSize =
+        size && size !== '-'
+          ? `${escapeHtml(name)} <span class="size-inline">(${escapeHtml(L.size)}: ${escapeHtml(size)})</span>`
+          : escapeHtml(name);
+
+      return `
+        <tr>
+          <td class="num col-no">${index + 1}</td>
+          <td>
+            <div class="line-title">${titleWithSize}</div>
+            ${meta}
+          </td>
+          <td class="num col-size">${escapeHtml(size)}</td>
+          <td class="num col-qty">${qty}</td>
+          <td class="num col-unit">${formatMoney(unitPrice, lang)}</td>
+          <td class="num col-amt strong">${formatMoney(lineTotal, lang)}</td>
+        </tr>`;
+    })
+    .join('');
+
+  const logoUrl = absoluteUrl('/logo3-01-01-01-01.png');
+
+  return `<!DOCTYPE html>
+<html lang="${lang}">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapeHtml(docTitle)} — ${escapeHtml(noticeNo)}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+    :root {
+      --ink: #0f172a;
+      --navy: #1e3a5f;
+      --muted: #475569;
+      --line: #cbd5e1;
+      --paper: #ffffff;
+      --wash: #f8fafc;
+      --emerald: #059669;
+      --amber: #d97706;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Sarabun', 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #e2e8f0;
+      color: var(--ink);
+      padding: 20px 12px 36px;
+      line-height: 1.45;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .toolbar { text-align: center; margin-bottom: 16px; }
+    .btn-print {
+      padding: 10px 22px;
+      background: var(--navy);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    }
+    .sheet {
+      width: 100%;
+      max-width: 210mm;
+      min-height: 297mm;
+      margin: 0 auto;
+      background: var(--paper);
+      border: 1px solid #94a3b8;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+      padding: 18mm 16mm 16mm;
+      position: relative;
+    }
+    .original-badge {
+      position: absolute;
+      top: 12mm;
+      right: 14mm;
+      border: 1.5px solid var(--navy);
+      color: var(--navy);
+      font-size: 10.5px;
+      font-weight: 700;
+      padding: 3px 10px;
+      letter-spacing: 0.08em;
+      border-radius: 3px;
+      background: #fff;
+    }
+    .header {
+      display: grid;
+      grid-template-columns: 80px 1fr;
+      gap: 16px;
+      padding-bottom: 14px;
+      border-bottom: 2.5px solid var(--navy);
+      align-items: center;
+      padding-right: 140px;
+    }
+    .header img {
+      width: 76px;
+      height: 76px;
+      object-fit: contain;
+      display: block;
+    }
+    .org-name {
+      font-size: 14.5px;
+      font-weight: 700;
+      color: var(--navy);
+      line-height: 1.3;
+    }
+    .org-name-en {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 1px;
+    }
+    .org-contact {
+      font-size: 10.5px;
+      color: var(--muted);
+      margin-top: 4px;
+      line-height: 1.35;
+    }
+    .doc-title {
+      margin-top: 16px;
+      text-align: center;
+    }
+    .doc-title h1 {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--navy);
+      letter-spacing: 0.04em;
+    }
+    .doc-title .sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .meta {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 10px 24px;
+      padding: 14px 0 16px;
+      border-bottom: 1px solid var(--line);
+      font-size: 12.5px;
+    }
+    .meta .label {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .meta .value {
+      font-weight: 600;
+      margin-top: 1px;
+      word-break: break-word;
+    }
+    .meta .mono { font-family: ui-monospace, 'Courier New', monospace; font-size: 12px; }
+    table.items {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+      font-size: 12.5px;
+    }
+    table.items th {
+      background: var(--wash);
+      border-top: 1.5px solid var(--navy);
+      border-bottom: 1.5px solid var(--navy);
+      color: var(--navy);
+      font-size: 11px;
+      font-weight: 700;
+      padding: 8px 6px;
+      text-align: left;
+    }
+    table.items td {
+      border-bottom: 1px solid var(--line);
+      padding: 9px 6px;
+      vertical-align: top;
+    }
+    .line-title { font-weight: 600; color: var(--ink); }
+    .size-inline { font-weight: 500; color: var(--muted); }
+    .line-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .num { text-align: center; white-space: nowrap; }
+    .col-no { width: 36px; }
+    .col-size { width: 64px; }
+    .col-qty { width: 52px; }
+    .col-unit, .col-amt { text-align: right !important; width: 88px; }
+    th.col-unit, th.col-amt { text-align: right; }
+    th.col-no, th.col-size, th.col-qty { text-align: center; }
+    .strong { font-weight: 700; }
+    .summary {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr;
+      gap: 16px;
+      margin-top: 14px;
+      align-items: start;
+    }
+    .words-box {
+      border: 1px solid var(--line);
+      background: var(--wash);
+      padding: 10px 12px;
+      font-size: 12px;
+    }
+    .words-box .label { color: var(--muted); font-size: 11px; font-weight: 600; }
+    .words-box .value { margin-top: 4px; font-weight: 700; color: var(--ink); }
+    .pay-meta { margin-top: 10px; font-size: 12px; color: var(--muted); line-height: 1.55; }
+    .pay-meta strong { color: var(--ink); }
+    .totals {
+      border: 1px solid var(--line);
+      padding: 8px 12px 10px;
+    }
+    .total-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 4px 0;
+      font-size: 12.5px;
+      color: var(--muted);
+    }
+    .total-row.grand {
+      margin-top: 6px;
+      padding-top: 8px;
+      border-top: 2px solid var(--navy);
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--navy);
+    }
+    .footer-grid {
+      display: grid;
+      grid-template-columns: 140px 1fr;
+      gap: 24px;
+      margin-top: 28px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+      align-items: end;
+    }
+    .qr-block { text-align: center; }
+    .qr-svg {
+      display: inline-flex;
+      width: 110px;
+      height: 110px;
+      border: 1px solid var(--line);
+      padding: 4px;
+      background: #fff;
+      align-items: center;
+      justify-content: center;
+    }
+    .qr-svg svg { width: 100%; height: 100%; display: block; }
+    .qr-block p {
+      margin-top: 6px;
+      font-size: 10px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+    .sign-block {
+      text-align: center;
+      padding-bottom: 4px;
+      position: relative;
+    }
+    .sign-area {
+      position: relative;
+      margin: 8px auto 8px;
+      width: 70%;
+      max-width: 280px;
+      height: 100px;
+    }
+    .sign-line {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 18px;
+      border-bottom: 1px solid var(--ink);
+    }
+    .official-stamp {
+      position: absolute;
+      left: 50%;
+      top: 46%;
+      transform: translate(-50%, -50%) rotate(-12deg);
+      opacity: 0.75;
+      pointer-events: none;
+      mix-blend-mode: multiply;
+    }
+    .sign-caption {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--ink);
+    }
+    .sign-sub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .thanks {
+      margin-top: 18px;
+      text-align: center;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    @media print {
+      html, body {
+        background: #fff !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+        height: auto !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      .sheet {
+        max-width: none !important;
+        width: 100% !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+      }
+      .meta { display: grid !important; grid-template-columns: 1.2fr 1fr !important; }
+      .summary { display: grid !important; grid-template-columns: 1.3fr 1fr !important; }
+      .footer-grid { display: grid !important; grid-template-columns: 140px 1fr !important; }
+      .col-size, th.col-size { display: table-cell !important; }
+      .original-badge { position: absolute !important; right: 0 !important; top: -12px !important; }
+      .toolbar, .no-print { display: none !important; }
+      .official-stamp { opacity: 0.75 !important; -webkit-print-color-adjust: exact !important; }
+      @page { size: A4 portrait; margin: 10mm 12mm; }
+    }
+    @media screen and (max-width: 720px) {
+      .sheet { padding: 18px 14px 24px; min-height: 0; }
+      .header { padding-right: 0; }
+      .original-badge { position: static; margin-bottom: 10px; display: inline-block; }
+      .meta, .summary, .footer-grid { grid-template-columns: 1fr; }
+      .col-size { display: none; }
+      th.col-size { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar no-print">
+    <button class="btn-print" type="button" onclick="window.print()">${escapeHtml(L.print)}</button>
+  </div>
+  <article class="sheet" aria-label="${escapeHtml(docTitle)}">
+    <div class="original-badge">${escapeHtml(isPaid ? 'ชำระเงินแล้ว / PAID' : 'รอชำระเงิน / PENDING')}</div>
+    <header class="header">
+      <img src="${escapeHtml(logoUrl)}" alt="${escapeHtml(ISSUER.shortTh)}" />
+      <div>
+        <div class="org-name">${escapeHtml(orgName)}</div>
+        <div class="org-name-en">${escapeHtml(lang === 'th' ? ISSUER.nameEn : ISSUER.nameTh)}</div>
+        <div class="org-contact">
+          ${escapeHtml(orgAddress)}<br />
+          ${lang === 'th' ? 'โทร' : 'Tel'}: ${escapeHtml(ISSUER.phone)}
+          &nbsp;|&nbsp;
+          ${lang === 'th' ? 'อีเมล' : 'Email'}: ${escapeHtml(ISSUER.email)}
+        </div>
+      </div>
+    </header>
+
+    <div class="doc-title">
+      <h1>${escapeHtml(docTitle)}</h1>
+      <div class="sub">${escapeHtml(ISSUER.shortTh)}</div>
+    </div>
+
+    <section class="meta">
+      <div>
+        <div class="label">${escapeHtml(L.customer)}</div>
+        <div class="value">${escapeHtml(customerName)}</div>
+      </div>
+      <div>
+        <div class="label">เลขที่หนังสือแจ้งชำระเงิน</div>
+        <div class="value mono">${escapeHtml(noticeNo)}</div>
+      </div>
+      <div>
+        <div class="label">${escapeHtml(L.email)}</div>
+        <div class="value">${escapeHtml(customerEmail)}</div>
+      </div>
+      <div>
+        <div class="label">${escapeHtml(L.orderRef)}</div>
+        <div class="value mono">${escapeHtml(ref)}</div>
+      </div>
+      <div>
+        <div class="label">${escapeHtml(L.phone)} ${studentId ? `· รหัสนักศึกษา: ${escapeHtml(studentId)}` : ''}</div>
+        <div class="value">${escapeHtml(customerPhone)}</div>
+      </div>
+      <div>
+        <div class="label">วันที่ออกเอกสาร</div>
+        <div class="value">${escapeHtml(formatDateTime(orderDate, lang))}</div>
+      </div>
+      ${
+        customerAddress
+          ? `<div style="grid-column:1/-1">
+        <div class="label">${escapeHtml(L.address)}</div>
+        <div class="value">${escapeHtml(customerAddress)}</div>
+      </div>`
+          : ''
+      }
+    </section>
+
+    <table class="items">
+      <thead>
+        <tr>
+          <th class="col-no">${escapeHtml(L.no)}</th>
+          <th>${escapeHtml(L.item)}</th>
+          <th class="col-size">${escapeHtml(L.size)}</th>
+          <th class="col-qty">${escapeHtml(L.qty)}</th>
+          <th class="col-unit">${escapeHtml(L.unitPrice)}</th>
+          <th class="col-amt">${escapeHtml(L.lineTotal)}</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${
+          cartRows ||
+          `<tr><td colspan="6" style="text-align:center;color:#6b7280;padding:16px;">—</td></tr>`
+        }
+      </tbody>
+    </table>
+
+    <section class="summary">
+      <div>
+        <div class="words-box">
+          <div class="label">${escapeHtml(L.amountInWords)}</div>
+          <div class="value">${escapeHtml(amountWords)}</div>
+        </div>
+        <div class="pay-meta">
+          <div><strong>ช่องทางชำระเงิน:</strong> Stripe PromptPay / โอนผ่านบัญชีธนาคารไทยพาณิชย์ (SCB)</div>
+          <div><strong>สถานะเอกสาร:</strong> ${escapeHtml(isPaid ? 'ชำระเงินเรียบร้อยแล้ว' : 'รอการชำระเงิน')}</div>
+        </div>
+      </div>
+      <div class="totals">
+        <div class="total-row"><span>${escapeHtml(L.subtotal)}</span><span>${formatMoney(subtotal, lang)}</span></div>
+        ${
+          shippingFee > 0
+            ? `<div class="total-row"><span>${escapeHtml(L.shipping)}</span><span>${formatMoney(shippingFee, lang)}</span></div>`
+            : ''
+        }
+        ${
+          discount > 0
+            ? `<div class="total-row"><span>${escapeHtml(L.discount)}</span><span>-${formatMoney(discount, lang)}</span></div>`
+            : ''
+        }
+        <div class="total-row grand"><span>${escapeHtml(L.grandTotal)}</span><span>${formatMoney(grandTotal, lang)}</span></div>
+      </div>
+    </section>
+
+    <section class="footer-grid">
+      ${renderQrBlock(options, verifyUrl, noticeNo, 'สแกนเพื่อตรวจสอบหนังสือแจ้งชำระเงิน')}
+      <div class="sign-block">
+        <div class="sign-area" aria-hidden="true">
+          ${buildOfficialStampSvg(lang)}
+          <div class="sign-line"></div>
+        </div>
+        <div class="sign-caption">${escapeHtml(L.receiverSign)}</div>
+        <div class="sign-sub">${escapeHtml(L.authorizedSign)}</div>
+        <div class="sign-sub" style="margin-top:6px;">${escapeHtml(ISSUER.shortTh)}</div>
+      </div>
+    </section>
+
+    <p class="thanks">
+      เอกสารแจ้งชำระเงินอิเล็กทรอนิกส์ออกโดยระบบอัตโนมัติของ ${escapeHtml(ISSUER.shortTh)}<br />
+      ${escapeHtml(L.generatedAt)}: ${escapeHtml(formatDateTime(orderDate, lang))}
+    </p>
+  </article>
+</body>
+</html>`;
+}

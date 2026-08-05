@@ -17,7 +17,7 @@ import {
   TextField,
   Divider,
 } from '@mui/material';
-import { ArrowLeft, QrCode, CreditCard, CheckCircle2, ShieldCheck, Upload, Building2, Copy } from 'lucide-react';
+import { ArrowLeft, QrCode, CreditCard, CheckCircle2, ShieldCheck, Upload, Building2, Copy, Printer } from 'lucide-react';
 import StorefrontNavbar from '@/components/StorefrontNavbar';
 import MobileBottomNav from '@/components/MobileBottomNav';
 import StripePromptPay from '@/components/StripePromptPay';
@@ -140,11 +140,34 @@ export default function StandalonePaymentPage() {
               </Typography>
             </Box>
 
-            <Box sx={{ textAlign: 'right' }}>
-              <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>ยอดชำระทั้งหมด</Typography>
-              <Typography variant="h4" sx={{ fontWeight: 800, color: '#166534' }}>
-                ฿{Number(order?.totalAmount || order?.amount || 0).toLocaleString()}
-              </Typography>
+            <Box sx={{ textAlign: { xs: 'left', sm: 'right' }, display: 'flex', flexDirection: 'column', alignItems: { xs: 'flex-start', sm: 'flex-end' }, gap: 1 }}>
+              <Box>
+                <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>ยอดชำระทั้งหมด</Typography>
+                <Typography variant="h4" sx={{ fontWeight: 800, color: '#166534' }}>
+                  ฿{Number(order?.totalAmount || order?.amount || 0).toLocaleString()}
+                </Typography>
+              </Box>
+              <Button
+                component={Link}
+                href={`/api/payment-notice?ref=${encodeURIComponent(ref)}&lang=${lang}`}
+                target="_blank"
+                size="small"
+                startIcon={<Printer size={16} />}
+                sx={{
+                  textTransform: 'none',
+                  fontWeight: 700,
+                  fontSize: '0.75rem',
+                  color: '#1e3a5f',
+                  border: '1px solid rgba(30,58,95,0.28)',
+                  bgcolor: '#f1f5f9',
+                  borderRadius: '8px',
+                  px: 1.25,
+                  py: 0.5,
+                  '&:hover': { bgcolor: '#e2e8f0' },
+                }}
+              >
+                {lang === 'en' ? 'Payment Notice (PDF)' : 'หนังสือแจ้งชำระเงินอิเล็กทรอนิกส์ (PDF)'}
+              </Button>
             </Box>
           </Box>
         </Paper>

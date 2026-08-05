@@ -548,8 +548,14 @@ export default function PaymentModal({ orderRef, onClose, onSuccess }: PaymentMo
   const copyAccount = () => copyText(accountNumber, t.payment.copiedAccount);
 
   const handlePrintNotice = useCallback(() => {
-    window.print();
-  }, []);
+    const url = `/api/payment-notice?ref=${encodeURIComponent(orderRef)}&lang=${lang}`;
+    const printWin = window.open(url, '_blank');
+    if (printWin) {
+      printWin.focus();
+    } else {
+      window.location.href = url;
+    }
+  }, [orderRef, lang]);
 
   const openSupportForPayment = useCallback(() => {
     const prefill = String(t.payment.supportPrefillMessage || '')
