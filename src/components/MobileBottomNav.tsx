@@ -3,6 +3,9 @@
 import type { ReactNode } from 'react';
 import { Box, Typography } from '@mui/material';
 
+import { useRouter } from 'next/navigation';
+import { Home, ShoppingBag, ShoppingCart, Clock } from 'lucide-react';
+
 export type MobileBottomTab = {
   key: string;
   label: string;
@@ -12,11 +15,11 @@ export type MobileBottomTab = {
 };
 
 type MobileBottomNavProps = {
-  tabs: MobileBottomTab[];
-  activeKey: string;
+  tabs?: MobileBottomTab[];
+  activeKey?: string;
   chatActive?: boolean;
   hidden?: boolean;
-  onTabClick: (key: string) => void;
+  onTabClick?: (key: string) => void;
   /** Kept for API compat; center chat FAB removed in PCD layout */
   onChatClick?: (anchor: HTMLElement) => void;
 };
@@ -27,12 +30,33 @@ type MobileBottomNavProps = {
  */
 export default function MobileBottomNav({
   tabs,
-  activeKey,
+  activeKey = 'home',
   chatActive = false,
   hidden = false,
   onTabClick,
 }: MobileBottomNavProps) {
-  const visibleTabs = tabs.filter((t) => !t.center);
+  const router = useRouter();
+
+  const defaultTabs: MobileBottomTab[] = [
+    { key: 'home', label: 'หน้าแรก', icon: <Home size={20} /> },
+    { key: 'shop', label: 'ร้านค้า', icon: <ShoppingBag size={20} /> },
+    { key: 'cart', label: 'ตะกร้า', icon: <ShoppingCart size={20} /> },
+    { key: 'history', label: 'คำสั่งซื้อ', icon: <Clock size={20} /> },
+  ];
+
+  const activeTabsList = tabs || defaultTabs;
+  const visibleTabs = activeTabsList.filter((t) => !t.center);
+
+  const handleTabClick = (key: string) => {
+    if (onTabClick) {
+      onTabClick(key);
+    } else {
+      if (key === 'home') router.push('/');
+      else if (key === 'shop') router.push('/shop');
+      else if (key === 'cart') router.push('/cart');
+      else if (key === 'history') router.push('/orders');
+    }
+  };
 
   return (
     <Box
@@ -84,7 +108,7 @@ export default function MobileBottomNav({
               data-tab-key={tab.key}
               aria-label={tab.label}
               aria-current={isActive ? 'page' : undefined}
-              onClick={() => onTabClick(tab.key)}
+              onClick={() => handleTabClick(tab.key)}
               sx={{
                 flex: 1,
                 display: 'flex',

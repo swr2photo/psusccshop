@@ -18,18 +18,19 @@ import {
   User,
 } from 'lucide-react';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { useTranslation } from '@/hooks/useTranslation';
 
 export type StorefrontNavbarProps = {
   hidden?: boolean;
-  activeTab: string;
-  pendingOrderCount: number;
-  cartCount: number;
-  wishlistCount: number;
-  searchActive: boolean;
-  filterCount: number;
-  isLiveActive: boolean;
-  isAuthenticated: boolean;
+  activeTab?: string;
+  pendingOrderCount?: number;
+  cartCount?: number;
+  wishlistCount?: number;
+  searchActive?: boolean;
+  filterCount?: number;
+  isLiveActive?: boolean;
+  isAuthenticated?: boolean;
   avatarUrl?: string;
   serverStatusBanner?: ReactNode;
   utilityLeft?: string;
@@ -37,13 +38,13 @@ export type StorefrontNavbarProps = {
   searchPanel?: ReactNode;
   languageToggle?: ReactNode;
   themeToggle?: ReactNode;
-  onTabChange: (tab: string) => void;
-  onSearchToggle: () => void;
-  onOpenSidebar: () => void;
-  onOpenWishlist: () => void;
+  onTabChange?: (tab: string) => void;
+  onSearchToggle?: () => void;
+  onOpenSidebar?: () => void;
+  onOpenWishlist?: () => void;
   onOpenLive?: () => void;
-  onShopClick: () => void;
-  onFlagshipClick: () => void;
+  onShopClick?: () => void;
+  onFlagshipClick?: () => void;
 };
 
 function NavBadge({
@@ -180,14 +181,14 @@ function BrandLockup({ compact = false }: { compact?: boolean }) {
  */
 export default function StorefrontNavbar({
   hidden = false,
-  activeTab,
-  pendingOrderCount,
-  cartCount,
-  wishlistCount,
-  searchActive,
-  filterCount,
-  isLiveActive,
-  isAuthenticated,
+  activeTab = 'home',
+  pendingOrderCount = 0,
+  cartCount = 0,
+  wishlistCount = 0,
+  searchActive = false,
+  filterCount = 0,
+  isLiveActive = false,
+  isAuthenticated = false,
   avatarUrl,
   serverStatusBanner,
   utilityLeft,
@@ -204,6 +205,28 @@ export default function StorefrontNavbar({
   onFlagshipClick,
 }: StorefrontNavbarProps) {
   const { t } = useTranslation();
+  const router = useRouter();
+
+  const handleTab = (tab: string) => {
+    if (onTabChange) {
+      onTabChange(tab);
+    } else {
+      if (tab === 'home') router.push('/');
+      else if (tab === 'cart') router.push('/cart');
+      else if (tab === 'history') router.push('/orders');
+      else if (tab === 'profile') router.push('/orders');
+    }
+  };
+
+  const handleShop = () => {
+    if (onShopClick) onShopClick();
+    else router.push('/shop');
+  };
+
+  const handleFlagship = () => {
+    if (onFlagshipClick) onFlagshipClick();
+    else router.push('/shop');
+  };
 
   const iconBtnSx = {
     color: 'var(--foreground)',
@@ -325,7 +348,7 @@ export default function StorefrontNavbar({
           <Box
             component="button"
             type="button"
-            onClick={() => onTabChange('home')}
+            onClick={() => handleTab('home')}
             sx={{
               border: 'none',
               background: 'none',
@@ -355,7 +378,7 @@ export default function StorefrontNavbar({
 
         <IconButton
           aria-label={t.nav.cart}
-          onClick={() => onTabChange('cart')}
+          onClick={() => handleTab('cart')}
           sx={{ ...iconBtnSx, width: 44, height: 44 }}
         >
           <Badge badgeContent={cartCount} color="error" max={99}>
@@ -377,7 +400,7 @@ export default function StorefrontNavbar({
         <Box
           component="button"
           type="button"
-          onClick={() => onTabChange('home')}
+          onClick={() => handleTab('home')}
           sx={{
             border: 'none',
             background: 'none',
@@ -405,17 +428,17 @@ export default function StorefrontNavbar({
         >
           <Button
             variant="text"
-            onClick={() => onTabChange('home')}
+            onClick={() => handleTab('home')}
             sx={desktopLinkSx(activeTab === 'home')}
           >
             {t.nav.home}
           </Button>
 
-          <Button variant="text" onClick={onShopClick} sx={desktopLinkSx(false)}>
+          <Button variant="text" onClick={handleShop} sx={desktopLinkSx(false)}>
             {t.nav.shop}
           </Button>
 
-          <Button variant="text" onClick={onFlagshipClick} sx={desktopLinkSx(false)}>
+          <Button variant="text" onClick={handleFlagship} sx={desktopLinkSx(false)}>
             <NavLabel badge={<NavBadge label={t.nav.badgeNew} color="#06b6d4" />}>
               {t.nav.flagship}
             </NavLabel>
@@ -423,7 +446,7 @@ export default function StorefrontNavbar({
 
           <Button
             variant="text"
-            onClick={() => onTabChange('history')}
+            onClick={() => handleTab('history')}
             sx={desktopLinkSx(activeTab === 'history')}
           >
             <NavLabel
@@ -466,7 +489,7 @@ export default function StorefrontNavbar({
 
           <IconButton
             aria-label={t.nav.profile}
-            onClick={() => (isAuthenticated ? onTabChange('profile') : onOpenSidebar())}
+            onClick={() => (isAuthenticated ? handleTab('profile') : onOpenSidebar?.())}
             sx={iconBtnSx}
           >
             {isAuthenticated && avatarUrl ? (
@@ -493,7 +516,7 @@ export default function StorefrontNavbar({
 
           <IconButton
             aria-label={t.nav.cart}
-            onClick={() => onTabChange('cart')}
+            onClick={() => handleTab('cart')}
             sx={iconBtnSx}
           >
             <Badge badgeContent={cartCount} color="error" max={99}>
