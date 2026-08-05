@@ -2,6 +2,7 @@
 'use client';
 
 import { apiFetch } from '@/lib/api-client';
+import { decryptPayload } from '@/lib/payload-crypto';
 // Custom PromptPay payment via Stripe.js (https://docs.stripe.com/js)
 //
 // Flow:
@@ -48,8 +49,13 @@ async function readApiJson(res: Response): Promise<any> {
     );
   }
   try {
-    return JSON.parse(trimmed);
-  } catch {
+    const parsed = JSON.parse(trimmed);
+    if (parsed && typeof parsed === 'object' && parsed._e) {
+      return await decryptPayload(parsed._e);
+    }
+    return parsed;
+  } catch (err: any) {
+    if (err?.message?.includes('decrypt')) throw err;
     throw new Error(
       `ตอบกลับไม่ใช่ JSON (HTTP ${res.status}) กรุณาลองใหม่ หรือเลือกโอนเอง + แนบสลิป`,
     );
