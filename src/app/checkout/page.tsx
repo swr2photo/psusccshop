@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -20,6 +20,8 @@ import {
   CircularProgress,
   Card,
   CardContent,
+  Skeleton,
+  Chip,
 } from '@mui/material';
 import {
   ArrowLeft,
@@ -32,6 +34,7 @@ import {
   User,
   Tag,
   Truck,
+  Store,
 } from 'lucide-react';
 import StorefrontNavbar from '@/components/StorefrontNavbar';
 import MobileBottomNav from '@/components/MobileBottomNav';
@@ -40,6 +43,7 @@ import { useCartStore } from '@/store/cartStore';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useSession } from 'next-auth/react';
 import { apiFetch } from '@/lib/api-client';
+import { ShippingConfig, ShippingOption } from '@/lib/shipping';
 
 export default function StandaloneCheckoutPage() {
   const router = useRouter();
@@ -53,7 +57,12 @@ export default function StandaloneCheckoutPage() {
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [studentId, setStudentId] = useState('');
-  const [pickupLocation, setPickupLocation] = useState<'SCC_CLUB' | 'DELIVERY'>('SCC_CLUB');
+
+  // Dynamic Shipping Config from API
+  const [shippingConfig, setShippingConfig] = useState<ShippingConfig | null>(null);
+  const [selectedShippingId, setSelectedShippingId] = useState<string>('pickup');
+  const [loadingConfig, setLoadingConfig] = useState(true);
+
   const [paymentGateway, setPaymentGateway] = useState<'promptpay' | 'manual'>('promptpay');
   const [turnstileToken, setTurnstileToken] = useState('');
   const [wantReceipt, setWantReceipt] = useState(false);
@@ -74,6 +83,24 @@ export default function StandaloneCheckoutPage() {
     }
   }, [session]);
 
+  // Fetch Shipping Configuration
+  useEffect(() => {
+    apiFetch('/api/shipping/config')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.data) {
+          setShippingConfig(data.data);
+          const enabled = (data.data.options as ShippingOption[])?.filter((o) => o.enabled) || [];
+          if (enabled.length > 0) {
+            const defaultOpt = enabled.find((o) => o.id === data.data.defaultOptionId) || enabled[0];
+            setSelectedShippingId(defaultOpt.id);
+          }
+        }
+      })
+      .catch((err) => console.error('[Checkout] Failed to load shipping config:', err))
+      .finally(() => setLoadingConfig(false));
+  }, []);
+
   const getItemUnitPrice = (item: any) => Number(item.unitPrice ?? item.price ?? 0);
   const getItemQty = (item: any) => Number(item.quantity ?? item.qty ?? 1);
   const getItemTotal = (item: any) => {
@@ -83,8 +110,40 @@ export default function StandaloneCheckoutPage() {
   };
   const getItemName = (item: any) => item.productName || item.name || 'สินค้า';
 
-  const totalAmount = cart.reduce((sum, item) => sum + getItemTotal(item), 0);
-  const totalItems = cart.reduce((sum, item) => sum + getItemQty(item), 0);
+  const totalAmount = useMemo(
+    () => cart.reduce((sum, item) => sum + getItemTotal(item), 0),
+    [cart]
+  );
+  const totalItems = useMemo(
+    () => cart.reduce((sum, item) => sum + getItemQty(item), 0),
+    [cart]
+  );
+
+  const enabledShippingOptions = useMemo(() => {
+    return shippingConfig?.options?.filter((o: ShippingOption) => o.enabled) || [];
+  }, [shippingConfig]);
+
+  const selectedShippingOption = useMemo(() => {
+    return enabledShippingOptions.find((o) => o.id === selectedShippingId) || enabledShippingOptions[0];
+  }, [enabledShippingOptions, selectedShippingId]);
+
+  const isPickupSelected = useMemo(() => {
+    if (!selectedShippingOption) return true;
+    return selectedShippingOption.provider === 'pickup';
+  }, [selectedShippingOption]);
+
+  const shippingFee = useMemo(() => {
+    if (!selectedShippingOption || isPickupSelected) return 0;
+
+    const freeMin = shippingConfig?.globalFreeShippingMinimum || selectedShippingOption.freeShippingMinimum;
+    if (freeMin && totalAmount >= freeMin) return 0;
+
+    let fee = selectedShippingOption.baseFee || 0;
+    if (selectedShippingOption.perItemFee && totalItems > 1) {
+      fee += (totalItems - 1) * selectedShippingOption.perItemFee;
+    }
+    return fee;
+  }, [selectedShippingOption, isPickupSelected, shippingConfig, totalAmount, totalItems]);
 
   const handleApplyPromo = async () => {
     if (!promoCode.trim()) return;
@@ -111,7 +170,7 @@ export default function StandaloneCheckoutPage() {
     }
   };
 
-  const finalTotal = Math.max(0, totalAmount - promoDiscount);
+  const finalTotal = Math.max(0, totalAmount + shippingFee - promoDiscount);
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,7 +182,7 @@ export default function StandaloneCheckoutPage() {
       setErrorMsg('กรุณากรอกชื่อ-นามสกุล และอีเมลให้ครบถ้วน');
       return;
     }
-    if (pickupLocation === 'DELIVERY' && !address.trim()) {
+    if (!isPickupSelected && !address.trim()) {
       setErrorMsg('กรุณากรอกที่อยู่สำหรับจัดส่งพัสดุ');
       return;
     }
@@ -158,10 +217,11 @@ export default function StandaloneCheckoutPage() {
         customerName: customerName.trim(),
         customerEmail: customerEmail.trim().toLowerCase(),
         phone: phone.trim(),
-        customerAddress: pickupLocation === 'DELIVERY' ? address.trim() : 'รับที่ห้องชุมนุม SCC',
+        customerAddress: !isPickupSelected ? address.trim() : (shippingConfig?.pickupLocation || 'รับที่ห้องชุมนุม SCC'),
         studentId: studentId.trim(),
-        pickupLocation,
-        shippingOptionId: pickupLocation === 'DELIVERY' ? 'delivery' : 'pickup',
+        pickupLocation: !isPickupSelected ? 'DELIVERY' : 'SCC_CLUB',
+        shippingOptionId: selectedShippingOption?.id || 'pickup',
+        shippingFee,
         paymentMethod: paymentGateway,
         turnstileToken: turnstileToken || 'dev-bypass',
         cart: formattedCart,
@@ -300,7 +360,7 @@ export default function StandaloneCheckoutPage() {
                 </Box>
               </Paper>
 
-              {/* Pickup & Delivery Options */}
+              {/* Dynamic Shipping Options */}
               <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', bgcolor: '#ffffff' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                   <MapPin size={20} color="#1e3a5f" />
@@ -309,50 +369,87 @@ export default function StandaloneCheckoutPage() {
                   </Typography>
                 </Box>
 
-                <RadioGroup value={pickupLocation} onChange={(e) => setPickupLocation(e.target.value as any)}>
-                  <Card variant="outlined" sx={{ mb: 1.5, borderColor: pickupLocation === 'SCC_CLUB' ? '#1e3a5f' : '#e2e8f0', borderRadius: 2 }}>
-                    <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-                      <FormControlLabel
-                        value="SCC_CLUB"
-                        control={<Radio size="small" />}
-                        label={
-                          <Box>
-                            <Typography sx={{ fontWeight: 700, fontSize: '0.95rem' }}>
-                              รับที่ห้องชุมนุมคอมพิวเตอร์ (SCC Club Pickup)
-                            </Typography>
-                            <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>
-                              ชั้น 2 อาคารศูนย์คอมพิวเตอร์ คณะวิทยาศาสตร์ ม.สงขลานครินทร์ (รับฟรีไม่มีค่าจัดส่ง)
-                            </Typography>
-                          </Box>
-                        }
-                      />
-                    </CardContent>
-                  </Card>
+                {loadingConfig ? (
+                  <Box sx={{ py: 2 }}>
+                    <Skeleton variant="rounded" height={60} sx={{ mb: 1.5 }} />
+                    <Skeleton variant="rounded" height={60} />
+                  </Box>
+                ) : (
+                  <RadioGroup
+                    value={selectedShippingId}
+                    onChange={(e) => setSelectedShippingId(e.target.value)}
+                  >
+                    {enabledShippingOptions.map((option) => {
+                      const isPickup = option.provider === 'pickup';
+                      const optName = lang === 'en' && option.nameEn ? option.nameEn : option.name;
+                      const optDesc = lang === 'en' && option.descriptionEn ? option.descriptionEn : option.description;
+                      const isSelected = option.id === selectedShippingId;
 
-                  <Card variant="outlined" sx={{ borderColor: pickupLocation === 'DELIVERY' ? '#1e3a5f' : '#e2e8f0', borderRadius: 2 }}>
-                    <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-                      <FormControlLabel
-                        value="DELIVERY"
-                        control={<Radio size="small" />}
-                        label={
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Truck size={18} color="#1e3a5f" />
-                            <Box>
-                              <Typography sx={{ fontWeight: 700, fontSize: '0.95rem' }}>
-                                จัดส่งพัสดุตามที่อยู่ (Standard Delivery)
-                              </Typography>
-                              <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>
-                                จัดส่งด่วนถึงบ้านผ่าน Flash Express / ไปรษณีย์ไทย
-                              </Typography>
-                            </Box>
-                          </Box>
+                      let feeText = 'ฟรี';
+                      if (!isPickup) {
+                        const freeMin = shippingConfig?.globalFreeShippingMinimum || option.freeShippingMinimum;
+                        if (freeMin && totalAmount >= freeMin) {
+                          feeText = 'ฟรี (ครบเงื่อนไขส่งฟรี)';
+                        } else {
+                          feeText = `฿${option.baseFee}`;
                         }
-                      />
-                    </CardContent>
-                  </Card>
-                </RadioGroup>
+                      }
 
-                {pickupLocation === 'DELIVERY' && (
+                      return (
+                        <Card
+                          key={option.id}
+                          variant="outlined"
+                          sx={{
+                            mb: 1.5,
+                            borderColor: isSelected ? '#1e3a5f' : '#e2e8f0',
+                            bgcolor: isSelected ? 'rgba(30, 58, 95, 0.02)' : '#ffffff',
+                            borderRadius: 2,
+                            transition: 'border-color 0.2s ease',
+                          }}
+                        >
+                          <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+                            <FormControlLabel
+                              value={option.id}
+                              control={<Radio size="small" />}
+                              sx={{ width: '100%', margin: 0 }}
+                              label={
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', ml: 1 }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                                    {isPickup ? <Store size={20} color="#1e3a5f" /> : <Truck size={20} color="#1e3a5f" />}
+                                    <Box>
+                                      <Typography sx={{ fontWeight: 700, fontSize: '0.95rem', color: '#1e3a5f' }}>
+                                        {optName}
+                                      </Typography>
+                                      {optDesc && (
+                                        <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>
+                                          {optDesc}
+                                        </Typography>
+                                      )}
+                                      {option.estimatedDays && (
+                                        <Typography sx={{ fontSize: '0.75rem', color: '#64748b', mt: 0.25 }}>
+                                          ระยะเวลาจัดส่งประมาณ {option.estimatedDays.min}-{option.estimatedDays.max} วัน
+                                        </Typography>
+                                      )}
+                                    </Box>
+                                  </Box>
+                                  <Chip
+                                    label={feeText}
+                                    size="small"
+                                    color={feeText.startsWith('ฟรี') ? 'success' : 'default'}
+                                    variant={feeText.startsWith('ฟรี') ? 'filled' : 'outlined'}
+                                    sx={{ fontWeight: 700, ml: 1 }}
+                                  />
+                                </Box>
+                              }
+                            />
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </RadioGroup>
+                )}
+
+                {!isPickupSelected && (
                   <Box sx={{ mt: 2.5 }}>
                     <TextField
                       label="ที่อยู่สำหรับจัดส่งพัสดุ (Delivery Address)"
@@ -530,6 +627,12 @@ export default function StandaloneCheckoutPage() {
                 <span>ยอดรวมสินค้า</span>
                 <span style={{ fontWeight: 600 }}>฿{totalAmount.toLocaleString()}</span>
               </Box>
+
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, fontSize: '0.9rem', color: '#475569' }}>
+                <span>ค่าจัดส่ง ({selectedShippingOption ? (lang === 'en' && selectedShippingOption.nameEn ? selectedShippingOption.nameEn : selectedShippingOption.name) : 'จัดส่ง'})</span>
+                <span style={{ fontWeight: 600 }}>{shippingFee === 0 ? 'ฟรี' : `฿${shippingFee.toLocaleString()}`}</span>
+              </Box>
+
               {promoDiscount > 0 && (
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, fontSize: '0.9rem', color: '#16a34a' }}>
                   <span>ส่วนลดโปรโมชั่น</span>

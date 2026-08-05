@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useState, useMemo, type ReactNode } from 'react';
 import {
   AppBar,
   Badge,
@@ -9,6 +9,13 @@ import {
   IconButton,
   Toolbar,
   Typography,
+  Drawer,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Divider,
 } from '@mui/material';
 import {
   Heart,
@@ -16,10 +23,20 @@ import {
   Search,
   ShoppingBag,
   User,
+  X,
+  Home,
+  Store as StoreIcon,
+  Clock,
+  HelpCircle,
+  Sparkles,
 } from 'lucide-react';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useSession } from 'next-auth/react';
+import { useCartStore } from '@/store/cartStore';
+import ThemeToggle from '@/components/ThemeToggle';
+import LanguageToggle from '@/components/LanguageToggle';
 
 export type StorefrontNavbarProps = {
   hidden?: boolean;
@@ -62,7 +79,6 @@ function NavBadge({
         position: 'absolute',
         top: 0,
         right: 0,
-        // Sit outside the glyph box (top-right corner), never over the label
         transform: 'translate(55%, -65%)',
         px: 0.5,
         py: 0.08,
@@ -84,7 +100,6 @@ function NavBadge({
   );
 }
 
-/** Tight label wrapper so corner badges position relative to the text, not the Button. */
 function NavLabel({
   children,
   badge,
@@ -99,7 +114,6 @@ function NavLabel({
         position: 'relative',
         display: 'inline-block',
         lineHeight: 1.2,
-        // Reserve a little room so the badge doesn't collide with the next link
         pr: badge ? 0.85 : 0,
       }}
     >
@@ -175,20 +189,16 @@ function BrandLockup({ compact = false }: { compact?: boolean }) {
   );
 }
 
-/**
- * Storefront header inspired by Pop Culture Depot:
- * utility strip + centered uppercase links + icon actions.
- */
 export default function StorefrontNavbar({
   hidden = false,
-  activeTab = 'home',
+  activeTab,
   pendingOrderCount = 0,
   cartCount = 0,
   wishlistCount = 0,
   searchActive = false,
   filterCount = 0,
   isLiveActive = false,
-  isAuthenticated = false,
+  isAuthenticated,
   avatarUrl,
   serverStatusBanner,
   utilityLeft,
@@ -206,8 +216,35 @@ export default function StorefrontNavbar({
 }: StorefrontNavbarProps) {
   const { t } = useTranslation();
   const router = useRouter();
+  const pathname = usePathname();
+  const { data: session } = useSession();
+  const storeCart = useCartStore((s) => s.cart);
+
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+
+  // Auto-detect auth status & avatar
+  const isAuth = isAuthenticated !== undefined ? isAuthenticated : !!session?.user;
+  const userAvatar = avatarUrl || session?.user?.image || undefined;
+
+  // Auto-detect active tab from pathname
+  const currentTab = useMemo(() => {
+    if (activeTab && activeTab !== 'home') return activeTab;
+    if (!pathname) return 'home';
+    if (pathname === '/') return 'home';
+    if (pathname.startsWith('/cart')) return 'cart';
+    if (pathname.startsWith('/orders') || pathname.startsWith('/payment')) return 'history';
+    if (pathname.startsWith('/shop')) return 'shop';
+    return activeTab || 'home';
+  }, [activeTab, pathname]);
+
+  // Auto-calculate cart count if not provided
+  const effectiveCartCount = useMemo(() => {
+    if (cartCount > 0) return cartCount;
+    return storeCart.reduce((sum, item) => sum + (Number(item.qty || (item as any).quantity) || 1), 0);
+  }, [cartCount, storeCart]);
 
   const handleTab = (tab: string) => {
+    setMobileDrawerOpen(false);
     if (onTabChange) {
       onTabChange(tab);
     } else {
@@ -215,17 +252,38 @@ export default function StorefrontNavbar({
       else if (tab === 'cart') router.push('/cart');
       else if (tab === 'history') router.push('/orders');
       else if (tab === 'profile') router.push('/orders');
+      else if (tab === 'support') router.push('/support');
     }
   };
 
   const handleShop = () => {
+    setMobileDrawerOpen(false);
     if (onShopClick) onShopClick();
     else router.push('/shop');
   };
 
   const handleFlagship = () => {
+    setMobileDrawerOpen(false);
     if (onFlagshipClick) onFlagshipClick();
     else router.push('/shop');
+  };
+
+  const handleMenuClick = () => {
+    if (onOpenSidebar) {
+      onOpenSidebar();
+    } else {
+      setMobileDrawerOpen(true);
+    }
+  };
+
+  const handleProfileClick = () => {
+    if (isAuth) {
+      handleTab('profile');
+    } else if (onOpenSidebar) {
+      onOpenSidebar();
+    } else {
+      router.push('/orders');
+    }
   };
 
   const iconBtnSx = {
@@ -247,7 +305,6 @@ export default function StorefrontNavbar({
     letterSpacing: '0.08em',
     borderRadius: 0,
     px: 1.5,
-    // Extra top padding so corner badges clear the label + active underline
     pt: 1.45,
     pb: 1.15,
     minHeight: 48,
@@ -261,90 +318,146 @@ export default function StorefrontNavbar({
   });
 
   return (
-    <AppBar
-      position="sticky"
-      elevation={0}
-      sx={{
-        bgcolor: 'var(--background)',
-        backgroundImage: 'none',
-        boxShadow: 'none',
-        border: 'none',
-        borderBottom: '1px solid var(--glass-border)',
-        color: 'var(--foreground)',
-        transform: hidden ? 'translateY(-110%)' : 'translateY(0)',
-        opacity: hidden ? 0 : 1,
-        transition: 'transform 0.38s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.28s ease',
-        top: 0,
-        zIndex: 1200,
-        overflow: 'visible',
-        pt: { xs: 'env(safe-area-inset-top)', md: 0 },
-      }}
-    >
-      {serverStatusBanner}
-      {/* Utility strip — desktop */}
-      <Box
+    <>
+      <AppBar
+        position="sticky"
+        elevation={0}
         sx={{
-          display: { xs: 'none', md: 'flex' },
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 2,
-          px: { md: 3, lg: 4 },
-          py: 0.7,
-          bgcolor: 'var(--surface-2)',
+          bgcolor: 'var(--background)',
+          backgroundImage: 'none',
+          boxShadow: 'none',
+          border: 'none',
           borderBottom: '1px solid var(--glass-border)',
-          fontSize: '0.75rem',
+          color: 'var(--foreground)',
+          transform: hidden ? 'translateY(-110%)' : 'translateY(0)',
+          opacity: hidden ? 0 : 1,
+          transition: 'transform 0.38s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.28s ease',
+          top: 0,
+          zIndex: 1200,
+          overflow: 'visible',
+          pt: { xs: 'env(safe-area-inset-top)', md: 0 },
         }}
       >
-        <Typography
-          sx={{
-            fontSize: '0.72rem',
-            color: 'var(--text-muted)',
-            fontWeight: 500,
-            minWidth: 0,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            flex: 1,
-          }}
-        >
-          {utilityLeft || t.nav.shopTitle}
-        </Typography>
+        {serverStatusBanner}
+
+        {/* Utility strip — desktop */}
         <Box
           sx={{
-            flex: 1.4,
-            textAlign: 'center',
-            color: 'var(--foreground)',
-            fontWeight: 600,
-            fontSize: '0.74rem',
+            display: { xs: 'none', md: 'flex' },
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 2,
+            px: { md: 3, lg: 4 },
+            py: 0.7,
+            bgcolor: 'var(--surface-2)',
+            borderBottom: '1px solid var(--glass-border)',
+            fontSize: '0.75rem',
           }}
         >
-          {utilityCenter}
-        </Box>
-        <Box sx={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 0.75 }}>
-          {languageToggle}
-          {themeToggle}
-        </Box>
-      </Box>
+          <Typography
+            sx={{
+              fontSize: '0.72rem',
+              color: 'var(--text-muted)',
+              fontWeight: 500,
+              minWidth: 0,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              flex: 1,
+            }}
+          >
+            {utilityLeft || t.nav.shopTitle}
+          </Typography>
 
-      {/* Mobile header — PCD: menu | logo | search + bag */}
-      <Toolbar
-        sx={{
-          display: { xs: 'flex', md: 'none' },
-          minHeight: 56,
-          px: 0.75,
-          gap: 0.25,
-          bgcolor: 'var(--background)',
-        }}
-      >
-        <IconButton
-          aria-label={t.nav.menu}
-          onClick={onOpenSidebar}
-          sx={{ ...iconBtnSx, width: 44, height: 44 }}
+          <Box
+            sx={{
+              flex: 1.4,
+              textAlign: 'center',
+              color: 'var(--foreground)',
+              fontWeight: 600,
+              fontSize: '0.74rem',
+            }}
+          >
+            {utilityCenter}
+          </Box>
+
+          <Box sx={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 0.75 }}>
+            {languageToggle || <LanguageToggle size="small" />}
+            {themeToggle || <ThemeToggle compact size="small" />}
+          </Box>
+        </Box>
+
+        {/* Mobile header */}
+        <Toolbar
+          sx={{
+            display: { xs: 'flex', md: 'none' },
+            minHeight: 56,
+            px: 0.75,
+            gap: 0.25,
+            bgcolor: 'var(--background)',
+          }}
         >
-          <Menu size={22} strokeWidth={1.75} />
-        </IconButton>
+          <IconButton
+            aria-label={t.nav.menu}
+            onClick={handleMenuClick}
+            sx={{ ...iconBtnSx, width: 44, height: 44 }}
+          >
+            <Menu size={22} strokeWidth={1.75} />
+          </IconButton>
 
-        <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center', minWidth: 0 }}>
+          <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center', minWidth: 0 }}>
+            <Box
+              component="button"
+              type="button"
+              onClick={() => handleTab('home')}
+              sx={{
+                border: 'none',
+                background: 'none',
+                p: 0,
+                cursor: 'pointer',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <BrandLockup compact />
+            </Box>
+          </Box>
+
+          <IconButton
+            aria-label={t.nav.search}
+            onClick={onSearchToggle}
+            sx={{
+              ...iconBtnSx,
+              width: 44,
+              height: 44,
+              color: searchActive ? 'var(--primary)' : 'var(--foreground)',
+            }}
+          >
+            <Badge badgeContent={filterCount || undefined} color="warning" invisible={filterCount === 0}>
+              <Search size={20} strokeWidth={1.75} />
+            </Badge>
+          </IconButton>
+
+          <IconButton
+            aria-label={t.nav.cart}
+            onClick={() => handleTab('cart')}
+            sx={{ ...iconBtnSx, width: 44, height: 44 }}
+          >
+            <Badge badgeContent={effectiveCartCount} color="error" max={99}>
+              <ShoppingBag size={20} strokeWidth={1.75} />
+            </Badge>
+          </IconButton>
+        </Toolbar>
+
+        {/* Desktop header */}
+        <Toolbar
+          sx={{
+            display: { xs: 'none', md: 'flex' },
+            minHeight: 64,
+            px: { md: 2.5, lg: 3.5 },
+            gap: 1,
+            overflow: 'visible',
+          }}
+        >
           <Box
             component="button"
             type="button"
@@ -354,189 +467,218 @@ export default function StorefrontNavbar({
               background: 'none',
               p: 0,
               cursor: 'pointer',
-              WebkitTapHighlightColor: 'transparent',
+              mr: 1,
             }}
           >
-            <BrandLockup compact />
+            <BrandLockup />
           </Box>
-        </Box>
 
-        <IconButton
-          aria-label={t.nav.search}
-          onClick={onSearchToggle}
-          sx={{
-            ...iconBtnSx,
-            width: 44,
-            height: 44,
-            color: searchActive ? 'var(--primary)' : 'var(--foreground)',
-          }}
-        >
-          <Badge badgeContent={filterCount || undefined} color="warning" invisible={filterCount === 0}>
-            <Search size={20} strokeWidth={1.75} />
-          </Badge>
-        </IconButton>
-
-        <IconButton
-          aria-label={t.nav.cart}
-          onClick={() => handleTab('cart')}
-          sx={{ ...iconBtnSx, width: 44, height: 44 }}
-        >
-          <Badge badgeContent={cartCount} color="error" max={99}>
-            <ShoppingBag size={20} strokeWidth={1.75} />
-          </Badge>
-        </IconButton>
-      </Toolbar>
-
-      {/* Desktop header */}
-      <Toolbar
-        sx={{
-          display: { xs: 'none', md: 'flex' },
-          minHeight: 64,
-          px: { md: 2.5, lg: 3.5 },
-          gap: 1,
-          overflow: 'visible',
-        }}
-      >
-        <Box
-          component="button"
-          type="button"
-          onClick={() => handleTab('home')}
-          sx={{
-            border: 'none',
-            background: 'none',
-            p: 0,
-            cursor: 'pointer',
-            mr: 1,
-          }}
-        >
-          <BrandLockup />
-        </Box>
-
-        <Box
-          sx={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 0.5,
-            minWidth: 0,
-            // Prefer visible overflow — overflow-x:auto creates a scrollport that
-            // also clips vertical overflow and cuts corner badges into flat bars.
-            overflow: 'visible',
-            flexWrap: 'nowrap',
-          }}
-        >
-          <Button
-            variant="text"
-            onClick={() => handleTab('home')}
-            sx={desktopLinkSx(activeTab === 'home')}
+          <Box
+            sx={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 0.5,
+              minWidth: 0,
+              overflow: 'visible',
+              flexWrap: 'nowrap',
+            }}
           >
-            {t.nav.home}
-          </Button>
-
-          <Button variant="text" onClick={handleShop} sx={desktopLinkSx(false)}>
-            {t.nav.shop}
-          </Button>
-
-          <Button variant="text" onClick={handleFlagship} sx={desktopLinkSx(false)}>
-            <NavLabel badge={<NavBadge label={t.nav.badgeNew} color="#06b6d4" />}>
-              {t.nav.flagship}
-            </NavLabel>
-          </Button>
-
-          <Button
-            variant="text"
-            onClick={() => handleTab('history')}
-            sx={desktopLinkSx(activeTab === 'history')}
-          >
-            <NavLabel
-              badge={
-                pendingOrderCount > 0 ? (
-                  <NavBadge label={String(Math.min(pendingOrderCount, 99))} color="#f59e0b" />
-                ) : undefined
-              }
-            >
-              {t.nav.history}
-            </NavLabel>
-          </Button>
-
-          {isLiveActive && (
             <Button
               variant="text"
-              onClick={onOpenLive}
-              sx={{ ...desktopLinkSx(false), color: '#ff3b30' }}
+              onClick={() => handleTab('home')}
+              sx={desktopLinkSx(currentTab === 'home')}
             >
-              <NavLabel badge={<NavBadge label="LIVE" color="#ff3b30" />}>
-                {t.nav.live}
+              {t.nav.home}
+            </Button>
+
+            <Button variant="text" onClick={handleShop} sx={desktopLinkSx(currentTab === 'shop')}>
+              {t.nav.shop}
+            </Button>
+
+            <Button variant="text" onClick={handleFlagship} sx={desktopLinkSx(false)}>
+              <NavLabel badge={<NavBadge label={t.nav.badgeNew} color="#06b6d4" />}>
+                {t.nav.flagship}
               </NavLabel>
             </Button>
-          )}
-        </Box>
 
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.35, flexShrink: 0 }}>
-          <IconButton
-            aria-label={t.nav.search}
-            onClick={onSearchToggle}
-            sx={{
-              ...iconBtnSx,
-              color: searchActive ? 'var(--primary)' : 'var(--foreground)',
-            }}
-          >
-            <Badge badgeContent={filterCount || undefined} color="warning" invisible={filterCount === 0}>
-              <Search size={20} />
-            </Badge>
-          </IconButton>
-
-          <IconButton
-            aria-label={t.nav.profile}
-            onClick={() => (isAuthenticated ? handleTab('profile') : onOpenSidebar?.())}
-            sx={iconBtnSx}
-          >
-            {isAuthenticated && avatarUrl ? (
-              <Box
-                component="img"
-                src={avatarUrl}
-                alt=""
-                sx={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover' }}
-              />
-            ) : (
-              <User size={20} />
-            )}
-          </IconButton>
-
-          <IconButton
-            aria-label={t.wishlist.title}
-            onClick={onOpenWishlist}
-            sx={iconBtnSx}
-          >
-            <Badge badgeContent={wishlistCount} color="error" max={99} invisible={wishlistCount === 0}>
-              <Heart size={20} />
-            </Badge>
-          </IconButton>
-
-          <IconButton
-            aria-label={t.nav.cart}
-            onClick={() => handleTab('cart')}
-            sx={iconBtnSx}
-          >
-            <Badge badgeContent={cartCount} color="error" max={99}>
-              <ShoppingBag size={20} />
-            </Badge>
-          </IconButton>
-
-          {isAuthenticated && (
-            <IconButton
-              aria-label={t.nav.menu}
-              onClick={onOpenSidebar}
-              sx={{ ...iconBtnSx, ml: 0.25 }}
+            <Button
+              variant="text"
+              onClick={() => handleTab('history')}
+              sx={desktopLinkSx(currentTab === 'history')}
             >
-              <Menu size={20} />
-            </IconButton>
-          )}
-        </Box>
-      </Toolbar>
+              <NavLabel
+                badge={
+                  pendingOrderCount > 0 ? (
+                    <NavBadge label={String(Math.min(pendingOrderCount, 99))} color="#f59e0b" />
+                  ) : undefined
+                }
+              >
+                {t.nav.history}
+              </NavLabel>
+            </Button>
 
-      {searchPanel}
-    </AppBar>
+            {isLiveActive && (
+              <Button
+                variant="text"
+                onClick={onOpenLive}
+                sx={{ ...desktopLinkSx(false), color: '#ff3b30' }}
+              >
+                <NavLabel badge={<NavBadge label="LIVE" color="#ff3b30" />}>
+                  {t.nav.live}
+                </NavLabel>
+              </Button>
+            )}
+          </Box>
+
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.35, flexShrink: 0 }}>
+            <IconButton
+              aria-label={t.nav.search}
+              onClick={onSearchToggle}
+              sx={{
+                ...iconBtnSx,
+                color: searchActive ? 'var(--primary)' : 'var(--foreground)',
+              }}
+            >
+              <Badge badgeContent={filterCount || undefined} color="warning" invisible={filterCount === 0}>
+                <Search size={20} />
+              </Badge>
+            </IconButton>
+
+            <IconButton
+              aria-label={t.nav.profile}
+              onClick={handleProfileClick}
+              sx={iconBtnSx}
+            >
+              {isAuth && userAvatar ? (
+                <Box
+                  component="img"
+                  src={userAvatar}
+                  alt=""
+                  sx={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover' }}
+                />
+              ) : (
+                <User size={20} />
+              )}
+            </IconButton>
+
+            <IconButton
+              aria-label={t.wishlist.title}
+              onClick={onOpenWishlist}
+              sx={iconBtnSx}
+            >
+              <Badge badgeContent={wishlistCount} color="error" max={99} invisible={wishlistCount === 0}>
+                <Heart size={20} />
+              </Badge>
+            </IconButton>
+
+            <IconButton
+              aria-label={t.nav.cart}
+              onClick={() => handleTab('cart')}
+              sx={iconBtnSx}
+            >
+              <Badge badgeContent={effectiveCartCount} color="error" max={99}>
+                <ShoppingBag size={20} />
+              </Badge>
+            </IconButton>
+
+            {isAuth && (
+              <IconButton
+                aria-label={t.nav.menu}
+                onClick={handleMenuClick}
+                sx={{ ...iconBtnSx, ml: 0.25 }}
+              >
+                <Menu size={20} />
+              </IconButton>
+            )}
+          </Box>
+        </Toolbar>
+
+        {searchPanel}
+      </AppBar>
+
+      {/* Fallback Mobile Navigation Drawer */}
+      <Drawer
+        anchor="left"
+        open={mobileDrawerOpen}
+        onClose={() => setMobileDrawerOpen(false)}
+        PaperProps={{
+          sx: {
+            width: 280,
+            bgcolor: 'var(--background)',
+            color: 'var(--foreground)',
+            p: 2,
+          },
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, pb: 1, borderBottom: '1px solid var(--glass-border)' }}>
+          <BrandLockup compact />
+          <IconButton onClick={() => setMobileDrawerOpen(false)} sx={{ color: 'var(--foreground)' }}>
+            <X size={20} />
+          </IconButton>
+        </Box>
+
+        <List sx={{ pt: 0 }}>
+          <ListItem disablePadding>
+            <ListItemButton onClick={() => handleTab('home')} selected={currentTab === 'home'}>
+              <ListItemIcon sx={{ minWidth: 36, color: 'var(--primary)' }}><Home size={20} /></ListItemIcon>
+              <ListItemText primary={t.nav.home} primaryTypographyProps={{ fontWeight: 700 }} />
+            </ListItemButton>
+          </ListItem>
+
+          <ListItem disablePadding>
+            <ListItemButton onClick={handleShop} selected={currentTab === 'shop'}>
+              <ListItemIcon sx={{ minWidth: 36, color: 'var(--primary)' }}><StoreIcon size={20} /></ListItemIcon>
+              <ListItemText primary={t.nav.shop} primaryTypographyProps={{ fontWeight: 700 }} />
+            </ListItemButton>
+          </ListItem>
+
+          <ListItem disablePadding>
+            <ListItemButton onClick={handleFlagship}>
+              <ListItemIcon sx={{ minWidth: 36, color: '#06b6d4' }}><Sparkles size={20} /></ListItemIcon>
+              <ListItemText primary={t.nav.flagship} primaryTypographyProps={{ fontWeight: 700 }} />
+            </ListItemButton>
+          </ListItem>
+
+          <ListItem disablePadding>
+            <ListItemButton onClick={() => handleTab('cart')} selected={currentTab === 'cart'}>
+              <ListItemIcon sx={{ minWidth: 36, color: 'var(--primary)' }}>
+                <Badge badgeContent={effectiveCartCount} color="error" max={99}>
+                  <ShoppingBag size={20} />
+                </Badge>
+              </ListItemIcon>
+              <ListItemText primary={t.nav.cart} primaryTypographyProps={{ fontWeight: 700 }} />
+            </ListItemButton>
+          </ListItem>
+
+          <ListItem disablePadding>
+            <ListItemButton onClick={() => handleTab('history')} selected={currentTab === 'history'}>
+              <ListItemIcon sx={{ minWidth: 36, color: 'var(--primary)' }}><Clock size={20} /></ListItemIcon>
+              <ListItemText primary={t.nav.history} primaryTypographyProps={{ fontWeight: 700 }} />
+            </ListItemButton>
+          </ListItem>
+
+          <ListItem disablePadding>
+            <ListItemButton onClick={() => handleTab('support')}>
+              <ListItemIcon sx={{ minWidth: 36, color: 'var(--primary)' }}><HelpCircle size={20} /></ListItemIcon>
+              <ListItemText primary="ศูนย์ช่วยเหลือ" primaryTypographyProps={{ fontWeight: 700 }} />
+            </ListItemButton>
+          </ListItem>
+        </List>
+
+        <Divider sx={{ my: 2 }} />
+
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 1 }}>
+          <Typography variant="body2" sx={{ fontWeight: 600, color: 'var(--text-muted)' }}>
+            ตั้งค่า / Settings
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <LanguageToggle size="small" />
+            <ThemeToggle compact size="small" />
+          </Box>
+        </Box>
+      </Drawer>
+    </>
   );
 }
