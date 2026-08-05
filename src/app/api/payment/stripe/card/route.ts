@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { orders, paymentTransactions } from '@/db/schema';
 import { eq, and, desc, isNotNull } from 'drizzle-orm';
-import { requireAuth, isResourceOwner, isAdminEmailAsync } from '@/lib/auth';
+import { getSession, isResourceOwner, isAdminEmailAsync } from '@/lib/auth';
 import {
   createStripePaymentIntentDetailed,
   isStripeEnvConfigured,
@@ -25,11 +25,8 @@ const PAID_STATUSES = ['PAID', 'READY', 'SHIPPED', 'RECEIVED', 'COMPLETED'];
  * POST: Create a PaymentIntent for Credit/Debit Card payment
  */
 export async function POST(req: NextRequest) {
-  const authResult = await requireAuth(req);
-  if (authResult instanceof NextResponse) {
-    return authResult;
-  }
-  const userEmail = authResult.email;
+  const session = await getSession(req);
+  const userEmail = session?.user?.email || null;
 
   try {
     if (!isStripeEnvConfigured()) {
@@ -60,11 +57,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!isResourceOwner(order.customerEmail, userEmail) && !(await isAdminEmailAsync(userEmail))) {
-      return await secureJsonResponse(
-        { status: 'error', message: 'ไม่มีสิทธิ์ชำระเงินสำหรับคำสั่งซื้อนี้' },
-        { status: 403 }
-      );
+    if (userEmail && order.customerEmail) {
+      const isOwner = isResourceOwner(order.customerEmail, userEmail);
+      const isAdmin = await isAdminEmailAsync(userEmail);
+      if (!isOwner && !isAdmin) {
+        return await secureJsonResponse(
+          { status: 'error', message: 'ไม่มีสิทธิ์ชำระเงินสำหรับคำสั่งซื้อนี้' },
+          { status: 403 }
+        );
+      }
     }
 
     if (PAID_STATUSES.includes(currentStatus) || order.paymentVerified) {
@@ -175,10 +176,8 @@ export async function POST(req: NextRequest) {
  * GET: Poll and verify Stripe PaymentIntent status server-side
  */
 export async function GET(req: NextRequest) {
-  const authResult = await requireAuth(req);
-  if (authResult instanceof NextResponse) {
-    return authResult;
-  }
+  const session = await getSession(req);
+  const userEmail = session?.user?.email || null;
 
   try {
     const ref = req.nextUrl.searchParams.get('ref');

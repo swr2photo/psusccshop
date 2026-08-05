@@ -76,7 +76,15 @@ export default function StandalonePaymentPage() {
         } catch { /* ignore */ }
 
         if (!found) throw new Error('ไม่พบข้อมูลคำสั่งซื้อหมายเลขอ้างอิงนี้');
-        if (active) setOrder(found);
+        if (active) {
+          setOrder(found);
+          const method = String(found.paymentMethod || found.paymentOptionId || '').toLowerCase();
+          if (method === 'credit_card' || method === 'card') {
+            setPayMethod('card');
+          } else if (method === 'manual' || method === 'bank_transfer') {
+            setPayMethod('manual');
+          }
+        }
       } catch (err: any) {
         if (active) setErrorMsg(err?.message || 'เกิดข้อผิดพลาดในการโหลดข้อมูลคำสั่งซื้อ');
       } finally {

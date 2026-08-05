@@ -64,30 +64,6 @@ export default function StripeCardPayment({
 
       setClientSecret(data.clientSecret);
       setPublishableKey(data.publishableKey);
-
-      // Initialize Stripe.js and Mount Card Element
-      if (data.publishableKey && cardContainerRef.current) {
-        const stripe = await getStripe(data.publishableKey);
-        stripeRef.current = stripe;
-
-        const elements = stripe.elements({ locale: 'th' });
-        const cardElement = elements.create('card', {
-          style: {
-            base: {
-              fontSize: '15px',
-              color: '#0f172a',
-              fontFamily: 'Inter, system-ui, sans-serif',
-              '::placeholder': { color: '#94a3b8' },
-            },
-            invalid: { color: '#ef4444' },
-          },
-          hidePostalCode: true,
-        });
-
-        cardContainerRef.current.innerHTML = '';
-        cardElement.mount(cardContainerRef.current);
-        cardElementRef.current = cardElement;
-      }
     } catch (err: any) {
       console.error('[StripeCardPayment] fetchIntent error:', err);
       setErrorMsg(err.message || 'เกิดข้อผิดพลาดในการโหลดระบบชำระเงิน');
@@ -95,6 +71,48 @@ export default function StripeCardPayment({
       setLoadingIntent(false);
     }
   };
+
+  // Mount Card Element after loadingIntent becomes false and container div is in DOM
+  useEffect(() => {
+    if (loadingIntent || !publishableKey || !clientSecret || !cardContainerRef.current) {
+      return;
+    }
+
+    let isSubscribed = true;
+
+    getStripe(publishableKey).then((stripe) => {
+      if (!isSubscribed || !cardContainerRef.current || !stripe) return;
+      stripeRef.current = stripe;
+
+      const elements = stripe.elements({ locale: 'th' });
+      const cardElement = elements.create('card', {
+        style: {
+          base: {
+            fontSize: '15px',
+            color: '#0f172a',
+            fontFamily: 'Inter, system-ui, sans-serif',
+            '::placeholder': { color: '#94a3b8' },
+          },
+          invalid: { color: '#ef4444' },
+        },
+        hidePostalCode: true,
+      });
+
+      cardContainerRef.current.innerHTML = '';
+      cardElement.mount(cardContainerRef.current);
+      cardElementRef.current = cardElement;
+    });
+
+    return () => {
+      isSubscribed = false;
+      if (cardElementRef.current) {
+        try {
+          cardElementRef.current.destroy();
+        } catch { /* ignore */ }
+        cardElementRef.current = null;
+      }
+    };
+  }, [loadingIntent, publishableKey, clientSecret]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

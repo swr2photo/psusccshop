@@ -63,7 +63,7 @@ export default function StandaloneCheckoutPage() {
   const [selectedShippingId, setSelectedShippingId] = useState<string>('pickup');
   const [loadingConfig, setLoadingConfig] = useState(true);
 
-  const [paymentGateway, setPaymentGateway] = useState<'promptpay' | 'manual'>('promptpay');
+  const [paymentGateway, setPaymentGateway] = useState<'promptpay' | 'credit_card' | 'manual'>('promptpay');
   const [turnstileToken, setTurnstileToken] = useState('');
   const [wantReceipt, setWantReceipt] = useState(false);
   const [taxId, setTaxId] = useState('');
@@ -489,6 +489,28 @@ export default function StandaloneCheckoutPage() {
                               </Typography>
                               <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>
                                 สแกนจ่ายผ่านแอปธนาคาร ระบบยืนยันยอดทันที 24 ชม.
+                              </Typography>
+                            </Box>
+                          </Box>
+                        }
+                      />
+                    </CardContent>
+                  </Card>
+
+                  <Card variant="outlined" sx={{ mb: 1.5, borderColor: paymentGateway === 'credit_card' ? '#1d4ed8' : '#e2e8f0', borderRadius: 2 }}>
+                    <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+                      <FormControlLabel
+                        value="credit_card"
+                        control={<Radio size="small" />}
+                        label={
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <CreditCard size={20} color="#1d4ed8" />
+                            <Box>
+                              <Typography sx={{ fontWeight: 700, fontSize: '0.95rem', color: '#1d4ed8' }}>
+                                บัตรเครดิต / เดบิต (Credit/Debit Card)
+                              </Typography>
+                              <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>
+                                ชำระด้วย Visa, Mastercard, JCB ปลอดภัย 256-bit SSL
                               </Typography>
                             </Box>
                           </Box>
