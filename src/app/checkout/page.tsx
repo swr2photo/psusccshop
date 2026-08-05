@@ -33,6 +33,7 @@ import {
   Mail,
   Phone,
   Building2,
+  Tag,
 } from 'lucide-react';
 import StorefrontNavbar from '@/components/StorefrontNavbar';
 import MobileBottomNav from '@/components/MobileBottomNav';
@@ -60,6 +61,10 @@ export default function StandaloneCheckoutPage() {
   const [receiptAddress, setReceiptAddress] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [promoCode, setPromoCode] = useState('');
+  const [promoDiscount, setPromoDiscount] = useState(0);
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [promoMsg, setPromoMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     if (session?.user) {
@@ -70,6 +75,33 @@ export default function StandaloneCheckoutPage() {
 
   const totalAmount = cart.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
   const totalItems = cart.reduce((sum, item) => sum + (Number(item.qty) || 1), 0);
+
+  const handleApplyPromo = async () => {
+    if (!promoCode.trim()) return;
+    setPromoLoading(true);
+    setPromoMsg(null);
+    try {
+      const res = await apiFetch('/api/promo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: promoCode.trim(), amount: totalAmount }),
+      });
+      const data = await res.json();
+      if (res.ok && data.valid) {
+        setPromoDiscount(data.discount || 0);
+        setPromoMsg({ type: 'success', text: `ใช้ส่วนลดสำเร็จ! ลด ฿${data.discount}` });
+      } else {
+        setPromoDiscount(0);
+        setPromoMsg({ type: 'error', text: data.error || 'โค้ดส่วนลดไม่ถูกต้องหรือหมดอายุ' });
+      }
+    } catch {
+      setPromoMsg({ type: 'error', text: 'ไม่สามารถตรวจสอบโค้ดส่วนลดได้' });
+    } finally {
+      setPromoLoading(false);
+    }
+  };
+
+  const finalTotal = Math.max(0, totalAmount - promoDiscount);
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,6 +126,8 @@ export default function StandaloneCheckoutPage() {
         pickupLocation,
         paymentMethod: paymentGateway,
         cart,
+        promoCode: promoDiscount > 0 ? promoCode.trim() : undefined,
+        promoDiscount: promoDiscount > 0 ? promoDiscount : undefined,
         receiptRequest: wantReceipt
           ? {
               wanted: true,
@@ -372,10 +406,54 @@ export default function StandaloneCheckoutPage() {
 
               <Divider sx={{ my: 2 }} />
 
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+              {/* Promo Code Section */}
+              <Box sx={{ mb: 2 }}>
+                <Typography sx={{ fontWeight: 700, fontSize: '0.85rem', color: '#1e3a5f', mb: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <Tag size={16} /> โค้ดส่วนลด
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <TextField
+                    size="small"
+                    placeholder="ใส่โค้ดส่วนลด..."
+                    value={promoCode}
+                    onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                    sx={{ flex: 1 }}
+                  />
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={handleApplyPromo}
+                    disabled={promoLoading || !promoCode.trim()}
+                    sx={{ borderColor: '#1e3a5f', color: '#1e3a5f', fontWeight: 700, textTransform: 'none', minWidth: 80 }}
+                  >
+                    {promoLoading ? <CircularProgress size={16} /> : 'ใช้โค้ด'}
+                  </Button>
+                </Box>
+                {promoMsg && (
+                  <Alert severity={promoMsg.type} sx={{ mt: 1, py: 0, fontSize: '0.8rem', borderRadius: 1.5 }}>
+                    {promoMsg.text}
+                  </Alert>
+                )}
+              </Box>
+
+              <Divider sx={{ my: 2 }} />
+
+              {/* Price Breakdown */}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, fontSize: '0.9rem', color: '#475569' }}>
+                <span>ยอดรวมสินค้า</span>
+                <span style={{ fontWeight: 600 }}>฿{totalAmount.toLocaleString()}</span>
+              </Box>
+              {promoDiscount > 0 && (
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, fontSize: '0.9rem', color: '#16a34a' }}>
+                  <span>ส่วนลดโปรโมชั่น</span>
+                  <span style={{ fontWeight: 700 }}>-฿{promoDiscount.toLocaleString()}</span>
+                </Box>
+              )}
+
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3, pt: 1, borderTop: '2px solid #e2e8f0' }}>
                 <Typography sx={{ fontWeight: 800, fontSize: '1.1rem' }}>ยอดชำระทั้งหมด</Typography>
                 <Typography sx={{ fontWeight: 800, fontSize: '1.3rem', color: 'var(--navy, #1e3a5f)' }}>
-                  ฿{totalAmount.toLocaleString()}
+                  ฿{finalTotal.toLocaleString()}
                 </Typography>
               </Box>
 

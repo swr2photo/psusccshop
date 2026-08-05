@@ -141,6 +141,7 @@ const EXTERNAL_API_ROUTES = [
 
 const NAVIGABLE_API_ROUTES = [
   '/api/invoice',
+  '/api/payment-notice',
 ];
 
 const CACHEABLE_API_PREFIXES = [

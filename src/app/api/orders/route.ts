@@ -82,6 +82,8 @@ export async function GET(req: NextRequest) {
   const currentUserEmail = authResult.email;
   const isAdmin = await isAdminEmailAsync(currentUserEmail);
 
+  const refParam = req.nextUrl.searchParams.get('ref');
+  const refsParam = req.nextUrl.searchParams.get('refs');
   const email = req.nextUrl.searchParams.get('email');
   const offsetParam = Number(req.nextUrl.searchParams.get('offset'));
   const offset = Number.isFinite(offsetParam) ? Math.max(0, offsetParam) : 0;
@@ -89,12 +91,48 @@ export async function GET(req: NextRequest) {
   const limit = Number.isFinite(limitParam) ? Math.min(100, Math.max(10, limitParam)) : 50;
   const shopSlug = req.nextUrl.searchParams.get('shopSlug') || undefined;
 
-  // ถ้าไม่ใช่ admin ต้องดู orders ของตัวเองเท่านั้น
-  const queryEmail = isAdmin && email ? email : currentUserEmail;
-
   try {
+    // Single order lookup by ref
+    if (refParam) {
+      const order = await getOrderByRef(refParam.trim());
+      if (!order) {
+        return await secureJsonResponse({ status: 'error', message: 'Order not found' }, { status: 404 });
+      }
+      const orderEmail = order.customerEmail || order.email;
+      if (!isAdmin && !isResourceOwner(orderEmail, currentUserEmail)) {
+        return await secureJsonResponse({ status: 'error', message: 'Forbidden' }, { status: 403 });
+      }
+      const sanitized = sanitizeOrderForUser(order);
+      return await secureJsonResponse(
+        { status: 'success', order: sanitized, data: { order: sanitized } },
+        { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Content-Type': 'application/json; charset=utf-8' } }
+      );
+    }
+
+    // Batch order lookup by refs (comma-separated)
+    if (refsParam) {
+      const refList = refsParam.split(',').map((r) => r.trim()).filter(Boolean).slice(0, 50);
+      const fetchedOrders: any[] = [];
+      for (const r of refList) {
+        const o = await getOrderByRef(r);
+        if (o) {
+          const oEmail = o.customerEmail || o.email;
+          if (isAdmin || isResourceOwner(oEmail, currentUserEmail)) {
+            fetchedOrders.push(o);
+          }
+        }
+      }
+      const sanitized = sanitizeOrdersForUser(fetchedOrders);
+      return await secureJsonResponse(
+        { status: 'success', data: { history: sanitized, total: sanitized.length, hasMore: false }, orders: sanitized },
+        { headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Content-Type': 'application/json; charset=utf-8' } }
+      );
+    }
+
+    // ถ้าไม่ใช่ admin ต้องดู orders ของตัวเองเท่านั้น
+    const queryEmail = isAdmin && email ? email : currentUserEmail;
     const normalizedEmail = normalizeEmail(queryEmail);
-    
+
     // Use optimized Supabase query (with optional shopSlug filter)
     const { orders, total } = await getOrdersByEmail(normalizedEmail, { limit, offset, shopSlug });
     

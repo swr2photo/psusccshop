@@ -53,11 +53,26 @@ export default function StandaloneOrderDetailPage() {
     const fetchDetail = async () => {
       setLoading(true);
       try {
-        const res = await apiFetch(`/api/orders?ref=${encodeURIComponent(ref)}`);
-        if (!res.ok) throw new Error('ไม่พบข้อมูลคำสั่งซื้อ');
-        const data = await res.json();
-        const found = data.order || (data.orders && data.orders[0]);
-        if (!found) throw new Error('ไม่พบคำสั่งซื้อหมายเลขอ้างอิงนี้');
+        let found: any = null;
+        // 1. Try GET /api/orders?ref=...
+        try {
+          const res = await apiFetch(`/api/orders?ref=${encodeURIComponent(ref)}`);
+          if (res.ok) {
+            const data = await res.json();
+            found = data.order || data.data?.order || (data.orders && data.orders[0]);
+          }
+        } catch { /* fallback below */ }
+
+        // 2. Fallback to GET /api/payment-info?ref=...
+        if (!found) {
+          const resPay = await apiFetch(`/api/payment-info?ref=${encodeURIComponent(ref)}`);
+          if (resPay.ok) {
+            const dataPay = await resPay.json();
+            found = dataPay.order || dataPay.data?.order;
+          }
+        }
+
+        if (!found) throw new Error('ไม่พบข้อมูลคำสั่งซื้อหมายเลขอ้างอิงนี้');
         if (active) setOrder(found);
       } catch (err: any) {
         if (active) setErrorMsg(err?.message || 'เกิดข้อผิดพลาดในการโหลดข้อมูล');

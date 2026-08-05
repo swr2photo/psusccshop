@@ -47,20 +47,62 @@ export default function StandaloneOrdersPage() {
     const fetchOrders = async () => {
       setLoading(true);
       try {
-        let refs: string[] = [];
+        let localRefs: string[] = [];
         try {
           const raw = localStorage.getItem('psu_scc_orders');
-          if (raw) refs = JSON.parse(raw);
+          if (raw) localRefs = JSON.parse(raw);
         } catch { /* ignore */ }
 
         const email = session?.user?.email;
-        const res = await apiFetch(`/api/orders?email=${encodeURIComponent(email || '')}&refs=${encodeURIComponent(refs.join(','))}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (active && data.orders) {
-            setOrdersList(data.orders);
+        const fetchedList: any[] = [];
+        const seenRefs = new Set<string>();
+
+        // 1. Fetch user email orders
+        if (email) {
+          try {
+            const res = await apiFetch(`/api/orders?email=${encodeURIComponent(email)}`);
+            if (res.ok) {
+              const data = await res.json();
+              const history = data.data?.history || data.orders || data.history || [];
+              if (Array.isArray(history)) {
+                for (const o of history) {
+                  if (o?.ref && !seenRefs.has(o.ref)) {
+                    seenRefs.add(o.ref);
+                    fetchedList.push(o);
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            console.warn('[OrdersPage] Email fetch error:', e);
           }
         }
+
+        // 2. Fetch local storage refs if any missing
+        if (localRefs.length > 0) {
+          const missingRefs = localRefs.filter((r) => !seenRefs.has(r));
+          if (missingRefs.length > 0) {
+            try {
+              const resRefs = await apiFetch(`/api/orders?refs=${encodeURIComponent(missingRefs.join(','))}`);
+              if (resRefs.ok) {
+                const dataRefs = await resRefs.json();
+                const historyRefs = dataRefs.data?.history || dataRefs.orders || dataRefs.history || [];
+                if (Array.isArray(historyRefs)) {
+                  for (const o of historyRefs) {
+                    if (o?.ref && !seenRefs.has(o.ref)) {
+                      seenRefs.add(o.ref);
+                      fetchedList.push(o);
+                    }
+                  }
+                }
+              }
+            } catch (e) {
+              console.warn('[OrdersPage] Refs fetch error:', e);
+            }
+          }
+        }
+
+        if (active) setOrdersList(fetchedList);
       } catch (err) {
         console.error('[OrdersPage] Fetch error:', err);
       } finally {

@@ -38,16 +38,48 @@ export default function StandalonePaymentPage() {
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  const [bankInfo, setBankInfo] = useState<{ bankName?: string; accountNumber?: string; accountName?: string }>({});
+
   useEffect(() => {
     if (!ref) return;
     let active = true;
     const fetchOrder = async () => {
       setLoading(true);
       try {
-        const res = await apiFetch(`/api/orders?ref=${encodeURIComponent(ref)}`);
-        if (!res.ok) throw new Error('ไม่พบข้อมูลคำสั่งซื้อ');
-        const data = await res.json();
-        const found = data.order || (data.orders && data.orders[0]);
+        let found: any = null;
+        // 1. Fetch order details from /api/orders
+        try {
+          const res = await apiFetch(`/api/orders?ref=${encodeURIComponent(ref)}`);
+          if (res.ok) {
+            const data = await res.json();
+            found = data.order || data.data?.order || (data.orders && data.orders[0]);
+          }
+        } catch { /* fallback below */ }
+
+        // 2. Fetch payment info from /api/payment-info
+        try {
+          const resPay = await apiFetch(`/api/payment-info?ref=${encodeURIComponent(ref)}`);
+          if (resPay.ok) {
+            const dataPay = await resPay.json();
+            const payOrder = dataPay.order || dataPay.data?.order;
+            if (!found) found = payOrder;
+            if (active && dataPay.info) {
+              setBankInfo({
+                bankName: dataPay.info.bankName,
+                accountNumber: dataPay.info.accountNumber,
+                accountName: dataPay.info.accountName,
+              });
+            } else if (active && dataPay.bankName) {
+              setBankInfo({
+                bankName: dataPay.bankName,
+                accountNumber: dataPay.accountNumber,
+                accountName: dataPay.accountName,
+              });
+            }
+          }
+        } catch { /* ignore */ }
+
+        if (!found) throw new Error('ไม่พบข้อมูลคำสั่งซื้อหมายเลขอ้างอิงนี้');
         if (active) setOrder(found);
       } catch (err: any) {
         if (active) setErrorMsg(err?.message || 'เกิดข้อผิดพลาดในการโหลดข้อมูลคำสั่งซื้อ');
@@ -226,11 +258,13 @@ export default function StandalonePaymentPage() {
                   <Typography sx={{ fontWeight: 700, color: '#1e3a5f', mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Building2 size={18} /> บัญชีธนาคารสำหรับโอนเงิน
                   </Typography>
-                  <Typography sx={{ fontSize: '0.9rem', mb: 0.5 }}>ธนาคารไทยพาณิชย์ (SCB)</Typography>
+                  <Typography sx={{ fontSize: '0.9rem', mb: 0.5 }}>{bankInfo.bankName || 'ธนาคารไทยพาณิชย์ (SCB)'}</Typography>
                   <Typography sx={{ fontSize: '1.2rem', fontWeight: 800, color: '#1e3a5f', letterSpacing: 1 }}>
-                    123-4-56789-0
+                    {bankInfo.accountNumber || '123-4-56789-0'}
                   </Typography>
-                  <Typography sx={{ fontSize: '0.85rem', color: '#64748b' }}>ชื่อบัญชี: ชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ มอ.</Typography>
+                  <Typography sx={{ fontSize: '0.85rem', color: '#64748b' }}>
+                    ชื่อบัญชี: {bankInfo.accountName || 'ชุมนุมคอมพิวเตอร์ คณะวิทยาศาสตร์ มหาวิทยาลัยสงขลานครินทร์'}
+                  </Typography>
                 </Box>
 
                 {/* Upload Form */}
