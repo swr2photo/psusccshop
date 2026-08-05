@@ -52,6 +52,10 @@ export default function StandaloneCheckoutPage() {
   const cart = useCartStore((s) => s.cart);
   const clearCart = useCartStore((s) => s.clearCart);
 
+  // Wait for Zustand persist hydration from localStorage
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   const [customerName, setCustomerName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -272,6 +276,19 @@ export default function StandaloneCheckoutPage() {
       setLoading(false);
     }
   };
+
+  if (!mounted) {
+    return (
+      <Box sx={{ minHeight: '100vh', bgcolor: 'var(--background, #f8fafc)', pb: 10 }}>
+        <StorefrontNavbar />
+        <Container maxWidth="sm" sx={{ pt: 8, textAlign: 'center' }}>
+          <CircularProgress size={36} sx={{ color: '#1e3a5f', mb: 2 }} />
+          <Typography sx={{ color: '#64748b' }}>กำลังโหลดข้อมูลตะกร้าสินค้า...</Typography>
+        </Container>
+        <MobileBottomNav />
+      </Box>
+    );
+  }
 
   if (cart.length === 0 && !loading) {
     return (

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -15,7 +15,8 @@ import {
   Paper,
   Chip,
   Card,
-  CardContent,
+  CircularProgress,
+  Skeleton,
 } from '@mui/material';
 import {
   ShoppingCart,
@@ -26,7 +27,6 @@ import {
   ArrowLeft,
   ShoppingBag,
   ShieldCheck,
-  Tag,
 } from 'lucide-react';
 import StorefrontNavbar from '@/components/StorefrontNavbar';
 import MobileBottomNav from '@/components/MobileBottomNav';
@@ -41,8 +41,30 @@ export default function StandaloneCartPage() {
   const updateItem = useCartStore((s) => s.updateItem);
   const clearCart = useCartStore((s) => s.clearCart);
 
-  const totalAmount = cart.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
-  const totalItems = cart.reduce((sum, item) => sum + (Number(item.qty) || 1), 0);
+  // Wait for client hydration so Zustand persist loads cart from localStorage
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const getItemUnitPrice = (item: any) => Number(item.unitPrice ?? item.price ?? 0);
+  const getItemQty = (item: any) => Number(item.quantity ?? item.qty ?? 1);
+  const getItemTotal = (item: any) => {
+    if (item.total != null && Number(item.total) > 0) return Number(item.total);
+    if (item.subtotal != null && Number(item.subtotal) > 0) return Number(item.subtotal);
+    return getItemUnitPrice(item) * getItemQty(item);
+  };
+  const getItemName = (item: any) => item.productName || item.name || 'สินค้า';
+  const getItemImage = (item: any) => item.image || item.coverImage || item.images?.[0] || '/icon.png';
+
+  const totalAmount = useMemo(
+    () => cart.reduce((sum, item) => sum + getItemTotal(item), 0),
+    [cart]
+  );
+  const totalItems = useMemo(
+    () => cart.reduce((sum, item) => sum + getItemQty(item), 0),
+    [cart]
+  );
 
   const handleQtyChange = (index: number, newQty: number) => {
     if (newQty <= 0) {
@@ -50,14 +72,28 @@ export default function StandaloneCartPage() {
       return;
     }
     const item = cart[index];
-    const unitPrice = item.price || (item.total / (item.qty || 1));
+    const unitPrice = getItemUnitPrice(item);
     const updated = {
       ...item,
       qty: newQty,
+      quantity: newQty,
       total: unitPrice * newQty,
     };
     updateItem(index, updated);
   };
+
+  if (!mounted) {
+    return (
+      <Box sx={{ minHeight: '100vh', bgcolor: 'var(--background, #f8fafc)', pb: 10 }}>
+        <StorefrontNavbar />
+        <Container maxWidth="lg" sx={{ pt: 6, textAlign: 'center' }}>
+          <CircularProgress size={36} sx={{ color: '#1e3a5f', mb: 2 }} />
+          <Typography sx={{ color: '#64748b' }}>กำลังโหลดข้อมูลตะกร้าสินค้า...</Typography>
+        </Container>
+        <MobileBottomNav />
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'var(--background, #f8fafc)', color: 'var(--foreground, #0f172a)', pb: 10 }}>
@@ -153,81 +189,92 @@ export default function StandaloneCartPage() {
               </Box>
 
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {cart.map((item, index) => (
-                  <Card
-                    key={`${item.id}-${index}`}
-                    variant="outlined"
-                    sx={{
-                      borderRadius: 2.5,
-                      borderColor: '#e2e8f0',
-                      p: 2,
-                      display: 'grid',
-                      gridTemplateColumns: { xs: '80px 1fr', sm: '100px 1fr auto' },
-                      gap: 2,
-                      alignItems: 'center',
-                    }}
-                  >
-                    {/* Item Image */}
-                    <Box sx={{ width: { xs: 80, sm: 100 }, height: { xs: 80, sm: 100 }, borderRadius: 2, overflow: 'hidden', bgcolor: '#f1f5f9', position: 'relative' }}>
-                      <Image
-                        src={(item as any).image || '/icon.png'}
-                        alt={item.name}
-                        fill
-                        style={{ objectFit: 'cover' }}
-                      />
-                    </Box>
+                {cart.map((item, index) => {
+                  const name = getItemName(item);
+                  const qty = getItemQty(item);
+                  const price = getItemUnitPrice(item);
+                  const itemTotal = getItemTotal(item);
+                  const image = getItemImage(item);
 
-                    {/* Item Info */}
-                    <Box>
-                      <Typography sx={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--foreground, #0f172a)', mb: 0.5 }}>
-                        {item.name}
-                      </Typography>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
-                        {item.size && (
-                          <Chip label={`ไซส์ ${item.size}`} size="small" sx={{ fontSize: '0.7rem', height: 22, bgcolor: '#e2e8f0' }} />
-                        )}
-                        {item.sleeve && (
-                          <Chip label={item.sleeve === 'LONG' ? 'แขนยาว' : 'แขนสั้น'} size="small" sx={{ fontSize: '0.7rem', height: 22, bgcolor: '#fef3c7', color: '#92400e' }} />
-                        )}
-                        {item.selectedVariant && (
-                          <Chip label={item.selectedVariant.name} size="small" sx={{ fontSize: '0.7rem', height: 22, bgcolor: '#e0f2fe', color: '#0369a1' }} />
-                        )}
-                      </Box>
-                      {(item.customName || item.customNumber) && (
-                        <Typography sx={{ fontSize: '0.75rem', color: '#475569' }}>
-                          สกรีน: {item.customName ? `ชื่อ ${item.customName}` : ''} {item.customNumber ? `เบอร์ ${item.customNumber}` : ''}
-                        </Typography>
-                      )}
-                      <Typography sx={{ fontWeight: 700, color: 'var(--navy, #1e3a5f)', mt: 0.5 }}>
-                        ฿{Number(item.price || (item.total / (item.qty || 1))).toLocaleString()}
-                      </Typography>
-                    </Box>
-
-                    {/* Controls & Total */}
-                    <Box sx={{ display: 'flex', flexDirection: { xs: 'row', sm: 'column' }, alignItems: { xs: 'center', sm: 'flex-end' }, justifyContent: 'space-between', gridColumn: { xs: '1 / -1', sm: 'auto' }, gap: 1.5, pt: { xs: 1, sm: 0 }, borderTop: { xs: '1px solid #f1f5f9', sm: 'none' } }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', border: '1px solid #cbd5e1', borderRadius: 2, px: 0.5 }}>
-                        <IconButton size="small" onClick={() => handleQtyChange(index, (item.qty || 1) - 1)}>
-                          <Minus size={14} />
-                        </IconButton>
-                        <Typography sx={{ px: 1.5, fontWeight: 700, fontSize: '0.875rem' }}>
-                          {item.qty || 1}
-                        </Typography>
-                        <IconButton size="small" onClick={() => handleQtyChange(index, (item.qty || 1) + 1)}>
-                          <Plus size={14} />
-                        </IconButton>
+                  return (
+                    <Card
+                      key={`${item.id}-${index}`}
+                      variant="outlined"
+                      sx={{
+                        borderRadius: 2.5,
+                        borderColor: '#e2e8f0',
+                        p: 2,
+                        display: 'grid',
+                        gridTemplateColumns: { xs: '80px 1fr', sm: '100px 1fr auto' },
+                        gap: 2,
+                        alignItems: 'center',
+                      }}
+                    >
+                      {/* Item Image */}
+                      <Box sx={{ width: { xs: 80, sm: 100 }, height: { xs: 80, sm: 100 }, borderRadius: 2, overflow: 'hidden', bgcolor: '#f1f5f9', position: 'relative' }}>
+                        <Image
+                          src={image}
+                          alt={name}
+                          fill
+                          style={{ objectFit: 'cover' }}
+                        />
                       </Box>
 
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography sx={{ fontWeight: 800, fontSize: '1rem', color: 'var(--navy, #1e3a5f)' }}>
-                          ฿{Number(item.total).toLocaleString()}
+                      {/* Item Info */}
+                      <Box>
+                        <Typography sx={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--foreground, #0f172a)', mb: 0.5 }}>
+                          {name}
                         </Typography>
-                        <IconButton size="small" onClick={() => removeFromCart(index)} sx={{ color: '#94a3b8', '&:hover': { color: '#ef4444' } }}>
-                          <Trash2 size={16} />
-                        </IconButton>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 1 }}>
+                          {item.size && item.size !== '-' && (
+                            <Chip label={`ไซส์ ${item.size}`} size="small" sx={{ fontSize: '0.7rem', height: 22, bgcolor: '#e2e8f0' }} />
+                          )}
+                          {item.sleeve && (
+                            <Chip label={item.sleeve === 'LONG' ? 'แขนยาว' : 'แขนสั้น'} size="small" sx={{ fontSize: '0.7rem', height: 22, bgcolor: '#fef3c7', color: '#92400e' }} />
+                          )}
+                          {item.selectedVariant && (
+                            <Chip label={item.selectedVariant.name} size="small" sx={{ fontSize: '0.7rem', height: 22, bgcolor: '#e0f2fe', color: '#0369a1' }} />
+                          )}
+                          {item.shopSlug && (
+                            <Chip label={`ร้าน: ${item.shopSlug}`} size="small" sx={{ fontSize: '0.7rem', height: 22, bgcolor: '#f1f5f9', color: '#475569' }} />
+                          )}
+                        </Box>
+                        {(item.customName || item.customNumber) && (
+                          <Typography sx={{ fontSize: '0.75rem', color: '#475569' }}>
+                            สกรีน: {item.customName ? `ชื่อ ${item.customName}` : ''} {item.customNumber ? `เบอร์ ${item.customNumber}` : ''}
+                          </Typography>
+                        )}
+                        <Typography sx={{ fontWeight: 700, color: 'var(--navy, #1e3a5f)', mt: 0.5 }}>
+                          ฿{price.toLocaleString()}
+                        </Typography>
                       </Box>
-                    </Box>
-                  </Card>
-                ))}
+
+                      {/* Controls & Total */}
+                      <Box sx={{ display: 'flex', flexDirection: { xs: 'row', sm: 'column' }, alignItems: { xs: 'center', sm: 'flex-end' }, justifyContent: 'space-between', gridColumn: { xs: '1 / -1', sm: 'auto' }, gap: 1.5, pt: { xs: 1, sm: 0 }, borderTop: { xs: '1px solid #f1f5f9', sm: 'none' } }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', border: '1px solid #cbd5e1', borderRadius: 2, px: 0.5 }}>
+                          <IconButton size="small" onClick={() => handleQtyChange(index, qty - 1)}>
+                            <Minus size={14} />
+                          </IconButton>
+                          <Typography sx={{ px: 1.5, fontWeight: 700, fontSize: '0.875rem' }}>
+                            {qty}
+                          </Typography>
+                          <IconButton size="small" onClick={() => handleQtyChange(index, qty + 1)}>
+                            <Plus size={14} />
+                          </IconButton>
+                        </Box>
+
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography sx={{ fontWeight: 800, fontSize: '1rem', color: 'var(--navy, #1e3a5f)' }}>
+                            ฿{itemTotal.toLocaleString()}
+                          </Typography>
+                          <IconButton size="small" onClick={() => removeFromCart(index)} sx={{ color: '#94a3b8', '&:hover': { color: '#ef4444' } }}>
+                            <Trash2 size={16} />
+                          </IconButton>
+                        </Box>
+                      </Box>
+                    </Card>
+                  );
+                })}
               </Box>
             </Paper>
 

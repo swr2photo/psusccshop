@@ -3109,6 +3109,8 @@ export default function HomePage() {
       setShowCart(false);
       setShowHistoryDialog(false);
       setShowWishlistDrawer(false);
+      setActiveShopMenu('main');
+      setCategoryFilter('ALL');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else if (tab === 'cart') {
       setShowCart(true);
