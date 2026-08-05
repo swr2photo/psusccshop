@@ -1264,12 +1264,15 @@ textarea::placeholder {
 
 /* ---- Electronic Payment Notice print (PaymentModal) ---- */
 @media print {
-  body * {
+  body:has(.payment-notice-print) * {
     visibility: hidden !important;
   }
-  .payment-notice-print,
-  .payment-notice-print * {
+  body:has(.payment-notice-print) .payment-notice-print,
+  body:has(.payment-notice-print) .payment-notice-print * {
     visibility: visible !important;
+  }
+  .no-print {
+    display: none !important;
   }
   .payment-notice-print {
     position: absolute !important;

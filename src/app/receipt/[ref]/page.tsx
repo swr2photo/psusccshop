@@ -133,7 +133,8 @@ function ReceiptPageInner() {
             boxShadow: 'none !important',
             width: '100% !important',
             maxWidth: 'none !important',
-            height: '100vh !important',
+            height: 'auto !important',
+            minHeight: '100% !important',
           },
         },
       }}
@@ -162,7 +163,12 @@ function ReceiptPageInner() {
             variant="contained"
             onClick={() => {
               const frame = document.getElementById('receipt-frame') as HTMLIFrameElement | null;
-              frame?.contentWindow?.print();
+              if (frame?.contentWindow) {
+                frame.contentWindow.focus();
+                frame.contentWindow.print();
+              } else {
+                window.print();
+              }
             }}
             sx={{ textTransform: 'none', bgcolor: '#2563eb' }}
           >

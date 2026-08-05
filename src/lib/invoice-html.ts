@@ -905,22 +905,50 @@ export function buildInvoiceHtml(
       font-weight: 700;
     }
     @media print {
-      body { background: #fff; padding: 0; }
+      html, body {
+        background: #fff !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+        height: auto !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
       .sheet {
-        max-width: none;
-        width: 210mm;
-        min-height: 297mm;
-        margin: 0;
-        border: none;
-        box-shadow: none;
-        padding: 12mm 14mm;
+        max-width: none !important;
+        width: 100% !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+      }
+      .meta {
+        display: grid !important;
+        grid-template-columns: 1.2fr 1fr !important;
+      }
+      .summary {
+        display: grid !important;
+        grid-template-columns: 1.3fr 1fr !important;
+      }
+      .footer-grid {
+        display: grid !important;
+        grid-template-columns: 140px 1fr !important;
+      }
+      .col-size, th.col-size {
+        display: table-cell !important;
+      }
+      .original-badge {
+        position: absolute !important;
+        right: 0 !important;
+        top: -12px !important;
       }
       .toolbar,
       .no-print { display: none !important; }
-      .official-stamp { opacity: 0.65; }
-      @page { size: A4; margin: 10mm; }
+      .official-stamp { opacity: 0.7 !important; -webkit-print-color-adjust: exact !important; }
+      @page { size: A4 portrait; margin: 10mm 12mm; }
     }
-    @media (max-width: 720px) {
+    @media screen and (max-width: 720px) {
       .sheet { padding: 18px 14px 24px; min-height: 0; }
       .header { padding-right: 0; }
       .original-badge { position: static; margin-bottom: 10px; display: inline-block; }
