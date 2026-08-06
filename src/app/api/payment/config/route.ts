@@ -9,6 +9,7 @@ import { eq } from 'drizzle-orm';
 import { PaymentConfig, DEFAULT_PAYMENT_CONFIG } from '@/lib/payment';
 import { invalidateConfigCache } from '@/lib/config-db';
 import { secureJsonRequest, secureJsonResponse } from '@/lib/payload-crypto';
+import { isStripePromptPayEnabled, isStripeCardEnabled } from '@/lib/payment-server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -21,19 +22,20 @@ export async function GET(request: NextRequest) {
     const rows = await db.select().from(config).where(eq(config.key, CONFIG_KEY)).limit(1);
     const data = rows[0];
 
-    if (!data) {
-      return await secureJsonResponse({ success: true, data: DEFAULT_PAYMENT_CONFIG });
-    }
-
-    const paymentCfg = data.value as unknown as PaymentConfig;
+    const paymentCfg = data ? (data.value as unknown as PaymentConfig) : DEFAULT_PAYMENT_CONFIG;
     const session = await getSession(request);
     const isAdminUser = session?.user?.email ? await isAdminEmailAsync(session.user.email) : false;
 
+    const stripePromptPayEnabled = isStripePromptPayEnabled(paymentCfg);
+    const stripeCardEnabled = isStripeCardEnabled(paymentCfg);
+
     if (!isAdminUser) {
-      const publicConfig: PaymentConfig = {
+      const publicConfig = {
         ...paymentCfg,
-        options: paymentCfg.options.filter(opt => opt.enabled),
-        gateways: paymentCfg.gateways.map(gw => ({
+        stripePromptPayEnabled,
+        stripeCardEnabled,
+        options: (paymentCfg.options || []).filter(opt => opt.enabled),
+        gateways: (paymentCfg.gateways || []).map(gw => ({
           ...gw,
           webhookEndpoint: undefined,
         })),
@@ -41,7 +43,14 @@ export async function GET(request: NextRequest) {
       return await secureJsonResponse({ success: true, data: publicConfig });
     }
 
-    return await secureJsonResponse({ success: true, data: paymentCfg });
+    return await secureJsonResponse({
+      success: true,
+      data: {
+        ...paymentCfg,
+        stripePromptPayEnabled,
+        stripeCardEnabled,
+      },
+    });
   } catch (error) {
     console.error('[API] Get payment config error:', error);
     return await secureJsonResponse({ success: false, error: 'Failed to get payment config' }, { status: 500 });

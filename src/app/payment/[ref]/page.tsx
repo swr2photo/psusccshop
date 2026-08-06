@@ -40,6 +40,9 @@ export default function StandalonePaymentPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const [bankInfo, setBankInfo] = useState<{ bankName?: string; accountNumber?: string; accountName?: string }>({});
+  const [stripePromptPayEnabled, setStripePromptPayEnabled] = useState(true);
+  const [stripeCardEnabled, setStripeCardEnabled] = useState(true);
+  const [manualEnabled, setManualEnabled] = useState(true);
 
   useEffect(() => {
     if (!ref) return;
@@ -48,6 +51,10 @@ export default function StandalonePaymentPage() {
       setLoading(true);
       try {
         let found: any = null;
+        let promptPayOk = true;
+        let cardOk = true;
+        let manualOk = true;
+
         // 1. Fetch order details from /api/orders
         try {
           const res = await apiFetch(`/api/orders?ref=${encodeURIComponent(ref)}`);
@@ -65,12 +72,26 @@ export default function StandalonePaymentPage() {
             const payOrder = dataPay.order || dataPay.data?.order;
             if (!found) found = payOrder;
             const payData = dataPay.data || dataPay.info || dataPay;
-            if (active && payData && (payData.bankName || payData.accountNumber)) {
-              setBankInfo({
-                bankName: payData.bankName,
-                accountNumber: payData.accountNumber,
-                accountName: payData.accountName,
-              });
+            if (active && payData) {
+              if (typeof payData.stripePromptPayEnabled === 'boolean') {
+                promptPayOk = payData.stripePromptPayEnabled;
+                setStripePromptPayEnabled(payData.stripePromptPayEnabled);
+              }
+              if (typeof payData.stripeCardEnabled === 'boolean') {
+                cardOk = payData.stripeCardEnabled;
+                setStripeCardEnabled(payData.stripeCardEnabled);
+              }
+              if (typeof payData.paymentEnabled === 'boolean') {
+                manualOk = payData.paymentEnabled;
+                setManualEnabled(payData.paymentEnabled);
+              }
+              if (payData.bankName || payData.accountNumber) {
+                setBankInfo({
+                  bankName: payData.bankName,
+                  accountNumber: payData.accountNumber,
+                  accountName: payData.accountName,
+                });
+              }
             }
           }
         } catch { /* ignore */ }
@@ -79,9 +100,15 @@ export default function StandalonePaymentPage() {
         if (active) {
           setOrder(found);
           const method = String(found.paymentMethod || found.paymentOptionId || '').toLowerCase();
-          if (method === 'credit_card' || method === 'card') {
+          if ((method === 'credit_card' || method === 'card') && cardOk) {
             setPayMethod('card');
-          } else if (method === 'manual' || method === 'bank_transfer') {
+          } else if ((method === 'manual' || method === 'bank_transfer') && manualOk) {
+            setPayMethod('manual');
+          } else if (promptPayOk) {
+            setPayMethod('promptpay');
+          } else if (cardOk) {
+            setPayMethod('card');
+          } else if (manualOk) {
             setPayMethod('manual');
           }
         }
@@ -274,16 +301,28 @@ export default function StandalonePaymentPage() {
             )}
 
             {/* Method Tabs */}
-            <Tabs
-              value={payMethod}
-              onChange={(_, val) => setPayMethod(val)}
-              variant="fullWidth"
-              sx={{ mb: 3, borderBottom: '1px solid #e2e8f0', '& .MuiTab-root': { fontWeight: 700, textTransform: 'none' } }}
-            >
-              <Tab icon={<QrCode size={18} />} iconPosition="start" label="Stripe PromptPay (AUTO)" value="promptpay" />
-              <Tab icon={<CreditCard size={18} />} iconPosition="start" label="บัตรเครดิต / เดบิต" value="card" />
-              <Tab icon={<Upload size={18} />} iconPosition="start" label="โอนเงิน + แนบสลิป" value="manual" />
-            </Tabs>
+            {(!stripePromptPayEnabled && !stripeCardEnabled && !manualEnabled) ? (
+              <Alert severity="warning" sx={{ mb: 3, borderRadius: 2 }}>
+                ระบบชำระเงินปิดให้บริการชั่วคราว กรุณาติดต่อทีมงานผู้ดูแลระบบ
+              </Alert>
+            ) : (
+              <Tabs
+                value={payMethod}
+                onChange={(_, val) => setPayMethod(val)}
+                variant="fullWidth"
+                sx={{ mb: 3, borderBottom: '1px solid #e2e8f0', '& .MuiTab-root': { fontWeight: 700, textTransform: 'none' } }}
+              >
+                {stripePromptPayEnabled && (
+                  <Tab icon={<QrCode size={18} />} iconPosition="start" label="Stripe PromptPay (AUTO)" value="promptpay" />
+                )}
+                {stripeCardEnabled && (
+                  <Tab icon={<CreditCard size={18} />} iconPosition="start" label="บัตรเครดิต / เดบิต" value="card" />
+                )}
+                {manualEnabled && (
+                  <Tab icon={<Upload size={18} />} iconPosition="start" label="โอนเงิน + แนบสลิป" value="manual" />
+                )}
+              </Tabs>
+            )}
 
             {payMethod === 'promptpay' ? (
               <Box sx={{ py: 2 }}>

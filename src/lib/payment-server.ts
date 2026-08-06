@@ -475,6 +475,9 @@ export function isStripePromptPayEnabled(
 ): boolean {
   if (!isStripeEnvConfigured()) return false;
 
+  const stripeGw = paymentConfig?.gateways?.find((g) => g.gateway === 'stripe');
+  if (stripeGw && stripeGw.enabled === false) return false;
+
   const stripe = resolveStripeSpecificConfig(paymentConfig);
   if (!stripe.enablePromptPay) return false;
 
@@ -503,9 +506,11 @@ export function isStripeCardEnabled(
 ): boolean {
   if (!isStripeEnvConfigured()) return false;
 
+  const stripeGw = paymentConfig?.gateways?.find((g) => g.gateway === 'stripe');
+  if (stripeGw && stripeGw.enabled === false) return false;
+
   const stripe = resolveStripeSpecificConfig(paymentConfig);
-  // Default to enabled when Stripe keys are configured and enableCreditCard is not explicitly set to false
-  if (stripe.enableCreditCard === false) return false;
+  if (!stripe.enableCreditCard) return false;
 
   if (typeof amountTHB === 'number' && Number.isFinite(amountTHB)) {
     if (amountTHB < 10) return false;

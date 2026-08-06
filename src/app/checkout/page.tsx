@@ -62,12 +62,16 @@ export default function StandaloneCheckoutPage() {
   const [address, setAddress] = useState('');
   const [studentId, setStudentId] = useState('');
 
-  // Dynamic Shipping Config from API
+  // Dynamic Shipping & Payment Config from API
   const [shippingConfig, setShippingConfig] = useState<ShippingConfig | null>(null);
   const [selectedShippingId, setSelectedShippingId] = useState<string>('pickup');
   const [loadingConfig, setLoadingConfig] = useState(true);
 
   const [paymentGateway, setPaymentGateway] = useState<'promptpay' | 'credit_card' | 'manual'>('promptpay');
+  const [stripePromptPayEnabled, setStripePromptPayEnabled] = useState(true);
+  const [stripeCardEnabled, setStripeCardEnabled] = useState(true);
+  const [manualEnabled, setManualEnabled] = useState(true);
+
   const [turnstileToken, setTurnstileToken] = useState('');
   const [wantReceipt, setWantReceipt] = useState(false);
   const [taxId, setTaxId] = useState('');
@@ -87,22 +91,43 @@ export default function StandaloneCheckoutPage() {
     }
   }, [session]);
 
-  // Fetch Shipping Configuration
+  // Fetch Shipping & Payment Configuration
   useEffect(() => {
-    apiFetch('/api/shipping/config')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success && data.data) {
-          setShippingConfig(data.data);
-          const enabled = (data.data.options as ShippingOption[])?.filter((o) => o.enabled) || [];
-          if (enabled.length > 0) {
-            const defaultOpt = enabled.find((o) => o.id === data.data.defaultOptionId) || enabled[0];
-            setSelectedShippingId(defaultOpt.id);
-          }
+    let active = true;
+    Promise.all([
+      apiFetch('/api/shipping/options').then((r) => r.json()).catch(() => null),
+      apiFetch('/api/payment/config').then((r) => r.json()).catch(() => null),
+    ]).then(([shipData, payData]) => {
+      if (!active) return;
+      if (shipData?.success && shipData?.data) {
+        setShippingConfig(shipData.data);
+        const enabled = (shipData.data.options as ShippingOption[])?.filter((o) => o.enabled) || [];
+        if (enabled.length > 0) {
+          const defaultOpt = enabled.find((o) => o.id === shipData.data.defaultOptionId) || enabled[0];
+          setSelectedShippingId(defaultOpt.id);
         }
-      })
-      .catch((err) => console.error('[Checkout] Failed to load shipping config:', err))
-      .finally(() => setLoadingConfig(false));
+      }
+
+      if (payData?.success && payData?.data) {
+        const pData = payData.data;
+        const promptPayOk = typeof pData.stripePromptPayEnabled === 'boolean' ? pData.stripePromptPayEnabled : true;
+        const cardOk = typeof pData.stripeCardEnabled === 'boolean' ? pData.stripeCardEnabled : true;
+        const manualOpt = pData.options?.find((o: any) => o.method === 'bank_transfer' || o.id === 'bank_transfer');
+        const manualOk = manualOpt ? manualOpt.enabled !== false : true;
+
+        setStripePromptPayEnabled(promptPayOk);
+        setStripeCardEnabled(cardOk);
+        setManualEnabled(manualOk);
+
+        if (promptPayOk) setPaymentGateway('promptpay');
+        else if (cardOk) setPaymentGateway('credit_card');
+        else if (manualOk) setPaymentGateway('manual');
+      }
+    }).finally(() => {
+      if (active) setLoadingConfig(false);
+    });
+
+    return () => { active = false; };
   }, []);
 
   const getItemUnitPrice = (item: any) => Number(item.unitPrice ?? item.price ?? 0);
@@ -193,6 +218,47 @@ export default function StandaloneCheckoutPage() {
 
     setLoading(true);
     setErrorMsg(null);
+
+    // Validate live stock before placing order
+    try {
+      const catRes = await apiFetch('/api/shops/catalog').then((r) => r.json()).catch(() => null);
+      if (catRes?.shops || catRes?.data) {
+        const shops = catRes.shops || catRes.data || [];
+        const prodMap: Record<string, any> = {};
+        for (const s of shops) {
+          for (const p of s.products || []) {
+            prodMap[p.id] = p;
+          }
+        }
+
+        for (const item of cart) {
+          const pId = item.productId || item.id?.split('-')[0];
+          const prod = prodMap[pId];
+          if (!prod) continue;
+
+          let maxStock: number | null = prod.stock ?? null;
+          const variantId = item.selectedVariant?.id || item.size;
+          if (prod.variants && prod.variants.length > 0 && variantId) {
+            const v = prod.variants.find((x: any) => x.id === variantId);
+            if (v && typeof v.stock === 'number') maxStock = v.stock;
+          }
+
+          const qty = getItemQty(item);
+          if (maxStock !== null && maxStock <= 0) {
+            setLoading(false);
+            setErrorMsg(`สินค้า "${getItemName(item)}" หมดแล้ว ไม่สามารถสั่งซื้อได้`);
+            return;
+          }
+          if (maxStock !== null && qty > maxStock) {
+            setLoading(false);
+            setErrorMsg(`สินค้า "${getItemName(item)}" มีในสต็อกเพียง ${maxStock} ชิ้น (ในตะกร้ามี ${qty} ชิ้น)`);
+            return;
+          }
+        }
+      }
+    } catch {
+      /* continue order creation; backend will also validate */
+    }
 
     try {
       const formattedCart = cart.map((item: any) => ({
@@ -491,70 +557,82 @@ export default function StandaloneCheckoutPage() {
                   </Typography>
                 </Box>
 
-                <RadioGroup value={paymentGateway} onChange={(e) => setPaymentGateway(e.target.value as any)}>
-                  <Card variant="outlined" sx={{ mb: 1.5, borderColor: paymentGateway === 'promptpay' ? '#1a237e' : '#e2e8f0', borderRadius: 2 }}>
-                    <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-                      <FormControlLabel
-                        value="promptpay"
-                        control={<Radio size="small" />}
-                        label={
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <QrCode size={20} color="#1a237e" />
-                            <Box>
-                              <Typography sx={{ fontWeight: 700, fontSize: '0.95rem', color: '#1a237e' }}>
-                                Stripe PromptPay (สแกน QR อัตโนมัติ)
-                              </Typography>
-                              <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>
-                                สแกนจ่ายผ่านแอปธนาคาร ระบบยืนยันยอดทันที 24 ชม.
-                              </Typography>
-                            </Box>
-                          </Box>
-                        }
-                      />
-                    </CardContent>
-                  </Card>
+                {(!stripePromptPayEnabled && !stripeCardEnabled && !manualEnabled) ? (
+                  <Alert severity="warning" sx={{ borderRadius: 2 }}>
+                    ระบบชำระเงินปิดให้บริการชั่วคราว กรุณาติดต่อแอดมิน
+                  </Alert>
+                ) : (
+                  <RadioGroup value={paymentGateway} onChange={(e) => setPaymentGateway(e.target.value as any)}>
+                    {stripePromptPayEnabled && (
+                      <Card variant="outlined" sx={{ mb: 1.5, borderColor: paymentGateway === 'promptpay' ? '#1a237e' : '#e2e8f0', borderRadius: 2 }}>
+                        <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+                          <FormControlLabel
+                            value="promptpay"
+                            control={<Radio size="small" />}
+                            label={
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <QrCode size={20} color="#1a237e" />
+                                <Box>
+                                  <Typography sx={{ fontWeight: 700, fontSize: '0.95rem', color: '#1a237e' }}>
+                                    Stripe PromptPay (สแกน QR อัตโนมัติ)
+                                  </Typography>
+                                  <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>
+                                    สแกนจ่ายผ่านแอปธนาคาร ระบบยืนยันยอดทันที 24 ชม.
+                                  </Typography>
+                                </Box>
+                              </Box>
+                            }
+                          />
+                        </CardContent>
+                      </Card>
+                    )}
 
-                  <Card variant="outlined" sx={{ mb: 1.5, borderColor: paymentGateway === 'credit_card' ? '#1d4ed8' : '#e2e8f0', borderRadius: 2 }}>
-                    <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-                      <FormControlLabel
-                        value="credit_card"
-                        control={<Radio size="small" />}
-                        label={
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <CreditCard size={20} color="#1d4ed8" />
-                            <Box>
-                              <Typography sx={{ fontWeight: 700, fontSize: '0.95rem', color: '#1d4ed8' }}>
-                                บัตรเครดิต / เดบิต (Credit/Debit Card)
-                              </Typography>
-                              <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>
-                                ชำระด้วย Visa, Mastercard, JCB ปลอดภัย 256-bit SSL
-                              </Typography>
-                            </Box>
-                          </Box>
-                        }
-                      />
-                    </CardContent>
-                  </Card>
+                    {stripeCardEnabled && (
+                      <Card variant="outlined" sx={{ mb: 1.5, borderColor: paymentGateway === 'credit_card' ? '#1d4ed8' : '#e2e8f0', borderRadius: 2 }}>
+                        <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+                          <FormControlLabel
+                            value="credit_card"
+                            control={<Radio size="small" />}
+                            label={
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <CreditCard size={20} color="#1d4ed8" />
+                                <Box>
+                                  <Typography sx={{ fontWeight: 700, fontSize: '0.95rem', color: '#1d4ed8' }}>
+                                    บัตรเครดิต / เดบิต (Credit/Debit Card)
+                                  </Typography>
+                                  <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>
+                                    ชำระด้วย Visa, Mastercard, JCB ปลอดภัย 256-bit SSL
+                                  </Typography>
+                                </Box>
+                              </Box>
+                            }
+                          />
+                        </CardContent>
+                      </Card>
+                    )}
 
-                  <Card variant="outlined" sx={{ borderColor: paymentGateway === 'manual' ? '#1e3a5f' : '#e2e8f0', borderRadius: 2 }}>
-                    <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-                      <FormControlLabel
-                        value="manual"
-                        control={<Radio size="small" />}
-                        label={
-                          <Box>
-                            <Typography sx={{ fontWeight: 700, fontSize: '0.95rem' }}>
-                              โอนเงินผ่านบัญชีธนาคาร + แนบสลิป
-                            </Typography>
-                            <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>
-                              โอนเงินเข้าบัญชีร้านค้า และอัปโหลดสลิปเพื่อให้ทีมงานตรวจสอบ
-                            </Typography>
-                          </Box>
-                        }
-                      />
-                    </CardContent>
-                  </Card>
-                </RadioGroup>
+                    {manualEnabled && (
+                      <Card variant="outlined" sx={{ borderColor: paymentGateway === 'manual' ? '#1e3a5f' : '#e2e8f0', borderRadius: 2 }}>
+                        <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+                          <FormControlLabel
+                            value="manual"
+                            control={<Radio size="small" />}
+                            label={
+                              <Box>
+                                <Typography sx={{ fontWeight: 700, fontSize: '0.95rem' }}>
+                                  โอนเงินผ่านบัญชีธนาคาร + แนบสลิป
+                                </Typography>
+                                <Typography sx={{ fontSize: '0.8rem', color: '#64748b' }}>
+                                  โอนเงินเข้าบัญชีร้านค้า และอัปโหลดสลิปเพื่อให้ทีมงานตรวจสอบ
+                                </Typography>
+                              </Box>
+                            }
+                          />
+                        </CardContent>
+                      </Card>
+                    )}
+                  </RadioGroup>
+                )}
               </Paper>
 
               {/* Full Tax Invoice / E-Receipt Options */}

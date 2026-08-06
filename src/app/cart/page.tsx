@@ -32,6 +32,7 @@ import StorefrontNavbar from '@/components/StorefrontNavbar';
 import MobileBottomNav from '@/components/MobileBottomNav';
 import { useCartStore } from '@/store/cartStore';
 import { useTranslation } from '@/hooks/useTranslation';
+import { apiFetch } from '@/lib/api-client';
 
 export default function StandaloneCartPage() {
   const router = useRouter();
@@ -43,8 +44,25 @@ export default function StandaloneCartPage() {
 
   // Wait for client hydration so Zustand persist loads cart from localStorage
   const [mounted, setMounted] = useState(false);
+  const [catalogMap, setCatalogMap] = useState<Record<string, any>>({});
+
   useEffect(() => {
     setMounted(true);
+    apiFetch('/api/shops/catalog')
+      .then((r: Response) => r.json())
+      .then((data: any) => {
+        const shops = data.shops || data.data || [];
+        if (Array.isArray(shops)) {
+          const map: Record<string, any> = {};
+          for (const s of shops) {
+            for (const p of s.products || []) {
+              map[p.id] = p;
+            }
+          }
+          setCatalogMap(map);
+        }
+      })
+      .catch(() => null);
   }, []);
 
   const getItemUnitPrice = (item: any) => Number(item.unitPrice ?? item.price ?? 0);
@@ -56,6 +74,19 @@ export default function StandaloneCartPage() {
   };
   const getItemName = (item: any) => item.productName || item.name || 'สินค้า';
   const getItemImage = (item: any) => item.image || item.coverImage || item.images?.[0] || '/icon.png';
+
+  const getItemStock = (item: any): number | null => {
+    const pId = item.productId || item.id?.split('-')[0];
+    const catProd = catalogMap[pId];
+    if (!catProd) return item.stock ?? null;
+
+    const variantId = item.selectedVariant?.id || item.size;
+    if (catProd.variants && catProd.variants.length > 0 && variantId) {
+      const v = catProd.variants.find((x: any) => x.id === variantId);
+      if (v && typeof v.stock === 'number') return v.stock;
+    }
+    return catProd.stock ?? null;
+  };
 
   const totalAmount = useMemo(
     () => cart.reduce((sum, item) => sum + getItemTotal(item), 0),
@@ -72,6 +103,12 @@ export default function StandaloneCartPage() {
       return;
     }
     const item = cart[index];
+    const maxStock = getItemStock(item);
+
+    if (maxStock !== null && newQty > maxStock) {
+      return; // Block increasing beyond stock
+    }
+
     const unitPrice = getItemUnitPrice(item);
     const updated = {
       ...item,
@@ -195,6 +232,9 @@ export default function StandaloneCartPage() {
                   const price = getItemUnitPrice(item);
                   const itemTotal = getItemTotal(item);
                   const image = getItemImage(item);
+                  const maxStock = getItemStock(item);
+                  const isOutOfStock = maxStock !== null && maxStock <= 0;
+                  const isExceedingStock = maxStock !== null && qty > maxStock;
 
                   return (
                     <Card
@@ -202,7 +242,8 @@ export default function StandaloneCartPage() {
                       variant="outlined"
                       sx={{
                         borderRadius: 2.5,
-                        borderColor: '#e2e8f0',
+                        borderColor: isOutOfStock || isExceedingStock ? '#fca5a5' : '#e2e8f0',
+                        bgcolor: isOutOfStock || isExceedingStock ? '#fff5f5' : '#ffffff',
                         p: 2,
                         display: 'grid',
                         gridTemplateColumns: { xs: '80px 1fr', sm: '100px 1fr auto' },
@@ -238,6 +279,12 @@ export default function StandaloneCartPage() {
                           {item.shopSlug && (
                             <Chip label={`ร้าน: ${item.shopSlug}`} size="small" sx={{ fontSize: '0.7rem', height: 22, bgcolor: '#f1f5f9', color: '#475569' }} />
                           )}
+                          {isOutOfStock && (
+                            <Chip label="สินค้าหมด" size="small" sx={{ fontSize: '0.7rem', height: 22, bgcolor: '#fee2e2', color: '#991b1b', fontWeight: 700 }} />
+                          )}
+                          {!isOutOfStock && maxStock !== null && maxStock > 0 && (
+                            <Chip label={`คงเหลือ ${maxStock} ชิ้น`} size="small" sx={{ fontSize: '0.7rem', height: 22, bgcolor: maxStock <= 5 ? '#ffedd5' : '#f1f5f9', color: maxStock <= 5 ? '#c2410c' : '#475569' }} />
+                          )}
                         </Box>
                         {(item.customName || item.customNumber) && (
                           <Typography sx={{ fontSize: '0.75rem', color: '#475569' }}>
@@ -258,7 +305,11 @@ export default function StandaloneCartPage() {
                           <Typography sx={{ px: 1.5, fontWeight: 700, fontSize: '0.875rem' }}>
                             {qty}
                           </Typography>
-                          <IconButton size="small" onClick={() => handleQtyChange(index, qty + 1)}>
+                          <IconButton
+                            size="small"
+                            onClick={() => handleQtyChange(index, qty + 1)}
+                            disabled={maxStock !== null && qty >= maxStock}
+                          >
                             <Plus size={14} />
                           </IconButton>
                         </Box>
