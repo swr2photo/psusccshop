@@ -163,6 +163,35 @@ function isCacheableApiPath(pathname: string): boolean {
   return /^\/api\/shops\/[^/]+\/(public|products)$/.test(pathname);
 }
 
+const DEFAULT_UNIVERSITY_IP_PREFIXES = [
+  '202.29.',    // PSU Public IP Range
+  '161.200.',   // PSU Public IP Range
+  '172.28.',    // PSU Intranet / WiFi Range
+  '10.',        // PSU Campus Network Range
+  '127.0.0.1',  // Localhost IPv4
+  '::1',        // Localhost IPv6
+];
+
+function isUniversityAccessAllowed(ip: string, pathname: string): boolean {
+  const isEnabled = process.env.RESTRICT_TO_UNIVERSITY === 'true';
+  if (!isEnabled) return true;
+
+  // Always allow webhook routes, health checks, monitoring, etc.
+  const BYPASS_ROUTES = [
+    '/api/payment/webhook/',
+    '/monitoring',
+  ];
+  if (BYPASS_ROUTES.some(route => pathname.startsWith(route))) {
+    return true;
+  }
+
+  const envPrefixes = process.env.ALLOWED_UNIVERSITY_IPS
+    ? process.env.ALLOWED_UNIVERSITY_IPS.split(',').map(p => p.trim())
+    : DEFAULT_UNIVERSITY_IP_PREFIXES;
+
+  return envPrefixes.some(prefix => ip.startsWith(prefix));
+}
+
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
@@ -181,6 +210,24 @@ export async function middleware(request: NextRequest) {
   const method = request.method;
   const ip = getIP(request);
   const userAgent = request.headers.get('user-agent');
+
+  // ตรวจสอบการเข้าถึงเฉพาะเครือข่ายภายในมหาวิทยาลัย (เมื่อเปิดใช้งาน RESTRICT_TO_UNIVERSITY=true)
+  if (!isUniversityAccessAllowed(ip, pathname)) {
+    console.warn(`[Security] Blocked non-university IP: ${ip} on ${pathname}`);
+    return new NextResponse(
+      JSON.stringify({
+        status: 'error',
+        message: 'Access Denied: สามารถเข้าใช้งานได้เฉพาะเครือข่ายภายในมหาวิทยาลัยเท่านั้น',
+      }),
+      {
+        status: 403,
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          ...securityHeaders,
+        },
+      }
+    );
+  }
 
   if (pathname.startsWith('/api/orders') && method === 'POST') {
     try {
