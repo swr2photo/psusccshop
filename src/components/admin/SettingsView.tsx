@@ -1,13 +1,7 @@
 import React from 'react';
 import {
-  Settings,
-  Save,
-  AlertTriangle as Warning,
   Store,
-  Calendar as CalendarToday,
   User as Person,
-  Users as Groups,
-  CheckCircle,
   Zap as Bolt,
   Check,
   ShieldAlert as AdminPanelSettings,
@@ -22,6 +16,12 @@ import {
   CalendarDays,
   ShoppingBag as LocalMall,
   DollarSign as AttachMoney,
+  ChevronDown,
+  ExternalLink,
+  Loader2,
+  Save,
+  Undo2,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 import {
@@ -34,54 +34,185 @@ import {
 } from '@/lib/config';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { DateTimePicker } from '@/components/ui/date-picker';
+import { Kbd, STATUS_LABEL_TH } from '@/components/admin/admin-ui';
 import { cn } from '@/lib/utils';
 
-const glassCardClass =
-  // overflow-visible so native datetime-local / select menus are not clipped
-  'rounded-[20px] border border-[var(--glass-border)] bg-[var(--glass-bg)] text-[var(--foreground)] shadow-[0_8px_32px_rgba(0,0,0,0.12)] backdrop-blur-[20px]';
+// ============== LAYOUT PRIMITIVES ==============
+function SettingSection({
+  id,
+  icon,
+  title,
+  description,
+  action,
+  children,
+}: {
+  id: string;
+  icon: React.ReactNode;
+  title: string;
+  description?: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section
+      id={id}
+      className="scroll-mt-20 rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
+    >
+      <header className="flex items-start justify-between gap-3 border-b border-border px-4 py-3.5 md:px-5">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground [&_svg]:size-4">
+            {icon}
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold">{title}</h2>
+            {description ? <p className="text-xs text-muted-foreground">{description}</p> : null}
+          </div>
+        </div>
+        {action}
+      </header>
+      <div className="divide-y divide-border">{children}</div>
+    </section>
+  );
+}
 
-const gradientBtnClass =
-  'rounded-[10px] bg-gradient-to-br from-indigo-500 to-violet-500 font-bold text-white shadow-[0_4px_15px_rgba(139,92,246,0.3)] hover:opacity-90';
-
-const inputClass = 'rounded-[10px]';
-
-// ============== SETTINGS COMPONENTS ==============
-const SettingSection = ({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) => (
-  <Card className={cn(glassCardClass, 'gap-0 py-0 shadow-none')}>
-    <CardHeader className="flex flex-row items-center gap-4 border-b border-[var(--glass-border)] bg-gradient-to-br from-violet-500/5 to-blue-500/5 px-5 py-4">
-      <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-500 text-white">
-        {icon}
-      </div>
-      <CardTitle className="text-lg font-bold">{title}</CardTitle>
-    </CardHeader>
-    <CardContent className="flex flex-col gap-4 px-5 py-5">{children}</CardContent>
-  </Card>
-);
-
-const SettingToggleRow = ({ label, description, checked, onChange }: { label: string; description?: string; checked: boolean; onChange: (checked: boolean) => void }) => (
-  <div className="flex items-center justify-between py-1">
-    <div>
-      <p className="text-[0.95rem] font-medium text-[var(--foreground)]">{label}</p>
-      {description && (
-        <p className="text-xs text-[var(--text-muted)]">{description}</p>
+/** One setting: label + help on the left, control on the right (or below when `stacked`). */
+function SettingRow({
+  label,
+  description,
+  htmlFor,
+  children,
+  stacked,
+  inline,
+  className,
+}: {
+  label: React.ReactNode;
+  description?: React.ReactNode;
+  htmlFor?: string;
+  children?: React.ReactNode;
+  stacked?: boolean;
+  /** Keep label and control on one line even on phones (for switches) */
+  inline?: boolean;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        'flex gap-3 px-4 py-3.5 md:px-5',
+        stacked ? 'flex-col' : inline ? 'flex-row items-center justify-between' : 'flex-col sm:flex-row sm:items-center sm:justify-between',
+        className,
       )}
+    >
+      <div className={cn('min-w-0', inline ? 'flex-1' : 'sm:max-w-[60%]')}>
+        <Label htmlFor={htmlFor} className="text-sm font-medium">
+          {label}
+        </Label>
+        {description ? <p className="mt-0.5 text-xs text-muted-foreground">{description}</p> : null}
+      </div>
+      {children ? <div className={cn('min-w-0', inline ? 'shrink-0' : !stacked && 'sm:shrink-0')}>{children}</div> : null}
     </div>
-    <Switch
-      checked={checked}
-      onCheckedChange={onChange}
-      className="data-[state=checked]:bg-emerald-500"
-    />
-  </div>
-);
+  );
+}
 
-// ============== UTILITIES ==============
+function ClearableDateTime({
+  id,
+  value,
+  onChange,
+  placeholder,
+}: {
+  id: string;
+  value?: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <DateTimePicker
+        id={id}
+        value={value || ''}
+        onChange={onChange}
+        placeholder={placeholder}
+        className="min-w-0 flex-1 sm:w-[240px] sm:flex-none"
+      />
+      {value ? (
+        <Button variant="ghost" size="icon-sm" onClick={() => onChange('')} aria-label="ล้างวันที่">
+          <Close />
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
+function Notice({
+  tone = 'muted',
+  icon,
+  children,
+}: {
+  tone?: 'muted' | 'success' | 'warning';
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={cn(
+        'flex items-start gap-2.5 rounded-xl px-3 py-2.5 text-xs [&_svg]:mt-px [&_svg]:size-4 [&_svg]:shrink-0',
+        tone === 'success' && 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-300',
+        tone === 'warning' && 'bg-amber-500/12 text-amber-800 dark:text-amber-300',
+        tone === 'muted' && 'bg-muted text-muted-foreground',
+      )}
+    >
+      {icon}
+      <div className="min-w-0 flex-1">{children}</div>
+    </div>
+  );
+}
+
+// ============== CONSTANTS / UTILITIES ==============
+const PERMISSION_GROUPS: { group: string; icon: React.ReactNode; items: { key: keyof AdminPermissions; label: string }[] }[] = [
+  {
+    group: 'ร้านค้า & ระบบ',
+    icon: <Store />,
+    items: [
+      { key: 'canManageShop', label: 'เปิด/ปิดร้าน' },
+      { key: 'canManageSheet', label: 'จัดการ Sheet' },
+      { key: 'canManageShipping', label: 'ตั้งค่าจัดส่ง' },
+      { key: 'canManagePayment', label: 'ตั้งค่าชำระเงิน' },
+    ],
+  },
+  {
+    group: 'สินค้า & ออเดอร์',
+    icon: <Inventory />,
+    items: [
+      { key: 'canManageProducts', label: 'จัดการสินค้า' },
+      { key: 'canManageOrders', label: 'จัดการออเดอร์' },
+      { key: 'canManagePickup', label: 'รับสินค้า' },
+      { key: 'canManageTracking', label: 'ติดตามพัสดุ' },
+      { key: 'canManageRefunds', label: 'คืนเงิน' },
+    ],
+  },
+  {
+    group: 'การตลาด & สื่อสาร',
+    icon: <Campaign />,
+    items: [
+      { key: 'canManageAnnouncement', label: 'ประกาศ' },
+      { key: 'canManageEvents', label: 'อีเวนต์/โปรโมชั่น' },
+      { key: 'canManagePromoCodes', label: 'โค้ดส่วนลด' },
+      { key: 'canManageSupport', label: 'แชทสนับสนุน' },
+      { key: 'canSendEmail', label: 'ส่งอีเมล' },
+      { key: 'canManageLiveStream', label: 'ไลฟ์สด' },
+    ],
+  },
+];
+const PERMISSION_KEYS = Object.keys(DEFAULT_ADMIN_PERMISSIONS) as (keyof AdminPermissions)[];
+
+/** Statuses an order can be in when it should appear on the factory summary sheet */
+const SHEET_STATUS_OPTIONS = ['WAITING_PAYMENT', 'PENDING', 'PAID', 'READY', 'SHIPPED', 'COMPLETED'];
+
 const extractSheetInfo = (input: string): { sheetId: string; sheetUrl: string } => {
   const value = (input || '').trim();
   if (!value) return { sheetId: '', sheetUrl: '' };
@@ -127,6 +258,7 @@ export const SettingsView = React.memo(function SettingsView({
   showToast,
   triggerSheetSync,
 }: SettingsViewProps) {
+  const [expandedAdmins, setExpandedAdmins] = React.useState<Set<string>>(new Set());
 
   // Get admin permissions — isSuperAdminUser already comes from parent (server-validated)
   const hasCustomPerms = !!localConfig.adminPermissions?.[userEmail?.toLowerCase() ?? ''];
@@ -139,782 +271,616 @@ export const SettingsView = React.memo(function SettingsView({
   // Super admin has all permissions
   const canManageShop = isSuperAdminUser || adminPerms.canManageShop;
   const canManageSheet = isSuperAdminUser || adminPerms.canManageSheet;
-  const canManageAnnouncement = isSuperAdminUser || adminPerms.canManageAnnouncement;
+
+  // Ctrl/⌘+S saves; warn before leaving the page with unsaved changes
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        if (hasChanges && !loading) onSave();
+      }
+    };
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!hasChanges) return;
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('beforeunload', onBeforeUnload);
+    };
+  }, [hasChanges, loading, onSave]);
+
+  const set = (patch: Partial<ShopConfig>) => onConfigChange({ ...localConfig, ...patch });
+
+  const sections = [
+    { id: 'st-shop', label: 'สถานะร้านค้า', show: canManageShop },
+    { id: 'st-payment', label: 'ระบบชำระเงิน', show: canManageShop },
+    { id: 'st-names', label: 'ชื่อ-นามสกุลลูกค้า', show: canManageShop },
+    { id: 'st-sheet', label: 'Google Sheet', show: canManageSheet },
+    { id: 'st-admins', label: 'แอดมิน', show: isSuperAdminUser },
+    { id: 'st-pickup', label: 'รับสินค้าหน้าร้าน', show: canManageShop },
+  ].filter((s) => s.show);
+
+  // Scroll the window directly, leaving room for the 56px sticky top bar.
+  const jumpTo = (id: string) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 72, behavior: 'smooth' });
+  };
+
+  // ---------- admin helpers ----------
+  const permsFor = (email: string): AdminPermissions =>
+    localConfig.adminPermissions?.[email.toLowerCase()]
+      ? { ...DEFAULT_ADMIN_PERMISSIONS, ...localConfig.adminPermissions[email.toLowerCase()] }
+      : { ...DEFAULT_ADMIN_PERMISSIONS };
+
+  const setPermsFor = (email: string, perms: AdminPermissions) =>
+    set({ adminPermissions: { ...(localConfig.adminPermissions ?? {}), [email.toLowerCase()]: perms } });
+
+  const addAdmin = () => {
+    const email = newAdminEmail.trim().toLowerCase();
+    if (!email) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      showToast('error', 'รูปแบบอีเมลไม่ถูกต้อง');
+      return;
+    }
+    if (email === SUPER_ADMIN_EMAIL.toLowerCase()) {
+      showToast('warning', 'ไม่สามารถเพิ่มบัญชีสูงสุดซ้ำได้');
+      return;
+    }
+    const currentAdmins = localConfig.adminEmails || [];
+    if (currentAdmins.map(e => e.toLowerCase()).includes(email)) {
+      showToast('warning', 'อีเมลนี้เป็นแอดมินอยู่แล้ว');
+      return;
+    }
+    set({ adminEmails: [...currentAdmins, email] });
+    onNewAdminEmailChange('');
+    setExpandedAdmins((prev) => new Set(prev).add(email));
+    showToast('success', `เพิ่ม ${email} เป็นแอดมินแล้ว (กรุณาบันทึกการตั้งค่า)`);
+  };
+
+  const removeAdmin = (adminEmail: string, idx: number) => {
+    const currentAdmins = localConfig.adminEmails || [];
+    const currentPerms = { ...(localConfig.adminPermissions ?? {}) };
+    delete currentPerms[adminEmail.toLowerCase()];
+    set({ adminEmails: currentAdmins.filter((_, i) => i !== idx), adminPermissions: currentPerms });
+    showToast('info', `ลบ ${adminEmail} ออกจากแอดมินแล้ว (กรุณาบันทึกการตั้งค่า)`);
+  };
+
+  const nv = { ...DEFAULT_NAME_VALIDATION, ...localConfig.nameValidation };
+  const updateNV = (patch: Partial<NameValidationConfig>) => set({ nameValidation: { ...nv, ...patch } });
+
+  const sheetStatuses = localConfig.sheetSettings?.factoryOrderStatuses || ['PAID'];
+  const statusChoices = [...SHEET_STATUS_OPTIONS, ...sheetStatuses.filter((s) => !SHEET_STATUS_OPTIONS.includes(s))];
+  const toggleSheetStatus = (status: string) => {
+    const next = sheetStatuses.includes(status) ? sheetStatuses.filter((s) => s !== status) : [...sheetStatuses, status];
+    if (next.length === 0) {
+      showToast('warning', 'ต้องเลือกอย่างน้อย 1 สถานะ');
+      return;
+    }
+    set({ sheetSettings: { ...localConfig.sheetSettings, factoryOrderStatuses: next } });
+  };
+
+  const productsWithPickup = localConfig.products?.filter(p => p.pickup?.enabled) || [];
+  const adminEmails = localConfig.adminEmails || [];
 
   return (
-    <div className="flex max-w-[700px] flex-col gap-6">
-      {/* Header with Save Button */}
-      <div className="mb-1 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 className="flex items-center gap-2 text-2xl font-extrabold text-[var(--foreground)]">
-            <Settings size={24} />
-            ตั้งค่าร้านค้า
-          </h2>
-          <p className="text-sm text-[var(--text-muted)]">
-            {isSuperAdminUser ? 'จัดการการตั้งค่าทั้งหมดของร้าน' : 'จัดการประกาศและการตั้งค่าที่ได้รับอนุญาต'}
-          </p>
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-[200px_minmax(0,1fr)] lg:gap-8">
+      {/* ─── Section nav ─── */}
+      <nav aria-label="หมวดการตั้งค่า" className="min-w-0 lg:sticky lg:top-20 lg:self-start">
+        <div className="-mx-3 flex gap-1.5 overflow-x-auto px-3 [scrollbar-width:none] md:-mx-6 md:px-6 lg:mx-0 lg:flex-col lg:gap-0.5 lg:px-0 [&::-webkit-scrollbar]:hidden">
+          {sections.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => jumpTo(s.id)}
+              className="shrink-0 rounded-full border border-border px-3 py-1.5 text-xs font-medium whitespace-nowrap text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:rounded-md lg:border-0 lg:px-2.5 lg:text-left lg:text-sm"
+            >
+              {s.label}
+            </button>
+          ))}
         </div>
-
-        <div
-          className={cn(
-            'flex gap-2 transition-opacity duration-200',
-            hasChanges ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0',
-          )}
-        >
-          <Button
-            variant="outline"
-            onClick={onReset}
-            className="rounded-[10px] border-[var(--glass-border)] text-[var(--text-muted)] hover:border-red-500 hover:text-red-500"
-          >
-            ยกเลิก
-          </Button>
-          <Button
-            onClick={onSave}
-            className={cn(gradientBtnClass, hasChanges && 'animate-glow-pulse')}
-          >
-            <Save size={18} />
-            บันทึกการตั้งค่า
-          </Button>
-        </div>
-      </div>
-
-      {/* Unsaved Changes Warning - use opacity instead of conditional render to prevent layout shift */}
-      <div
-        className={cn(
-          'flex items-center gap-4 overflow-hidden rounded-xl border border-amber-400/30 bg-amber-400/10 p-4 transition-all duration-200',
-          hasChanges ? 'mb-0 max-h-[100px] opacity-100' : '-mb-6 max-h-0 opacity-0',
-        )}
-      >
-        <Warning size={24} className="shrink-0 text-amber-400" />
-        <p className="text-[0.9rem] text-amber-400">
-          มีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก กดปุ่ม &quot;บันทึกการตั้งค่า&quot; เพื่อยืนยัน
+        <p className="mt-4 hidden items-center gap-2 px-2.5 text-xs text-muted-foreground lg:flex">
+          <span className={cn('size-1.5 shrink-0 rounded-full', hasChanges ? 'bg-amber-500' : 'bg-emerald-500')} />
+          {hasChanges
+            ? 'ยังไม่ได้บันทึก'
+            : lastSavedTime
+              ? `บันทึกล่าสุด ${lastSavedTime.toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`
+              : 'บันทึกแล้ว'}
         </p>
-      </div>
+      </nav>
 
-      {/* Shop Status - Only for Super Admin or admins with permission */}
-      {canManageShop && (
-        <SettingSection icon={<Store size={20} />} title="สถานะร้านค้า">
-          <SettingToggleRow
-            label="เปิดรับออเดอร์"
-            description={localConfig.isOpen ? 'ร้านเปิดให้บริการอยู่' : 'ปิดรับออเดอร์ชั่วคราว'}
-            checked={localConfig.isOpen}
-            onChange={(checked) => onConfigChange({...localConfig, isOpen: checked})}
-          />
-          {!localConfig.isOpen && (
-            <div className="mt-2 flex flex-col gap-4 rounded-xl border border-red-500/20 bg-red-500/10 p-4">
-              <div>
-                <p className="mb-2 text-[0.85rem] text-red-400">
-                  <CalendarToday size={18} className="mr-2 inline align-middle" />
-                  กำหนดวันเปิดร้านใหม่ (ถ้ามี)
-                </p>
-                <Input
-                  type="datetime-local"
-                  value={localConfig.openDate || ''}
-                  onChange={(e) => onConfigChange({...localConfig, openDate: e.target.value})}
-                  placeholder="เช่น 2025-01-20T09:00"
-                  className={inputClass}
-                />
-              </div>
-              <div>
-                <p className="mb-2 text-[0.85rem] text-red-400">
-                  <Warning size={18} className="mr-2 inline align-middle" />
-                  ข้อความแจ้งผู้ใช้ (ไม่บังคับ)
-                </p>
-                <Textarea
-                  placeholder="เช่น: ร้านปิดปรับปรุงถึงวันที่ 20 ม.ค."
-                  value={localConfig.closedMessage || ''}
-                  onChange={(e) => onConfigChange({...localConfig, closedMessage: e.target.value})}
-                  rows={2}
-                  className={inputClass}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Close Date - กำหนดวันปิดรับออเดอร์ */}
-          {localConfig.isOpen && (
-            <div className="mt-2 rounded-xl border border-amber-500/20 bg-amber-500/10 p-4">
-              <p className="mb-2 text-[0.85rem] text-amber-400">
-                <CalendarToday size={18} className="mr-2 inline align-middle" />
-                กำหนดวันปิดรับออเดอร์ (ไม่บังคับ)
-              </p>
-              <Input
-                type="datetime-local"
-                value={localConfig.closeDate || ''}
-                onChange={(e) => onConfigChange({...localConfig, closeDate: e.target.value})}
-                placeholder="เช่น 2025-01-25T23:59"
-                className={inputClass}
-              />
-              <p className="mt-2 text-xs text-[var(--text-muted)]">
-                เมื่อถึงวันนี้ ระบบจะแสดงสถานะ &quot;หมดเขตสั่งซื้อ&quot; โดยอัตโนมัติ
-              </p>
-            </div>
-          )}
-        </SettingSection>
-      )}
-
-      {/* Payment System Toggle - Only for Super Admin or admins with shop permission */}
-      {canManageShop && (
-        <SettingSection icon={<AttachMoney size={20} />} title="ระบบชำระเงิน">
-          <SettingToggleRow
-            label="เปิดรับชำระเงิน"
-            description={localConfig.paymentEnabled !== false ? 'ผู้ใช้สามารถอัพโหลดสลิปได้' : 'ปิดรับชำระเงินชั่วคราว'}
-            checked={localConfig.paymentEnabled !== false}
-            onChange={(checked) => onConfigChange({...localConfig, paymentEnabled: checked})}
-          />
-          {localConfig.paymentEnabled === false && (
-            <div className="mt-2 rounded-xl border border-orange-500/20 bg-orange-500/10 p-4">
-              <p className="mb-3 text-[0.85rem] text-orange-400">
-                <Warning size={20} className="mr-2 inline align-middle" />
-                ข้อความแจ้งผู้ใช้ (ไม่บังคับ)
-              </p>
-              <Textarea
-                placeholder="เช่น: ระบบปิดปรับปรุงถึง 18:00 น."
-                value={localConfig.paymentDisabledMessage || ''}
-                onChange={(e) => onConfigChange({...localConfig, paymentDisabledMessage: e.target.value})}
-                rows={2}
-                className={inputClass}
-              />
-            </div>
-          )}
-        </SettingSection>
-      )}
-
-      {/* Name Validation Settings */}
-      {canManageShop && (
-        <SettingSection icon={<Person size={20} />} title="ตั้งค่าชื่อ-นามสกุล">
-          {(() => {
-            const nv = { ...DEFAULT_NAME_VALIDATION, ...localConfig.nameValidation };
-            const updateNV = (patch: Partial<NameValidationConfig>) => {
-              onConfigChange({ ...localConfig, nameValidation: { ...nv, ...patch } });
-            };
-            return (
-              <div className="flex flex-col gap-4">
-                {/* Length settings */}
-                <div className="flex gap-3">
-                  <div className="flex-1 space-y-1.5">
-                    <Label htmlFor="name-min-length">ความยาวขั้นต่ำ</Label>
-                    <Input
-                      id="name-min-length"
-                      type="number"
-                      value={nv.minLength}
-                      onChange={e => updateNV({ minLength: Math.max(1, Number(e.target.value) || 1) })}
-                      min={1}
-                      max={200}
-                      className={inputClass}
-                    />
-                  </div>
-                  <div className="flex-1 space-y-1.5">
-                    <Label htmlFor="name-max-length">ความยาวสูงสุด</Label>
-                    <Input
-                      id="name-max-length"
-                      type="number"
-                      value={nv.maxLength}
-                      onChange={e => updateNV({ maxLength: Math.max(nv.minLength, Number(e.target.value) || 10) })}
-                      min={nv.minLength}
-                      max={500}
-                      className={inputClass}
-                    />
-                  </div>
-                </div>
-
-                {/* Language toggles */}
-                <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/[0.08] p-4">
-                  <p className="mb-3 flex items-center gap-1 text-[0.85rem] font-bold text-indigo-400">
-                    <Groups size={14} /> ภาษาที่อนุญาต
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      { key: 'allowThai' as const, label: 'ภาษาไทย', color: '#0071e3' },
-                      { key: 'allowEnglish' as const, label: 'English', color: '#10b981' },
-                    ].map(lang => (
-                      <button
-                        key={lang.key}
-                        type="button"
-                        onClick={() => {
-                          if (nv[lang.key] && !Object.entries(nv).some(([k, v]) => k !== lang.key && k.startsWith('allow') && k !== 'allowSpecialChars' && v === true)) return;
-                          updateNV({ [lang.key]: !nv[lang.key] });
-                        }}
-                        className="cursor-pointer rounded-[10px] border-[1.5px] px-4 py-2 text-[0.85rem] font-semibold transition-all"
-                        style={{
-                          backgroundColor: nv[lang.key] ? `${lang.color}15` : 'rgba(255,255,255,0.05)',
-                          color: nv[lang.key] ? lang.color : '#64748b',
-                          borderColor: nv[lang.key] ? lang.color : 'transparent',
-                        }}
-                      >
-                        {lang.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Special characters */}
-                <SettingToggleRow
-                  label="อนุญาตอักษรพิเศษ"
-                  description={nv.allowSpecialChars ? `ตัวอักษรที่อนุญาต: ${nv.allowedSpecialChars}` : 'ปิดใช้งาน'}
-                  checked={nv.allowSpecialChars}
-                  onChange={checked => updateNV({ allowSpecialChars: checked })}
-                />
-                {nv.allowSpecialChars && (
-                  <div className="space-y-1.5">
-                    <Label htmlFor="name-special-chars">อักษรพิเศษที่อนุญาต</Label>
-                    <Input
-                      id="name-special-chars"
-                      value={nv.allowedSpecialChars}
-                      onChange={e => updateNV({ allowedSpecialChars: e.target.value })}
-                      placeholder=".-'"
-                      className={inputClass}
-                    />
-                    <p className="text-xs text-[var(--text-muted)]">
-                      กรอกตัวอักษรพิเศษที่ต้องการอนุญาต เช่น . - &apos; ( )
-                    </p>
-                  </div>
+      <div className={cn('flex min-w-0 max-w-3xl flex-col gap-5', hasChanges && 'pb-24')}>
+        {/* ─── Shop status ─── */}
+        {canManageShop && (
+          <SettingSection
+            id="st-shop"
+            icon={<Store />}
+            title="สถานะร้านค้า"
+            description="เปิด/ปิดการรับออเดอร์ และตั้งเวลาเปิด-ปิดล่วงหน้า"
+            action={
+              <span
+                className={cn(
+                  'inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[0.7rem] font-semibold',
+                  localConfig.isOpen
+                    ? 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-400'
+                    : 'bg-rose-500/12 text-rose-700 dark:text-rose-400',
                 )}
-
-                {/* Preview */}
-                <div className="rounded-[10px] border border-emerald-500/20 bg-emerald-500/[0.08] p-3">
-                  <p className="mb-1 flex items-center gap-1 text-xs font-semibold text-emerald-500">
-                    <CheckCircle size={14} /> ตัวอย่างที่ระบบจะยอมรับ:
-                  </p>
-                  <p className="text-[0.8rem] text-[var(--text-muted)]">
-                    {[
-                      nv.allowThai && 'สมชาย ใจดี',
-                      nv.allowEnglish && 'John Smith',
-                      (nv.allowThai && nv.allowEnglish) && 'สมชาย Smith',
-                      nv.allowSpecialChars && (nv.allowThai ? `สมชาย ใจ${nv.allowedSpecialChars[0] || '.'}ดี` : `John O${nv.allowedSpecialChars[0] || "'"}Brien`),
-                    ].filter(Boolean).join(' / ')}
-                    {` (${nv.minLength}-${nv.maxLength} ตัว)`}
-                  </p>
-                </div>
-              </div>
-            );
-          })()}
-        </SettingSection>
-      )}
-
-      {/* Google Sheet - Only for Super Admin or admins with permission */}
-      {canManageSheet && (
-        <SettingSection icon={<Bolt size={20} />} title="Google Sheet">
-          <div className="flex flex-col gap-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="sheet-id">Sheet ID (ออเดอร์ + สรุปการผลิต)</Label>
-              <Input
-                id="sheet-id"
-                placeholder="วาง Sheet ID หรือ URL ก็ได้"
-                value={localConfig.sheetId || ''}
-                onChange={(e) => {
-                  const { sheetId, sheetUrl } = extractSheetInfo(e.target.value);
-                  onConfigChange({ ...localConfig, sheetId, sheetUrl });
-                }}
-                className={inputClass}
-              />
-              <p className="text-xs text-[var(--text-muted)]">
-                ชีตหลัก — แท็บ Orders รวมทุกออเดอร์ และแท็บสรุปตามสินค้า
-              </p>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="vendor-sheet-id">Vendor Sheet ID</Label>
-              <Input
-                id="vendor-sheet-id"
-                placeholder="วาง Sheet ID หรือ URL ให้โรงงาน"
-                value={localConfig.vendorSheetId || ''}
-                onChange={(e) => {
-                  const { sheetId, sheetUrl } = extractSheetInfo(e.target.value);
-                  onConfigChange({ ...localConfig, vendorSheetId: sheetId, vendorSheetUrl: sheetUrl });
-                }}
-                className={inputClass}
-              />
-              <p className="text-xs text-[var(--text-muted)]">
-                ชีตแยกสำหรับส่งให้โรงงาน (ตัดอีเมล/ลิงก์สลิปออก) — ไม่บังคับ
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-[var(--glass-border)] bg-[var(--surface-2)] p-4">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-[0.9rem] font-semibold text-[var(--foreground)]">
-                    แยกชีตสรุปตามสินค้า
-                  </p>
-                  <p className="text-xs text-[var(--text-muted)]">
-                    แต่ละสินค้าจะมีแท็บชื่อ &quot;สรุป [ชื่อสินค้า]&quot; พร้อมรายการและสรุปไซซ์แยกกัน
-                  </p>
-                </div>
-                <Switch
-                  checked={localConfig.sheetSettings?.factoryPerProduct !== false}
-                  onCheckedChange={(checked) => onConfigChange({
-                    ...localConfig,
-                    sheetSettings: {
-                      ...localConfig.sheetSettings,
-                      factoryPerProduct: checked,
-                    },
-                  })}
-                  className="shrink-0 data-[state=checked]:bg-emerald-500"
+              >
+                <span className={cn('size-1.5 rounded-full', localConfig.isOpen ? 'bg-emerald-500' : 'bg-rose-500')} />
+                {localConfig.isOpen ? 'เปิดอยู่' : 'ปิดอยู่'}
+              </span>
+            }
+          >
+            <SettingRow
+              label="เปิดรับออเดอร์"
+              description={localConfig.isOpen ? 'ลูกค้าสั่งซื้อได้ตามปกติ' : 'ปิดรับออเดอร์ชั่วคราว ลูกค้าจะยังดูสินค้าได้'}
+              htmlFor="st-is-open"
+              inline
+            >
+              <Switch id="st-is-open" checked={localConfig.isOpen} onCheckedChange={(checked) => set({ isOpen: checked })} />
+            </SettingRow>
+            {localConfig.isOpen ? (
+              <SettingRow
+                label="ปิดรับออเดอร์อัตโนมัติ"
+                description='เมื่อถึงเวลานี้ หน้าร้านจะแสดง "หมดเขตสั่งซื้อ" (ไม่บังคับ)'
+              >
+                <ClearableDateTime
+                  id="st-close-date"
+                  value={localConfig.closeDate}
+                  onChange={(v) => set({ closeDate: v })}
+                  placeholder="ไม่กำหนด"
                 />
-              </div>
+              </SettingRow>
+            ) : (
+              <>
+                <SettingRow label="วันเปิดร้านอีกครั้ง" description="แสดงให้ลูกค้าเห็น (ไม่บังคับ)">
+                  <ClearableDateTime
+                    id="st-open-date"
+                    value={localConfig.openDate}
+                    onChange={(v) => set({ openDate: v })}
+                    placeholder="ไม่กำหนด"
+                  />
+                </SettingRow>
+                <SettingRow label="ข้อความแจ้งลูกค้า" description="แสดงบนหน้าร้านขณะปิด (ไม่บังคับ)" htmlFor="st-closed-msg" stacked>
+                  <Textarea
+                    id="st-closed-msg"
+                    placeholder="เช่น ร้านปิดปรับปรุงถึงวันที่ 20 ม.ค."
+                    value={localConfig.closedMessage || ''}
+                    onChange={(e) => set({ closedMessage: e.target.value })}
+                    rows={2}
+                  />
+                </SettingRow>
+              </>
+            )}
+          </SettingSection>
+        )}
 
-              <div className="mt-4 space-y-1.5">
-                <Label htmlFor="factory-order-statuses">สถานะออเดอร์ที่นำเข้าชีตสรุป</Label>
+        {/* ─── Payment ─── */}
+        {canManageShop && (
+          <SettingSection id="st-payment" icon={<AttachMoney />} title="ระบบชำระเงิน" description="ปิดการอัปโหลดสลิปชั่วคราวได้โดยไม่ต้องปิดร้าน">
+            <SettingRow
+              label="เปิดรับชำระเงิน"
+              description={localConfig.paymentEnabled !== false ? 'ลูกค้าอัปโหลดสลิปได้' : 'ปิดรับชำระเงินชั่วคราว'}
+              htmlFor="st-payment-enabled"
+              inline
+            >
+              <Switch
+                id="st-payment-enabled"
+                checked={localConfig.paymentEnabled !== false}
+                onCheckedChange={(checked) => set({ paymentEnabled: checked })}
+              />
+            </SettingRow>
+            {localConfig.paymentEnabled === false && (
+              <SettingRow label="ข้อความแจ้งลูกค้า" description="ไม่บังคับ" htmlFor="st-payment-msg" stacked>
+                <Textarea
+                  id="st-payment-msg"
+                  placeholder="เช่น ระบบปิดปรับปรุงถึง 18:00 น."
+                  value={localConfig.paymentDisabledMessage || ''}
+                  onChange={(e) => set({ paymentDisabledMessage: e.target.value })}
+                  rows={2}
+                />
+              </SettingRow>
+            )}
+          </SettingSection>
+        )}
+
+        {/* ─── Name validation ─── */}
+        {canManageShop && (
+          <SettingSection id="st-names" icon={<Person />} title="ชื่อ-นามสกุลลูกค้า" description="กฎตรวจสอบชื่อที่ลูกค้ากรอกตอนสั่งซื้อ">
+            <SettingRow label="ความยาว (ตัวอักษร)" description="ขั้นต่ำ – สูงสุด">
+              <div className="flex items-center gap-2">
                 <Input
-                  id="factory-order-statuses"
-                  placeholder="PAID"
-                  value={(localConfig.sheetSettings?.factoryOrderStatuses || ['PAID']).join(', ')}
-                  onChange={(e) => {
-                    const statuses = e.target.value
-                      .split(',')
-                      .map((s) => s.trim().toUpperCase())
-                      .filter(Boolean);
-                    onConfigChange({
-                      ...localConfig,
-                      sheetSettings: {
-                        ...localConfig.sheetSettings,
-                        factoryOrderStatuses: statuses.length ? statuses : ['PAID'],
-                      },
-                    });
-                  }}
-                  className={inputClass}
+                  id="name-min-length"
+                  type="number"
+                  aria-label="ความยาวขั้นต่ำ"
+                  value={nv.minLength}
+                  onChange={e => updateNV({ minLength: Math.max(1, Number(e.target.value) || 1) })}
+                  min={1}
+                  max={200}
+                  className="h-9 w-20"
                 />
-                <p className="text-xs text-[var(--text-muted)]">
-                  คั่นด้วยจุลภาค เช่น PAID หรือ PAID, READY
-                </p>
+                <span className="text-muted-foreground">–</span>
+                <Input
+                  id="name-max-length"
+                  type="number"
+                  aria-label="ความยาวสูงสุด"
+                  value={nv.maxLength}
+                  onChange={e => updateNV({ maxLength: Math.max(nv.minLength, Number(e.target.value) || 10) })}
+                  min={nv.minLength}
+                  max={500}
+                  className="h-9 w-20"
+                />
               </div>
-
-              {localConfig.sheetSettings?.factoryPerProduct !== false && (localConfig.products?.length ?? 0) > 0 && (
-                <div className="mt-4">
-                  <p className="mb-1.5 text-xs text-[var(--text-muted)]">
-                    แท็บสรุปที่จะสร้างเมื่อมีออเดอร์:
-                  </p>
-                  <div className="flex flex-wrap gap-1">
-                    {(localConfig.products || [])
-                      .filter((p) => p.isActive !== false)
-                      .map((p) => (
-                        <Badge
-                          key={p.id}
-                          variant="secondary"
-                          className="bg-indigo-500/12 text-[0.7rem] text-indigo-500"
-                        >
-                          {`สรุป ${p.name}`}
-                        </Badge>
-                      ))}
-                  </div>
-                </div>
-              )}
+            </SettingRow>
+            <SettingRow label="ภาษาที่อนุญาต" description="ต้องเลือกอย่างน้อย 1 ภาษา">
+              <div className="flex items-center gap-4">
+                {([
+                  { key: 'allowThai', label: 'ภาษาไทย' },
+                  { key: 'allowEnglish', label: 'English' },
+                ] as const).map((lang) => {
+                  const other = lang.key === 'allowThai' ? 'allowEnglish' : 'allowThai';
+                  const isLast = nv[lang.key] && !nv[other];
+                  return (
+                    <label key={lang.key} className={cn('flex items-center gap-2 text-sm', isLast ? 'cursor-not-allowed' : 'cursor-pointer')}>
+                      <Checkbox
+                        checked={nv[lang.key]}
+                        disabled={isLast}
+                        onCheckedChange={(checked) => updateNV({ [lang.key]: checked === true })}
+                      />
+                      {lang.label}
+                    </label>
+                  );
+                })}
+              </div>
+            </SettingRow>
+            <SettingRow
+              label="อนุญาตอักษรพิเศษ"
+              description={nv.allowSpecialChars ? 'เช่น จุด ขีด หรือ apostrophe ในชื่อ' : 'ปิดใช้งาน'}
+              htmlFor="name-special-toggle"
+            >
+              <div className="flex items-center gap-3">
+                {nv.allowSpecialChars ? (
+                  <Input
+                    id="name-special-chars"
+                    aria-label="อักษรพิเศษที่อนุญาต"
+                    value={nv.allowedSpecialChars}
+                    onChange={e => updateNV({ allowedSpecialChars: e.target.value })}
+                    placeholder=".-'"
+                    className="h-9 w-28 font-mono"
+                  />
+                ) : null}
+                <Switch
+                  id="name-special-toggle"
+                  checked={nv.allowSpecialChars}
+                  onCheckedChange={checked => updateNV({ allowSpecialChars: checked })}
+                />
+              </div>
+            </SettingRow>
+            <div className="px-4 py-3 md:px-5">
+              <Notice tone="success" icon={<Check />}>
+                <span className="font-medium">ตัวอย่างที่ระบบยอมรับ: </span>
+                {[
+                  nv.allowThai && 'สมชาย ใจดี',
+                  nv.allowEnglish && 'John Smith',
+                  (nv.allowThai && nv.allowEnglish) && 'สมชาย Smith',
+                  nv.allowSpecialChars && (nv.allowThai ? `สมชาย ใจ${nv.allowedSpecialChars[0] || '.'}ดี` : `John O${nv.allowedSpecialChars[0] || "'"}Brien`),
+                ].filter(Boolean).join(' / ')}
+                {` (${nv.minLength}–${nv.maxLength} ตัว)`}
+              </Notice>
             </div>
+          </SettingSection>
+        )}
 
-            {localConfig.sheetUrl && (
-              <div className="flex items-center gap-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-emerald-500">
-                  <Check size={20} className="text-white" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-[0.9rem] font-semibold text-emerald-500">
-                    เชื่อมต่อแล้ว
-                  </p>
-                  <a
-                    href={localConfig.sheetUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[0.8rem] text-[var(--text-muted)] underline hover:text-[var(--text-muted)]"
-                  >
-                    เปิด Google Sheet
-                  </a>
-                </div>
-              </div>
-            )}
-
-            {localConfig.vendorSheetUrl && (
-              <div className="flex items-center gap-4 rounded-xl border border-blue-500/20 bg-blue-500/10 p-4">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-blue-500">
-                  <Check size={20} className="text-white" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-[0.9rem] font-semibold text-blue-500">
-                    เชื่อมต่อชีตโรงงานแล้ว
-                  </p>
-                  <a
-                    href={localConfig.vendorSheetUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[0.8rem] text-[var(--text-muted)] underline hover:text-[var(--text-muted)]"
-                  >
-                    เปิด Vendor Sheet
-                  </a>
-                </div>
-              </div>
-            )}
-
-            <div className="flex gap-3">
+        {/* ─── Google Sheet ─── */}
+        {canManageSheet && (
+          <SettingSection
+            id="st-sheet"
+            icon={<FileSpreadsheet />}
+            title="Google Sheet"
+            description="ซิงก์ออเดอร์และสรุปการผลิตไปยังชีต"
+            action={
               <Button
+                size="sm"
+                variant="outline"
                 onClick={() => triggerSheetSync(localConfig.sheetId ? 'sync' : 'create')}
                 disabled={sheetSyncing}
-                className={cn(gradientBtnClass, 'flex-1')}
+                className="shrink-0"
               >
-                <Bolt size={18} />
-                {sheetSyncing ? 'กำลังซิงก์...' : localConfig.sheetId ? 'ซิงก์ทันที' : 'สร้าง Sheet ใหม่'}
+                {sheetSyncing ? <Loader2 className="animate-spin" /> : <Bolt />}
+                {sheetSyncing ? 'กำลังซิงก์…' : localConfig.sheetId ? 'ซิงก์ตอนนี้' : 'สร้างชีตใหม่'}
               </Button>
-            </div>
-          </div>
-        </SettingSection>
-      )}
-
-      {/* Admin Management - Only visible to Super Admin */}
-      {isSuperAdminUser && (
-        <SettingSection icon={<AdminPanelSettings size={20} />} title="จัดการแอดมิน">
-          <div className="mb-4">
-            <div className="mb-4 flex items-center gap-2 rounded-[10px] border border-amber-400/30 bg-amber-400/10 p-3">
-              <Shield size={18} className="shrink-0 text-amber-400" />
-              <p className="text-[0.8rem] text-amber-400">
-                เฉพาะบัญชีสูงสุดเท่านั้นที่สามารถจัดการแอดมินได้
-              </p>
-            </div>
-
-            {/* Super Admin Badge */}
-            <div className="mb-4 flex items-center gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-[10px] bg-gradient-to-br from-emerald-500 to-emerald-600">
-                <Shield size={20} className="text-white" />
+            }
+          >
+            <SettingRow
+              label="ชีตหลัก"
+              description="แท็บ Orders รวมทุกออเดอร์ และแท็บสรุปตามสินค้า — วาง Sheet ID หรือ URL ก็ได้"
+              htmlFor="sheet-id"
+              stacked
+            >
+              <div className="flex items-center gap-2">
+                <Input
+                  id="sheet-id"
+                  placeholder="Sheet ID หรือ URL"
+                  value={localConfig.sheetId || ''}
+                  onChange={(e) => {
+                    const { sheetId, sheetUrl } = extractSheetInfo(e.target.value);
+                    set({ sheetId, sheetUrl });
+                  }}
+                  className="h-9 font-mono text-xs"
+                />
+                {localConfig.sheetUrl ? (
+                  <Button variant="outline" size="sm" asChild className="shrink-0">
+                    <a href={localConfig.sheetUrl} target="_blank" rel="noreferrer">
+                      <ExternalLink /> เปิด
+                    </a>
+                  </Button>
+                ) : null}
               </div>
-              <div>
-                <p className="text-xs text-[var(--text-muted)]">บัญชีสูงสุด (Super Admin)</p>
-                <p className="text-[0.9rem] font-semibold text-emerald-400">
-                  {SUPER_ADMIN_EMAIL}
-                </p>
+            </SettingRow>
+            <SettingRow
+              label="ชีตสำหรับโรงงาน"
+              description="ชีตแยกที่ตัดอีเมลและลิงก์สลิปออก (ไม่บังคับ)"
+              htmlFor="vendor-sheet-id"
+              stacked
+            >
+              <div className="flex items-center gap-2">
+                <Input
+                  id="vendor-sheet-id"
+                  placeholder="Sheet ID หรือ URL"
+                  value={localConfig.vendorSheetId || ''}
+                  onChange={(e) => {
+                    const { sheetId, sheetUrl } = extractSheetInfo(e.target.value);
+                    set({ vendorSheetId: sheetId, vendorSheetUrl: sheetUrl });
+                  }}
+                  className="h-9 font-mono text-xs"
+                />
+                {localConfig.vendorSheetUrl ? (
+                  <Button variant="outline" size="sm" asChild className="shrink-0">
+                    <a href={localConfig.vendorSheetUrl} target="_blank" rel="noreferrer">
+                      <ExternalLink /> เปิด
+                    </a>
+                  </Button>
+                ) : null}
               </div>
-            </div>
-
-            {/* Add Admin Form */}
-            <div className="mb-4 flex gap-2">
-              <Input
-                placeholder="กรอกอีเมลแอดมินใหม่..."
-                value={newAdminEmail}
-                onChange={(e) => onNewAdminEmailChange(e.target.value)}
-                className={cn(inputClass, 'flex-1')}
+            </SettingRow>
+            <SettingRow
+              label="แยกแท็บสรุปตามสินค้า"
+              description='แต่ละสินค้าจะมีแท็บ "สรุป [ชื่อสินค้า]" พร้อมสรุปไซส์แยกกัน'
+              htmlFor="sheet-per-product"
+              inline
+            >
+              <Switch
+                id="sheet-per-product"
+                checked={localConfig.sheetSettings?.factoryPerProduct !== false}
+                onCheckedChange={(checked) => set({ sheetSettings: { ...localConfig.sheetSettings, factoryPerProduct: checked } })}
               />
-              <Button
-                onClick={() => {
-                  const email = newAdminEmail.trim().toLowerCase();
-                  if (!email) return;
-                  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-                    showToast('error', 'รูปแบบอีเมลไม่ถูกต้อง');
-                    return;
-                  }
-                  if (email === SUPER_ADMIN_EMAIL.toLowerCase()) {
-                    showToast('warning', 'ไม่สามารถเพิ่มบัญชีสูงสุดซ้ำได้');
-                    return;
-                  }
-                  const currentAdmins = localConfig.adminEmails || [];
-                  if (currentAdmins.map(e => e.toLowerCase()).includes(email)) {
-                    showToast('warning', 'อีเมลนี้เป็นแอดมินอยู่แล้ว');
-                    return;
-                  }
-                  onConfigChange({
-                    ...localConfig,
-                    adminEmails: [...currentAdmins, email]
-                  });
-                  onNewAdminEmailChange('');
-                  showToast('success', `เพิ่ม ${email} เป็นแอดมินแล้ว (กรุณาบันทึกการตั้งค่า)`);
-                }}
-                className={cn(gradientBtnClass, 'min-w-[100px] whitespace-nowrap')}
-              >
-                <PersonAdd size={18} />
-                เพิ่ม
-              </Button>
-            </div>
-
-            {/* Admin List */}
-            <p className="mb-2 text-[0.8rem] text-[var(--text-muted)]">
-              รายชื่อแอดมิน ({(localConfig.adminEmails || []).length} คน)
-            </p>
-            <div className="flex flex-col gap-3">
-              {(localConfig.adminEmails || []).length === 0 ? (
-                <div className="rounded-[10px] border border-[var(--glass-border)] bg-white/[0.03] p-4 text-center">
-                  <p className="text-[0.85rem] text-[var(--text-muted)]">
-                    ยังไม่มีแอดมินเพิ่มเติม
-                  </p>
-                </div>
-              ) : (
-                (localConfig.adminEmails || []).map((adminEmail, idx) => {
-                  const perms: AdminPermissions = localConfig.adminPermissions?.[adminEmail.toLowerCase()]
-                    ? { ...DEFAULT_ADMIN_PERMISSIONS, ...localConfig.adminPermissions[adminEmail.toLowerCase()] }
-                    : { ...DEFAULT_ADMIN_PERMISSIONS };
-
-                  const togglePermission = (key: string, value: boolean) => {
-                    const currentPerms = localConfig.adminPermissions ?? {};
-                    onConfigChange({
-                      ...localConfig,
-                      adminPermissions: {
-                        ...currentPerms,
-                        [adminEmail.toLowerCase()]: {
-                          ...perms,
-                          [key]: value,
-                        }
-                      }
-                    });
-                  };
-
+            </SettingRow>
+            <SettingRow label="สถานะที่นำเข้าชีตสรุป" description="นับเฉพาะออเดอร์ในสถานะที่เลือก" stacked>
+              <div className="flex flex-wrap gap-1.5" role="group" aria-label="สถานะที่นำเข้าชีตสรุป">
+                {statusChoices.map((status) => {
+                  const on = sheetStatuses.includes(status);
                   return (
-                    <div
-                      key={idx}
-                      className="overflow-hidden rounded-xl border border-[var(--glass-border)] bg-white/[0.03]"
+                    <button
+                      key={status}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => toggleSheetStatus(status)}
+                      className={cn(
+                        'inline-flex h-8 !min-h-0 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors',
+                        on ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-muted',
+                      )}
                     >
-                      {/* Admin Header */}
-                      <div className="flex items-center gap-3 border-b border-[var(--glass-border)] bg-violet-500/5 p-3">
-                        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-violet-500/20">
-                          <Person size={18} className="text-violet-400" />
-                        </div>
-                        <p className="flex-1 text-[0.9rem] font-semibold text-[var(--foreground)]">
-                          {adminEmail}
-                        </p>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          onClick={() => {
-                            const currentAdmins = localConfig.adminEmails || [];
-                            const currentPerms = { ...(localConfig.adminPermissions ?? {}) };
-                            delete currentPerms[adminEmail.toLowerCase()];
-                            onConfigChange({
-                              ...localConfig,
-                              adminEmails: currentAdmins.filter((_, i) => i !== idx),
-                              adminPermissions: currentPerms,
-                            });
-                            showToast('info', `ลบ ${adminEmail} ออกจากแอดมินแล้ว (กรุณาบันทึกการตั้งค่า)`);
-                          }}
-                          className="text-red-500 hover:bg-red-500/10 hover:text-red-500"
-                        >
-                          <Delete size={18} />
-                        </Button>
-                      </div>
-
-                      {/* Permissions */}
-                      <div className="p-3">
-                        <p className="mb-2 text-xs text-[var(--text-muted)]">สิทธิ์การใช้งาน:</p>
-
-                        {/* Permission Groups */}
-                        {[
-                          {
-                            group: 'ร้านค้า & ระบบ', groupIcon: <Store size={14} />,
-                            items: [
-                              { key: 'canManageShop', label: 'เปิด/ปิดร้าน', color: '#10b981' },
-                              { key: 'canManageSheet', label: 'จัดการ Sheet', color: '#3b82f6' },
-                              { key: 'canManageShipping', label: 'ตั้งค่าจัดส่ง', color: '#a78bfa' },
-                              { key: 'canManagePayment', label: 'ตั้งค่าชำระเงิน', color: '#22d3ee' },
-                            ],
-                          },
-                          {
-                            group: 'สินค้า & ออเดอร์', groupIcon: <Inventory size={14} />,
-                            items: [
-                              { key: 'canManageProducts', label: 'จัดการสินค้า', color: '#ec4899' },
-                              { key: 'canManageOrders', label: 'จัดการออเดอร์', color: '#8b5cf6' },
-                              { key: 'canManagePickup', label: 'รับสินค้า', color: '#06b6d4' },
-                              { key: 'canManageTracking', label: 'ติดตามพัสดุ', color: '#fb923c' },
-                              { key: 'canManageRefunds', label: 'คืนเงิน', color: '#c084fc' },
-                            ],
-                          },
-                          {
-                            group: 'การตลาด & สื่อสาร', groupIcon: <Campaign size={14} />,
-                            items: [
-                              { key: 'canManageAnnouncement', label: 'ประกาศ', color: '#f59e0b' },
-                              { key: 'canManageEvents', label: 'อีเวนต์/โปรโมชั่น', color: '#fbbf24' },
-                              { key: 'canManagePromoCodes', label: 'โค้ดส่วนลด', color: '#34c759' },
-                              { key: 'canManageSupport', label: 'แชทสนับสนุน', color: '#ec4899' },
-                              { key: 'canSendEmail', label: 'ส่งอีเมล', color: '#10b981' },
-                              { key: 'canManageLiveStream', label: 'ไลฟ์สด', color: '#ef4444' },
-                            ],
-                          },
-                        ].map((group) => (
-                          <div key={group.group} className="mb-3">
-                            <p className="mb-1 flex items-center gap-1 text-[0.7rem] font-semibold text-[var(--text-muted)]">
-                              {group.groupIcon} {group.group}
-                            </p>
-                            <div className="flex flex-wrap gap-1">
-                              {group.items.map(perm => (
-                                <button
-                                  key={perm.key}
-                                  type="button"
-                                  onClick={() => togglePermission(perm.key, !perms[perm.key as keyof AdminPermissions])}
-                                  className="cursor-pointer rounded-lg border px-3 py-1 text-xs font-medium transition-all"
-                                  style={{
-                                    backgroundColor: perms[perm.key as keyof AdminPermissions]
-                                      ? `${perm.color}20`
-                                      : 'rgba(255,255,255,0.05)',
-                                    color: perms[perm.key as keyof AdminPermissions]
-                                      ? perm.color
-                                      : '#64748b',
-                                    borderColor: perms[perm.key as keyof AdminPermissions]
-                                      ? perm.color
-                                      : 'transparent',
-                                  }}
-                                >
-                                  {perm.label}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-
-                        {/* Quick Actions */}
-                        <div className="mt-2 flex gap-1 border-t border-[var(--glass-border)] pt-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const allPerms: AdminPermissions = {};
-                              Object.keys(DEFAULT_ADMIN_PERMISSIONS).forEach(k => {
-                                (allPerms as Record<string, boolean>)[k] = true;
-                              });
-                              const currentPerms = localConfig.adminPermissions ?? {};
-                              onConfigChange({
-                                ...localConfig,
-                                adminPermissions: {
-                                  ...currentPerms,
-                                  [adminEmail.toLowerCase()]: allPerms,
-                                }
-                              });
-                            }}
-                            className="cursor-pointer rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-[0.7rem] font-semibold text-emerald-500 transition-colors hover:bg-emerald-500/20"
-                          >
-                            <span className="flex items-center gap-1"><Check size={12} /> เปิดทั้งหมด</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const noPerms: AdminPermissions = {};
-                              Object.keys(DEFAULT_ADMIN_PERMISSIONS).forEach(k => {
-                                (noPerms as Record<string, boolean>)[k] = false;
-                              });
-                              const currentPerms = localConfig.adminPermissions ?? {};
-                              onConfigChange({
-                                ...localConfig,
-                                adminPermissions: {
-                                  ...currentPerms,
-                                  [adminEmail.toLowerCase()]: noPerms,
-                                }
-                              });
-                            }}
-                            className="cursor-pointer rounded-md border border-red-500/30 bg-red-500/10 px-3 py-1 text-[0.7rem] font-semibold text-red-500 transition-colors hover:bg-red-500/20"
-                          >
-                            <span className="flex items-center gap-1"><Close size={12} /> ปิดทั้งหมด</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const currentPerms = localConfig.adminPermissions ?? {};
-                              onConfigChange({
-                                ...localConfig,
-                                adminPermissions: {
-                                  ...currentPerms,
-                                  [adminEmail.toLowerCase()]: { ...DEFAULT_ADMIN_PERMISSIONS },
-                                }
-                              });
-                            }}
-                            className="cursor-pointer rounded-md border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-[0.7rem] font-semibold text-indigo-500 transition-colors hover:bg-indigo-500/20"
-                          >
-                            <span className="flex items-center gap-1"><RefreshCw size={12} /> ค่าเริ่มต้น</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+                      {on ? <Check className="size-3.5" /> : null}
+                      {STATUS_LABEL_TH[status] || status}
+                    </button>
                   );
-                })
-              )}
+                })}
+              </div>
+            </SettingRow>
+            {localConfig.sheetSettings?.factoryPerProduct !== false && (localConfig.products?.length ?? 0) > 0 && (
+              <div className="px-4 py-3 md:px-5">
+                <Notice icon={<FileSpreadsheet />}>
+                  <span className="font-medium">แท็บสรุปที่จะสร้าง: </span>
+                  {(localConfig.products || [])
+                    .filter((p) => p.isActive !== false)
+                    .map((p) => `สรุป ${p.name}`)
+                    .join(', ') || '—'}
+                </Notice>
+              </div>
+            )}
+          </SettingSection>
+        )}
+
+        {/* ─── Admins ─── */}
+        {isSuperAdminUser && (
+          <SettingSection
+            id="st-admins"
+            icon={<AdminPanelSettings />}
+            title="แอดมิน"
+            description={`เพิ่มแอดมินและกำหนดสิทธิ์ — ${adminEmails.length} คน`}
+          >
+            <div className="flex flex-col gap-3 px-4 py-3.5 md:px-5">
+              <Notice icon={<Shield />}>
+                {/* SUPER_ADMIN_EMAIL is a server-only env var (empty in the browser), so it is not displayed here */}
+                บัญชีสูงสุด (Super Admin) มีสิทธิ์ทั้งหมดเสมอ และเป็นบัญชีเดียวที่จัดการแอดมินได้
+              </Notice>
+              <form
+                className="flex gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  addAdmin();
+                }}
+              >
+                <Input
+                  type="email"
+                  placeholder="อีเมลแอดมินใหม่"
+                  aria-label="อีเมลแอดมินใหม่"
+                  value={newAdminEmail}
+                  onChange={(e) => onNewAdminEmailChange(e.target.value)}
+                  className="h-9 flex-1"
+                />
+                <Button type="submit" disabled={!newAdminEmail.trim()}>
+                  <PersonAdd /> เพิ่ม
+                </Button>
+              </form>
             </div>
-          </div>
-        </SettingSection>
-      )}
 
-      {/* Pickup Settings - Per Product Summary */}
-      {canManageShop && (
-        <SettingSection icon={<LocalMall size={20} />} title="สถานะรับสินค้า">
-          {(() => {
-            const productsWithPickup = localConfig.products?.filter(p => p.pickup?.enabled) || [];
-            const totalProducts = localConfig.products?.length || 0;
+            {adminEmails.length === 0 ? (
+              <p className="px-4 py-6 text-center text-sm text-muted-foreground md:px-5">ยังไม่มีแอดมินเพิ่มเติม</p>
+            ) : (
+              adminEmails.map((adminEmail, idx) => {
+                const perms = permsFor(adminEmail);
+                const enabledCount = PERMISSION_KEYS.filter((k) => perms[k]).length;
+                const open = expandedAdmins.has(adminEmail);
+                const toggleOpen = () =>
+                  setExpandedAdmins((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(adminEmail)) next.delete(adminEmail);
+                    else next.add(adminEmail);
+                    return next;
+                  });
+                const setAll = (value: boolean | 'default') => {
+                  if (value === 'default') return setPermsFor(adminEmail, { ...DEFAULT_ADMIN_PERMISSIONS });
+                  const all: AdminPermissions = {};
+                  PERMISSION_KEYS.forEach((k) => {
+                    all[k] = value;
+                  });
+                  setPermsFor(adminEmail, all);
+                };
+                return (
+                  <div key={adminEmail}>
+                    <div className="flex items-center gap-2 px-4 py-2.5 md:px-5">
+                      <button
+                        type="button"
+                        onClick={toggleOpen}
+                        aria-expanded={open}
+                        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                      >
+                        <span className="grid size-8 shrink-0 place-items-center rounded-full bg-muted text-xs font-semibold uppercase text-muted-foreground">
+                          {adminEmail[0]}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium">{adminEmail}</span>
+                          <span className="block text-xs text-muted-foreground">
+                            สิทธิ์ {enabledCount}/{PERMISSION_KEYS.length}
+                          </span>
+                        </span>
+                        <ChevronDown className={cn('size-4 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')} />
+                      </button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => removeAdmin(adminEmail, idx)}
+                        aria-label={`ลบ ${adminEmail}`}
+                        className="text-muted-foreground hover:text-destructive"
+                      >
+                        <Delete />
+                      </Button>
+                    </div>
+                    {open ? (
+                      <div className="border-t border-dashed border-border bg-muted/30 px-4 py-3 md:px-5">
+                        <div className="grid gap-4 sm:grid-cols-3">
+                          {PERMISSION_GROUPS.map((group) => (
+                            <div key={group.group}>
+                              <p className="mb-1.5 flex items-center gap-1.5 text-[0.7rem] font-semibold uppercase tracking-wider text-muted-foreground [&_svg]:size-3.5">
+                                {group.icon} {group.group}
+                              </p>
+                              <div className="flex flex-col gap-1.5">
+                                {group.items.map((perm) => (
+                                  <label key={perm.key} className="flex cursor-pointer items-center gap-2 text-sm">
+                                    <Checkbox
+                                      checked={!!perms[perm.key]}
+                                      onCheckedChange={(checked) => setPermsFor(adminEmail, { ...perms, [perm.key]: checked === true })}
+                                    />
+                                    {perm.label}
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-1.5 border-t border-border pt-3">
+                          <Button variant="outline" size="sm" onClick={() => setAll(true)}>
+                            <Check /> เปิดทั้งหมด
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => setAll(false)}>
+                            <Close /> ปิดทั้งหมด
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => setAll('default')}>
+                            <RefreshCw /> ค่าเริ่มต้น
+                          </Button>
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })
+            )}
+          </SettingSection>
+        )}
 
-            return (
-              <div className="flex flex-col gap-4">
-                <div
-                  className={cn(
-                    'flex items-center gap-4 rounded-xl p-4',
-                    productsWithPickup.length > 0
-                      ? 'border border-emerald-500/30 bg-emerald-500/10'
-                      : 'border border-[var(--glass-border)] bg-white/[0.03]',
-                  )}
-                >
-                  <LocalMall
-                    size={32}
-                    className={productsWithPickup.length > 0 ? 'text-emerald-500' : 'text-[var(--text-muted)]'}
-                  />
-                  <div className="flex-1">
-                    <p className="font-bold text-[var(--foreground)]">
-                      {productsWithPickup.length > 0
-                        ? `เปิดรับ ${productsWithPickup.length} สินค้า`
-                        : 'ยังไม่มีสินค้าเปิดรับ'}
-                    </p>
-                    <p className="text-[0.8rem] text-[var(--text-muted)]">
-                      จากทั้งหมด {totalProducts} สินค้า
-                    </p>
+        {/* ─── Pickup summary ─── */}
+        {canManageShop && (
+          <SettingSection
+            id="st-pickup"
+            icon={<LocalMall />}
+            title="รับสินค้าหน้าร้าน"
+            description={`เปิดรับ ${productsWithPickup.length} จาก ${localConfig.products?.length || 0} สินค้า — ตั้งค่าได้ที่เมนู ⋯ ของแต่ละสินค้าในหน้าจัดการสินค้า`}
+          >
+            {productsWithPickup.length === 0 ? (
+              <p className="px-4 py-6 text-center text-sm text-muted-foreground md:px-5">ยังไม่มีสินค้าที่เปิดรับหน้าร้าน</p>
+            ) : (
+              productsWithPickup.map((p) => (
+                <div key={p.id} className="flex items-start gap-3 px-4 py-3 md:px-5">
+                  <Check className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{p.name}</p>
+                    <div className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
+                      {p.pickup?.location && (
+                        <span className="inline-flex items-center gap-1">
+                          <Crosshair className="size-3" /> {p.pickup.location}
+                        </span>
+                      )}
+                      {(p.pickup?.startDate || p.pickup?.endDate) && (
+                        <span className="inline-flex items-center gap-1">
+                          <CalendarDays className="size-3" />
+                          {p.pickup?.startDate ? new Date(p.pickup.startDate).toLocaleDateString('th-TH') : '…'} –{' '}
+                          {p.pickup?.endDate ? new Date(p.pickup.endDate).toLocaleDateString('th-TH') : '…'}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
-
-                {productsWithPickup.length > 0 && (
-                  <div className="flex flex-col gap-3">
-                    {productsWithPickup.map(p => (
-                      <div
-                        key={p.id}
-                        className="flex items-center gap-3 rounded-[10px] border border-cyan-500/15 bg-cyan-500/[0.05] p-3"
-                      >
-                        <CheckCircle size={18} className="shrink-0 text-emerald-500" />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-[0.85rem] font-semibold text-[var(--foreground)]">
-                            {p.name}
-                          </p>
-                          {p.pickup?.location && (
-                            <p className="flex items-center gap-1 text-xs text-[var(--text-muted)]">
-                              <Crosshair size={12} /> {p.pickup.location}
-                            </p>
-                          )}
-                          {(p.pickup?.startDate || p.pickup?.endDate) && (
-                            <p className="flex items-center gap-1 text-[0.7rem] text-[var(--text-muted)]">
-                              <CalendarDays size={12} /> {p.pickup?.startDate ? new Date(p.pickup.startDate).toLocaleDateString('th-TH') : '...'} - {p.pickup?.endDate ? new Date(p.pickup.endDate).toLocaleDateString('th-TH') : '...'}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <Alert className="border border-indigo-500/20 bg-indigo-500/10 text-[0.8rem]">
-                  <AlertDescription>
-                    ไปที่แท็บ <strong>สินค้า</strong> และกดปุ่ม &quot;ตั้งค่ารับสินค้า&quot; ในแต่ละสินค้าเพื่อเปิด/ปิดการรับสินค้า
-                  </AlertDescription>
-                </Alert>
-              </div>
-            );
-          })()}
-        </SettingSection>
-      )}
-
-      {/* Save Status */}
-      <div className={cn(glassCardClass, 'flex items-center justify-between p-4')}>
-        <div className="flex items-center gap-4">
-          <div
-            className="size-2.5 shrink-0 rounded-full"
-            style={{
-              backgroundColor: hasChanges ? '#f59e0b' : '#10b981',
-              boxShadow: `0 0 12px ${hasChanges ? '#f59e0b' : '#10b981'}`,
-            }}
-          />
-          <p className="text-[0.85rem] text-[var(--text-muted)]">
-            {hasChanges ? 'มีการเปลี่ยนแปลงที่ยังไม่บันทึก' : 'บันทึกล่าสุด: ' + (lastSavedTime ? lastSavedTime?.toLocaleString('th-TH') : '-')}
-          </p>
-        </div>
-        <Button
-          onClick={onSave}
-          disabled={!hasChanges || loading}
-          className={cn(gradientBtnClass, 'min-w-[120px]', !hasChanges && 'opacity-50')}
-        >
-          <Save size={18} />
-          บันทึก
-        </Button>
+              ))
+            )}
+          </SettingSection>
+        )}
       </div>
+
+      {/* ─── Floating save bar ─── */}
+      {hasChanges ? (
+        <div className="pointer-events-none fixed inset-x-0 bottom-20 z-30 flex justify-center px-3 md:bottom-6">
+          <div
+            role="status"
+            className="pointer-events-auto flex items-center gap-2 rounded-full border border-border bg-popover py-1.5 pr-1.5 pl-4 text-sm shadow-lg"
+          >
+            <span className="size-1.5 shrink-0 rounded-full bg-amber-500" />
+            <span className="font-medium whitespace-nowrap">มีการแก้ไขที่ยังไม่บันทึก</span>
+            <Button variant="ghost" size="sm" className="rounded-full" onClick={onReset} disabled={loading}>
+              <Undo2 /> <span className="hidden sm:inline">ยกเลิก</span>
+            </Button>
+            <Button size="sm" className="rounded-full" onClick={onSave} disabled={loading}>
+              {loading ? <Loader2 className="animate-spin" /> : <Save />}
+              บันทึก
+              <Kbd className="ml-1 hidden border-primary-foreground/30 bg-primary-foreground/15 text-primary-foreground md:inline-flex">Ctrl S</Kbd>
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 });

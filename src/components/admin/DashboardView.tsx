@@ -1,62 +1,37 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
-  DollarSign as AttachMoney,
-  CalendarRange as DateRange,
-  CircleCheck as CheckCircle,
-  Truck as LocalShipping,
-  Hand as WavingHand,
-  Store,
+  ArrowRight,
+  Banknote,
+  CircleCheck,
+  Clock,
+  Flame,
+  PackageCheck,
   Radio,
+  Receipt,
+  RefreshCw,
+  Ruler,
+  Shirt,
+  ShoppingBag,
+  Store,
   Timer,
   TrendingUp,
-  BarChart3,
-  Flame as Fire,
-  Receipt,
-  Zap as Bolt,
-  Package as Inventory,
-  Ruler,
-  Target,
-  ShoppingBag as LocalMall,
+  Truck,
 } from 'lucide-react';
 
 import { ShopConfig } from '@/lib/config';
 import { STATUS_THEME } from '@/lib/adminTheme';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-} from '@/components/ui/card';
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from '@/components/ui/table';
-import { Separator } from '@/components/ui/separator';
-
-const Shirt = ({ size, color }: { size?: number; color?: string }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width={size || 24}
-    height={size || 24}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke={color || 'currentColor'}
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M20.38 3.46L16 6.14V4a2 2 0 0 0-2-2H10a2 2 0 0 0-2 2v2.14L3.62 3.46a2 2 0 0 0-2.38.38l-1 1a2 2 0 0 0 .38 2.38L4 9.18V20a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9.18l3.38-2.96a2 2 0 0 0 .38-2.38l-1-1a2 2 0 0 0-2.38-.38z" />
-  </svg>
-);
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { EmptyState, Panel, StatCard, StatusPill, statusLabel } from '@/components/admin/admin-ui';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface DashboardOrderItem {
+  name?: string;
+  id?: string;
+  qty?: number;
+  total?: number;
+  price?: number;
   size?: string;
   quantity?: number;
   isLongSleeve?: boolean;
@@ -75,29 +50,8 @@ interface DashboardAdminOrder {
   status: string;
   date?: string;
   raw?: unknown;
-  slip?: {
-    uploadedAt?: string;
-    base64?: string;
-    imageUrl?: string;
-    fileName?: string;
-    mime?: string;
-    slipData?: {
-      transRef?: string;
-      transDate?: string;
-      transTime?: string;
-      amount?: number;
-      senderName?: string;
-      senderFullName?: string;
-      senderDisplayName?: string;
-      senderBank?: string;
-      senderAccount?: string;
-      receiverName?: string;
-      receiverDisplayName?: string;
-      receiverBank?: string;
-      receiverAccount?: string;
-    };
-  };
-  cart?: DashboardOrderItem[];
+  slip?: unknown;
+  cart?: DashboardOrderItem[] | string;
   items?: DashboardOrderItem[];
   trackingNumber?: string;
   shopId?: string;
@@ -121,21 +75,41 @@ interface DashboardViewProps {
   triggerSheetSync: (action: 'sync' | 'create') => void;
 }
 
-const glassCardClass = cn(
-  'admin-glass gap-0 overflow-hidden border-[var(--border)] bg-[var(--card)] py-0 shadow-none',
-);
+const SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL', '7XL', '8XL', '9XL', '10XL'];
+const sizeIndex = (size: string) => {
+  // Match the longest size label first so "2XL" is not read as "XL"
+  const upper = size?.toUpperCase() || '';
+  let best = -1;
+  let bestLen = 0;
+  SIZE_ORDER.forEach((s, i) => {
+    if (upper.includes(s) && s.length > bestLen) {
+      best = i;
+      bestLen = s.length;
+    }
+  });
+  return best === -1 ? 999 : best;
+};
 
-const secondaryButtonClass = cn(
-  'h-auto w-full justify-start gap-3 rounded-xl border-[var(--border)] bg-[var(--card)] py-3 font-semibold text-[var(--muted-foreground)] hover:bg-[var(--surface-2)]',
-);
+const PENDING = ['WAITING_PAYMENT', 'PENDING', 'PENDING_PAYMENT', 'AWAITING_PAYMENT'];
 
-const gradientButtonClass = cn(
-  'h-auto w-full justify-start gap-3 rounded-xl border-0 bg-gradient-to-br from-indigo-500 to-violet-500 py-3 font-bold text-white shadow-[0_4px_14px_rgba(99,102,241,0.35)] hover:from-indigo-600 hover:to-violet-600 hover:shadow-[0_6px_20px_rgba(99,102,241,0.45)] disabled:opacity-50',
-);
+const localDayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+
+const baht = (n: number) => `฿${(Number(n) || 0).toLocaleString()}`;
+const bahtShort = (n: number) => (n >= 1000 ? `฿${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : `฿${n.toLocaleString()}`);
+
+function getCart(order: DashboardAdminOrder): DashboardOrderItem[] {
+  if (typeof order.cart === 'string') {
+    try {
+      return JSON.parse(order.cart || '[]');
+    } catch {
+      return [];
+    }
+  }
+  return order.cart || [];
+}
 
 export const DashboardView = React.memo(function DashboardView({
   shopOrders,
-  orders,
   session,
   isShopMode,
   myShops,
@@ -148,656 +122,480 @@ export const DashboardView = React.memo(function DashboardView({
   sheetSyncing,
   triggerSheetSync,
 }: DashboardViewProps) {
-  const validOrders = shopOrders.filter(o => o.status !== 'CANCELLED');
-  const totalSales = validOrders.reduce((sum, o) => sum + (Number(o.amount) || 0), 0);
-  const pendingOrders = shopOrders.filter(o => ['WAITING_PAYMENT', 'PENDING'].includes(o.status)).length;
-  const paidOrders = shopOrders.filter(o => o.status === 'PAID').length;
-  const readyOrders = shopOrders.filter(o => ['READY', 'SHIPPED'].includes(o.status)).length;
-  const completedOrders = shopOrders.filter(o => o.status === 'COMPLETED').length;
-  const cancelledOrders = shopOrders.filter(o => o.status === 'CANCELLED').length;
+  const { lang } = useTranslation();
+  const en = lang === 'en';
+  const locale = en ? 'en-US' : 'th-TH';
 
-  const statsData = [
-    {
-      label: 'ยอดขายรวม',
-      value: `฿${totalSales?.toLocaleString()}`,
-      subtitle: `${validOrders.length} ออเดอร์`,
-      gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-      iconBg: 'rgba(16,185,129,0.2)',
-      icon: <AttachMoney size={28} color="#34d399" />,
-    },
-    {
-      label: 'รอชำระเงิน',
-      value: `${pendingOrders}`,
-      subtitle: 'รายการ',
-      gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-      iconBg: 'rgba(245,158,11,0.2)',
-      icon: <DateRange size={28} color="#fbbf24" />,
-    },
-    {
-      label: 'ชำระแล้ว',
-      value: `${paidOrders}`,
-      subtitle: 'พร้อมจัดส่ง',
-      gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-      iconBg: 'rgba(59,130,246,0.2)',
-      icon: <CheckCircle size={28} color="#60a5fa" />,
-    },
-    {
-      label: 'จัดส่งแล้ว',
-      value: `${readyOrders + completedOrders}`,
-      subtitle: 'เสร็จสมบูรณ์',
-      gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-      iconBg: 'rgba(139,92,246,0.2)',
-      icon: <LocalShipping size={28} color="#a78bfa" />,
-    },
+  const stats = useMemo(() => {
+    const valid = shopOrders.filter((o) => o.status !== 'CANCELLED');
+    const count = (pred: (s: string) => boolean) => shopOrders.filter((o) => pred(o.status)).length;
+    const todayKey = localDayKey(new Date());
+    const todayOrders = valid.filter((o) => {
+      const d = new Date(o.date || '');
+      return !Number.isNaN(d.getTime()) && localDayKey(d) === todayKey;
+    });
+    return {
+      valid,
+      totalSales: valid.reduce((s, o) => s + (Number(o.amount) || 0), 0),
+      todayCount: todayOrders.length,
+      todaySales: todayOrders.reduce((s, o) => s + (Number(o.amount) || 0), 0),
+      pending: count((s) => PENDING.includes(s)),
+      paid: count((s) => s === 'PAID'),
+      ready: count((s) => s === 'READY'),
+      shipped: count((s) => s === 'SHIPPED'),
+      completed: count((s) => s === 'COMPLETED'),
+      cancelled: count((s) => s === 'CANCELLED'),
+      refund: count((s) => s === 'REFUND_REQUESTED'),
+    };
+  }, [shopOrders]);
+
+  // Last 7 days revenue (local time)
+  const daily = useMemo(() => {
+    const days: { key: string; label: string; weekday: string; revenue: number; count: number }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      days.push({
+        key: localDayKey(d),
+        label: d.toLocaleDateString(locale, { day: 'numeric', month: 'short' }),
+        weekday: d.toLocaleDateString(locale, { weekday: 'short' }),
+        revenue: 0,
+        count: 0,
+      });
+    }
+    for (const o of stats.valid) {
+      const d = new Date(o.date || '');
+      if (Number.isNaN(d.getTime())) continue;
+      const day = days.find((x) => x.key === localDayKey(d));
+      if (day) {
+        day.revenue += Number(o.amount) || 0;
+        day.count += 1;
+      }
+    }
+    return days;
+  }, [stats.valid, locale]);
+  const weekRevenue = daily.reduce((s, d) => s + d.revenue, 0);
+  const weekOrders = daily.reduce((s, d) => s + d.count, 0);
+  const maxDaily = Math.max(...daily.map((d) => d.revenue), 1);
+
+  const bestSellers = useMemo(() => {
+    const map: Record<string, { name: string; count: number; revenue: number }> = {};
+    for (const order of stats.valid) {
+      for (const item of getCart(order)) {
+        const key = item.name || item.id || 'Unknown';
+        if (!map[key]) map[key] = { name: key, count: 0, revenue: 0 };
+        map[key].count += item.qty || 1;
+        map[key].revenue += item.total || item.price || 0;
+      }
+    }
+    return Object.values(map).sort((a, b) => b.count - a.count).slice(0, 5);
+  }, [stats.valid]);
+
+  const production = useMemo(() => {
+    const paid = shopOrders.filter((o) => o.status === 'PAID');
+    const total: Record<string, number> = {};
+    const long: Record<string, number> = {};
+    const short: Record<string, number> = {};
+    let items = 0;
+    for (const o of paid) {
+      const list = o.items || getCart(o);
+      for (const item of list) {
+        const size = item.size || (en ? 'N/A' : 'ไม่ระบุ');
+        const qty = Number(item.quantity ?? item.qty ?? 1) || 1;
+        const isLong = item.options?.isLongSleeve || item.isLongSleeve || false;
+        items += qty;
+        total[size] = (total[size] || 0) + qty;
+        if (isLong) long[size] = (long[size] || 0) + qty;
+        else short[size] = (short[size] || 0) + qty;
+      }
+    }
+    const sizes = Object.keys(total).sort((a, b) => sizeIndex(a) - sizeIndex(b));
+    return {
+      paidCount: paid.length,
+      items,
+      sizes,
+      total,
+      long,
+      short,
+      totalLong: Object.values(long).reduce((a, b) => a + b, 0),
+      totalShort: Object.values(short).reduce((a, b) => a + b, 0),
+    };
+  }, [shopOrders, en]);
+
+  const recentOrders = useMemo(
+    () =>
+      [...shopOrders]
+        .sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime())
+        .slice(0, 6),
+    [shopOrders],
+  );
+
+  const distribution = [
+    { key: 'WAITING_PAYMENT', count: stats.pending },
+    { key: 'PAID', count: stats.paid },
+    { key: 'READY', count: stats.ready },
+    { key: 'SHIPPED', count: stats.shipped },
+    { key: 'COMPLETED', count: stats.completed },
+    { key: 'REFUND_REQUESTED', count: stats.refund },
+    { key: 'CANCELLED', count: stats.cancelled },
   ];
+  const distTotal = distribution.reduce((s, d) => s + d.count, 0) || 1;
+
+  const firstName = session?.user?.name?.split(' ')[0] || 'Admin';
+  const shopName = isShopMode ? myShops.find((s) => s.id === selectedShopId)?.name : null;
+  const hour = new Date().getHours();
+  const greeting = en
+    ? hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
+    : hour < 12 ? 'สวัสดีตอนเช้า' : hour < 18 ? 'สวัสดีตอนบ่าย' : 'สวัสดีตอนเย็น';
+
+  const goOrders = (term = '') => {
+    setActiveTab(2);
+    setSearchTerm(term);
+  };
+
+  const todo = [
+    {
+      count: stats.pending,
+      label: en ? 'Awaiting payment' : 'รอชำระเงิน / ตรวจสลิป',
+      icon: <Clock />,
+      tone: 'text-amber-600 dark:text-amber-400 bg-amber-500/12',
+    },
+    {
+      count: stats.paid,
+      label: en ? 'Paid — prepare to ship' : 'ชำระแล้ว รอจัดเตรียม/จัดส่ง',
+      icon: <PackageCheck />,
+      tone: 'text-sky-600 dark:text-sky-400 bg-sky-500/12',
+    },
+    {
+      count: stats.refund,
+      label: en ? 'Refund requests' : 'คำขอคืนเงิน',
+      icon: <RefreshCw />,
+      tone: 'text-violet-600 dark:text-violet-400 bg-violet-500/12',
+      tab: 13,
+    },
+  ].filter((t) => t.count > 0);
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Welcome Header — Aurora + Grid Pattern */}
-      <div
-        className={cn(
-          'aurora-bg grid-pattern noise-overlay relative overflow-hidden rounded-[20px] border border-indigo-500/15 p-6',
-        )}
-      >
-        <h2 className="relative z-[2] mb-1 flex items-center gap-2 text-[1.4rem] font-extrabold text-[var(--foreground)]">
-          <WavingHand size={22} color="#fbbf24" />
-          ยินดีต้อนรับ, {session?.user?.name?.split(' ')[0] || 'Admin'}
-        </h2>
-        {isShopMode && (
-          <Badge
-            className="relative z-[2] mb-2 rounded-[10px] border-transparent bg-violet-500/20 font-bold text-violet-300"
-          >
-            <Store size={14} />
-            กำลังดูร้าน: {myShops.find(s => s.id === selectedShopId)?.name || 'ร้านค้าย่อย'}
-          </Badge>
-        )}
-        <div className="relative z-[2] flex flex-wrap items-center gap-4">
-          <p className="text-[0.9rem] text-[var(--muted-foreground)]">
-            จัดการร้านค้าและออเดอร์ของคุณได้ที่นี่ • อัพเดทล่าสุด:{' '}
-            {lastSavedTime?.toLocaleTimeString('th-TH') || 'กำลังโหลด...'}
+    <div className="flex flex-col gap-5">
+      {/* ─── Greeting / status row ─── */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-base font-semibold">
+            {greeting}, {firstName}
           </p>
-          <div
-            className={cn(
-              'flex items-center gap-1 rounded-full px-3 py-1',
-              realtimeConnected
-                ? 'border border-emerald-500/30 bg-emerald-500/15'
-                : 'border border-amber-500/30 bg-amber-500/15',
-            )}
-          >
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            {shopName ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-violet-500/12 px-2 py-0.5 font-medium text-violet-600 dark:text-violet-400">
+                <Store className="size-3" /> {shopName}
+              </span>
+            ) : null}
             <span
               className={cn(
-                'size-2 rounded-full',
-                realtimeConnected ? 'animate-pulse bg-[var(--success)]' : 'bg-amber-500',
-              )}
-            />
-            <span
-              className={cn(
-                'flex items-center gap-1 text-[0.7rem] font-semibold',
-                realtimeConnected ? 'text-[var(--success)]' : 'text-amber-500',
+                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium',
+                realtimeConnected
+                  ? 'bg-emerald-500/12 text-emerald-600 dark:text-emerald-400'
+                  : 'bg-amber-500/12 text-amber-600 dark:text-amber-400',
               )}
             >
-              {realtimeConnected ? (
-                <>
-                  <Radio size={10} /> Live
-                </>
-              ) : (
-                <>
-                  <Timer size={10} /> Polling
-                </>
-              )}
+              {realtimeConnected ? <Radio className="size-3" /> : <Timer className="size-3" />}
+              {realtimeConnected ? (en ? 'Live updates' : 'อัปเดตเรียลไทม์') : (en ? 'Polling' : 'รีเฟรชอัตโนมัติ')}
+            </span>
+            <span>
+              {en ? 'Last update' : 'อัปเดตล่าสุด'}{' '}
+              {lastSavedTime ? lastSavedTime.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }) : '—'}
             </span>
           </div>
         </div>
-      </div>
-
-      {/* Stats Grid - Modern Cards */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        {statsData.map((stat, idx) => (
-          <div
-            key={idx}
-            className={cn(
-              'admin-glass relative overflow-hidden rounded-[18px] p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(0,0,0,0.3)]',
-            )}
-          >
-            <div
-              className="absolute -right-5 -top-5 size-20 rounded-full opacity-15 blur-[20px]"
-              style={{ background: stat.gradient }}
-            />
-
-            <div className="relative mb-4 flex items-start justify-between">
-              <div
-                className="grid size-12 place-items-center rounded-[14px]"
-                style={{ backgroundColor: stat.iconBg }}
-              >
-                {stat.icon}
-              </div>
-            </div>
-
-            <p className="mb-1 text-[1.75rem] font-black leading-none text-[var(--foreground)]">
-              {stat.value}
-            </p>
-            <p className="text-[0.8rem] font-semibold text-[var(--muted-foreground)]">{stat.label}</p>
-            <p className="mt-1 text-[0.7rem] text-[var(--muted-foreground)]">{stat.subtitle}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* ===== Analytics Charts ===== */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-[2fr_1fr]">
-        {/* Revenue Trend - Last 7 days */}
-        <Card className={cn(glassCardClass, 'p-0')}>
-          <CardHeader className="px-6 pt-6 pb-0">
-            <CardTitle className="flex items-center gap-2 text-base font-bold text-[var(--foreground)]">
-              <TrendingUp size={20} color="#34c759" />
-              Revenue Trend (7 Days)
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-6 pb-6">
-            {(() => {
-              const days = 7;
-              const dailyData: { date: string; revenue: number; count: number }[] = [];
-              for (let i = days - 1; i >= 0; i--) {
-                const d = new Date();
-                d.setDate(d.getDate() - i);
-                const dateStr = d.toISOString().split('T')[0];
-                const dayLabel = d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
-                const dayOrders = validOrders.filter(o => {
-                  const od = new Date(o.date || '');
-                  if (Number.isNaN(od.getTime())) return false;
-                  return od.toISOString().split('T')[0] === dateStr;
-                });
-                dailyData.push({
-                  date: dayLabel,
-                  revenue: dayOrders.reduce((s, o) => s + (Number(o.amount) || 0), 0),
-                  count: dayOrders.length,
-                });
-              }
-              const maxRev = Math.max(...dailyData.map(d => d.revenue), 1);
-              return (
-                <div>
-                  <div className="mb-2 flex h-[120px] items-end gap-1">
-                    {dailyData.map((d, i) => (
-                      <div key={i} className="flex flex-1 flex-col items-center gap-1">
-                        <span
-                          className={cn(
-                            'text-[0.55rem] font-bold text-[var(--success)]',
-                            d.revenue > 0 ? 'opacity-100' : 'opacity-0',
-                          )}
-                        >
-                          ฿{d.revenue >= 1000 ? `${(d.revenue / 1000).toFixed(1)}k` : d.revenue?.toLocaleString()}
-                        </span>
-                        <div
-                          className="w-full min-h-1 rounded-t-md rounded-b-sm transition-[height] duration-500 ease-out"
-                          style={{
-                            height: `${Math.max((d.revenue / maxRev) * 100, 3)}%`,
-                            background:
-                              d.revenue > 0
-                                ? 'linear-gradient(180deg, #34c759, #059669)'
-                                : 'rgba(100,116,139,0.15)',
-                          }}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex gap-1">
-                    {dailyData.map((d, i) => (
-                      <div key={i} className="flex-1 text-center">
-                        <p className="text-[0.55rem] text-[var(--muted-foreground)]">{d.date}</p>
-                        <p className="text-[0.55rem] text-[var(--muted-foreground)] opacity-60">
-                          {d.count} orders
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })()}
-          </CardContent>
-        </Card>
-
-        {/* Order Status Donut Chart */}
-        <Card className={cn(glassCardClass, 'p-0')}>
-          <CardHeader className="px-6 pt-6 pb-0">
-            <CardTitle className="flex items-center gap-2 text-base font-bold text-[var(--foreground)]">
-              <BarChart3 size={20} color="#a5b4fc" />
-              Order Distribution
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-6 pb-6">
-            {(() => {
-              const total = orders.length || 1;
-              const segments = [
-                { label: 'Pending', count: pendingOrders, color: '#ff9f0a' },
-                { label: 'Paid', count: paidOrders, color: '#34c759' },
-                { label: 'Ready/Shipped', count: readyOrders, color: '#2997ff' },
-                { label: 'Completed', count: completedOrders, color: '#30d158' },
-                { label: 'Cancelled', count: cancelledOrders, color: '#ff453a' },
-              ].filter(s => s.count > 0);
-
-              let accumulated = 0;
-              const gradientParts = segments.map(s => {
-                const start = accumulated;
-                const end = accumulated + (s.count / total) * 360;
-                accumulated = end;
-                return `${s.color} ${start}deg ${end}deg`;
-              });
-
-              return (
-                <div className="flex flex-col items-center gap-4">
-                  <div
-                    className="relative size-[120px] rounded-full"
-                    style={{ background: `conic-gradient(${gradientParts.join(', ')})` }}
-                  >
-                    <div className="absolute inset-[25%] rounded-full bg-[var(--surface)]" />
-                    <div className="absolute inset-0 z-[1] flex items-center justify-center">
-                      <span className="text-[1.2rem] font-extrabold text-[var(--foreground)]">{total}</span>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap justify-center gap-2">
-                    {segments.map(s => (
-                      <div key={s.label} className="flex items-center gap-1">
-                        <span className="size-2 rounded-full" style={{ backgroundColor: s.color }} />
-                        <span className="text-[0.6rem] text-[var(--muted-foreground)]">
-                          {s.label} ({s.count})
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })()}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* ===== Best Sellers ===== */}
-      <Card className={cn(glassCardClass, 'p-0')}>
-        <CardHeader className="px-6 pt-6 pb-0">
-          <CardTitle className="flex items-center gap-2 text-base font-bold text-[var(--foreground)]">
-            <Fire size={20} color="#ff9f0a" />
-            Best Selling Products
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="px-6 pb-6">
-          {(() => {
-            const productSales: Record<string, { name: string; count: number; revenue: number }> = {};
-            for (const order of validOrders) {
-              const cart =
-                typeof order.cart === 'string' ? JSON.parse(order.cart || '[]') : order.cart || [];
-              for (const item of cart) {
-                const key = item.name || item.id || 'Unknown';
-                if (!productSales[key]) productSales[key] = { name: key, count: 0, revenue: 0 };
-                productSales[key].count += item.qty || 1;
-                productSales[key].revenue += item.total || item.price || 0;
-              }
-            }
-            const sorted = Object.values(productSales).sort((a, b) => b.count - a.count).slice(0, 5);
-            if (sorted.length === 0) {
-              return (
-                <p className="text-[0.85rem] text-[var(--muted-foreground)]">No sales data yet</p>
-              );
-            }
-            const maxCount = sorted[0].count;
-            return (
-              <div className="flex flex-col gap-2">
-                {sorted.map((product, idx) => (
-                  <div key={idx} className="flex items-center gap-3">
-                    <span
-                      className={cn(
-                        'w-5 text-[0.75rem] font-extrabold',
-                        idx === 0 ? 'text-amber-500' : 'text-[var(--muted-foreground)]',
-                      )}
-                    >
-                      #{idx + 1}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-[0.8rem] font-semibold text-[var(--foreground)]">
-                        {product.name}
-                      </p>
-                      <div className="relative mt-1 h-1 overflow-hidden rounded-sm bg-slate-500/10">
-                        <div
-                          className="absolute inset-y-0 left-0 rounded-sm bg-gradient-to-r from-blue-600 to-blue-400 transition-[width] duration-500 ease-out"
-                          style={{ width: `${(product.count / maxCount) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <p className="text-[0.75rem] font-bold text-[var(--foreground)]">
-                        {product.count} pcs
-                      </p>
-                      <p className="text-[0.6rem] text-[var(--success)]">
-                        ฿{product.revenue?.toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
-        </CardContent>
-      </Card>
-
-      {/* Quick Status Overview */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {/* Order Status Breakdown */}
-        <Card className={cn(glassCardClass, 'p-0')}>
-          <CardHeader className="px-6 pt-6 pb-0">
-            <CardTitle className="flex items-center gap-2 text-base font-bold text-[var(--foreground)]">
-              <Receipt size={20} color="#a5b4fc" />
-              สถานะออเดอร์
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-6 pb-6">
-            <div className="flex flex-col gap-3">
-              {[
-                { status: 'WAITING_PAYMENT', count: pendingOrders },
-                { status: 'PAID', count: paidOrders },
-                { status: 'READY', count: readyOrders },
-                { status: 'COMPLETED', count: completedOrders },
-                { status: 'CANCELLED', count: cancelledOrders },
-              ].map(item => {
-                const theme = STATUS_THEME[item.status] || STATUS_THEME.PENDING;
-                const total = orders.length || 1;
-                const percent = Math.round((item.count / total) * 100);
-                return (
-                  <div key={item.status} className="flex items-center gap-4">
-                    <div
-                      className="w-[100px] shrink-0 rounded-lg px-3 py-1 text-center"
-                      style={{
-                        backgroundColor: theme.bg,
-                        border: `1px solid ${theme.border}`,
-                      }}
-                    >
-                      <span className="text-[0.7rem] font-bold" style={{ color: theme.text }}>
-                        {item.status.replace('_', ' ')}
-                      </span>
-                    </div>
-                    <div className="h-2 flex-1 overflow-hidden rounded bg-[var(--glass-bg)]">
-                      <div
-                        className="h-full rounded transition-[width] duration-500 ease-out"
-                        style={{
-                          width: `${percent}%`,
-                          backgroundColor: theme.text.replace('1)', '0.8)'),
-                        }}
-                      />
-                    </div>
-                    <span
-                      className="min-w-[30px] text-right text-[0.85rem] font-bold"
-                      style={{ color: theme.text }}
-                    >
-                      {item.count}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Quick Actions */}
-        <Card className={cn(glassCardClass, 'p-0')}>
-          <CardHeader className="px-6 pt-6 pb-0">
-            <CardTitle className="flex items-center gap-2 text-base font-bold text-[var(--foreground)]">
-              <Bolt size={20} color="#fbbf24" />
-              Quick Actions
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3 px-6 pb-6">
-            <Button variant="outline" className={secondaryButtonClass} onClick={() => setActiveTab(1)}>
-              <Store size={20} />
-              จัดการสินค้า ({config.products?.length || 0} รายการ)
-            </Button>
-            <Button variant="outline" className={secondaryButtonClass} onClick={() => setActiveTab(2)}>
-              <Receipt size={20} />
-              ดูออเดอร์ทั้งหมด ({orders.length} รายการ)
-            </Button>
-            <Button
-              className={gradientButtonClass}
-              disabled={sheetSyncing}
-              onClick={() => triggerSheetSync(config.sheetId ? 'sync' : 'create')}
-            >
-              <Bolt size={20} />
-              {sheetSyncing ? 'กำลังซิงก์...' : 'ซิงก์ Google Sheet'}
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Factory Production Summary - Size & Sleeve breakdown for PAID orders */}
-      {(() => {
-        const paidOrdersList = orders.filter(o => o.status === 'PAID');
-        const sizeOrder = [
-          'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL', '7XL', '8XL', '9XL', '10XL',
-        ];
-        const getSizeIndex = (size: string) => {
-          const idx = sizeOrder.findIndex(s => size?.toUpperCase()?.includes(s));
-          return idx === -1 ? 999 : idx;
-        };
-
-        const sizeCount: Record<string, number> = {};
-        const sizeLongSleeveCount: Record<string, number> = {};
-        const sizeShortSleeveCount: Record<string, number> = {};
-        let totalItems = 0;
-
-        paidOrdersList.forEach(o => {
-          const items = o?.items || o?.cart || [];
-          items.forEach((item: DashboardOrderItem) => {
-            const size = item.size || 'ไม่ระบุ';
-            const qty = Number(item.quantity ?? 1) || 1;
-            const isLongSleeve = item.options?.isLongSleeve || item.isLongSleeve || false;
-
-            totalItems += qty;
-            sizeCount[size] = (sizeCount[size] || 0) + qty;
-            if (isLongSleeve) {
-              sizeLongSleeveCount[size] = (sizeLongSleeveCount[size] || 0) + qty;
-            } else {
-              sizeShortSleeveCount[size] = (sizeShortSleeveCount[size] || 0) + qty;
-            }
-          });
-        });
-
-        const sortedSizes = Object.keys(sizeCount).sort((a, b) => getSizeIndex(a) - getSizeIndex(b));
-        const totalShortSleeve = Object.values(sizeShortSleeveCount).reduce((a, b) => a + b, 0);
-        const totalLongSleeve = Object.values(sizeLongSleeveCount).reduce((a, b) => a + b, 0);
-
-        return (
-          <Card className={cn(glassCardClass, 'p-0')}>
-            <CardHeader className="px-6 pt-6 pb-0">
-              <CardTitle className="flex items-center gap-2 text-base font-bold text-[var(--foreground)]">
-                <LocalMall size={20} color="#f472b6" />
-                สรุปการผลิต (ออเดอร์ชำระแล้ว)
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="px-6 pb-6">
-              <div className="mb-6 grid grid-cols-3 gap-4 rounded-xl border border-indigo-500/20 bg-indigo-500/10 p-4">
-                <div className="text-center">
-                  <p className="text-2xl font-black text-[var(--foreground)]">{paidOrdersList.length}</p>
-                  <p className="flex items-center justify-center gap-1 text-[0.7rem] text-[var(--muted-foreground)]">
-                    <Inventory size={12} /> ออเดอร์
-                  </p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-black text-cyan-400">{totalItems}</p>
-                  <p className="flex items-center justify-center gap-1 text-[0.7rem] text-[var(--muted-foreground)]">
-                    <Shirt size={12} /> ตัวทั้งหมด
-                  </p>
-                </div>
-                <div className="text-center">
-                  <p className="text-2xl font-black text-violet-400">{sortedSizes.length}</p>
-                  <p className="flex items-center justify-center gap-1 text-[0.7rem] text-[var(--muted-foreground)]">
-                    <Ruler size={12} /> ไซส์
-                  </p>
-                </div>
-              </div>
-
-              {sortedSizes.length > 0 ? (
-                <Table className="min-w-[400px]">
-                  <TableHeader>
-                    <TableRow className="border-[var(--border)] hover:bg-transparent">
-                      <TableHead className="border-[var(--border)] text-[0.75rem] font-semibold text-[var(--muted-foreground)]">
-                        ไซส์
-                      </TableHead>
-                      <TableHead className="border-[var(--border)] text-center text-[0.75rem] font-semibold text-[var(--muted-foreground)]">
-                        แขนสั้น
-                      </TableHead>
-                      <TableHead className="border-[var(--border)] text-center text-[0.75rem] font-semibold text-[var(--muted-foreground)]">
-                        แขนยาว
-                      </TableHead>
-                      <TableHead className="border-[var(--border)] text-center text-[0.75rem] font-semibold text-[var(--muted-foreground)]">
-                        รวม
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedSizes.map(size => (
-                      <TableRow key={size} className="border-[var(--border)] hover:bg-white/[0.02]">
-                        <TableCell className="border-[var(--border)]">
-                          <span className="text-[0.85rem] font-bold text-[var(--foreground)]">{size}</span>
-                        </TableCell>
-                        <TableCell className="border-[var(--border)] text-center">
-                          <span className="text-[0.85rem] text-[var(--muted-foreground)]">
-                            {sizeShortSleeveCount[size] || 0}
-                          </span>
-                        </TableCell>
-                        <TableCell className="border-[var(--border)] text-center">
-                          <span className="text-[0.85rem] text-blue-400">
-                            {sizeLongSleeveCount[size] || 0}
-                          </span>
-                        </TableCell>
-                        <TableCell className="border-[var(--border)] text-center">
-                          <span className="text-[0.9rem] font-bold text-[var(--success)]">
-                            {sizeCount[size]}
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    <TableRow className="border-[var(--border)] bg-indigo-500/10 hover:bg-indigo-500/10">
-                      <TableCell className="border-[var(--border)]">
-                        <span className="flex items-center gap-1 text-[0.85rem] font-bold text-indigo-300">
-                          <Target size={14} /> รวมทั้งหมด
-                        </span>
-                      </TableCell>
-                      <TableCell className="border-[var(--border)] text-center">
-                        <span className="text-[0.9rem] font-bold text-[var(--foreground)]">
-                          {totalShortSleeve}
-                        </span>
-                      </TableCell>
-                      <TableCell className="border-[var(--border)] text-center">
-                        <span className="text-[0.9rem] font-bold text-blue-400">{totalLongSleeve}</span>
-                      </TableCell>
-                      <TableCell className="border-[var(--border)] text-center">
-                        <span className="text-base font-black text-[var(--success)]">{totalItems}</span>
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              ) : (
-                <p className="py-6 text-center text-[0.85rem] text-[var(--muted-foreground)]">
-                  ยังไม่มีออเดอร์ที่ชำระแล้ว
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        );
-      })()}
-
-      {/* Recent Orders - Modern Table */}
-      <Card className={glassCardClass}>
-        <CardHeader className="flex-row items-center justify-between space-y-0 px-6 py-5">
-          <CardTitle className="flex items-center gap-2 text-base font-bold text-[var(--foreground)]">
-            <LocalShipping size={20} color="#22d3ee" />
-            ออเดอร์ล่าสุด
-          </CardTitle>
+        <div className="flex flex-wrap items-center gap-2">
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
-            className="text-[0.8rem] text-indigo-300 hover:text-indigo-200"
-            onClick={() => setActiveTab(2)}
+            disabled={sheetSyncing}
+            onClick={() => triggerSheetSync(config.sheetId ? 'sync' : 'create')}
           >
-            ดูทั้งหมด →
+            <RefreshCw className={cn(sheetSyncing && 'animate-spin')} />
+            {sheetSyncing
+              ? (en ? 'Syncing…' : 'กำลังซิงก์…')
+              : config.sheetId
+                ? (en ? 'Sync Google Sheet' : 'ซิงก์ Google Sheet')
+                : (en ? 'Create Google Sheet' : 'สร้าง Google Sheet')}
           </Button>
-        </CardHeader>
-        <Separator className="bg-[var(--border)]" />
-        <CardContent className="px-0 pb-0">
-          <Table className="min-w-[600px]">
-            <TableHeader>
-              <TableRow className="border-[var(--border)] hover:bg-transparent">
-                <TableHead className="border-[var(--border)] text-[0.75rem] font-semibold text-[var(--muted-foreground)]">
-                  REF
-                </TableHead>
-                <TableHead className="border-[var(--border)] text-[0.75rem] font-semibold text-[var(--muted-foreground)]">
-                  ลูกค้า
-                </TableHead>
-                <TableHead className="border-[var(--border)] text-right text-[0.75rem] font-semibold text-[var(--muted-foreground)]">
-                  ยอด
-                </TableHead>
-                <TableHead className="border-[var(--border)] text-[0.75rem] font-semibold text-[var(--muted-foreground)]">
-                  สถานะ
-                </TableHead>
-                <TableHead className="border-[var(--border)] text-[0.75rem] font-semibold text-[var(--muted-foreground)]">
-                  วันที่
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {orders.slice(0, 5).map(order => {
-                const theme = STATUS_THEME[order.status] || STATUS_THEME.PENDING;
-                return (
-                  <TableRow
-                    key={order.ref}
-                    className="cursor-pointer border-[var(--border)] hover:bg-white/[0.02]"
-                    onClick={() => {
-                      setActiveTab(2);
-                      setSearchTerm(order.ref);
-                    }}
+          <Button size="sm" onClick={() => goOrders()}>
+            <Receipt />
+            {en ? 'View orders' : 'ดูออเดอร์'}
+          </Button>
+        </div>
+      </div>
+
+      {/* ─── KPIs ─── */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard
+          label={en ? 'Total sales' : 'ยอดขายรวม'}
+          value={baht(stats.totalSales)}
+          hint={en ? `${stats.valid.length} orders (excl. cancelled)` : `${stats.valid.length} ออเดอร์ (ไม่รวมยกเลิก)`}
+          icon={<Banknote />}
+          tone="success"
+        />
+        <StatCard
+          label={en ? 'Today' : 'วันนี้'}
+          value={baht(stats.todaySales)}
+          hint={en ? `${stats.todayCount} new orders` : `${stats.todayCount} ออเดอร์ใหม่`}
+          icon={<TrendingUp />}
+          tone="info"
+        />
+        <StatCard
+          label={en ? 'Awaiting payment' : 'รอชำระเงิน'}
+          value={stats.pending.toLocaleString()}
+          hint={en ? 'Check slips / follow up' : 'ตรวจสลิป / ติดตามลูกค้า'}
+          icon={<Clock />}
+          tone="warning"
+          onClick={() => goOrders()}
+          actionLabel={en ? 'Open orders' : 'เปิดหน้าออเดอร์'}
+        />
+        <StatCard
+          label={en ? 'To ship' : 'รอจัดส่ง'}
+          value={stats.paid.toLocaleString()}
+          hint={en ? `${stats.shipped + stats.completed} delivered` : `ส่งแล้ว ${stats.shipped + stats.completed} รายการ`}
+          icon={<Truck />}
+          tone="violet"
+          onClick={() => goOrders()}
+          actionLabel={en ? 'Open orders' : 'เปิดหน้าออเดอร์'}
+        />
+      </div>
+
+      {/* ─── To-do strip ─── */}
+      {todo.length > 0 ? (
+        <Panel
+          title={en ? 'Needs your attention' : 'งานที่ต้องจัดการ'}
+          icon={<CircleCheck />}
+          bodyClassName="grid gap-2 sm:grid-cols-2 lg:grid-cols-3"
+        >
+          {todo.map((t) => (
+            <button
+              key={t.label}
+              type="button"
+              onClick={() => (t.tab ? setActiveTab(t.tab) : goOrders())}
+              className="group flex items-center gap-3 rounded-xl border border-border p-3 text-left transition-colors hover:border-primary/40 hover:bg-accent/40"
+            >
+              <span className={cn('grid size-9 shrink-0 place-items-center rounded-lg [&_svg]:size-[18px]', t.tone)}>
+                {t.icon}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-lg font-bold leading-tight tabular-nums">{t.count}</span>
+                <span className="block truncate text-xs text-muted-foreground">{t.label}</span>
+              </span>
+              <ArrowRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+            </button>
+          ))}
+        </Panel>
+      ) : null}
+
+      {/* ─── Revenue + distribution ─── */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Panel
+          className="lg:col-span-2"
+          title={en ? 'Revenue — last 7 days' : 'ยอดขาย 7 วันล่าสุด'}
+          description={en ? `${baht(weekRevenue)} from ${weekOrders} orders` : `${baht(weekRevenue)} จาก ${weekOrders} ออเดอร์`}
+          icon={<TrendingUp />}
+        >
+          <div className="flex h-44 items-end gap-2 pt-4">
+            {daily.map((d, i) => {
+              const isToday = i === daily.length - 1;
+              return (
+                <div key={d.key} className="group flex h-full flex-1 flex-col items-center justify-end gap-1.5">
+                  <span
+                    className={cn(
+                      'text-[0.65rem] font-semibold tabular-nums text-muted-foreground transition-opacity',
+                      d.revenue > 0 ? 'opacity-100' : 'opacity-0',
+                    )}
                   >
-                    <TableCell className="border-[var(--border)]">
-                      <span className="font-mono text-[0.8rem] font-semibold text-indigo-300">
-                        {order.ref.slice(-8)}
-                      </span>
-                    </TableCell>
-                    <TableCell className="border-[var(--border)]">
-                      <p className="text-[0.85rem] font-semibold text-[var(--foreground)]">
-                        {order.name || '—'}
-                      </p>
-                      <p className="text-[0.7rem] text-[var(--muted-foreground)]">
-                        {order.email?.slice(0, 20) || ''}
-                      </p>
-                    </TableCell>
-                    <TableCell className="border-[var(--border)] text-right">
-                      <span className="text-[0.9rem] font-bold text-[var(--success)]">
-                        ฿{Number(order.amount)?.toLocaleString()}
-                      </span>
-                    </TableCell>
-                    <TableCell className="border-[var(--border)]">
-                      <span
-                        className="inline-flex rounded-lg px-3 py-1 text-[0.7rem] font-bold"
-                        style={{
-                          backgroundColor: theme.bg,
-                          border: `1px solid ${theme.border}`,
-                          color: theme.text,
-                        }}
-                      >
-                        {order.status.replace('_', ' ')}
-                      </span>
-                    </TableCell>
-                    <TableCell className="border-[var(--border)]">
-                      <span className="text-[0.8rem] text-[var(--muted-foreground)]">
+                    {bahtShort(d.revenue)}
+                  </span>
+                  <div
+                    title={`${d.label}: ${baht(d.revenue)} · ${d.count} ${en ? 'orders' : 'ออเดอร์'}`}
+                    className={cn(
+                      'w-full max-w-12 rounded-md transition-[height] duration-500 ease-out',
+                      d.revenue > 0
+                        ? isToday
+                          ? 'bg-primary'
+                          : 'bg-primary/45 group-hover:bg-primary/70'
+                        : 'bg-muted',
+                    )}
+                    style={{ height: `${Math.max((d.revenue / maxDaily) * 100, 3)}%` }}
+                  />
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-2 flex gap-2 border-t border-border pt-2">
+            {daily.map((d, i) => (
+              <div key={d.key} className="flex-1 text-center">
+                <p className={cn('text-[0.68rem]', i === daily.length - 1 ? 'font-semibold text-foreground' : 'text-muted-foreground')}>
+                  {d.weekday}
+                </p>
+                <p className="text-[0.62rem] text-muted-foreground/70">{d.count}</p>
+              </div>
+            ))}
+          </div>
+        </Panel>
+
+        <Panel title={en ? 'Order status' : 'สถานะออเดอร์'} description={en ? `${shopOrders.length} orders total` : `ทั้งหมด ${shopOrders.length} ออเดอร์`} icon={<Receipt />}>
+          <div className="mb-4 flex h-2.5 overflow-hidden rounded-full bg-muted">
+            {distribution
+              .filter((d) => d.count > 0)
+              .map((d) => (
+                <div
+                  key={d.key}
+                  title={`${statusLabel(d.key, lang)}: ${d.count}`}
+                  style={{ width: `${(d.count / distTotal) * 100}%`, backgroundColor: (STATUS_THEME[d.key] || STATUS_THEME.PENDING).text }}
+                />
+              ))}
+          </div>
+          <ul className="flex flex-col gap-2">
+            {distribution.map((d) => (
+              <li key={d.key} className="flex items-center gap-2 text-sm">
+                <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: (STATUS_THEME[d.key] || STATUS_THEME.PENDING).text }} />
+                <span className="flex-1 truncate text-muted-foreground">{statusLabel(d.key, lang)}</span>
+                <span className="font-semibold tabular-nums">{d.count}</span>
+                <span className="w-10 text-right text-xs tabular-nums text-muted-foreground">
+                  {Math.round((d.count / distTotal) * 100)}%
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      </div>
+
+      {/* ─── Recent orders + best sellers ─── */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Panel
+          className="lg:col-span-2"
+          title={en ? 'Recent orders' : 'ออเดอร์ล่าสุด'}
+          icon={<ShoppingBag />}
+          flush
+          action={
+            <Button variant="ghost" size="sm" onClick={() => goOrders()}>
+              {en ? 'View all' : 'ดูทั้งหมด'}
+              <ArrowRight />
+            </Button>
+          }
+        >
+          {recentOrders.length === 0 ? (
+            <EmptyState icon={<Receipt />} title={en ? 'No orders yet' : 'ยังไม่มีออเดอร์'} />
+          ) : (
+            <ul className="divide-y divide-border border-t border-border">
+              {recentOrders.map((order) => (
+                <li key={order.ref}>
+                  <button
+                    type="button"
+                    onClick={() => goOrders(order.ref)}
+                    className="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-muted/50"
+                  >
+                    <span className="grid size-9 shrink-0 place-items-center rounded-full bg-muted text-xs font-semibold uppercase text-muted-foreground">
+                      {(order.name || '?').slice(0, 1)}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">{order.name || '—'}</span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        <span className="font-mono">#{order.ref.slice(-8)}</span>
                         {order.date
-                          ? new Date(order.date).toLocaleDateString('th-TH', {
-                              day: 'numeric',
-                              month: 'short',
-                            })
-                          : '-'}
+                          ? ` · ${new Date(order.date).toLocaleString(locale, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`
+                          : ''}
                       </span>
-                    </TableCell>
+                    </span>
+                    <span className="hidden sm:block">
+                      <StatusPill status={order.status} lang={lang} />
+                    </span>
+                    <span className="w-20 shrink-0 text-right text-sm font-semibold tabular-nums">
+                      {baht(order.amount)}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
+
+        <Panel title={en ? 'Best sellers' : 'สินค้าขายดี'} icon={<Flame />}>
+          {bestSellers.length === 0 ? (
+            <EmptyState icon={<Flame />} title={en ? 'No sales yet' : 'ยังไม่มียอดขาย'} className="py-6" />
+          ) : (
+            <ol className="flex flex-col gap-3.5">
+              {bestSellers.map((p, i) => (
+                <li key={p.name} className="flex items-center gap-3">
+                  <span
+                    className={cn(
+                      'grid size-6 shrink-0 place-items-center rounded-md text-xs font-bold',
+                      i === 0 ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400' : 'bg-muted text-muted-foreground',
+                    )}
+                  >
+                    {i + 1}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-baseline justify-between gap-2">
+                      <span className="truncate text-sm font-medium">{p.name}</span>
+                      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                        {p.count} {en ? 'pcs' : 'ชิ้น'}
+                      </span>
+                    </span>
+                    <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-muted">
+                      <span
+                        className="block h-full rounded-full bg-primary/70"
+                        style={{ width: `${(p.count / bestSellers[0].count) * 100}%` }}
+                      />
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </Panel>
+      </div>
+
+      {/* ─── Production summary ─── */}
+      <Panel
+        title={en ? 'Production summary (paid orders)' : 'สรุปยอดผลิต (ออเดอร์ที่ชำระแล้ว)'}
+        description={
+          en
+            ? `${production.paidCount} orders · ${production.items} items · ${production.sizes.length} sizes`
+            : `${production.paidCount} ออเดอร์ · ${production.items} ตัว · ${production.sizes.length} ไซส์`
+        }
+        icon={<Shirt />}
+        flush
+      >
+        {production.sizes.length === 0 ? (
+          <EmptyState icon={<Ruler />} title={en ? 'No paid orders yet' : 'ยังไม่มีออเดอร์ที่ชำระแล้ว'} />
+        ) : (
+          <div className="overflow-x-auto border-t border-border">
+            <Table className="min-w-[420px]">
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="pl-5">{en ? 'Size' : 'ไซส์'}</TableHead>
+                  <TableHead className="text-right">{en ? 'Short sleeve' : 'แขนสั้น'}</TableHead>
+                  <TableHead className="text-right">{en ? 'Long sleeve' : 'แขนยาว'}</TableHead>
+                  <TableHead className="pr-5 text-right">{en ? 'Total' : 'รวม'}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {production.sizes.map((size) => (
+                  <TableRow key={size}>
+                    <TableCell className="pl-5 font-semibold">{size}</TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">{production.short[size] || 0}</TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">{production.long[size] || 0}</TableCell>
+                    <TableCell className="pr-5 text-right font-semibold tabular-nums">{production.total[size]}</TableCell>
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                ))}
+                <TableRow className="bg-muted/50 font-semibold hover:bg-muted/50">
+                  <TableCell className="pl-5">{en ? 'Total' : 'รวมทั้งหมด'}</TableCell>
+                  <TableCell className="text-right tabular-nums">{production.totalShort}</TableCell>
+                  <TableCell className="text-right tabular-nums">{production.totalLong}</TableCell>
+                  <TableCell className="pr-5 text-right tabular-nums text-primary">{production.items}</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </Panel>
     </div>
   );
 });

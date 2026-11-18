@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useSyncExternalStore } from 'react';
 import type { JSX } from 'react';
 import {
   Plus as Add,
@@ -8,12 +8,9 @@ import {
   Pencil as Edit,
   X as Close,
   Search,
-  History,
-  XCircle as Clear,
   Check,
   Clock as AccessTime,
   CircleDot as FiberManualRecord,
-  Calendar as CalendarToday,
   ShoppingBag as LocalMall,
   Save,
   Package as Inventory,
@@ -33,6 +30,12 @@ import {
   CalendarDays,
   StickyNote,
   Loader2,
+  MoreHorizontal,
+  Copy,
+  Link as LinkIcon,
+  LayoutGrid,
+  List,
+  RefreshCw,
 } from 'lucide-react';
 
 import {
@@ -47,7 +50,6 @@ import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import ShirtNameConfigFields from '@/components/admin/ShirtNameConfigFields';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -58,6 +60,7 @@ import { DateTimePicker } from '@/components/ui/date-picker';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -69,6 +72,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { EmptyState, StatCard } from '@/components/admin/admin-ui';
 
 // ============== CONSTANTS ==============
 const PRODUCT_CATEGORIES = ['APPAREL', 'MERCHANDISE', 'CAMP_FEE', 'EVENT', 'SERVICE', 'OTHER'] as const;
@@ -119,17 +130,13 @@ const CATEGORY_ICON_COMPONENTS: Record<string, React.ReactNode> = {
   OTHER: <Inventory size={16} />,
 };
 
-const glassCardClass =
-  // overflow-visible so native datetime-local / select menus are not clipped
-  'rounded-[20px] border border-[var(--glass-border)] bg-[var(--glass-bg)] text-[var(--foreground)] shadow-[0_8px_32px_rgba(0,0,0,0.12)] backdrop-blur-[20px]';
+/** Primary action inside the editor — plain theme primary (kept as a name for existing call sites) */
+const gradientBtnClass = '';
 
-const gradientBtnClass =
-  'rounded-[10px] bg-gradient-to-br from-indigo-500 to-violet-500 font-bold text-white shadow-[0_4px_15px_rgba(139,92,246,0.3)] hover:opacity-90';
-
-const inputClass = 'rounded-[10px] w-full';
+const inputClass = 'w-full';
 
 const sectionClass =
-  'flex flex-col gap-3 rounded-lg border border-[var(--glass-border)] bg-[var(--surface-2)] p-4';
+  'flex scroll-mt-4 flex-col gap-3 rounded-2xl border border-border bg-card p-4 md:p-5';
 
 // ============== HELPERS ==============
 function sanitizeInput(str?: string): string {
@@ -148,17 +155,18 @@ const isProductOpen = (product: Product): { isOpen: boolean; status: 'upcoming' 
   return { isOpen: !!product.isActive, status: 'active' };
 };
 
-const formatDateTime = (dateStr: string | undefined): string => {
-  if (!dateStr) return '-';
-  const date = new Date(dateStr);
-  return date?.toLocaleString('th-TH', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
+
+/** Problems that block saving — shown in the editor and as a toast on save */
+function getProductIssues(product: Product): string[] {
+  const issues: string[] = [];
+  if (!product.name?.trim()) issues.push('กรุณาตั้งชื่อสินค้า');
+  if (!validatePrice(Number(product.basePrice))) issues.push('ราคาพื้นฐานต้องอยู่ระหว่าง 0–999,999 บาท');
+  const badSizes = Object.entries(product.sizePricing || {})
+    .filter(([, price]) => !validatePrice(Number(price)))
+    .map(([size]) => size);
+  if (badSizes.length) issues.push(`ราคาไซส์ ${badSizes.join(', ')} ไม่ถูกต้อง`);
+  return issues;
+}
 
 // ============== TYPES ==============
 export interface ProductsViewProps {
@@ -183,172 +191,155 @@ interface ProductPickupSettings {
   updatedAt?: string;
 }
 
-// ============== PRODUCT CARD ==============
-const ProductCardItem = ({
-  product,
-  onEdit,
-  onDelete,
-  onToggle,
-  onPickupSetting,
-}: {
-  product: Product;
+// ============== PRODUCT LIST ITEMS ==============
+type SaleState = 'selling' | 'upcoming' | 'ended' | 'hidden';
+
+const SALE_STATE: Record<SaleState, { label: string; className: string; dot: string }> = {
+  selling: { label: 'กำลังขาย', className: 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-400', dot: 'bg-emerald-500' },
+  upcoming: { label: 'รอเปิดขาย', className: 'bg-amber-500/14 text-amber-700 dark:text-amber-400', dot: 'bg-amber-500' },
+  ended: { label: 'หมดเวลาขาย', className: 'bg-rose-500/12 text-rose-700 dark:text-rose-400', dot: 'bg-rose-500' },
+  hidden: { label: 'ปิดขาย / แบบร่าง', className: 'bg-muted text-muted-foreground', dot: 'bg-muted-foreground/60' },
+};
+
+function getSaleState(product: Product): SaleState {
+  if (!product.isActive) return 'hidden';
+  const { status } = isProductOpen(product);
+  if (status === 'upcoming') return 'upcoming';
+  if (status === 'ended') return 'ended';
+  return 'selling';
+}
+
+function productCategory(product: Product): string {
+  return product.category || (product.type === 'OTHER' ? 'OTHER' : 'APPAREL');
+}
+
+function productMeta(product: Product): string {
+  const p = product as Product & { stock?: number | null };
+  const parts = [CATEGORY_LABELS[productCategory(product)] || productCategory(product)];
+  const sizes = Object.keys(product.sizePricing || {}).length;
+  if (sizes) parts.push(`${sizes} ไซส์`);
+  if (p.stock != null) parts.push(`สต็อก ${p.stock}`);
+  return parts.join(' · ');
+}
+
+function SaleBadge({ state, className }: { state: SaleState; className?: string }) {
+  const s = SALE_STATE[state];
+  return (
+    <span className={cn('inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-[0.7rem] font-semibold', s.className, className)}>
+      <span className={cn('size-1.5 rounded-full', s.dot)} />
+      {s.label}
+    </span>
+  );
+}
+
+type ProductActions = {
   onEdit: () => void;
   onDelete: () => void;
-  onToggle?: () => void;
-  onPickupSetting?: () => void;
-}): JSX.Element => {
-  const { isOpen, status } = isProductOpen(product);
+  onToggle: () => void;
+  onPickupSetting: () => void;
+  onDuplicate: () => void;
+  onCopyLink: () => void;
+};
 
-  const statusConfig = {
-    upcoming: { label: 'รอเปิดขาย', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.2)', icon: <AccessTime size={12} /> },
-    active: { label: 'กำลังขาย', color: '#10b981', bg: 'rgba(16, 185, 129, 0.2)', icon: <FiberManualRecord size={10} className="text-emerald-400" /> },
-    ended: { label: 'หมดเวลา', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.2)', icon: <FiberManualRecord size={10} className="text-rose-400" /> },
-    always: {
-      label: product.isActive ? 'เปิดขาย' : 'ปิดขาย',
-      color: product.isActive ? '#10b981' : '#94a3b8',
-      bg: product.isActive ? 'rgba(16, 185, 129, 0.2)' : 'rgba(148, 163, 184, 0.15)',
-      icon: product.isActive ? <Check size={12} /> : <Close size={12} />,
-    },
-  };
-
-  const currentStatus = statusConfig[status];
-  const coverBg = product.coverImage
-    ? `url(${product.coverImage})`
-    : product.images?.[0]
-      ? `url(${product.images[0]})`
-      : 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)';
-
-  const categoryKey = product.category || (product.type === 'OTHER' ? 'OTHER' : 'APPAREL');
-  const categoryLabel = CATEGORY_LABELS[categoryKey] || categoryKey;
-  const categoryIcon = CATEGORY_ICON_COMPONENTS[categoryKey] || <Inventory size={14} />;
-
+function ProductMenu({ product, actions }: { product: Product; actions: ProductActions }) {
   return (
-    <Card className={cn(glassCardClass, 'flex h-full flex-col gap-0 overflow-hidden py-0 transition-all duration-200 hover:-translate-y-1 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10')}>
-      {/* Cover Image & Badges */}
-      <div
-        className="relative flex h-[160px] items-center justify-center overflow-hidden border-b border-[var(--glass-border)] bg-[var(--surface-2)] bg-cover bg-center"
-        style={{ backgroundImage: coverBg }}
-      >
-        {/* Category Tag */}
-        <div className="absolute left-2.5 top-2.5 flex items-center gap-1.5 rounded-lg border border-white/20 bg-black/60 px-2.5 py-1 backdrop-blur-md">
-          <span className="text-xs text-primary-foreground">{categoryIcon}</span>
-          <span className="text-[0.7rem] font-bold text-white">{categoryLabel}</span>
-        </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon-sm" aria-label="ตัวเลือกเพิ่มเติม">
+          <MoreHorizontal />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuItem onSelect={actions.onEdit}>
+          <Edit /> แก้ไขสินค้า
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={actions.onDuplicate}>
+          <Copy /> ทำสำเนา
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={actions.onCopyLink}>
+          <LinkIcon /> คัดลอกลิงก์สินค้า
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={actions.onPickupSetting}>
+          <LocalMall />
+          {product.pickup?.enabled ? 'รับหน้าร้าน (เปิดอยู่)' : 'ตั้งค่ารับหน้าร้าน'}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem variant="destructive" onSelect={actions.onDelete}>
+          <Delete /> ลบสินค้า
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
-        {/* Status Tag */}
-        <div
-          className="absolute right-2.5 top-2.5 flex items-center gap-1 rounded-lg px-2.5 py-1 backdrop-blur-md"
-          style={{ backgroundColor: currentStatus.bg, border: `1px solid ${currentStatus.color}50` }}
-        >
-          <span className="flex items-center gap-1 text-[0.7rem] font-bold" style={{ color: currentStatus.color }}>
-            {currentStatus.icon} {currentStatus.label}
+function ProductThumb({ product, className }: { product: Product; className?: string }) {
+  const img = product.coverImage || product.images?.[0];
+  return img ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={img} alt="" loading="lazy" className={cn('object-cover', className)} />
+  ) : (
+    <div className={cn('grid place-items-center bg-muted text-muted-foreground', className)}>
+      {CATEGORY_ICON_COMPONENTS[productCategory(product)] || <Inventory size={18} />}
+    </div>
+  );
+}
+
+const ProductCardItem = ({ product, actions }: { product: Product; actions: ProductActions }): JSX.Element => {
+  const state = getSaleState(product);
+  return (
+    <article className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-colors hover:border-primary/40">
+      <button type="button" onClick={actions.onEdit} className="relative block aspect-[4/3] w-full overflow-hidden bg-muted text-left">
+        <ProductThumb product={product} className={cn('size-full transition-transform duration-300 group-hover:scale-[1.03]', state !== 'selling' && 'opacity-60')} />
+        <SaleBadge state={state} className="absolute top-2.5 left-2.5 bg-background/90 shadow-sm backdrop-blur" />
+        {product.pickup?.enabled ? (
+          <span className="absolute top-2.5 right-2.5 inline-flex items-center gap-1 rounded-full bg-background/90 px-2 py-0.5 text-[0.7rem] font-medium shadow-sm backdrop-blur">
+            <LocalMall size={11} /> รับหน้าร้าน
           </span>
-        </div>
-
-        {/* Inactive Overlay */}
-        {!isOpen && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-[2px]">
-            <span
-              className="rounded-lg border px-3 py-1 text-xs font-extrabold uppercase tracking-wider shadow-lg"
-              style={{
-                color: status === 'upcoming' ? '#f59e0b' : '#ef4444',
-                borderColor: status === 'upcoming' ? 'rgba(245,158,11,0.4)' : 'rgba(239,68,68,0.4)',
-                backgroundColor: 'rgba(0,0,0,0.6)',
-              }}
-            >
-              {status === 'upcoming' ? 'เร็วๆ นี้ (Coming Soon)' : status === 'ended' ? 'หมดเวลาขาย' : 'ปิดการขาย'}
-            </span>
-          </div>
-        )}
+        ) : null}
+      </button>
+      <div className="flex flex-1 flex-col gap-1 p-3.5">
+        <button type="button" onClick={actions.onEdit} className="text-left">
+          <h3 className="line-clamp-1 text-sm font-semibold hover:underline" title={product.name}>
+            {product.name || 'ไม่มีชื่อสินค้า'}
+          </h3>
+        </button>
+        <p className="truncate text-xs text-muted-foreground">{productMeta(product)}</p>
+        <p className="mt-1 text-base font-bold tabular-nums">฿{Number(product.basePrice || 0).toLocaleString()}</p>
       </div>
+      <div className="flex items-center gap-2 border-t border-border px-3.5 py-2">
+        <label className="flex flex-1 cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+          <Switch checked={!!product.isActive} onCheckedChange={actions.onToggle} aria-label="เปิด/ปิดการขาย" />
+          {product.isActive ? 'เปิดขาย' : 'ปิดขาย'}
+        </label>
+        <Button variant="ghost" size="sm" onClick={actions.onEdit}>
+          <Edit /> แก้ไข
+        </Button>
+        <ProductMenu product={product} actions={actions} />
+      </div>
+    </article>
+  );
+};
 
-      {/* Details */}
-      <CardContent className="flex flex-1 flex-col justify-between gap-3 px-4.5 py-4">
-        <div>
-          <div className="flex items-start justify-between gap-2">
-            <h3 className="line-clamp-1 text-base font-bold text-[var(--foreground)]" title={product.name}>
-              {product.name || 'ไม่มีชื่อสินค้า'}
-            </h3>
-            <span className="whitespace-nowrap text-lg font-black text-emerald-400">
-              ฿{Number(product.basePrice || 0)?.toLocaleString()}
-            </span>
-          </div>
-
-          <div className="mt-1.5 flex flex-wrap gap-1">
-            {product.subType && (
-              <Badge variant="outline" className="h-5 text-[0.68rem] font-medium border-primary/30 bg-primary/10 text-primary">
-                {SUBTYPE_LABELS[product.subType] || product.subType}
-              </Badge>
-            )}
-            {Object.keys(product.sizePricing || {}).length > 0 && (
-              <Badge variant="outline" className="h-5 text-[0.68rem] font-medium border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
-                {Object.keys(product.sizePricing || {}).length} ไซส์
-              </Badge>
-            )}
-            {product.options?.hasCustomName && (
-              <Badge variant="outline" className="h-5 text-[0.68rem] font-medium border-amber-500/30 bg-amber-500/10 text-amber-400">
-                ชื่อ custom
-              </Badge>
-            )}
-          </div>
-        </div>
-
-        {/* Action Controls */}
-        <div className="flex flex-col gap-2 pt-2 border-t border-[var(--glass-border)]">
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onEdit}
-              className="h-8 gap-1.5 border-blue-500/30 bg-blue-500/10 text-xs font-semibold text-blue-400 hover:bg-blue-500/20"
-            >
-              <Edit size={14} /> แก้ไข
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onDelete}
-              className="h-8 gap-1.5 border-rose-500/30 bg-rose-500/10 text-xs font-semibold text-rose-400 hover:bg-rose-500/20"
-            >
-              <Delete size={14} /> ลบ
-            </Button>
-          </div>
-
-          {onToggle && (
-            <div className="flex items-center justify-between rounded-xl border border-[var(--glass-border)] bg-black/20 px-3 py-1.5">
-              <span className="text-xs font-semibold text-[var(--text-muted)]">สถานะสินค้า</span>
-              <div className="flex items-center gap-2">
-                <span className={cn('text-[0.7rem] font-bold', product.isActive ? 'text-emerald-400' : 'text-muted-foreground')}>
-                  {product.isActive ? 'เปิดขาย' : 'ปิดขาย'}
-                </span>
-                <Switch
-                  checked={product.isActive}
-                  onCheckedChange={onToggle}
-                  className="data-[state=checked]:bg-emerald-500"
-                />
-              </div>
-            </div>
-          )}
-
-          {onPickupSetting && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onPickupSetting}
-              className={cn(
-                'h-8 w-full text-xs font-semibold transition-colors',
-                product.pickup?.enabled
-                  ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25'
-                  : 'border-[var(--glass-border)] bg-black/10 text-[var(--text-muted)] hover:bg-black/20'
-              )}
-            >
-              <LocalMall size={14} className="mr-1.5" />
-              {product.pickup?.enabled ? '✓ รับสินค้าหน้าร้าน (เปิดอยู่)' : 'ตั้งค่ารับสินค้าหน้าร้าน'}
-            </Button>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+const ProductRowItem = ({ product, actions }: { product: Product; actions: ProductActions }): JSX.Element => {
+  const state = getSaleState(product);
+  return (
+    <li className="flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-muted/40 md:px-4">
+      <button type="button" onClick={actions.onEdit} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+        <ProductThumb product={product} className="size-12 shrink-0 rounded-lg" />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold">{product.name || 'ไม่มีชื่อสินค้า'}</span>
+          <span className="block truncate text-xs text-muted-foreground">{productMeta(product)}</span>
+        </span>
+      </button>
+      <span className="hidden sm:block">
+        <SaleBadge state={state} />
+      </span>
+      <span className="w-20 shrink-0 text-right text-sm font-semibold tabular-nums">
+        ฿{Number(product.basePrice || 0).toLocaleString()}
+      </span>
+      <Switch checked={!!product.isActive} onCheckedChange={actions.onToggle} aria-label="เปิด/ปิดการขาย" />
+      <ProductMenu product={product} actions={actions} />
+    </li>
   );
 };
 
@@ -507,8 +498,10 @@ const ProductEditDialog = ({
   onSave,
   isSaving,
   showToast,
+  isNew,
 }: {
   product: Product;
+  isNew: boolean;
   onClose: () => void;
   onChange: (p: Product) => void;
   onSave: (mode?: 'publish' | 'draft') => void;
@@ -525,6 +518,11 @@ const ProductEditDialog = ({
   const [newPatternImage, setNewPatternImage] = useState('');
   const [newTagText, setNewTagText] = useState('');
   const [newTagColor, setNewTagColor] = useState('#10b981');
+  const [triedSave, setTriedSave] = useState(false);
+  const save = (mode: 'publish' | 'draft') => {
+    setTriedSave(true);
+    onSave(mode);
+  };
   const MAX_IMAGE_SIZE = 3 * 1024 * 1024;
 
   const productAny = product as Product & Record<string, unknown>;
@@ -755,8 +753,30 @@ const ProductEditDialog = ({
     always: { icon: <DateRange size={16} />, text: 'ไม่มีกำหนดเวลา (เปิดตลอด)', color: 'var(--text-muted)' },
   };
   const schedulePreview = scheduleInfo[scheduleStatus];
-  const isNew = product.id.startsWith('prod_');
   const previewCover = product.coverImage || product.images?.[0] || '';
+  const isApparel = category === 'APPAREL' || !productAny.category;
+  const navSections = [
+    { id: 'pe-basic', label: 'ข้อมูลพื้นฐาน', show: true },
+    { id: 'pe-camp', label: 'ข้อมูลค่าย', show: category === 'CAMP_FEE' || subType === 'CAMP_REGISTRATION' },
+    { id: 'pe-event', label: 'ข้อมูลอีเวนต์', show: category === 'EVENT' || subType === 'EVENT_TICKET' },
+    { id: 'pe-pricing', label: 'ราคาและสต็อก', show: true },
+    { id: 'pe-apparel', label: 'ตัวเลือกเสื้อ', show: isApparel },
+    { id: 'pe-sizes', label: 'ราคาต่อไซส์', show: isApparel && productAny.options?.requiresSize !== false },
+    { id: 'pe-variants', label: 'ตัวเลือกสินค้า', show: needsVariants() },
+    { id: 'pe-schedule', label: 'กำหนดเวลาขาย', show: true },
+    { id: 'pe-images', label: 'รูปภาพ', show: true },
+    { id: 'pe-patterns', label: 'ลายเสื้อ', show: category === 'APPAREL' || (!productAny.category && product.type !== 'OTHER') },
+    { id: 'pe-options', label: 'ตัวเลือกเพิ่มเติม', show: true },
+    { id: 'pe-tags', label: 'แท็ก', show: true },
+  ].filter((x) => x.show);
+  const issues = getProductIssues(product);
+  const checklist = [
+    { ok: Boolean(product.name?.trim()), label: 'ตั้งชื่อสินค้า', target: 'pe-basic' },
+    { ok: validatePrice(product.basePrice) && Number(product.basePrice) > 0, label: 'กำหนดราคา', target: 'pe-pricing' },
+    { ok: Boolean(previewCover), label: 'เพิ่มรูปสินค้า', target: 'pe-images' },
+    { ok: scheduleStatus !== 'ended', label: 'ช่วงเวลาขายยังไม่หมด', target: 'pe-schedule' },
+  ];
+  const jumpTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   return (
     <Dialog open={!!product} onOpenChange={() => {}}>
@@ -764,30 +784,39 @@ const ProductEditDialog = ({
         fullscreen
         showCloseButton={false}
         onPointerDownOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => {
+          e.preventDefault();
+          onClose();
+        }}
         className="gap-0 bg-[var(--background)] text-[var(--foreground)]"
       >
-        <div className="relative shrink-0 border-b border-[var(--glass-border)] bg-gradient-to-br from-indigo-500 to-violet-500 px-5 py-4 sm:px-8">
-          <DialogTitle className="pr-10 text-left text-lg font-bold text-white sm:text-xl">
-            {isNew ? 'สินค้าใหม่' : 'แก้ไขสินค้า'}
-          </DialogTitle>
-          <p className="mt-0.5 text-sm text-white/80">
-            {product.name?.trim() || 'กรอกข้อมูลสินค้าด้านล่าง'}
-          </p>
-          <button
-            type="button"
-            onClick={onClose}
-            className="absolute right-3 top-3 rounded-lg p-1.5 text-white/90 hover:bg-white/15 sm:right-5 sm:top-4"
-            aria-label="ปิด"
-          >
-            <Close size={20} />
-          </button>
-        </div>
+        <header className="flex shrink-0 items-center gap-3 border-b border-border bg-background px-4 py-3 sm:px-6">
+          <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="ปิด">
+            <Close />
+          </Button>
+          <div className="min-w-0 flex-1">
+            <DialogTitle className="truncate text-left text-base font-semibold">
+              {isNew ? 'เพิ่มสินค้าใหม่' : 'แก้ไขสินค้า'}
+            </DialogTitle>
+            <p className="truncate text-xs text-muted-foreground">
+              {product.name?.trim() || 'ยังไม่ได้ตั้งชื่อ'}
+              <span className="mx-1.5">·</span>
+              {product.isActive ? 'เผยแพร่' : 'แบบร่าง'}
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => save('draft')} disabled={isSaving} className="hidden sm:inline-flex">
+            บันทึกแบบร่าง
+          </Button>
+          <Button size="sm" onClick={() => save('publish')} disabled={isSaving}>
+            {isSaving ? <Loader2 className="animate-spin" /> : <Save />}
+            {isSaving ? 'กำลังบันทึก…' : 'บันทึกและเผยแพร่'}
+          </Button>
+        </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="mx-auto grid w-full max-w-7xl gap-5 p-4 sm:p-6 lg:grid-cols-[minmax(0,1.7fr)_minmax(300px,0.9fr)] lg:gap-8 lg:p-8">
+          <div className="mx-auto grid w-full max-w-6xl gap-5 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-6">
             <div className="flex min-w-0 flex-col gap-5">
-              <section className={sectionClass}>
+              <section id="pe-basic" className={sectionClass}>
                 <p className="text-sm font-bold">ข้อมูลพื้นฐาน</p>
                 <div className="space-y-1.5">
                   <Label>ชื่อสินค้า</Label>
@@ -872,7 +901,7 @@ const ProductEditDialog = ({
               </section>
 
               {(category === 'CAMP_FEE' || subType === 'CAMP_REGISTRATION') && (
-                <section className="space-y-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
+                <section id="pe-camp" className="scroll-mt-4 space-y-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4">
                   <p className="flex items-center gap-2 text-sm font-bold text-amber-400">
                     <Tent size={16} /> ข้อมูลค่าย
                   </p>
@@ -924,7 +953,7 @@ const ProductEditDialog = ({
               )}
 
               {(category === 'EVENT' || subType === 'EVENT_TICKET') && (
-                <section className="space-y-3 rounded-lg border border-pink-500/30 bg-pink-500/10 p-4">
+                <section id="pe-event" className="scroll-mt-4 space-y-3 rounded-2xl border border-pink-500/30 bg-pink-500/10 p-4">
                   <p className="flex items-center gap-2 text-sm font-bold text-pink-400">
                     <Ticket size={16} /> ข้อมูลอีเวนต์
                   </p>
@@ -957,7 +986,7 @@ const ProductEditDialog = ({
                 </section>
               )}
 
-              <section className={sectionClass}>
+              <section id="pe-pricing" className={sectionClass}>
                 <p className="flex items-center gap-1 text-sm font-bold">
                   <Inventory size={16} /> ราคาและสต็อก
                 </p>
@@ -1009,7 +1038,7 @@ const ProductEditDialog = ({
               </section>
 
               {(category === 'APPAREL' || !productAny.category) && (
-                <section className={sectionClass}>
+                <section id="pe-apparel" className={sectionClass}>
                   <p className="flex items-center gap-1 text-sm font-bold">
                     <Settings size={16} /> ตัวเลือกเสื้อ
                   </p>
@@ -1034,7 +1063,7 @@ const ProductEditDialog = ({
 
               {(category === 'APPAREL' || !productAny.category) &&
                 productAny.options?.requiresSize !== false && (
-                  <section className={sectionClass}>
+                  <section id="pe-sizes" className={sectionClass}>
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-bold">ราคาต่อไซส์</p>
                       <p className="text-xs text-[var(--text-muted)]">ปล่อยว่างจะใช้ราคาพื้นฐาน</p>
@@ -1141,7 +1170,7 @@ const ProductEditDialog = ({
                 )}
 
               {needsVariants() && (
-                <section className="space-y-3 rounded-lg border border-violet-500/30 bg-violet-500/10 p-4">
+                <section id="pe-variants" className="scroll-mt-4 space-y-3 rounded-2xl border border-violet-500/30 bg-violet-500/10 p-4">
                   <p className="flex items-center gap-2 text-sm font-bold text-violet-400">
                     <Palette size={16} /> ตัวเลือกสินค้า (Variants)
                   </p>
@@ -1285,7 +1314,7 @@ const ProductEditDialog = ({
                 </section>
               )}
 
-              <section className={sectionClass}>
+              <section id="pe-schedule" className={sectionClass}>
                 <div className="flex items-center gap-3">
                   <div className="flex size-9 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-amber-600">
                     <DateRange size={20} className="text-white" />
@@ -1357,7 +1386,7 @@ const ProductEditDialog = ({
                 </div>
               </section>
 
-              <section className={sectionClass}>
+              <section id="pe-images" className={sectionClass}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-sm font-bold">รูปภาพสินค้า</p>
                   <div className="flex gap-2">
@@ -1431,7 +1460,7 @@ const ProductEditDialog = ({
 
               {(category === 'APPAREL' ||
                 (!productAny.category && product.type !== 'OTHER')) && (
-                <section className="space-y-3 rounded-lg border border-sky-500/30 bg-sky-500/10 p-4">
+                <section id="pe-patterns" className="scroll-mt-4 space-y-3 rounded-2xl border border-sky-500/30 bg-sky-500/10 p-4">
                   <p className="flex items-center gap-2 text-sm font-bold text-sky-400">
                     <Palette size={16} /> ลายเสื้อ (Patterns)
                   </p>
@@ -1573,7 +1602,7 @@ const ProductEditDialog = ({
                 </section>
               )}
 
-              <section className={sectionClass}>
+              <section id="pe-options" className={sectionClass}>
                 <p className="text-sm font-bold">ตัวเลือกเพิ่มเติม</p>
                 {[
                   { key: 'hasCustomName', label: 'อนุญาตใส่ชื่อบนเสื้อ' },
@@ -1640,7 +1669,7 @@ const ProductEditDialog = ({
                 )}
               </section>
 
-              <section className={sectionClass}>
+              <section id="pe-tags" className={sectionClass}>
                 <p className="flex items-center gap-2 text-sm font-bold">
                   <LocalOffer size={20} /> แท็กสินค้า
                 </p>
@@ -1778,65 +1807,86 @@ const ProductEditDialog = ({
               </div>
             </div>
 
-            <aside className="lg:sticky lg:top-4 lg:self-start">
-              <p className="mb-2 text-sm font-bold">ตัวอย่างการ์ดสินค้า</p>
-              <Card className={cn(glassCardClass, 'gap-0 overflow-hidden py-0')}>
-                <div
-                  className="h-[200px] bg-cover bg-center"
-                  style={{
-                    backgroundImage: previewCover
-                      ? `url(${previewCover})`
-                      : 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-                  }}
-                />
-                <CardContent className="flex flex-col gap-2 px-4 py-4">
-                  <div className="flex flex-wrap gap-1.5">
-                    <Badge variant="secondary" className="gap-1">
-                      {CATEGORY_ICON_COMPONENTS[category]}
-                      {CATEGORY_LABELS[category] || category}
-                    </Badge>
-                    <Badge variant="outline">{SUBTYPE_LABELS[subType] || subType}</Badge>
-                  </div>
-                  <p className="text-base font-bold leading-snug">
-                    {product.name || 'ชื่อสินค้า'}
-                  </p>
-                  <p className="text-xl font-bold text-emerald-500">
-                    ฿{(product.basePrice || 0)?.toLocaleString()}
-                  </p>
-                  {Object.keys(product.sizePricing || {}).length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {Object.entries(product.sizePricing || {})
-                        .slice(0, 5)
-                        .map(([size, raw]) => (
-                          <Badge key={size} variant="secondary">
-                            {size}: ฿{Number(raw) || 0}
-                          </Badge>
-                        ))}
+            <aside className="order-first flex flex-col gap-4 lg:order-none lg:sticky lg:top-0 lg:self-start">
+              {triedSave && issues.length > 0 ? (
+                <div className="rounded-2xl border border-destructive/40 bg-destructive/5 p-4 text-sm">
+                  <p className="mb-1.5 font-semibold text-destructive">ยังบันทึกไม่ได้</p>
+                  <ul className="list-disc space-y-0.5 pl-5 text-xs text-destructive">
+                    {issues.map((m) => (
+                      <li key={m}>{m}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              <div className="hidden rounded-2xl border border-border bg-card p-4 lg:block">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">ความพร้อม</p>
+                <ul className="space-y-1.5">
+                  {checklist.map((c) => (
+                    <li key={c.label}>
+                      <button
+                        type="button"
+                        onClick={() => jumpTo(c.target)}
+                        className="flex w-full items-center gap-2 text-left text-sm hover:underline"
+                      >
+                        <span
+                          className={cn(
+                            'grid size-4 shrink-0 place-items-center rounded-full',
+                            c.ok ? 'bg-emerald-500 text-white' : 'border border-border',
+                          )}
+                        >
+                          {c.ok ? <Check size={11} strokeWidth={3} /> : null}
+                        </span>
+                        <span className={c.ok ? 'text-muted-foreground' : ''}>{c.label}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-4 mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">ไปที่ส่วน</p>
+                <nav className="flex flex-col">
+                  {navSections.map((n) => (
+                    <button
+                      key={n.id}
+                      type="button"
+                      onClick={() => jumpTo(n.id)}
+                      className="rounded-md px-2 py-1 text-left text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                    >
+                      {n.label}
+                    </button>
+                  ))}
+                </nav>
+              </div>
+
+              <div className="hidden rounded-2xl border border-border bg-card lg:block">
+                <p className="px-4 pt-3 pb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">ตัวอย่างในร้าน</p>
+                <div className="mx-4 aspect-[4/3] overflow-hidden rounded-xl bg-muted">
+                  {previewCover ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={previewCover} alt="" className="size-full object-cover" />
+                  ) : (
+                    <div className="grid size-full place-items-center text-muted-foreground">
+                      <ImageIcon size={28} />
                     </div>
                   )}
-                  <Badge className={product.isActive ? 'w-fit bg-emerald-500' : 'w-fit'}>
-                    {product.isActive ? 'เผยแพร่แล้ว' : 'แบบร่าง'}
-                  </Badge>
-                </CardContent>
-              </Card>
+                </div>
+                <div className="space-y-1 p-4">
+                  <p className="line-clamp-2 text-sm font-semibold">{product.name || 'ชื่อสินค้า'}</p>
+                  <p className="text-lg font-bold tabular-nums">฿{(product.basePrice || 0)?.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {CATEGORY_LABELS[category] || category} · {SUBTYPE_LABELS[subType] || subType}
+                  </p>
+                </div>
+              </div>
             </aside>
           </div>
         </div>
 
-        <DialogFooter className="shrink-0 gap-2 border-t border-[var(--glass-border)] bg-[var(--background)] px-4 py-4 sm:justify-end sm:px-8">
-          <Button variant="outline" onClick={onClose} className="border-[var(--glass-border)]">
-            ยกเลิก
+        <DialogFooter className="shrink-0 flex-row gap-2 border-t border-border bg-background px-4 py-3 sm:hidden">
+          <Button variant="outline" className="flex-1" onClick={() => save('draft')} disabled={isSaving}>
+            บันทึกแบบร่าง
           </Button>
-          <Button
-            variant="outline"
-            onClick={() => onSave('draft')}
-            disabled={isSaving}
-            className="border-[var(--glass-border)]"
-          >
-            {isSaving ? 'กำลังบันทึก...' : 'บันทึกแบบร่าง'}
-          </Button>
-          <Button onClick={() => onSave('publish')} disabled={isSaving} className={gradientBtnClass}>
-            {isSaving ? 'กำลังบันทึก...' : 'บันทึกและเผยแพร่'}
+          <Button className="flex-1" onClick={() => save('publish')} disabled={isSaving}>
+            {isSaving ? 'กำลังบันทึก…' : 'เผยแพร่'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -1845,6 +1895,31 @@ const ProductEditDialog = ({
 };
 
 // ============== PRODUCTS VIEW ==============
+const VIEW_MODE_KEY = 'admin-products-view';
+type ViewMode = 'grid' | 'list';
+const viewModeListeners = new Set<() => void>();
+function readViewMode(): ViewMode {
+  try {
+    return window.localStorage.getItem(VIEW_MODE_KEY) === 'list' ? 'list' : 'grid';
+  } catch {
+    return 'grid';
+  }
+}
+function writeViewMode(mode: ViewMode) {
+  try {
+    window.localStorage.setItem(VIEW_MODE_KEY, mode);
+  } catch {
+    /* ignore */
+  }
+  viewModeListeners.forEach((l) => l());
+}
+function subscribeViewMode(listener: () => void) {
+  viewModeListeners.add(listener);
+  return () => {
+    viewModeListeners.delete(listener);
+  };
+}
+
 export function ProductsView({
   config,
   searchTerm,
@@ -1857,43 +1932,75 @@ export function ProductsView({
   isRefreshing,
 }: ProductsViewProps): JSX.Element {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editingSnapshot, setEditingSnapshot] = useState('');
+  const [discardPromptOpen, setDiscardPromptOpen] = useState(false);
   const [pickupSettingProduct, setPickupSettingProduct] = useState<Product | null>(null);
   const [pickupSaving, setPickupSaving] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+  const [stateFilter, setStateFilter] = useState<'ALL' | SaleState>('ALL');
+  // Server snapshot is always 'grid' so SSR markup matches the first client render
+  const viewMode = useSyncExternalStore(subscribeViewMode, readViewMode, () => 'grid' as ViewMode);
   const { confirm, ConfirmDialog: ProductConfirmDialog } = useConfirmDialog();
 
   // Auto-fetch latest product data when component mounts
   useEffect(() => {
     onRefresh?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const products = config.products;
+
+  const stateCounts = useMemo(() => {
+    const counts: Record<SaleState, number> = { selling: 0, upcoming: 0, ended: 0, hidden: 0 };
+    for (const p of products) counts[getSaleState(p)] += 1;
+    return counts;
+  }, [products]);
+
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const p of products) {
+      const c = productCategory(p);
+      counts[c] = (counts[c] || 0) + 1;
+    }
+    return counts;
+  }, [products]);
 
   const filteredProducts = useMemo(() => {
     const term = searchTerm.toLowerCase().trim();
-    return config.products.filter((p) => {
-      // Category filter
-      if (selectedCategory !== 'ALL') {
-        const pCat = p.category || (p.type === 'OTHER' ? 'OTHER' : 'APPAREL');
-        if (pCat !== selectedCategory) return false;
-      }
-      // Search term filter
+    return products.filter((p) => {
+      if (selectedCategory !== 'ALL' && productCategory(p) !== selectedCategory) return false;
+      if (stateFilter !== 'ALL' && getSaleState(p) !== stateFilter) return false;
       if (!term) return true;
       return (
-        p.name.toLowerCase().includes(term) ||
+        (p.name || '').toLowerCase().includes(term) ||
         p.id.toLowerCase().includes(term) ||
         (p.type || '').toLowerCase().includes(term) ||
-        (p.category || '').toLowerCase().includes(term)
+        (p.category || '').toLowerCase().includes(term) ||
+        (CATEGORY_LABELS[productCategory(p)] || '').includes(term)
       );
     });
-  }, [searchTerm, selectedCategory, config.products]);
+  }, [searchTerm, selectedCategory, stateFilter, products]);
 
-  const visibleProducts = useMemo(
-    () => config.products,
-    [config.products],
-  );
+  const setMode = (mode: ViewMode) => writeViewMode(mode);
+
+  const openEditor = (product: Product) => {
+    setEditingProduct(product);
+    setEditingSnapshot(JSON.stringify(product));
+  };
+
+  // The discard prompt must be a Radix dialog: it opens on top of the (Radix, modal) editor,
+  // which disables pointer events outside Radix layers — an MUI confirm would be unclickable.
+  const closeEditor = () => {
+    if (editingProduct && JSON.stringify(editingProduct) !== editingSnapshot) {
+      setDiscardPromptOpen(true);
+      return;
+    }
+    setEditingProduct(null);
+  };
 
   const createNewProduct = () => {
     const now = new Date().toISOString();
-    const newP: Product = {
+    openEditor({
       id: `prod_${Date.now()}`,
       name: '',
       description: '',
@@ -1912,21 +2019,44 @@ export function ProductsView({
       customTags: [],
       createdAt: now,
       updatedAt: now,
-    };
-    setEditingProduct(newP);
+    });
   };
 
-  const handleDelete = async (id: string) => {
+  const duplicateProduct = (product: Product) => {
+    const now = new Date().toISOString();
+    const copy = JSON.parse(JSON.stringify(product)) as Product & { slug?: string };
+    copy.id = `prod_${Date.now()}`;
+    copy.name = `${product.name} (สำเนา)`;
+    copy.isActive = false;
+    copy.slug = undefined;
+    copy.pickup = undefined;
+    copy.createdAt = now;
+    copy.updatedAt = now;
+    openEditor(copy);
+    showToast('info', 'สร้างสำเนาแล้ว — ตรวจสอบและกดบันทึก');
+  };
+
+  const copyProductLink = async (product: Product) => {
+    const url = `${window.location.origin}/?p=${product.id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      showToast('success', 'คัดลอกลิงก์สินค้าแล้ว');
+    } catch {
+      showToast('error', 'คัดลอกไม่สำเร็จ');
+    }
+  };
+
+  const handleDelete = async (product: Product) => {
     const ok = await confirm({
-      title: 'ลบสินค้า?',
-      message: 'การลบสินค้าจะไม่สามารถย้อนกลับได้ คุณแน่ใจหรือไม่?',
+      title: `ลบ "${product.name || 'สินค้า'}"?`,
+      message: 'การลบสินค้าจะไม่สามารถย้อนกลับได้ ถ้าแค่ต้องการหยุดขาย ให้ปิดสวิตช์ "เปิดขาย" แทน',
       variant: 'warning',
       confirmText: 'ลบเลย',
       cancelText: 'ยกเลิก',
       destructive: true,
     });
     if (ok) {
-      const newProducts = config.products.filter((p) => p.id !== id);
+      const newProducts = config.products.filter((p) => p.id !== product.id);
       saveFullConfig({ ...config, products: newProducts });
       showToast('success', 'ลบสินค้าเรียบร้อยแล้ว');
     }
@@ -1953,11 +2083,11 @@ export function ProductsView({
       nextProduct.isActive = false;
     }
 
-    if (!nextProduct.name.trim()) return;
-    if (!validatePrice(nextProduct.basePrice)) return;
-
-    const invalidSizePrice = Object.values(nextProduct.sizePricing || {}).some((p) => !validatePrice(Number(p)));
-    if (invalidSizePrice) return;
+    const issues = getProductIssues(nextProduct);
+    if (issues.length > 0) {
+      showToast('warning', issues[0]);
+      return;
+    }
 
     const idx = config.products.findIndex((p) => p.id === nextProduct.id);
     const newProducts = [...config.products];
@@ -1980,124 +2110,232 @@ export function ProductsView({
     saveFullConfig({ ...config, products: newProducts });
   };
 
-  const categories = ['ALL', ...PRODUCT_CATEGORIES];
+  const actionsFor = (p: Product): ProductActions => ({
+    onEdit: () => openEditor(p),
+    onDelete: () => handleDelete(p),
+    onToggle: () => handleToggleActive(p.id),
+    onPickupSetting: () => setPickupSettingProduct(p),
+    onDuplicate: () => duplicateProduct(p),
+    onCopyLink: () => copyProductLink(p),
+  });
+
+  const stateTabs: { key: 'ALL' | SaleState; label: string; count: number }[] = [
+    { key: 'ALL', label: 'ทั้งหมด', count: products.length },
+    { key: 'selling', label: SALE_STATE.selling.label, count: stateCounts.selling },
+    { key: 'upcoming', label: SALE_STATE.upcoming.label, count: stateCounts.upcoming },
+    { key: 'hidden', label: 'ปิดขาย / แบบร่าง', count: stateCounts.hidden },
+    { key: 'ended', label: SALE_STATE.ended.label, count: stateCounts.ended },
+  ];
+  const hasFilters = Boolean(searchTerm) || selectedCategory !== 'ALL' || stateFilter !== 'ALL';
 
   return (
-    <div className="flex h-full flex-col gap-5">
+    <div className="flex flex-col gap-4">
       <ProductConfirmDialog />
 
-      {/* Sticky Header Bar */}
-      <div className="sticky top-0 z-10 space-y-3 bg-[var(--background)]/90 px-0 pb-3 pt-1 backdrop-blur-xl md:-mx-3 md:px-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-xl font-extrabold text-[var(--foreground)] md:text-2xl">
-              จัดการสินค้า ({filteredProducts.length}/{visibleProducts.length} รายการ)
-            </h2>
-            <p className="text-xs text-[var(--text-muted)]">
-              สร้าง แก้ไข และกำหนดค่าการขายสินค้าของร้านค้า
-            </p>
+      <Dialog open={discardPromptOpen} onOpenChange={setDiscardPromptOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>ทิ้งการแก้ไข?</DialogTitle>
+            <DialogDescription>
+              คุณยังไม่ได้บันทึกการเปลี่ยนแปลง ถ้าปิดตอนนี้ข้อมูลที่แก้จะหายไป
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDiscardPromptOpen(false)} autoFocus>
+              กลับไปแก้ต่อ
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setDiscardPromptOpen(false);
+                setEditingProduct(null);
+              }}
+            >
+              ทิ้งการแก้ไข
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* KPIs */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard label="สินค้าทั้งหมด" value={products.length} icon={<Inventory />} />
+        <StatCard
+          label="กำลังขาย"
+          value={stateCounts.selling}
+          icon={<FiberManualRecord />}
+          tone="success"
+          onClick={() => setStateFilter(stateFilter === 'selling' ? 'ALL' : 'selling')}
+          actionLabel="กรองเฉพาะสินค้าที่กำลังขาย"
+        />
+        <StatCard
+          label="รอเปิดขาย"
+          value={stateCounts.upcoming}
+          icon={<AccessTime />}
+          tone="warning"
+          onClick={() => setStateFilter(stateFilter === 'upcoming' ? 'ALL' : 'upcoming')}
+          actionLabel="กรองเฉพาะสินค้าที่รอเปิดขาย"
+        />
+        <StatCard
+          label="ปิดขาย / หมดเวลา"
+          value={stateCounts.hidden + stateCounts.ended}
+          icon={<VisibilityOff />}
+          onClick={() => setStateFilter(stateFilter === 'hidden' ? 'ALL' : 'hidden')}
+          actionLabel="กรองเฉพาะสินค้าที่ปิดขาย"
+        />
+      </div>
+
+      {/* Toolbar */}
+      <section className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-3 shadow-[0_1px_2px_rgba(0,0,0,0.04)] md:p-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="relative min-w-0 flex-1">
+            <Search size={16} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="ค้นหาชื่อสินค้า, หมวดหมู่ หรือรหัส…"
+              className="h-9 pr-9 pl-9"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              aria-label="ค้นหาสินค้า"
+            />
+            {searchTerm ? (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                aria-label="ล้างคำค้นหา"
+                className="absolute top-1/2 right-2 grid size-6 !min-h-0 !min-w-0 -translate-y-1/2 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <Close size={14} />
+              </button>
+            ) : null}
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onRefresh?.()}
-              disabled={isRefreshing}
-              className="gap-1.5 border-[var(--glass-border)] bg-[var(--glass-bg)] font-medium"
-            >
-              <Loader2 className={cn("size-4 text-primary", isRefreshing && "animate-spin")} />
-              <span>{isRefreshing ? 'กำลังโหลด...' : 'ดึงข้อมูลล่าสุด'}</span>
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <SelectTrigger className="h-9 min-w-0 flex-1 sm:w-[190px] sm:flex-none" aria-label="หมวดหมู่">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent align="end">
+                <SelectItem value="ALL">ทุกหมวดหมู่ ({products.length})</SelectItem>
+                {PRODUCT_CATEGORIES.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    <span className="inline-flex items-center gap-2">
+                      {CATEGORY_ICON_COMPONENTS[c]}
+                      {CATEGORY_LABELS[c] || c} ({categoryCounts[c] || 0})
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex h-9 shrink-0 items-center rounded-md border border-input p-0.5" role="group" aria-label="รูปแบบการแสดงผล">
+              <button
+                type="button"
+                onClick={() => setMode('grid')}
+                aria-pressed={viewMode === 'grid'}
+                aria-label="แสดงแบบการ์ด"
+                className={cn('grid h-full w-8 !min-h-0 !min-w-0 place-items-center rounded-[5px]', viewMode === 'grid' ? 'bg-muted text-foreground' : 'text-muted-foreground')}
+              >
+                <LayoutGrid size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('list')}
+                aria-pressed={viewMode === 'list'}
+                aria-label="แสดงแบบรายการ"
+                className={cn('grid h-full w-8 !min-h-0 !min-w-0 place-items-center rounded-[5px]', viewMode === 'list' ? 'bg-muted text-foreground' : 'text-muted-foreground')}
+              >
+                <List size={16} />
+              </button>
+            </div>
+            <Button variant="outline" size="icon" onClick={() => onRefresh?.()} disabled={isRefreshing} aria-label="ดึงข้อมูลล่าสุด" title="ดึงข้อมูลล่าสุด">
+              <RefreshCw className={cn(isRefreshing && 'animate-spin')} />
             </Button>
-            <Button size="sm" onClick={createNewProduct} className={gradientBtnClass}>
-              <Add size={18} className="mr-1" /> เพิ่มสินค้าใหม่
+            <Button onClick={createNewProduct} className="shrink-0">
+              <Add /> <span className="hidden sm:inline">เพิ่มสินค้า</span>
             </Button>
           </div>
         </div>
 
-        {/* Search & Category Pill Filters */}
-        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
-          <div className="relative flex-1">
-            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-            <Input
-              placeholder="ค้นหาชื่อสินค้า, หมวดหมู่ หรือ ID..."
-              className={cn(inputClass, 'h-10 rounded-xl py-2 pl-9 pr-9 text-xs sm:text-sm')}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            {searchTerm && (
-              <button
-                type="button"
-                onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--foreground)]"
-              >
-                <Clear size={16} />
-              </button>
-            )}
-          </div>
-
-          {/* Category Filter Pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-            {categories.map((cat) => {
-              const isActive = selectedCategory === cat;
-              const label = cat === 'ALL' ? 'ทั้งหมด' : CATEGORY_LABELS[cat] || cat;
-              const count = cat === 'ALL'
-                ? visibleProducts.length
-                : visibleProducts.filter(p => (p.category || (p.type === 'OTHER' ? 'OTHER' : 'APPAREL')) === cat).length;
+        <div className="-mx-3 overflow-x-auto px-3 md:-mx-4 md:px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="flex w-max items-center gap-1.5" role="tablist" aria-label="กรองตามสถานะการขาย">
+            {stateTabs.map((t) => {
+              const active = stateFilter === t.key;
               return (
                 <button
-                  key={cat}
+                  key={t.key}
                   type="button"
-                  onClick={() => setSelectedCategory(cat)}
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setStateFilter(t.key)}
                   className={cn(
-                    'flex shrink-0 items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all',
-                    isActive
-                      ? 'border-primary/40 bg-primary/15 text-primary shadow-sm'
-                      : 'border-[var(--glass-border)] bg-black/10 text-muted-foreground hover:bg-black/20 hover:text-foreground'
+                    'inline-flex h-8 !min-h-0 items-center gap-1.5 rounded-full border px-3 text-xs font-medium whitespace-nowrap transition-colors',
+                    active ? 'border-foreground bg-foreground text-background' : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground',
                   )}
                 >
-                  {cat !== 'ALL' && CATEGORY_ICON_COMPONENTS[cat]}
-                  <span>{label}</span>
-                  <span className={cn(
-                    'rounded-md px-1.5 py-0.2 text-[0.65rem] font-bold',
-                    isActive ? 'bg-primary/25 text-primary' : 'bg-white/10 text-muted-foreground'
-                  )}>
-                    {count}
+                  {t.key !== 'ALL' ? <span className={cn('size-1.5 rounded-full', SALE_STATE[t.key].dot)} /> : null}
+                  {t.label}
+                  <span className={cn('rounded-full px-1.5 text-[0.65rem] font-semibold tabular-nums', active ? 'bg-background/20' : 'bg-muted')}>
+                    {t.count}
                   </span>
                 </button>
               );
             })}
+            {hasFilters ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm('');
+                  setSelectedCategory('ALL');
+                  setStateFilter('ALL');
+                }}
+                className="ml-1 !min-h-0 text-xs font-medium text-primary hover:underline"
+              >
+                ล้างตัวกรอง
+              </button>
+            ) : null}
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Product Cards Grid */}
+      {/* Products */}
       {filteredProducts.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-[var(--glass-border)] bg-[var(--glass-bg)] py-12 text-center backdrop-blur-xl">
-          <Inventory size={48} className="mb-3 text-[var(--text-muted)] opacity-60" />
-          <p className="text-base font-bold text-[var(--foreground)]">ไม่พบรายการสินค้า</p>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">
-            {searchTerm ? `ไม่พบสินค้าที่ตรงกับคำค้นหา "${searchTerm}"` : 'ยังไม่มีสินค้าในหมวดหมู่นี้'}
-          </p>
+        <div className="rounded-2xl border border-border bg-card">
+          <EmptyState
+            icon={<Inventory />}
+            title={products.length === 0 ? 'ยังไม่มีสินค้า' : 'ไม่พบสินค้า'}
+            description={
+              products.length === 0
+                ? 'เริ่มจากเพิ่มสินค้าชิ้นแรกของร้าน'
+                : searchTerm
+                  ? `ไม่พบสินค้าที่ตรงกับ "${searchTerm}"`
+                  : 'ลองเปลี่ยนตัวกรอง'
+            }
+            action={
+              products.length === 0 ? (
+                <Button onClick={createNewProduct}>
+                  <Add /> เพิ่มสินค้า
+                </Button>
+              ) : null
+            }
+          />
         </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-4.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      ) : viewMode === 'grid' ? (
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
           {filteredProducts.map((p) => (
-            <ProductCardItem
-              key={p.id}
-              product={p}
-              onEdit={() => setEditingProduct(p)}
-              onDelete={() => handleDelete(p.id)}
-              onToggle={() => handleToggleActive(p.id)}
-              onPickupSetting={() => setPickupSettingProduct(p)}
-            />
+            <ProductCardItem key={p.id} product={p} actions={actionsFor(p)} />
           ))}
         </div>
+      ) : (
+        <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
+          {filteredProducts.map((p) => (
+            <ProductRowItem key={p.id} product={p} actions={actionsFor(p)} />
+          ))}
+        </ul>
       )}
 
       {editingProduct && (
         <ProductEditDialog
           product={editingProduct}
-          onClose={() => setEditingProduct(null)}
+          isNew={!config.products.some((p) => p.id === editingProduct.id)}
+          onClose={closeEditor}
           onChange={setEditingProduct}
           onSave={handleSaveEdit}
           isSaving={saving}
@@ -2138,7 +2376,7 @@ export function ProductsView({
               }
 
               setPickupSettingProduct(null);
-            } catch (err: any) /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
+            } catch (err: unknown) {
               const message = err instanceof Error ? err.message : 'เกิดข้อผิดพลาด';
               showToast('error', message);
             } finally {

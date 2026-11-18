@@ -21,9 +21,9 @@ import { useConfirmDialog, useAlertDialog } from '@/hooks/useConfirmDialog';
 import { useRealtimeAdminOrders } from '@/hooks/useRealtimeOrders';
 import { supabase } from '@/lib/supabase-client';
 import { useAdminDataSWR } from '@/hooks/useAdminDataSWR';
-import { SettingsView } from '@/components/admin/SettingsView';
 import { DashboardView } from '@/components/admin/DashboardView';
-import FlagshipSettings from '@/components/admin/FlagshipSettings';
+import { OrdersView } from '@/components/admin/OrdersView';
+import { OrderEditorDialog } from '@/components/admin/OrderEditorDialog';
 
 import {
   Box,
@@ -184,20 +184,34 @@ import {
   adminTableSx as tableSx,
 } from '@/lib/adminTheme';
 import { deleteOrderAdmin, getProfile, saveShopConfig, syncOrdersSheet, updateOrderAdmin, updateOrderStatusAPI } from '@/lib/api-client';
-import SupportChatPanel from '@/components/admin/SupportChatPanel';
-import EmailManagement from '@/components/admin/EmailManagement';
-import UserLogsView from '@/components/admin/UserLogsView';
-import ShippingSettings from '@/components/admin/ShippingSettings';
 import { SHIPPING_PROVIDERS, type ShippingProvider } from '@/lib/shipping';
-import PaymentSettings from '@/components/admin/PaymentSettings';
-import TrackingManagement from '@/components/admin/TrackingManagement';
-import RefundManagement from '@/components/admin/RefundManagement';
-import LiveStreamSettings from '@/components/admin/LiveStreamSettings';
-import ShopManagement from '@/components/admin/ShopManagement';
-import { PromoCodesView } from '@/components/admin/PromoCodesView';
-import { EventsView } from '@/components/admin/EventsView';
-import { AnnouncementsView } from '@/components/admin/AnnouncementsView';
-import { ProductsView } from '@/components/admin/ProductsView';
+
+// ── Lazy-loaded admin sections ──
+// Each tab's code is downloaded only when that tab is opened, instead of
+// shipping ~20k lines of admin UI on the first admin page load.
+function AdminViewLoading() {
+  return (
+    <div className="flex min-h-[240px] items-center justify-center" role="status" aria-label="กำลังโหลด">
+      <div className="size-8 animate-spin rounded-full border-[3px] border-[var(--glass-border)] border-t-[var(--primary)]" />
+    </div>
+  );
+}
+const lazyView = { ssr: false, loading: AdminViewLoading } as const;
+const SettingsView = dynamic(() => import('@/components/admin/SettingsView').then((m) => m.SettingsView), lazyView);
+const FlagshipSettings = dynamic(() => import('@/components/admin/FlagshipSettings'), lazyView);
+const SupportChatPanel = dynamic(() => import('@/components/admin/SupportChatPanel'), lazyView);
+const EmailManagement = dynamic(() => import('@/components/admin/EmailManagement'), lazyView);
+const UserLogsView = dynamic(() => import('@/components/admin/UserLogsView'), lazyView);
+const ShippingSettings = dynamic(() => import('@/components/admin/ShippingSettings'), lazyView);
+const PaymentSettings = dynamic(() => import('@/components/admin/PaymentSettings'), lazyView);
+const TrackingManagement = dynamic(() => import('@/components/admin/TrackingManagement'), lazyView);
+const RefundManagement = dynamic(() => import('@/components/admin/RefundManagement'), lazyView);
+const LiveStreamSettings = dynamic(() => import('@/components/admin/LiveStreamSettings'), lazyView);
+const ShopManagement = dynamic(() => import('@/components/admin/ShopManagement'), lazyView);
+const PromoCodesView = dynamic(() => import('@/components/admin/PromoCodesView').then((m) => m.PromoCodesView), lazyView);
+const EventsView = dynamic(() => import('@/components/admin/EventsView').then((m) => m.EventsView), lazyView);
+const AnnouncementsView = dynamic(() => import('@/components/admin/AnnouncementsView').then((m) => m.AnnouncementsView), lazyView);
+const ProductsView = dynamic(() => import('@/components/admin/ProductsView').then((m) => m.ProductsView), lazyView);
 import { mapShopPermissionsToAdminPanel } from '@/lib/admin-permissions';
 import { useTranslation } from '@/hooks/useTranslation';
 import { AdminShell, type AdminNavGroup } from '@/components/admin/AdminShell';
@@ -3446,10 +3460,13 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
     }
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
+      const digits = term.replace(/[^0-9]/g, '');
       filtered = filtered.filter(o =>
         o.ref.toLowerCase().includes(term) ||
-        o.name.toLowerCase().includes(term) ||
-        (o.email && o.email.toLowerCase().includes(term))
+        (o.name || '').toLowerCase().includes(term) ||
+        (o.email && o.email.toLowerCase().includes(term)) ||
+        (o.trackingNumber && o.trackingNumber.toLowerCase().includes(term)) ||
+        (digits.length >= 4 && (o.phone || '').replace(/[^0-9]/g, '').includes(digits))
       );
     }
     return filtered;
@@ -3474,7 +3491,7 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
       const st = normalizeStatusKey(o.status);
       if (st === 'WAITING_PAYMENT' || st === 'PENDING') pending += 1;
       if (st === 'PAID' || st === 'READY' || st === 'SHIPPED' || st === 'COMPLETED') paidShip += 1;
-      revenue += Number(o.amount) || 0;
+      if (st !== 'CANCELLED' && st !== 'REFUNDED') revenue += Number(o.amount) || 0;
     }
     return { total: scopedOrders.length, pending, paidShip, revenue };
   }, [scopedOrders]);
@@ -3484,1715 +3501,99 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
   // JSX variable (not nested component) so parent re-renders do not remount and swallow clicks
   const activeProductsForOrders = config.products || [];
   const ordersViewElement =
-    activeTab !== 2 || !canManageOrders
-      ? null
-      : selectedProductIdForOrders === null ? (
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, height: '100%', py: 1 }}>
-          {/* Header */}
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.5, mb: 1, flexWrap: 'wrap' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Inventory size={28} color="#a5b4fc" />
-              <Box>
-                <Typography sx={{ fontSize: { xs: '1.1rem', md: '1.4rem' }, fontWeight: 800, color: 'var(--foreground)', lineHeight: 1.2 }}>
-                  เลือกสินค้าเพื่อดูออเดอร์
-                </Typography>
-                <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  เลือกสินค้าที่ต้องการตรวจสอบรายละเอียดและสถานะการสั่งซื้อ
-                </Typography>
-              </Box>
-            </Box>
-            <Button
-              size="small"
-              onClick={() => setSelectedProductIdForOrders('ALL')}
-              sx={{
-                textTransform: 'none',
-                fontWeight: 600,
-                color: '#a5b4fc',
-                bgcolor: 'rgba(99,102,241,0.12)',
-                border: '1px solid rgba(99,102,241,0.3)',
-                borderRadius: '10px',
-                px: 1.5,
-              }}
-            >
-              ดูทั้งหมดเลย
-            </Button>
-          </Box>
+    activeTab !== 2 || !canManageOrders ? null : (
+      <OrdersView
+        orders={pagedOrders}
+        scopedOrders={scopedOrders}
+        filteredCount={filteredOrders.length}
+        filteredRefs={filteredOrders.map((o) => o.ref)}
+        kpis={scopedKpis}
+        products={activeProductsForOrders}
+        productFilter={selectedProductIdForOrders || 'ALL'}
+        onProductFilterChange={(id) => setSelectedProductIdForOrders(id)}
+        statuses={ORDER_STATUSES}
+        statusLabels={ORDER_STATUS_LABELS}
+        statusFilter={orderFilterStatus}
+        onStatusFilterChange={setOrderFilterStatus}
+        normalizeStatus={normalizeStatusKey}
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        searchInputRef={searchInputRef}
+        page={safeOrdersPage}
+        totalPages={ordersTotalPages}
+        pageSize={ORDERS_PAGE_SIZE}
+        onPageChange={(p) => {
+          setOrdersPage(p);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        selected={selectedOrders}
+        allSelected={allFilteredSelected}
+        onToggleSelect={toggleOrderSelection}
+        onSelectAll={selectAllOrders}
+        onClearSelection={clearAllSelections}
+        onBatchUpdate={() => setBatchStatusDialogOpen(true)}
+        expanded={expandedOrders}
+        onToggleExpand={toggleOrderExpand}
+        processingRef={orderProcessingRef}
+        onStatusChange={(ref, status) => { updateOrderStatus(ref, status); }}
+        onEdit={(order) => { openOrderEditor(order); }}
+        onViewSlip={openSlipViewer}
+        onCancel={(order) => { deleteOrder(order, false); }}
+        onDelete={(order) => { deleteOrder(order, true); }}
+        sheetUrl={config.sheetUrl}
+        hasSheet={Boolean(config.sheetId)}
+        sheetSyncing={sheetSyncing}
+        onSheetSync={() => triggerSheetSync(config.sheetId ? 'sync' : 'create')}
+        onRefresh={() => fetchData()}
+      />
+    );
 
-          <Box sx={{
-            display: 'grid',
-            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' },
-            gap: 2.5,
-          }}>
-            {/* View All Orders Card */}
-            <Card
-              onClick={() => setSelectedProductIdForOrders('ALL')}
-              sx={{
-                ...glassCardSx,
-                cursor: 'pointer',
-                transition: 'all 0.2s ease-in-out',
-                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(168, 85, 247, 0.08) 100%)',
-                border: '1px solid rgba(139, 92, 246, 0.2)',
-                display: 'flex',
-                alignItems: 'center',
-                p: 2.5,
-                gap: 2,
-                '&:hover': {
-                  transform: 'translateY(-4px)',
-                  boxShadow: '0 8px 24px rgba(139, 92, 246, 0.12)',
-                  borderColor: 'rgba(139, 92, 246, 0.45)',
-                },
-              }}
-            >
-              <Box sx={{
-                width: 48,
-                height: 48,
-                borderRadius: '10px',
-                background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                flexShrink: 0,
-              }}>
-                <Receipt size={24} />
-              </Box>
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                  ออเดอร์ทั้งหมด (ทุกสินค้า)
-                </Typography>
-                <Typography sx={{ fontSize: '0.7rem', color: '#a5b4fc', mt: 0.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  ออเดอร์ทั้งหมดในระบบของร้านนี้
-                </Typography>
-                <Box sx={{ display: 'inline-flex', mt: 1, px: 1.2, py: 0.2, borderRadius: '12px', bgcolor: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)' }}>
-                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: 'white' }}>
-                    {shopOrders.length} ออเดอร์
-                  </Typography>
-                </Box>
-              </Box>
-            </Card>
-
-            {/* Product Cards */}
-            {activeProductsForOrders.map((p) => {
-              const productOrdersCount = shopOrders.filter((o) => orderContainsProduct(o, p.id)).length;
-              const coverImg = p.coverImage || p.images?.[0];
-
-              return (
-                <Card
-                  key={p.id}
-                  onClick={() => setSelectedProductIdForOrders(p.id)}
-                  sx={{
-                    ...glassCardSx,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease-in-out',
-                    display: 'flex',
-                    alignItems: 'center',
-                    p: 2.5,
-                    gap: 2,
-                    '&:hover': {
-                      transform: 'translateY(-4px)',
-                      boxShadow: '0 8px 24px rgba(255, 255, 255, 0.04)',
-                      borderColor: 'var(--primary)',
-                    },
-                  }}
-                >
-                  {/* Thumbnail */}
-                  <Box sx={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: '10px',
-                    overflow: 'hidden',
-                    flexShrink: 0,
-                    bgcolor: 'var(--surface-2)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    border: '1px solid var(--glass-border)',
-                  }}>
-                    {coverImg ? (
-                      <Box component="img" src={coverImg} alt={p.name} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <Store size={22} color="var(--text-muted)" />
-                    )}
-                  </Box>
-
-                  {/* Info */}
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography noWrap sx={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                      {p.name}
-                    </Typography>
-                    <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', mt: 0.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {p.category ? `หมวดหมู่: ${p.category}` : 'ไม่มีหมวดหมู่'}
-                    </Typography>
-                    <Box sx={{ display: 'inline-flex', mt: 1, px: 1.2, py: 0.2, borderRadius: '12px', bgcolor: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.15)' }}>
-                      <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#a5b4fc' }}>
-                        {productOrdersCount} ออเดอร์
-                      </Typography>
-                    </Box>
-                  </Box>
-                </Card>
-              );
-            })}
-          </Box>
-        </Box>
-      ) : (
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, height: '100%' }}>
-        {/* Sticky: title + search + filters only */}
-        <Box sx={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 10,
-          bgcolor: ADMIN_THEME.bg,
-          pb: 1.5,
-          mx: { xs: -2, md: -3 },
-          px: { xs: 2, md: 3 },
-          pt: { xs: 0.5, md: 0 },
-        }}>
-          <Box sx={{
-            display: 'flex',
-            flexDirection: { xs: 'column', sm: 'row' },
-            justifyContent: 'space-between',
-            alignItems: { xs: 'stretch', sm: 'center' },
-            gap: 1.5,
-            mb: 1.5,
-          }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography sx={{ fontSize: { xs: '1.1rem', md: '1.3rem' }, fontWeight: 800, color: 'var(--foreground)', lineHeight: 1.2 }}>
-                  {selectedProductIdForOrders === 'ALL'
-                    ? 'ออเดอร์ทั้งหมด'
-                    : (config.products?.find(p => p.id === selectedProductIdForOrders)?.name || 'ออเดอร์สินค้า')}
-                </Typography>
-                <Typography sx={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  {filteredOrders.length}/{scopedOrders.length} รายการ
-                </Typography>
-              </Box>
-            </Box>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.8, alignItems: 'center' }}>
-              <TextField
-                select
-                size="small"
-                value={selectedProductIdForOrders || 'ALL'}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setSelectedProductIdForOrders(v === '__PICKER__' ? null : v);
-                }}
-                SelectProps={{ native: true }}
-                sx={{
-                  ...inputSx,
-                  minWidth: { xs: 140, sm: 180 },
-                  '& .MuiOutlinedInput-root': {
-                    ...inputSx['& .MuiOutlinedInput-root'],
-                    borderRadius: '10px',
-                    fontSize: '0.8rem',
-                  },
-                }}
-              >
-                <option value="ALL">ทุกสินค้า</option>
-                {activeProductsForOrders.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-                <option value="__PICKER__">เลือกจากกริด…</option>
-              </TextField>
-              {selectedOrders.size > 0 && (
-                <>
-                  <Button
-                    onClick={() => setBatchStatusDialogOpen(true)}
-                    size="small"
-                    sx={{
-                      ...gradientButtonSx,
-                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                      px: 1.5,
-                      py: 0.8,
-                      gap: 0.5,
-                    }}
-                  >
-                    <Update size={16} />
-                    <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>อัปเดต</Box> ({selectedOrders.size})
-                  </Button>
-                  <IconButton
-                    onClick={clearAllSelections}
-                    size="small"
-                    sx={{ color: 'var(--text-muted)', bgcolor: 'var(--glass-bg)', border: `1px solid ${ADMIN_THEME.border}` }}
-                  >
-                    <Clear size={18} />
-                  </IconButton>
-                </>
-              )}
-              {config.sheetUrl && (
-                <IconButton
-                  component="a"
-                  href={config.sheetUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  size="small"
-                  sx={{ color: '#60a5fa', bgcolor: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)' }}
-                >
-                  <Description size={18} />
-                </IconButton>
-              )}
-              <IconButton
-                onClick={() => triggerSheetSync(config.sheetId ? 'sync' : 'create')}
-                disabled={sheetSyncing}
-                size="small"
-                sx={{ color: '#a5b4fc', bgcolor: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)' }}
-              >
-                {sheetSyncing ? <CircularProgress size={18} sx={{ color: '#a5b4fc' }} /> : <Bolt size={18} />}
-              </IconButton>
-              <IconButton
-                onClick={() => fetchData()}
-                size="small"
-                sx={{ color: 'var(--text-muted)', bgcolor: 'var(--glass-bg)', border: `1px solid ${ADMIN_THEME.border}` }}
-              >
-                <Refresh size={18} />
-              </IconButton>
-            </Box>
-          </Box>
-
-          <TextField
-            key="orders-search-input"
-            inputRef={searchInputRef}
-            placeholder="ค้นหา Ref / ชื่อ / อีเมล..."
-            variant="outlined"
-            fullWidth
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            size="small"
-            autoComplete="off"
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search size={20} color="#64748b" />
-                </InputAdornment>
-              ),
-              endAdornment: searchTerm ? (
-                <InputAdornment position="end">
-                  <IconButton size="small" onClick={() => setSearchTerm('')} sx={{ color: 'var(--text-muted)' }}>
-                    <Clear size={18} />
-                  </IconButton>
-                </InputAdornment>
-              ) : null,
-            }}
-            sx={{
-              ...inputSx,
-              mb: 1.2,
-              '& .MuiOutlinedInput-root': {
-                ...inputSx['& .MuiOutlinedInput-root'],
-                borderRadius: '12px',
-                py: 0.3,
-              },
-            }}
-          />
-
-          <Box sx={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1,
-            mb: 0.5,
-          }}>
-            <Box sx={{
-              display: 'flex',
-              gap: 0.8,
-              overflowX: 'auto',
-              pb: 0.5,
-              flex: 1,
-              '&::-webkit-scrollbar': { height: 3 },
-              '&::-webkit-scrollbar-track': { bgcolor: 'transparent' },
-              '&::-webkit-scrollbar-thumb': { bgcolor: 'var(--glass-bg)', borderRadius: 2 },
-            }}>
-              {['ALL', ...ORDER_STATUSES].map((status) => {
-                const isActive = orderFilterStatus === status;
-                const count = status === 'ALL'
-                  ? scopedOrders.length
-                  : scopedOrders.filter(o => normalizeStatusKey(o.status) === status).length;
-                const theme = STATUS_THEME[status] || { bg: 'rgba(255,255,255,0.05)', text: 'var(--text-muted)', border: ADMIN_THEME.border };
-                return (
-                  <Box
-                    key={status}
-                    onClick={() => setOrderFilterStatus(status)}
-                    sx={{
-                      px: 1.5,
-                      py: 0.6,
-                      borderRadius: '16px',
-                      cursor: 'pointer',
-                      whiteSpace: 'nowrap',
-                      flexShrink: 0,
-                      transition: 'all 0.15s ease',
-                      bgcolor: isActive ? theme.bg : 'rgba(255,255,255,0.03)',
-                      border: `1px solid ${isActive ? theme.border : ADMIN_THEME.border}`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 0.6,
-                      '&:hover': { bgcolor: theme.bg },
-                      '&:active': { transform: 'scale(0.97)' },
-                    }}
-                  >
-                    <Typography sx={{
-                      fontSize: '0.72rem',
-                      fontWeight: 600,
-                      color: isActive ? theme.text : '#64748b',
-                    }}>
-                      {status === 'ALL' ? 'ทั้งหมด' : (ORDER_STATUS_LABELS[status] || status)}
-                    </Typography>
-                    <Box sx={{
-                      px: 0.6,
-                      py: 0.1,
-                      borderRadius: '6px',
-                      bgcolor: isActive ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.05)',
-                      fontSize: '0.65rem',
-                      fontWeight: 700,
-                      color: isActive ? theme.text : '#64748b',
-                      minWidth: 18,
-                      textAlign: 'center',
-                    }}>
-                      {count}
-                    </Box>
-                  </Box>
-                );
-              })}
-            </Box>
-            <Button
-              size="small"
-              onClick={() => {
-                if (allFilteredSelected) clearAllSelections();
-                else selectAllOrders(filteredOrders.map((o) => o.ref));
-              }}
-              disabled={filteredOrders.length === 0}
-              sx={{
-                flexShrink: 0,
-                textTransform: 'none',
-                fontSize: '0.72rem',
-                fontWeight: 600,
-                color: allFilteredSelected ? '#a5b4fc' : 'var(--text-muted)',
-                bgcolor: 'var(--glass-bg)',
-                border: `1px solid ${ADMIN_THEME.border}`,
-                borderRadius: '10px',
-                px: 1.2,
-                py: 0.6,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {allFilteredSelected ? 'ยกเลิกเลือก' : 'เลือกทั้งหมด'}
-            </Button>
-          </Box>
-        </Box>
-
-        {/* KPI summary — scrolls with content (scoped to selected product) */}
-        <Box sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)' },
-          gap: 1.5,
-        }}>
-          <Box sx={{
-            p: 1.5,
-            borderRadius: '14px',
-            bgcolor: 'rgba(99, 102, 241, 0.08)',
-            border: '1px solid rgba(99, 102, 241, 0.25)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 0.3,
-          }}>
-            <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#a5b4fc' }}>
-              ออเดอร์ทั้งหมด
-            </Typography>
-            <Typography sx={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--foreground)' }}>
-              {scopedKpis.total} <Typography component="span" sx={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>รายการ</Typography>
-            </Typography>
-          </Box>
-          <Box sx={{
-            p: 1.5,
-            borderRadius: '14px',
-            bgcolor: 'rgba(245, 158, 11, 0.08)',
-            border: '1px solid rgba(245, 158, 11, 0.25)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 0.3,
-          }}>
-            <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#fbbf24' }}>
-              รอตรวจสอบ / รอชำระ
-            </Typography>
-            <Typography sx={{ fontSize: '1.2rem', fontWeight: 800, color: '#fbbf24' }}>
-              {scopedKpis.pending} <Typography component="span" sx={{ fontSize: '0.75rem', color: '#fbbf24', opacity: 0.8, fontWeight: 500 }}>รายการ</Typography>
-            </Typography>
-          </Box>
-          <Box sx={{
-            p: 1.5,
-            borderRadius: '14px',
-            bgcolor: 'rgba(16, 185, 129, 0.08)',
-            border: '1px solid rgba(16, 185, 129, 0.25)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 0.3,
-          }}>
-            <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#34d399' }}>
-              ชำระแล้ว / จัดส่งแล้ว
-            </Typography>
-            <Typography sx={{ fontSize: '1.2rem', fontWeight: 800, color: '#34d399' }}>
-              {scopedKpis.paidShip} <Typography component="span" sx={{ fontSize: '0.75rem', color: '#34d399', opacity: 0.8, fontWeight: 500 }}>รายการ</Typography>
-            </Typography>
-          </Box>
-          <Box sx={{
-            p: 1.5,
-            borderRadius: '14px',
-            bgcolor: 'rgba(56, 189, 248, 0.08)',
-            border: '1px solid rgba(56, 189, 248, 0.25)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 0.3,
-          }}>
-            <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#38bdf8' }}>
-              ยอดขายรวม
-            </Typography>
-            <Typography sx={{ fontSize: '1.2rem', fontWeight: 800, color: '#38bdf8' }}>
-              ฿{scopedKpis.revenue?.toLocaleString()}
-            </Typography>
-          </Box>
-        </Box>
-
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-          {pagedOrders.map(order => {
-            const statusTheme = STATUS_THEME[normalizeStatusKey(order.status)] || STATUS_THEME.WAITING_PAYMENT;
-            const isProcessing = orderProcessingRef === order.ref;
-            const isSelected = selectedOrders.has(order.ref);
-            const slipData = order.slip || order.raw?.slip;
-            const hasSlip = !!(slipData && (slipData.imageUrl || slipData.base64));
-            const isPickup =
-              order.shippingOption === 'pickup' ||
-              (order.shippingOption || '').toLowerCase().includes('รับ') ||
-              (!order.shippingOption && !order.shippingProvider);
-            let shippingLabel = 'รับหน้าร้าน';
-            if (order.shippingOption === 'pickup') shippingLabel = 'รับหน้าร้าน';
-            else if (order.shippingOption === 'delivery_legacy') shippingLabel = 'จัดส่ง (เดิม)';
-            else if (order.shippingProvider) {
-              shippingLabel = (SHIPPING_PROVIDERS as Record<string, any>)[order.shippingProvider]?.nameThai || order.shippingProvider;
-            } else if (order.shippingOption === 'thailand_post_ems') shippingLabel = 'EMS ไปรษณีย์ไทย';
-            else if (order.shippingOption && !isPickup) shippingLabel = order.shippingOption;
-            else if (!order.shippingOption && !order.shippingProvider) shippingLabel = 'รับหน้าร้าน (เดิม)';
-            else if ((order.shippingOption || '').toLowerCase().includes('รับ')) shippingLabel = order.shippingOption || 'รับหน้าร้าน';
-
-            return (
-              <Box
-                key={order.ref}
-                sx={{
-                  ...glassCardSx,
-                  p: 0,
-                  transition: 'all 0.2s ease',
-                  opacity: isProcessing ? 0.6 : 1,
-                  border: isSelected ? '2px solid rgba(99,102,241,0.6)' : `1px solid ${ADMIN_THEME.border}`,
-                  '&:active': { transform: 'scale(0.99)' },
-                }}
-              >
-                <Box sx={{
-                  height: '3px',
-                  background: `linear-gradient(90deg, ${statusTheme.text}, ${statusTheme.border})`,
-                }} />
-
-                <Box sx={{ p: { xs: 1.5, sm: 2 } }}>
-                  <Box sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 1,
-                    mb: 1,
-                    flexWrap: 'wrap',
-                  }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, minWidth: 0, flex: 1, flexWrap: 'wrap' }}>
-                      <IconButton
-                        size="small"
-                        onClick={(e) => { e.stopPropagation(); toggleOrderSelection(order.ref); }}
-                        sx={{
-                          color: isSelected ? '#6366f1' : '#64748b',
-                          p: 0.3,
-                        }}
-                      >
-                        {isSelected ? <CheckBox size={20} /> : <CheckBoxOutlineBlank size={20} />}
-                      </IconButton>
-                      <Typography sx={{
-                        fontFamily: 'monospace',
-                        fontSize: '0.78rem',
-                        fontWeight: 700,
-                        color: '#a5b4fc',
-                      }}>
-                        #{order.ref}
-                      </Typography>
-                      {hasSlip && (
-                        <Button
-                          size="small"
-                          onClick={(e) => { e.stopPropagation(); openSlipViewer(order); }}
-                          sx={{
-                            height: 24,
-                            px: 1,
-                            borderRadius: '8px',
-                            bgcolor: 'rgba(16, 185, 129, 0.15)',
-                            color: '#34d399',
-                            border: '1px solid rgba(16, 185, 129, 0.3)',
-                            fontSize: '0.68rem',
-                            fontWeight: 600,
-                            textTransform: 'none',
-                            gap: 0.5,
-                            '&:hover': { bgcolor: 'rgba(16, 185, 129, 0.25)' },
-                          }}
-                        >
-                          <ImageIcon size={14} />
-                          สลิป
-                        </Button>
-                      )}
-                    </Box>
-                    <Typography sx={{
-                      fontSize: { xs: '1.05rem', sm: '1.2rem' },
-                      fontWeight: 800,
-                      color: '#10b981',
-                      whiteSpace: 'nowrap',
-                    }}>
-                      ฿{Number(order.amount)?.toLocaleString()}
-                    </Typography>
-                  </Box>
-
-                  <Box sx={{
-                    display: 'flex',
-                    flexDirection: { xs: 'column', sm: 'row' },
-                    gap: { xs: 0.3, sm: 2 },
-                    mb: 1,
-                  }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
-                      <Person size={15} color="#a78bfa" />
-                      <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--foreground)' }}>
-                        {order.name}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, overflow: 'hidden' }}>
-                      <Email size={15} color="#60a5fa" style={{ flexShrink: 0 }} />
-                      <Typography sx={{
-                        fontSize: '0.78rem',
-                        color: 'var(--text-muted)',
-                        textOverflow: 'ellipsis',
-                        overflow: 'hidden',
-                        whiteSpace: 'nowrap',
-                      }}>
-                        {order.email || '-'}
-                      </Typography>
-                    </Box>
-                  </Box>
-
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.6, mb: 1, alignItems: 'center' }}>
-                    <Chip
-                      size="small"
-                      icon={isPickup ? <Inventory size={14} /> : <LocalShipping size={14} />}
-                      label={shippingLabel}
-                      sx={{
-                        height: 24,
-                        fontSize: '0.7rem',
-                        bgcolor: isPickup ? 'rgba(16, 185, 129, 0.12)' : 'rgba(96, 165, 250, 0.12)',
-                        color: isPickup ? '#10b981' : '#60a5fa',
-                        border: `1px solid ${isPickup ? 'rgba(16, 185, 129, 0.28)' : 'rgba(96, 165, 250, 0.28)'}`,
-                        '& .MuiChip-icon': { color: isPickup ? '#10b981' : '#60a5fa' },
-                      }}
-                    />
-                    {order.trackingNumber && (
-                      <Chip
-                        size="small"
-                        label={order.trackingNumber}
-                        sx={{
-                          height: 24,
-                          fontSize: '0.7rem',
-                          bgcolor: 'rgba(34, 211, 238, 0.12)',
-                          color: '#22d3ee',
-                          border: '1px solid rgba(34, 211, 238, 0.28)',
-                          fontFamily: 'monospace',
-                        }}
-                      />
-                    )}
-                    {order.pickup?.pickedUp && (
-                      <Chip
-                        size="small"
-                        icon={<CheckCircle size={14} />}
-                        label="รับแล้ว"
-                        sx={{
-                          height: 24,
-                          fontSize: '0.7rem',
-                          fontWeight: 600,
-                          bgcolor: 'rgba(16, 185, 129, 0.12)',
-                          color: '#10b981',
-                          border: '1px solid rgba(16, 185, 129, 0.28)',
-                          '& .MuiChip-icon': { color: '#10b981' },
-                        }}
-                      />
-                    )}
-                    {!isPickup && order.address && (
-                      <Typography sx={{
-                        fontSize: '0.7rem',
-                        color: 'var(--text-muted)',
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        gap: 0.4,
-                        width: '100%',
-                        mt: 0.2,
-                      }}>
-                        <MapPin size={13} color="#64748b" style={{ marginTop: 2, flexShrink: 0 }} />
-                        <Box component="span" sx={{
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          display: '-webkit-box',
-                          WebkitLineClamp: 1,
-                          WebkitBoxOrient: 'vertical',
-                        }}>
-                          {order.address}
-                        </Box>
-                      </Typography>
-                    )}
-                  </Box>
-
-                  {((order as AdminOrder & { _listOnly?: boolean })._listOnly
-                    || (order.cart && order.cart.length > 0)
-                    || (order.items && order.items.length > 0)) && (
-                    <Box sx={{ mb: 1 }}>
-                      <Box
-                        onClick={() => toggleOrderExpand(order.ref)}
-                        sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 0.8,
-                          cursor: 'pointer',
-                          py: 0.6,
-                          px: 1,
-                          borderRadius: '8px',
-                          bgcolor: 'rgba(99, 102, 241, 0.06)',
-                          border: '1px solid rgba(99, 102, 241, 0.15)',
-                        }}
-                      >
-                        <ShoppingBag size={15} color="#818cf8" />
-                        <Typography sx={{ fontSize: '0.72rem', fontWeight: 600, color: '#a5b4fc', flex: 1 }}>
-                          {(order as AdminOrder & { _listOnly?: boolean })._listOnly
-                            ? (expandedOrders.has(order.ref) ? 'กำลังโหลดรายการ...' : 'แตะเพื่อโหลดรายการ')
-                            : `${(order.cart || order.items || []).length} รายการ`}
-                        </Typography>
-                        {expandedOrders.has(order.ref) ? (
-                          <ExpandLess size={16} color="#818cf8" />
-                        ) : (
-                          <ExpandMore size={16} color="#818cf8" />
-                        )}
-                      </Box>
-
-                      {expandedOrders.has(order.ref) && (
-                        <Box sx={{
-                          mt: 0.8,
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: 0.6,
-                        }}>
-                          {(order.cart || order.items || []).map((item, idx) => {
-                            const product = config.products?.find(p => p.id === item.productId);
-                            return (
-                              <Box
-                                key={item.id || idx}
-                                sx={{
-                                  display: 'flex',
-                                  alignItems: 'flex-start',
-                                  gap: 1,
-                                  p: 1,
-                                  borderRadius: '8px',
-                                  bgcolor: 'rgba(255,255,255,0.03)',
-                                  border: `1px solid ${ADMIN_THEME.border}`,
-                                }}
-                              >
-                                {product?.images?.[0] ? (
-                                  <Box
-                                    component="img"
-                                    src={product.images[0]}
-                                    alt={item.productName}
-                                    sx={{
-                                      width: 40,
-                                      height: 40,
-                                      borderRadius: '8px',
-                                      objectFit: 'cover',
-                                      border: '1px solid var(--glass-border)',
-                                    }}
-                                  />
-                                ) : (
-                                  <Box sx={{
-                                    width: 40,
-                                    height: 40,
-                                    borderRadius: '8px',
-                                    bgcolor: 'rgba(99, 102, 241, 0.15)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                  }}>
-                                    <Inventory size={16} color="#818cf8" />
-                                  </Box>
-                                )}
-                                <Box sx={{ flex: 1, minWidth: 0 }}>
-                                  <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--foreground)' }}>
-                                    {item.productName || product?.name || 'สินค้า'}
-                                  </Typography>
-                                  <Typography sx={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
-                                    {[item.size, item.options?.customName, item.options?.customNumber ? `#${item.options.customNumber}` : null, item.options?.pattern]
-                                      .filter(Boolean).join(' · ') || '—'}
-                                    {' · '}x{item.quantity}
-                                  </Typography>
-                                </Box>
-                                <Typography sx={{ fontSize: '0.78rem', fontWeight: 700, color: '#10b981', whiteSpace: 'nowrap' }}>
-                                  ฿{(item.quantity * item.unitPrice)?.toLocaleString()}
-                                </Typography>
-                              </Box>
-                            );
-                          })}
-                        </Box>
-                      )}
-                    </Box>
-                  )}
-
-                  <Box sx={{
-                    display: 'flex',
-                    flexDirection: { xs: 'column', sm: 'row' },
-                    justifyContent: 'space-between',
-                    alignItems: { xs: 'stretch', sm: 'center' },
-                    gap: 1,
-                    pt: 1,
-                    borderTop: `1px solid ${ADMIN_THEME.border}`,
-                  }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'var(--text-muted)' }}>
-                      <CalendarToday size={12} />
-                      <Typography sx={{ fontSize: '0.7rem' }}>
-                        {order.date ? new Date(order.date).toLocaleDateString('th-TH', {
-                          day: 'numeric',
-                          month: 'short',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        }) : '-'}
-                      </Typography>
-                    </Box>
-
-                    <Box sx={{ display: 'flex', gap: 0.8, alignItems: 'center', flexWrap: 'wrap', justifyContent: { xs: 'space-between', sm: 'flex-end' } }}>
-                      <Select
-                        value={order.status}
-                        onChange={(e) => { updateOrderStatus(order.ref, e.target.value as string); }}
-                        size="small"
-                        disabled={isProcessing}
-                        MenuProps={{
-                          PaperProps: {
-                            sx: {
-                              bgcolor: 'var(--card-bg, #1e293b)',
-                              color: 'var(--foreground, #f8fafc)',
-                              border: '1px solid var(--glass-border, rgba(255,255,255,0.15))',
-                              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)',
-                              backgroundImage: 'none',
-                              '& .MuiMenuItem-root': {
-                                fontSize: '0.8rem',
-                                fontWeight: 500,
-                                color: 'var(--foreground, #f8fafc)',
-                                py: 1,
-                                px: 1.5,
-                                '&:hover': { bgcolor: 'rgba(255,255,255,0.08)' },
-                                '&.Mui-selected': {
-                                  bgcolor: 'rgba(99,102,241,0.25)',
-                                  color: '#a5b4fc',
-                                  fontWeight: 700,
-                                  '&:hover': { bgcolor: 'rgba(99,102,241,0.35)' },
-                                },
-                              },
-                            },
-                          },
-                        }}
-                        sx={{
-                          minWidth: { xs: 130, sm: 150 },
-                          fontSize: '0.75rem',
-                          bgcolor: statusTheme.bg,
-                          borderRadius: '8px',
-                          '& .MuiOutlinedInput-notchedOutline': {
-                            borderColor: statusTheme.border,
-                          },
-                          '& .MuiSelect-select': {
-                            py: 0.5,
-                            px: 1.2,
-                            fontWeight: 600,
-                            color: statusTheme.text,
-                          },
-                        }}
-                      >
-                        {ORDER_STATUSES.map(status => (
-                          <MenuItem key={status} value={status}>
-                            {ORDER_STATUS_LABELS[status] || status}
-                          </MenuItem>
-                        ))}
-                      </Select>
-
-                      <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
-                        <Button
-                          size="small"
-                          onClick={() => openOrderEditor(order)}
-                          disabled={isProcessing}
-                          sx={{
-                            bgcolor: 'rgba(59, 130, 246, 0.12)',
-                            color: '#60a5fa',
-                            border: '1px solid rgba(59, 130, 246, 0.3)',
-                            borderRadius: '8px',
-                            fontSize: '0.72rem',
-                            fontWeight: 600,
-                            textTransform: 'none',
-                            px: 1.2,
-                            py: 0.4,
-                            minWidth: 'auto',
-                            '&:hover': { bgcolor: 'rgba(59, 130, 246, 0.22)' },
-                          }}
-                        >
-                          <EditIconMUI size={14} style={{ marginRight: 4 }} />
-                          แก้ไข
-                        </Button>
-                        {order.status !== 'CANCELLED' && (
-                          <Tooltip title="ยกเลิกออเดอร์">
-                            <IconButton
-                              size="small"
-                              onClick={() => deleteOrder(order, false)}
-                              disabled={isProcessing}
-                              sx={{
-                                color: '#fbbf24',
-                                bgcolor: 'rgba(245, 158, 11, 0.1)',
-                                border: '1px solid rgba(245, 158, 11, 0.25)',
-                                borderRadius: '8px',
-                                '&:hover': { bgcolor: 'rgba(245, 158, 11, 0.2)' },
-                              }}
-                            >
-                              <Close size={16} />
-                            </IconButton>
-                          </Tooltip>
-                        )}
-                        <Tooltip title="ลบถาวร">
-                          <IconButton
-                            size="small"
-                            onClick={() => deleteOrder(order, true)}
-                            disabled={isProcessing}
-                            sx={{
-                              color: '#f87171',
-                              bgcolor: 'rgba(239, 68, 68, 0.1)',
-                              border: '1px solid rgba(239, 68, 68, 0.25)',
-                              borderRadius: '8px',
-                              '&:hover': { bgcolor: 'rgba(239, 68, 68, 0.2)' },
-                            }}
-                          >
-                            <Delete size={16} />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    </Box>
-                  </Box>
-                </Box>
-              </Box>
-            );
-          })}
-
-          {filteredOrders.length === 0 && (
-            <Box sx={{
-              ...glassCardSx,
-              textAlign: 'center',
-              py: 6,
-            }}>
-              <Receipt size={56} color="#475569" style={{ marginBottom: 16 }} />
-              <Typography sx={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-muted)', mb: 0.5 }}>
-                ไม่พบออเดอร์
-              </Typography>
-              <Typography sx={{ fontSize: '0.85rem', color: '#475569' }}>
-                ลองเปลี่ยนตัวกรองหรือคำค้นหา
-              </Typography>
-            </Box>
-          )}
-
-          {filteredOrders.length > ORDERS_PAGE_SIZE && (
-            <Box sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 1.5,
-              py: 1,
-            }}>
-              <Button
-                size="small"
-                disabled={safeOrdersPage <= 1}
-                onClick={() => setOrdersPage((p) => Math.max(1, p - 1))}
-                sx={{
-                  textTransform: 'none',
-                  color: 'var(--text-muted)',
-                  border: `1px solid ${ADMIN_THEME.border}`,
-                  borderRadius: '10px',
-                  minWidth: 80,
-                }}
-              >
-                ก่อนหน้า
-              </Button>
-              <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                {safeOrdersPage} / {ordersTotalPages}
-              </Typography>
-              <Button
-                size="small"
-                disabled={safeOrdersPage >= ordersTotalPages}
-                onClick={() => setOrdersPage((p) => Math.min(ordersTotalPages, p + 1))}
-                sx={{
-                  textTransform: 'none',
-                  color: 'var(--text-muted)',
-                  border: `1px solid ${ADMIN_THEME.border}`,
-                  borderRadius: '10px',
-                  minWidth: 80,
-                }}
-              >
-                ถัดไป
-              </Button>
-            </Box>
-          )}
-        </Box>
-      </Box>
-  );
+  // Recalculate every cart line from the current catalog price
+  const recalculateOrderEditorPrices = () => {
+    let changed = 0;
+    let missingProduct = 0;
+    const newCart = orderEditor.cart.map((item) => {
+      const product = config.products?.find((p) => p.id === item.productId);
+      if (!product) {
+        missingProduct += 1;
+        return item;
+      }
+      const nextPrice = calculateItemUnitPrice(item, product);
+      if (Number(item.unitPrice) !== nextPrice) changed += 1;
+      return { ...item, unitPrice: nextPrice };
+    });
+    const cartTotal = newCart.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+    setOrderEditor((prev) => ({ ...prev, cart: newCart, amount: cartTotal }));
+    if (missingProduct > 0 && changed === 0) {
+      showToast('warning', 'ไม่พบสินค้าในระบบสำหรับบางรายการ จึงคำนวณไม่ได้');
+    } else if (changed > 0) {
+      showToast('success', `อัปเดตราคาแล้ว ${changed} รายการ`);
+    } else {
+      showToast('info', 'ราคาตรงกับสินค้าปัจจุบันแล้ว');
+    }
+  };
 
   // Order Editor Dialog - rendered as JSX variable (not as component) to prevent remounting
   const orderEditorDialogElement = (
-    <Dialog 
-      open={orderEditor.open} 
-      onClose={resetOrderEditor} 
-      fullscreen
-      ariaTitle="แก้ไขออเดอร์"
-    >
-      {/* Header */}
-      <Box sx={{
-        p: 3,
-        pb: 2,
-        flexShrink: 0,
-        background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%)',
-        borderBottom: '1px solid var(--glass-border)',
-      }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }} className="mx-auto max-w-[1100px]">
-          <Box sx={{
-            width: 48,
-            height: 48,
-            borderRadius: '14px',
-            background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-            <EditIconMUI size={24} color="#fff" />
-          </Box>
-          <Box>
-            <DialogTitle
-              className="p-0 m-0 text-[1.2rem] font-bold text-[var(--foreground)]"
-            >
-              แก้ไขออเดอร์
-            </DialogTitle>
-            {orderEditor.ref && (
-              <Typography sx={{ 
-                fontSize: '0.85rem', 
-                color: 'var(--text-muted)',
-                fontFamily: 'monospace',
-              }}>
-                #{orderEditor.ref}
-              </Typography>
-            )}
-          </Box>
-        </Box>
-      </Box>
-
-      <DialogContent
-        className="mx-auto min-h-0 w-full max-w-[1100px] flex-1 overflow-y-auto"
-        sx={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
-          gap: 2.5,
-          p: 3,
-        }}
-      >
-        {/* Customer Info Section */}
-        <Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mb: 1.5, flexWrap: 'wrap' }}>
-            <Typography sx={{ 
-              fontSize: '0.75rem', 
-              fontWeight: 600, 
-              color: 'var(--text-muted)', 
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-            }}>
-              ข้อมูลลูกค้า / โปรไฟล์
-            </Typography>
-            <Button
-              size="small"
-              type="button"
-              variant="outlined"
-              disabled={!orderEditor.email || orderEditor.profileLoading}
-              onClick={() => applyProfileToOrderEditor(orderEditor.email, 'overwrite')}
-              sx={{
-                textTransform: 'none',
-                fontSize: '0.72rem',
-                fontWeight: 600,
-                color: '#818cf8',
-                borderColor: 'rgba(129,140,248,0.4)',
-                borderRadius: '10px',
-                px: 1.2,
-                gap: 0.5,
-              }}
-            >
-              {orderEditor.profileLoading ? <CircularProgress size={14} /> : <Person size={14} />}
-              ดึงโปรไฟล์ทั้งหมด
-            </Button>
-          </Box>
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
-            <TextField
-              label="ชื่อลูกค้า"
-              placeholder="กรอกชื่อ-นามสกุล"
-              value={orderEditor.name}
-              onChange={(e) => setOrderEditor(prev => ({ ...prev, name: e.target.value }))}
-              fullWidth
-              sx={{
-                ...inputSx,
-                gridColumn: { xs: 'auto', sm: '1 / -1' },
-                '& .MuiOutlinedInput-root': {
-                  ...inputSx['& .MuiOutlinedInput-root'],
-                  borderRadius: '12px',
-                },
-              }}
-            />
-            <TextField
-              label="อีเมล"
-              placeholder="example@email.com"
-              type="email"
-              value={orderEditor.email}
-              onChange={(e) => setOrderEditor(prev => ({ ...prev, email: e.target.value }))}
-              fullWidth
-              sx={{
-                ...inputSx,
-                '& .MuiOutlinedInput-root': {
-                  ...inputSx['& .MuiOutlinedInput-root'],
-                  borderRadius: '12px',
-                },
-              }}
-            />
-            <TextField
-              label="เบอร์โทร"
-              placeholder="08x-xxx-xxxx"
-              value={orderEditor.phone}
-              onChange={(e) => setOrderEditor(prev => ({ ...prev, phone: e.target.value }))}
-              fullWidth
-              sx={{
-                ...inputSx,
-                '& .MuiOutlinedInput-root': {
-                  ...inputSx['& .MuiOutlinedInput-root'],
-                  borderRadius: '12px',
-                },
-              }}
-            />
-            <TextField
-              label="Instagram"
-              placeholder="@username"
-              value={orderEditor.instagram}
-              onChange={(e) => setOrderEditor(prev => ({ ...prev, instagram: e.target.value }))}
-              fullWidth
-              sx={{
-                ...inputSx,
-                gridColumn: { xs: 'auto', sm: '1 / -1' },
-                '& .MuiOutlinedInput-root': {
-                  ...inputSx['& .MuiOutlinedInput-root'],
-                  borderRadius: '12px',
-                },
-              }}
-            />
-            <TextField
-              label="ที่อยู่จัดส่ง"
-              placeholder="บ้านเลขที่ ถนน ตำบล อำเภอ จังหวัด รหัสไปรษณีย์"
-              value={orderEditor.address}
-              onChange={(e) => setOrderEditor(prev => ({ ...prev, address: e.target.value }))}
-              fullWidth
-              multiline
-              rows={3}
-              sx={{
-                ...inputSx,
-                gridColumn: { xs: 'auto', sm: '1 / -1' },
-                '& .MuiOutlinedInput-root': {
-                  ...inputSx['& .MuiOutlinedInput-root'],
-                  borderRadius: '12px',
-                },
-              }}
-            />
-          </Box>
-        </Box>
-
-        {/* Order Details Section */}
-        <Box>
-          <Typography sx={{ 
-            fontSize: '0.75rem', 
-            fontWeight: 600, 
-            color: 'var(--text-muted)', 
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
-            mb: 1.5,
-          }}>
-            รายละเอียดออเดอร์
-          </Typography>
-          <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-            {/* Calculated Amount - Read Only */}
-            <Box sx={{
-              p: 2,
-              borderRadius: '12px',
-              bgcolor: 'rgba(16, 185, 129, 0.1)',
-              border: '1px solid rgba(16, 185, 129, 0.3)',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-            }}>
-              <Typography sx={{ fontSize: '0.7rem', color: 'var(--text-muted)', mb: 0.5 }}>
-                ยอดชำระ (คำนวณจากตะกร้า)
-              </Typography>
-              <Typography sx={{ fontSize: '1.25rem', fontWeight: 700, color: '#10b981' }}>
-                ฿{orderEditor.cart.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0)?.toLocaleString()}
-              </Typography>
-              {orderEditor.amount > 0 && orderEditor.amount !== orderEditor.cart.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0) && (
-                <Typography sx={{ fontSize: '0.7rem', color: '#f59e0b', mt: 0.5 }}>
-                  ยอดเดิม: ฿{orderEditor.amount?.toLocaleString()}
-                </Typography>
-              )}
-            </Box>
-            <DateTimePicker
-              id="order-editor-date"
-              label="วันที่"
-              value={orderEditor.date}
-              onChange={(local) => setOrderEditor((prev) => ({ ...prev, date: local }))}
-              placeholder="เลือกวันและเวลา"
-            />
-          </Box>
-        </Box>
-
-        {/* Cart Items Section */}
-        <Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
-            <Typography sx={{ 
-              fontSize: '0.75rem', 
-              fontWeight: 600, 
-              color: 'var(--text-muted)', 
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-            }}>
-              รายการสินค้า ({orderEditor.cart.length} รายการ)
-            </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-              <Button
-                size="small"
-                type="button"
-                onClick={() => {
-                  let changed = 0;
-                  let missingProduct = 0;
-                  const newCart = orderEditor.cart.map((item) => {
-                    const product = config.products?.find((p) => p.id === item.productId);
-                    if (!product) {
-                      missingProduct += 1;
-                      return item;
-                    }
-                    const nextPrice = calculateItemUnitPrice(item, product);
-                    if (Number(item.unitPrice) !== nextPrice) changed += 1;
-                    return { ...item, unitPrice: nextPrice };
-                  });
-                  const cartTotal = newCart.reduce(
-                    (sum, item) => sum + item.quantity * item.unitPrice,
-                    0,
-                  );
-                  setOrderEditor((prev) => ({ ...prev, cart: newCart, amount: cartTotal }));
-                  if (missingProduct > 0 && changed === 0) {
-                    showToast('warning', 'ไม่พบสินค้าในระบบสำหรับบางรายการ จึงคำนวณไม่ได้');
-                  } else if (changed > 0) {
-                    showToast('success', `อัปเดตราคาแล้ว ${changed} รายการ`);
-                  } else {
-                    showToast('info', 'ราคาตรงกับสินค้าปัจจุบันแล้ว');
-                  }
-                }}
-                sx={{
-                  fontSize: '0.7rem',
-                  color: '#f59e0b',
-                  borderColor: 'rgba(245,158,11,0.3)',
-                  '&:hover': { borderColor: '#f59e0b', bgcolor: 'rgba(245,158,11,0.1)' },
-                }}
-                variant="outlined"
-              >
-                <RefreshCw size={12} /> คำนวณราคาใหม่
-              </Button>
-              <Typography sx={{ 
-                fontSize: '0.85rem', 
-                fontWeight: 700, 
-                color: '#10b981',
-              }}>
-                รวม ฿{orderEditor.cart.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0)?.toLocaleString()}
-              </Typography>
-            </Box>
-          </Box>
-
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {orderEditor.cart.map((item, idx) => {
-              const product = config.products?.find(p => p.id === item.productId);
-              const catalogPrice = calculateItemUnitPrice(item, product);
-              const orderedPrice = Number(item.unitPrice) || 0;
-              const priceDiff = catalogPrice - orderedPrice;
-              const hasPriceDiff = !!product && orderedPrice !== catalogPrice;
-              const productMissing = !product;
-              const productInactive = !!product && product.isActive === false;
-              const cover = product?.coverImage || product?.images?.[0];
-
-              return (
-                <Box 
-                  key={item.id || idx}
-                  sx={{
-                    p: 2.5,
-                    borderRadius: '16px',
-                    bgcolor: 'var(--surface-2, rgba(255,255,255,0.03))',
-                    border: hasPriceDiff
-                      ? '1px solid rgba(245,158,11,0.45)'
-                      : productMissing || productInactive
-                        ? '1px solid rgba(239,68,68,0.35)'
-                        : `1px solid ${ADMIN_THEME.border}`,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 2,
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
-                    {cover ? (
-                      <Box
-                        component="img"
-                        src={cover}
-                        alt={item.productName}
-                        sx={{
-                          width: 56,
-                          height: 56,
-                          borderRadius: '12px',
-                          objectFit: 'cover',
-                          border: '1px solid var(--glass-border)',
-                          flexShrink: 0,
-                        }}
-                      />
-                    ) : (
-                      <Box sx={{
-                        width: 56,
-                        height: 56,
-                        borderRadius: '12px',
-                        bgcolor: 'rgba(99, 102, 241, 0.15)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                      }}>
-                        <Inventory size={22} color="#818cf8" />
-                      </Box>
-                    )}
-                    <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
-                      <TextField
-                        select
-                        fullWidth
-                        size="small"
-                        label="สินค้าในระบบ (เปิดอยู่)"
-                        value={
-                          activeCatalogProducts.some((p) => p.id === item.productId)
-                            ? (item.productId || '')
-                            : (item.productId || '__missing__')
-                        }
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          if (v && v !== '__missing__') changeCartProduct(idx, v);
-                        }}
-                        SelectProps={{ native: true }}
-                        sx={{
-                          ...inputSx,
-                          '& .MuiOutlinedInput-root': {
-                            ...inputSx['& .MuiOutlinedInput-root'],
-                            borderRadius: '10px',
-                          },
-                        }}
-                      >
-                        {(productMissing || productInactive) && (
-                          <option value={item.productId || '__missing__'}>
-                            {item.productName || product?.name || 'สินค้าเดิม'}{productInactive ? ' (ปิดอยู่)' : ' (ไม่พบในระบบ)'}
-                          </option>
-                        )}
-                        {activeCatalogProducts.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name} — ฿{Number(p.basePrice || 0)?.toLocaleString()}
-                          </option>
-                        ))}
-                      </TextField>
-                      {(productMissing || productInactive) && (
-                        <Typography sx={{ fontSize: '0.72rem', color: '#f87171', fontWeight: 600 }}>
-                          {productMissing
-                            ? 'ไม่พบสินค้านี้ในแคตตาล็อก — เลือกสินค้าที่เปิดอยู่เพื่อเปลี่ยน'
-                            : 'สินค้านี้ถูกปิดในระบบแล้ว — แนะนำให้เปลี่ยนเป็นสินค้าที่เปิดอยู่'}
-                        </Typography>
-                      )}
-                    </Box>
-                    <IconButton
-                      size="small"
-                      onClick={() => {
-                        const newCart = orderEditor.cart.filter((_, i) => i !== idx);
-                        setOrderEditor(prev => ({ ...prev, cart: newCart }));
-                      }}
-                      sx={{ color: '#ef4444', '&:hover': { bgcolor: 'rgba(239,68,68,0.1)' } }}
-                    >
-                      <Delete size={18} />
-                    </IconButton>
-                  </Box>
-
-                  <Box sx={{
-                    display: 'grid',
-                    gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr auto' },
-                    gap: 1.2,
-                    p: 1.5,
-                    borderRadius: '12px',
-                    bgcolor: hasPriceDiff ? 'rgba(245,158,11,0.08)' : 'rgba(16,185,129,0.06)',
-                    border: `1px solid ${hasPriceDiff ? 'rgba(245,158,11,0.3)' : 'rgba(16,185,129,0.22)'}`,
-                    alignItems: 'center',
-                  }}>
-                    <Box>
-                      <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600, mb: 0.3 }}>
-                        ราคาในออเดอร์
-                      </Typography>
-                      <Typography sx={{ fontSize: '1rem', fontWeight: 800, color: 'var(--foreground)' }}>
-                        ฿{orderedPrice?.toLocaleString()}
-                      </Typography>
-                    </Box>
-                    <Box>
-                      <Typography sx={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600, mb: 0.3 }}>
-                        ราคาปัจจุบันในระบบ
-                      </Typography>
-                      <Typography sx={{ fontSize: '1rem', fontWeight: 800, color: product ? '#38bdf8' : '#94a3b8' }}>
-                        {product ? `฿${catalogPrice?.toLocaleString()}` : '—'}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.6, alignItems: { xs: 'stretch', sm: 'flex-end' } }}>
-                      {hasPriceDiff ? (
-                        <>
-                          <Typography sx={{
-                            fontSize: '0.75rem',
-                            fontWeight: 700,
-                            color: priceDiff > 0 ? '#f59e0b' : '#34d399',
-                          }}>
-                            ส่วนต่าง {priceDiff > 0 ? '+' : ''}฿{priceDiff?.toLocaleString()}
-                          </Typography>
-                          <Button
-                            size="small"
-                            type="button"
-                            variant="outlined"
-                            onClick={() => updateCartItem(idx, { unitPrice: catalogPrice })}
-                            sx={{
-                              textTransform: 'none',
-                              fontSize: '0.7rem',
-                              fontWeight: 600,
-                              color: '#f59e0b',
-                              borderColor: 'rgba(245,158,11,0.4)',
-                              borderRadius: '8px',
-                            }}
-                          >
-                            ใช้ราคาปัจจุบัน
-                          </Button>
-                        </>
-                      ) : (
-                        <Typography sx={{ fontSize: '0.72rem', fontWeight: 600, color: '#34d399' }}>
-                          {product ? 'ราคาตรงกับระบบ' : 'เทียบราคาไม่ได้'}
-                        </Typography>
-                      )}
-                    </Box>
-                  </Box>
-                  
-                  <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5, alignItems: 'start' }}>
-                    <TextField
-                      select
-                      fullWidth
-                      label="ไซส์"
-                      value={item.size || ''}
-                      onChange={(e) => updateCartItem(idx, { size: e.target.value })}
-                      size="small"
-                      SelectProps={{ native: true }}
-                      sx={{
-                        ...inputSx,
-                        '& .MuiOutlinedInput-root': {
-                          ...inputSx['& .MuiOutlinedInput-root'],
-                          borderRadius: '10px',
-                        },
-                      }}
-                    >
-                      <option value="">เลือกไซส์</option>
-                      {SIZES.map((size) => (
-                        <option key={size} value={size}>{size}</option>
-                      ))}
-                    </TextField>
-                    
-                    <TextField
-                      type="number"
-                      fullWidth
-                      label="จำนวน"
-                      value={item.quantity}
-                      onChange={(e) => updateCartItem(idx, { quantity: Math.max(1, Number(e.target.value)) })}
-                      size="small"
-                      inputProps={{ min: 1 }}
-                      sx={{
-                        ...inputSx,
-                        '& .MuiOutlinedInput-root': {
-                          ...inputSx['& .MuiOutlinedInput-root'],
-                          borderRadius: '10px',
-                        },
-                      }}
-                    />
-                  </Box>
-                  
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                    {(() => {
-                      const cartProduct = config?.products?.find((p) => p.id === item.productId);
-                      const sc = getProductShirtNameConfig(cartProduct, config?.shirtNameConfig);
-                      const langs: string[] = [];
-                      if (sc.allowThai) langs.push('ไทย');
-                      if (sc.allowEnglish) langs.push('อังกฤษ');
-                      const langLabel = langs.join('/');
-                      return (
-                        <TextField
-                          label={`ชื่อติดเสื้อ (${langLabel}, ${sc.minLength}-${sc.maxLength} ตัว)`}
-                          value={item.options?.customName || ''}
-                          onChange={(e) => {
-                            let pattern = '';
-                            if (sc.allowEnglish) pattern += 'a-zA-Z';
-                            if (sc.allowThai) pattern += '\u0E00-\u0E7F';
-                            if (sc.allowSpecialChars && sc.allowedSpecialChars) {
-                              pattern += sc.allowedSpecialChars.replace(/[\\\]\^\-]/g, '\\$&');
-                            }
-                            pattern += '\\s';
-                            const regex = new RegExp(`[^${pattern}]`, 'g');
-                            let val = e.target.value.replace(regex, '');
-                            if (sc.autoUppercase) val = val.toUpperCase();
-                            val = val.slice(0, sc.maxLength);
-                            const newOptions = { ...item.options, customName: val };
-                            updateCartItem(idx, { options: newOptions });
-                          }}
-                          size="small"
-                          inputProps={{ maxLength: sc.maxLength }}
-                          placeholder={sc.allowThai ? 'เช่น สมชาย' : 'เช่น JOHN'}
-                          sx={{
-                            ...inputSx,
-                            '& .MuiOutlinedInput-root': {
-                              ...inputSx['& .MuiOutlinedInput-root'],
-                              borderRadius: '10px',
-                            },
-                          }}
-                        />
-                      );
-                    })()}
-                    
-                    <TextField
-                      label="หมายเลขเสื้อ (0-99)"
-                      value={item.options?.customNumber || ''}
-                      onChange={(e) => {
-                        const digits = e.target.value.replace(/\D/g, '');
-                        const num = digits ? String(Math.min(99, Number(digits))) : '';
-                        const newOptions = { ...item.options, customNumber: num };
-                        updateCartItem(idx, { options: newOptions });
-                      }}
-                      size="small"
-                      placeholder="เช่น 10"
-                      sx={{
-                        ...inputSx,
-                        '& .MuiOutlinedInput-root': {
-                          ...inputSx['& .MuiOutlinedInput-root'],
-                          borderRadius: '10px',
-                        },
-                      }}
-                    />
-                    
-                    {(() => {
-                      const patterns = product?.patterns?.filter(p => p.isActive !== false) || [];
-                      if (patterns.length === 0) return null;
-                      return (
-                        <TextField
-                          select
-                          fullWidth
-                          label="ลายเสื้อ"
-                          value={item.options?.pattern || ''}
-                          onChange={(e) => {
-                            const newOptions = { ...item.options, pattern: e.target.value };
-                            updateCartItem(idx, { options: newOptions });
-                          }}
-                          SelectProps={{ native: true }}
-                          size="small"
-                          sx={{
-                            ...inputSx,
-                            '& .MuiOutlinedInput-root': {
-                              ...inputSx['& .MuiOutlinedInput-root'],
-                              borderRadius: '10px',
-                            },
-                          }}
-                        >
-                          <option value="">-- เลือกลายสินค้า --</option>
-                          {patterns.map(p => (
-                            <option key={p.id} value={p.name}>{p.name}</option>
-                          ))}
-                        </TextField>
-                      );
-                    })()}
-                    
-                    <Box 
-                      onClick={() => {
-                        const newOptions = { ...item.options, isLongSleeve: !item.options?.isLongSleeve };
-                        updateCartItem(idx, { options: newOptions });
-                      }}
-                      sx={{
-                        p: 1.5,
-                        borderRadius: '10px',
-                        border: item.options?.isLongSleeve ? '2px solid #f59e0b' : '1px solid rgba(255,255,255,0.1)',
-                        bgcolor: item.options?.isLongSleeve ? 'rgba(245,158,11,0.1)' : 'rgba(255,255,255,0.02)',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        transition: 'all 0.2s ease',
-                        '&:hover': { borderColor: item.options?.isLongSleeve ? '#f59e0b' : 'rgba(245,158,11,0.5)' },
-                      }}
-                    >
-                      <Typography sx={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--foreground)' }}>
-                        แขนยาว (+฿{product?.options?.longSleevePrice ?? 50})
-                      </Typography>
-                      <Switch
-                        checked={item.options?.isLongSleeve || false}
-                        color="warning"
-                        size="small"
-                        sx={{ pointerEvents: 'none' }}
-                      />
-                    </Box>
-                  </Box>
-                  
-                  <Box sx={{ 
-                    pt: 1.5, 
-                    borderTop: '1px solid rgba(255,255,255,0.06)',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}>
-                    <Typography sx={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      {item.quantity} × ฿{orderedPrice?.toLocaleString()}
-                    </Typography>
-                    <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: '#10b981' }}>
-                      ฿{(item.quantity * orderedPrice)?.toLocaleString()}
-                    </Typography>
-                  </Box>
-                </Box>
-              );
-            })}
-
-            <Box sx={{
-              p: 2,
-              borderRadius: '14px',
-              border: `1px dashed ${ADMIN_THEME.border}`,
-              display: 'flex',
-              flexDirection: { xs: 'column', sm: 'row' },
-              gap: 1.5,
-              alignItems: { xs: 'stretch', sm: 'center' },
-            }}>
-              <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', flexShrink: 0 }}>
-                เพิ่มสินค้าที่เปิดอยู่
-              </Typography>
-              <TextField
-                select
-                fullWidth
-                size="small"
-                value=""
-                onChange={(e) => {
-                  if (e.target.value) addCartProduct(e.target.value);
-                }}
-                SelectProps={{ native: true }}
-                sx={{
-                  ...inputSx,
-                  '& .MuiOutlinedInput-root': {
-                    ...inputSx['& .MuiOutlinedInput-root'],
-                    borderRadius: '10px',
-                  },
-                }}
-              >
-                <option value="">-- เลือกสินค้าเพื่อเพิ่ม --</option>
-                {activeCatalogProducts.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} — ฿{Number(p.basePrice || 0)?.toLocaleString()}
-                  </option>
-                ))}
-              </TextField>
-            </Box>
-          </Box>
-        </Box>
-
-
-        {/* Status Section */}
-        <Box>
-          <Typography sx={{ 
-            fontSize: '0.75rem', 
-            fontWeight: 600, 
-            color: 'var(--text-muted)', 
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
-            mb: 1.5,
-          }}>
-            สถานะ
-          </Typography>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-            {ORDER_STATUSES.map(status => {
-              const theme = STATUS_THEME[status] || STATUS_THEME.WAITING_PAYMENT;
-              const isSelected = orderEditor.status === status;
-              return (
-                <Box
-                  key={status}
-                  onClick={() => setOrderEditor(prev => ({ ...prev, status }))}
-                  sx={{
-                    px: 2,
-                    py: 1,
-                    borderRadius: '10px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    bgcolor: isSelected ? theme.bg : 'rgba(255,255,255,0.03)',
-                    border: `2px solid ${isSelected ? theme.border : 'transparent'}`,
-                    '&:hover': { 
-                      bgcolor: theme.bg,
-                      transform: 'translateY(-1px)',
-                    },
-                  }}
-                >
-                  <Typography sx={{ 
-                    fontSize: '0.8rem', 
-                    fontWeight: 600, 
-                    color: isSelected ? theme.text : '#64748b',
-                  }}>
-                    {ORDER_STATUS_LABELS[status] || status}
-                  </Typography>
-                </Box>
-              );
-            })}
-          </Box>
-        </Box>
-      </DialogContent>
-
-      <DialogActions
-        className="border-t border-[var(--glass-border)] bg-[var(--surface)]"
-        sx={{ 
-          p: 3, 
-          pt: 2,
-          gap: 1.5,
-        }}
-      >
-        <Box className="mx-auto flex w-full max-w-[1100px] gap-3">
-          <Button 
-            onClick={resetOrderEditor}
-            sx={{
-              ...secondaryButtonSx,
-              flex: 1,
-            }}
-          >
-            ยกเลิก
-          </Button>
-          <Button
-            onClick={saveOrderEdits}
-            disabled={orderProcessingRef === orderEditor.ref}
-            sx={{
-              ...gradientButtonSx,
-              flex: 2,
-              gap: 1,
-            }}
-          >
-            <Save size={18} />
-            {orderProcessingRef === orderEditor.ref ? 'กำลังบันทึก...' : 'บันทึกการเปลี่ยนแปลง'}
-          </Button>
-        </Box>
-      </DialogActions>
-    </Dialog>
+    <OrderEditorDialog
+      editor={orderEditor}
+      setEditor={setOrderEditor}
+      products={config.products || []}
+      activeProducts={activeCatalogProducts}
+      legacyShirtNameConfig={config?.shirtNameConfig}
+      statuses={ORDER_STATUSES}
+      statusLabels={ORDER_STATUS_LABELS}
+      normalizeStatus={normalizeStatusKey}
+      saving={orderProcessingRef === orderEditor.ref}
+      calcUnitPrice={calculateItemUnitPrice}
+      onUpdateItem={updateCartItem}
+      onChangeProduct={changeCartProduct}
+      onAddProduct={addCartProduct}
+      onRecalculateAll={recalculateOrderEditorPrices}
+      onLoadProfile={() => { applyProfileToOrderEditor(orderEditor.email, 'overwrite'); }}
+      onClose={resetOrderEditor}
+      onSave={() => { saveOrderEdits(); }}
+    />
   );
 
   // Callbacks for SettingsView component
@@ -5775,49 +4176,69 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
   }
 
 
+  const en = lang === 'en';
   const adminNavGroups: AdminNavGroup[] = [
     {
       category: t.admin.catMain,
       items: [
-        { icon: <Dashboard size={18} />, label: t.admin.navDashboard, idx: 0, color: '#a5b4fc', show: true },
-        { icon: <ShoppingCart size={18} />, label: t.admin.navProducts, idx: 1, color: '#fbbf24', show: Boolean(canManageProducts) },
-        { icon: <Receipt size={18} />, label: t.admin.navOrders, idx: 2, color: '#34d399', badge: pendingCount, show: Boolean(canManageOrders) },
+        { icon: <Dashboard size={18} />, label: t.admin.navDashboard, idx: 0, color: '#6366f1', show: true, primary: true,
+          description: en ? 'Sales overview and what needs your attention' : 'ภาพรวมยอดขายและงานที่ต้องจัดการ', keywords: 'dashboard home overview หน้าแรก ภาพรวม' },
+        { icon: <Receipt size={18} />, label: t.admin.navOrders, idx: 2, color: '#10b981', badge: pendingCount, show: Boolean(canManageOrders), primary: true,
+          description: en ? 'Review payments, update status and ship orders' : 'ตรวจสลิป อัปเดตสถานะ และจัดการคำสั่งซื้อ', keywords: 'orders order ออเดอร์ คำสั่งซื้อ สลิป' },
+        { icon: <ShoppingCart size={18} />, label: t.admin.navProducts, idx: 1, color: '#f59e0b', show: Boolean(canManageProducts), primary: true,
+          description: en ? 'Add, edit and organise products and stock' : 'เพิ่ม แก้ไข และจัดการสินค้า/สต็อก', keywords: 'products product สินค้า สต็อก stock' },
       ],
     },
     {
       category: t.admin.catManage,
       items: [
-        { icon: <QrCodeScanner size={18} />, label: t.admin.navPickup, idx: 3, color: '#06b6d4', show: Boolean(canManagePickup) },
-        { icon: <LocalShipping size={18} />, label: t.admin.navTracking, idx: 12, color: '#fb923c', show: Boolean(canManageTracking) },
-        { icon: <Refresh size={18} />, label: t.admin.navRefunds, idx: 13, color: '#c084fc', show: Boolean(canManageRefunds) },
+        { icon: <QrCodeScanner size={18} />, label: t.admin.navPickup, idx: 3, color: '#06b6d4', show: Boolean(canManagePickup),
+          description: en ? 'Scan QR codes and hand over orders' : 'สแกน QR และส่งมอบสินค้าให้ลูกค้า', keywords: 'pickup scan qr รับสินค้า สแกน' },
+        { icon: <LocalShipping size={18} />, label: t.admin.navTracking, idx: 12, color: '#f97316', show: Boolean(canManageTracking),
+          description: en ? 'Add tracking numbers and follow parcels' : 'ใส่เลขพัสดุและติดตามการจัดส่ง', keywords: 'tracking parcel พัสดุ เลขพัสดุ' },
+        { icon: <Refresh size={18} />, label: t.admin.navRefunds, idx: 13, color: '#a855f7', show: Boolean(canManageRefunds),
+          description: en ? 'Handle refund requests' : 'จัดการคำขอคืนเงิน', keywords: 'refund คืนเงิน' },
       ],
     },
     {
       category: t.admin.catComms,
       items: [
-        { icon: <SupportAgent size={18} />, label: t.admin.navSupport, idx: 4, color: '#ec4899', show: Boolean(canManageSupport) },
-        { icon: <NotificationsActive size={18} />, label: t.admin.navAnnounce, idx: 5, color: '#f472b6', show: Boolean(canManageAnnouncement) },
-        { icon: <Send size={18} />, label: t.admin.navEmail, idx: 7, color: '#10b981', show: Boolean(canSendEmail) },
-        { icon: <Sparkles size={18} />, label: t.admin.navEvents, idx: 14, color: '#fbbf24', show: Boolean(canManageEvents) },
-        { icon: <Ticket size={18} />, label: t.admin.navPromo, idx: 15, color: '#34c759', show: Boolean(canManagePromoCodes) },
-        { icon: <Radio size={18} />, label: t.admin.navLive, idx: 16, color: '#ef4444', show: Boolean(canManageLiveStream) },
-        { icon: <Sparkles size={18} />, label: 'หน้าสินค้า Flagship', idx: 18, color: '#8b5cf6', show: Boolean(canManageProducts || canManageShop || isSuperAdminUser) },
+        { icon: <SupportAgent size={18} />, label: t.admin.navSupport, idx: 4, color: '#ec4899', show: Boolean(canManageSupport), primary: true,
+          description: en ? 'Reply to customer messages' : 'ตอบแชทและช่วยเหลือลูกค้า', keywords: 'support chat แชท ลูกค้า' },
+        { icon: <NotificationsActive size={18} />, label: t.admin.navAnnounce, idx: 5, color: '#f472b6', show: Boolean(canManageAnnouncement),
+          description: en ? 'Banners and announcements on the storefront' : 'ประกาศและแบนเนอร์บนหน้าร้าน', keywords: 'announcement banner ประกาศ' },
+        { icon: <Send size={18} />, label: t.admin.navEmail, idx: 7, color: '#10b981', show: Boolean(canSendEmail),
+          description: en ? 'Send emails to customers' : 'ส่งอีเมลถึงลูกค้า', keywords: 'email mail อีเมล' },
+        { icon: <Sparkles size={18} />, label: t.admin.navEvents, idx: 14, color: '#eab308', show: Boolean(canManageEvents),
+          description: en ? 'Campaigns and special events' : 'แคมเปญและกิจกรรมพิเศษ', keywords: 'events campaign อีเวนต์ กิจกรรม' },
+        { icon: <Ticket size={18} />, label: t.admin.navPromo, idx: 15, color: '#22c55e', show: Boolean(canManagePromoCodes),
+          description: en ? 'Create and manage discount codes' : 'สร้างและจัดการโค้ดส่วนลด', keywords: 'promo coupon discount โค้ด ส่วนลด คูปอง' },
+        { icon: <Radio size={18} />, label: t.admin.navLive, idx: 16, color: '#ef4444', show: Boolean(canManageLiveStream),
+          description: en ? 'Live stream settings' : 'ตั้งค่าการไลฟ์สด', keywords: 'live stream ไลฟ์' },
+        { icon: <Sparkles size={18} />, label: en ? 'Flagship page' : 'หน้าสินค้า Flagship', idx: 18, color: '#8b5cf6', show: Boolean(canManageProducts || canManageShop || isSuperAdminUser),
+          description: en ? 'Featured product landing page' : 'หน้าแนะนำสินค้าเรือธง', keywords: 'flagship landing เรือธง' },
       ],
     },
     {
       category: t.admin.catSettings,
       items: [
-        { icon: <Settings size={18} />, label: t.admin.navShopSettings, idx: 6, color: '#60a5fa', show: Boolean(canManageShop || canManageSheet || isSuperAdminUser) },
-        { icon: <LocalShipping size={18} />, label: t.admin.navShipping, idx: 10, color: '#a78bfa', show: Boolean(canManageShipping) },
-        { icon: <AttachMoney size={18} />, label: t.admin.navPayment, idx: 11, color: '#22d3ee', show: Boolean(canManagePayment) },
+        { icon: <Settings size={18} />, label: t.admin.navShopSettings, idx: 6, color: '#3b82f6', show: Boolean(canManageShop || canManageSheet || isSuperAdminUser),
+          description: en ? 'Store status, admins, Google Sheet and general settings' : 'เปิด/ปิดร้าน ผู้ดูแล Google Sheet และค่าทั่วไป', keywords: 'settings shop ตั้งค่า ร้าน admin sheet' },
+        { icon: <LocalShipping size={18} />, label: t.admin.navShipping, idx: 10, color: '#8b5cf6', show: Boolean(canManageShipping),
+          description: en ? 'Shipping methods and fees' : 'วิธีจัดส่งและค่าส่ง', keywords: 'shipping delivery จัดส่ง ค่าส่ง' },
+        { icon: <AttachMoney size={18} />, label: t.admin.navPayment, idx: 11, color: '#06b6d4', show: Boolean(canManagePayment),
+          description: en ? 'PromptPay, cards and payment options' : 'พร้อมเพย์ บัตร และช่องทางชำระเงิน', keywords: 'payment promptpay stripe ชำระเงิน บัตร' },
       ],
     },
     {
       category: t.admin.catAudit,
       items: [
-        { icon: <Groups size={18} />, label: t.admin.navUserLogs, idx: 8, color: '#f97316', show: Boolean(isSuperAdminUser) },
-        { icon: <Store size={18} />, label: t.admin.navShops, idx: 17, color: '#c084fc', show: Boolean(isSuperAdminUser) },
-        { icon: <History size={18} />, label: t.admin.navSystemLogs, idx: 9, color: '#64748b', show: Boolean(isSuperAdminUser) },
+        { icon: <Store size={18} />, label: t.admin.navShops, idx: 17, color: '#a855f7', show: Boolean(isSuperAdminUser),
+          description: en ? 'Manage sub-shops and their admins' : 'จัดการร้านค้าย่อยและผู้ดูแล', keywords: 'shops sub-shop ร้านค้าย่อย' },
+        { icon: <Groups size={18} />, label: t.admin.navUserLogs, idx: 8, color: '#f97316', show: Boolean(isSuperAdminUser),
+          description: en ? 'What customers did and when' : 'ประวัติการใช้งานของผู้ใช้', keywords: 'user logs history ประวัติ ผู้ใช้' },
+        { icon: <History size={18} />, label: t.admin.navSystemLogs, idx: 9, color: '#64748b', show: Boolean(isSuperAdminUser),
+          description: en ? 'Admin actions and system events' : 'บันทึกการทำงานของแอดมินและระบบ', keywords: 'system logs audit ประวัติ ระบบ' },
       ],
     },
   ];
@@ -5848,15 +4269,10 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
       <ConfirmDialog />
       <AlertDialog />
       {isDataLoading && (
-        <div className="fixed inset-x-0 top-0 z-[9999] h-[3px] overflow-hidden bg-[var(--glass-bg)]">
-          <div
-            className="h-full w-[40%] animate-pulse"
-            style={{
-              background: 'linear-gradient(90deg, transparent, #8b5cf6, #3b82f6, transparent)',
-            }}
-          />
+        <div className="fixed inset-x-0 top-0 z-[9999] h-0.5 overflow-hidden bg-primary/15" role="progressbar" aria-label="loading">
+          <div className="admin-progress-bar h-full w-1/3 bg-primary" />
           {(sectionsLoading?.config || sectionsLoading?.orders) && (
-            <p className="fixed top-1.5 right-3 z-[10000] rounded bg-black/45 px-2 py-0.5 text-[0.65rem] text-[var(--text-muted)]">
+            <p className="fixed top-2 left-1/2 z-[10000] -translate-x-1/2 rounded-full border border-border bg-popover px-3 py-1 text-[0.7rem] text-muted-foreground shadow-sm">
               {sectionsLoading.config && sectionsLoading.orders
                 ? t.admin.loadingConfigOrders
                 : sectionsLoading.config
@@ -5872,6 +4288,8 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
         roleLabel={t.admin.role}
         userName={session?.user?.name}
         userImage={session?.user?.image}
+        userEmail={session?.user?.email}
+        lang={lang}
         saving={saving}
         savingLabel={t.admin.saving}
         readyLabel={t.admin.ready}
@@ -5893,37 +4311,6 @@ export default function AdminConsole({ section: sectionProp }: AdminConsoleProps
         shopSwitcher={shopSwitcher}
       >
         <div className="flex min-h-0 flex-col gap-6">
-          <div className="breadcrumb mb-1 flex items-center gap-1.5 px-0.5 text-xs text-muted-foreground">
-            <Dashboard size={12} />
-            <span>Admin</span>
-            <span className="breadcrumb-separator text-[0.65rem]">›</span>
-            <span className="breadcrumb-current text-foreground">
-              {(
-                {
-                  0: t.admin.navDashboard,
-                  1: t.admin.navProducts,
-                  2: t.admin.navOrders,
-                  3: t.admin.navPickup,
-                  4: t.admin.navSupport,
-                  5: t.admin.navAnnounce,
-                  6: t.admin.navShopSettings,
-                  7: t.admin.navEmail,
-                  8: t.admin.navUserLogs,
-                  9: t.admin.navSystemLogs,
-                  10: t.admin.navShipping,
-                  11: t.admin.navPayment,
-                  12: t.admin.navTracking,
-                  13: t.admin.navRefunds,
-                  14: t.admin.navEvents,
-                  15: t.admin.navPromo,
-                  16: t.admin.navLive,
-                  17: t.admin.navShops,
-                  18: 'หน้าสินค้า Flagship',
-                } as Record<number, string>
-              )[activeTab] || t.admin.navDashboard}
-            </span>
-          </div>
-
           {shopConfigLoading && (
             <div className="flex items-center justify-center gap-3 rounded-2xl border border-border bg-card/60 p-8">
               <Loader2 className="size-6 animate-spin text-primary" />
